@@ -1,10 +1,10 @@
 # llm2fpga-mlir-bringup
 
-Compiler bring-up lab for the latest working Task 3-derived pipeline currently
-embedded in `~/LLM2FPGA` branch `task6-crisp`.
+Compiler bring-up lab for auditable TinyStories-to-MLIR-to-SystemVerilog
+pipeline artifacts. The repo is for proving frontend graph shapes and lowering
+paths, not model quality or accelerator optimization.
 
-The first flake cut keeps the reusable MLIR/CIRCT/Yosys pipeline and exposes a
-small TinyStories model registry:
+The flake exposes a small TinyStories model registry:
 
 - `tinystories-fp32`: full TinyStories-1M FP32 export.
 - `tinystories-representative-core-fp32`: reduced FP32 TinyStories core.
@@ -25,6 +25,6 @@ The `*-pytorch-exported` package contains the serialized `ExportedProgram`
 consumed by the `*-torch` package, so torch-mlir no longer rebuilds the PyTorch
 export inline.
 
-The current path is intentionally the Task 3-derived path, including Handshake.
-No-handshake and TOSA branches should be added as separate pipeline variants
-after this baseline is verified.
+The current baseline intentionally includes Handshake. No-handshake and TOSA
+branches should be added as separate pipeline variants after this baseline is
+verified.

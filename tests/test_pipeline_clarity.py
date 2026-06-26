@@ -48,6 +48,34 @@ class PipelineClarityTest(unittest.TestCase):
         self.assertIn("pytorchToolchain", pipeline)
         self.assertIn("pytorchToolchain", models)
 
+    def test_torch_mlir_compiler_accepts_exported_program_only(self) -> None:
+        compiler = read("scripts/compile-pytorch.py")
+
+        self.assertIn("--exported-program-dir", compiler)
+        self.assertNotIn("--adapter", compiler)
+        self.assertNotIn("build_mlir_module", compiler)
+        self.assertNotIn("torch.export.export", compiler)
+        self.assertNotIn("load_adapter", compiler)
+
+    def test_docs_describe_current_baseline_without_local_provenance(self) -> None:
+        readme = read("README.md")
+        org = read("docs/llm2fpga-mlir-bringup.org")
+        models = read("nix/models.nix")
+
+        for text in [readme, org, models]:
+            self.assertNotIn("task6-crisp", text)
+            self.assertNotIn("~/LLM2FPGA", text)
+            self.assertNotIn("Task 3-derived", text)
+
+        self.assertIn("Current baseline", org)
+        self.assertIn("Future direction", org)
+
+    def test_no_orphan_lsq_pipeline_script_remains(self) -> None:
+        self.assertFalse((REPO_ROOT / "scripts/pipeline/cf_to_handshake_lsq.sh").exists())
+        self.assertFalse(
+            (REPO_ROOT / "docs/superpowers/plans/2026-06-26-task3-derived-flake.md").exists()
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

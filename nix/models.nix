@@ -14,7 +14,7 @@ in {
     key = "tinystories-fp32";
     name = "tinystories-fp32";
     description =
-      "TinyStories-1M FP32 export through the current Task 3-derived pipeline.";
+      "Full TinyStories-1M FP32 ExportedProgram through the baseline lowering pipeline.";
     source = {
       type = "huggingface";
       model_id = tinyStories1m.modelId;
@@ -39,7 +39,7 @@ in {
     key = "tinystories-representative-core-fp32";
     name = "tinystories-representative-core-fp32";
     description =
-      "Reduced TinyStories representative core through the current Task 3-derived FP32 pipeline.";
+      "Reduced TinyStories representative-core FP32 ExportedProgram for pipeline bring-up.";
     source = {
       type = "derived";
       base_model_id = tinyStories1m.modelId;
@@ -72,7 +72,7 @@ in {
     key = "tinystories-representative-core-w4a8";
     name = "tinystories-representative-core-w4a8";
     description =
-      "Reduced TinyStories representative core using PT2E static W4A8 quantization through the current Task 3-derived pipeline.";
+      "Reduced TinyStories representative-core PT2E static W4A8 ExportedProgram for quantized bring-up.";
     source = {
       type = "derived";
       base_model_id = tinyStories1m.modelId;

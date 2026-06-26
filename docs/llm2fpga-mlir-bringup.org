@@ -143,11 +143,30 @@ The pass/fail check should include:
 - Integer accumulator is visible.
 - Requantization is visible.
 
-* Research Direction 2: Handshake
+* Current Baseline: Handshake
 
-Handshake should be optional and disabled by default.
+The current implemented baseline includes Handshake. Current baseline stages:
 
-The initial default path should be:
+#+begin_src text
+PyTorch ExportedProgram
+  |
+  v
+torch-mlir
+  |
+  v
+Linalg/CF
+  |
+  v
+CIRCT Handshake
+  |
+  v
+CIRCT hw/comb/seq/sv
+#+end_src
+
+This baseline exists to preserve the currently working route while the pipeline
+contract is made auditable stage by stage.
+
+* Future Direction: No-Handshake
 
 #+begin_src text
 TOSA/Linalg
@@ -160,9 +179,9 @@ CIRCT hw/comb/seq/sv
 #+end_src
 
 Handshake is useful for dataflow synthesis, but it is too expensive as an early
-requirement. First prove that clean integer MLIR can become small
-SystemVerilog. Add Handshake later only when it solves a specific scheduling or
-streaming problem.
+requirement for future variants. Future direction: a no-handshake branch should
+prove that clean integer MLIR can become small SystemVerilog through
+hw/comb/seq/sv directly.
 
 * Research Direction 3: TOSA
 
@@ -207,5 +226,5 @@ The repository should avoid:
 - Full model quality experiments.
 - Accelerator architecture exploration.
 - Performance tuning before semantic correctness and FPGA fit are established.
-- Making Handshake mandatory before a concrete scheduling or streaming need is
-  proven.
+- Treating the current Handshake baseline as the only acceptable long-term
+  lowering route.
