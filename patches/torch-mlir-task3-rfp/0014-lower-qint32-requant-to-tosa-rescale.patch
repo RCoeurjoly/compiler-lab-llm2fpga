@@ -1,0 +1,63 @@
+--- a/lib/Conversion/TorchToTosa/TorchToTosa.cpp
++++ b/lib/Conversion/TorchToTosa/TorchToTosa.cpp
+@@ -10136,6 +10136,44 @@
+       getTypeConverter()->convertType(op->getResult(0).getType()));
+   auto resultElemTy = resultTy.getElementType();
+ 
++  if (auto dequant = op.getSelf().getDefiningOp<AtenDequantizeTensorOp>()) {
++    if (auto makeQuant = dequant.getQtensor()
++                             .getDefiningOp<Aten_MakePerTensorQuantizedTensorOp>()) {
++      auto quantizedInputTy =
++          dyn_cast<BaseTensorType>(makeQuant.getSelf().getType());
++      if (!quantizedInputTy || !quantizedInputTy.hasDtype() ||
++          !quantizedInputTy.getDtype().isInteger(32))
++        return rewriter.notifyMatchFailure(
++            op, "qint32 requant input must be a torch i32 tensor");
++
++      double inputScale;
++      if (!matchPattern(makeQuant.getScale(), m_TorchConstantFloat(&inputScale)))
++        return rewriter.notifyMatchFailure(
++            op, "qint32 requant input scale must be a Scalar constant");
++
++      int64_t inputZp;
++      if (!matchPattern(makeQuant.getZeroPoint(),
++                        m_TorchConstantInt(&inputZp)))
++        return rewriter.notifyMatchFailure(
++            op, "qint32 requant input zero point must be a Scalar constant");
++
++      Value integerInput = getTypeConverter()->materializeTargetConversion(
++          rewriter, loc,
++          getTypeConverter()->convertType(makeQuant.getSelf().getType()),
++          makeQuant.getSelf());
++      if (!integerInput)
++        return rewriter.notifyMatchFailure(
++            op, "failed to materialize integer requant input");
++
++      Value rescaled = tosa::buildRescale(
++          rewriter, op, resultTy, integerInput, inputScale / scaleConst,
++          inputZp, zpConst, tosa::RoundingMode::SINGLE_ROUND,
++          /*scale32=*/true);
++      rewriter.replaceOp(op, rescaled);
++      return success();
++    }
++  }
++
+   // Rescale the input: input * (1.0 / scale)
+   auto scaleReciprocal = 1.0 / scaleConst;
+   auto scaleConstTensor = tosa::getConstTensor<float>(
+--- a/lib/Dialect/Torch/Transforms/FuseQuantizedOps.cpp
++++ b/lib/Dialect/Torch/Transforms/FuseQuantizedOps.cpp
+@@ -1252,13 +1252,6 @@
+       return signalPassFailure();
+     }
+ 
+-    RewritePatternSet stage3(context);
+-    stage3.insert<RequantizeQint32ToQint8>(context);
+-    if (failed(
+-            applyPatternsGreedily(getOperation(), std::move(stage3), config))) {
+-      return signalPassFailure();
+-    }
+-
+     RewritePatternSet stage4(context);
+     stage4.insert<QuantizeAttentionSoftmaxOutput,
+                   QuantizeDecomposedAttentionSoftmaxOutput>(context);

@@ -1,11 +1,12 @@
 { pkgs, mlir, circt, yosysPkg, yosysSlang, torchMlir, python, pipelineScripts
-, compilePyTorch }:
+, compilePyTorch, tosaToLinalgMlir ? mlir }:
 let
   stageNames = [
     "hf-snapshot"
     "pytorch-exported"
     "torch"
     "torch-stats"
+    "tosa"
     "linalg"
     "cf"
     "cf-stats"
@@ -62,9 +63,7 @@ let
     '';
 
   mkTorchStage = { name, pytorchExported, pytorchToolchain ? [ ] }:
-    pkgs.runCommand "${name}-torch.mlir" {
-      buildInputs = pytorchToolchain;
-    } ''
+    pkgs.runCommand "${name}-torch.mlir" { buildInputs = pytorchToolchain; } ''
       set -euo pipefail
       export PYTHONPATH="${torchMlir}/${python.sitePackages}:${torchMlir}/${python.sitePackages}/torch_mlir:''${PYTHONPATH:-}"
       python ${compilePyTorch} \
@@ -82,6 +81,22 @@ let
     pkgs.runCommand "${name}-linalg.mlir" { buildInputs = [ torchMlir ]; } ''
       ${pkgs.bash}/bin/bash ${pipelineScripts}/torch_to_linalg.sh \
         ${torchMlirOpt} ${torch} "$out"
+    '';
+
+  mkTosaDerivation = { name, torch }:
+    pkgs.runCommand "${name}-tosa.mlir" { buildInputs = [ torchMlir ]; } ''
+      ${torchMlirOpt} ${torch} \
+        --torch-fuse-quantized-ops \
+        --torch-backend-to-tosa-backend-pipeline \
+        -o "$out"
+    '';
+
+  mkTosaToLinalgDerivation = { name, tosa }:
+    pkgs.runCommand "${name}-linalg.mlir" {
+      buildInputs = [ tosaToLinalgMlir ];
+    } ''
+      ${pkgs.bash}/bin/bash ${pipelineScripts}/tosa_to_linalg.sh \
+        ${tosaToLinalgMlir}/bin/mlir-opt ${tosa} "$out"
     '';
 
   mkCfDerivation = { name, linalg }:
@@ -164,9 +179,11 @@ let
         ${sv}/sources.f "$out"
     '';
 
-  mkBasePipeline =
-    { name, hfSnapshot, pytorchExported, torchStage, handshakeFromCf
-    , allowHwExterns ? false, fpPrimsSv ? null, slangPerFileExternModules ? false }:
+  mkBasePipeline = { name, hfSnapshot, pytorchExported, torchStage
+    , handshakeFromCf, tosaFromTorch ? null, linalgFromStages ?
+      ({ name, torch, ... }: mkLinalgDerivation { inherit name torch; })
+    , allowHwExterns ? false, fpPrimsSv ? null
+    , slangPerFileExternModules ? false }:
     let
       self = {
         "hf-snapshot" = hfSnapshot;
@@ -178,9 +195,21 @@ let
           tool = torchMlirOpt;
           input = self.torch;
         };
-        linalg = mkLinalgDerivation {
+        tosa = if tosaFromTorch == null then
+          mkUnavailableStage {
+            inherit name;
+            stage = "tosa";
+            reason =
+              "direct Torch-to-Linalg pipeline does not emit a TOSA handoff";
+          }
+        else
+          tosaFromTorch {
+            inherit name;
+            inherit (self) torch;
+          };
+        linalg = linalgFromStages {
           inherit name;
-          inherit (self) torch;
+          inherit (self) torch tosa;
         };
         cf = mkCfDerivation {
           inherit name;
@@ -234,14 +263,28 @@ let
       };
     in self;
 
-  mkPipeline =
-    { name, hfSnapshot, pytorchExported, torchStage, allowHwExterns ? false
-    , fpPrimsSv ? null, slangPerFileExternModules ? false }:
+  mkPipeline = { name, hfSnapshot, pytorchExported, torchStage
+    , allowHwExterns ? false, fpPrimsSv ? null
+    , slangPerFileExternModules ? false }:
     mkBasePipeline {
       inherit name hfSnapshot pytorchExported torchStage allowHwExterns
         fpPrimsSv slangPerFileExternModules;
       handshakeFromCf = mkHandshakeDerivation;
     };
+
+  mkTosaPipeline = { name, hfSnapshot, pytorchExported, torchStage
+    , allowHwExterns ? false, fpPrimsSv ? null
+    , slangPerFileExternModules ? false }:
+    let
+      self = mkBasePipeline {
+        inherit name hfSnapshot pytorchExported torchStage allowHwExterns
+          fpPrimsSv slangPerFileExternModules;
+        handshakeFromCf = mkHandshakeDerivation;
+        tosaFromTorch = mkTosaDerivation;
+        linalgFromStages = { name, tosa, ... }:
+          mkTosaToLinalgDerivation { inherit name tosa; };
+      };
+    in self;
 
   stagePathsForPipeline = publicStageNames: pipeline:
     builtins.listToAttrs (map (stage: {
@@ -266,8 +309,7 @@ let
 
   registerPipelineModel = { pipelineFactory, name, key ? name, description ? ""
     , source ? { type = "local"; }, hfSnapshot ? null, pytorchToolchain ? [ ]
-    , pytorchExportedCommand
-    , pytorchExportedBuildInputs ? pytorchToolchain
+    , pytorchExportedCommand, pytorchExportedBuildInputs ? pytorchToolchain
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false }:
     let
@@ -305,9 +347,13 @@ let
   registerModel = args:
     registerPipelineModel (args // { pipelineFactory = mkPipeline; });
 
+  registerTosaModel = args:
+    registerPipelineModel (args // { pipelineFactory = mkTosaPipeline; });
+
   pipelineStagePackagesFromRegistry = registry:
-    pkgs.lib.concatMapAttrs (name: model:
-      mkPipelineStagePackages stageNames name model.pipeline) registry;
+    pkgs.lib.concatMapAttrs
+    (name: model: mkPipelineStagePackages stageNames name model.pipeline)
+    registry;
 
   metadataPackagesFromRegistry = registry:
     pkgs.lib.mapAttrs' (name: model:
@@ -316,16 +362,15 @@ let
 
   registryIndexPackage = registry:
     pkgs.writeText "model-registry.json" (builtins.toJSON (pkgs.lib.mapAttrs
-      (name: model:
-        {
-          inherit (model) name description source;
-          packages = builtins.listToAttrs (map (stage: {
-            name = stage;
-            value = "${name}-${stage}";
-          }) stageNames);
-        }) registry));
+      (name: model: {
+        inherit (model) name description source;
+        packages = builtins.listToAttrs (map (stage: {
+          name = stage;
+          value = "${name}-${stage}";
+        }) stageNames);
+      }) registry));
 in {
-  inherit registerModel;
+  inherit registerModel registerTosaModel;
   inherit pipelineStagePackagesFromRegistry;
   inherit metadataPackagesFromRegistry;
   inherit registryIndexPackage;

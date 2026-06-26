@@ -26,6 +26,8 @@ let
     ./patches/torch-mlir-task3-rfp/0011-propagate-native-fx-quantized-metadata.patch
     ./patches/torch-mlir-task3-rfp/0012-propagate-native-fx-quantize-matmul-shape-metadata.patch
     ./patches/torch-mlir-task3-rfp/0013-match-torchao-affine-quantization-ops.patch
+    ./patches/torch-mlir-task3-rfp/0014-lower-qint32-requant-to-tosa-rescale.patch
+    ./patches/torch-mlir-task3-rfp/0015-widen-narrow-int-add-sub-for-tosa.patch
   ];
   mlirDev = mlir.dev or mlir;
   llvmDev = llvm.dev or llvm;
@@ -33,7 +35,7 @@ in stdenv.mkDerivation {
   pname = "torch-mlir";
   version = "0-unstable-2026-02-12";
   src = torchMlirSrc;
-  patches = task6Patches ++ lib.optionals applyTask3RfpPatches task3RfpPatches;
+  patches = if applyTask3RfpPatches then task3RfpPatches else task6Patches;
 
   nativeBuildInputs =
     [ cmake ninja pkg-config gitMinimal python pybind11 nanobind tblgen ];

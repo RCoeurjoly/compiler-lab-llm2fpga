@@ -1,0 +1,97 @@
+--- a/lib/Conversion/TorchToTosa/TorchToTosa.cpp
++++ b/lib/Conversion/TorchToTosa/TorchToTosa.cpp
+@@ -507,6 +507,35 @@
+   return success();
+ }
+ 
++template <typename TosaOpT>
++static FailureOr<Value>
++rewriteNarrowIntegerAddSub(PatternRewriter &rewriter, Operation *op,
++                           TensorType outType, Value lhs, Value rhs) {
++  auto outElemTy = dyn_cast<IntegerType>(outType.getElementType());
++  if (!outElemTy || outElemTy.getWidth() >= 32)
++    return failure();
++
++  // TOSA elementwise add/sub (tosa::AddOp/tosa::SubOp) does not accept i8/i16
++  // tensor arithmetic in the profiles used by this pipeline. Widen the
++  // arithmetic to i32 and then cast back to the expected narrow result type.
++  auto wideType = outType.clone(rewriter.getI32Type());
++  auto lhsWide = tosa::tosaCastTensorToType(rewriter, lhs, wideType);
++  if (!lhsWide)
++    return failure();
++
++  auto rhsWide = tosa::tosaCastTensorToType(rewriter, rhs, wideType);
++  if (!rhsWide)
++    return failure();
++
++  auto wideAddOrSub = tosa::CreateOpAndInfer<TosaOpT>(
++      rewriter, op->getLoc(), wideType, *lhsWide, *rhsWide);
++  auto narrowed =
++      tosa::tosaCastTensorToType(rewriter, wideAddOrSub.getResult(), outType);
++  if (!narrowed)
++    return failure();
++  return *narrowed;
++}
++
+ // These binary op legalizations are specific to add/sub which have an
+ // alpha multiplier.
+ template <typename AtenOpT, typename TosaOpT>
+@@ -623,6 +652,17 @@
+       return success();
+     }
+ 
++    FailureOr<Value> widened =
++        rewriteNarrowIntegerAddSub<TosaOpT>(rewriter, op, outType, lhs,
++                                            mulAlphaOp);
++    if (succeeded(widened)) {
++      rewriter.replaceOp(op, widened.value());
++      return success();
++    }
++    if (outElemTy.isInteger() && outElemTy.getIntOrFloatBitWidth() < 32)
++      return rewriter.notifyMatchFailure(
++          op, "failed to widen narrow integer add/sub");
++
+     auto binaryOp = tosa::createBinaryOpAndCast<TosaOpT>(rewriter, op, outType,
+                                                          lhs, mulAlphaOp);
+     rewriter.replaceOp(op, binaryOp.getResult());
+@@ -10194,8 +10234,9 @@
+         op, "failed to implement round-half-to-even with TOSA ops");
+   }
+ 
+-  // Cast to the destination integer type.
+-  auto intermediateIntTy = resultTy.clone(resultElemTy);
++  // Cast to i32 before adding the zero point. TOSA elementwise add does not
++  // accept narrow integer tensors in the profiles used by this pipeline.
++  auto intermediateIntTy = resultTy.clone(rewriter.getI32Type());
+   Value castToInt =
+       tosa::CastOp::create(rewriter, loc, intermediateIntTy, *rounded);
+ 
+@@ -10208,22 +10249,13 @@
+   Value withZp = tosa::AddOp::create(rewriter, loc, intermediateIntTy,
+                                      castToInt, zpTensor);
+ 
+-  // Clamp the result to the valid range of the quantized type.
+-  std::optional<int64_t> minInt,
+-      maxInt; // no initialization needed as we want to clamp to the numeric
+-              // limits of the type
+-  IntegerAttr minIntAttr, maxIntAttr;
+-  if (failed(tosa::getIntegerClampAttrs(rewriter, op, resultElemTy, minInt,
+-                                        maxInt, minIntAttr, maxIntAttr))) {
+-    return failure();
+-  }
+-  Value clamped = tosa::ClampOp::create(
+-      rewriter, loc, resultTy, withZp, minIntAttr, maxIntAttr,
+-      /*nan_mode=*/
+-      tosa::NanPropagationModeAttr::get(rewriter.getContext(),
+-                                        tosa::NanPropagationMode::PROPAGATE));
++  Value rescaled =
++      tosa::buildRescale(rewriter, op, resultTy, withZp, /*rescale=*/1.0,
++                         /*inputZp=*/0, /*outputZp=*/0,
++                         tosa::RoundingMode::SINGLE_ROUND,
++                         /*scale32=*/true);
+ 
+-  rewriter.replaceOp(op, clamped);
++  rewriter.replaceOp(op, rescaled);
+   return success();
+ }
+ 

@@ -62,11 +62,22 @@ class LinearPatternTest(unittest.TestCase):
 
         self.assertIn('"pattern-linear-fp32"', models)
         self.assertIn('"pattern-linear-w4a8"', models)
+        self.assertIn('"pattern-linear-w4a8-core"', models)
         self.assertIn('type = "pattern";', models)
         self.assertIn("../patterns/linear/adapter.py", models)
         self.assertIn("../patterns/linear/adapter_w4a8.py", models)
+        self.assertIn("../patterns/linear/adapter_w4a8_core.py", models)
         self.assertIn("TINYSTORIES_PYTORCHAO_WEIGHT_BITS=4", models)
         self.assertIn("TINYSTORIES_PYTORCHAO_ACTIVATION_BITS=8", models)
+
+    def test_w4a8_core_adapter_declares_int8_boundary(self) -> None:
+        adapter = (PATTERN_DIR / "adapter_w4a8_core.py").read_text(encoding="utf-8")
+
+        self.assertIn("torch.int8", adapter)
+        self.assertIn("torch.int32", adapter)
+        self.assertIn("def export_program", adapter)
+        self.assertNotIn("prepare_pt2e", adapter)
+        self.assertNotIn("convert_pt2e", adapter)
 
 
 if __name__ == "__main__":

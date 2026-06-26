@@ -56,6 +56,28 @@ in {
     '';
   };
 
+  "pattern-linear-w4a8-core" = registerModel {
+    key = "pattern-linear-w4a8-core";
+    name = "pattern-linear-w4a8-core";
+    description =
+      "Local linear W4A8 hardware core with int8 activation input and explicit integer requantization.";
+    source = {
+      type = "pattern";
+      pattern = "linear";
+      quantization = "w4a8-core-int8-input";
+      boundary = "hardware";
+    };
+    allowHwExterns = false;
+    slangPerFileExternModules = true;
+    pytorchToolchain = [ pythonWithTinyStories torchMlir ];
+    pytorchExportedCommand = ''
+      export PYTHONPATH="${../patterns/linear}:''${PYTHONPATH:-}"
+      python ${materializePyTorchExported} \
+        --adapter ${../patterns/linear/adapter_w4a8_core.py} \
+        --out-dir "$out"
+    '';
+  };
+
   "tinystories-fp32" = registerModel {
     key = "tinystories-fp32";
     name = "tinystories-fp32";

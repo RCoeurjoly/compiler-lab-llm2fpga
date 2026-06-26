@@ -1,0 +1,147 @@
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = REPO_ROOT / "scripts" / "pipeline" / "diagnose_quantized_linalg.py"
+
+
+class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
+    def run_diagnostic(self, mlir: str) -> tuple[subprocess.CompletedProcess[str], dict]:
+        with tempfile.TemporaryDirectory() as tmp:
+            input_path = Path(tmp) / "input.mlir"
+            output_path = Path(tmp) / "report.json"
+            input_path.write_text(mlir, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--stage",
+                    "test-linalg",
+                    "--input",
+                    str(input_path),
+                    "--out",
+                    str(output_path),
+                    "--fail-on-float-after-quantized-matmul",
+                ],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            return result, json.loads(output_path.read_text(encoding="utf-8"))
+
+    def test_fails_on_float_requant_after_quantized_matmul(self) -> None:
+        result, report = self.run_diagnostic(
+            """
+            %0 = linalg.quantized_matmul ins(%a, %b, %azp, %bzp : tensor<1x8xi8>, tensor<8x4xi8>, i32, i32) outs(%acc : tensor<1x4xi32>) -> tensor<1x4xi32>
+            %1 = arith.sitofp %0 : i32 to f32
+            %2 = arith.mulf %1, %scale : f32
+            """
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(report["stage"], "test-linalg")
+        self.assertTrue(report["saw_quantized_matmul"])
+        self.assertEqual(report["hard_failures"][0]["kind"], "float-after-quantized-matmul")
+        self.assertEqual(report["float_ops_after_quantized_matmul"][0]["op"], "arith.sitofp")
+
+    def test_passes_integer_post_matmul_path(self) -> None:
+        result, report = self.run_diagnostic(
+            """
+            %0 = linalg.quantized_matmul ins(%a, %b, %azp, %bzp : tensor<1x8xi8>, tensor<8x4xi8>, i32, i32) outs(%acc : tensor<1x4xi32>) -> tensor<1x4xi32>
+            %1 = arith.addi %0, %bias : i32
+            %2 = arith.muli %1, %multiplier : i32
+            %3 = arith.shrsi %2, %shift : i32
+            %4 = arith.trunci %3 : i32 to i8
+            """
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(report["saw_quantized_matmul"])
+        self.assertEqual(report["hard_failures"], [])
+        self.assertEqual(report["float_ops_after_quantized_matmul"], [])
+
+    def test_flake_exposes_pattern_linear_w4a8_linalg_diagnostic_gate(self) -> None:
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+
+        self.assertIn("pattern-linear-w4a8-linalg-diagnostics", flake)
+        self.assertIn("diagnose_quantized_linalg.py", flake)
+        self.assertIn("pattern-linear-w4a8-linalg", flake)
+
+    def test_flake_exposes_pattern_linear_w4a8_tosa_experiment(self) -> None:
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+
+        self.assertIn("pattern-linear-w4a8-tosa.mlir", flake)
+        self.assertIn("--torch-backend-to-tosa-backend-pipeline", flake)
+        self.assertIn("pattern-linear-w4a8-torch", flake)
+
+    def test_flake_exposes_patched_pattern_linear_w4a8_tosa_experiment(self) -> None:
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+        torch_mlir = (REPO_ROOT / "torch-mlir.nix").read_text(encoding="utf-8")
+
+        self.assertIn("0014-lower-qint32-requant-to-tosa-rescale.patch", torch_mlir)
+        self.assertIn("0015-widen-narrow-int-add-sub-for-tosa.patch", torch_mlir)
+        self.assertIn("pattern-linear-w4a8-tosa-patched.mlir", flake)
+        self.assertIn("torchMlirPatched", flake)
+        self.assertIn("--torch-fuse-quantized-ops", flake)
+        self.assertIn("pattern-linear-w4a8-sv-patched", flake)
+
+    def test_torch_mlir_patch_widens_narrow_integer_tosa_adds(self) -> None:
+        patch = (
+            REPO_ROOT
+            / "patches"
+            / "torch-mlir-task3-rfp"
+            / "0015-widen-narrow-int-add-sub-for-tosa.patch"
+        )
+
+        self.assertTrue(patch.exists())
+        text = patch.read_text(encoding="utf-8")
+        self.assertIn("rewriteNarrowIntegerAddSub", text)
+        self.assertIn("rewriter.getI32Type()", text)
+        self.assertIn("tosa::AddOp", text)
+        self.assertIn("tosaCastTensorToType", text)
+
+    def test_torch_mlir_patch_widens_quantize_zero_point_add(self) -> None:
+        patch = (
+            REPO_ROOT
+            / "patches"
+            / "torch-mlir-task3-rfp"
+            / "0015-widen-narrow-int-add-sub-for-tosa.patch"
+        )
+
+        text = patch.read_text(encoding="utf-8")
+        self.assertIn("resultTy.clone(rewriter.getI32Type())", text)
+        self.assertIn("tosa::buildRescale", text)
+        self.assertIn("/*rescale=*/1.0", text)
+        self.assertIn("rewriter.replaceOp(op, rescaled)", text)
+
+    def test_tosa_pipeline_rejoins_sv_path(self) -> None:
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+        pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
+        tosa_to_linalg = REPO_ROOT / "scripts" / "pipeline" / "tosa_to_linalg.sh"
+
+        self.assertTrue(tosa_to_linalg.exists())
+        self.assertIn("--tosa-to-linalg-pipeline", tosa_to_linalg.read_text(encoding="utf-8"))
+        self.assertIn("--tosa-to-arith='include-apply-rescale'", tosa_to_linalg.read_text(encoding="utf-8"))
+        self.assertIn("registerTosaModel", pipeline)
+        self.assertIn("mkTosaToLinalgDerivation", pipeline)
+        self.assertIn("pipelineLibTosaPatched", flake)
+        self.assertIn("tosaToLinalgMlir = mlirForTorchMlir", flake)
+        self.assertIn("pattern-linear-w4a8-via-tosa-cf", flake)
+        self.assertIn("pattern-linear-w4a8-via-tosa-hw0", flake)
+        self.assertIn("pattern-linear-w4a8-via-tosa-sv", flake)
+        self.assertIn("pattern-linear-w4a8-core-via-tosa-sv", flake)
+        self.assertIn("tinystories-representative-core-w4a8-via-tosa-sv", flake)
+        self.assertIn(
+            "tinystories-representative-core-w4a8-via-tosa-yosys-stat", flake
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
