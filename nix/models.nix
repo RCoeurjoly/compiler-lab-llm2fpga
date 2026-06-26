@@ -10,6 +10,52 @@ let
     export TINYSTORIES_CORE_NUM_HEADS=1
   '';
 in {
+  "pattern-linear-fp32" = registerModel {
+    key = "pattern-linear-fp32";
+    name = "pattern-linear-fp32";
+    description =
+      "Local FP32 linear PyTorch pattern through the baseline lowering pipeline.";
+    source = {
+      type = "pattern";
+      pattern = "linear";
+      quantization = "none";
+    };
+    allowHwExterns = true;
+    slangPerFileExternModules = true;
+    inherit fpPrimsSv;
+    pytorchToolchain = [ pythonWithTinyStories torchMlir ];
+    pytorchExportedCommand = ''
+      export PYTHONPATH="${../patterns/linear}:''${PYTHONPATH:-}"
+      python ${materializePyTorchExported} \
+        --adapter ${../patterns/linear/adapter.py} \
+        --out-dir "$out"
+    '';
+  };
+
+  "pattern-linear-w4a8" = registerModel {
+    key = "pattern-linear-w4a8";
+    name = "pattern-linear-w4a8";
+    description =
+      "Local linear PyTorch pattern with PT2E static W4A8 quantization through the baseline lowering pipeline.";
+    source = {
+      type = "pattern";
+      pattern = "linear";
+      quantization = "pt2e-static-w4a8";
+    };
+    allowHwExterns = true;
+    slangPerFileExternModules = true;
+    inherit fpPrimsSv;
+    pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
+    pytorchExportedCommand = ''
+      export PYTHONPATH="${../patterns/linear}:''${PYTHONPATH:-}"
+      export TINYSTORIES_PYTORCHAO_WEIGHT_BITS=4
+      export TINYSTORIES_PYTORCHAO_ACTIVATION_BITS=8
+      python ${materializePyTorchExported} \
+        --adapter ${../patterns/linear/adapter_w4a8.py} \
+        --out-dir "$out"
+    '';
+  };
+
   "tinystories-fp32" = registerModel {
     key = "tinystories-fp32";
     name = "tinystories-fp32";

@@ -1,0 +1,17 @@
+{
+  "name": "linear",
+  "source_dtype": "fp32",
+  "target": "w4a8",
+  "expected_op_family": "linear",
+  "quantization": {
+    "activation_bits": 8,
+    "weight_bits": 4,
+    "accumulator_bits": 32,
+    "output_bits": 8
+  },
+  "diagnostics": {
+    "purpose": "minimal PT2E W4A8 linear diagnostics seed",
+    "quantization_owner": "pipeline",
+    "fail_on_core_float_leakage": true
+  }
+}
