@@ -3,8 +3,6 @@
 let
   stageNames = [
     "hf-snapshot"
-    "pytorch-model"
-    "pytorch-quantized"
     "pytorch-exported"
     "torch"
     "torch-stats"
@@ -200,14 +198,11 @@ let
     '';
 
   mkBasePipeline =
-    { name, hfSnapshot, pytorchModel, pytorchQuantized, pytorchExported
-    , torchMlirInput, handshakeFromCf, allowHwExterns ? false, fpPrimsSv ? null
-    , slangPerFileExternModules ? false }:
+    { name, hfSnapshot, pytorchExported, torchMlirInput, handshakeFromCf
+    , allowHwExterns ? false, fpPrimsSv ? null, slangPerFileExternModules ? false }:
     let
       self = {
         "hf-snapshot" = hfSnapshot;
-        "pytorch-model" = pytorchModel;
-        "pytorch-quantized" = pytorchQuantized;
         "pytorch-exported" = pytorchExported;
         torch = torchMlirInput;
         "torch-stats" = mkMlirOpStatsDerivation {
@@ -273,22 +268,20 @@ let
     in self;
 
   mkPipeline =
-    { name, hfSnapshot, pytorchModel, pytorchQuantized, pytorchExported
-    , torchMlirInput, allowHwExterns ? false, fpPrimsSv ? null
-    , slangPerFileExternModules ? false }:
+    { name, hfSnapshot, pytorchExported, torchMlirInput, allowHwExterns ? false
+    , fpPrimsSv ? null, slangPerFileExternModules ? false }:
     mkBasePipeline {
-      inherit name hfSnapshot pytorchModel pytorchQuantized pytorchExported
-        torchMlirInput allowHwExterns fpPrimsSv slangPerFileExternModules;
+      inherit name hfSnapshot pytorchExported torchMlirInput allowHwExterns
+        fpPrimsSv slangPerFileExternModules;
       handshakeFromCf = mkHandshakeDerivation;
     };
 
   mkLsqPipeline =
-    { name, hfSnapshot, pytorchModel, pytorchQuantized, pytorchExported
-    , torchMlirInput, allowHwExterns ? false, fpPrimsSv ? null
-    , slangPerFileExternModules ? false }:
+    { name, hfSnapshot, pytorchExported, torchMlirInput, allowHwExterns ? false
+    , fpPrimsSv ? null, slangPerFileExternModules ? false }:
     mkBasePipeline {
-      inherit name hfSnapshot pytorchModel pytorchQuantized pytorchExported
-        torchMlirInput allowHwExterns fpPrimsSv slangPerFileExternModules;
+      inherit name hfSnapshot pytorchExported torchMlirInput allowHwExterns
+        fpPrimsSv slangPerFileExternModules;
       handshakeFromCf = mkHandshakeLsqDerivation;
     };
 
@@ -323,37 +316,18 @@ let
   registerPipelineModel = { pipelineFactory, name, key ? name, description ? ""
     , source ? { type = "local"; }, hfSnapshot ? null, torchMlirInput ? null
     , torchInputCommand ? null, torchInputBuildInputs ? [ ]
-    , pytorchModelCommand ? null, pytorchModelBuildInputs ? torchInputBuildInputs
-    , pytorchQuantizedCommand ? null
-    , pytorchQuantizedBuildInputs ? torchInputBuildInputs
     , pytorchExportedCommand ? null
     , pytorchExportedBuildInputs ? torchInputBuildInputs
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false }:
     let
       resolvedHfSnapshot = mkHfSnapshotDerivation { inherit name hfSnapshot; };
-      resolvedPyTorchModel = mkPyTorchStageDerivation {
-        inherit name;
-        stage = "pytorch-model";
-        command = pytorchModelCommand;
-        buildInputs = pytorchModelBuildInputs;
-        upstream = resolvedHfSnapshot;
-        unavailableReason = "model inspection stage is not defined";
-      };
-      resolvedPyTorchQuantized = mkPyTorchStageDerivation {
-        inherit name;
-        stage = "pytorch-quantized";
-        command = pytorchQuantizedCommand;
-        buildInputs = pytorchQuantizedBuildInputs;
-        upstream = resolvedPyTorchModel;
-        unavailableReason = "quantized model stage is not meaningful for this model";
-      };
       resolvedPyTorchExported = mkPyTorchStageDerivation {
         inherit name;
         stage = "pytorch-exported";
         command = pytorchExportedCommand;
         buildInputs = pytorchExportedBuildInputs;
-        upstream = resolvedPyTorchQuantized;
+        upstream = resolvedHfSnapshot;
         unavailableReason = "exported program stage is not defined";
       };
       resolvedTorchMlirInput = mkTorchMlirInput {
@@ -365,8 +339,6 @@ let
       pipeline = pipelineFactory {
         inherit name;
         hfSnapshot = resolvedHfSnapshot;
-        pytorchModel = resolvedPyTorchModel;
-        pytorchQuantized = resolvedPyTorchQuantized;
         pytorchExported = resolvedPyTorchExported;
         torchMlirInput = resolvedTorchMlirInput;
         inherit allowHwExterns fpPrimsSv slangPerFileExternModules;
@@ -375,8 +347,6 @@ let
         inherit key name description;
         source = normalizedSource;
         hfSnapshot = resolvedHfSnapshot;
-        pytorchModel = resolvedPyTorchModel;
-        pytorchQuantized = resolvedPyTorchQuantized;
         pytorchExported = resolvedPyTorchExported;
         torchMlirInput = resolvedTorchMlirInput;
         inherit pipeline;

@@ -16,8 +16,6 @@ Each registry entry expands into stage packages such as:
 
 ```sh
 nix build .#tinystories-representative-core-w4a8-hf-snapshot
-nix build .#tinystories-representative-core-w4a8-pytorch-model
-nix build .#tinystories-representative-core-w4a8-pytorch-quantized
 nix build .#tinystories-representative-core-w4a8-pytorch-exported
 nix build .#tinystories-representative-core-w4a8-torch
 nix build .#tinystories-representative-core-w4a8-linalg

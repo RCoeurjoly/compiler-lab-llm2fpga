@@ -26,14 +26,6 @@ in {
     inherit fpPrimsSv;
     hfSnapshot = tinyStories1m.snapshot;
     torchInputBuildInputs = [ pythonWithTinyStories torchMlir ];
-    pytorchModelCommand = ''
-      export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
-      python ${materializePyTorchStage} \
-        --adapter ${tinyStories1m.adapterPy} \
-        --model-path ${tinyStories1m.snapshot} \
-        --stage model \
-        --out-dir "$out"
-    '';
     pytorchExportedCommand = ''
       export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
       python ${materializePyTorchStage} \
@@ -67,15 +59,6 @@ in {
     inherit fpPrimsSv;
     hfSnapshot = tinyStories1m.snapshot;
     torchInputBuildInputs = [ pythonWithTinyStories torchMlir ];
-    pytorchModelCommand = ''
-      export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
-      ${representativeCoreEnv}
-      python ${materializePyTorchStage} \
-        --adapter ${tinyStories1m.sourceDir}/model_adapter_representative_core.py \
-        --model-path ${tinyStories1m.snapshot} \
-        --stage model \
-        --out-dir "$out"
-    '';
     pytorchExportedCommand = ''
       export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
       ${representativeCoreEnv}
@@ -111,26 +94,6 @@ in {
     inherit fpPrimsSv;
     hfSnapshot = tinyStories1m.snapshot;
     torchInputBuildInputs = [ pythonWithTinyStoriesTorchAO torchMlir ];
-    pytorchModelCommand = ''
-      export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
-      ${representativeCoreEnv}
-      python ${materializePyTorchStage} \
-        --adapter ${tinyStories1m.sourceDir}/model_adapter_representative_core_pt2e_static_quant.py \
-        --model-path ${tinyStories1m.snapshot} \
-        --stage model \
-        --out-dir "$out"
-    '';
-    pytorchQuantizedCommand = ''
-      export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
-      ${representativeCoreEnv}
-      export TINYSTORIES_PYTORCHAO_WEIGHT_BITS=4
-      export TINYSTORIES_PYTORCHAO_ACTIVATION_BITS=8
-      python ${materializePyTorchStage} \
-        --adapter ${tinyStories1m.sourceDir}/model_adapter_representative_core_pt2e_static_quant.py \
-        --model-path ${tinyStories1m.snapshot} \
-        --stage quantized \
-        --out-dir "$out"
-    '';
     pytorchExportedCommand = ''
       export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
       ${representativeCoreEnv}

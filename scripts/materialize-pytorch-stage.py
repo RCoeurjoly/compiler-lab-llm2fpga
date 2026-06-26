@@ -91,70 +91,6 @@ def flattened_input_summaries(inputs: object) -> list[dict[str, object]]:
     return [tensor_summary(value) for value in args_tuple]
 
 
-def materialize_model(args: argparse.Namespace, adapter: ModuleType) -> None:
-    build_model = getattr(adapter, "build_model", None)
-    example_inputs = getattr(adapter, "example_inputs", None)
-    if build_model is None:
-        raise SystemExit("model stage requires adapter.build_model(model_path)")
-
-    model = build_model(args.model_path).eval()
-    inputs = tuple(example_inputs()) if example_inputs is not None else ()
-    (args.out_dir / "model-repr.txt").write_text(repr(model) + "\n", encoding="utf-8")
-    write_json(
-        args.out_dir / "manifest.json",
-        {
-            "stage": "pytorch-model",
-            "adapter": str(args.adapter),
-            "adapter_copy": "adapter.py",
-            "model_path": args.model_path,
-            "model_type": type(model).__name__,
-            "example_inputs": flattened_input_summaries(inputs),
-            "environment": relevant_environment(),
-            "files": {"model_repr": "model-repr.txt"},
-        },
-    )
-
-
-def materialize_quantized(args: argparse.Namespace, adapter: ModuleType) -> None:
-    export_program = getattr(adapter, "export_program", None)
-    if export_program is None:
-        write_json(
-            args.out_dir / "manifest.json",
-            {
-                "stage": "pytorch-quantized",
-                "status": "unavailable",
-                "reason": "adapter has no quantized export_program stage",
-                "adapter": str(args.adapter),
-                "adapter_copy": "adapter.py",
-                "model_path": args.model_path,
-                "environment": relevant_environment(),
-            },
-        )
-        return
-
-    quantized_graph = args.out_dir / "quantized-graph.txt"
-    os.environ.setdefault("TINYSTORIES_DUMP_PT2E_QUANTIZED_GRAPH", str(quantized_graph))
-    exported = export_program(args.model_path)
-    (args.out_dir / "post-quant-exported-graph.txt").write_text(
-        str(exported.graph) + "\n", encoding="utf-8"
-    )
-    write_json(
-        args.out_dir / "manifest.json",
-        {
-            "stage": "pytorch-quantized",
-            "adapter": str(args.adapter),
-            "adapter_copy": "adapter.py",
-            "model_path": args.model_path,
-            "status": "materialized",
-            "environment": relevant_environment(),
-            "files": {
-                "quantized_graph": "quantized-graph.txt",
-                "post_quant_exported_graph": "post-quant-exported-graph.txt",
-            },
-        },
-    )
-
-
 def materialize_exported(args: argparse.Namespace, adapter: ModuleType) -> None:
     exported, export_source, inputs = adapter_exported_program(adapter, args.model_path)
     torch.export.save(exported, args.out_dir / "exported.pt2")
@@ -198,19 +134,14 @@ def main() -> None:
     parser.add_argument(
         "--stage",
         required=True,
-        choices=("model", "quantized", "exported"),
+        choices=("exported",),
     )
     args = parser.parse_args()
 
     write_common_files(args.out_dir, args.adapter)
     adapter = load_adapter(args.adapter)
 
-    if args.stage == "model":
-        materialize_model(args, adapter)
-    elif args.stage == "quantized":
-        materialize_quantized(args, adapter)
-    else:
-        materialize_exported(args, adapter)
+    materialize_exported(args, adapter)
 
 
 if __name__ == "__main__":
