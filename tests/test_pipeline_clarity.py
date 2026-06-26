@@ -76,6 +76,12 @@ class PipelineClarityTest(unittest.TestCase):
             (REPO_ROOT / "docs/superpowers/plans/2026-06-26-task3-derived-flake.md").exists()
         )
 
+    def test_no_accelerator_manifest_contract_remains(self) -> None:
+        self.assertFalse((REPO_ROOT / "scripts/pipeline/llm2fpga_model_manifest.py").exists())
+        self.assertFalse(
+            (REPO_ROOT / "scripts/pipeline/test_llm2fpga_model_manifest.py").exists()
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

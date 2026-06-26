@@ -30,57 +30,6 @@ Every failure becomes a minimal pattern. Every minimal pattern gets a regression
 test. Every fix is first manual, then automated.
 #+end_quote
 
-* Repository Structure
-
-#+begin_src text
-llm2fpga-mlir-bringup/
-  README.md
-  flake.nix
-  scripts/
-    export_torch.py
-    lower_torch_mlir.sh
-    lower_tosa.sh
-    lower_circt.sh
-    synth_yosys.sh
-    report.py
-
-  models/
-    tinystories/
-      fp32_export.py
-      w4a8_export.py
-      frozen_config.json
-
-  patterns/
-    001_linear_fp32/
-    002_linear_w4a8/
-    003_embedding/
-    004_residual_add/
-    005_attention_qk_matmul/
-    006_softmax/
-    007_layernorm/
-    008_gelu/
-
-  pipelines/
-    fp32_baseline.yaml
-    w4a8_pt2e.yaml
-    w4a8_tosa.yaml
-    no_handshake.yaml
-
-  artifacts/
-    graph/
-    mlir/
-    sv/
-    yosys/
-    reports/
-
-  tests/
-    test_export_equivalence.py
-    test_mlir_contains.py
-    test_no_float_leakage.py
-    test_sv_builds.py
-    test_fpga_fit.py
-#+end_src
-
 * Success Metrics
 
 Success should be measured as a staged pipeline, not only by whether generated
