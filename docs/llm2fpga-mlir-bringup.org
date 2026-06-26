@@ -1,0 +1,211 @@
+#+title: LLM2FPGA MLIR Bring-Up Repository
+#+author: Compiler Lab LLM2FPGA
+#+startup: overview
+
+* Purpose
+
+Create a separate repository for pipeline bring-up. This repository is not for
+model quality work or accelerator optimization. Its purpose is to prove which
+frontend graph shapes and MLIR lowering paths are viable before they are moved
+into the main LLM2FPGA accelerator project.
+
+Suggested repository name:
+
+#+begin_src text
+llm2fpga-mlir-bringup
+#+end_src
+
+Core goal:
+
+#+begin_quote
+Given small PyTorch graph fragments and TinyStories-1M variants, produce
+auditable MLIR and SystemVerilog, with pass/fail criteria based on FPGA fit and
+semantic equivalence.
+#+end_quote
+
+Main design rule:
+
+#+begin_quote
+Every failure becomes a minimal pattern. Every minimal pattern gets a regression
+test. Every fix is first manual, then automated.
+#+end_quote
+
+* Repository Structure
+
+#+begin_src text
+llm2fpga-mlir-bringup/
+  README.md
+  flake.nix
+  scripts/
+    export_torch.py
+    lower_torch_mlir.sh
+    lower_tosa.sh
+    lower_circt.sh
+    synth_yosys.sh
+    report.py
+
+  models/
+    tinystories/
+      fp32_export.py
+      w4a8_export.py
+      frozen_config.json
+
+  patterns/
+    001_linear_fp32/
+    002_linear_w4a8/
+    003_embedding/
+    004_residual_add/
+    005_attention_qk_matmul/
+    006_softmax/
+    007_layernorm/
+    008_gelu/
+
+  pipelines/
+    fp32_baseline.yaml
+    w4a8_pt2e.yaml
+    w4a8_tosa.yaml
+    no_handshake.yaml
+
+  artifacts/
+    graph/
+    mlir/
+    sv/
+    yosys/
+    reports/
+
+  tests/
+    test_export_equivalence.py
+    test_mlir_contains.py
+    test_no_float_leakage.py
+    test_sv_builds.py
+    test_fpga_fit.py
+#+end_src
+
+* Success Metrics
+
+Success should be measured as a staged pipeline, not only by whether generated
+SystemVerilog fits.
+
+| Stage | Requirement                              |
+|-------+------------------------------------------|
+| A     | PyTorch graph exports.                   |
+| B     | =torch-mlir= emits MLIR.                 |
+| C     | MLIR has acceptable structure.           |
+| D     | CIRCT emits SystemVerilog.               |
+| E     | Yosys accepts SystemVerilog.             |
+| F     | The design fits the target FPGA.         |
+| G     | Outputs match reference test vectors.    |
+
+* Pattern Layout
+
+Each pattern directory should use the same structure:
+
+#+begin_src text
+patterns/002_linear_w4a8/
+  model.py
+  export.py
+  reference.py
+  input.pt
+  expected.pt
+  bad.graph.txt
+  bad.mlir
+  good.graph.txt
+  good.mlir
+  good.sv
+  notes.md
+  check.py
+#+end_src
+
+The pattern directory is the unit of evidence. It should contain the minimal
+model, fixed inputs and expected outputs, examples of failed and successful
+intermediate forms, notes explaining what was learned, and an executable check.
+
+* Research Direction 1: Quantization
+
+Start with W4A8 rather than W2A2.
+
+The first quantized pattern should be linear:
+
+#+begin_src text
+Linear:
+  input: int8 activation
+  weight: int4 packed/simulated
+  accumulator: int32
+  output: int8
+  rescale: explicit integer multiplier + shift
+#+end_src
+
+The pass/fail check should include:
+
+- No =f32= weight constants.
+- No =f32= matmul.
+- No =arith.mulf= or =arith.addf= in the core linear path.
+- Integer accumulator is visible.
+- Requantization is visible.
+
+* Research Direction 2: Handshake
+
+Handshake should be optional and disabled by default.
+
+The initial default path should be:
+
+#+begin_src text
+TOSA/Linalg
+  |
+  v
+arith/scf/memref/vector if needed
+  |
+  v
+CIRCT hw/comb/seq/sv
+#+end_src
+
+Handshake is useful for dataflow synthesis, but it is too expensive as an early
+requirement. First prove that clean integer MLIR can become small
+SystemVerilog. Add Handshake later only when it solves a specific scheduling or
+streaming problem.
+
+* Research Direction 3: TOSA
+
+Add TOSA as an experimental branch, not as a mandatory dependency at first.
+
+#+begin_src text
+pipelines/
+  fp32_direct.yaml
+  w4a8_direct.yaml
+  w4a8_tosa.yaml
+#+end_src
+
+The TOSA experiment should answer one question:
+
+#+begin_quote
+Does TOSA give a cleaner quantized contract than direct Torch/Linalg lowering?
+#+end_quote
+
+Acceptance criteria:
+
+- =tosa.matmul= or =tosa.fully_connected= appears for linear-like operations.
+- =tosa.rescale= appears for requantization.
+- QDQ scaffolding is gone.
+- No unexpected =f32= core arithmetic appears.
+- Lowering to CIRCT is simpler or smaller than the non-TOSA route.
+
+* Scope Boundaries
+
+This repository should not contain the full evolving LLM2FPGA accelerator. It is
+the compiler laboratory that tells the main project which frontend graph shapes
+and MLIR paths are viable.
+
+The repository should optimize for:
+
+- Small, auditable examples.
+- Reproducible toolchain execution.
+- Clear pass/fail evidence at each pipeline stage.
+- Regression tests for every discovered lowering failure.
+
+The repository should avoid:
+
+- Full model quality experiments.
+- Accelerator architecture exploration.
+- Performance tuning before semantic correctness and FPGA fit are established.
+- Making Handshake mandatory before a concrete scheduling or streaming need is
+  proven.
