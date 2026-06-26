@@ -1,5 +1,5 @@
 { registerModel, pythonWithTinyStories, pythonWithTinyStoriesTorchAO, torchMlir
-, tinyStories1m, fpPrimsSv, materializePyTorchStage }:
+, tinyStories1m, fpPrimsSv, materializePyTorchExported }:
 let
   representativeCoreEnv = ''
     export TINYSTORIES_CORE_VOCAB_SIZE=32
@@ -25,13 +25,12 @@ in {
     slangPerFileExternModules = true;
     inherit fpPrimsSv;
     hfSnapshot = tinyStories1m.snapshot;
-    torchInputBuildInputs = [ pythonWithTinyStories torchMlir ];
+    pytorchToolchain = [ pythonWithTinyStories torchMlir ];
     pytorchExportedCommand = ''
       export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
-      python ${materializePyTorchStage} \
+      python ${materializePyTorchExported} \
         --adapter ${tinyStories1m.adapterPy} \
         --model-path ${tinyStories1m.snapshot} \
-        --stage exported \
         --out-dir "$out"
     '';
   };
@@ -58,14 +57,13 @@ in {
     slangPerFileExternModules = true;
     inherit fpPrimsSv;
     hfSnapshot = tinyStories1m.snapshot;
-    torchInputBuildInputs = [ pythonWithTinyStories torchMlir ];
+    pytorchToolchain = [ pythonWithTinyStories torchMlir ];
     pytorchExportedCommand = ''
       export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
       ${representativeCoreEnv}
-      python ${materializePyTorchStage} \
+      python ${materializePyTorchExported} \
         --adapter ${tinyStories1m.sourceDir}/model_adapter_representative_core.py \
         --model-path ${tinyStories1m.snapshot} \
-        --stage exported \
         --out-dir "$out"
     '';
   };
@@ -93,16 +91,15 @@ in {
     slangPerFileExternModules = true;
     inherit fpPrimsSv;
     hfSnapshot = tinyStories1m.snapshot;
-    torchInputBuildInputs = [ pythonWithTinyStoriesTorchAO torchMlir ];
+    pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
     pytorchExportedCommand = ''
       export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
       ${representativeCoreEnv}
       export TINYSTORIES_PYTORCHAO_WEIGHT_BITS=4
       export TINYSTORIES_PYTORCHAO_ACTIVATION_BITS=8
-      python ${materializePyTorchStage} \
+      python ${materializePyTorchExported} \
         --adapter ${tinyStories1m.sourceDir}/model_adapter_representative_core_pt2e_static_quant.py \
         --model-path ${tinyStories1m.snapshot} \
-        --stage exported \
         --out-dir "$out"
     '';
   };

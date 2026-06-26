@@ -127,15 +127,12 @@ def materialize_exported(args: argparse.Namespace, adapter: ModuleType) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Materialize PyTorch pipeline stages.")
+    parser = argparse.ArgumentParser(
+        description="Materialize a serialized PyTorch ExportedProgram."
+    )
     parser.add_argument("--adapter", required=True, type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--model-path")
-    parser.add_argument(
-        "--stage",
-        required=True,
-        choices=("exported",),
-    )
     args = parser.parse_args()
 
     write_common_files(args.out_dir, args.adapter)

@@ -72,30 +72,16 @@ let
           if unavailableReason != null then unavailableReason else "stage is not defined";
       };
 
-  mkTorchMlirInput = { name, pytorchExported, torchMlirInput ? null
-    , torchInputCommand ? null, torchInputBuildInputs ? [ ] }:
-    if torchMlirInput != null then
-      torchMlirInput
-    else if torchInputCommand != null then
-      pkgs.runCommand "${name}-torch.mlir" {
-        buildInputs = torchInputBuildInputs;
-      } ''
-        set -euo pipefail
-        ${torchInputCommand}
-      ''
-    else if pytorchExported != null then
-      pkgs.runCommand "${name}-torch.mlir" {
-        buildInputs = torchInputBuildInputs;
-      } ''
-        set -euo pipefail
-        export PYTHONPATH="${torchMlir}/${python.sitePackages}:${torchMlir}/${python.sitePackages}/torch_mlir:''${PYTHONPATH:-}"
-        python ${compilePyTorch} \
-          --exported-program-dir ${pytorchExported} \
-          --out "$out" >/dev/null
-      ''
-    else
-      throw
-      "registerModel(${name}): provide torchMlirInput, torchInputCommand, or pytorchExported";
+  mkTorchStage = { name, pytorchExported, pytorchToolchain ? [ ] }:
+    pkgs.runCommand "${name}-torch.mlir" {
+      buildInputs = pytorchToolchain;
+    } ''
+      set -euo pipefail
+      export PYTHONPATH="${torchMlir}/${python.sitePackages}:${torchMlir}/${python.sitePackages}/torch_mlir:''${PYTHONPATH:-}"
+      python ${compilePyTorch} \
+        --exported-program-dir ${pytorchExported} \
+        --out "$out" >/dev/null
+    '';
 
   mkMlirOpStatsDerivation = { name, stageName, tool, input }:
     pkgs.runCommand "${name}-${stageName}.stats" { } ''
@@ -120,14 +106,6 @@ let
       buildInputs = [ mlir circt ];
     } ''
       ${pkgs.bash}/bin/bash ${pipelineScripts}/cf_to_handshake.sh \
-        ${circt}/bin/circt-opt ${mlir}/bin/mlir-opt ${cf} "$out"
-    '';
-
-  mkHandshakeLsqDerivation = { name, cf }:
-    pkgs.runCommand "${name}-handshake.mlir" {
-      buildInputs = [ mlir circt ];
-    } ''
-      ${pkgs.bash}/bin/bash ${pipelineScripts}/cf_to_handshake_lsq.sh \
         ${circt}/bin/circt-opt ${mlir}/bin/mlir-opt ${cf} "$out"
     '';
 
@@ -198,13 +176,13 @@ let
     '';
 
   mkBasePipeline =
-    { name, hfSnapshot, pytorchExported, torchMlirInput, handshakeFromCf
+    { name, hfSnapshot, pytorchExported, torchStage, handshakeFromCf
     , allowHwExterns ? false, fpPrimsSv ? null, slangPerFileExternModules ? false }:
     let
       self = {
         "hf-snapshot" = hfSnapshot;
         "pytorch-exported" = pytorchExported;
-        torch = torchMlirInput;
+        torch = torchStage;
         "torch-stats" = mkMlirOpStatsDerivation {
           inherit name;
           stageName = "torch";
@@ -268,28 +246,13 @@ let
     in self;
 
   mkPipeline =
-    { name, hfSnapshot, pytorchExported, torchMlirInput, allowHwExterns ? false
+    { name, hfSnapshot, pytorchExported, torchStage, allowHwExterns ? false
     , fpPrimsSv ? null, slangPerFileExternModules ? false }:
     mkBasePipeline {
-      inherit name hfSnapshot pytorchExported torchMlirInput allowHwExterns
+      inherit name hfSnapshot pytorchExported torchStage allowHwExterns
         fpPrimsSv slangPerFileExternModules;
       handshakeFromCf = mkHandshakeDerivation;
     };
-
-  mkLsqPipeline =
-    { name, hfSnapshot, pytorchExported, torchMlirInput, allowHwExterns ? false
-    , fpPrimsSv ? null, slangPerFileExternModules ? false }:
-    mkBasePipeline {
-      inherit name hfSnapshot pytorchExported torchMlirInput allowHwExterns
-        fpPrimsSv slangPerFileExternModules;
-      handshakeFromCf = mkHandshakeLsqDerivation;
-    };
-
-  publicStageNamesForModel = modelKey:
-    if modelKey == "tiny-stories-1m" then
-      builtins.filter (stage: stage != "yosys-stat") stageNames
-    else
-      stageNames;
 
   stagePathsForPipeline = publicStageNames: pipeline:
     builtins.listToAttrs (map (stage: {
@@ -304,20 +267,18 @@ let
     }) publicStageNames);
 
   mkModelMetadata = modelKey: model:
-    let publicStageNames = publicStageNamesForModel modelKey;
-    in pkgs.writeText "${modelKey}-pipeline-metadata.json" (builtins.toJSON {
+    pkgs.writeText "${modelKey}-pipeline-metadata.json" (builtins.toJSON {
       model = {
         inherit modelKey;
         inherit (model) name description source;
       };
-      artifacts = stagePathsForPipeline publicStageNames model.pipeline;
+      artifacts = stagePathsForPipeline stageNames model.pipeline;
     });
 
   registerPipelineModel = { pipelineFactory, name, key ? name, description ? ""
-    , source ? { type = "local"; }, hfSnapshot ? null, torchMlirInput ? null
-    , torchInputCommand ? null, torchInputBuildInputs ? [ ]
+    , source ? { type = "local"; }, hfSnapshot ? null, pytorchToolchain ? [ ]
     , pytorchExportedCommand ? null
-    , pytorchExportedBuildInputs ? torchInputBuildInputs
+    , pytorchExportedBuildInputs ? pytorchToolchain
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false }:
     let
@@ -330,8 +291,8 @@ let
         upstream = resolvedHfSnapshot;
         unavailableReason = "exported program stage is not defined";
       };
-      resolvedTorchMlirInput = mkTorchMlirInput {
-        inherit name torchMlirInput torchInputCommand torchInputBuildInputs;
+      resolvedTorchStage = mkTorchStage {
+        inherit name pytorchToolchain;
         pytorchExported = resolvedPyTorchExported;
       };
       normalizedSource =
@@ -340,7 +301,7 @@ let
         inherit name;
         hfSnapshot = resolvedHfSnapshot;
         pytorchExported = resolvedPyTorchExported;
-        torchMlirInput = resolvedTorchMlirInput;
+        torchStage = resolvedTorchStage;
         inherit allowHwExterns fpPrimsSv slangPerFileExternModules;
       };
       model = {
@@ -348,7 +309,7 @@ let
         source = normalizedSource;
         hfSnapshot = resolvedHfSnapshot;
         pytorchExported = resolvedPyTorchExported;
-        torchMlirInput = resolvedTorchMlirInput;
+        torchStage = resolvedTorchStage;
         inherit pipeline;
       };
       metadata = mkModelMetadata key model;
@@ -357,19 +318,9 @@ let
   registerModel = args:
     registerPipelineModel (args // { pipelineFactory = mkPipeline; });
 
-  registerLsqModel = args:
-    registerPipelineModel (args // { pipelineFactory = mkLsqPipeline; });
-
-  registerQuantizedModel = args:
-    registerPipelineModel (args // { pipelineFactory = mkLsqPipeline; });
-
-  modelPipelinesFromRegistry = registry:
-    pkgs.lib.mapAttrs (_: model: model.pipeline) registry;
-
   pipelineStagePackagesFromRegistry = registry:
     pkgs.lib.concatMapAttrs (name: model:
-      mkPipelineStagePackages (publicStageNamesForModel name) name
-      model.pipeline) registry;
+      mkPipelineStagePackages stageNames name model.pipeline) registry;
 
   metadataPackagesFromRegistry = registry:
     pkgs.lib.mapAttrs' (name: model:
@@ -379,19 +330,15 @@ let
   registryIndexPackage = registry:
     pkgs.writeText "model-registry.json" (builtins.toJSON (pkgs.lib.mapAttrs
       (name: model:
-        let publicStageNames = publicStageNamesForModel name;
-        in {
+        {
           inherit (model) name description source;
           packages = builtins.listToAttrs (map (stage: {
             name = stage;
             value = "${name}-${stage}";
-          }) publicStageNames);
+          }) stageNames);
         }) registry));
 in {
   inherit registerModel;
-  inherit registerLsqModel;
-  inherit registerQuantizedModel;
-  inherit modelPipelinesFromRegistry;
   inherit pipelineStagePackagesFromRegistry;
   inherit metadataPackagesFromRegistry;
   inherit registryIndexPackage;

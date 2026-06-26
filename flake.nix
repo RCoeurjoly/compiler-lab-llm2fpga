@@ -200,7 +200,7 @@
           inherit (pipelineLib) registerModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
             tinyStories1m fpPrimsSv;
-          materializePyTorchStage = ./scripts/materialize-pytorch-stage.py;
+          materializePyTorchExported = ./scripts/materialize-pytorch-exported.py;
         };
         pipelineStagePackages =
           pipelineLib.pipelineStagePackagesFromRegistry modelRegistry;
