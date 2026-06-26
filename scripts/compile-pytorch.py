@@ -31,7 +31,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Compile a PyTorch model adapter into torch-mlir text."
     )
-    parser.add_argument("--adapter", required=True, type=Path)
+    parser.add_argument("--adapter", type=Path)
+    parser.add_argument("--exported-program-dir", type=Path)
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--model-path")
     parser.add_argument(
@@ -41,6 +42,26 @@ def main() -> None:
         help="torch-mlir import stage to emit",
     )
     args = parser.parse_args()
+
+    if args.exported_program_dir is not None:
+        exported_path = args.exported_program_dir / "exported.pt2"
+        # Registers quantized_decomposed ops needed when loading PT2E exports.
+        import torch.ao.quantization.quantize_pt2e  # noqa: F401
+
+        try:
+            import transformers.modeling_outputs  # noqa: F401
+        except ImportError:
+            pass
+
+        exported = torch.export.load(exported_path)
+        module = export_and_import(exported, output_type=args.output_type)
+        mlir_text = str(module)
+        args.out.write_text(mlir_text, encoding="utf-8")
+        print(mlir_text)
+        return
+
+    if args.adapter is None:
+        raise SystemExit("--adapter is required unless --exported-program-dir is provided")
 
     adapter = load_adapter(args.adapter)
 

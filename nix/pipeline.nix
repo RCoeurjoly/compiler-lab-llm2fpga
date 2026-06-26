@@ -1,6 +1,11 @@
-{ pkgs, mlir, circt, yosysPkg, yosysSlang, torchMlir, python, pipelineScripts }:
+{ pkgs, mlir, circt, yosysPkg, yosysSlang, torchMlir, python, pipelineScripts
+, compilePyTorch }:
 let
   stageNames = [
+    "hf-snapshot"
+    "pytorch-model"
+    "pytorch-quantized"
+    "pytorch-exported"
     "torch"
     "torch-stats"
     "linalg"
@@ -29,25 +34,70 @@ let
   else
     builtins.head matches;
 
-  mkTorchInput = { name, torchMlirInput ? null, torchInputCommand ? null
-    , torchInputBuildInputs ? [ ] }:
+  mkUnavailableStage = { name, stage, reason }:
+    pkgs.runCommand "${name}-${stage}" { } ''
+      mkdir -p "$out"
+      cat >"$out/manifest.json" <<'JSON'
+      ${builtins.toJSON {
+        inherit stage reason;
+        status = "unavailable";
+      }}
+      JSON
+    '';
+
+  mkHfSnapshotDerivation = { name, hfSnapshot ? null }:
+    if hfSnapshot != null then
+      hfSnapshot
+    else
+      mkUnavailableStage {
+        inherit name;
+        stage = "hf-snapshot";
+        reason = "model was not registered from a HuggingFace snapshot";
+      };
+
+  mkPyTorchStageDerivation =
+    { name, stage, command ? null, buildInputs ? [ ], unavailableReason ? null
+    , upstream ? null }:
+    if command != null then
+      pkgs.runCommand "${name}-${stage}" { inherit buildInputs; } ''
+        set -euo pipefail
+        mkdir -p "$out"
+        ${pkgs.lib.optionalString (upstream != null) ''
+          ln -s ${upstream} "$out/upstream"
+        ''}
+        ${command}
+      ''
+    else
+      mkUnavailableStage {
+        inherit name stage;
+        reason =
+          if unavailableReason != null then unavailableReason else "stage is not defined";
+      };
+
+  mkTorchMlirInput = { name, pytorchExported, torchMlirInput ? null
+    , torchInputCommand ? null, torchInputBuildInputs ? [ ] }:
     if torchMlirInput != null then
       torchMlirInput
     else if torchInputCommand != null then
-      pkgs.runCommand "${name}-torch-input.mlir" {
+      pkgs.runCommand "${name}-torch.mlir" {
         buildInputs = torchInputBuildInputs;
       } ''
         set -euo pipefail
         ${torchInputCommand}
       ''
+    else if pytorchExported != null then
+      pkgs.runCommand "${name}-torch.mlir" {
+        buildInputs = torchInputBuildInputs;
+      } ''
+        set -euo pipefail
+        export PYTHONPATH="${torchMlir}/${python.sitePackages}:${torchMlir}/${python.sitePackages}/torch_mlir:''${PYTHONPATH:-}"
+        python ${compilePyTorch} \
+          --exported-program-dir ${pytorchExported} \
+          --out "$out" >/dev/null
+      ''
     else
       throw
-      "registerModel(${name}): provide torchMlirInput or torchInputCommand";
-
-  mkTorchDerivation = { name, torchMlirInput }:
-    pkgs.runCommand "${name}-torch.mlir" { } ''
-      cp ${torchMlirInput} "$out"
-    '';
+      "registerModel(${name}): provide torchMlirInput, torchInputCommand, or pytorchExported";
 
   mkMlirOpStatsDerivation = { name, stageName, tool, input }:
     pkgs.runCommand "${name}-${stageName}.stats" { } ''
@@ -149,12 +199,17 @@ let
         ${sv}/sources.f "$out"
     '';
 
-  mkBasePipeline = { name, torchMlirInput, handshakeFromCf
-    , allowHwExterns ? false, fpPrimsSv ? null
+  mkBasePipeline =
+    { name, hfSnapshot, pytorchModel, pytorchQuantized, pytorchExported
+    , torchMlirInput, handshakeFromCf, allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false }:
     let
       self = {
-        torch = mkTorchDerivation { inherit name torchMlirInput; };
+        "hf-snapshot" = hfSnapshot;
+        "pytorch-model" = pytorchModel;
+        "pytorch-quantized" = pytorchQuantized;
+        "pytorch-exported" = pytorchExported;
+        torch = torchMlirInput;
         "torch-stats" = mkMlirOpStatsDerivation {
           inherit name;
           stageName = "torch";
@@ -217,19 +272,23 @@ let
       };
     in self;
 
-  mkPipeline = { name, torchMlirInput, allowHwExterns ? false, fpPrimsSv ? null
+  mkPipeline =
+    { name, hfSnapshot, pytorchModel, pytorchQuantized, pytorchExported
+    , torchMlirInput, allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false }:
     mkBasePipeline {
-      inherit name torchMlirInput allowHwExterns fpPrimsSv
-        slangPerFileExternModules;
+      inherit name hfSnapshot pytorchModel pytorchQuantized pytorchExported
+        torchMlirInput allowHwExterns fpPrimsSv slangPerFileExternModules;
       handshakeFromCf = mkHandshakeDerivation;
     };
 
-  mkLsqPipeline = { name, torchMlirInput, allowHwExterns ? false
-    , fpPrimsSv ? null, slangPerFileExternModules ? false }:
+  mkLsqPipeline =
+    { name, hfSnapshot, pytorchModel, pytorchQuantized, pytorchExported
+    , torchMlirInput, allowHwExterns ? false, fpPrimsSv ? null
+    , slangPerFileExternModules ? false }:
     mkBasePipeline {
-      inherit name torchMlirInput allowHwExterns fpPrimsSv
-        slangPerFileExternModules;
+      inherit name hfSnapshot pytorchModel pytorchQuantized pytorchExported
+        torchMlirInput allowHwExterns fpPrimsSv slangPerFileExternModules;
       handshakeFromCf = mkHandshakeLsqDerivation;
     };
 
@@ -262,25 +321,64 @@ let
     });
 
   registerPipelineModel = { pipelineFactory, name, key ? name, description ? ""
-    , source ? { type = "local"; }, torchMlirInput ? null
+    , source ? { type = "local"; }, hfSnapshot ? null, torchMlirInput ? null
     , torchInputCommand ? null, torchInputBuildInputs ? [ ]
+    , pytorchModelCommand ? null, pytorchModelBuildInputs ? torchInputBuildInputs
+    , pytorchQuantizedCommand ? null
+    , pytorchQuantizedBuildInputs ? torchInputBuildInputs
+    , pytorchExportedCommand ? null
+    , pytorchExportedBuildInputs ? torchInputBuildInputs
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false }:
     let
-      resolvedTorchInput = mkTorchInput {
+      resolvedHfSnapshot = mkHfSnapshotDerivation { inherit name hfSnapshot; };
+      resolvedPyTorchModel = mkPyTorchStageDerivation {
+        inherit name;
+        stage = "pytorch-model";
+        command = pytorchModelCommand;
+        buildInputs = pytorchModelBuildInputs;
+        upstream = resolvedHfSnapshot;
+        unavailableReason = "model inspection stage is not defined";
+      };
+      resolvedPyTorchQuantized = mkPyTorchStageDerivation {
+        inherit name;
+        stage = "pytorch-quantized";
+        command = pytorchQuantizedCommand;
+        buildInputs = pytorchQuantizedBuildInputs;
+        upstream = resolvedPyTorchModel;
+        unavailableReason = "quantized model stage is not meaningful for this model";
+      };
+      resolvedPyTorchExported = mkPyTorchStageDerivation {
+        inherit name;
+        stage = "pytorch-exported";
+        command = pytorchExportedCommand;
+        buildInputs = pytorchExportedBuildInputs;
+        upstream = resolvedPyTorchQuantized;
+        unavailableReason = "exported program stage is not defined";
+      };
+      resolvedTorchMlirInput = mkTorchMlirInput {
         inherit name torchMlirInput torchInputCommand torchInputBuildInputs;
+        pytorchExported = resolvedPyTorchExported;
       };
       normalizedSource =
         if source ? type then source else source // { type = "local"; };
       pipeline = pipelineFactory {
         inherit name;
-        torchMlirInput = resolvedTorchInput;
+        hfSnapshot = resolvedHfSnapshot;
+        pytorchModel = resolvedPyTorchModel;
+        pytorchQuantized = resolvedPyTorchQuantized;
+        pytorchExported = resolvedPyTorchExported;
+        torchMlirInput = resolvedTorchMlirInput;
         inherit allowHwExterns fpPrimsSv slangPerFileExternModules;
       };
       model = {
         inherit key name description;
         source = normalizedSource;
-        torchInput = resolvedTorchInput;
+        hfSnapshot = resolvedHfSnapshot;
+        pytorchModel = resolvedPyTorchModel;
+        pytorchQuantized = resolvedPyTorchQuantized;
+        pytorchExported = resolvedPyTorchExported;
+        torchMlirInput = resolvedTorchMlirInput;
         inherit pipeline;
       };
       metadata = mkModelMetadata key model;

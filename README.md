@@ -15,9 +15,17 @@ small TinyStories model registry:
 Each registry entry expands into stage packages such as:
 
 ```sh
+nix build .#tinystories-representative-core-w4a8-hf-snapshot
+nix build .#tinystories-representative-core-w4a8-pytorch-model
+nix build .#tinystories-representative-core-w4a8-pytorch-quantized
+nix build .#tinystories-representative-core-w4a8-pytorch-exported
 nix build .#tinystories-representative-core-w4a8-torch
 nix build .#tinystories-representative-core-w4a8-linalg
 ```
+
+The `*-pytorch-exported` package contains the serialized `ExportedProgram`
+consumed by the `*-torch` package, so torch-mlir no longer rebuilds the PyTorch
+export inline.
 
 The current path is intentionally the Task 3-derived path, including Handshake.
 No-handshake and TOSA branches should be added as separate pipeline variants

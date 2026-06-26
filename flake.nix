@@ -194,12 +194,13 @@
         pipelineLib = import ./nix/pipeline.nix {
           inherit pkgs mlir circt yosysPkg yosysSlang torchMlir python;
           inherit pipelineScripts;
+          compilePyTorch = ./scripts/compile-pytorch.py;
         };
         modelRegistry = import ./nix/models.nix {
           inherit (pipelineLib) registerModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
-            python tinyStories1m fpPrimsSv;
-          compilePyTorch = ./scripts/compile-pytorch.py;
+            tinyStories1m fpPrimsSv;
+          materializePyTorchStage = ./scripts/materialize-pytorch-stage.py;
         };
         pipelineStagePackages =
           pipelineLib.pipelineStagePackagesFromRegistry modelRegistry;
