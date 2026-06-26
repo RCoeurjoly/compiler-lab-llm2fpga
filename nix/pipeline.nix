@@ -53,24 +53,13 @@ let
         reason = "model was not registered from a HuggingFace snapshot";
       };
 
-  mkPyTorchStageDerivation =
-    { name, stage, command ? null, buildInputs ? [ ], unavailableReason ? null
-    , upstream ? null }:
-    if command != null then
-      pkgs.runCommand "${name}-${stage}" { inherit buildInputs; } ''
-        set -euo pipefail
-        mkdir -p "$out"
-        ${pkgs.lib.optionalString (upstream != null) ''
-          ln -s ${upstream} "$out/upstream"
-        ''}
-        ${command}
-      ''
-    else
-      mkUnavailableStage {
-        inherit name stage;
-        reason =
-          if unavailableReason != null then unavailableReason else "stage is not defined";
-      };
+  mkPyTorchExportedDerivation = { name, command, buildInputs ? [ ], upstream }:
+    pkgs.runCommand "${name}-pytorch-exported" { inherit buildInputs; } ''
+      set -euo pipefail
+      mkdir -p "$out"
+      ln -s ${upstream} "$out/upstream"
+      ${command}
+    '';
 
   mkTorchStage = { name, pytorchExported, pytorchToolchain ? [ ] }:
     pkgs.runCommand "${name}-torch.mlir" {
@@ -277,19 +266,17 @@ let
 
   registerPipelineModel = { pipelineFactory, name, key ? name, description ? ""
     , source ? { type = "local"; }, hfSnapshot ? null, pytorchToolchain ? [ ]
-    , pytorchExportedCommand ? null
+    , pytorchExportedCommand
     , pytorchExportedBuildInputs ? pytorchToolchain
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false }:
     let
       resolvedHfSnapshot = mkHfSnapshotDerivation { inherit name hfSnapshot; };
-      resolvedPyTorchExported = mkPyTorchStageDerivation {
+      resolvedPyTorchExported = mkPyTorchExportedDerivation {
         inherit name;
-        stage = "pytorch-exported";
         command = pytorchExportedCommand;
         buildInputs = pytorchExportedBuildInputs;
         upstream = resolvedHfSnapshot;
-        unavailableReason = "exported program stage is not defined";
       };
       resolvedTorchStage = mkTorchStage {
         inherit name pytorchToolchain;

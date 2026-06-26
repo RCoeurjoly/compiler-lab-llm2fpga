@@ -48,6 +48,13 @@ class PipelineClarityTest(unittest.TestCase):
         self.assertIn("pytorchToolchain", pipeline)
         self.assertIn("pytorchToolchain", models)
 
+    def test_pytorch_export_command_is_required(self) -> None:
+        pipeline = read("nix/pipeline.nix")
+
+        self.assertNotIn("pytorchExportedCommand ? null", pipeline)
+        self.assertNotIn("exported program stage is not defined", pipeline)
+        self.assertNotIn("command ? null", pipeline)
+
     def test_torch_mlir_compiler_accepts_exported_program_only(self) -> None:
         compiler = read("scripts/compile-pytorch.py")
 
