@@ -114,7 +114,6 @@
           doCheck = false;
           pythonImportsCheck = [ "torchao" ];
         };
-        pythonWithTorch = python.withPackages (ps: [ ps.torch ps.packaging ]);
         pythonWithTinyStories =
           python.withPackages (ps: [ ps.torch ps.packaging ps.transformers ]);
         pythonWithTinyStoriesTorchAO = python.withPackages
@@ -198,14 +197,9 @@
         };
         modelRegistry = import ./nix/models.nix {
           inherit (pipelineLib) registerModel;
-          inherit pythonWithTorch pythonWithTinyStories
-            pythonWithTinyStoriesTorchAO torchMlir python tinyStories1m
-            fpPrimsSv;
+          inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
+            python tinyStories1m fpPrimsSv;
           compilePyTorch = ./scripts/compile-pytorch.py;
-          matmulPy = ./src/matmul.py;
-          matmulAdapterPy = ./src/matmul_adapter.py;
-          matmulSrcDir = ./src;
-          simDir = ./sim;
         };
         pipelineStagePackages =
           pipelineLib.pipelineStagePackagesFromRegistry modelRegistry;
@@ -229,7 +223,6 @@
             torchMlir
             yosysPkg
             yosysSlang
-            pythonWithTorch
             pythonWithTinyStories
             pkgs.verilator
           ];

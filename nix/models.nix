@@ -1,6 +1,5 @@
-{ registerModel, pythonWithTorch, pythonWithTinyStories
-, pythonWithTinyStoriesTorchAO, torchMlir, python, tinyStories1m, fpPrimsSv
-, compilePyTorch, matmulPy, matmulAdapterPy, matmulSrcDir, simDir }:
+{ registerModel, pythonWithTinyStories, pythonWithTinyStoriesTorchAO, torchMlir
+, python, tinyStories1m, fpPrimsSv, compilePyTorch }:
 let
   torchMlirPythonPath =
     "${torchMlir}/${python.sitePackages}:${torchMlir}/${python.sitePackages}/torch_mlir";
@@ -13,25 +12,6 @@ let
     export TINYSTORIES_CORE_NUM_HEADS=1
   '';
 in {
-  matmul = registerModel {
-    key = "matmul";
-    name = "matmul";
-    description =
-      "Minimal local matmul PyTorch module used as a fast Task 3 pipeline smoke input.";
-    source = {
-      type = "local";
-      path = "${matmulPy}";
-    };
-    torchInputBuildInputs = [ pythonWithTorch ];
-    torchInputCommand = ''
-      export MATMUL_PY="${matmulPy}"
-      export PYTHONPATH="${matmulSrcDir}:${simDir}:${torchMlirPythonPath}:''${PYTHONPATH:-}"
-      python ${compilePyTorch} \
-        --adapter ${matmulAdapterPy} \
-        --out "$out" >/dev/null
-    '';
-  };
-
   "tinystories-fp32" = registerModel {
     key = "tinystories-fp32";
     name = "tinystories-fp32";

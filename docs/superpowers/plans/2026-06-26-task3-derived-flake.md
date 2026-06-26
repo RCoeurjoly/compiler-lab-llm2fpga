@@ -35,7 +35,7 @@
 - [x] Define only compiler bring-up inputs, excluding Task 6 board and PCIe inputs.
 - [x] Preserve the current CIRCT Task 3 recovery patch set.
 - [x] Preserve the current torch-mlir source build and default to the same unpatched torch-mlir selection used by `task6-crisp`.
-- [x] Expose `matmul`, `tinystories-fp32`, `tinystories-representative-core-fp32`, and `tinystories-representative-core-w4a8` stage packages.
+- [x] Expose `tinystories-fp32`, `tinystories-representative-core-fp32`, and `tinystories-representative-core-w4a8` stage packages.
 
 ### Task 3: Verify Evaluation
 
@@ -45,7 +45,5 @@
 
 - [x] Run `nix flake show`.
 - [x] Build `.#model-registry`.
-- [x] Build `.#matmul-torch`.
-- [x] Build `.#matmul-linalg`.
 - [x] Build `.#tinystories-representative-core-w4a8-torch`.
 - [x] Build `.#tinystories-representative-core-w4a8-linalg`.

@@ -4,9 +4,8 @@ Compiler bring-up lab for the latest working Task 3-derived pipeline currently
 embedded in `~/LLM2FPGA` branch `task6-crisp`.
 
 The first flake cut keeps the reusable MLIR/CIRCT/Yosys pipeline and exposes a
-small model registry:
+small TinyStories model registry:
 
-- `matmul`: fast local smoke input.
 - `tinystories-fp32`: full TinyStories-1M FP32 export.
 - `tinystories-representative-core-fp32`: reduced FP32 TinyStories core.
 - `tinystories-representative-core-w4a8`: reduced PT2E static W4A8 TinyStories
@@ -16,9 +15,6 @@ small model registry:
 Each registry entry expands into stage packages such as:
 
 ```sh
-nix build .#matmul-torch
-nix build .#matmul-linalg
-nix build .#matmul-sv
 nix build .#tinystories-representative-core-w4a8-torch
 nix build .#tinystories-representative-core-w4a8-linalg
 ```
