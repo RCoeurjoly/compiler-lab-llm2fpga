@@ -1,5 +1,4 @@
-{ pkgs, mlir, circt, yosysPkg, yosysSlang, torchMlir, python, pipelineScripts
-, directLowerScript }:
+{ pkgs, mlir, circt, yosysPkg, yosysSlang, torchMlir, python, pipelineScripts }:
 let
   stageNames = [
     "torch"
@@ -14,12 +13,6 @@ let
     "hw-clean"
     "sv-mlir"
     "sv"
-    "direct-fail-fast"
-    "direct-sv-smoke"
-    "direct-sv-smoke-hw-clean"
-    "direct-sv-lint"
-    "direct-sv-lint-hw-clean"
-    "direct-functional"
     "il"
     "yosys-stat"
   ];
@@ -156,117 +149,6 @@ let
         ${sv}/sources.f "$out"
     '';
 
-  mkDirectFailFastDerivation = { name, linalg }:
-    pkgs.runCommand "${name}-direct-fail-fast" { buildInputs = [ python ]; } ''
-      mkdir -p "$out"
-      ${python}/bin/python ${directLowerScript} \
-        --input-linalg ${linalg} \
-        --out-dir "$out" \
-        --mode fail-fast \
-        --report-only
-    '';
-
-  mkDirectSvSmokeDerivation = { name, linalg, cutpoint ? null, fpPrimsSv ? null }:
-    pkgs.runCommand "${name}-direct-sv-smoke" {
-      buildInputs = [ circt python ];
-    } ''
-      mkdir -p "$out"
-      ${pkgs.lib.optionalString (fpPrimsSv != null) ''
-        export FP_PRIMS_SV=${fpPrimsSv}
-      ''}
-      export CIRCT_SV_EXPORT_MODE=single
-      export CIRCT_STRIP_DEBUGINFO_SUFFIX=.mlir
-      ${python}/bin/python ${directLowerScript} \
-        --input-linalg ${linalg} \
-        ${pkgs.lib.optionalString (cutpoint != null) "--cutpoint ${pkgs.lib.escapeShellArg cutpoint}"} \
-        --out-dir "$out" \
-        --mode sv-smoke \
-        --circt-opt ${circt}/bin/circt-opt
-    '';
-
-  mkDirectSvLintDerivation = { name, directSvSmoke }:
-    pkgs.runCommand "${name}-direct-sv-lint.json" {
-      buildInputs = [ pkgs.verilator python ];
-    } ''
-      set -euo pipefail
-      ${python}/bin/python - "${directSvSmoke}/direct-lower-manifest.json" "${directSvSmoke}" "$out" <<'PY'
-import json
-from pathlib import Path
-import subprocess
-import sys
-
-manifest_path = Path(sys.argv[1])
-source = sys.argv[2]
-out_path = Path(sys.argv[3])
-default_fail = {
-    "status": "SKIP",
-    "source": source,
-}
-
-if not manifest_path.exists():
-    default_fail["reason"] = "direct_sv_smoke_manifest_missing"
-    out_path.write_text(json.dumps(default_fail, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    raise SystemExit(0)
-
-manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-sv_input_status = manifest.get("sv_input_status", "")
-if sv_input_status != "hw_lowered":
-    out = default_fail | {
-        "reason": "unsupported_sv_input_format",
-        "sv_input_status": sv_input_status,
-    }
-    out_path.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    raise SystemExit(0)
-
-command = [
-    "verilator",
-    "--top-module",
-    "main",
-    "--lint-only",
-    "--timing",
-    "--language",
-    "1800-2017",
-    "--threads",
-    "1",
-    "-Wno-fatal",
-    "-f",
-    f"{source}/sources.f",
-]
-proc = subprocess.run(command, capture_output=True, text=True, check=False)
-payload = {
-    "status": "PASS" if proc.returncode == 0 else "FAIL",
-    "source": source,
-    "verilator_exit_code": proc.returncode,
-    "verilator_stdout": proc.stdout,
-    "verilator_stderr": proc.stderr,
-}
-out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-if proc.returncode != 0:
-    print(proc.stderr, file=sys.stderr)
-    raise SystemExit(1)
-PY
-    '';
-
-  mkDirectFunctionalDerivation = { name, linalg, cutpoint ? null, fixtureJson ? null }:
-    pkgs.runCommand "${name}-direct-functional" {
-      buildInputs = [ circt python ];
-    } ''
-      mkdir -p "$out"
-      ${pkgs.lib.optionalString (cutpoint != null) ''
-        export DIRECT_CUTPOINT=${pkgs.lib.escapeShellArg cutpoint}
-      ''}
-      ${pkgs.lib.optionalString (fixtureJson != null) ''
-        cp "${fixtureJson}" "$out"/fixture.json
-      ''}
-      ${python}/bin/python ${directLowerScript} \
-        --input-linalg ${linalg} \
-        --out-dir "$out" \
-        --mode functional \
-        --circt-opt ${circt}/bin/circt-opt \
-        ${pkgs.lib.optionalString (cutpoint != null) "--cutpoint \"$DIRECT_CUTPOINT\""} \
-        ${pkgs.lib.optionalString (fixtureJson != null) "--fixture-json \"$out/fixture.json\""}
-    '';
-
   mkBasePipeline = { name, torchMlirInput, handshakeFromCf
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false }:
@@ -321,33 +203,6 @@ PY
           inherit name;
           svMlir = self."sv-mlir";
           inherit allowHwExterns fpPrimsSv;
-        };
-        "direct-fail-fast" = mkDirectFailFastDerivation {
-          inherit name;
-          inherit (self) linalg;
-        };
-        "direct-sv-smoke" = mkDirectSvSmokeDerivation {
-          inherit name;
-          inherit (self) linalg;
-          inherit fpPrimsSv;
-        };
-        "direct-sv-smoke-hw-clean" = mkDirectSvSmokeDerivation {
-          name = name;
-          linalg = self.linalg;
-          cutpoint = self."hw-clean";
-          inherit fpPrimsSv;
-        };
-        "direct-sv-lint" = mkDirectSvLintDerivation {
-          inherit name;
-          directSvSmoke = self."direct-sv-smoke";
-        };
-        "direct-sv-lint-hw-clean" = mkDirectSvLintDerivation {
-          name = name;
-          directSvSmoke = self."direct-sv-smoke-hw-clean";
-        };
-        "direct-functional" = mkDirectFunctionalDerivation {
-          inherit name;
-          inherit (self) linalg;
         };
         il = mkIlDerivation {
           inherit name;

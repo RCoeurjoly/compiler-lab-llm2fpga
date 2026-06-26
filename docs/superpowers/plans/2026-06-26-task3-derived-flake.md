@@ -15,7 +15,6 @@
 **Files:**
 - Copy: `scripts/pipeline/`
 - Copy: `scripts/compile-pytorch.py`
-- Copy: `scripts/direct_lower.py`
 - Copy: `nix/pipeline.nix`
 - Copy: `nix/nanobind-bootstrap.nix`
 - Copy: `patches/circt-upstream-task3-recovery/`

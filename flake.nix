@@ -195,7 +195,6 @@
         pipelineLib = import ./nix/pipeline.nix {
           inherit pkgs mlir circt yosysPkg yosysSlang torchMlir python;
           inherit pipelineScripts;
-          directLowerScript = ./scripts/direct_lower.py;
         };
         modelRegistry = import ./nix/models.nix {
           inherit (pipelineLib) registerModel;
