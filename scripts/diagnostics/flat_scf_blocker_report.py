@@ -14,6 +14,23 @@ BLOCKER_PATTERNS = {
     "linalg": re.compile(r"\blinalg\."),
 }
 
+FLOAT_MATH_PATTERNS = {
+    "arith.addf": re.compile(r"\barith\.addf\b"),
+    "arith.divf": re.compile(r"\barith\.divf\b"),
+    "arith.fptosi": re.compile(r"\barith\.fptosi\b"),
+    "arith.fptoui": re.compile(r"\barith\.fptoui\b"),
+    "arith.mulf": re.compile(r"\barith\.mulf\b"),
+    "arith.sitofp": re.compile(r"\barith\.sitofp\b"),
+    "arith.subf": re.compile(r"\barith\.subf\b"),
+    "arith.uitofp": re.compile(r"\barith\.uitofp\b"),
+    "math.ceil": re.compile(r"\bmath\.ceil\b"),
+    "math.exp": re.compile(r"\bmath\.exp\b"),
+    "math.floor": re.compile(r"\bmath\.floor\b"),
+    "math.powf": re.compile(r"\bmath\.powf\b"),
+    "math.roundeven": re.compile(r"\bmath\.roundeven\b"),
+    "math.tanh": re.compile(r"\bmath\.tanh\b"),
+}
+
 FUNCTION_RE = re.compile(r"\bfunc\.func\s+@([\w$.]+)")
 PARENT_OP_RE = re.compile(r"^\s*((?:scf|affine|cf)\.[\w.]+)\b")
 RESULT_RE = re.compile(r"^\s*(%[\w$.]+)\s*=")
@@ -56,18 +73,33 @@ def operand_names(line: str) -> list[str]:
     return list(dict.fromkeys(values))
 
 
-def value_definitions(lines: list[str]) -> dict[str, dict]:
-    definitions = {}
+def value_definitions(lines: list[str]) -> dict[str, list[dict]]:
+    definitions: dict[str, list[dict]] = {}
     for line_number, line in enumerate(lines, start=1):
         result = result_name(line)
         if result is None:
             continue
-        definitions[result] = {
-            "line": line_number,
-            "op": operation_name(line),
-            "text": line.strip(),
-        }
+        definitions.setdefault(result, []).append(
+            {
+                "line": line_number,
+                "op": operation_name(line),
+                "text": line.strip(),
+            }
+        )
     return definitions
+
+
+def nearest_prior_definition(
+    definitions: dict[str, list[dict]], value: str, line_number: int
+) -> dict | None:
+    candidates = [
+        definition
+        for definition in definitions.get(value, [])
+        if int(definition["line"]) < line_number
+    ]
+    if not candidates:
+        return None
+    return candidates[-1]
 
 
 def value_users(lines: list[str], value: str | None, defining_line: int) -> list[dict]:
@@ -77,8 +109,10 @@ def value_users(lines: list[str], value: str | None, defining_line: int) -> list
     users = []
     value_pattern = re.compile(rf"(?<![\w$.]){re.escape(value)}(?![\w$.])")
     for line_number, line in enumerate(lines, start=1):
-        if line_number == defining_line:
+        if line_number <= defining_line:
             continue
+        if result_name(line) == value:
+            break
         if not value_pattern.search(line):
             continue
         users.append(
@@ -95,7 +129,9 @@ def build_report(text: str) -> dict:
     lines = text.splitlines()
     definitions = value_definitions(lines)
     counts = {name: 0 for name in BLOCKER_PATTERNS}
+    float_math_counts = {name: 0 for name in FLOAT_MATH_PATTERNS}
     locations = []
+    float_math_locations = []
     current_function = None
     parent_stack: list[dict[str, int | str]] = []
 
@@ -120,9 +156,39 @@ def build_report(text: str) -> dict:
                     "result": result,
                     "operands": operands,
                     "operand_definitions": [
-                        definitions[operand]
+                        definition
                         for operand in operands
-                        if operand in definitions
+                        for definition in [
+                            nearest_prior_definition(definitions, operand, line_number)
+                        ]
+                        if definition is not None
+                    ],
+                    "users": value_users(lines, result, line_number),
+                    "text": line.strip(),
+                }
+            )
+
+        for op, pattern in FLOAT_MATH_PATTERNS.items():
+            if not pattern.search(line):
+                continue
+            result = result_name(line)
+            operands = operand_names(line)
+            float_math_counts[op] += 1
+            float_math_locations.append(
+                {
+                    "op": op,
+                    "line": line_number,
+                    "function": current_function,
+                    "parents": [str(parent["op"]) for parent in parent_stack],
+                    "result": result,
+                    "operands": operands,
+                    "operand_definitions": [
+                        definition
+                        for operand in operands
+                        for definition in [
+                            nearest_prior_definition(definitions, operand, line_number)
+                        ]
+                        if definition is not None
                     ],
                     "users": value_users(lines, result, line_number),
                     "text": line.strip(),
@@ -136,7 +202,20 @@ def build_report(text: str) -> dict:
         for op, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
         if count
     ]
-    return {"stage": "flat-scf", "blockers": blockers, "locations": locations}
+    float_math_ops = [
+        {"op": op, "count": count}
+        for op, count in sorted(
+            float_math_counts.items(), key=lambda item: (-item[1], item[0])
+        )
+        if count
+    ]
+    return {
+        "stage": "flat-scf",
+        "blockers": blockers,
+        "locations": locations,
+        "float_math_ops": float_math_ops,
+        "float_math_locations": float_math_locations,
+    }
 
 
 def main() -> int:
