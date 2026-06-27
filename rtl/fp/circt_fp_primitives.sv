@@ -176,6 +176,24 @@ package circt_fp_fixed_pkg;
       q_roundeven = sign ? -sat32($signed(rounded) <<< 16) : sat32($signed(rounded) <<< 16);
     end
   endfunction
+
+  function automatic logic signed [31:0] q_floor(input logic signed [31:0] x);
+    logic signed [31:0] int_part;
+    begin
+      int_part = x >>> 16;
+      q_floor = sat32($signed(int_part) <<< 16);
+    end
+  endfunction
+
+  function automatic logic signed [31:0] q_ceil(input logic signed [31:0] x);
+    logic signed [31:0] int_part;
+    logic has_frac;
+    begin
+      int_part = x >>> 16;
+      has_frac = |x[15:0];
+      q_ceil = sat32($signed(int_part + ((x[31] || !has_frac) ? 0 : 1)) <<< 16);
+    end
+  endfunction
 endpackage
 
 module arith_addf_in_f32_f32_out_f32 (
@@ -262,6 +280,30 @@ module arith_cmpf_in_f32_f32_out_ui1_ugt (
   assign out0_valid = in0_valid & in1_valid; assign in0_ready = out0_ready & in1_valid; assign in1_ready = out0_ready & in0_valid;
 endmodule
 
+module arith_cmpf_in_f32_f32_out_ui1_uge (
+  input logic [31:0] in0, input logic in0_valid,
+  input logic [31:0] in1, input logic in1_valid, input logic out0_ready,
+  output logic in0_ready, output logic in1_ready, output logic out0, output logic out0_valid
+);
+  import circt_fp_fixed_pkg::*;
+  logic signed [31:0] a_q, b_q;
+  assign a_q = f32_to_q16_16(in0); assign b_q = f32_to_q16_16(in1);
+  assign out0 = ($signed(a_q) >= $signed(b_q));
+  assign out0_valid = in0_valid & in1_valid; assign in0_ready = out0_ready & in1_valid; assign in1_ready = out0_ready & in0_valid;
+endmodule
+
+module arith_cmpf_in_f32_f32_out_ui1_oeq (
+  input logic [31:0] in0, input logic in0_valid,
+  input logic [31:0] in1, input logic in1_valid, input logic out0_ready,
+  output logic in0_ready, output logic in1_ready, output logic out0, output logic out0_valid
+);
+  import circt_fp_fixed_pkg::*;
+  logic signed [31:0] a_q, b_q;
+  assign a_q = f32_to_q16_16(in0); assign b_q = f32_to_q16_16(in1);
+  assign out0 = ($signed(a_q) == $signed(b_q));
+  assign out0_valid = in0_valid & in1_valid; assign in0_ready = out0_ready & in1_valid; assign in1_ready = out0_ready & in0_valid;
+endmodule
+
 module arith_cmpf_in_f32_f32_out_ui1_uno (
   input logic [31:0] in0, input logic in0_valid,
   input logic [31:0] in1, input logic in1_valid, input logic out0_ready,
@@ -291,6 +333,17 @@ module arith_fptosi_in_f32_out_ui8 (
   logic signed [31:0] qv, iv;
   assign qv = f32_to_q16_16(in0); assign iv = qv >>> 16;
   assign out0 = (iv > 32'sd127) ? 8'sh7f : (iv < -32'sd128) ? 8'sh80 : iv[7:0];
+  assign out0_valid = in0_valid; assign in0_ready = out0_ready;
+endmodule
+
+module arith_fptosi_in_f32_out_ui32 (
+  input logic [31:0] in0, input logic in0_valid, input logic out0_ready,
+  output logic in0_ready, output logic [31:0] out0, output logic out0_valid
+);
+  import circt_fp_fixed_pkg::*;
+  logic signed [31:0] qv, iv;
+  assign qv = f32_to_q16_16(in0); assign iv = qv >>> 16;
+  assign out0 = iv[31:0];
   assign out0_valid = in0_valid; assign in0_ready = out0_ready;
 endmodule
 
@@ -351,6 +404,26 @@ module math_roundeven_in_f32_out_f32 (
   assign out0_valid = in0_valid; assign in0_ready = out0_ready;
 endmodule
 
+module math_floor_in_f32_out_f32 (
+  input logic [31:0] in0, input logic in0_valid, input logic out0_ready,
+  output logic in0_ready, output logic [31:0] out0, output logic out0_valid
+);
+  import circt_fp_fixed_pkg::*;
+  logic signed [31:0] x_q;
+  assign x_q = f32_to_q16_16(in0); assign out0 = q16_16_to_f32(q_floor(x_q));
+  assign out0_valid = in0_valid; assign in0_ready = out0_ready;
+endmodule
+
+module math_ceil_in_f32_out_f32 (
+  input logic [31:0] in0, input logic in0_valid, input logic out0_ready,
+  output logic in0_ready, output logic [31:0] out0, output logic out0_valid
+);
+  import circt_fp_fixed_pkg::*;
+  logic signed [31:0] x_q;
+  assign x_q = f32_to_q16_16(in0); assign out0 = q16_16_to_f32(q_ceil(x_q));
+  assign out0_valid = in0_valid; assign in0_ready = out0_ready;
+endmodule
+
 module math_exp_in_f32_out_f32 (
   input logic [31:0] in0, input logic in0_valid, input logic out0_ready,
   output logic in0_ready, output logic [31:0] out0, output logic out0_valid
@@ -359,6 +432,20 @@ module math_exp_in_f32_out_f32 (
   logic signed [31:0] x_q;
   assign x_q = f32_to_q16_16(in0); assign out0 = q16_16_to_f32(q_exp_approx(x_q));
   assign out0_valid = in0_valid; assign in0_ready = out0_ready;
+endmodule
+
+module math_powf_in_f32_f32_out_f32 (
+  input logic [31:0] in0, input logic in0_valid,
+  input logic [31:0] in1, input logic in1_valid, input logic out0_ready,
+  output logic in0_ready, output logic in1_ready, output logic [31:0] out0, output logic out0_valid
+);
+  import circt_fp_fixed_pkg::*;
+  logic signed [31:0] x_q, p_q;
+  logic [63:0] p_int;
+  assign x_q = f32_to_q16_16(in0); assign p_q = f32_to_q16_16(in1);
+  assign p_int = {{32{p_q[31]}}, p_q} >>> 16;
+  assign out0 = q16_16_to_f32(q_powi_approx(x_q, p_int));
+  assign out0_valid = in0_valid & in1_valid; assign in0_ready = out0_ready & in1_valid; assign in1_ready = out0_ready & in0_valid;
 endmodule
 
 module math_rsqrt_in_f32_out_f32 (

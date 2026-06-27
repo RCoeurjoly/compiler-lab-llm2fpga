@@ -223,6 +223,17 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
             flake,
         )
 
+    def test_representative_core_adapter_removes_hf_rank4_attention_bias(self) -> None:
+        adapter = (
+            REPO_ROOT
+            / "TinyStories"
+            / "model_adapter_representative_core_pt2e_static_quant.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("replace_attention_with_hardware_friendly_attention", adapter)
+        self.assertIn("disable_single_token_causal_mask", adapter)
+        self.assertNotIn("attn.attention.bias", adapter)
+
 
 if __name__ == "__main__":
     unittest.main()

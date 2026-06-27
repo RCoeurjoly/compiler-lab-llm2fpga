@@ -462,7 +462,7 @@
        // HW operations.
        StructCreateConversionPattern,
        // Handshake operations.
-@@ -1940,6 +2113,25 @@
+@@ -1940,6 +2113,28 @@
        MergeConversionPattern, ControlMergeConversionPattern,
        LoadConversionPattern, StoreConversionPattern, MemoryConversionPattern,
        InstanceConversionPattern,
@@ -479,7 +479,10 @@
 +      ExtModuleConversionPattern<arith::FPToUIOp>,
 +      ExtModuleConversionPattern<arith::ExtFOp>,
 +      ExtModuleConversionPattern<arith::TruncFOp>,
++      ExtModuleConversionPattern<math::FloorOp>,
++      ExtModuleConversionPattern<math::CeilOp>,
 +      ExtModuleConversionPattern<math::ExpOp>,
++      ExtModuleConversionPattern<math::PowFOp>,
 +      ExtModuleConversionPattern<math::FPowIOp>,
 +      ExtModuleConversionPattern<math::RsqrtOp>,
 +      ExtModuleConversionPattern<math::TanhOp>,

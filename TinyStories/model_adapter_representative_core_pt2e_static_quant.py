@@ -5,8 +5,10 @@ from __future__ import annotations
 import copy
 import os
 from pathlib import Path
+from types import MethodType
 
 import torch
+from torch import nn
 from torch.ao.quantization import move_exported_model_to_eval
 from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_pt2e
 from torch.ao.quantization.pt2e.representation.rewrite import (
@@ -96,6 +98,56 @@ def _decompose_out_dtype(model: torch.fx.GraphModule) -> torch.fx.GraphModule:
     return model
 
 
+def _single_token_attn_without_causal_bias(
+    self: torch.nn.Module,
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attention_mask: torch.Tensor | None = None,
+    head_mask: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    query = query.to(torch.float32)
+    key = key.to(torch.float32)
+
+    attn_weights = torch.matmul(query, key.transpose(-1, -2))
+
+    if attention_mask is not None:
+        attn_weights = attn_weights + attention_mask[:, :, :, : key.shape[-2]]
+
+    attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+    attn_weights = attn_weights.to(value.dtype)
+    attn_weights = self.attn_dropout(attn_weights)
+
+    if head_mask is not None:
+        attn_weights = attn_weights * head_mask
+
+    return torch.matmul(attn_weights, value), attn_weights
+
+
+def replace_attention_with_hardware_friendly_attention(model: torch.nn.Module) -> None:
+    for module in model.modules():
+        if all(hasattr(module, name) for name in ("q_proj", "k_proj", "v_proj", "out_proj")):
+            module._attn = MethodType(_single_token_attn_without_causal_bias, module)
+
+
+def _no_single_token_causal_mask(
+    self: torch.nn.Module,
+    attention_mask: torch.Tensor | None,
+    input_tensor: torch.Tensor,
+    cache_position: torch.Tensor,
+    past_key_values: object,
+    output_attentions: bool = False,
+) -> None:
+    return None
+
+
+def disable_single_token_causal_mask(model: torch.nn.Module) -> None:
+    transformer = getattr(model, "transformer", None)
+    if transformer is None:
+        raise RuntimeError("expected TinyStories GPT-Neo model to expose .transformer")
+    transformer._update_causal_mask = MethodType(_no_single_token_causal_mask, transformer)
+
+
 def attention_types_for_layers(num_layers: int) -> list[list[object]]:
     pattern = ["global", "local"]
     full_repeats, remainder = divmod(num_layers, len(pattern))
@@ -172,7 +224,10 @@ def build_model(model_path: str | None) -> torch.nn.Module:
     config.eos_token_id = config.vocab_size - 1
 
     torch.manual_seed(0)
-    return AutoModelForCausalLM.from_config(config).eval()
+    model = AutoModelForCausalLM.from_config(config).eval()
+    replace_attention_with_hardware_friendly_attention(model)
+    disable_single_token_causal_mask(model)
+    return model
 
 
 def example_inputs() -> tuple[torch.Tensor, ...]:

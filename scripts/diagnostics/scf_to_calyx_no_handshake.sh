@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-circt_opt="${1:?usage: scf_to_calyx_no_handshake.sh <circt-opt> <input-scf-mlir> <output-dir>}"
-input="${2:?usage: scf_to_calyx_no_handshake.sh <circt-opt> <input-scf-mlir> <output-dir>}"
-output_dir="${3:?usage: scf_to_calyx_no_handshake.sh <circt-opt> <input-scf-mlir> <output-dir>}"
+circt_opt="${1:?usage: scf_to_calyx_no_handshake.sh <circt-opt> <input-flat-scf-mlir> <output-dir>}"
+input="${2:?usage: scf_to_calyx_no_handshake.sh <circt-opt> <input-flat-scf-mlir> <output-dir>}"
+output_dir="${3:?usage: scf_to_calyx_no_handshake.sh <circt-opt> <input-flat-scf-mlir> <output-dir>}"
 
 if [[ ! -x "$circt_opt" ]]; then
   echo "not executable: $circt_opt" >&2
@@ -15,25 +15,18 @@ if [[ ! -f "$input" ]]; then
   exit 2
 fi
 
-tmp_flat="$(mktemp /tmp/no_handshake_flat_XXXXXX.mlir)"
 tmp_log="$(mktemp /tmp/no_handshake_calyx_XXXXXX.log)"
 cleanup() {
-  rm -f "$tmp_flat" "$tmp_log"
+  rm -f "$tmp_log"
 }
 trap cleanup EXIT
 
 mkdir -p "$output_dir"
 
-"$circt_opt" "$input" \
-  --flatten-memref \
-  --canonicalize \
-  --cse \
-  -o "$tmp_flat"
-
-cp "$tmp_flat" "$output_dir/flat.scf.mlir"
+cp "$input" "$output_dir/flat.scf.mlir"
 
 set +e
-"$circt_opt" "$tmp_flat" \
+"$circt_opt" "$input" \
   --lower-scf-to-calyx='top-level-function=main' \
   -o "$output_dir/model.calyx.mlir" >"$tmp_log" 2>&1
 rc=$?
