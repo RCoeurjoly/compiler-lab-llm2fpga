@@ -78,6 +78,28 @@ in {
     '';
   };
 
+  "pattern-embedding-w4a8-core" = registerModel {
+    key = "pattern-embedding-w4a8-core";
+    name = "pattern-embedding-w4a8-core";
+    description =
+      "Local embedding W4A8 hardware core with int64 token input and int8 activation output.";
+    source = {
+      type = "pattern";
+      pattern = "embedding";
+      quantization = "w4a8-core-int8-lookup";
+      boundary = "hardware";
+    };
+    allowHwExterns = false;
+    slangPerFileExternModules = true;
+    pytorchToolchain = [ pythonWithTinyStories torchMlir ];
+    pytorchExportedCommand = ''
+      export PYTHONPATH="${../patterns/embedding}:''${PYTHONPATH:-}"
+      python ${materializePyTorchExported} \
+        --adapter ${../patterns/embedding/adapter_w4a8_core.py} \
+        --out-dir "$out"
+    '';
+  };
+
   "tinystories-fp32" = registerModel {
     key = "tinystories-fp32";
     name = "tinystories-fp32";

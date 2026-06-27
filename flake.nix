@@ -172,8 +172,7 @@
           ./scripts/diagnostics/scf_to_calyx_no_handshake.sh;
         noHandshakeLinalgToLlvm =
           ./scripts/diagnostics/linalg_to_llvm_no_handshake.sh;
-        flatScfBlockerReport =
-          ./scripts/diagnostics/flat_scf_blocker_report.py;
+        flatScfBlockerReport = ./scripts/diagnostics/flat_scf_blocker_report.py;
         fpPrimsSv = ./rtl/fp/circt_fp_primitives.sv;
         tinyStories1m = let
           modelId = "roneneldan/TinyStories-1M";
@@ -355,6 +354,20 @@
             pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-sv";
           "pattern-linear-w4a8-core-via-tosa-no-handshake-yosys-stat" =
             pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-yosys-stat";
+          "pattern-embedding-w4a8-core-via-tosa-no-handshake-torch" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-torch";
+          "pattern-embedding-w4a8-core-via-tosa-no-handshake-tosa" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-tosa";
+          "pattern-embedding-w4a8-core-via-tosa-no-handshake-linalg" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-linalg";
+          "pattern-embedding-w4a8-core-via-tosa-no-handshake-scf" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-scf";
+          "pattern-embedding-w4a8-core-via-tosa-no-handshake-flat-scf" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-flat-scf";
+          "pattern-embedding-w4a8-core-via-tosa-no-handshake-calyx" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-calyx";
+          "pattern-embedding-w4a8-core-via-tosa-no-handshake-llvm" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-llvm";
           "tinystories-representative-core-w4a8-via-tosa-torch" =
             pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-torch";
           "tinystories-representative-core-w4a8-via-tosa-tosa" =
