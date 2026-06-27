@@ -9,6 +9,7 @@ from types import MethodType
 
 import torch
 from torch import nn
+import torch.nn.functional as F
 from torch.ao.quantization import move_exported_model_to_eval
 from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_pt2e
 from torch.ao.quantization.pt2e.representation.rewrite import (
@@ -77,6 +78,44 @@ def _materialize_missing_linear_biases(model: torch.nn.Module) -> None:
     for module in model.modules():
         if isinstance(module, torch.nn.Linear) and module.bias is None:
             module.bias = torch.nn.Parameter(torch.zeros(module.out_features))
+
+
+class Int8Embedding(torch.nn.Module):
+    def __init__(self, source: torch.nn.Embedding) -> None:
+        super().__init__()
+        weight = source.weight.detach()
+        scale = torch.clamp(weight.abs().max() / 127.0, min=1.0e-12)
+        weight_i8 = torch.clamp(torch.round(weight / scale), -128, 127).to(torch.int8)
+        self.register_buffer("weight_i8", weight_i8)
+        self.register_buffer("scale", scale.to(torch.float32))
+        self.padding_idx = source.padding_idx
+        self.max_norm = source.max_norm
+        self.norm_type = source.norm_type
+        self.scale_grad_by_freq = source.scale_grad_by_freq
+        self.sparse = source.sparse
+
+    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+        embedded_i8 = F.embedding(
+            input_ids,
+            self.weight_i8,
+            self.padding_idx,
+            self.max_norm,
+            self.norm_type,
+            self.scale_grad_by_freq,
+            self.sparse,
+        )
+        return embedded_i8.to(torch.float32) * self.scale
+
+
+def replace_embeddings_with_int8_lookup(model: torch.nn.Module) -> None:
+    transformer = getattr(model, "transformer", None)
+    if transformer is None:
+        raise RuntimeError("expected TinyStories GPT-Neo model to expose .transformer")
+    for name in ("wte", "wpe"):
+        embedding = getattr(transformer, name, None)
+        if not isinstance(embedding, torch.nn.Embedding):
+            raise RuntimeError(f"expected transformer.{name} to be an Embedding")
+        setattr(transformer, name, Int8Embedding(embedding))
 
 
 def _decompose_out_dtype(model: torch.fx.GraphModule) -> torch.fx.GraphModule:
@@ -225,6 +264,7 @@ def build_model(model_path: str | None) -> torch.nn.Module:
 
     torch.manual_seed(0)
     model = AutoModelForCausalLM.from_config(config).eval()
+    replace_embeddings_with_int8_lookup(model)
     replace_attention_with_hardware_friendly_attention(model)
     disable_single_token_causal_mask(model)
     return model

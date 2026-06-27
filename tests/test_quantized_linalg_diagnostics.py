@@ -234,6 +234,19 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("disable_single_token_causal_mask", adapter)
         self.assertNotIn("attn.attention.bias", adapter)
 
+    def test_representative_core_adapter_uses_int8_embedding_lookup(self) -> None:
+        adapter = (
+            REPO_ROOT
+            / "TinyStories"
+            / "model_adapter_representative_core_pt2e_static_quant.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("class Int8Embedding", adapter)
+        self.assertIn("replace_embeddings_with_int8_lookup", adapter)
+        self.assertIn("torch.int8", adapter)
+        self.assertIn("F.embedding", adapter)
+        self.assertIn("replace_embeddings_with_int8_lookup(model)", adapter)
+
 
 if __name__ == "__main__":
     unittest.main()
