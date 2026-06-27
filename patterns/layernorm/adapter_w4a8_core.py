@@ -9,13 +9,6 @@ EXPORT_STRICT = False
 class LayerNormW4A8Core(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        inv_std = [
-            int(round(128.0 / ((variance + 1.0) ** 0.5)))
-            for variance in range(256)
-        ]
-        self.register_buffer(
-            "inv_std_lut_i16", torch.tensor(inv_std, dtype=torch.int16)
-        )
         self.register_buffer(
             "gamma_i16", torch.tensor([128, 120, 136, 112], dtype=torch.int16)
         )
@@ -23,37 +16,36 @@ class LayerNormW4A8Core(torch.nn.Module):
             "beta_i32", torch.tensor([0, -2, 1, 3], dtype=torch.int32)
         )
         self.register_buffer("mean_shift_i32", torch.tensor(2, dtype=torch.int32))
+        self.register_buffer("variance_shift_i32", torch.tensor(1, dtype=torch.int32))
         self.register_buffer("norm_shift_i32", torch.tensor(7, dtype=torch.int32))
+        self.register_buffer("inv_std_base_i32", torch.tensor(128, dtype=torch.int32))
+        self.register_buffer("inv_std_min_i32", torch.tensor(1, dtype=torch.int32))
         self.register_buffer("qmin_i32", torch.tensor(-128, dtype=torch.int32))
         self.register_buffer("qmax_i32", torch.tensor(127, dtype=torch.int32))
 
     def forward(self, x_i8: torch.Tensor) -> torch.Tensor:
         x_i32 = x_i8.to(torch.int32)
-        x0 = x_i32[:, :, 0:1]
-        x1 = x_i32[:, :, 1:2]
-        x2 = x_i32[:, :, 2:3]
-        x3 = x_i32[:, :, 3:4]
+        sum_i32 = torch.sum(x_i32, dim=-1, keepdim=True).to(torch.int32)
         mean_i32 = torch.bitwise_right_shift(
-            x0 + x1 + x2 + x3, self.mean_shift_i32
+            sum_i32, self.mean_shift_i32
         )
-        c0 = x0 - mean_i32
-        c1 = x1 - mean_i32
-        c2 = x2 - mean_i32
-        c3 = x3 - mean_i32
-        centered_i32 = torch.cat((c0, c1, c2, c3), dim=-1)
+        centered_i32 = x_i32 - mean_i32
+        sumsq_i32 = torch.sum(
+            centered_i32 * centered_i32, dim=-1, keepdim=True
+        ).to(torch.int32)
         variance_i32 = torch.bitwise_right_shift(
-            c0 * c0 + c1 * c1 + c2 * c2 + c3 * c3, self.mean_shift_i32
+            sumsq_i32, self.mean_shift_i32
         )
         variance_clamped_i32 = torch.minimum(
             torch.maximum(variance_i32, torch.tensor(0, dtype=torch.int32)),
             torch.tensor(255, dtype=torch.int32),
         )
-        lut_i16 = self.inv_std_lut_i16.reshape(1, 1, 256).expand(
-            variance_clamped_i32.shape[0], variance_clamped_i32.shape[1], 256
+        inv_std_drop_i32 = torch.bitwise_right_shift(
+            variance_clamped_i32, self.variance_shift_i32
         )
-        inv_std_i32 = torch.gather(
-            lut_i16, -1, variance_clamped_i32.to(torch.int64)
-        ).to(torch.int32)
+        inv_std_i32 = torch.maximum(
+            self.inv_std_base_i32 - inv_std_drop_i32, self.inv_std_min_i32
+        )
         normalized_i32 = torch.bitwise_right_shift(
             centered_i32 * inv_std_i32, self.norm_shift_i32
         )

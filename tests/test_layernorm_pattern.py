@@ -47,12 +47,26 @@ class LayerNormPatternTest(unittest.TestCase):
         self.assertIn("torch.int8", adapter)
         self.assertIn("torch.int32", adapter)
         self.assertIn("torch.bitwise_right_shift", adapter)
-        self.assertIn("inv_std_lut_i16", adapter)
+        self.assertIn("inv_std_base_i32", adapter)
+        self.assertIn("inv_std_min_i32", adapter)
         self.assertIn("def export_program", adapter)
         self.assertNotIn("torch.nn.LayerNorm", adapter)
         self.assertNotIn("torch.rsqrt", adapter)
         self.assertNotIn("prepare_pt2e", adapter)
         self.assertNotIn("convert_pt2e", adapter)
+
+    def test_adapter_avoids_lane_extraction_slices(self) -> None:
+        adapter = (PATTERN_DIR / "adapter_w4a8_core.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertNotIn("torch.gather", adapter)
+        self.assertIn("torch.sum", adapter)
+        self.assertIn("inv_std_base_i32", adapter)
+        self.assertNotIn("[:, :, 0:1]", adapter)
+        self.assertNotIn("[:, :, 1:2]", adapter)
+        self.assertNotIn("[:, :, 2:3]", adapter)
+        self.assertNotIn("[:, :, 3:4]", adapter)
 
     def test_pattern_is_registered_in_existing_pipeline(self) -> None:
         models = (REPO_ROOT / "nix" / "models.nix").read_text(encoding="utf-8")
