@@ -170,6 +170,8 @@
           ./scripts/diagnostics/scf_to_flat_scf_no_handshake.sh;
         noHandshakeScfToCalyx =
           ./scripts/diagnostics/scf_to_calyx_no_handshake.sh;
+        calyxToSvNoHandshake =
+          ./scripts/diagnostics/calyx_to_sv_no_handshake.sh;
         noHandshakeLinalgToLlvm =
           ./scripts/diagnostics/linalg_to_llvm_no_handshake.sh;
         flatScfBlockerReport = ./scripts/diagnostics/flat_scf_blocker_report.py;
@@ -386,14 +388,6 @@
             pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-hw";
           "tinystories-representative-core-w4a8-via-tosa-hw-clean" =
             pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-hw-clean";
-          "tinystories-representative-core-w4a8-via-tosa-sv-mlir" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-sv-mlir";
-          "tinystories-representative-core-w4a8-via-tosa-sv" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-sv";
-          "tinystories-representative-core-w4a8-via-tosa-sv-provenance-report" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-sv-provenance-report";
-          "tinystories-representative-core-w4a8-via-tosa-yosys-stat" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-yosys-stat";
           "tinystories-representative-core-w4a8-via-tosa-no-handshake-torch" =
             pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-torch";
           "tinystories-representative-core-w4a8-via-tosa-no-handshake-tosa" =
@@ -408,10 +402,17 @@
             pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-calyx";
           "tinystories-representative-core-w4a8-via-tosa-no-handshake-llvm" =
             pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-llvm";
-          "tinystories-representative-core-w4a8-via-tosa-no-handshake-sv" =
-            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-sv";
-          "tinystories-representative-core-w4a8-via-tosa-no-handshake-yosys-stat" =
-            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-yosys-stat";
+          "tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv" =
+            pkgs.runCommand "tinystories-representative-core-w4a8-calyx-sv" {
+              buildInputs = [ circt ];
+            } ''
+              ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
+                ${circt}/bin/circt-opt \
+                ${
+                  pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-calyx"
+                } \
+                "$out"
+            '';
         };
         torchMlirPatchedOpt = "${torchMlirPatched}/bin/torch-mlir-opt";
         quantizedLinalgDiagnosticPackages = {

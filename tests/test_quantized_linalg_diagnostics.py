@@ -159,9 +159,9 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("pattern-linear-w4a8-via-tosa-hw0", flake)
         self.assertIn("pattern-linear-w4a8-via-tosa-sv", flake)
         self.assertIn("pattern-linear-w4a8-core-via-tosa-sv", flake)
-        self.assertIn("tinystories-representative-core-w4a8-via-tosa-sv", flake)
         self.assertIn(
-            "tinystories-representative-core-w4a8-via-tosa-yosys-stat", flake
+            "tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv",
+            flake,
         )
 
     def test_tosa_no_handshake_pipeline_is_public_and_skips_handshake_tail(self) -> None:
@@ -219,7 +219,7 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
             flake,
         )
         self.assertIn(
-            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-sv"',
+            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv"',
             flake,
         )
 

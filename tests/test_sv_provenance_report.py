@@ -88,7 +88,7 @@ class SvProvenanceReportTest(unittest.TestCase):
             flake,
         )
         self.assertIn(
-            "tinystories-representative-core-w4a8-via-tosa-sv-provenance-report",
+            "tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv",
             flake,
         )
 
