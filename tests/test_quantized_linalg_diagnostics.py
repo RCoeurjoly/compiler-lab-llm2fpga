@@ -121,6 +121,28 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("/*rescale=*/1.0", text)
         self.assertIn("rewriter.replaceOp(op, rescaled)", text)
 
+    def test_circt_float_extern_patch_covers_tosa_rounding_helpers(self) -> None:
+        patch = (
+            REPO_ROOT
+            / "patches"
+            / "circt-upstream-task3-recovery"
+            / "0011-rebased-handshaketohw-stack.patch"
+        )
+        primitives = REPO_ROOT / "rtl" / "fp" / "circt_fp_primitives.sv"
+
+        patch_text = patch.read_text(encoding="utf-8")
+        primitive_text = primitives.read_text(encoding="utf-8")
+
+        for op in ["math::FloorOp", "math::CeilOp", "math::RoundEvenOp"]:
+            self.assertIn(op, patch_text)
+
+        for module in [
+            "math_floor_in_f32_out_f32",
+            "math_ceil_in_f32_out_f32",
+            "math_roundeven_in_f32_out_f32",
+        ]:
+            self.assertIn(f"module {module}", primitive_text)
+
     def test_tosa_pipeline_rejoins_sv_path(self) -> None:
         flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
         pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
@@ -140,6 +162,65 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("tinystories-representative-core-w4a8-via-tosa-sv", flake)
         self.assertIn(
             "tinystories-representative-core-w4a8-via-tosa-yosys-stat", flake
+        )
+
+    def test_tosa_no_handshake_pipeline_is_public_and_skips_handshake_tail(self) -> None:
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+        pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
+
+        self.assertIn("registerTosaNoHandshakeModel", pipeline)
+        self.assertIn("mkNoHandshakePipeline", pipeline)
+        self.assertIn("mkLinalgToScfDerivation", pipeline)
+        self.assertIn("mkScfToFlatScfDerivation", pipeline)
+        self.assertIn("mkScfToCalyxDerivation", pipeline)
+        self.assertIn("mkLinalgToLlvmDerivation", pipeline)
+        self.assertIn("noHandshakeScfToFlatScf", pipeline)
+        self.assertIn("flatScfBlockerReport", pipeline)
+        self.assertIn("FLAT_SCF_BLOCKER_REPORT", pipeline)
+        self.assertIn("flatScf = self.\"flat-scf\"", pipeline)
+        self.assertIn("model.calyx.mlir", pipeline)
+        self.assertIn("manifest.json", pipeline)
+        self.assertIn("scf_to_flat_scf_no_handshake.sh", flake)
+        self.assertIn("flat_scf_blocker_report.py", flake)
+        self.assertIn(
+            '"pattern-linear-w4a8-core-via-tosa-no-handshake-scf"',
+            flake,
+        )
+        self.assertIn(
+            '"pattern-linear-w4a8-core-via-tosa-no-handshake-flat-scf"',
+            flake,
+        )
+        self.assertIn(
+            '"pattern-linear-w4a8-core-via-tosa-no-handshake-calyx"',
+            flake,
+        )
+        self.assertIn(
+            '"pattern-linear-w4a8-core-via-tosa-no-handshake-llvm"',
+            flake,
+        )
+        self.assertIn(
+            '"pattern-linear-w4a8-core-via-tosa-no-handshake-sv"',
+            flake,
+        )
+        self.assertIn(
+            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-scf"',
+            flake,
+        )
+        self.assertIn(
+            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-flat-scf"',
+            flake,
+        )
+        self.assertIn(
+            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx"',
+            flake,
+        )
+        self.assertIn(
+            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-llvm"',
+            flake,
+        )
+        self.assertIn(
+            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-sv"',
+            flake,
         )
 
 

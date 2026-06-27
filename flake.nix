@@ -163,6 +163,17 @@
         torchMlir = torchMlirUnpatched;
 
         pipelineScripts = ./scripts/pipeline;
+        svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
+        noHandshakeLinalgToScf =
+          ./scripts/diagnostics/linalg_to_scf_no_handshake.sh;
+        noHandshakeScfToFlatScf =
+          ./scripts/diagnostics/scf_to_flat_scf_no_handshake.sh;
+        noHandshakeScfToCalyx =
+          ./scripts/diagnostics/scf_to_calyx_no_handshake.sh;
+        noHandshakeLinalgToLlvm =
+          ./scripts/diagnostics/linalg_to_llvm_no_handshake.sh;
+        flatScfBlockerReport =
+          ./scripts/diagnostics/flat_scf_blocker_report.py;
         fpPrimsSv = ./rtl/fp/circt_fp_primitives.sv;
         tinyStories1m = let
           modelId = "roneneldan/TinyStories-1M";
@@ -193,7 +204,10 @@
 
         pipelineLib = import ./nix/pipeline.nix {
           inherit pkgs mlir circt yosysPkg yosysSlang torchMlir python;
-          inherit pipelineScripts;
+          inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
+            noHandshakeScfToFlatScf noHandshakeScfToCalyx
+            noHandshakeLinalgToLlvm;
+          inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
         };
         modelRegistry = import ./nix/models.nix {
@@ -211,7 +225,10 @@
         pipelineLibPatched = import ./nix/pipeline.nix {
           inherit pkgs mlir circt yosysPkg yosysSlang python;
           torchMlir = torchMlirPatched;
-          inherit pipelineScripts;
+          inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
+            noHandshakeScfToFlatScf noHandshakeScfToCalyx
+            noHandshakeLinalgToLlvm;
+          inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
         };
         modelRegistryPatched = import ./nix/models.nix {
@@ -239,7 +256,10 @@
           inherit pkgs mlir circt yosysPkg yosysSlang python;
           tosaToLinalgMlir = mlirForTorchMlir;
           torchMlir = torchMlirPatched;
-          inherit pipelineScripts;
+          inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
+            noHandshakeScfToFlatScf noHandshakeScfToCalyx
+            noHandshakeLinalgToLlvm;
+          inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
         };
         modelRegistryTosaPatched = import ./nix/models.nix {
@@ -253,6 +273,17 @@
         pipelineStagePackagesTosaPatched =
           pipelineLibTosaPatched.pipelineStagePackagesFromRegistry
           modelRegistryTosaPatched;
+        modelRegistryTosaNoHandshakePatched = import ./nix/models.nix {
+          registerModel = pipelineLibTosaPatched.registerTosaNoHandshakeModel;
+          inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO
+            tinyStories1m fpPrimsSv;
+          torchMlir = torchMlirPatched;
+          materializePyTorchExported =
+            ./scripts/materialize-pytorch-exported.py;
+        };
+        pipelineStagePackagesTosaNoHandshakePatched =
+          pipelineLibTosaPatched.pipelineStagePackagesFromRegistry
+          modelRegistryTosaNoHandshakePatched;
         viaTosaLinearW4A8PipelinePackages = {
           "pattern-linear-w4a8-via-tosa-torch" =
             pipelineStagePackagesTosaPatched."pattern-linear-w4a8-torch";
@@ -276,6 +307,8 @@
             pipelineStagePackagesTosaPatched."pattern-linear-w4a8-sv-mlir";
           "pattern-linear-w4a8-via-tosa-sv" =
             pipelineStagePackagesTosaPatched."pattern-linear-w4a8-sv";
+          "pattern-linear-w4a8-via-tosa-sv-provenance-report" =
+            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-sv-provenance-report";
           "pattern-linear-w4a8-via-tosa-yosys-stat" =
             pipelineStagePackagesTosaPatched."pattern-linear-w4a8-yosys-stat";
           "pattern-linear-w4a8-core-via-tosa-torch" =
@@ -300,8 +333,28 @@
             pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-sv-mlir";
           "pattern-linear-w4a8-core-via-tosa-sv" =
             pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-sv";
+          "pattern-linear-w4a8-core-via-tosa-sv-provenance-report" =
+            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-sv-provenance-report";
           "pattern-linear-w4a8-core-via-tosa-yosys-stat" =
             pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-yosys-stat";
+          "pattern-linear-w4a8-core-via-tosa-no-handshake-torch" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-torch";
+          "pattern-linear-w4a8-core-via-tosa-no-handshake-tosa" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-tosa";
+          "pattern-linear-w4a8-core-via-tosa-no-handshake-linalg" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-linalg";
+          "pattern-linear-w4a8-core-via-tosa-no-handshake-scf" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-scf";
+          "pattern-linear-w4a8-core-via-tosa-no-handshake-flat-scf" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-flat-scf";
+          "pattern-linear-w4a8-core-via-tosa-no-handshake-calyx" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-calyx";
+          "pattern-linear-w4a8-core-via-tosa-no-handshake-llvm" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-llvm";
+          "pattern-linear-w4a8-core-via-tosa-no-handshake-sv" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-sv";
+          "pattern-linear-w4a8-core-via-tosa-no-handshake-yosys-stat" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-yosys-stat";
           "tinystories-representative-core-w4a8-via-tosa-torch" =
             pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-torch";
           "tinystories-representative-core-w4a8-via-tosa-tosa" =
@@ -324,8 +377,28 @@
             pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-sv-mlir";
           "tinystories-representative-core-w4a8-via-tosa-sv" =
             pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-sv";
+          "tinystories-representative-core-w4a8-via-tosa-sv-provenance-report" =
+            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-sv-provenance-report";
           "tinystories-representative-core-w4a8-via-tosa-yosys-stat" =
             pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-yosys-stat";
+          "tinystories-representative-core-w4a8-via-tosa-no-handshake-torch" =
+            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-torch";
+          "tinystories-representative-core-w4a8-via-tosa-no-handshake-tosa" =
+            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-tosa";
+          "tinystories-representative-core-w4a8-via-tosa-no-handshake-linalg" =
+            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-linalg";
+          "tinystories-representative-core-w4a8-via-tosa-no-handshake-scf" =
+            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-scf";
+          "tinystories-representative-core-w4a8-via-tosa-no-handshake-flat-scf" =
+            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-flat-scf";
+          "tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx" =
+            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-calyx";
+          "tinystories-representative-core-w4a8-via-tosa-no-handshake-llvm" =
+            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-llvm";
+          "tinystories-representative-core-w4a8-via-tosa-no-handshake-sv" =
+            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-sv";
+          "tinystories-representative-core-w4a8-via-tosa-no-handshake-yosys-stat" =
+            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-yosys-stat";
         };
         torchMlirPatchedOpt = "${torchMlirPatched}/bin/torch-mlir-opt";
         quantizedLinalgDiagnosticPackages = {

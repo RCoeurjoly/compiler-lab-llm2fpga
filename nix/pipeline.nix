@@ -1,5 +1,7 @@
 { pkgs, mlir, circt, yosysPkg, yosysSlang, torchMlir, python, pipelineScripts
-, compilePyTorch, tosaToLinalgMlir ? mlir }:
+, compilePyTorch, svProvenanceReport, noHandshakeLinalgToScf
+, noHandshakeScfToFlatScf, noHandshakeScfToCalyx, noHandshakeLinalgToLlvm
+, flatScfBlockerReport, tosaToLinalgMlir ? mlir }:
 let
   stageNames = [
     "hf-snapshot"
@@ -8,8 +10,12 @@ let
     "torch-stats"
     "tosa"
     "linalg"
+    "scf"
+    "flat-scf"
+    "calyx"
     "cf"
     "cf-stats"
+    "llvm"
     "handshake"
     "hs-ext"
     "hw0"
@@ -17,6 +23,7 @@ let
     "hw-clean"
     "sv-mlir"
     "sv"
+    "sv-provenance-report"
     "il"
     "yosys-stat"
   ];
@@ -105,6 +112,38 @@ let
         ${mlir}/bin/mlir-opt ${linalg} "$out"
     '';
 
+  mkLinalgToScfDerivation = { name, linalg }:
+    pkgs.runCommand "${name}-scf.mlir" { buildInputs = [ mlir ]; } ''
+      ${pkgs.bash}/bin/bash ${noHandshakeLinalgToScf} \
+        ${mlir}/bin/mlir-opt ${linalg} "$out"
+    '';
+
+  mkScfToFlatScfDerivation = { name, scf }:
+    pkgs.runCommand "${name}-flat-scf" { buildInputs = [ circt python ]; } ''
+      export FLAT_SCF_BLOCKER_REPORT=${flatScfBlockerReport}
+      ${pkgs.bash}/bin/bash ${noHandshakeScfToFlatScf} \
+        ${circt}/bin/circt-opt ${scf} "$out"
+      test -f "$out/flat.scf.mlir"
+      test -f "$out/manifest.json"
+      test -f "$out/blockers.json"
+    '';
+
+  mkScfToCalyxDerivation = { name, flatScf }:
+    pkgs.runCommand "${name}-calyx" { buildInputs = [ circt python ]; } ''
+      ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
+        ${circt}/bin/circt-opt ${flatScf}/flat.scf.mlir "$out"
+      test -f "$out/manifest.json"
+      if ${pkgs.gnugrep}/bin/grep -q '"status":"ok"' "$out/manifest.json"; then
+        test -f "$out/model.calyx.mlir"
+      fi
+    '';
+
+  mkLinalgToLlvmDerivation = { name, linalg }:
+    pkgs.runCommand "${name}-llvm.mlir" { buildInputs = [ mlir ]; } ''
+      ${pkgs.bash}/bin/bash ${noHandshakeLinalgToLlvm} \
+        ${mlir}/bin/mlir-opt ${linalg} "$out"
+    '';
+
   mkHandshakeDerivation = { name, cf }:
     pkgs.runCommand "${name}-handshake.mlir" {
       buildInputs = [ mlir circt ];
@@ -153,6 +192,15 @@ let
       ''}
       ${pkgs.bash}/bin/bash ${pipelineScripts}/sv_mlir_to_sv.sh \
         ${circt}/bin/circt-opt ${svMlir} "$out"
+    '';
+
+  mkSvProvenanceReportDerivation = { name, sv }:
+    pkgs.runCommand "${name}-sv-provenance-report.json" {
+      buildInputs = [ python ];
+    } ''
+      ${python}/bin/python3 ${svProvenanceReport} \
+        --input-filelist ${sv}/sources.f \
+        --output "$out"
     '';
 
   mkIlDerivation = { name, sv, slangPerFileExternModules ? false }:
@@ -211,6 +259,21 @@ let
           inherit name;
           inherit (self) torch tosa;
         };
+        scf = mkUnavailableStage {
+          inherit name;
+          stage = "scf";
+          reason = "baseline hardware pipeline lowers through CF and Handshake";
+        };
+        "flat-scf" = mkUnavailableStage {
+          inherit name;
+          stage = "flat-scf";
+          reason = "baseline hardware pipeline lowers through CF and Handshake";
+        };
+        calyx = mkUnavailableStage {
+          inherit name;
+          stage = "calyx";
+          reason = "baseline hardware pipeline lowers through CF and Handshake";
+        };
         cf = mkCfDerivation {
           inherit name;
           inherit (self) linalg;
@@ -220,6 +283,11 @@ let
           stageName = "cf";
           tool = "${mlir}/bin/mlir-opt";
           input = self.cf;
+        };
+        llvm = mkUnavailableStage {
+          inherit name;
+          stage = "llvm";
+          reason = "baseline hardware pipeline lowers through Handshake, not LLVM";
         };
         handshake = handshakeFromCf {
           inherit name;
@@ -249,6 +317,10 @@ let
           inherit name;
           svMlir = self."sv-mlir";
           inherit allowHwExterns fpPrimsSv;
+        };
+        "sv-provenance-report" = mkSvProvenanceReportDerivation {
+          inherit name;
+          inherit (self) sv;
         };
         il = mkIlDerivation {
           inherit name;
@@ -283,6 +355,73 @@ let
         tosaFromTorch = mkTosaDerivation;
         linalgFromStages = { name, tosa, ... }:
           mkTosaToLinalgDerivation { inherit name tosa; };
+      };
+    in self;
+
+  mkNoHandshakePipeline = { name, hfSnapshot, pytorchExported, torchStage
+    , allowHwExterns ? false, fpPrimsSv ? null
+    , slangPerFileExternModules ? false }:
+    let
+      unavailable = stage: reason:
+        mkUnavailableStage { inherit name stage reason; };
+      self = {
+        "hf-snapshot" = hfSnapshot;
+        "pytorch-exported" = pytorchExported;
+        torch = torchStage;
+        "torch-stats" = mkMlirOpStatsDerivation {
+          inherit name;
+          stageName = "torch";
+          tool = torchMlirOpt;
+          input = self.torch;
+        };
+        tosa = mkTosaDerivation {
+          inherit name;
+          inherit (self) torch;
+        };
+        linalg = mkTosaToLinalgDerivation {
+          inherit name;
+          inherit (self) tosa;
+        };
+        scf = mkLinalgToScfDerivation {
+          inherit name;
+          inherit (self) linalg;
+        };
+        "flat-scf" = mkScfToFlatScfDerivation {
+          inherit name;
+          inherit (self) scf;
+        };
+        calyx = mkScfToCalyxDerivation {
+          inherit name;
+          flatScf = self."flat-scf";
+        };
+        cf = unavailable "cf"
+          "no-handshake experiment stops before control-flow hardware lowering";
+        "cf-stats" = unavailable "cf-stats"
+          "no-handshake experiment does not emit a CF hardware handoff";
+        llvm = mkLinalgToLlvmDerivation {
+          inherit name;
+          inherit (self) linalg;
+        };
+        handshake = unavailable "handshake"
+          "no-handshake experiment intentionally skips Handshake lowering";
+        "hs-ext" = unavailable "hs-ext"
+          "no-handshake experiment intentionally skips Handshake lowering";
+        hw0 = unavailable "hw0"
+          "no direct Linalg/SCF/MemRef-to-HW backend is wired yet";
+        hw = unavailable "hw"
+          "no direct Linalg/SCF/MemRef-to-HW backend is wired yet";
+        "hw-clean" = unavailable "hw-clean"
+          "no direct Linalg/SCF/MemRef-to-HW backend is wired yet";
+        "sv-mlir" = unavailable "sv-mlir"
+          "no direct no-handshake HW/SV lowering backend is wired yet";
+        sv = unavailable "sv"
+          "no direct no-handshake HW/SV lowering backend is wired yet";
+        "sv-provenance-report" = unavailable "sv-provenance-report"
+          "no emitted SV exists for this no-handshake experiment yet";
+        il = unavailable "il"
+          "no emitted SV exists for this no-handshake experiment yet";
+        "yosys-stat" = unavailable "yosys-stat"
+          "no emitted SV exists for this no-handshake experiment yet";
       };
     in self;
 
@@ -350,6 +489,9 @@ let
   registerTosaModel = args:
     registerPipelineModel (args // { pipelineFactory = mkTosaPipeline; });
 
+  registerTosaNoHandshakeModel = args:
+    registerPipelineModel (args // { pipelineFactory = mkNoHandshakePipeline; });
+
   pipelineStagePackagesFromRegistry = registry:
     pkgs.lib.concatMapAttrs
     (name: model: mkPipelineStagePackages stageNames name model.pipeline)
@@ -370,7 +512,7 @@ let
         }) stageNames);
       }) registry));
 in {
-  inherit registerModel registerTosaModel;
+  inherit registerModel registerTosaModel registerTosaNoHandshakeModel;
   inherit pipelineStagePackagesFromRegistry;
   inherit metadataPackagesFromRegistry;
   inherit registryIndexPackage;
