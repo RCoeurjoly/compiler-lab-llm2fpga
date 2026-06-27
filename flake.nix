@@ -370,6 +370,20 @@
             pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-calyx";
           "pattern-embedding-w4a8-core-via-tosa-no-handshake-llvm" =
             pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-llvm";
+          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-torch" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-torch";
+          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-tosa" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-tosa";
+          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-linalg" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-linalg";
+          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-scf" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-scf";
+          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-flat-scf" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-flat-scf";
+          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-calyx" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-calyx";
+          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-llvm" =
+            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-llvm";
           "tinystories-representative-core-w4a8-via-tosa-torch" =
             pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-torch";
           "tinystories-representative-core-w4a8-via-tosa-tosa" =

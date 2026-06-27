@@ -100,6 +100,28 @@ in {
     '';
   };
 
+  "pattern-layernorm-w4a8-core" = registerModel {
+    key = "pattern-layernorm-w4a8-core";
+    name = "pattern-layernorm-w4a8-core";
+    description =
+      "Local layernorm W4A8 hardware core with int8 activation input, integer reductions, fixed-point inverse standard deviation, and int8 output.";
+    source = {
+      type = "pattern";
+      pattern = "layernorm";
+      quantization = "w4a8-core-int8-fixed-point";
+      boundary = "hardware";
+    };
+    allowHwExterns = false;
+    slangPerFileExternModules = true;
+    pytorchToolchain = [ pythonWithTinyStories torchMlir ];
+    pytorchExportedCommand = ''
+      export PYTHONPATH="${../patterns/layernorm}:''${PYTHONPATH:-}"
+      python ${materializePyTorchExported} \
+        --adapter ${../patterns/layernorm/adapter_w4a8_core.py} \
+        --out-dir "$out"
+    '';
+  };
+
   "tinystories-fp32" = registerModel {
     key = "tinystories-fp32";
     name = "tinystories-fp32";
