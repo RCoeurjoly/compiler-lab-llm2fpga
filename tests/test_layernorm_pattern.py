@@ -46,10 +46,13 @@ class LayerNormPatternTest(unittest.TestCase):
 
         self.assertIn("torch.int8", adapter)
         self.assertIn("torch.int32", adapter)
+        self.assertIn("gamma_i32", adapter)
         self.assertIn("torch.bitwise_right_shift", adapter)
         self.assertIn("inv_std_base_i32", adapter)
         self.assertIn("inv_std_min_i32", adapter)
         self.assertIn("def export_program", adapter)
+        self.assertNotIn("gamma_i16", adapter)
+        self.assertNotIn("gamma_i16.to(torch.int32)", adapter)
         self.assertNotIn("torch.nn.LayerNorm", adapter)
         self.assertNotIn("torch.rsqrt", adapter)
         self.assertNotIn("prepare_pt2e", adapter)

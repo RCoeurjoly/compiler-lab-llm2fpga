@@ -10,7 +10,7 @@ class LayerNormW4A8Core(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.register_buffer(
-            "gamma_i16", torch.tensor([128, 120, 136, 112], dtype=torch.int16)
+            "gamma_i32", torch.tensor([128, 120, 136, 112], dtype=torch.int32)
         )
         self.register_buffer(
             "beta_i32", torch.tensor([0, -2, 1, 3], dtype=torch.int32)
@@ -50,7 +50,7 @@ class LayerNormW4A8Core(torch.nn.Module):
             centered_i32 * inv_std_i32, self.norm_shift_i32
         )
         scaled_i32 = torch.bitwise_right_shift(
-            normalized_i32 * self.gamma_i16.to(torch.int32), self.norm_shift_i32
+            normalized_i32 * self.gamma_i32, self.norm_shift_i32
         )
         biased_i32 = scaled_i32 + self.beta_i32
         clamped_i32 = torch.minimum(
