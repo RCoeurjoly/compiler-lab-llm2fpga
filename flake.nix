@@ -26,17 +26,7 @@
         };
 
         circtPkgs = circt-nix.packages.${system};
-        circt =
-          (circtPkgs.circt.override { enableSlang = false; }).overrideAttrs
-          (old: {
-            patches = (old.patches or [ ]) ++ [
-              ./patches/circt-upstream-task3-recovery/0001-flatten-memref-shape-ops-after-memref-flattening.patch
-              ./patches/circt-upstream-task3-recovery/0002-handle-cfg-threaded-memrefs-in-handshake-lowering.patch
-              ./patches/circt-upstream-task3-recovery/0005-handle-dense-resource-globals-in-flattenmemrefs.patch
-              ./patches/circt-upstream-task3-recovery/0011-rebased-handshaketohw-stack.patch
-              ./patches/circt-upstream-task3-recovery/0012-update-buffer-lowering-test-for-constant-order.patch
-            ];
-          });
+        circt = circtPkgs.circt.override { enableSlang = false; };
 
         nixEdaPkgs = nix-eda.packages.${system};
         yosysPkgBase = nixEdaPkgs.yosys;
@@ -144,23 +134,13 @@
               "${nanobindBootstrap}/${python.sitePackages}/nanobind/cmake")
           ];
         });
-        torchMlirPatched = pkgsLlvm21.callPackage ./torch-mlir.nix {
+        torchMlir = pkgsLlvm21.callPackage ./torch-mlir.nix {
           inherit python;
           nanobind = nanobindBootstrap;
           inherit (torchMlirLlvmPackages) tblgen;
           mlir = mlirForTorchMlir;
           inherit (torchMlirLlvmPackages) llvm;
-          applyTask3RfpPatches = true;
         };
-        torchMlirUnpatched = pkgsLlvm21.callPackage ./torch-mlir.nix {
-          inherit python;
-          nanobind = nanobindBootstrap;
-          inherit (torchMlirLlvmPackages) tblgen;
-          mlir = mlirForTorchMlir;
-          inherit (torchMlirLlvmPackages) llvm;
-          applyTask3RfpPatches = false;
-        };
-        torchMlir = torchMlirUnpatched;
 
         pipelineScripts = ./scripts/pipeline;
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
@@ -207,7 +187,7 @@
           inherit pkgs mlir circt yosysPkg yosysSlang torchMlir python;
           inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
             noHandshakeScfToFlatScf noHandshakeScfToCalyx
-            noHandshakeLinalgToLlvm;
+            calyxToSvNoHandshake noHandshakeLinalgToLlvm;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
         };
@@ -223,212 +203,173 @@
         pipelineMetadataPackages =
           pipelineLib.metadataPackagesFromRegistry modelRegistry;
         modelRegistryJson = pipelineLib.registryIndexPackage modelRegistry;
-        pipelineLibPatched = import ./nix/pipeline.nix {
-          inherit pkgs mlir circt yosysPkg yosysSlang python;
-          torchMlir = torchMlirPatched;
-          inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
-            noHandshakeScfToFlatScf noHandshakeScfToCalyx
-            noHandshakeLinalgToLlvm;
-          inherit flatScfBlockerReport;
-          compilePyTorch = ./scripts/compile-pytorch.py;
-        };
-        modelRegistryPatched = import ./nix/models.nix {
-          inherit (pipelineLibPatched) registerModel;
-          inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO
-            tinyStories1m fpPrimsSv;
-          torchMlir = torchMlirPatched;
-          materializePyTorchExported =
-            ./scripts/materialize-pytorch-exported.py;
-        };
-        pipelineStagePackagesPatched =
-          pipelineLibPatched.pipelineStagePackagesFromRegistry
-          modelRegistryPatched;
-        patchedLinearW4A8PipelinePackages = {
-          "pattern-linear-w4a8-torch-patched" =
-            pipelineStagePackagesPatched."pattern-linear-w4a8-torch";
-          "pattern-linear-w4a8-linalg-patched" =
-            pipelineStagePackagesPatched."pattern-linear-w4a8-linalg";
-          "pattern-linear-w4a8-sv-patched" =
-            pipelineStagePackagesPatched."pattern-linear-w4a8-sv";
-          "pattern-linear-w4a8-yosys-stat-patched" =
-            pipelineStagePackagesPatched."pattern-linear-w4a8-yosys-stat";
-        };
-        pipelineLibTosaPatched = import ./nix/pipeline.nix {
+        pipelineLibTosa = import ./nix/pipeline.nix {
           inherit pkgs mlir circt yosysPkg yosysSlang python;
           tosaToLinalgMlir = mlirForTorchMlir;
-          torchMlir = torchMlirPatched;
+          inherit torchMlir;
           inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
             noHandshakeScfToFlatScf noHandshakeScfToCalyx
-            noHandshakeLinalgToLlvm;
+            calyxToSvNoHandshake noHandshakeLinalgToLlvm;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
         };
-        modelRegistryTosaPatched = import ./nix/models.nix {
-          registerModel = pipelineLibTosaPatched.registerTosaModel;
+        modelRegistryTosa = import ./nix/models.nix {
+          registerModel = pipelineLibTosa.registerTosaModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO
             tinyStories1m fpPrimsSv;
-          torchMlir = torchMlirPatched;
+          inherit torchMlir;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
         };
-        pipelineStagePackagesTosaPatched =
-          pipelineLibTosaPatched.pipelineStagePackagesFromRegistry
-          modelRegistryTosaPatched;
-        modelRegistryTosaNoHandshakePatched = import ./nix/models.nix {
-          registerModel = pipelineLibTosaPatched.registerTosaNoHandshakeModel;
+        pipelineStagePackagesTosa =
+          pipelineLibTosa.pipelineStagePackagesFromRegistry modelRegistryTosa;
+        modelRegistryTosaNoHandshake = import ./nix/models.nix {
+          registerModel = pipelineLibTosa.registerTosaNoHandshakeModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO
             tinyStories1m fpPrimsSv;
-          torchMlir = torchMlirPatched;
+          inherit torchMlir;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
         };
-        pipelineStagePackagesTosaNoHandshakePatched =
-          pipelineLibTosaPatched.pipelineStagePackagesFromRegistry
-          modelRegistryTosaNoHandshakePatched;
+        pipelineStagePackagesTosaNoHandshake =
+          pipelineLibTosa.pipelineStagePackagesFromRegistry
+          modelRegistryTosaNoHandshake;
         viaTosaLinearW4A8PipelinePackages = {
           "pattern-linear-w4a8-via-tosa-torch" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-torch";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-torch";
           "pattern-linear-w4a8-via-tosa-tosa" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-tosa";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-tosa";
           "pattern-linear-w4a8-via-tosa-linalg" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-linalg";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-linalg";
           "pattern-linear-w4a8-via-tosa-cf" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-cf";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-cf";
           "pattern-linear-w4a8-via-tosa-handshake" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-handshake";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-handshake";
           "pattern-linear-w4a8-via-tosa-hs-ext" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-hs-ext";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-hs-ext";
           "pattern-linear-w4a8-via-tosa-hw0" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-hw0";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-hw0";
           "pattern-linear-w4a8-via-tosa-hw" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-hw";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-hw";
           "pattern-linear-w4a8-via-tosa-hw-clean" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-hw-clean";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-hw-clean";
           "pattern-linear-w4a8-via-tosa-sv-mlir" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-sv-mlir";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-sv-mlir";
           "pattern-linear-w4a8-via-tosa-sv" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-sv";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-sv";
           "pattern-linear-w4a8-via-tosa-sv-provenance-report" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-sv-provenance-report";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-sv-provenance-report";
           "pattern-linear-w4a8-via-tosa-yosys-stat" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-yosys-stat";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-yosys-stat";
           "pattern-linear-w4a8-core-via-tosa-torch" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-torch";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-torch";
           "pattern-linear-w4a8-core-via-tosa-tosa" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-tosa";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-tosa";
           "pattern-linear-w4a8-core-via-tosa-linalg" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-linalg";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-linalg";
           "pattern-linear-w4a8-core-via-tosa-cf" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-cf";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-cf";
           "pattern-linear-w4a8-core-via-tosa-handshake" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-handshake";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-handshake";
           "pattern-linear-w4a8-core-via-tosa-hs-ext" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-hs-ext";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-hs-ext";
           "pattern-linear-w4a8-core-via-tosa-hw0" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-hw0";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-hw0";
           "pattern-linear-w4a8-core-via-tosa-hw" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-hw";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-hw";
           "pattern-linear-w4a8-core-via-tosa-hw-clean" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-hw-clean";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-hw-clean";
           "pattern-linear-w4a8-core-via-tosa-sv-mlir" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-sv-mlir";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-sv-mlir";
           "pattern-linear-w4a8-core-via-tosa-sv" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-sv";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-sv";
           "pattern-linear-w4a8-core-via-tosa-sv-provenance-report" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-sv-provenance-report";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-sv-provenance-report";
           "pattern-linear-w4a8-core-via-tosa-yosys-stat" =
-            pipelineStagePackagesTosaPatched."pattern-linear-w4a8-core-yosys-stat";
+            pipelineStagePackagesTosa."pattern-linear-w4a8-core-yosys-stat";
           "pattern-linear-w4a8-core-via-tosa-no-handshake-torch" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-torch";
+            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-torch";
           "pattern-linear-w4a8-core-via-tosa-no-handshake-tosa" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-tosa";
+            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-tosa";
           "pattern-linear-w4a8-core-via-tosa-no-handshake-linalg" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-linalg";
+            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-linalg";
           "pattern-linear-w4a8-core-via-tosa-no-handshake-scf" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-scf";
+            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-scf";
           "pattern-linear-w4a8-core-via-tosa-no-handshake-flat-scf" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-flat-scf";
+            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-flat-scf";
           "pattern-linear-w4a8-core-via-tosa-no-handshake-calyx" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-calyx";
+            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-calyx";
+          "pattern-linear-w4a8-core-via-tosa-no-handshake-calyx-sv" =
+            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-calyx-sv";
           "pattern-linear-w4a8-core-via-tosa-no-handshake-llvm" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-llvm";
-          "pattern-linear-w4a8-core-via-tosa-no-handshake-sv" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-sv";
-          "pattern-linear-w4a8-core-via-tosa-no-handshake-yosys-stat" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-linear-w4a8-core-yosys-stat";
+            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-llvm";
           "pattern-embedding-w4a8-core-via-tosa-no-handshake-torch" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-torch";
+            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-torch";
           "pattern-embedding-w4a8-core-via-tosa-no-handshake-tosa" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-tosa";
+            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-tosa";
           "pattern-embedding-w4a8-core-via-tosa-no-handshake-linalg" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-linalg";
+            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-linalg";
           "pattern-embedding-w4a8-core-via-tosa-no-handshake-scf" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-scf";
+            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-scf";
           "pattern-embedding-w4a8-core-via-tosa-no-handshake-flat-scf" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-flat-scf";
+            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-flat-scf";
           "pattern-embedding-w4a8-core-via-tosa-no-handshake-calyx" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-calyx";
+            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-calyx";
+          "pattern-embedding-w4a8-core-via-tosa-no-handshake-calyx-sv" =
+            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-calyx-sv";
           "pattern-embedding-w4a8-core-via-tosa-no-handshake-llvm" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-embedding-w4a8-core-llvm";
+            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-llvm";
           "pattern-layernorm-w4a8-core-via-tosa-no-handshake-torch" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-torch";
+            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-torch";
           "pattern-layernorm-w4a8-core-via-tosa-no-handshake-tosa" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-tosa";
+            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-tosa";
           "pattern-layernorm-w4a8-core-via-tosa-no-handshake-linalg" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-linalg";
+            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-linalg";
           "pattern-layernorm-w4a8-core-via-tosa-no-handshake-scf" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-scf";
+            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-scf";
           "pattern-layernorm-w4a8-core-via-tosa-no-handshake-flat-scf" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-flat-scf";
+            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-flat-scf";
           "pattern-layernorm-w4a8-core-via-tosa-no-handshake-calyx" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-calyx";
+            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-calyx";
+          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-calyx-sv" =
+            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-calyx-sv";
           "pattern-layernorm-w4a8-core-via-tosa-no-handshake-llvm" =
-            pipelineStagePackagesTosaNoHandshakePatched."pattern-layernorm-w4a8-core-llvm";
+            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-llvm";
           "tinystories-representative-core-w4a8-via-tosa-torch" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-torch";
+            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-torch";
           "tinystories-representative-core-w4a8-via-tosa-tosa" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-tosa";
+            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-tosa";
           "tinystories-representative-core-w4a8-via-tosa-linalg" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-linalg";
+            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-linalg";
           "tinystories-representative-core-w4a8-via-tosa-cf" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-cf";
+            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-cf";
           "tinystories-representative-core-w4a8-via-tosa-handshake" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-handshake";
+            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-handshake";
           "tinystories-representative-core-w4a8-via-tosa-hs-ext" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-hs-ext";
+            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-hs-ext";
           "tinystories-representative-core-w4a8-via-tosa-hw0" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-hw0";
+            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-hw0";
           "tinystories-representative-core-w4a8-via-tosa-hw" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-hw";
+            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-hw";
           "tinystories-representative-core-w4a8-via-tosa-hw-clean" =
-            pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-hw-clean";
+            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-hw-clean";
           "tinystories-representative-core-w4a8-via-tosa-no-handshake-torch" =
-            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-torch";
+            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-torch";
           "tinystories-representative-core-w4a8-via-tosa-no-handshake-tosa" =
-            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-tosa";
+            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-tosa";
           "tinystories-representative-core-w4a8-via-tosa-no-handshake-linalg" =
-            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-linalg";
+            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-linalg";
           "tinystories-representative-core-w4a8-via-tosa-no-handshake-scf" =
-            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-scf";
+            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-scf";
           "tinystories-representative-core-w4a8-via-tosa-no-handshake-flat-scf" =
-            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-flat-scf";
+            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-flat-scf";
           "tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx" =
-            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-calyx";
-          "tinystories-representative-core-w4a8-via-tosa-no-handshake-llvm" =
-            pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-llvm";
+            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-calyx";
           "tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv" =
-            pkgs.runCommand "tinystories-representative-core-w4a8-calyx-sv" {
-              buildInputs = [ circt ];
-            } ''
-              ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
-                ${circt}/bin/circt-opt \
-                ${
-                  pipelineStagePackagesTosaNoHandshakePatched."tinystories-representative-core-w4a8-calyx"
-                } \
-                "$out"
-            '';
+            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-calyx-sv";
+          "tinystories-representative-core-w4a8-via-tosa-no-handshake-llvm" =
+            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-llvm";
         };
-        torchMlirPatchedOpt = "${torchMlirPatched}/bin/torch-mlir-opt";
         quantizedLinalgDiagnosticPackages = {
           "pattern-linear-w4a8-tosa" =
             pkgs.runCommand "pattern-linear-w4a8-tosa.mlir" {
@@ -436,17 +377,6 @@
             } ''
               ${torchMlir}/bin/torch-mlir-opt \
                 ${pipelineStagePackages."pattern-linear-w4a8-torch"} \
-                --torch-backend-to-tosa-backend-pipeline \
-                -o "$out"
-            '';
-
-          "pattern-linear-w4a8-tosa-patched" =
-            pkgs.runCommand "pattern-linear-w4a8-tosa-patched.mlir" {
-              buildInputs = [ torchMlirPatched ];
-            } ''
-              ${torchMlirPatchedOpt} \
-                ${pipelineStagePackages."pattern-linear-w4a8-torch"} \
-                --torch-fuse-quantized-ops \
                 --torch-backend-to-tosa-backend-pipeline \
                 -o "$out"
             '';
@@ -464,14 +394,11 @@
         };
       in {
         packages = {
-          inherit circt mlir torchMlir torchMlirPatched torchMlirUnpatched
-            yosysPkg modelRegistryJson;
+          inherit circt mlir torchMlir yosysPkg modelRegistryJson;
           model-registry = modelRegistryJson;
           default = modelRegistryJson;
         } // pipelineStagePackages // pipelineMetadataPackages
-          // quantizedLinalgDiagnosticPackages
-          // patchedLinearW4A8PipelinePackages
-          // viaTosaLinearW4A8PipelinePackages;
+          // quantizedLinalgDiagnosticPackages // viaTosaLinearW4A8PipelinePackages;
 
         checks.default = modelRegistryJson;
 

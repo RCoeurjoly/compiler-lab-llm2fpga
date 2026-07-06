@@ -81,16 +81,21 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("--torch-backend-to-tosa-backend-pipeline", flake)
         self.assertIn("pattern-linear-w4a8-torch", flake)
 
-    def test_flake_exposes_patched_pattern_linear_w4a8_tosa_experiment(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+    def test_torch_mlir_build_uses_upstream_without_local_patches(self) -> None:
         torch_mlir = (REPO_ROOT / "torch-mlir.nix").read_text(encoding="utf-8")
 
-        self.assertIn("0014-lower-qint32-requant-to-tosa-rescale.patch", torch_mlir)
-        self.assertIn("0015-widen-narrow-int-add-sub-for-tosa.patch", torch_mlir)
-        self.assertIn("pattern-linear-w4a8-tosa-patched.mlir", flake)
-        self.assertIn("torchMlirPatched", flake)
-        self.assertIn("--torch-fuse-quantized-ops", flake)
-        self.assertIn("pattern-linear-w4a8-sv-patched", flake)
+        self.assertIn("patches = [ ];", torch_mlir)
+        self.assertNotIn("applyTask3RfpPatches", torch_mlir)
+        self.assertNotIn("task3RfpPatches", torch_mlir)
+        self.assertNotIn("task6Patches", torch_mlir)
+
+    def test_flake_does_not_expose_patched_torch_mlir_variants(self) -> None:
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+
+        self.assertNotIn("torchMlirPatched", flake)
+        self.assertNotIn("pipelineLibPatched", flake)
+        self.assertNotIn("pipelineLibTosaPatched", flake)
+        self.assertNotIn("-patched", flake)
 
     def test_torch_mlir_patch_widens_narrow_integer_tosa_adds(self) -> None:
         patch = (
@@ -153,7 +158,7 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("--tosa-to-arith='include-apply-rescale'", tosa_to_linalg.read_text(encoding="utf-8"))
         self.assertIn("registerTosaModel", pipeline)
         self.assertIn("mkTosaToLinalgDerivation", pipeline)
-        self.assertIn("pipelineLibTosaPatched", flake)
+        self.assertIn("pipelineLibTosa", flake)
         self.assertIn("tosaToLinalgMlir = mlirForTorchMlir", flake)
         self.assertIn("pattern-linear-w4a8-via-tosa-cf", flake)
         self.assertIn("pattern-linear-w4a8-via-tosa-hw0", flake)
@@ -195,13 +200,15 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
             flake,
         )
         self.assertIn(
-            '"pattern-linear-w4a8-core-via-tosa-no-handshake-llvm"',
+            '"pattern-linear-w4a8-core-via-tosa-no-handshake-calyx-sv"',
             flake,
         )
         self.assertIn(
-            '"pattern-linear-w4a8-core-via-tosa-no-handshake-sv"',
+            '"pattern-linear-w4a8-core-via-tosa-no-handshake-llvm"',
             flake,
         )
+        self.assertIn("mkCalyxSvDerivation", pipeline)
+        self.assertIn('"calyx-sv"', pipeline)
         self.assertIn(
             '"tinystories-representative-core-w4a8-via-tosa-no-handshake-scf"',
             flake,
@@ -222,6 +229,16 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
             '"tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv"',
             flake,
         )
+
+    def test_flat_scf_stage_does_not_rewrite_mlir_text_with_embedded_python(self) -> None:
+        script = (
+            REPO_ROOT / "scripts" / "diagnostics" / "scf_to_flat_scf_no_handshake.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("python3 -", script)
+        self.assertNotIn("COPY_RE", script)
+        self.assertNotIn("memref.load {src}", script)
+        self.assertNotIn("memref.store {value}", script)
 
     def test_representative_core_adapter_removes_hf_rank4_attention_bias(self) -> None:
         adapter = (

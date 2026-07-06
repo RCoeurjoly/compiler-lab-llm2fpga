@@ -1,7 +1,7 @@
 { pkgs, mlir, circt, yosysPkg, yosysSlang, torchMlir, python, pipelineScripts
 , compilePyTorch, svProvenanceReport, noHandshakeLinalgToScf
 , noHandshakeScfToFlatScf, noHandshakeScfToCalyx, noHandshakeLinalgToLlvm
-, flatScfBlockerReport, tosaToLinalgMlir ? mlir }:
+, calyxToSvNoHandshake, flatScfBlockerReport, tosaToLinalgMlir ? mlir }:
 let
   stageNames = [
     "hf-snapshot"
@@ -13,6 +13,7 @@ let
     "scf"
     "flat-scf"
     "calyx"
+    "calyx-sv"
     "cf"
     "cf-stats"
     "llvm"
@@ -142,6 +143,12 @@ let
     pkgs.runCommand "${name}-llvm.mlir" { buildInputs = [ mlir ]; } ''
       ${pkgs.bash}/bin/bash ${noHandshakeLinalgToLlvm} \
         ${mlir}/bin/mlir-opt ${linalg} "$out"
+    '';
+
+  mkCalyxSvDerivation = { name, calyx }:
+    pkgs.runCommand "${name}-calyx-sv" { buildInputs = [ circt ]; } ''
+      ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
+        ${circt}/bin/circt-opt ${calyx} "$out"
     '';
 
   mkHandshakeDerivation = { name, cf }:
@@ -274,6 +281,11 @@ let
           stage = "calyx";
           reason = "baseline hardware pipeline lowers through CF and Handshake";
         };
+        "calyx-sv" = mkUnavailableStage {
+          inherit name;
+          stage = "calyx-sv";
+          reason = "baseline hardware pipeline does not lower through Calyx";
+        };
         cf = mkCfDerivation {
           inherit name;
           inherit (self) linalg;
@@ -393,6 +405,10 @@ let
         calyx = mkScfToCalyxDerivation {
           inherit name;
           flatScf = self."flat-scf";
+        };
+        "calyx-sv" = mkCalyxSvDerivation {
+          inherit name;
+          inherit (self) calyx;
         };
         cf = unavailable "cf"
           "no-handshake experiment stops before control-flow hardware lowering";

@@ -218,14 +218,30 @@ def build_report(text: str) -> dict:
     }
 
 
+def build_manifest(report: dict) -> dict:
+    status = "ok" if not report["blockers"] else "blocked"
+    return {
+        "stage": "flat-scf",
+        "status": status,
+        "artifact": "flat.scf.mlir",
+        "blockers": "blockers.json",
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--manifest-output", type=Path)
     args = parser.parse_args()
 
     report = build_report(args.input.read_text(encoding="utf-8"))
     args.output.write_text(json.dumps(report, sort_keys=True) + "\n", encoding="utf-8")
+    if args.manifest_output is not None:
+        args.manifest_output.write_text(
+            json.dumps(build_manifest(report), sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     return 0
 
 
