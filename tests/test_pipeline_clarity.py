@@ -129,6 +129,38 @@ class PipelineClarityTest(unittest.TestCase):
         self.assertIn("backend = \"calyx-sv\"", flake)
         self.assertNotIn("viaTosaLinearW4A8PipelinePackages = {", flake)
 
+    def test_active_pipeline_variants_are_exported_as_json(self) -> None:
+        flake = read("flake.nix")
+
+        self.assertIn("activePipelineVariantsJson", flake)
+        self.assertIn("active-pipeline-variants", flake)
+        self.assertIn("active-pipeline-variants.json", flake)
+        self.assertIn("schemaVersion = 1", flake)
+        self.assertIn("builtins.toJSON", flake)
+        self.assertIn("generatedAliases", flake)
+
+    def test_read_the_repo_doc_points_to_core_files_in_order(self) -> None:
+        doc = read("docs/read-the-repo.md")
+
+        expected = [
+            "docs/pipeline-contract.md",
+            "docs/read-the-repo.md",
+            "flake.nix",
+            "nix/models.nix",
+            "nix/pipeline.nix",
+            "scripts/pipeline/",
+            "TinyStories/model_adapter_representative_core_pt2e_static_quant.py",
+            "scripts/diagnostics/",
+            "tests/",
+        ]
+        positions = [doc.index(path) for path in expected]
+
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("active-pipeline-variants", doc)
+        self.assertIn("model", doc)
+        self.assertIn("frontend", doc)
+        self.assertIn("backend", doc)
+
 
 if __name__ == "__main__":
     unittest.main()

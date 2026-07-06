@@ -277,6 +277,14 @@
         mkPipelineAliases = specs:
           builtins.listToAttrs (pkgs.lib.concatMap
             (spec: map (stage: mkPipelineAlias spec stage) spec.stages) specs);
+        pipelineAliasMetadata = spec: {
+          inherit (spec) alias model frontend backend stages;
+          generatedAliases = map (stage: {
+            inherit stage;
+            name = "${spec.alias}-${stage}";
+            sourcePackage = "${spec.model}-${stage}";
+          }) spec.stages;
+        };
         pipelineAliasSpecs = [
           {
             alias = "pattern-linear-w4a8-via-tosa";
@@ -336,6 +344,11 @@
           }
         ];
         pipelineAliasPackages = mkPipelineAliases pipelineAliasSpecs;
+        activePipelineVariantsJson =
+          pkgs.writeText "active-pipeline-variants.json" (builtins.toJSON {
+            schemaVersion = 1;
+            variants = map pipelineAliasMetadata pipelineAliasSpecs;
+          });
         quantizedLinalgDiagnosticPackages = {
           "pattern-linear-w4a8-tosa" =
             pkgs.runCommand "pattern-linear-w4a8-tosa.mlir" {
@@ -361,6 +374,7 @@
       in {
         packages = {
           inherit circt mlir torchMlir yosysPkg modelRegistryJson;
+          "active-pipeline-variants" = activePipelineVariantsJson;
           model-registry = modelRegistryJson;
           default = modelRegistryJson;
         } // pipelineStagePackages // pipelineMetadataPackages
