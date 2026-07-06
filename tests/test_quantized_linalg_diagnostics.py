@@ -97,56 +97,16 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertNotIn("pipelineLibTosaPatched", flake)
         self.assertNotIn("-patched", flake)
 
-    def test_torch_mlir_patch_widens_narrow_integer_tosa_adds(self) -> None:
-        patch = (
-            REPO_ROOT
-            / "patches"
-            / "torch-mlir-task3-rfp"
-            / "0015-widen-narrow-int-add-sub-for-tosa.patch"
-        )
+    def test_local_patch_stacks_are_archived_and_not_part_of_active_pipeline(self) -> None:
+        archive = REPO_ROOT / "archive" / "patches" / "unused"
+        readme = (archive / "README.md").read_text(encoding="utf-8").lower()
 
-        self.assertTrue(patch.exists())
-        text = patch.read_text(encoding="utf-8")
-        self.assertIn("rewriteNarrowIntegerAddSub", text)
-        self.assertIn("rewriter.getI32Type()", text)
-        self.assertIn("tosa::AddOp", text)
-        self.assertIn("tosaCastTensorToType", text)
-
-    def test_torch_mlir_patch_widens_quantize_zero_point_add(self) -> None:
-        patch = (
-            REPO_ROOT
-            / "patches"
-            / "torch-mlir-task3-rfp"
-            / "0015-widen-narrow-int-add-sub-for-tosa.patch"
-        )
-
-        text = patch.read_text(encoding="utf-8")
-        self.assertIn("resultTy.clone(rewriter.getI32Type())", text)
-        self.assertIn("tosa::buildRescale", text)
-        self.assertIn("/*rescale=*/1.0", text)
-        self.assertIn("rewriter.replaceOp(op, rescaled)", text)
-
-    def test_circt_float_extern_patch_covers_tosa_rounding_helpers(self) -> None:
-        patch = (
-            REPO_ROOT
-            / "patches"
-            / "circt-upstream-task3-recovery"
-            / "0011-rebased-handshaketohw-stack.patch"
-        )
-        primitives = REPO_ROOT / "rtl" / "fp" / "circt_fp_primitives.sv"
-
-        patch_text = patch.read_text(encoding="utf-8")
-        primitive_text = primitives.read_text(encoding="utf-8")
-
-        for op in ["math::FloorOp", "math::CeilOp", "math::RoundEvenOp"]:
-            self.assertIn(op, patch_text)
-
-        for module in [
-            "math_floor_in_f32_out_f32",
-            "math_ceil_in_f32_out_f32",
-            "math_roundeven_in_f32_out_f32",
-        ]:
-            self.assertIn(f"module {module}", primitive_text)
+        self.assertFalse((REPO_ROOT / "patches").exists())
+        self.assertTrue((archive / "torch-mlir-task3-rfp").exists())
+        self.assertTrue((archive / "torch-mlir-task6").exists())
+        self.assertTrue((archive / "circt-upstream-task3-recovery").exists())
+        self.assertIn("not applied", readme)
+        self.assertIn("historical reference", readme)
 
     def test_tosa_pipeline_rejoins_sv_path(self) -> None:
         flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
@@ -160,14 +120,12 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("mkTosaToLinalgDerivation", pipeline)
         self.assertIn("pipelineLibTosa", flake)
         self.assertIn("tosaToLinalgMlir = mlirForTorchMlir", flake)
-        self.assertIn("pattern-linear-w4a8-via-tosa-cf", flake)
-        self.assertIn("pattern-linear-w4a8-via-tosa-hw0", flake)
-        self.assertIn("pattern-linear-w4a8-via-tosa-sv", flake)
-        self.assertIn("pattern-linear-w4a8-core-via-tosa-sv", flake)
-        self.assertIn(
-            "tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv",
-            flake,
-        )
+        self.assertIn("mkPipelineAliases", flake)
+        self.assertIn('alias = "pattern-linear-w4a8-via-tosa"', flake)
+        self.assertIn('alias = "pattern-linear-w4a8-core-via-tosa"', flake)
+        self.assertIn('alias = "tinystories-representative-core-w4a8-via-tosa-no-handshake"', flake)
+        for stage in ["cf", "hw0", "sv", "calyx-sv"]:
+            self.assertIn(f'"{stage}"', flake)
 
     def test_tosa_no_handshake_pipeline_is_public_and_skips_handshake_tail(self) -> None:
         flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
@@ -187,48 +145,15 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("manifest.json", pipeline)
         self.assertIn("scf_to_flat_scf_no_handshake.sh", flake)
         self.assertIn("flat_scf_blocker_report.py", flake)
-        self.assertIn(
-            '"pattern-linear-w4a8-core-via-tosa-no-handshake-scf"',
-            flake,
-        )
-        self.assertIn(
-            '"pattern-linear-w4a8-core-via-tosa-no-handshake-flat-scf"',
-            flake,
-        )
-        self.assertIn(
-            '"pattern-linear-w4a8-core-via-tosa-no-handshake-calyx"',
-            flake,
-        )
-        self.assertIn(
-            '"pattern-linear-w4a8-core-via-tosa-no-handshake-calyx-sv"',
-            flake,
-        )
-        self.assertIn(
-            '"pattern-linear-w4a8-core-via-tosa-no-handshake-llvm"',
-            flake,
-        )
+        self.assertIn('alias = "pattern-linear-w4a8-core-via-tosa-no-handshake"', flake)
+        self.assertIn('model = "pattern-linear-w4a8-core"', flake)
+        self.assertIn('backend = "calyx-sv"', flake)
+        for stage in ["scf", "flat-scf", "calyx", "calyx-sv", "llvm"]:
+            self.assertIn(f'"{stage}"', flake)
         self.assertIn("mkCalyxSvDerivation", pipeline)
         self.assertIn('"calyx-sv"', pipeline)
-        self.assertIn(
-            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-scf"',
-            flake,
-        )
-        self.assertIn(
-            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-flat-scf"',
-            flake,
-        )
-        self.assertIn(
-            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx"',
-            flake,
-        )
-        self.assertIn(
-            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-llvm"',
-            flake,
-        )
-        self.assertIn(
-            '"tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv"',
-            flake,
-        )
+        self.assertIn('alias = "tinystories-representative-core-w4a8-via-tosa-no-handshake"', flake)
+        self.assertIn('model = "tinystories-representative-core-w4a8"', flake)
 
     def test_flat_scf_stage_does_not_rewrite_mlir_text_with_embedded_python(self) -> None:
         script = (

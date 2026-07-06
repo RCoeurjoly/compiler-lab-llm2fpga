@@ -88,9 +88,10 @@ class SvProvenanceReportTest(unittest.TestCase):
             flake,
         )
         self.assertIn(
-            "tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv",
+            'alias = "tinystories-representative-core-w4a8-via-tosa-no-handshake"',
             flake,
         )
+        self.assertIn('"calyx-sv"', flake)
 
     def test_filters_generic_ports_and_ranks_assignment_clusters(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

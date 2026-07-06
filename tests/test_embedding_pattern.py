@@ -59,9 +59,11 @@ class EmbeddingPatternTest(unittest.TestCase):
         self.assertIn('"pattern-embedding-w4a8-core"', models)
         self.assertIn("../patterns/embedding/adapter_w4a8_core.py", models)
         self.assertIn(
-            '"pattern-embedding-w4a8-core-via-tosa-no-handshake-flat-scf"',
+            'alias = "pattern-embedding-w4a8-core-via-tosa-no-handshake"',
             flake,
         )
+        self.assertIn('model = "pattern-embedding-w4a8-core"', flake)
+        self.assertIn('"flat-scf"', flake)
 
 
 if __name__ == "__main__":

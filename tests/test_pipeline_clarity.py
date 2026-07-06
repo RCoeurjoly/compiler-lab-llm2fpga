@@ -89,6 +89,46 @@ class PipelineClarityTest(unittest.TestCase):
             (REPO_ROOT / "scripts/pipeline/test_llm2fpga_model_manifest.py").exists()
         )
 
+    def test_pipeline_contract_documents_allowed_transforms(self) -> None:
+        contract = read("docs/pipeline-contract.md")
+
+        self.assertIn("Allowed transformations", contract)
+        self.assertIn("Disallowed transformations", contract)
+        self.assertIn("Active pipeline variants", contract)
+        self.assertIn("PyTorch quantization", contract)
+        self.assertIn("MLIR/CIRCT passes", contract)
+        self.assertIn("textual MLIR rewrites", contract)
+
+    def test_unused_patch_stacks_are_archived_not_active(self) -> None:
+        archive_readme = read("archive/patches/unused/README.md")
+
+        self.assertFalse((REPO_ROOT / "patches").exists())
+        self.assertTrue((REPO_ROOT / "archive/patches/unused/torch-mlir-task3-rfp").exists())
+        self.assertTrue((REPO_ROOT / "archive/patches/unused/torch-mlir-task6").exists())
+        self.assertTrue((REPO_ROOT / "archive/patches/unused/circt-upstream-task3-recovery").exists())
+        self.assertIn("not applied", archive_readme.lower())
+        self.assertIn("historical reference", archive_readme.lower())
+
+    def test_compiler_stage_scripts_are_under_pipeline(self) -> None:
+        self.assertTrue((REPO_ROOT / "scripts/pipeline/scf_to_calyx_no_handshake.sh").exists())
+        self.assertTrue((REPO_ROOT / "scripts/pipeline/calyx_to_sv_no_handshake.sh").exists())
+        self.assertFalse(
+            (REPO_ROOT / "scripts/diagnostics/scf_to_calyx_no_handshake.sh").exists()
+        )
+        self.assertFalse(
+            (REPO_ROOT / "scripts/diagnostics/calyx_to_sv_no_handshake.sh").exists()
+        )
+
+    def test_pipeline_aliases_are_generated_from_metadata(self) -> None:
+        flake = read("flake.nix")
+
+        self.assertIn("pipelineAliasSpecs", flake)
+        self.assertIn("mkPipelineAliases", flake)
+        self.assertIn("model = \"tinystories-representative-core-w4a8\"", flake)
+        self.assertIn("frontend = \"tosa\"", flake)
+        self.assertIn("backend = \"calyx-sv\"", flake)
+        self.assertNotIn("viaTosaLinearW4A8PipelinePackages = {", flake)
+
 
 if __name__ == "__main__":
     unittest.main()

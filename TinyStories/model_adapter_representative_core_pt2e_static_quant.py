@@ -242,7 +242,7 @@ def _strip_trailing_output_dequantize(
     )
 
 
-def build_model(model_path: str | None) -> torch.nn.Module:
+def build_representative_core_config(model_path: str | None) -> object:
     if model_path is None:
         raise RuntimeError("TinyStories adapter requires --model-path")
 
@@ -261,35 +261,48 @@ def build_model(model_path: str | None) -> torch.nn.Module:
     config.use_cache = False
     config.bos_token_id = config.vocab_size - 1
     config.eos_token_id = config.vocab_size - 1
+    return config
 
+
+def build_base_model_from_config(config: object) -> torch.nn.Module:
     torch.manual_seed(0)
-    model = AutoModelForCausalLM.from_config(config).eval()
+    return AutoModelForCausalLM.from_config(config).eval()
+
+
+def apply_model_simplifications(model: torch.nn.Module) -> torch.nn.Module:
     replace_embeddings_with_int8_lookup(model)
     replace_attention_with_hardware_friendly_attention(model)
     disable_single_token_causal_mask(model)
     return model
 
 
+def build_model(model_path: str | None) -> torch.nn.Module:
+    config = build_representative_core_config(model_path)
+    model = build_base_model_from_config(config)
+    return apply_model_simplifications(model)
+
+
 def example_inputs() -> tuple[torch.Tensor, ...]:
     return (torch.zeros((1, 1), dtype=torch.long),)
 
 
-def export_program(model_path: str | None) -> torch.export.ExportedProgram:
-    model = build_model(model_path)
-    use_reference_rewrite = _reference_representation_rewrite_enabled()
-    if use_reference_rewrite:
-        _materialize_missing_linear_biases(model)
-    inputs = tuple(example_inputs())
-    exported = torch.export.export(
+def export_simplified_model(
+    model: torch.nn.Module,
+    inputs: tuple[torch.Tensor, ...],
+) -> torch.export.ExportedProgram:
+    return torch.export.export(
         model,
         inputs,
         strict=EXPORT_STRICT,
     )
+
+
+def build_pt2e_quantizer() -> XNNPACKQuantizer:
     activation_bits = env_int("TINYSTORIES_PYTORCHAO_ACTIVATION_BITS", 8)
     weight_bits = env_int("TINYSTORIES_PYTORCHAO_WEIGHT_BITS", 8)
     activation_qmin, activation_qmax = _qrange(activation_bits)
     weight_qmin, weight_qmax = _qrange(weight_bits)
-    quantizer = XNNPACKQuantizer().set_global(
+    return XNNPACKQuantizer().set_global(
         get_symmetric_quantization_config(
             is_dynamic=False,
             act_qmin=activation_qmin,
@@ -298,20 +311,46 @@ def export_program(model_path: str | None) -> torch.export.ExportedProgram:
             weight_qmax=weight_qmax,
         )
     )
+
+
+def quantize_exported_program(
+    exported: torch.export.ExportedProgram,
+    inputs: tuple[torch.Tensor, ...],
+) -> torch.fx.GraphModule:
+    quantizer = build_pt2e_quantizer()
     prepared = prepare_pt2e(exported.module(), quantizer)
     with torch.no_grad():
         prepared(*inputs)
-    quantized = convert_pt2e(prepared)
-    _maybe_dump_quantized_graph(quantized)
-    quantized = _maybe_reference_representation_rewrite(quantized)
+    return convert_pt2e(prepared)
+
+
+def apply_quantized_export_cleanup(
+    quantized: torch.fx.GraphModule,
+    inputs: tuple[torch.Tensor, ...],
+    use_reference_rewrite: bool,
+) -> torch.export.ExportedProgram:
+    cleaned = _maybe_reference_representation_rewrite(quantized)
     if use_reference_rewrite:
-        quantized = _decompose_out_dtype(quantized)
-    move_exported_model_to_eval(quantized)
+        cleaned = _decompose_out_dtype(cleaned)
+    move_exported_model_to_eval(cleaned)
     exported = torch.export.export(
-        quantized,
+        cleaned,
         inputs,
         strict=EXPORT_STRICT,
     )
     if use_reference_rewrite:
         return exported
     return _strip_trailing_output_dequantize(exported)
+
+
+def export_program(model_path: str | None) -> torch.export.ExportedProgram:
+    model = build_model(model_path)
+    use_reference_rewrite = _reference_representation_rewrite_enabled()
+    if use_reference_rewrite:
+        _materialize_missing_linear_biases(model)
+    inputs = tuple(example_inputs())
+
+    simplified = export_simplified_model(model, inputs)
+    quantized = quantize_exported_program(simplified, inputs)
+    _maybe_dump_quantized_graph(quantized)
+    return apply_quantized_export_cleanup(quantized, inputs, use_reference_rewrite)

@@ -149,9 +149,9 @@
         noHandshakeScfToFlatScf =
           ./scripts/diagnostics/scf_to_flat_scf_no_handshake.sh;
         noHandshakeScfToCalyx =
-          ./scripts/diagnostics/scf_to_calyx_no_handshake.sh;
+          ./scripts/pipeline/scf_to_calyx_no_handshake.sh;
         calyxToSvNoHandshake =
-          ./scripts/diagnostics/calyx_to_sv_no_handshake.sh;
+          ./scripts/pipeline/calyx_to_sv_no_handshake.sh;
         noHandshakeLinalgToLlvm =
           ./scripts/diagnostics/linalg_to_llvm_no_handshake.sh;
         flatScfBlockerReport = ./scripts/diagnostics/flat_scf_blocker_report.py;
@@ -234,142 +234,108 @@
         pipelineStagePackagesTosaNoHandshake =
           pipelineLibTosa.pipelineStagePackagesFromRegistry
           modelRegistryTosaNoHandshake;
-        viaTosaLinearW4A8PipelinePackages = {
-          "pattern-linear-w4a8-via-tosa-torch" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-torch";
-          "pattern-linear-w4a8-via-tosa-tosa" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-tosa";
-          "pattern-linear-w4a8-via-tosa-linalg" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-linalg";
-          "pattern-linear-w4a8-via-tosa-cf" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-cf";
-          "pattern-linear-w4a8-via-tosa-handshake" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-handshake";
-          "pattern-linear-w4a8-via-tosa-hs-ext" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-hs-ext";
-          "pattern-linear-w4a8-via-tosa-hw0" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-hw0";
-          "pattern-linear-w4a8-via-tosa-hw" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-hw";
-          "pattern-linear-w4a8-via-tosa-hw-clean" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-hw-clean";
-          "pattern-linear-w4a8-via-tosa-sv-mlir" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-sv-mlir";
-          "pattern-linear-w4a8-via-tosa-sv" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-sv";
-          "pattern-linear-w4a8-via-tosa-sv-provenance-report" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-sv-provenance-report";
-          "pattern-linear-w4a8-via-tosa-yosys-stat" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-yosys-stat";
-          "pattern-linear-w4a8-core-via-tosa-torch" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-torch";
-          "pattern-linear-w4a8-core-via-tosa-tosa" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-tosa";
-          "pattern-linear-w4a8-core-via-tosa-linalg" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-linalg";
-          "pattern-linear-w4a8-core-via-tosa-cf" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-cf";
-          "pattern-linear-w4a8-core-via-tosa-handshake" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-handshake";
-          "pattern-linear-w4a8-core-via-tosa-hs-ext" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-hs-ext";
-          "pattern-linear-w4a8-core-via-tosa-hw0" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-hw0";
-          "pattern-linear-w4a8-core-via-tosa-hw" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-hw";
-          "pattern-linear-w4a8-core-via-tosa-hw-clean" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-hw-clean";
-          "pattern-linear-w4a8-core-via-tosa-sv-mlir" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-sv-mlir";
-          "pattern-linear-w4a8-core-via-tosa-sv" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-sv";
-          "pattern-linear-w4a8-core-via-tosa-sv-provenance-report" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-sv-provenance-report";
-          "pattern-linear-w4a8-core-via-tosa-yosys-stat" =
-            pipelineStagePackagesTosa."pattern-linear-w4a8-core-yosys-stat";
-          "pattern-linear-w4a8-core-via-tosa-no-handshake-torch" =
-            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-torch";
-          "pattern-linear-w4a8-core-via-tosa-no-handshake-tosa" =
-            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-tosa";
-          "pattern-linear-w4a8-core-via-tosa-no-handshake-linalg" =
-            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-linalg";
-          "pattern-linear-w4a8-core-via-tosa-no-handshake-scf" =
-            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-scf";
-          "pattern-linear-w4a8-core-via-tosa-no-handshake-flat-scf" =
-            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-flat-scf";
-          "pattern-linear-w4a8-core-via-tosa-no-handshake-calyx" =
-            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-calyx";
-          "pattern-linear-w4a8-core-via-tosa-no-handshake-calyx-sv" =
-            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-calyx-sv";
-          "pattern-linear-w4a8-core-via-tosa-no-handshake-llvm" =
-            pipelineStagePackagesTosaNoHandshake."pattern-linear-w4a8-core-llvm";
-          "pattern-embedding-w4a8-core-via-tosa-no-handshake-torch" =
-            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-torch";
-          "pattern-embedding-w4a8-core-via-tosa-no-handshake-tosa" =
-            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-tosa";
-          "pattern-embedding-w4a8-core-via-tosa-no-handshake-linalg" =
-            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-linalg";
-          "pattern-embedding-w4a8-core-via-tosa-no-handshake-scf" =
-            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-scf";
-          "pattern-embedding-w4a8-core-via-tosa-no-handshake-flat-scf" =
-            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-flat-scf";
-          "pattern-embedding-w4a8-core-via-tosa-no-handshake-calyx" =
-            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-calyx";
-          "pattern-embedding-w4a8-core-via-tosa-no-handshake-calyx-sv" =
-            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-calyx-sv";
-          "pattern-embedding-w4a8-core-via-tosa-no-handshake-llvm" =
-            pipelineStagePackagesTosaNoHandshake."pattern-embedding-w4a8-core-llvm";
-          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-torch" =
-            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-torch";
-          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-tosa" =
-            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-tosa";
-          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-linalg" =
-            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-linalg";
-          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-scf" =
-            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-scf";
-          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-flat-scf" =
-            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-flat-scf";
-          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-calyx" =
-            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-calyx";
-          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-calyx-sv" =
-            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-calyx-sv";
-          "pattern-layernorm-w4a8-core-via-tosa-no-handshake-llvm" =
-            pipelineStagePackagesTosaNoHandshake."pattern-layernorm-w4a8-core-llvm";
-          "tinystories-representative-core-w4a8-via-tosa-torch" =
-            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-torch";
-          "tinystories-representative-core-w4a8-via-tosa-tosa" =
-            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-tosa";
-          "tinystories-representative-core-w4a8-via-tosa-linalg" =
-            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-linalg";
-          "tinystories-representative-core-w4a8-via-tosa-cf" =
-            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-cf";
-          "tinystories-representative-core-w4a8-via-tosa-handshake" =
-            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-handshake";
-          "tinystories-representative-core-w4a8-via-tosa-hs-ext" =
-            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-hs-ext";
-          "tinystories-representative-core-w4a8-via-tosa-hw0" =
-            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-hw0";
-          "tinystories-representative-core-w4a8-via-tosa-hw" =
-            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-hw";
-          "tinystories-representative-core-w4a8-via-tosa-hw-clean" =
-            pipelineStagePackagesTosa."tinystories-representative-core-w4a8-hw-clean";
-          "tinystories-representative-core-w4a8-via-tosa-no-handshake-torch" =
-            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-torch";
-          "tinystories-representative-core-w4a8-via-tosa-no-handshake-tosa" =
-            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-tosa";
-          "tinystories-representative-core-w4a8-via-tosa-no-handshake-linalg" =
-            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-linalg";
-          "tinystories-representative-core-w4a8-via-tosa-no-handshake-scf" =
-            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-scf";
-          "tinystories-representative-core-w4a8-via-tosa-no-handshake-flat-scf" =
-            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-flat-scf";
-          "tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx" =
-            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-calyx";
-          "tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv" =
-            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-calyx-sv";
-          "tinystories-representative-core-w4a8-via-tosa-no-handshake-llvm" =
-            pipelineStagePackagesTosaNoHandshake."tinystories-representative-core-w4a8-llvm";
+        handshakeSvStages = [
+          "torch"
+          "tosa"
+          "linalg"
+          "cf"
+          "handshake"
+          "hs-ext"
+          "hw0"
+          "hw"
+          "hw-clean"
+          "sv-mlir"
+          "sv"
+          "sv-provenance-report"
+          "yosys-stat"
+        ];
+        handshakeHwStages = [
+          "torch"
+          "tosa"
+          "linalg"
+          "cf"
+          "handshake"
+          "hs-ext"
+          "hw0"
+          "hw"
+          "hw-clean"
+        ];
+        noHandshakeStages = [
+          "torch"
+          "tosa"
+          "linalg"
+          "scf"
+          "flat-scf"
+          "calyx"
+          "calyx-sv"
+          "llvm"
+        ];
+        mkPipelineAlias = spec: stage: {
+          name = "${spec.alias}-${stage}";
+          value = builtins.getAttr "${spec.model}-${stage}" spec.packages;
         };
+        mkPipelineAliases = specs:
+          builtins.listToAttrs (pkgs.lib.concatMap
+            (spec: map (stage: mkPipelineAlias spec stage) spec.stages) specs);
+        pipelineAliasSpecs = [
+          {
+            alias = "pattern-linear-w4a8-via-tosa";
+            model = "pattern-linear-w4a8";
+            frontend = "tosa";
+            backend = "handshake-sv";
+            packages = pipelineStagePackagesTosa;
+            stages = handshakeSvStages;
+          }
+          {
+            alias = "pattern-linear-w4a8-core-via-tosa";
+            model = "pattern-linear-w4a8-core";
+            frontend = "tosa";
+            backend = "handshake-sv";
+            packages = pipelineStagePackagesTosa;
+            stages = handshakeSvStages;
+          }
+          {
+            alias = "tinystories-representative-core-w4a8-via-tosa";
+            model = "tinystories-representative-core-w4a8";
+            frontend = "tosa";
+            backend = "handshake-hw";
+            packages = pipelineStagePackagesTosa;
+            stages = handshakeHwStages;
+          }
+          {
+            alias = "pattern-linear-w4a8-core-via-tosa-no-handshake";
+            model = "pattern-linear-w4a8-core";
+            frontend = "tosa";
+            backend = "calyx-sv";
+            packages = pipelineStagePackagesTosaNoHandshake;
+            stages = noHandshakeStages;
+          }
+          {
+            alias = "pattern-embedding-w4a8-core-via-tosa-no-handshake";
+            model = "pattern-embedding-w4a8-core";
+            frontend = "tosa";
+            backend = "calyx-sv";
+            packages = pipelineStagePackagesTosaNoHandshake;
+            stages = noHandshakeStages;
+          }
+          {
+            alias = "pattern-layernorm-w4a8-core-via-tosa-no-handshake";
+            model = "pattern-layernorm-w4a8-core";
+            frontend = "tosa";
+            backend = "calyx-sv";
+            packages = pipelineStagePackagesTosaNoHandshake;
+            stages = noHandshakeStages;
+          }
+          {
+            alias = "tinystories-representative-core-w4a8-via-tosa-no-handshake";
+            model = "tinystories-representative-core-w4a8";
+            frontend = "tosa";
+            backend = "calyx-sv";
+            packages = pipelineStagePackagesTosaNoHandshake;
+            stages = noHandshakeStages;
+          }
+        ];
+        pipelineAliasPackages = mkPipelineAliases pipelineAliasSpecs;
         quantizedLinalgDiagnosticPackages = {
           "pattern-linear-w4a8-tosa" =
             pkgs.runCommand "pattern-linear-w4a8-tosa.mlir" {
@@ -398,7 +364,7 @@
           model-registry = modelRegistryJson;
           default = modelRegistryJson;
         } // pipelineStagePackages // pipelineMetadataPackages
-          // quantizedLinalgDiagnosticPackages // viaTosaLinearW4A8PipelinePackages;
+          // quantizedLinalgDiagnosticPackages // pipelineAliasPackages;
 
         checks.default = modelRegistryJson;
 

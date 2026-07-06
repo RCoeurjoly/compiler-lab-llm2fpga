@@ -78,13 +78,12 @@ class LayerNormPatternTest(unittest.TestCase):
         self.assertIn('"pattern-layernorm-w4a8-core"', models)
         self.assertIn("../patterns/layernorm/adapter_w4a8_core.py", models)
         self.assertIn(
-            '"pattern-layernorm-w4a8-core-via-tosa-no-handshake-tosa"',
+            'alias = "pattern-layernorm-w4a8-core-via-tosa-no-handshake"',
             flake,
         )
-        self.assertIn(
-            '"pattern-layernorm-w4a8-core-via-tosa-no-handshake-flat-scf"',
-            flake,
-        )
+        self.assertIn('model = "pattern-layernorm-w4a8-core"', flake)
+        self.assertIn('"tosa"', flake)
+        self.assertIn('"flat-scf"', flake)
 
 
 if __name__ == "__main__":
