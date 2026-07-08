@@ -60,6 +60,19 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("--flatten-memref", script)
         self.assertNotIn("circt_opt=", script)
 
+    def test_current_calyx_truncf_blocker_is_minimized(self) -> None:
+        reproducer_dir = REPO_ROOT / "reproducers" / "calyx-arith-truncf-constant"
+        failing = (reproducer_dir / "input.mlir").read_text(encoding="utf-8")
+        passing_shape = (reproducer_dir / "f32-constant.mlir").read_text(
+            encoding="utf-8"
+        )
+        readme = (reproducer_dir / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("arith.truncf", failing)
+        self.assertIn(": f64 to f32", failing)
+        self.assertIn("arith.constant 1.000000e-05 : f32", passing_shape)
+        self.assertIn("Do not fix this with textual MLIR rewriting", readme)
+
 
 if __name__ == "__main__":
     unittest.main()
