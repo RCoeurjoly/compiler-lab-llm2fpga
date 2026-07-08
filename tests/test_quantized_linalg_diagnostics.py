@@ -123,7 +123,7 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("mkPipelineAliases", flake)
         self.assertIn('alias = "pattern-linear-w4a8-via-tosa"', flake)
         self.assertIn('alias = "pattern-linear-w4a8-core-via-tosa"', flake)
-        self.assertIn('alias = "tinystories-representative-core-w4a8-via-tosa-no-handshake"', flake)
+        self.assertIn('"tinystories-representative-core-w4a8-via-tosa-no-handshake"', flake)
         for stage in ["cf", "hw0", "sv", "calyx-sv"]:
             self.assertIn(f'"{stage}"', flake)
 
@@ -152,7 +152,7 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
             self.assertIn(f'"{stage}"', flake)
         self.assertIn("mkCalyxSvDerivation", pipeline)
         self.assertIn('"calyx-sv"', pipeline)
-        self.assertIn('alias = "tinystories-representative-core-w4a8-via-tosa-no-handshake"', flake)
+        self.assertIn('"tinystories-representative-core-w4a8-via-tosa-no-handshake"', flake)
         self.assertIn('model = "tinystories-representative-core-w4a8"', flake)
 
     def test_flat_scf_stage_does_not_rewrite_mlir_text_with_embedded_python(self) -> None:

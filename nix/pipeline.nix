@@ -299,7 +299,8 @@ let
         llvm = mkUnavailableStage {
           inherit name;
           stage = "llvm";
-          reason = "baseline hardware pipeline lowers through Handshake, not LLVM";
+          reason =
+            "baseline hardware pipeline lowers through Handshake, not LLVM";
         };
         handshake = handshakeFromCf {
           inherit name;
@@ -371,6 +372,8 @@ let
     in self;
 
   mkNoHandshakePipeline = { name, hfSnapshot, pytorchExported, torchStage
+    , tosaFromTorch ? null, linalgFromStages ?
+      ({ name, torch, ... }: mkLinalgDerivation { inherit name torch; })
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false }:
     let
@@ -386,13 +389,17 @@ let
           tool = torchMlirOpt;
           input = self.torch;
         };
-        tosa = mkTosaDerivation {
+        tosa = if tosaFromTorch == null then
+          unavailable "tosa"
+          "direct Torch-to-Linalg no-handshake pipeline does not emit a TOSA handoff"
+        else
+          tosaFromTorch {
+            inherit name;
+            inherit (self) torch;
+          };
+        linalg = linalgFromStages {
           inherit name;
-          inherit (self) torch;
-        };
-        linalg = mkTosaToLinalgDerivation {
-          inherit name;
-          inherit (self) tosa;
+          inherit (self) torch tosa;
         };
         scf = mkLinalgToScfDerivation {
           inherit name;
@@ -506,7 +513,18 @@ let
     registerPipelineModel (args // { pipelineFactory = mkTosaPipeline; });
 
   registerTosaNoHandshakeModel = args:
-    registerPipelineModel (args // { pipelineFactory = mkNoHandshakePipeline; });
+    registerPipelineModel (args // {
+      pipelineFactory = pipelineArgs:
+        mkNoHandshakePipeline (pipelineArgs // {
+          tosaFromTorch = mkTosaDerivation;
+          linalgFromStages = { name, tosa, ... }:
+            mkTosaToLinalgDerivation { inherit name tosa; };
+        });
+    });
+
+  registerNoHandshakeModel = args:
+    registerPipelineModel
+    (args // { pipelineFactory = mkNoHandshakePipeline; });
 
   pipelineStagePackagesFromRegistry = registry:
     pkgs.lib.concatMapAttrs
@@ -528,7 +546,8 @@ let
         }) stageNames);
       }) registry));
 in {
-  inherit registerModel registerTosaModel registerTosaNoHandshakeModel;
+  inherit registerModel registerTosaModel registerTosaNoHandshakeModel
+    registerNoHandshakeModel;
   inherit pipelineStagePackagesFromRegistry;
   inherit metadataPackagesFromRegistry;
   inherit registryIndexPackage;

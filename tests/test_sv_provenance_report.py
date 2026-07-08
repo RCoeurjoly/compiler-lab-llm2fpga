@@ -88,7 +88,7 @@ class SvProvenanceReportTest(unittest.TestCase):
             flake,
         )
         self.assertIn(
-            'alias = "tinystories-representative-core-w4a8-via-tosa-no-handshake"',
+            '"tinystories-representative-core-w4a8-via-tosa-no-handshake"',
             flake,
         )
         self.assertIn('"calyx-sv"', flake)

@@ -148,10 +148,8 @@
           ./scripts/diagnostics/linalg_to_scf_no_handshake.sh;
         noHandshakeScfToFlatScf =
           ./scripts/diagnostics/scf_to_flat_scf_no_handshake.sh;
-        noHandshakeScfToCalyx =
-          ./scripts/pipeline/scf_to_calyx_no_handshake.sh;
-        calyxToSvNoHandshake =
-          ./scripts/pipeline/calyx_to_sv_no_handshake.sh;
+        noHandshakeScfToCalyx = ./scripts/pipeline/scf_to_calyx_no_handshake.sh;
+        calyxToSvNoHandshake = ./scripts/pipeline/calyx_to_sv_no_handshake.sh;
         noHandshakeLinalgToLlvm =
           ./scripts/diagnostics/linalg_to_llvm_no_handshake.sh;
         flatScfBlockerReport = ./scripts/diagnostics/flat_scf_blocker_report.py;
@@ -186,8 +184,8 @@
         pipelineLib = import ./nix/pipeline.nix {
           inherit pkgs mlir circt yosysPkg yosysSlang torchMlir python;
           inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
-            noHandshakeScfToFlatScf noHandshakeScfToCalyx
-            calyxToSvNoHandshake noHandshakeLinalgToLlvm;
+            noHandshakeScfToFlatScf noHandshakeScfToCalyx calyxToSvNoHandshake
+            noHandshakeLinalgToLlvm;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
         };
@@ -203,13 +201,23 @@
         pipelineMetadataPackages =
           pipelineLib.metadataPackagesFromRegistry modelRegistry;
         modelRegistryJson = pipelineLib.registryIndexPackage modelRegistry;
+        modelRegistryNoHandshake = import ./nix/models.nix {
+          registerModel = pipelineLib.registerNoHandshakeModel;
+          inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
+            tinyStories1m fpPrimsSv;
+          materializePyTorchExported =
+            ./scripts/materialize-pytorch-exported.py;
+        };
+        pipelineStagePackagesNoHandshake =
+          pipelineLib.pipelineStagePackagesFromRegistry
+          modelRegistryNoHandshake;
         pipelineLibTosa = import ./nix/pipeline.nix {
           inherit pkgs mlir circt yosysPkg yosysSlang python;
           tosaToLinalgMlir = mlirForTorchMlir;
           inherit torchMlir;
           inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
-            noHandshakeScfToFlatScf noHandshakeScfToCalyx
-            calyxToSvNoHandshake noHandshakeLinalgToLlvm;
+            noHandshakeScfToFlatScf noHandshakeScfToCalyx calyxToSvNoHandshake
+            noHandshakeLinalgToLlvm;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
         };
@@ -270,6 +278,8 @@
           "calyx-sv"
           "llvm"
         ];
+        noHandshakeLinalgStages =
+          [ "torch" "linalg" "scf" "flat-scf" "calyx" "calyx-sv" "llvm" ];
         mkPipelineAlias = spec: stage: {
           name = "${spec.alias}-${stage}";
           value = builtins.getAttr "${spec.model}-${stage}" spec.packages;
@@ -335,12 +345,22 @@
             stages = noHandshakeStages;
           }
           {
-            alias = "tinystories-representative-core-w4a8-via-tosa-no-handshake";
+            alias =
+              "tinystories-representative-core-w4a8-via-tosa-no-handshake";
             model = "tinystories-representative-core-w4a8";
             frontend = "tosa";
             backend = "calyx-sv";
             packages = pipelineStagePackagesTosaNoHandshake;
             stages = noHandshakeStages;
+          }
+          {
+            alias =
+              "tinystories-representative-core-w4a8-via-linalg-no-handshake";
+            model = "tinystories-representative-core-w4a8";
+            frontend = "linalg";
+            backend = "calyx-sv";
+            packages = pipelineStagePackagesNoHandshake;
+            stages = noHandshakeLinalgStages;
           }
         ];
         pipelineAliasPackages = mkPipelineAliases pipelineAliasSpecs;

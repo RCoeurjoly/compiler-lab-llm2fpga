@@ -91,3 +91,23 @@ No textual MLIR rewrite is allowed as the fix. Acceptable fix classes are:
    before the long Calyx-SV build.
 5. After the legality blocker is fixed, rerun the same Calyx-SV package and
    record the next baseline.
+
+## Direct-Linalg No-Handshake Follow-Up
+
+The TOSA failure is avoided by changing frontend dialects, not by rewriting
+MLIR text. The direct torch-to-Linalg no-handshake variant is exposed as:
+
+```text
+tinystories-representative-core-w4a8-via-linalg-no-handshake
+```
+
+The `linalg` and `scf` stages build for this variant. The current first failing
+stage moves later to `flat-scf`:
+
+```text
+failed to legalize unresolved materialization from ('memref<2xf32>') to ('memref<1x1x2xf32>')
+```
+
+The reported live user is a `memref.expand_shape` from `memref<1x1x2xf32>` into
+`memref<1x1x1x2xf32>`. This is the next compiler-pipeline blocker to debug if
+the direct-Linalg dialect route becomes the active path.

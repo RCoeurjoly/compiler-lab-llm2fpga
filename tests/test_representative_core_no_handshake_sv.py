@@ -10,7 +10,7 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
 
         self.assertIn(
-            'alias = "tinystories-representative-core-w4a8-via-tosa-no-handshake"',
+            '"tinystories-representative-core-w4a8-via-tosa-no-handshake"',
             flake,
         )
         self.assertIn('model = "tinystories-representative-core-w4a8"', flake)
@@ -22,6 +22,17 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
             'pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-sv"',
             flake,
         )
+
+    def test_representative_core_has_direct_linalg_no_handshake_calyx_sv_target(self) -> None:
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+
+        self.assertIn(
+            '"tinystories-representative-core-w4a8-via-linalg-no-handshake"',
+            flake,
+        )
+        self.assertIn('frontend = "linalg"', flake)
+        self.assertIn('backend = "calyx-sv"', flake)
+        self.assertIn("pipelineStagePackagesNoHandshake", flake)
 
     def test_calyx_sv_script_does_not_use_handshake(self) -> None:
         script = (
