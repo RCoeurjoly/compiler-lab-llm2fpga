@@ -144,6 +144,7 @@ class PipelineClarityTest(unittest.TestCase):
 
         expected = [
             "docs/pipeline-contract.md",
+            "docs/current-baseline.md",
             "docs/read-the-repo.md",
             "flake.nix",
             "nix/models.nix",
@@ -160,6 +161,22 @@ class PipelineClarityTest(unittest.TestCase):
         self.assertIn("model", doc)
         self.assertIn("frontend", doc)
         self.assertIn("backend", doc)
+
+    def test_current_baseline_records_representative_core_w4a8_blocker(self) -> None:
+        doc = read("docs/current-baseline.md")
+
+        expected = [
+            "Representative-core W4A8, TOSA no-handshake Calyx-SV",
+            "tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv",
+            "First failing stage",
+            "TOSA-to-Linalg",
+            "tosa.add",
+            "i8",
+            "No textual MLIR rewrite",
+        ]
+
+        for text in expected:
+            self.assertIn(text, doc)
 
 
 if __name__ == "__main__":
