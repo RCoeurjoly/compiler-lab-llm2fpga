@@ -120,10 +120,10 @@ let
     '';
 
   mkScfToFlatScfDerivation = { name, scf }:
-    pkgs.runCommand "${name}-flat-scf" { buildInputs = [ circt python ]; } ''
+    pkgs.runCommand "${name}-flat-scf" { buildInputs = [ mlir python ]; } ''
       export FLAT_SCF_BLOCKER_REPORT=${flatScfBlockerReport}
       ${pkgs.bash}/bin/bash ${noHandshakeScfToFlatScf} \
-        ${circt}/bin/circt-opt ${scf} "$out"
+        ${mlir}/bin/mlir-opt ${scf} "$out"
       test -f "$out/flat.scf.mlir"
       test -f "$out/manifest.json"
       test -f "$out/blockers.json"

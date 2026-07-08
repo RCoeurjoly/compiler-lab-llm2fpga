@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-circt_opt="${1:?usage: scf_to_flat_scf_no_handshake.sh <circt-opt> <input-scf-mlir> <output-dir>}"
-input="${2:?usage: scf_to_flat_scf_no_handshake.sh <circt-opt> <input-scf-mlir> <output-dir>}"
-output_dir="${3:?usage: scf_to_flat_scf_no_handshake.sh <circt-opt> <input-scf-mlir> <output-dir>}"
+mlir_opt="${1:?usage: scf_to_flat_scf_no_handshake.sh <mlir-opt> <input-scf-mlir> <output-dir>}"
+input="${2:?usage: scf_to_flat_scf_no_handshake.sh <mlir-opt> <input-scf-mlir> <output-dir>}"
+output_dir="${3:?usage: scf_to_flat_scf_no_handshake.sh <mlir-opt> <input-scf-mlir> <output-dir>}"
 blocker_report="${FLAT_SCF_BLOCKER_REPORT:?set FLAT_SCF_BLOCKER_REPORT to flat_scf_blocker_report.py}"
 
-if [[ ! -x "$circt_opt" ]]; then
-  echo "not executable: $circt_opt" >&2
+if [[ ! -x "$mlir_opt" ]]; then
+  echo "not executable: $mlir_opt" >&2
   exit 2
 fi
 
@@ -24,7 +24,7 @@ trap cleanup EXIT
 
 mkdir -p "$output_dir"
 
-"$circt_opt" "$input" \
+"$mlir_opt" "$input" \
   --flatten-memref \
   --canonicalize \
   --cse \

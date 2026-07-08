@@ -101,13 +101,29 @@ MLIR text. The direct torch-to-Linalg no-handshake variant is exposed as:
 tinystories-representative-core-w4a8-via-linalg-no-handshake
 ```
 
-The `linalg` and `scf` stages build for this variant. The current first failing
-stage moves later to `flat-scf`:
+The `linalg`, `scf`, and `flat-scf` stages build for this variant. The
+`flat-scf` blocker was minimized in:
 
 ```text
-failed to legalize unresolved materialization from ('memref<2xf32>') to ('memref<1x1x2xf32>')
+reproducers/flat-scf-expand-shape-materialization/input.mlir
 ```
 
-The reported live user is a `memref.expand_shape` from `memref<1x1x2xf32>` into
-`memref<1x1x1x2xf32>`. This is the next compiler-pipeline blocker to debug if
-the direct-Linalg dialect route becomes the active path.
+The fix is to use upstream MLIR `mlir-opt --flatten-memref` for the flat-SCF
+stage instead of CIRCT `circt-opt --flatten-memref`.
+
+The current first failing stage moves later to `calyx`:
+
+```text
+failed to legalize operation 'arith.truncf' that was explicitly marked illegal
+```
+
+The reported operation is a constant `f64` to `f32` truncation before
+`--lower-scf-to-calyx`, for example:
+
+```mlir
+%41 = arith.truncf %cst_56 : f64 to f32
+```
+
+`--canonicalize`, `--arith-expand`, and `--sccp` did not fold these operations
+away. This is the next compiler-pipeline blocker to debug if the direct-Linalg
+dialect route remains the active path.

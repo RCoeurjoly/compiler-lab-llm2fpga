@@ -44,6 +44,22 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("--export-verilog", script)
         self.assertNotIn("handshake", script.lower())
 
+    def test_flat_scf_stage_uses_mlir_flatten_memref_for_expand_shape_reproducer(self) -> None:
+        script = (
+            REPO_ROOT / "scripts" / "diagnostics" / "scf_to_flat_scf_no_handshake.sh"
+        ).read_text(encoding="utf-8")
+        reproducer = (
+            REPO_ROOT
+            / "reproducers"
+            / "flat-scf-expand-shape-materialization"
+            / "input.mlir"
+        )
+
+        self.assertTrue(reproducer.exists())
+        self.assertIn("mlir_opt=", script)
+        self.assertIn("--flatten-memref", script)
+        self.assertNotIn("circt_opt=", script)
+
 
 if __name__ == "__main__":
     unittest.main()
