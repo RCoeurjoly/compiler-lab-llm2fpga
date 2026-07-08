@@ -141,6 +141,9 @@
           mlir = mlirForTorchMlir;
           inherit (torchMlirLlvmPackages) llvm;
         };
+        llm2fpgaMlirPasses = pkgsLlvm21.callPackage ./nix/mlir-passes.nix {
+          inherit mlir llvmPackages;
+        };
 
         pipelineScripts = ./scripts/pipeline;
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
@@ -186,6 +189,7 @@
           inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
             noHandshakeScfToFlatScf noHandshakeScfToCalyx calyxToSvNoHandshake
             noHandshakeLinalgToLlvm;
+          mlirPasses = llm2fpgaMlirPasses;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
         };
@@ -218,6 +222,7 @@
           inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
             noHandshakeScfToFlatScf noHandshakeScfToCalyx calyxToSvNoHandshake
             noHandshakeLinalgToLlvm;
+          mlirPasses = llm2fpgaMlirPasses;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
         };
@@ -393,7 +398,8 @@
         };
       in {
         packages = {
-          inherit circt mlir torchMlir yosysPkg modelRegistryJson;
+          inherit circt mlir torchMlir yosysPkg modelRegistryJson
+            llm2fpgaMlirPasses;
           "active-pipeline-variants" = activePipelineVariantsJson;
           model-registry = modelRegistryJson;
           default = modelRegistryJson;

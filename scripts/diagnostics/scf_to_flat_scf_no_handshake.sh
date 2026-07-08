@@ -26,6 +26,7 @@ mkdir -p "$output_dir"
 
 "$mlir_opt" "$input" \
   --flatten-memref \
+  --lower-affine \
   --canonicalize \
   --cse \
   -o "$tmp_flat"

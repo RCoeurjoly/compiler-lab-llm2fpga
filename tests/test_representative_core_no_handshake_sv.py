@@ -58,7 +58,31 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertTrue(reproducer.exists())
         self.assertIn("mlir_opt=", script)
         self.assertIn("--flatten-memref", script)
+        self.assertIn("--lower-affine", script)
         self.assertNotIn("circt_opt=", script)
+
+    def test_no_handshake_bufferization_uses_identity_layout_boundaries(self) -> None:
+        script = (
+            REPO_ROOT / "scripts" / "diagnostics" / "linalg_to_scf_no_handshake.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("--one-shot-bufferize=", script)
+        self.assertIn("bufferize-function-boundaries", script)
+        self.assertIn("function-boundary-type-conversion=identity-layout-map", script)
+
+    def test_pre_calyx_uses_checked_in_mlir_pass_plugin(self) -> None:
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+        pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
+        pass_source = (
+            REPO_ROOT / "tools" / "mlir-passes" / "FoldConstantTruncFOps.cpp"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("llm2fpgaMlirPasses", flake)
+        self.assertIn("inherit mlir llvmPackages", flake)
+        self.assertIn("--load-pass-plugin=${mlirPasses}", pipeline)
+        self.assertIn("llm2fpga-fold-constant-truncf", pipeline)
+        self.assertIn("PassRegistration<FoldConstantTruncFOpsPass>", pass_source)
+        self.assertNotIn("python3 -", pipeline)
 
     def test_current_calyx_truncf_blocker_is_minimized(self) -> None:
         reproducer_dir = REPO_ROOT / "reproducers" / "calyx-arith-truncf-constant"

@@ -1,7 +1,8 @@
 { pkgs, mlir, circt, yosysPkg, yosysSlang, torchMlir, python, pipelineScripts
 , compilePyTorch, svProvenanceReport, noHandshakeLinalgToScf
 , noHandshakeScfToFlatScf, noHandshakeScfToCalyx, noHandshakeLinalgToLlvm
-, calyxToSvNoHandshake, flatScfBlockerReport, tosaToLinalgMlir ? mlir }:
+, calyxToSvNoHandshake, flatScfBlockerReport, mlirPasses
+, tosaToLinalgMlir ? mlir }:
 let
   stageNames = [
     "hf-snapshot"
@@ -130,9 +131,14 @@ let
     '';
 
   mkScfToCalyxDerivation = { name, flatScf }:
-    pkgs.runCommand "${name}-calyx" { buildInputs = [ circt python ]; } ''
+    pkgs.runCommand "${name}-calyx" { buildInputs = [ mlir circt python ]; } ''
+      tmp_pre_calyx="$(mktemp /tmp/no_handshake_pre_calyx_XXXXXX.mlir)"
+      ${mlir}/bin/mlir-opt ${flatScf}/flat.scf.mlir \
+        --load-pass-plugin=${mlirPasses}/lib/LLM2FPGAMLIRPasses.so \
+        --pass-pipeline='builtin.module(llm2fpga-fold-constant-truncf,canonicalize,cse)' \
+        -o "$tmp_pre_calyx"
       ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
-        ${circt}/bin/circt-opt ${flatScf}/flat.scf.mlir "$out"
+        ${circt}/bin/circt-opt "$tmp_pre_calyx" "$out"
       test -f "$out/manifest.json"
       if ${pkgs.gnugrep}/bin/grep -q '"status":"ok"' "$out/manifest.json"; then
         test -f "$out/model.calyx.mlir"

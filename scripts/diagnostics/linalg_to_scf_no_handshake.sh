@@ -17,7 +17,7 @@ fi
 
 "$mlir_opt" "$input" \
   --empty-tensor-to-alloc-tensor \
-  --one-shot-bufferize='bufferize-function-boundaries' \
+  --one-shot-bufferize='bufferize-function-boundaries function-boundary-type-conversion=identity-layout-map' \
   --convert-bufferization-to-memref \
   --linalg-generalize-named-ops \
   --convert-linalg-to-loops \

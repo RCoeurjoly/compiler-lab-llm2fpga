@@ -111,19 +111,28 @@ reproducers/flat-scf-expand-shape-materialization/input.mlir
 The fix is to use upstream MLIR `mlir-opt --flatten-memref` for the flat-SCF
 stage instead of CIRCT `circt-opt --flatten-memref`.
 
-The current first failing stage moves later to `calyx`:
+The constant `arith.truncf` blocker was fixed by adding a checked-in MLIR pass
+plugin, `llm2fpga-fold-constant-truncf`, and running it before Calyx lowering.
+The pass folds constant floating-point truncations in the compiler pipeline
+instead of rewriting MLIR text.
+
+The direct-Linalg route now fails at `calyx` on memref view/port legality:
 
 ```text
-failed to legalize operation 'arith.truncf' that was explicitly marked illegal
+Unhandled operation during BuildOpGroups()
+memref.reinterpret_cast
 ```
 
-The reported operation is a constant `f64` to `f32` truncation before
-`--lower-scf-to-calyx`, for example:
+The same Calyx attempt also reports:
 
-```mlir
-%41 = arith.truncf %cst_56 : f64 to f32
+```text
+input memory dimension must be empty or one
 ```
 
-`--canonicalize`, `--arith-expand`, and `--sccp` did not fold these operations
-away. This is the next compiler-pipeline blocker to debug if the direct-Linalg
-dialect route remains the active path.
+The current normalized input no longer contains the earlier
+`memref.extract_strided_metadata` crash pattern, because no-handshake
+bufferization now requests identity-layout function boundaries and the flat-SCF
+stage lowers affine index expressions after flattening. The next compiler
+pipeline task is to eliminate or lower static `memref.reinterpret_cast` view
+operations and present only scalar or one-dimensional top-level memrefs to
+Calyx.
