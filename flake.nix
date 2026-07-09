@@ -201,6 +201,7 @@
             noHandshakeScfToFlatScf noHandshakeScfToCalyx calyxToSvNoHandshake
             calyxToHwSvNoHandshake noHandshakeLinalgToLlvm;
           mlirPasses = llm2fpgaMlirPasses;
+          circtPasses = llm2fpgaCirctPasses;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
         };
@@ -235,6 +236,7 @@
             noHandshakeScfToFlatScf noHandshakeScfToCalyx calyxToSvNoHandshake
             calyxToHwSvNoHandshake noHandshakeLinalgToLlvm;
           mlirPasses = llm2fpgaMlirPasses;
+          circtPasses = llm2fpgaCirctPasses;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
         };

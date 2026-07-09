@@ -166,6 +166,10 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertTrue(script_path.exists())
         script = script_path.read_text(encoding="utf-8")
 
+        self.assertIn("CIRCT_PASS_PLUGIN", script)
+        self.assertIn("--load-pass-plugin", script)
+        self.assertIn("--pass-pipeline", script)
+        self.assertIn("llm2fpga-calyx-hw-preflight", script)
         self.assertIn("--calyx-remove-groups", script)
         self.assertIn("--lower-calyx-to-hw", script)
         self.assertIn("--lower-hw-to-sv", script)
@@ -252,7 +256,12 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("find_package(CIRCT REQUIRED CONFIG)", cmake)
         self.assertIn("CIRCTCalyx", cmake)
         self.assertIn("llm2fpga-calyx-pipeline-sanity", pass_source)
+        self.assertIn("llm2fpga-calyx-hw-preflight", pass_source)
         self.assertIn("PassRegistration<CalyxPipelineSanityPass>", pass_source)
+        self.assertIn("PassRegistration<CalyxHwPreflightPass>", pass_source)
+        self.assertIn("calyx.invoke blocks direct Calyx-HW lowering", pass_source)
+        self.assertIn("calyx.instance blocks direct Calyx-HW lowering", pass_source)
+        self.assertIn("calyx.seq_mem blocks direct Calyx-HW lowering", pass_source)
 
     def test_native_calyx_backend_is_pinned_and_packaged(self) -> None:
         derivation = (REPO_ROOT / "nix" / "calyx.nix").read_text(encoding="utf-8")

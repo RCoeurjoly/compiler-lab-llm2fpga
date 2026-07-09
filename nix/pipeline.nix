@@ -2,7 +2,7 @@
 , pipelineScripts, compilePyTorch, svProvenanceReport, noHandshakeLinalgToScf
 , noHandshakeScfToFlatScf, noHandshakeScfToCalyx, noHandshakeLinalgToLlvm
 , calyxToSvNoHandshake, calyxToHwSvNoHandshake, flatScfBlockerReport, mlirPasses
-, tosaToLinalgMlir ? mlir }:
+, circtPasses, tosaToLinalgMlir ? mlir }:
 let
   stageNames = [
     "hf-snapshot"
@@ -171,8 +171,9 @@ let
 
   mkCalyxHwSvDerivation = { name, calyx }:
     pkgs.runCommand "${name}-calyx-hw-sv" {
-      buildInputs = [ circt python ];
+      buildInputs = [ circt python circtPasses ];
     } ''
+      export CIRCT_PASS_PLUGIN=${circtPasses}/lib/LLM2FPGACIRCTPasses.so
       ${pkgs.bash}/bin/bash ${calyxToHwSvNoHandshake} \
         ${circt}/bin/circt-opt \
         ${calyx} "$out"
