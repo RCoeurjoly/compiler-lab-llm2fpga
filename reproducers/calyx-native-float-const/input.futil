@@ -1,0 +1,11 @@
+import "primitives/core.futil";
+
+component main() -> () {
+  cells {
+    cst = std_float_const(0, 32, 0.000000);
+  }
+  wires {}
+  control {
+    empty;
+  }
+}

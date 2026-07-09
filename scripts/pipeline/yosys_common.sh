@@ -9,6 +9,7 @@ write_yosys_slang_script() {
   local -a early_files=()
   local -a middle_files=()
   local -a late_files=()
+  local max_parse_depth="${YOSYS_SLANG_MAX_PARSE_DEPTH:-20000}"
 
   : >"$script"
   echo "plugin -i ${yosys_slang_so}" >>"$script"
@@ -41,13 +42,13 @@ write_yosys_slang_script() {
     done
 
     for line in "${early_files[@]}" "${middle_files[@]}" "${late_files[@]}"; do
-      echo "read_slang --threads 1 --no-proc --extern-modules $(printf '%q' "$line")" >>"$script"
+      echo "read_slang --threads 1 --no-proc --max-parse-depth ${max_parse_depth} --extern-modules $(printf '%q' "$line")" >>"$script"
     done
     return
   fi
 
   {
-    printf 'read_slang --threads 1 --no-proc --top main'
+    printf 'read_slang --threads 1 --no-proc --max-parse-depth %s --top main' "$max_parse_depth"
     printf ' %q' "${slang_files[@]}"
     printf '\n'
   } >>"$script"

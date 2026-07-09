@@ -112,11 +112,23 @@ class PipelineClarityTest(unittest.TestCase):
     def test_compiler_stage_scripts_are_under_pipeline(self) -> None:
         self.assertTrue((REPO_ROOT / "scripts/pipeline/scf_to_calyx_no_handshake.sh").exists())
         self.assertTrue((REPO_ROOT / "scripts/pipeline/calyx_to_sv_no_handshake.sh").exists())
+        self.assertTrue((REPO_ROOT / "scripts/pipeline/linalg_to_scf_no_handshake.sh").exists())
+        self.assertTrue((REPO_ROOT / "scripts/pipeline/scf_to_flat_scf_no_handshake.sh").exists())
+        self.assertTrue((REPO_ROOT / "scripts/pipeline/linalg_to_llvm_no_handshake.sh").exists())
         self.assertFalse(
             (REPO_ROOT / "scripts/diagnostics/scf_to_calyx_no_handshake.sh").exists()
         )
         self.assertFalse(
             (REPO_ROOT / "scripts/diagnostics/calyx_to_sv_no_handshake.sh").exists()
+        )
+        self.assertFalse(
+            (REPO_ROOT / "scripts/diagnostics/linalg_to_scf_no_handshake.sh").exists()
+        )
+        self.assertFalse(
+            (REPO_ROOT / "scripts/diagnostics/scf_to_flat_scf_no_handshake.sh").exists()
+        )
+        self.assertFalse(
+            (REPO_ROOT / "scripts/diagnostics/linalg_to_llvm_no_handshake.sh").exists()
         )
 
     def test_pipeline_aliases_are_generated_from_metadata(self) -> None:
@@ -177,6 +189,35 @@ class PipelineClarityTest(unittest.TestCase):
 
         for text in expected:
             self.assertIn(text, doc)
+
+    def test_current_baseline_records_flat_scf_fix_and_current_frontier(self) -> None:
+        doc = read("docs/current-baseline.md")
+
+        self.assertIn("reproducers/flat-scf-expand-shape-materialization/input.mlir", doc)
+        self.assertIn("mlir-opt --flatten-memref", doc)
+        self.assertIn("tinystories-representative-core-w4a8-flat-scf", doc)
+        self.assertIn("tinystories-representative-core-w4a8-calyx", doc)
+        self.assertIn("Calyx-stage diagnostic directory", doc)
+        self.assertIn("status: failed", doc)
+        self.assertIn("has-unsupported-calyx-float-frontier", doc)
+        self.assertIn('"unsupported_ops": {"math.rsqrt": 5}', doc)
+        self.assertIn("math.rsqrt", doc)
+        self.assertIn("no longer flat-SCF", doc)
+
+    def test_current_baseline_records_fixed_layernorm_frontier(self) -> None:
+        doc = read("docs/current-baseline.md")
+
+        self.assertIn(
+            "tinystories-representative-core-w4a8-fixed-layernorm-calyx", doc
+        )
+        self.assertIn('{"stage":"calyx","status":"ok","artifact":"model.calyx.mlir"}', doc)
+        self.assertIn('"status": "has-float-frontier"', doc)
+        self.assertIn('"total_float_ops": 883', doc)
+        self.assertIn('"total_unsupported_ops": 0', doc)
+        self.assertIn("primitives/float/divSqrtFN.futil", doc)
+        self.assertIn(
+            "tinystories-representative-core-w4a8-fixed-layernorm-calyx-sv", doc
+        )
 
 
 if __name__ == "__main__":

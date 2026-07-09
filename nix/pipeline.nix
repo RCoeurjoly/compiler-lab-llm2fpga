@@ -1,5 +1,5 @@
-{ pkgs, mlir, circt, yosysPkg, yosysSlang, torchMlir, python, pipelineScripts
-, compilePyTorch, svProvenanceReport, noHandshakeLinalgToScf
+{ pkgs, mlir, circt, calyxTool, yosysPkg, yosysSlang, torchMlir, python
+, pipelineScripts, compilePyTorch, svProvenanceReport, noHandshakeLinalgToScf
 , noHandshakeScfToFlatScf, noHandshakeScfToCalyx, noHandshakeLinalgToLlvm
 , calyxToSvNoHandshake, flatScfBlockerReport, mlirPasses
 , tosaToLinalgMlir ? mlir }:
@@ -135,11 +135,15 @@ let
       tmp_pre_calyx="$(mktemp /tmp/no_handshake_pre_calyx_XXXXXX.mlir)"
       ${mlir}/bin/mlir-opt ${flatScf}/flat.scf.mlir \
         --load-pass-plugin=${mlirPasses}/lib/LLM2FPGAMLIRPasses.so \
-        --pass-pipeline='builtin.module(llm2fpga-fold-constant-truncf,canonicalize,cse)' \
+        --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,canonicalize,cse)' \
         -o "$tmp_pre_calyx"
       ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
         ${circt}/bin/circt-opt "$tmp_pre_calyx" "$out"
+      ${python}/bin/python3 ${pipelineScripts}/calyx_float_frontier_report.py \
+        "$out/flat.scf.mlir" "$out/float-frontier.json" \
+        --manifest-json "$out/manifest.json"
       test -f "$out/manifest.json"
+      test -f "$out/float-frontier.json"
       if ${pkgs.gnugrep}/bin/grep -q '"status":"ok"' "$out/manifest.json"; then
         test -f "$out/model.calyx.mlir"
       fi
@@ -152,9 +156,15 @@ let
     '';
 
   mkCalyxSvDerivation = { name, calyx }:
-    pkgs.runCommand "${name}-calyx-sv" { buildInputs = [ circt ]; } ''
+    pkgs.runCommand "${name}-calyx-sv" {
+      buildInputs = [ circt calyxTool python ];
+    } ''
+      export CALYX_COMPILE_PRIMITIVES_TO_SV=${pipelineScripts}/calyx_compile_primitives_to_sv.py
       ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
-        ${circt}/bin/circt-opt ${calyx} "$out"
+        ${circt}/bin/circt-translate \
+        ${calyxTool}/bin/calyx \
+        ${calyxTool}/share/calyx \
+        ${calyx} "$out"
     '';
 
   mkHandshakeDerivation = { name, cf }:
@@ -445,12 +455,18 @@ let
           "no direct no-handshake HW/SV lowering backend is wired yet";
         sv = unavailable "sv"
           "no direct no-handshake HW/SV lowering backend is wired yet";
-        "sv-provenance-report" = unavailable "sv-provenance-report"
-          "no emitted SV exists for this no-handshake experiment yet";
-        il = unavailable "il"
-          "no emitted SV exists for this no-handshake experiment yet";
-        "yosys-stat" = unavailable "yosys-stat"
-          "no emitted SV exists for this no-handshake experiment yet";
+        "sv-provenance-report" = mkSvProvenanceReportDerivation {
+          inherit name;
+          sv = self."calyx-sv";
+        };
+        il = mkIlDerivation {
+          inherit name slangPerFileExternModules;
+          sv = self."calyx-sv";
+        };
+        "yosys-stat" = mkYosysStatDerivation {
+          inherit name slangPerFileExternModules;
+          sv = self."calyx-sv";
+        };
       };
     in self;
 

@@ -74,6 +74,11 @@ def _reference_representation_rewrite_enabled() -> bool:
     return value is not None and value not in {"", "0", "false", "False"}
 
 
+def _env_flag(name: str) -> bool:
+    value = os.environ.get(name)
+    return value is not None and value not in {"", "0", "false", "False"}
+
+
 def _materialize_missing_linear_biases(model: torch.nn.Module) -> None:
     for module in model.modules():
         if isinstance(module, torch.nn.Linear) and module.bias is None:
@@ -118,6 +123,110 @@ def replace_embeddings_with_int8_lookup(model: torch.nn.Module) -> None:
         setattr(transformer, name, Int8Embedding(embedding))
 
 
+class FixedPointLayerNormBridge(torch.nn.Module):
+    def __init__(self, source: torch.nn.LayerNorm) -> None:
+        super().__init__()
+        normalized_shape = tuple(source.normalized_shape)
+        if len(normalized_shape) != 1:
+            raise RuntimeError(
+                "fixed-point representative LayerNorm expects one normalized "
+                f"dimension; got {source.normalized_shape}"
+            )
+        hidden_size = normalized_shape[0]
+        if hidden_size <= 0 or hidden_size & (hidden_size - 1) != 0:
+            raise RuntimeError(
+                "fixed-point representative LayerNorm mean is implemented as "
+                f"a shift and requires power-of-two hidden size; got {hidden_size}"
+            )
+
+        self.input_scale_i32 = 16
+        self.register_buffer(
+            "output_scale", torch.tensor(1.0 / 16.0, dtype=torch.float32)
+        )
+        self.register_buffer(
+            "gamma_i32",
+            torch.round(source.weight.detach().to(torch.float32) * 128.0).to(
+                torch.int32
+            ),
+        )
+        self.register_buffer(
+            "beta_i32",
+            torch.round(source.bias.detach().to(torch.float32) * 16.0).to(
+                torch.int32
+            ),
+        )
+        self.register_buffer(
+            "mean_shift_i32",
+            torch.tensor((hidden_size - 1).bit_length() - 1, dtype=torch.int32),
+        )
+        self.register_buffer("variance_shift_i32", torch.tensor(1, dtype=torch.int32))
+        self.register_buffer("norm_shift_i32", torch.tensor(7, dtype=torch.int32))
+        self.register_buffer("inv_std_base_i32", torch.tensor(128, dtype=torch.int32))
+        self.register_buffer("inv_std_min_i32", torch.tensor(1, dtype=torch.int32))
+        self.register_buffer("qmin_i32", torch.tensor(-128, dtype=torch.int32))
+        self.register_buffer("qmax_i32", torch.tensor(127, dtype=torch.int32))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x_i32 = torch.clamp(
+            torch.round(x * self.input_scale_i32),
+            self.qmin_i32,
+            self.qmax_i32,
+        ).to(torch.int32)
+        sum_i32 = torch.sum(x_i32, dim=-1, keepdim=True).to(torch.int32)
+        mean_i32 = torch.bitwise_right_shift(sum_i32, self.mean_shift_i32)
+        centered_i32 = x_i32 - mean_i32
+        sumsq_i32 = torch.sum(
+            centered_i32 * centered_i32, dim=-1, keepdim=True
+        ).to(torch.int32)
+        variance_i32 = torch.bitwise_right_shift(sumsq_i32, self.mean_shift_i32)
+        variance_clamped_i32 = torch.minimum(
+            torch.maximum(variance_i32, torch.tensor(0, dtype=torch.int32)),
+            torch.tensor(255, dtype=torch.int32),
+        )
+        inv_std_drop_i32 = torch.bitwise_right_shift(
+            variance_clamped_i32, self.variance_shift_i32
+        )
+        inv_std_i32 = torch.maximum(
+            self.inv_std_base_i32 - inv_std_drop_i32, self.inv_std_min_i32
+        )
+        normalized_i32 = torch.bitwise_right_shift(
+            centered_i32 * inv_std_i32, self.norm_shift_i32
+        )
+        scaled_i32 = torch.bitwise_right_shift(
+            normalized_i32 * self.gamma_i32, self.norm_shift_i32
+        )
+        biased_i32 = scaled_i32 + self.beta_i32
+        clamped_i32 = torch.minimum(
+            torch.maximum(biased_i32, self.qmin_i32), self.qmax_i32
+        )
+        return clamped_i32.to(torch.float32) * self.output_scale
+
+
+def replace_layernorm_with_fixed_point_bridge(model: torch.nn.Module) -> None:
+    for parent in model.modules():
+        for name, child in list(parent.named_children()):
+            if isinstance(child, torch.nn.LayerNorm):
+                setattr(parent, name, FixedPointLayerNormBridge(child))
+
+
+class QuadraticGeluHardwareApproximation(torch.nn.Module):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return 0.5 * x + 0.3989422804014327 * x * x
+
+
+def replace_gelu_with_quadratic_hardware_activation(model: torch.nn.Module) -> None:
+    for module in model.modules():
+        if all(hasattr(module, name) for name in ("c_fc", "c_proj", "act")):
+            module.act = QuadraticGeluHardwareApproximation()
+
+
+def replace_dropout_with_identity(model: torch.nn.Module) -> None:
+    for parent in model.modules():
+        for name, child in list(parent.named_children()):
+            if isinstance(child, torch.nn.Dropout):
+                setattr(parent, name, torch.nn.Identity())
+
+
 def _decompose_out_dtype(model: torch.fx.GraphModule) -> torch.fx.GraphModule:
     graph = model.graph
     for node in list(graph.nodes):
@@ -145,22 +254,36 @@ def _single_token_attn_without_causal_bias(
     attention_mask: torch.Tensor | None = None,
     head_mask: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    query = query.to(torch.float32)
-    key = key.to(torch.float32)
-
-    attn_weights = torch.matmul(query, key.transpose(-1, -2))
+    if key.shape[-2] != 1:
+        raise RuntimeError(
+            "representative-core attention simplification expects one key token; "
+            f"got {key.shape[-2]}"
+        )
+    if query.shape[-2] != 1:
+        raise RuntimeError(
+            "representative-core attention simplification expects one query token; "
+            f"got {query.shape[-2]}"
+        )
 
     if attention_mask is not None:
-        attn_weights = attn_weights + attention_mask[:, :, :, : key.shape[-2]]
+        raise RuntimeError(
+            "representative-core attention simplification expects no attention mask"
+        )
 
-    attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+    attn_weights = torch.ones(
+        (query.shape[0], query.shape[1], query.shape[2], key.shape[-2]),
+        dtype=value.dtype,
+        device=value.device,
+    )
     attn_weights = attn_weights.to(value.dtype)
     attn_weights = self.attn_dropout(attn_weights)
 
     if head_mask is not None:
-        attn_weights = attn_weights * head_mask
+        raise RuntimeError(
+            "representative-core attention simplification expects no head mask"
+        )
 
-    return torch.matmul(attn_weights, value), attn_weights
+    return value, attn_weights
 
 
 def replace_attention_with_hardware_friendly_attention(model: torch.nn.Module) -> None:
@@ -271,6 +394,11 @@ def build_base_model_from_config(config: object) -> torch.nn.Module:
 
 def apply_model_simplifications(model: torch.nn.Module) -> torch.nn.Module:
     replace_embeddings_with_int8_lookup(model)
+    replace_dropout_with_identity(model)
+    if _env_flag("TINYSTORIES_REPRESENTATIVE_CORE_FIXED_POINT_LAYERNORM"):
+        replace_layernorm_with_fixed_point_bridge(model)
+    if _env_flag("TINYSTORIES_REPRESENTATIVE_CORE_QUADRATIC_GELU"):
+        replace_gelu_with_quadratic_hardware_activation(model)
     replace_attention_with_hardware_friendly_attention(model)
     disable_single_token_causal_mask(model)
     return model

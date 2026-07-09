@@ -27,6 +27,8 @@
 
         circtPkgs = circt-nix.packages.${system};
         circt = circtPkgs.circt.override { enableSlang = false; };
+        circtMlir = circtPkgs.mlir;
+        circtLlvm = circtPkgs.libllvm;
 
         nixEdaPkgs = nix-eda.packages.${system};
         yosysPkgBase = nixEdaPkgs.yosys;
@@ -144,17 +146,23 @@
         llm2fpgaMlirPasses = pkgsLlvm21.callPackage ./nix/mlir-passes.nix {
           inherit mlir llvmPackages;
         };
+        llm2fpgaCirctPasses = pkgs.callPackage ./nix/circt-passes.nix {
+          inherit circt;
+          mlir = circtMlir;
+          llvm = circtLlvm;
+        };
+        calyx = pkgs.callPackage ./nix/calyx.nix { };
 
         pipelineScripts = ./scripts/pipeline;
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
         noHandshakeLinalgToScf =
-          ./scripts/diagnostics/linalg_to_scf_no_handshake.sh;
+          ./scripts/pipeline/linalg_to_scf_no_handshake.sh;
         noHandshakeScfToFlatScf =
-          ./scripts/diagnostics/scf_to_flat_scf_no_handshake.sh;
+          ./scripts/pipeline/scf_to_flat_scf_no_handshake.sh;
         noHandshakeScfToCalyx = ./scripts/pipeline/scf_to_calyx_no_handshake.sh;
         calyxToSvNoHandshake = ./scripts/pipeline/calyx_to_sv_no_handshake.sh;
         noHandshakeLinalgToLlvm =
-          ./scripts/diagnostics/linalg_to_llvm_no_handshake.sh;
+          ./scripts/pipeline/linalg_to_llvm_no_handshake.sh;
         flatScfBlockerReport = ./scripts/diagnostics/flat_scf_blocker_report.py;
         fpPrimsSv = ./rtl/fp/circt_fp_primitives.sv;
         tinyStories1m = let
@@ -186,6 +194,7 @@
 
         pipelineLib = import ./nix/pipeline.nix {
           inherit pkgs mlir circt yosysPkg yosysSlang torchMlir python;
+          calyxTool = calyx;
           inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
             noHandshakeScfToFlatScf noHandshakeScfToCalyx calyxToSvNoHandshake
             noHandshakeLinalgToLlvm;
@@ -217,6 +226,7 @@
           modelRegistryNoHandshake;
         pipelineLibTosa = import ./nix/pipeline.nix {
           inherit pkgs mlir circt yosysPkg yosysSlang python;
+          calyxTool = calyx;
           tosaToLinalgMlir = mlirForTorchMlir;
           inherit torchMlir;
           inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
@@ -281,10 +291,23 @@
           "flat-scf"
           "calyx"
           "calyx-sv"
+          "sv-provenance-report"
+          "il"
+          "yosys-stat"
           "llvm"
         ];
-        noHandshakeLinalgStages =
-          [ "torch" "linalg" "scf" "flat-scf" "calyx" "calyx-sv" "llvm" ];
+        noHandshakeLinalgStages = [
+          "torch"
+          "linalg"
+          "scf"
+          "flat-scf"
+          "calyx"
+          "calyx-sv"
+          "sv-provenance-report"
+          "il"
+          "yosys-stat"
+          "llvm"
+        ];
         mkPipelineAlias = spec: stage: {
           name = "${spec.alias}-${stage}";
           value = builtins.getAttr "${spec.model}-${stage}" spec.packages;
@@ -367,6 +390,42 @@
             packages = pipelineStagePackagesNoHandshake;
             stages = noHandshakeLinalgStages;
           }
+          {
+            alias =
+              "tinystories-representative-core-w4a8-fixed-layernorm-via-tosa-no-handshake";
+            model = "tinystories-representative-core-w4a8-fixed-layernorm";
+            frontend = "tosa";
+            backend = "calyx-sv";
+            packages = pipelineStagePackagesTosaNoHandshake;
+            stages = noHandshakeStages;
+          }
+          {
+            alias =
+              "tinystories-representative-core-w4a8-fixed-layernorm-via-linalg-no-handshake";
+            model = "tinystories-representative-core-w4a8-fixed-layernorm";
+            frontend = "linalg";
+            backend = "calyx-sv";
+            packages = pipelineStagePackagesNoHandshake;
+            stages = noHandshakeLinalgStages;
+          }
+          {
+            alias =
+              "tinystories-representative-core-w4a8-integer-via-tosa-no-handshake";
+            model = "tinystories-representative-core-w4a8-integer";
+            frontend = "tosa";
+            backend = "calyx-sv";
+            packages = pipelineStagePackagesTosaNoHandshake;
+            stages = noHandshakeStages;
+          }
+          {
+            alias =
+              "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake";
+            model = "tinystories-representative-core-w4a8-integer";
+            frontend = "linalg";
+            backend = "calyx-sv";
+            packages = pipelineStagePackagesNoHandshake;
+            stages = noHandshakeLinalgStages;
+          }
         ];
         pipelineAliasPackages = mkPipelineAliases pipelineAliasSpecs;
         activePipelineVariantsJson =
@@ -396,11 +455,37 @@
                 --fail-on-float-after-quantized-matmul
             '';
         };
+        resourceBaselineYosysStatMatrix =
+          pkgs.runCommand "resource-baseline-yosys-stat-matrix" { } ''
+            mkdir -p "$out"
+            ${python}/bin/python3 ${
+              ./scripts/pipeline/summarize_yosys_stat_baselines.py
+            } \
+              --entry alias=pattern-linear-w4a8-core-via-tosa-no-handshake,model=pattern-linear-w4a8-core,frontend=tosa,backend=calyx-sv,stat=${
+                pipelineAliasPackages."pattern-linear-w4a8-core-via-tosa-no-handshake-yosys-stat"
+              } \
+              --entry alias=pattern-embedding-w4a8-core-via-tosa-no-handshake,model=pattern-embedding-w4a8-core,frontend=tosa,backend=calyx-sv,stat=${
+                pipelineAliasPackages."pattern-embedding-w4a8-core-via-tosa-no-handshake-yosys-stat"
+              } \
+              --entry alias=pattern-layernorm-w4a8-core-via-tosa-no-handshake,model=pattern-layernorm-w4a8-core,frontend=tosa,backend=calyx-sv,stat=${
+                pipelineAliasPackages."pattern-layernorm-w4a8-core-via-tosa-no-handshake-yosys-stat"
+              } \
+              --entry alias=tinystories-representative-core-w4a8-integer-via-linalg-no-handshake,model=tinystories-representative-core-w4a8-integer,frontend=linalg,backend=calyx-sv,stat=${
+                pipelineAliasPackages."tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-yosys-stat"
+              } \
+              --entry alias=tinystories-representative-core-w4a8-integer-via-tosa-no-handshake,model=tinystories-representative-core-w4a8-integer,frontend=tosa,backend=calyx-sv,stat=${
+                pipelineAliasPackages."tinystories-representative-core-w4a8-integer-via-tosa-no-handshake-yosys-stat"
+              } \
+              --summary-json "$out/summary.json" \
+              --summary-md "$out/summary.md"
+          '';
       in {
         packages = {
           inherit circt mlir torchMlir yosysPkg modelRegistryJson
-            llm2fpgaMlirPasses;
+            llm2fpgaMlirPasses llm2fpgaCirctPasses calyx;
           "active-pipeline-variants" = activePipelineVariantsJson;
+          "resource-baseline-yosys-stat-matrix" =
+            resourceBaselineYosysStatMatrix;
           model-registry = modelRegistryJson;
           default = modelRegistryJson;
         } // pipelineStagePackages // pipelineMetadataPackages

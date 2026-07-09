@@ -157,7 +157,7 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
 
     def test_flat_scf_stage_does_not_rewrite_mlir_text_with_embedded_python(self) -> None:
         script = (
-            REPO_ROOT / "scripts" / "diagnostics" / "scf_to_flat_scf_no_handshake.sh"
+            REPO_ROOT / "scripts" / "pipeline" / "scf_to_flat_scf_no_handshake.sh"
         ).read_text(encoding="utf-8")
 
         self.assertNotIn("python3 -", script)

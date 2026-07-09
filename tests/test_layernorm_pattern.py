@@ -82,8 +82,10 @@ class LayerNormPatternTest(unittest.TestCase):
             flake,
         )
         self.assertIn('model = "pattern-layernorm-w4a8-core"', flake)
+        self.assertIn('backend = "calyx-sv"', flake)
         self.assertIn('"tosa"', flake)
         self.assertIn('"flat-scf"', flake)
+        self.assertIn('"calyx-sv"', flake)
 
 
 if __name__ == "__main__":

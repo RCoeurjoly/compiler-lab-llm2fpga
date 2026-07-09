@@ -68,7 +68,7 @@ in {
       boundary = "hardware";
     };
     allowHwExterns = false;
-    slangPerFileExternModules = true;
+    slangPerFileExternModules = false;
     pytorchToolchain = [ pythonWithTinyStories torchMlir ];
     pytorchExportedCommand = ''
       export PYTHONPATH="${../patterns/linear}:''${PYTHONPATH:-}"
@@ -90,7 +90,7 @@ in {
       boundary = "hardware";
     };
     allowHwExterns = false;
-    slangPerFileExternModules = true;
+    slangPerFileExternModules = false;
     pytorchToolchain = [ pythonWithTinyStories torchMlir ];
     pytorchExportedCommand = ''
       export PYTHONPATH="${../patterns/embedding}:''${PYTHONPATH:-}"
@@ -112,7 +112,7 @@ in {
       boundary = "hardware";
     };
     allowHwExterns = false;
-    slangPerFileExternModules = true;
+    slangPerFileExternModules = false;
     pytorchToolchain = [ pythonWithTinyStories torchMlir ];
     pytorchExportedCommand = ''
       export PYTHONPATH="${../patterns/layernorm}:''${PYTHONPATH:-}"
@@ -211,6 +211,78 @@ in {
       export TINYSTORIES_PYTORCHAO_ACTIVATION_BITS=8
       python ${materializePyTorchExported} \
         --adapter ${tinyStories1m.sourceDir}/model_adapter_representative_core_pt2e_static_quant.py \
+        --model-path ${tinyStories1m.snapshot} \
+        --out-dir "$out"
+    '';
+  };
+
+  "tinystories-representative-core-w4a8-fixed-layernorm" = registerModel {
+    key = "tinystories-representative-core-w4a8-fixed-layernorm";
+    name = "tinystories-representative-core-w4a8-fixed-layernorm";
+    description =
+      "Reduced TinyStories representative-core PT2E static W4A8 ExportedProgram with explicit fixed-point LayerNorm bridge for Calyx bring-up.";
+    source = {
+      type = "derived";
+      base_model_id = tinyStories1m.modelId;
+      inherit (tinyStories1m) revision;
+      profile = "representative-core-min";
+      quantization = "pt2e-static-w4a8";
+      normalization = "fixed-point-layernorm-bridge";
+      activation = "quadratic-gelu-hardware-approximation";
+      lowering = "default-handshake-nolsq";
+      vocab_size = 32;
+      num_layers = 2;
+      max_position_embeddings = 4;
+      window_size = 2;
+      hidden_size = 2;
+      num_heads = 1;
+    };
+    allowHwExterns = true;
+    slangPerFileExternModules = true;
+    inherit fpPrimsSv;
+    hfSnapshot = tinyStories1m.snapshot;
+    pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
+    pytorchExportedCommand = ''
+      export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
+      ${representativeCoreEnv}
+      export TINYSTORIES_REPRESENTATIVE_CORE_FIXED_POINT_LAYERNORM=1
+      export TINYSTORIES_REPRESENTATIVE_CORE_QUADRATIC_GELU=1
+      export TINYSTORIES_PYTORCHAO_WEIGHT_BITS=4
+      export TINYSTORIES_PYTORCHAO_ACTIVATION_BITS=8
+      python ${materializePyTorchExported} \
+        --adapter ${tinyStories1m.sourceDir}/model_adapter_representative_core_pt2e_static_quant.py \
+        --model-path ${tinyStories1m.snapshot} \
+        --out-dir "$out"
+    '';
+  };
+
+  "tinystories-representative-core-w4a8-integer" = registerModel {
+    key = "tinystories-representative-core-w4a8-integer";
+    name = "tinystories-representative-core-w4a8-integer";
+    description =
+      "TinyStories representative-core W4A8 hardware slice with explicit integer embedding, normalization, linear, activation, and residual arithmetic.";
+    source = {
+      type = "derived";
+      base_model_id = tinyStories1m.modelId;
+      inherit (tinyStories1m) revision;
+      profile = "representative-core-min-integer-slice";
+      quantization = "w4a8-explicit-integer-core";
+      normalization = "fixed-point-layernorm-core";
+      activation = "integer-quadratic-core";
+      boundary = "hardware";
+      vocab_size = 8;
+      num_layers = 2;
+      max_position_embeddings = 1;
+      hidden_size = 2;
+    };
+    allowHwExterns = false;
+    slangPerFileExternModules = false;
+    hfSnapshot = tinyStories1m.snapshot;
+    pytorchToolchain = [ pythonWithTinyStories torchMlir ];
+    pytorchExportedCommand = ''
+      export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
+      python ${materializePyTorchExported} \
+        --adapter ${tinyStories1m.sourceDir}/model_adapter_representative_core_w4a8_integer.py \
         --model-path ${tinyStories1m.snapshot} \
         --out-dir "$out"
     '';
