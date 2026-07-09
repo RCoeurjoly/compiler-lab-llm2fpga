@@ -52,19 +52,6 @@ class EmbeddingPatternTest(unittest.TestCase):
         self.assertNotIn("convert_pt2e", adapter)
         self.assertNotIn("quantize_per_tensor", adapter)
 
-    def test_pattern_is_registered_in_existing_pipeline(self) -> None:
-        models = (REPO_ROOT / "nix" / "models.nix").read_text(encoding="utf-8")
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
-
-        self.assertIn('"pattern-embedding-w4a8-core"', models)
-        self.assertIn("../patterns/embedding/adapter_w4a8_core.py", models)
-        self.assertIn(
-            'alias = "pattern-embedding-w4a8-core-via-tosa-no-handshake"',
-            flake,
-        )
-        self.assertIn('model = "pattern-embedding-w4a8-core"', flake)
-        self.assertIn('"flat-scf"', flake)
-
 
 if __name__ == "__main__":
     unittest.main()

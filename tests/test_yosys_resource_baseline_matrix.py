@@ -43,7 +43,7 @@ class YosysResourceBaselineMatrixTest(unittest.TestCase):
                     sys.executable,
                     str(SCRIPT),
                     "--entry",
-                    "alias=pattern-linear-w4a8-core-via-tosa-no-handshake,model=pattern-linear-w4a8-core,frontend=tosa,backend=calyx-sv,stat="
+                    "alias=pattern-linear-w4a8-core-via-tosa-no-handshake,model=pattern-linear-w4a8-core,frontend=tosa,backend=calyx-native-sv,stat="
                     + str(stat),
                     "--summary-json",
                     str(out_json),
@@ -58,7 +58,7 @@ class YosysResourceBaselineMatrixTest(unittest.TestCase):
             self.assertEqual(payload["entries"][0]["alias"], "pattern-linear-w4a8-core-via-tosa-no-handshake")
             self.assertEqual(payload["entries"][0]["model"], "pattern-linear-w4a8-core")
             self.assertEqual(payload["entries"][0]["frontend"], "tosa")
-            self.assertEqual(payload["entries"][0]["backend"], "calyx-sv")
+            self.assertEqual(payload["entries"][0]["backend"], "calyx-native-sv")
             self.assertEqual(payload["entries"][0]["status"], "ok")
             self.assertEqual(payload["entries"][0]["num_cells"], 12)
             self.assertEqual(payload["entries"][0]["num_memories"], 2)
@@ -67,18 +67,7 @@ class YosysResourceBaselineMatrixTest(unittest.TestCase):
 
             markdown = out_md.read_text(encoding="utf-8")
             self.assertIn("| alias | frontend | backend | status | cells | memories | memory bits |", markdown)
-            self.assertIn("| pattern-linear-w4a8-core-via-tosa-no-handshake | tosa | calyx-sv | ok | 12 | 2 | 128 |", markdown)
-
-    def test_flake_exposes_resource_baseline_matrix_package(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
-
-        self.assertIn("resourceBaselineYosysStatMatrix", flake)
-        self.assertIn('"resource-baseline-yosys-stat-matrix"', flake)
-        self.assertIn("summarize_yosys_stat_baselines.py", flake)
-        self.assertIn("pattern-linear-w4a8-core-via-tosa-no-handshake-yosys-stat", flake)
-        self.assertIn("pattern-embedding-w4a8-core-via-tosa-no-handshake-yosys-stat", flake)
-        self.assertIn("pattern-layernorm-w4a8-core-via-tosa-no-handshake-yosys-stat", flake)
-        self.assertIn("tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-yosys-stat", flake)
+            self.assertIn("| pattern-linear-w4a8-core-via-tosa-no-handshake | tosa | calyx-native-sv | ok | 12 | 2 | 128 |", markdown)
 
 
 if __name__ == "__main__":

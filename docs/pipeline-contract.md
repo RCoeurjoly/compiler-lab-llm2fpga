@@ -35,8 +35,14 @@ inspection.
   handshake -> hw -> sv.
 - `via-tosa`: PyTorch ExportedProgram -> torch-mlir TOSA -> linalg -> cf ->
   handshake -> hw -> sv.
-- `via-tosa-no-handshake-calyx-sv`: PyTorch ExportedProgram -> torch-mlir TOSA
-  -> linalg -> scf -> flat-scf -> calyx -> calyx-sv.
+- `via-tosa-no-handshake-calyx-native-sv`: PyTorch ExportedProgram ->
+  torch-mlir TOSA -> linalg -> scf -> flat-scf -> Calyx dialect ->
+  `circt-translate --export-calyx` -> native Calyx -> SV. This is the current
+  working Calyx SV route.
+- `via-tosa-no-handshake-calyx-hw-sv`: PyTorch ExportedProgram -> torch-mlir
+  TOSA -> linalg -> scf -> flat-scf -> Calyx dialect -> `--lower-calyx-to-hw`
+  -> HW/SV. This is the desired direct CIRCT route and the primary failing
+  target for Calyx backend debugging.
 - `via-tosa-no-handshake-llvm`: PyTorch ExportedProgram -> torch-mlir TOSA ->
   linalg -> scf -> flat-scf -> llvm, used as a compiler comparison path.
 

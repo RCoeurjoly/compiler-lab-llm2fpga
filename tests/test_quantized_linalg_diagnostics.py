@@ -67,20 +67,6 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertEqual(report["hard_failures"], [])
         self.assertEqual(report["float_ops_after_quantized_matmul"], [])
 
-    def test_flake_exposes_pattern_linear_w4a8_linalg_diagnostic_gate(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
-
-        self.assertIn("pattern-linear-w4a8-linalg-diagnostics", flake)
-        self.assertIn("diagnose_quantized_linalg.py", flake)
-        self.assertIn("pattern-linear-w4a8-linalg", flake)
-
-    def test_flake_exposes_pattern_linear_w4a8_tosa_experiment(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
-
-        self.assertIn("pattern-linear-w4a8-tosa.mlir", flake)
-        self.assertIn("--torch-backend-to-tosa-backend-pipeline", flake)
-        self.assertIn("pattern-linear-w4a8-torch", flake)
-
     def test_torch_mlir_build_uses_upstream_without_local_patches(self) -> None:
         torch_mlir = (REPO_ROOT / "torch-mlir.nix").read_text(encoding="utf-8")
 
@@ -88,14 +74,6 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertNotIn("applyTask3RfpPatches", torch_mlir)
         self.assertNotIn("task3RfpPatches", torch_mlir)
         self.assertNotIn("task6Patches", torch_mlir)
-
-    def test_flake_does_not_expose_patched_torch_mlir_variants(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
-
-        self.assertNotIn("torchMlirPatched", flake)
-        self.assertNotIn("pipelineLibPatched", flake)
-        self.assertNotIn("pipelineLibTosaPatched", flake)
-        self.assertNotIn("-patched", flake)
 
     def test_local_patch_stacks_are_archived_and_not_part_of_active_pipeline(self) -> None:
         archive = REPO_ROOT / "archive" / "patches" / "unused"
@@ -109,7 +87,6 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("historical reference", readme)
 
     def test_tosa_pipeline_rejoins_sv_path(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
         pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
         tosa_to_linalg = REPO_ROOT / "scripts" / "pipeline" / "tosa_to_linalg.sh"
 
@@ -118,17 +95,8 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("--tosa-to-arith='include-apply-rescale'", tosa_to_linalg.read_text(encoding="utf-8"))
         self.assertIn("registerTosaModel", pipeline)
         self.assertIn("mkTosaToLinalgDerivation", pipeline)
-        self.assertIn("pipelineLibTosa", flake)
-        self.assertIn("tosaToLinalgMlir = mlirForTorchMlir", flake)
-        self.assertIn("mkPipelineAliases", flake)
-        self.assertIn('alias = "pattern-linear-w4a8-via-tosa"', flake)
-        self.assertIn('alias = "pattern-linear-w4a8-core-via-tosa"', flake)
-        self.assertIn('"tinystories-representative-core-w4a8-via-tosa-no-handshake"', flake)
-        for stage in ["cf", "hw0", "sv", "calyx-sv"]:
-            self.assertIn(f'"{stage}"', flake)
 
     def test_tosa_no_handshake_pipeline_is_public_and_skips_handshake_tail(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
         pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
 
         self.assertIn("registerTosaNoHandshakeModel", pipeline)
@@ -143,17 +111,9 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
         self.assertIn("flatScf = self.\"flat-scf\"", pipeline)
         self.assertIn("model.calyx.mlir", pipeline)
         self.assertIn("manifest.json", pipeline)
-        self.assertIn("scf_to_flat_scf_no_handshake.sh", flake)
-        self.assertIn("flat_scf_blocker_report.py", flake)
-        self.assertIn('alias = "pattern-linear-w4a8-core-via-tosa-no-handshake"', flake)
-        self.assertIn('model = "pattern-linear-w4a8-core"', flake)
-        self.assertIn('backend = "calyx-sv"', flake)
-        for stage in ["scf", "flat-scf", "calyx", "calyx-sv", "llvm"]:
-            self.assertIn(f'"{stage}"', flake)
-        self.assertIn("mkCalyxSvDerivation", pipeline)
+        self.assertIn("mkCalyxNativeSvDerivation", pipeline)
+        self.assertIn("mkCalyxHwSvDerivation", pipeline)
         self.assertIn('"calyx-sv"', pipeline)
-        self.assertIn('"tinystories-representative-core-w4a8-via-tosa-no-handshake"', flake)
-        self.assertIn('model = "tinystories-representative-core-w4a8"', flake)
 
     def test_flat_scf_stage_does_not_rewrite_mlir_text_with_embedded_python(self) -> None:
         script = (

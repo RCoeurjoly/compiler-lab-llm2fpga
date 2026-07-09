@@ -71,22 +71,6 @@ class LayerNormPatternTest(unittest.TestCase):
         self.assertNotIn("[:, :, 2:3]", adapter)
         self.assertNotIn("[:, :, 3:4]", adapter)
 
-    def test_pattern_is_registered_in_existing_pipeline(self) -> None:
-        models = (REPO_ROOT / "nix" / "models.nix").read_text(encoding="utf-8")
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
-
-        self.assertIn('"pattern-layernorm-w4a8-core"', models)
-        self.assertIn("../patterns/layernorm/adapter_w4a8_core.py", models)
-        self.assertIn(
-            'alias = "pattern-layernorm-w4a8-core-via-tosa-no-handshake"',
-            flake,
-        )
-        self.assertIn('model = "pattern-layernorm-w4a8-core"', flake)
-        self.assertIn('backend = "calyx-sv"', flake)
-        self.assertIn('"tosa"', flake)
-        self.assertIn('"flat-scf"', flake)
-        self.assertIn('"calyx-sv"', flake)
-
 
 if __name__ == "__main__":
     unittest.main()

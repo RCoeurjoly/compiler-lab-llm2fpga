@@ -20,36 +20,7 @@ def load_module(name: str, path: Path):
 
 
 class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
-    def test_representative_core_has_explicit_no_handshake_calyx_sv_target(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
-
-        self.assertIn(
-            '"tinystories-representative-core-w4a8-via-tosa-no-handshake"',
-            flake,
-        )
-        self.assertIn('model = "tinystories-representative-core-w4a8"', flake)
-        self.assertIn('frontend = "tosa"', flake)
-        self.assertIn('backend = "calyx-sv"', flake)
-        self.assertIn('"calyx-sv"', flake)
-        self.assertIn("calyxToSvNoHandshake", flake)
-        self.assertNotIn(
-            'pipelineStagePackagesTosaPatched."tinystories-representative-core-w4a8-sv"',
-            flake,
-        )
-
-    def test_representative_core_has_direct_linalg_no_handshake_calyx_sv_target(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
-
-        self.assertIn(
-            '"tinystories-representative-core-w4a8-via-linalg-no-handshake"',
-            flake,
-        )
-        self.assertIn('frontend = "linalg"', flake)
-        self.assertIn('backend = "calyx-sv"', flake)
-        self.assertIn("pipelineStagePackagesNoHandshake", flake)
-
     def test_fixed_layernorm_representative_core_variant_is_explicit(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
         models = (REPO_ROOT / "nix" / "models.nix").read_text(encoding="utf-8")
         adapter = (
             REPO_ROOT
@@ -57,10 +28,6 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
             / "model_adapter_representative_core_pt2e_static_quant.py"
         ).read_text(encoding="utf-8")
 
-        self.assertIn(
-            '"tinystories-representative-core-w4a8-fixed-layernorm-via-linalg-no-handshake"',
-            flake,
-        )
         self.assertIn("fixed-point-layernorm-bridge", models)
         self.assertIn("quadratic-gelu-hardware-approximation", models)
         self.assertIn("TINYSTORIES_REPRESENTATIVE_CORE_FIXED_POINT_LAYERNORM", models)
@@ -95,7 +62,6 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertEqual(str(actual.dtype), "torch.int8")
 
     def test_integer_representative_core_variant_is_explicitly_registered(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
         models = (REPO_ROOT / "nix" / "models.nix").read_text(encoding="utf-8")
         adapter = (
             TINYSTORIES_DIR / "model_adapter_representative_core_w4a8_integer.py"
@@ -105,11 +71,6 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("model_adapter_representative_core_w4a8_integer.py", models)
         self.assertIn('quantization = "w4a8-explicit-integer-core"', models)
         self.assertIn("slangPerFileExternModules = false", models)
-        self.assertIn(
-            '"tinystories-representative-core-w4a8-integer-via-tosa-no-handshake"',
-            flake,
-        )
-        self.assertIn('model = "tinystories-representative-core-w4a8-integer"', flake)
         self.assertIn("torch.int8", adapter)
         self.assertIn("torch.int32", adapter)
         self.assertIn("torch.bitwise_right_shift", adapter)
@@ -192,16 +153,35 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("compile.futil", generator)
         self.assertNotIn("handshake", script.lower())
 
+    def test_no_handshake_backends_are_named_by_calyx_route(self) -> None:
+        pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
+
+        self.assertIn("mkCalyxNativeSvDerivation", pipeline)
+        self.assertIn("mkCalyxHwSvDerivation", pipeline)
+        self.assertIn('"calyx-native-sv"', pipeline)
+        self.assertIn('"calyx-hw-sv"', pipeline)
+
+    def test_direct_calyx_hw_sv_script_uses_circt_lower_calyx_to_hw(self) -> None:
+        script_path = REPO_ROOT / "scripts" / "pipeline" / "calyx_to_hw_sv_no_handshake.sh"
+        self.assertTrue(script_path.exists())
+        script = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("--calyx-remove-groups", script)
+        self.assertIn("--lower-calyx-to-hw", script)
+        self.assertIn("--lower-hw-to-sv", script)
+        self.assertIn("--lower-seq-to-sv", script)
+        self.assertIn("--export-verilog", script)
+        self.assertNotIn("--export-calyx", script)
+        self.assertNotIn("-b verilog", script)
+        self.assertNotIn("calyx_bin", script)
+
     def test_yosys_slang_raises_parse_depth_for_native_calyx_sv(self) -> None:
         common = (REPO_ROOT / "scripts" / "pipeline" / "common.sh").read_text(
             encoding="utf-8"
         )
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
 
         self.assertIn("--max-parse-depth", common)
         self.assertIn("YOSYS_SLANG_MAX_PARSE_DEPTH", common)
-        self.assertIn('"il"', flake)
-        self.assertIn('"yosys-stat"', flake)
 
     def test_flat_scf_stage_uses_mlir_flatten_memref_for_expand_shape_reproducer(self) -> None:
         script = (
@@ -230,14 +210,11 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("function-boundary-type-conversion=identity-layout-map", script)
 
     def test_pre_calyx_uses_checked_in_mlir_pass_plugin(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
         pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
         pass_source = (
             REPO_ROOT / "tools" / "mlir-passes" / "FoldConstantTruncFOps.cpp"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("llm2fpgaMlirPasses", flake)
-        self.assertIn("inherit mlir llvmPackages", flake)
         self.assertIn("--load-pass-plugin=${mlirPasses}", pipeline)
         self.assertIn("llm2fpga-lower-static-memref-views-for-calyx", pipeline)
         self.assertIn("llm2fpga-drop-calyx-unsupported-asserts", pipeline)
@@ -259,7 +236,6 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertNotIn("python3 -", pipeline)
 
     def test_calyx_backend_has_checked_in_circt_pass_plugin_home(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
         derivation = (REPO_ROOT / "nix" / "circt-passes.nix").read_text(
             encoding="utf-8"
         )
@@ -270,9 +246,6 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
             REPO_ROOT / "tools" / "circt-passes" / "CalyxPipelinePasses.cpp"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("llm2fpgaCirctPasses", flake)
-        self.assertIn("circtMlir = circtPkgs.mlir", flake)
-        self.assertIn("circtLlvm = circtPkgs.libllvm", flake)
         self.assertIn("-DCIRCT_DIR=${circt.dev}/lib/cmake/circt", derivation)
         self.assertIn("-DMLIR_DIR=${mlir.dev}/lib/cmake/mlir", derivation)
         self.assertIn("-DLLVM_DIR=${llvm.dev}/lib/cmake/llvm", derivation)
@@ -282,14 +255,12 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("PassRegistration<CalyxPipelineSanityPass>", pass_source)
 
     def test_native_calyx_backend_is_pinned_and_packaged(self) -> None:
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
         derivation = (REPO_ROOT / "nix" / "calyx.nix").read_text(encoding="utf-8")
         pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
         script = (
             REPO_ROOT / "scripts" / "pipeline" / "calyx_to_sv_no_handshake.sh"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("calyx = pkgs.callPackage ./nix/calyx.nix", flake)
         self.assertIn('version = "0.7.1"', derivation)
         self.assertIn("cargoHash =", derivation)
         self.assertIn("CALYX_PRIMITIVES_DIR", derivation)

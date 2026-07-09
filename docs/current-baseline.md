@@ -235,7 +235,15 @@ representative-core quantized model toward explicit integer hardware-core
 semantics, matching the existing `patterns/*/adapter_w4a8_core.py` direction,
 instead of trying to make Calyx accept floating-point quantization scaffolding.
 
-The direct CIRCT Calyx-to-HW/SV route still fails on memory primitives:
+The direct CIRCT Calyx-to-HW/SV route is now exposed as the explicit
+`calyx-hw-sv` stage. This is the desired compiler-internal route:
+
+```text
+CIRCT Calyx MLIR -> --calyx-remove-groups -> --lower-calyx-to-hw
+-> --lower-seq-to-sv -> --lower-hw-to-sv -> --export-verilog
+```
+
+It still fails on memory primitives:
 
 ```text
 'calyx.seq_mem' op couldn't convert to core primitive
@@ -254,9 +262,8 @@ That reproducer also fails with:
 'calyx.memory' op couldn't convert to core primitive
 ```
 
-That backend issue needs an official Calyx/CIRCT lowering path, the packaged
-native Calyx compiler route, or an
-actual CIRCT pass. Textual Calyx MLIR editing is not acceptable.
+That backend issue needs an official Calyx/CIRCT lowering path or an actual
+CIRCT pass. Textual Calyx MLIR editing is not acceptable.
 
 A memory-free Calyx smoke test is tracked in:
 
@@ -304,25 +311,32 @@ exists to prove that a pass plugin built against the same CIRCT/MLIR 23 stack as
 fixes for the `calyx.invoke`/reference-cell assertion or Calyx memory lowering
 should be added there as real CIRCT passes, not as textual Calyx MLIR edits.
 
-## Native Calyx Backend Follow-Up
+## Calyx Backend Naming Split
 
-The direct CIRCT Calyx-to-HW route is not the only official compiler route. The
-small integer no-handshake pattern now reaches SystemVerilog through:
+The current working native route remains available, but it is now named
+`calyx-native-sv` instead of being treated as the only Calyx SV route. It lowers
+through:
 
 ```text
 CIRCT Calyx MLIR -> circt-translate --export-calyx -> native Calyx Verilog
 ```
 
 The native Calyx compiler is packaged as `.#calyx` from the official `calyx`
-crate version `0.7.1`. The no-handshake `calyx-sv` stage runs native Calyx with
-`--synthesis` and disables only the `papercut` checker. That checker rejects
-CIRCT-exported memory groups before native Calyx adds default assignments, while
-the same program still compiles to Verilog and to the native resource report.
+crate version `0.7.1`. The no-handshake `calyx-native-sv` stage runs native
+Calyx with `--synthesis` and disables only the `papercut` checker. That checker
+rejects CIRCT-exported memory groups before native Calyx adds default
+assignments, while the same program still compiles to Verilog and to the native
+resource report.
+
+The legacy `calyx-sv` package name is currently kept as a compatibility alias
+for `calyx-native-sv`. New work should use one of the explicit route names:
+`calyx-native-sv` for the current working route, or `calyx-hw-sv` for the direct
+CIRCT route under debug.
 
 Verified package:
 
 ```text
-pattern-linear-w4a8-core-via-tosa-no-handshake-calyx-sv
+pattern-linear-w4a8-core-via-tosa-no-handshake-calyx-native-sv
 ```
 
 Verified output path:
@@ -430,11 +444,11 @@ It contains `summary.json` and `summary.md`. The current summary table is:
 
 | alias | frontend | backend | status | cells | memories | memory bits |
 | --- | --- | --- | --- | ---: | ---: | ---: |
-| pattern-linear-w4a8-core-via-tosa-no-handshake | tosa | calyx-sv | ok | 6378 | 19 | 3748 |
-| pattern-embedding-w4a8-core-via-tosa-no-handshake | tosa | calyx-sv | ok | 1623 | 6 | 578 |
-| pattern-layernorm-w4a8-core-via-tosa-no-handshake | tosa | calyx-sv | ok | 5985 | 21 | 1058 |
-| tinystories-representative-core-w4a8-integer-via-linalg-no-handshake | linalg | calyx-sv | ok | 41652 | 85 | 4580 |
-| tinystories-representative-core-w4a8-integer-via-tosa-no-handshake | tosa | calyx-sv | ok | 43269 | 86 | 4644 |
+| pattern-linear-w4a8-core-via-tosa-no-handshake | tosa | calyx-native-sv | ok | 6378 | 19 | 3748 |
+| pattern-embedding-w4a8-core-via-tosa-no-handshake | tosa | calyx-native-sv | ok | 1623 | 6 | 578 |
+| pattern-layernorm-w4a8-core-via-tosa-no-handshake | tosa | calyx-native-sv | ok | 5985 | 21 | 1058 |
+| tinystories-representative-core-w4a8-integer-via-linalg-no-handshake | linalg | calyx-native-sv | ok | 41652 | 85 | 4580 |
+| tinystories-representative-core-w4a8-integer-via-tosa-no-handshake | tosa | calyx-native-sv | ok | 43269 | 86 | 4644 |
 
 ## Fixed-LayerNorm Representative-Core Follow-Up
 
@@ -645,3 +659,57 @@ integer hardware semantics removes the SoftFloat import blocker and allows the
 existing no-handshake Calyx-SV backend to emit `sv/main.sv`. The remaining work
 is to tighten the equivalence story against the quantized model and then expand
 this slice toward the full representative-core computation.
+
+## Explicit-Integer SV Equivalence Baseline
+
+The frozen direct-Linalg integer route now has a first machine-readable
+equivalence baseline package:
+
+```text
+tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence
+```
+
+Verified output path:
+
+```text
+/nix/store/6gwxgv0y6v6c13wjkhb0l1l527igsqpm-tinystories-representative-core-w4a8-integer-sv-equivalence
+```
+
+It contains:
+
+```text
+reference.json
+report.json
+```
+
+The PyTorch integer reference for the current fixed input is:
+
+```json
+{
+  "input_token_ids": [[3]],
+  "pytorch_output_i8": [[[-2, 76]]],
+  "pytorch_output_shape": [1, 1, 2]
+}
+```
+
+The report status is currently:
+
+```json
+{
+  "status": "blocked-unobservable-sv-output",
+  "sv": {
+    "ports": {
+      "inputs": ["clk", "reset", "go"],
+      "outputs": ["done"]
+    },
+    "observable_functional_outputs": []
+  }
+}
+```
+
+This is not a passing equivalence result yet. It is the first gate result:
+Calyx-SV emits, but native Calyx currently generates a top-level module with
+only control ports, so the harness cannot compare PyTorch output against SV
+output without either an observable result port, a stable generated memory ABI,
+or an explicit test wrapper. Treat any future equivalence pass as invalid unless
+it compares functional output data, not just `done`.

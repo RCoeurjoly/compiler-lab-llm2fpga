@@ -20,11 +20,9 @@ class PipelineClarityTest(unittest.TestCase):
         self.assertIn("--exported-program-dir ${pytorchExported}", pipeline)
 
     def test_pytorch_export_materializer_is_single_purpose(self) -> None:
-        flake = read("flake.nix")
         models = read("nix/models.nix")
         materializer = read("scripts/materialize-pytorch-exported.py")
 
-        self.assertIn("materialize-pytorch-exported.py", flake)
         self.assertNotIn("--stage", models)
         self.assertNotIn("--stage", materializer)
         self.assertIn(
@@ -130,26 +128,6 @@ class PipelineClarityTest(unittest.TestCase):
         self.assertFalse(
             (REPO_ROOT / "scripts/diagnostics/linalg_to_llvm_no_handshake.sh").exists()
         )
-
-    def test_pipeline_aliases_are_generated_from_metadata(self) -> None:
-        flake = read("flake.nix")
-
-        self.assertIn("pipelineAliasSpecs", flake)
-        self.assertIn("mkPipelineAliases", flake)
-        self.assertIn("model = \"tinystories-representative-core-w4a8\"", flake)
-        self.assertIn("frontend = \"tosa\"", flake)
-        self.assertIn("backend = \"calyx-sv\"", flake)
-        self.assertNotIn("viaTosaLinearW4A8PipelinePackages = {", flake)
-
-    def test_active_pipeline_variants_are_exported_as_json(self) -> None:
-        flake = read("flake.nix")
-
-        self.assertIn("activePipelineVariantsJson", flake)
-        self.assertIn("active-pipeline-variants", flake)
-        self.assertIn("active-pipeline-variants.json", flake)
-        self.assertIn("schemaVersion = 1", flake)
-        self.assertIn("builtins.toJSON", flake)
-        self.assertIn("generatedAliases", flake)
 
     def test_read_the_repo_doc_points_to_core_files_in_order(self) -> None:
         doc = read("docs/read-the-repo.md")

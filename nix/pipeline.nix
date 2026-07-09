@@ -1,7 +1,7 @@
 { pkgs, mlir, circt, calyxTool, yosysPkg, yosysSlang, torchMlir, python
 , pipelineScripts, compilePyTorch, svProvenanceReport, noHandshakeLinalgToScf
 , noHandshakeScfToFlatScf, noHandshakeScfToCalyx, noHandshakeLinalgToLlvm
-, calyxToSvNoHandshake, flatScfBlockerReport, mlirPasses
+, calyxToSvNoHandshake, calyxToHwSvNoHandshake, flatScfBlockerReport, mlirPasses
 , tosaToLinalgMlir ? mlir }:
 let
   stageNames = [
@@ -15,6 +15,8 @@ let
     "flat-scf"
     "calyx"
     "calyx-sv"
+    "calyx-native-sv"
+    "calyx-hw-sv"
     "cf"
     "cf-stats"
     "llvm"
@@ -155,8 +157,8 @@ let
         ${mlir}/bin/mlir-opt ${linalg} "$out"
     '';
 
-  mkCalyxSvDerivation = { name, calyx }:
-    pkgs.runCommand "${name}-calyx-sv" {
+  mkCalyxNativeSvDerivation = { name, calyx }:
+    pkgs.runCommand "${name}-calyx-native-sv" {
       buildInputs = [ circt calyxTool python ];
     } ''
       export CALYX_COMPILE_PRIMITIVES_TO_SV=${pipelineScripts}/calyx_compile_primitives_to_sv.py
@@ -164,6 +166,15 @@ let
         ${circt}/bin/circt-translate \
         ${calyxTool}/bin/calyx \
         ${calyxTool}/share/calyx \
+        ${calyx} "$out"
+    '';
+
+  mkCalyxHwSvDerivation = { name, calyx }:
+    pkgs.runCommand "${name}-calyx-hw-sv" {
+      buildInputs = [ circt python ];
+    } ''
+      ${pkgs.bash}/bin/bash ${calyxToHwSvNoHandshake} \
+        ${circt}/bin/circt-opt \
         ${calyx} "$out"
     '';
 
@@ -302,6 +313,16 @@ let
           stage = "calyx-sv";
           reason = "baseline hardware pipeline does not lower through Calyx";
         };
+        "calyx-native-sv" = mkUnavailableStage {
+          inherit name;
+          stage = "calyx-native-sv";
+          reason = "baseline hardware pipeline does not lower through Calyx";
+        };
+        "calyx-hw-sv" = mkUnavailableStage {
+          inherit name;
+          stage = "calyx-hw-sv";
+          reason = "baseline hardware pipeline does not lower through Calyx";
+        };
         cf = mkCfDerivation {
           inherit name;
           inherit (self) linalg;
@@ -429,10 +450,15 @@ let
           inherit name;
           flatScf = self."flat-scf";
         };
-        "calyx-sv" = mkCalyxSvDerivation {
+        "calyx-native-sv" = mkCalyxNativeSvDerivation {
           inherit name;
           inherit (self) calyx;
         };
+        "calyx-hw-sv" = mkCalyxHwSvDerivation {
+          inherit name;
+          inherit (self) calyx;
+        };
+        "calyx-sv" = self."calyx-native-sv";
         cf = unavailable "cf"
           "no-handshake experiment stops before control-flow hardware lowering";
         "cf-stats" = unavailable "cf-stats"
@@ -457,15 +483,15 @@ let
           "no direct no-handshake HW/SV lowering backend is wired yet";
         "sv-provenance-report" = mkSvProvenanceReportDerivation {
           inherit name;
-          sv = self."calyx-sv";
+          sv = self."calyx-native-sv";
         };
         il = mkIlDerivation {
           inherit name slangPerFileExternModules;
-          sv = self."calyx-sv";
+          sv = self."calyx-native-sv";
         };
         "yosys-stat" = mkYosysStatDerivation {
           inherit name slangPerFileExternModules;
-          sv = self."calyx-sv";
+          sv = self."calyx-native-sv";
         };
       };
     in self;

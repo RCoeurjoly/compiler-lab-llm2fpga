@@ -161,6 +161,8 @@
           ./scripts/pipeline/scf_to_flat_scf_no_handshake.sh;
         noHandshakeScfToCalyx = ./scripts/pipeline/scf_to_calyx_no_handshake.sh;
         calyxToSvNoHandshake = ./scripts/pipeline/calyx_to_sv_no_handshake.sh;
+        calyxToHwSvNoHandshake =
+          ./scripts/pipeline/calyx_to_hw_sv_no_handshake.sh;
         noHandshakeLinalgToLlvm =
           ./scripts/pipeline/linalg_to_llvm_no_handshake.sh;
         flatScfBlockerReport = ./scripts/diagnostics/flat_scf_blocker_report.py;
@@ -197,7 +199,7 @@
           calyxTool = calyx;
           inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
             noHandshakeScfToFlatScf noHandshakeScfToCalyx calyxToSvNoHandshake
-            noHandshakeLinalgToLlvm;
+            calyxToHwSvNoHandshake noHandshakeLinalgToLlvm;
           mlirPasses = llm2fpgaMlirPasses;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
@@ -231,7 +233,7 @@
           inherit torchMlir;
           inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
             noHandshakeScfToFlatScf noHandshakeScfToCalyx calyxToSvNoHandshake
-            noHandshakeLinalgToLlvm;
+            calyxToHwSvNoHandshake noHandshakeLinalgToLlvm;
           mlirPasses = llm2fpgaMlirPasses;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
@@ -290,6 +292,8 @@
           "scf"
           "flat-scf"
           "calyx"
+          "calyx-native-sv"
+          "calyx-hw-sv"
           "calyx-sv"
           "sv-provenance-report"
           "il"
@@ -302,6 +306,8 @@
           "scf"
           "flat-scf"
           "calyx"
+          "calyx-native-sv"
+          "calyx-hw-sv"
           "calyx-sv"
           "sv-provenance-report"
           "il"
@@ -352,7 +358,7 @@
             alias = "pattern-linear-w4a8-core-via-tosa-no-handshake";
             model = "pattern-linear-w4a8-core";
             frontend = "tosa";
-            backend = "calyx-sv";
+            backend = "calyx-native-sv";
             packages = pipelineStagePackagesTosaNoHandshake;
             stages = noHandshakeStages;
           }
@@ -360,7 +366,7 @@
             alias = "pattern-embedding-w4a8-core-via-tosa-no-handshake";
             model = "pattern-embedding-w4a8-core";
             frontend = "tosa";
-            backend = "calyx-sv";
+            backend = "calyx-native-sv";
             packages = pipelineStagePackagesTosaNoHandshake;
             stages = noHandshakeStages;
           }
@@ -368,7 +374,7 @@
             alias = "pattern-layernorm-w4a8-core-via-tosa-no-handshake";
             model = "pattern-layernorm-w4a8-core";
             frontend = "tosa";
-            backend = "calyx-sv";
+            backend = "calyx-native-sv";
             packages = pipelineStagePackagesTosaNoHandshake;
             stages = noHandshakeStages;
           }
@@ -377,7 +383,7 @@
               "tinystories-representative-core-w4a8-via-tosa-no-handshake";
             model = "tinystories-representative-core-w4a8";
             frontend = "tosa";
-            backend = "calyx-sv";
+            backend = "calyx-native-sv";
             packages = pipelineStagePackagesTosaNoHandshake;
             stages = noHandshakeStages;
           }
@@ -386,7 +392,7 @@
               "tinystories-representative-core-w4a8-via-linalg-no-handshake";
             model = "tinystories-representative-core-w4a8";
             frontend = "linalg";
-            backend = "calyx-sv";
+            backend = "calyx-native-sv";
             packages = pipelineStagePackagesNoHandshake;
             stages = noHandshakeLinalgStages;
           }
@@ -395,7 +401,7 @@
               "tinystories-representative-core-w4a8-fixed-layernorm-via-tosa-no-handshake";
             model = "tinystories-representative-core-w4a8-fixed-layernorm";
             frontend = "tosa";
-            backend = "calyx-sv";
+            backend = "calyx-native-sv";
             packages = pipelineStagePackagesTosaNoHandshake;
             stages = noHandshakeStages;
           }
@@ -404,7 +410,7 @@
               "tinystories-representative-core-w4a8-fixed-layernorm-via-linalg-no-handshake";
             model = "tinystories-representative-core-w4a8-fixed-layernorm";
             frontend = "linalg";
-            backend = "calyx-sv";
+            backend = "calyx-native-sv";
             packages = pipelineStagePackagesNoHandshake;
             stages = noHandshakeLinalgStages;
           }
@@ -413,7 +419,7 @@
               "tinystories-representative-core-w4a8-integer-via-tosa-no-handshake";
             model = "tinystories-representative-core-w4a8-integer";
             frontend = "tosa";
-            backend = "calyx-sv";
+            backend = "calyx-native-sv";
             packages = pipelineStagePackagesTosaNoHandshake;
             stages = noHandshakeStages;
           }
@@ -422,7 +428,7 @@
               "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake";
             model = "tinystories-representative-core-w4a8-integer";
             frontend = "linalg";
-            backend = "calyx-sv";
+            backend = "calyx-native-sv";
             packages = pipelineStagePackagesNoHandshake;
             stages = noHandshakeLinalgStages;
           }
@@ -461,23 +467,43 @@
             ${python}/bin/python3 ${
               ./scripts/pipeline/summarize_yosys_stat_baselines.py
             } \
-              --entry alias=pattern-linear-w4a8-core-via-tosa-no-handshake,model=pattern-linear-w4a8-core,frontend=tosa,backend=calyx-sv,stat=${
+              --entry alias=pattern-linear-w4a8-core-via-tosa-no-handshake,model=pattern-linear-w4a8-core,frontend=tosa,backend=calyx-native-sv,stat=${
                 pipelineAliasPackages."pattern-linear-w4a8-core-via-tosa-no-handshake-yosys-stat"
               } \
-              --entry alias=pattern-embedding-w4a8-core-via-tosa-no-handshake,model=pattern-embedding-w4a8-core,frontend=tosa,backend=calyx-sv,stat=${
+              --entry alias=pattern-embedding-w4a8-core-via-tosa-no-handshake,model=pattern-embedding-w4a8-core,frontend=tosa,backend=calyx-native-sv,stat=${
                 pipelineAliasPackages."pattern-embedding-w4a8-core-via-tosa-no-handshake-yosys-stat"
               } \
-              --entry alias=pattern-layernorm-w4a8-core-via-tosa-no-handshake,model=pattern-layernorm-w4a8-core,frontend=tosa,backend=calyx-sv,stat=${
+              --entry alias=pattern-layernorm-w4a8-core-via-tosa-no-handshake,model=pattern-layernorm-w4a8-core,frontend=tosa,backend=calyx-native-sv,stat=${
                 pipelineAliasPackages."pattern-layernorm-w4a8-core-via-tosa-no-handshake-yosys-stat"
               } \
-              --entry alias=tinystories-representative-core-w4a8-integer-via-linalg-no-handshake,model=tinystories-representative-core-w4a8-integer,frontend=linalg,backend=calyx-sv,stat=${
+              --entry alias=tinystories-representative-core-w4a8-integer-via-linalg-no-handshake,model=tinystories-representative-core-w4a8-integer,frontend=linalg,backend=calyx-native-sv,stat=${
                 pipelineAliasPackages."tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-yosys-stat"
               } \
-              --entry alias=tinystories-representative-core-w4a8-integer-via-tosa-no-handshake,model=tinystories-representative-core-w4a8-integer,frontend=tosa,backend=calyx-sv,stat=${
+              --entry alias=tinystories-representative-core-w4a8-integer-via-tosa-no-handshake,model=tinystories-representative-core-w4a8-integer,frontend=tosa,backend=calyx-native-sv,stat=${
                 pipelineAliasPackages."tinystories-representative-core-w4a8-integer-via-tosa-no-handshake-yosys-stat"
               } \
               --summary-json "$out/summary.json" \
               --summary-md "$out/summary.md"
+          '';
+        tinystoriesIntegerSvEquivalenceReport =
+          pkgs.runCommand
+          "tinystories-representative-core-w4a8-integer-sv-equivalence" {
+            buildInputs = [ pythonWithTinyStories ];
+          } ''
+            mkdir -p "$out"
+            ${pythonWithTinyStories}/bin/python ${
+              ./scripts/pipeline/tinystories_integer_reference.py
+            } \
+              --adapter ${./TinyStories/model_adapter_representative_core_w4a8_integer.py} \
+              --out "$out/reference.json"
+            ${pythonWithTinyStories}/bin/python ${
+              ./scripts/pipeline/tinystories_integer_sv_equivalence_report.py
+            } \
+              --sv-dir ${
+                pipelineAliasPackages."tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-calyx-native-sv"
+              }/sv \
+              --expected-json "$out/reference.json" \
+              --out "$out/report.json"
           '';
       in {
         packages = {
@@ -486,6 +512,8 @@
           "active-pipeline-variants" = activePipelineVariantsJson;
           "resource-baseline-yosys-stat-matrix" =
             resourceBaselineYosysStatMatrix;
+          "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence" =
+            tinystoriesIntegerSvEquivalenceReport;
           model-registry = modelRegistryJson;
           default = modelRegistryJson;
         } // pipelineStagePackages // pipelineMetadataPackages

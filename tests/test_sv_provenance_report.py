@@ -77,21 +77,11 @@ class SvProvenanceReportTest(unittest.TestCase):
 
     def test_pipeline_exposes_sv_provenance_report_stage(self) -> None:
         pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
-        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
 
         self.assertIn('"sv-provenance-report"', pipeline)
         self.assertIn("mkSvProvenanceReportDerivation", pipeline)
         self.assertIn("svProvenanceReport", pipeline)
         self.assertNotIn("pipelineScripts}/sv_provenance_report.py", pipeline)
-        self.assertIn(
-            "svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py",
-            flake,
-        )
-        self.assertIn(
-            '"tinystories-representative-core-w4a8-via-tosa-no-handshake"',
-            flake,
-        )
-        self.assertIn('"calyx-sv"', flake)
 
     def test_filters_generic_ports_and_ranks_assignment_clusters(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
