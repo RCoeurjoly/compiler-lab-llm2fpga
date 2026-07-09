@@ -487,8 +487,7 @@
               --summary-json "$out/summary.json" \
               --summary-md "$out/summary.md"
           '';
-        tinystoriesIntegerSvEquivalenceReport =
-          pkgs.runCommand
+        tinystoriesIntegerSvEquivalenceReport = pkgs.runCommand
           "tinystories-representative-core-w4a8-integer-sv-equivalence" {
             buildInputs = [ pythonWithTinyStories ];
           } ''
@@ -496,7 +495,9 @@
             ${pythonWithTinyStories}/bin/python ${
               ./scripts/pipeline/tinystories_integer_reference.py
             } \
-              --adapter ${./TinyStories/model_adapter_representative_core_w4a8_integer.py} \
+              --adapter ${
+                ./TinyStories/model_adapter_representative_core_w4a8_integer.py
+              } \
               --out "$out/reference.json"
             ${pythonWithTinyStories}/bin/python ${
               ./scripts/pipeline/tinystories_integer_sv_equivalence_report.py
@@ -507,6 +508,335 @@
               --expected-json "$out/reference.json" \
               --out "$out/report.json"
           '';
+        task3TinyStoriesCapacities = {
+          slices = 74650;
+          clb_luts = 298600;
+          clb_ffs = 597200;
+          dsp = 1920;
+          bram36 = 955;
+          bram_kb = 34380;
+        };
+        task3BaselineFloatReference =
+          ./references/task3/tiny-stories-1m-baseline-float-selftest-all-memory-utilization;
+        task3RepresentativeCoreShapeMetadata =
+          ./references/task3/representative-core-parity-shapes.json;
+        mkTask3YosysRtlil = { name, script, quiet ? false }:
+          pkgs.runCommand "${name}.il" { } ''
+            cat > run.ys <<'EOF'
+            ${script}
+            EOF
+            ${yosysPkg}/bin/yosys ${pkgs.lib.optionalString quiet "-q"} \
+              -m ${yosysSlang}/share/yosys/plugins/slang.so \
+              -s run.ys
+
+            if [ ! -e "$out" ]; then
+              echo "mkTask3YosysRtlil expected output path was not created: $out" >&2
+              echo "--- run.ys ---" >&2
+              cat run.ys >&2
+              exit 1
+            fi
+          '';
+        mkTask3SynthStageIl = { name, stageId, stageLabel, inputIl, topName
+          , topSv ? null, commands, preCommands ? [ ], quiet ? false }:
+          pkgs.runCommand "${name}-${stageId}.il" { } ''
+            cat > run.ys <<'EOF'
+            ${builtins.concatStringsSep "\n" ([ "read_rtlil ${inputIl}" ]
+              ++ pkgs.lib.optional (topSv != null) "read_slang ${topSv}"
+              ++ [ "hierarchy -top ${topName} -check" ] ++ preCommands
+              ++ commands ++ [ "write_rtlil $out" ])}
+            EOF
+
+            echo "[task3-synth:${name}] ${stageLabel}" >&2
+            ${yosysPkg}/bin/yosys ${pkgs.lib.optionalString quiet "-q"} ${
+              pkgs.lib.optionalString (topSv != null)
+              "-m ${yosysSlang}/share/yosys/plugins/slang.so"
+            } -s run.ys
+
+            if [ ! -e "$out" ]; then
+              echo "mkTask3SynthStageIl ${stageId} expected output path was not created: $out" >&2
+              echo "--- run.ys ---" >&2
+              cat run.ys >&2
+              exit 1
+            fi
+          '';
+        mkTask3SynthStageMemoryMapIl =
+          { name, stageId, stageLabel, inputIl, topName, quiet ? false }:
+          pkgs.runCommand "${name}-${stageId}.il" { } ''
+            ${pkgs.gawk}/bin/awk '
+              /^module / { mod = $2 }
+              /^[[:space:]]*cell \$mem/ { mods[mod] = 1 }
+              END {
+                for (mod in mods)
+                  print mod
+              }
+            ' ${inputIl} | ${pkgs.coreutils}/bin/sort > stage-modules.txt
+
+            cat > run.ys <<EOF
+            read_rtlil ${inputIl}
+            hierarchy -top ${topName} -check
+            EOF
+
+            while IFS= read -r moduleName; do
+              printf '%s\n' \
+                "cd $moduleName" \
+                'memory_map' \
+                'cd ..' \
+                >> run.ys
+            done < stage-modules.txt
+
+            printf '%s\n' "write_rtlil $out" >> run.ys
+
+            echo "[task3-synth:${name}] ${stageLabel}" >&2
+            ${yosysPkg}/bin/yosys ${
+              pkgs.lib.optionalString quiet "-q"
+            } -s run.ys
+
+            if [ ! -e "$out" ]; then
+              echo "mkTask3SynthStageMemoryMapIl ${stageId} expected output path was not created: $out" >&2
+              echo "--- run.ys ---" >&2
+              cat run.ys >&2
+              exit 1
+            fi
+          '';
+        mkTask3SynthStageJson =
+          { name, stageId, stageLabel, inputIl, quiet ? false }:
+          pkgs.runCommand "${name}.json" { } ''
+            ${python}/bin/python3 ${pipelineScripts}/filter_rtlil_modules.py \
+              --input ${inputIl} \
+              --output stage8-stripped.il \
+              --drop-escaped-uppercase-modules
+
+            cat > run.ys <<'EOF'
+            read_rtlil stage8-stripped.il
+            proc
+            write_json $out
+            EOF
+
+            echo "[task3-synth:${name}] ${stageLabel}" >&2
+            ${yosysPkg}/bin/yosys ${
+              pkgs.lib.optionalString quiet "-q"
+            } -s run.ys
+
+            if [ ! -e "$out" ]; then
+              echo "mkTask3SynthStageJson ${stageId} expected output path was not created: $out" >&2
+              echo "--- run.ys ---" >&2
+              cat run.ys >&2
+              exit 1
+            fi
+          '';
+        mkTask3SynthJsonStages = { name, modelIl, topName, topSv }:
+          let
+            stage1 = mkTask3SynthStageIl {
+              inherit name topName topSv;
+              stageId = "stage1";
+              stageLabel = "stage1 synth_xilinx begin:prepare";
+              inputIl = modelIl;
+              preCommands = [ "proc" ];
+              commands = [
+                "synth_xilinx -family xc7 -top ${topName} -noiopad -run begin:prepare"
+              ];
+              quiet = true;
+            };
+            stage2 = mkTask3SynthStageIl {
+              inherit name topName;
+              stageId = "stage2";
+              stageLabel = "stage2 synth_xilinx coarse:map_memory";
+              inputIl = stage1;
+              commands = [
+                "synth_xilinx -family xc7 -top ${topName} -noiopad -run coarse:map_memory"
+              ];
+              quiet = true;
+            };
+            stage3 = mkTask3SynthStageIl {
+              inherit name topName;
+              stageId = "stage3";
+              stageLabel = "stage3 opt -fast -full";
+              inputIl = stage2;
+              commands = [ "opt -fast -full" ];
+              quiet = true;
+            };
+            stage4 = mkTask3SynthStageMemoryMapIl {
+              inherit name topName;
+              stageId = "stage4";
+              stageLabel = "stage4 targeted memory_map";
+              inputIl = stage3;
+              quiet = true;
+            };
+            stage5 = mkTask3SynthStageIl {
+              inherit name topName;
+              stageId = "stage5";
+              stageLabel = "stage5 synth_xilinx fine:fine";
+              inputIl = stage4;
+              commands = [
+                "synth_xilinx -family xc7 -top ${topName} -noiopad -run fine:fine"
+              ];
+              quiet = true;
+            };
+            stage6 = mkTask3SynthStageIl {
+              inherit name topName;
+              stageId = "stage6";
+              stageLabel = "stage6 synth_xilinx map_cells:map_cells";
+              inputIl = stage5;
+              commands = [
+                "synth_xilinx -family xc7 -top ${topName} -noiopad -run map_cells:map_cells"
+              ];
+              quiet = true;
+            };
+            stage7 = mkTask3SynthStageIl {
+              inherit name topName;
+              stageId = "stage7";
+              stageLabel = "stage7 synth_xilinx map_ffs:map_ffs";
+              inputIl = stage6;
+              commands = [
+                "synth_xilinx -family xc7 -top ${topName} -noiopad -run map_ffs:map_ffs"
+              ];
+              quiet = true;
+            };
+            stage8 = mkTask3SynthStageIl {
+              inherit name topName;
+              stageId = "stage8";
+              stageLabel = "stage8 final synth/write";
+              inputIl = stage7;
+              commands = [
+                "synth_xilinx -family xc7 -top ${topName} -noiopad -run map_luts:check"
+              ];
+              quiet = true;
+            };
+            json = mkTask3SynthStageJson {
+              inherit name;
+              stageId = "stage9";
+              stageLabel = "stage9 write_json";
+              inputIl = stage8;
+              quiet = true;
+            };
+          in {
+            inherit stage1 stage2 stage3 stage4 stage5 stage6 stage7 stage8
+              json;
+          };
+        mkTask3ExternalizedMemoryPlan =
+          { name, modelIl, minModuleBits ? 1, maxModules ? null }:
+          pkgs.runCommand "${name}-external-memory-plan" { } ''
+            ${python}/bin/python3 ${pipelineScripts}/externalize_large_memories.py \
+              --input ${modelIl} \
+              --output-script externalize.ys \
+              --output-report report.json \
+              --min-module-bits ${toString minModuleBits} ${
+                pkgs.lib.optionalString (maxModules != null)
+                "--max-modules ${toString maxModules}"
+              }
+            mkdir -p "$out"
+            cp externalize.ys "$out/externalize.ys"
+            cp report.json "$out/report.json"
+          '';
+        mkTask3MappedJsonUtilizationReport =
+          { name, capacities, topName, designJson }:
+          pkgs.runCommand "${name}-utilization" { } ''
+            mkdir -p "$out"
+            ${python}/bin/python3 ${pipelineScripts}/write_utilization_report.py \
+              --design-json ${designJson} \
+              --top ${topName} \
+              --summary-json "$out/summary.json" \
+              --summary-txt "$out/summary.txt" \
+              --stat-json "$out/stat.json" \
+              --capacity-slices ${toString capacities.slices} \
+              --capacity-clb-luts ${toString capacities.clb_luts} \
+              --capacity-clb-ffs ${toString capacities.clb_ffs} \
+              --capacity-dsp ${toString capacities.dsp} \
+              --capacity-bram36 ${toString capacities.bram36} \
+              --capacity-bram-kb ${toString capacities.bram_kb}
+          '';
+        mkTask3SelftestAllMemoryUtilization =
+          { name, mainSv, modelIl, capacities }:
+          let
+            topName = "tiny_stories_selftest_top";
+            top = pkgs.runCommand "${name}-top.sv" { } ''
+              ${python}/bin/python3 ${pipelineScripts}/gen_tiny_stories_selftest_top.py \
+                --main-sv ${mainSv} \
+                --out "$out"
+            '';
+            modelOptIl = mkTask3YosysRtlil {
+              name = "${name}-model-opt";
+              script = ''
+                read_rtlil ${modelIl}
+                hierarchy -top main -check
+                proc
+                opt_expr
+                opt_clean
+                clean
+                write_rtlil $out
+              '';
+              quiet = true;
+            };
+            externalMemoryPlan = mkTask3ExternalizedMemoryPlan {
+              inherit name;
+              modelIl = modelOptIl;
+              minModuleBits = 1;
+            };
+            modelShellIl = mkTask3YosysRtlil {
+              name = "${name}-model-shell";
+              script = ''
+                read_rtlil ${modelOptIl}
+                script ${externalMemoryPlan}/externalize.ys
+                hierarchy -top main -check
+                write_rtlil $out
+              '';
+              quiet = true;
+            };
+            stages = mkTask3SynthJsonStages {
+              inherit name topName;
+              topSv = top;
+              modelIl = modelShellIl;
+            };
+            utilization = mkTask3MappedJsonUtilizationReport {
+              inherit name capacities topName;
+              designJson = stages.json;
+            };
+          in pkgs.runCommand "${name}-utilization-bundle" { } ''
+            mkdir -p "$out"
+            cp ${utilization}/summary.json "$out/summary.json"
+            cp ${utilization}/summary.txt "$out/summary.txt"
+            cp ${utilization}/stat.json "$out/stat.json"
+            cp ${externalMemoryPlan}/report.json "$out/external-memory-plan.json"
+            cp ${top} "$out/tiny_stories_selftest_top.sv"
+            cat > "$out/manifest.json" <<'JSON'
+            ${builtins.toJSON {
+              package = name;
+              route = "task3-baseline-float-selftest-all-memory";
+              model = "tinystories-representative-core-fp32";
+              source_pipeline =
+                "PyTorch ExportedProgram -> torch-mlir -> linalg -> cf -> handshake -> hw -> sv";
+              selftest_top = "tiny_stories_selftest_top";
+              external_memory_min_module_bits = 1;
+              final_reports = [ "summary.json" "summary.txt" "stat.json" ];
+            }}
+            JSON
+          '';
+        task3RepresentativeCoreUtilization =
+          mkTask3SelftestAllMemoryUtilization {
+            name =
+              "tinystories-representative-core-task3-baseline-float-selftest-all-memory";
+            mainSv = "${
+                pipelineStagePackages."tinystories-representative-core-fp32-sv"
+              }/sv/main.sv";
+            modelIl =
+              pipelineStagePackages."tinystories-representative-core-fp32-il";
+            capacities = task3TinyStoriesCapacities;
+          };
+        task3RepresentativeCoreParity = pkgs.runCommand
+          "tinystories-representative-core-task3-baseline-float-selftest-all-memory-parity"
+          { } ''
+            mkdir -p "$out"
+            ${python}/bin/python3 ${pipelineScripts}/compare_task3_representative_core_parity.py \
+              --baseline-dir ${task3BaselineFloatReference} \
+              --candidate-dir ${task3RepresentativeCoreUtilization} \
+              --shape-json ${task3RepresentativeCoreShapeMetadata} \
+              --baseline-label tiny-stories-1m-baseline-float-selftest-all-memory-utilization \
+              --candidate-label tinystories-representative-core-task3-baseline-float-selftest-all-memory-utilization \
+              --summary-json "$out/parity-summary.json" \
+              --summary-md "$out/parity-summary.md"
+            cp ${task3BaselineFloatReference}/summary.json "$out/baseline-summary.json"
+            cp ${task3RepresentativeCoreUtilization}/summary.json "$out/representative-core-summary.json"
+          '';
       in {
         packages = {
           inherit circt mlir torchMlir yosysPkg modelRegistryJson
@@ -516,6 +846,10 @@
             resourceBaselineYosysStatMatrix;
           "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence" =
             tinystoriesIntegerSvEquivalenceReport;
+          "tinystories-representative-core-task3-baseline-float-selftest-all-memory-utilization" =
+            task3RepresentativeCoreUtilization;
+          "tinystories-representative-core-task3-baseline-float-selftest-all-memory-parity" =
+            task3RepresentativeCoreParity;
           model-registry = modelRegistryJson;
           default = modelRegistryJson;
         } // pipelineStagePackages // pipelineMetadataPackages
