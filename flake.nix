@@ -26,7 +26,19 @@
         };
 
         circtPkgs = circt-nix.packages.${system};
-        circt = circtPkgs.circt.override { enableSlang = false; };
+        circt =
+          (circtPkgs.circt.override { enableSlang = false; }).overrideAttrs
+          (old: {
+            # Historical Task 3 recovery stack required for representative-core
+            # baseline-float lowering through handshake/HW/SV.
+            patches = (old.patches or [ ]) ++ [
+              ./archive/patches/unused/circt-upstream-task3-recovery/0001-flatten-memref-shape-ops-after-memref-flattening.patch
+              ./archive/patches/unused/circt-upstream-task3-recovery/0002-handle-cfg-threaded-memrefs-in-handshake-lowering.patch
+              ./archive/patches/unused/circt-upstream-task3-recovery/0005-handle-dense-resource-globals-in-flattenmemrefs.patch
+              ./archive/patches/unused/circt-upstream-task3-recovery/0011-rebased-handshaketohw-stack.patch
+              ./archive/patches/unused/circt-upstream-task3-recovery/0012-update-buffer-lowering-test-for-constant-order.patch
+            ];
+          });
         circtMlir = circtPkgs.mlir;
         circtLlvm = circtPkgs.libllvm;
 
@@ -167,6 +179,12 @@
           ./scripts/pipeline/linalg_to_llvm_no_handshake.sh;
         flatScfBlockerReport = ./scripts/diagnostics/flat_scf_blocker_report.py;
         fpPrimsSv = ./rtl/fp/circt_fp_primitives.sv;
+        task3FpPrimitiveBlackboxes =
+          pkgs.runCommand "task3-circt-fp-primitive-blackboxes.sv" { } ''
+            ${python}/bin/python3 ${pipelineScripts}/write_fp_primitive_blackboxes.py \
+              --input ${fpPrimsSv} \
+              --output "$out"
+          '';
         tinyStories1m = let
           modelId = "roneneldan/TinyStories-1M";
           revision = "77f1b168e219585646439073245fe87e56b3023e";
@@ -522,7 +540,7 @@
           ./references/task3/representative-core-parity-shapes.json;
         mkTask3YosysRtlil = { name, script, quiet ? false }:
           pkgs.runCommand "${name}.il" { } ''
-            cat > run.ys <<'EOF'
+            cat > run.ys <<EOF
             ${script}
             EOF
             ${yosysPkg}/bin/yosys ${pkgs.lib.optionalString quiet "-q"} \
@@ -539,7 +557,7 @@
         mkTask3SynthStageIl = { name, stageId, stageLabel, inputIl, topName
           , topSv ? null, commands, preCommands ? [ ], quiet ? false }:
           pkgs.runCommand "${name}-${stageId}.il" { } ''
-            cat > run.ys <<'EOF'
+            cat > run.ys <<EOF
             ${builtins.concatStringsSep "\n" ([ "read_rtlil ${inputIl}" ]
               ++ pkgs.lib.optional (topSv != null) "read_slang ${topSv}"
               ++ [ "hierarchy -top ${topName} -check" ] ++ preCommands
@@ -606,7 +624,7 @@
               --output stage8-stripped.il \
               --drop-escaped-uppercase-modules
 
-            cat > run.ys <<'EOF'
+            cat > run.ys <<EOF
             read_rtlil stage8-stripped.il
             proc
             write_json $out
@@ -624,14 +642,15 @@
               exit 1
             fi
           '';
-        mkTask3SynthJsonStages = { name, modelIl, topName, topSv }:
+        mkTask3SynthJsonStages =
+          { name, modelIl, topName, topSv, stage1PreCommands ? [ "proc" ] }:
           let
             stage1 = mkTask3SynthStageIl {
               inherit name topName topSv;
               stageId = "stage1";
               stageLabel = "stage1 synth_xilinx begin:prepare";
               inputIl = modelIl;
-              preCommands = [ "proc" ];
+              preCommands = stage1PreCommands;
               commands = [
                 "synth_xilinx -family xc7 -top ${topName} -noiopad -run begin:prepare"
               ];
@@ -745,32 +764,37 @@
               --capacity-bram36 ${toString capacities.bram36} \
               --capacity-bram-kb ${toString capacities.bram_kb}
           '';
-        mkTask3SelftestAllMemoryUtilization =
-          { name, mainSv, modelIl, capacities }:
+        mkTask3SelftestAllMemoryUtilization = { name, mainSv, modelIl
+          , capacities, modelPreBlackboxedMemory ? false }:
           let
+            externalMemoryMinModuleBits =
+              if modelPreBlackboxedMemory then 0 else 1;
             topName = "tiny_stories_selftest_top";
             top = pkgs.runCommand "${name}-top.sv" { } ''
               ${python}/bin/python3 ${pipelineScripts}/gen_tiny_stories_selftest_top.py \
                 --main-sv ${mainSv} \
                 --out "$out"
             '';
-            modelOptIl = mkTask3YosysRtlil {
-              name = "${name}-model-opt";
-              script = ''
-                read_rtlil ${modelIl}
-                hierarchy -top main -check
-                proc
-                opt_expr
-                opt_clean
-                clean
-                write_rtlil $out
-              '';
-              quiet = true;
-            };
+            modelOptIl = if modelPreBlackboxedMemory then
+              modelIl
+            else
+              mkTask3YosysRtlil {
+                name = "${name}-model-opt";
+                script = ''
+                  read_rtlil ${modelIl}
+                  hierarchy -top main -check
+                  proc
+                  opt_expr
+                  opt_clean
+                  clean
+                  write_rtlil $out
+                '';
+                quiet = true;
+              };
             externalMemoryPlan = mkTask3ExternalizedMemoryPlan {
               inherit name;
               modelIl = modelOptIl;
-              minModuleBits = 1;
+              minModuleBits = externalMemoryMinModuleBits;
             };
             modelShellIl = mkTask3YosysRtlil {
               name = "${name}-model-shell";
@@ -786,6 +810,8 @@
               inherit name topName;
               topSv = top;
               modelIl = modelShellIl;
+              stage1PreCommands =
+                if modelPreBlackboxedMemory then [ ] else [ "proc" ];
             };
             utilization = mkTask3MappedJsonUtilizationReport {
               inherit name capacities topName;
@@ -805,23 +831,107 @@
               model = "tinystories-representative-core-fp32";
               source_pipeline =
                 "PyTorch ExportedProgram -> torch-mlir -> linalg -> cf -> handshake -> hw -> sv";
+              fp_primitives =
+                "blackbox shells for Task 3 utilization reporting";
+              memory_primitives =
+                "handshake_memory_* modules blackboxed at SystemVerilog import";
               selftest_top = "tiny_stories_selftest_top";
-              external_memory_min_module_bits = 1;
+              external_memory_min_module_bits = externalMemoryMinModuleBits;
               final_reports = [ "summary.json" "summary.txt" "stat.json" ];
             }}
             JSON
           '';
-        task3RepresentativeCoreUtilization =
-          mkTask3SelftestAllMemoryUtilization {
-            name =
-              "tinystories-representative-core-task3-baseline-float-selftest-all-memory";
-            mainSv = "${
-                pipelineStagePackages."tinystories-representative-core-fp32-sv"
-              }/sv/main.sv";
-            modelIl =
-              pipelineStagePackages."tinystories-representative-core-fp32-il";
-            capacities = task3TinyStoriesCapacities;
-          };
+        task3RepresentativeCoreSv = pkgs.runCommand
+          "tinystories-representative-core-task3-baseline-float-sv" { } ''
+            export ALLOW_HW_EXTERNS=1
+            export FP_PRIMS_SV=${task3FpPrimitiveBlackboxes}
+            ${pkgs.bash}/bin/bash ${pipelineScripts}/sv_mlir_to_sv.sh \
+              ${circt}/bin/circt-opt \
+              ${
+                pipelineStagePackages."tinystories-representative-core-fp32-sv-mlir"
+              } \
+              "$out"
+          '';
+        task3RepresentativeCoreIl = pkgs.runCommand
+          "tinystories-representative-core-task3-baseline-float.il" { } ''
+            ${pkgs.gawk}/bin/awk '
+              /^module handshake_memory_/ {
+                name = $2
+                sub(/\(.*/, "", name)
+                print "--blackboxed-module " name
+              }
+            ' ${task3RepresentativeCoreSv}/sv/main.sv > memory-blackboxes.args
+
+            blackboxArgs="$(${pkgs.coreutils}/bin/tr '\n' ' ' < memory-blackboxes.args)"
+            cat > run.ys <<EOF
+            plugin -i ${yosysSlang}/share/yosys/plugins/slang.so
+            read_slang --threads 1 --no-proc --max-parse-depth 20000 --top main $blackboxArgs ${task3RepresentativeCoreSv}/sv/main.sv ${task3RepresentativeCoreSv}/sv/zz_circt_fp_primitives.sv
+            hierarchy -check -top main
+            stat
+            write_rtlil $out
+            EOF
+
+            ${yosysPkg}/bin/yosys -s run.ys
+          '';
+        task3RepresentativeCoreUtilization = pkgs.runCommand
+          "tinystories-representative-core-task3-baseline-float-selftest-all-memory-utilization-bundle"
+          { } ''
+            mkdir -p "$out"
+            cat > "$out/summary.json" <<'JSON'
+            ${builtins.toJSON {
+              status = "pipeline-failed";
+              route = "task3-baseline-float-selftest-all-memory";
+              model = "tinystories-representative-core-fp32";
+              failure = {
+                stage = "yosys synth_xilinx begin:prepare/coarse:map_memory";
+                reason =
+                  "representative-core SV imports and wraps, but Task 3 Yosys synthesis is killed before final utilization reports are available";
+                observed_exit_code = 137;
+              };
+              resources = { };
+              usage = { };
+              utilization = { };
+              capacities = task3TinyStoriesCapacities;
+              inputs = {
+                sv_bundle = task3RepresentativeCoreSv;
+                model_rtlil = task3RepresentativeCoreIl;
+              };
+            }}
+            JSON
+            cat > "$out/summary.txt" <<'TXT'
+            status: pipeline-failed
+            route: task3-baseline-float-selftest-all-memory
+            model: tinystories-representative-core-fp32
+            failure: Yosys synthesis killed before final utilization reports were available
+            TXT
+            cat > "$out/stat.json" <<'JSON'
+            ${builtins.toJSON {
+              status = "pipeline-failed";
+              top = "tiny_stories_selftest_top";
+              resources = { };
+            }}
+            JSON
+            cat > "$out/manifest.json" <<'JSON'
+            ${builtins.toJSON {
+              package =
+                "tinystories-representative-core-task3-baseline-float-selftest-all-memory";
+              route = "task3-baseline-float-selftest-all-memory";
+              model = "tinystories-representative-core-fp32";
+              source_pipeline =
+                "PyTorch ExportedProgram -> torch-mlir -> linalg -> cf -> handshake -> hw -> sv";
+              fp_primitives =
+                "blackbox shells for Task 3 utilization reporting";
+              memory_primitives =
+                "handshake_memory_* modules blackboxed at SystemVerilog import";
+              final_reports = [ "summary.json" "summary.txt" "stat.json" ];
+              result = "pipeline failed before final utilization";
+              inputs = {
+                sv_bundle = task3RepresentativeCoreSv;
+                model_rtlil = task3RepresentativeCoreIl;
+              };
+            }}
+            JSON
+          '';
         task3RepresentativeCoreParity = pkgs.runCommand
           "tinystories-representative-core-task3-baseline-float-selftest-all-memory-parity"
           { } ''
