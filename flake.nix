@@ -1378,8 +1378,126 @@
             capacities = task3TinyStoriesCapacities;
             externalMemoryMinModuleBits = 1;
           };
-        task3TinyStories1mBaselineFloatUtilization =
+        task3TinyStories1mBaselineFloatLiveUtilization =
           task3TinyStories1mBaselineFloatSelftestAllMemory.utilizationBundle;
+        task3TinyStories1mBaselineFloatSavedUtilization = pkgs.runCommand
+          "tiny-stories-1m-baseline-float-selftest-all-memory-saved-utilization"
+          { } ''
+            mkdir -p "$out"
+            cp ${task3BaselineFloatReference}/summary.json "$out/summary.json"
+            cp ${task3BaselineFloatReference}/summary.txt "$out/summary.txt"
+            cp ${task3BaselineFloatReference}/stat.json "$out/stat.json"
+            cat > "$out/manifest.json" <<'JSON'
+            ${builtins.toJSON {
+              package =
+                "tiny-stories-1m-baseline-float-selftest-all-memory-saved-utilization";
+              route = "task3-baseline-float-selftest-all-memory";
+              model = "tiny-stories-1m-baseline-float";
+              source = "copied final report artifact from ~/LLM2FPGA";
+              final_reports = [ "summary.json" "summary.txt" "stat.json" ];
+            }}
+            JSON
+          '';
+        task3TinyStories1mBaselineFloatLiveStatus = pkgs.runCommand
+          "tiny-stories-1m-baseline-float-selftest-all-memory-live-status"
+          { } ''
+            mkdir -p "$out"
+            cat > "$out/summary.json" <<'JSON'
+            ${builtins.toJSON {
+              status = "pipeline-failed";
+              route = "task3-baseline-float-selftest-all-memory";
+              model = "tiny-stories-1m-baseline-float";
+              failure = {
+                stage = "sv-to-rtlil";
+                reason =
+                  "live full TinyStories rebuild reaches SystemVerilog, then Yosys/Slang is killed while importing main before RTLIL exists";
+                observed_exit_code = 137;
+              };
+              attempted_flow =
+                "PyTorch ExportedProgram -> torch-mlir -> linalg -> cf -> handshake -> hw -> sv -> rtlil -> Task 3 selftest/all-memory utilization";
+              live_derivation =
+                "tiny-stories-1m-baseline-float-selftest-all-memory-live-utilization";
+              resources = { };
+              usage = { };
+              utilization = { };
+            }}
+            JSON
+            cat > "$out/summary.txt" <<'TXT'
+            status: pipeline-failed
+            route: task3-baseline-float-selftest-all-memory
+            model: tiny-stories-1m-baseline-float
+            failure_stage: sv-to-rtlil
+            failure: live full TinyStories reaches SV, then Yosys/Slang is killed while importing main before RTLIL exists
+            observed_exit_code: 137
+            TXT
+            cat > "$out/stat.json" <<'JSON'
+            ${builtins.toJSON {
+              status = "pipeline-failed";
+              top = "tiny_stories_selftest_top";
+              resources = { };
+            }}
+            JSON
+            cat > "$out/manifest.json" <<'JSON'
+            ${builtins.toJSON {
+              package =
+                "tiny-stories-1m-baseline-float-selftest-all-memory-live-status";
+              route = "task3-baseline-float-selftest-all-memory";
+              model = "tiny-stories-1m-baseline-float";
+              final_reports = [ "summary.json" "summary.txt" "stat.json" ];
+              live_derivation =
+                "tiny-stories-1m-baseline-float-selftest-all-memory-live-utilization";
+            }}
+            JSON
+          '';
+        task3TinyStories1mBaselineFloatSavedVsLive = pkgs.runCommand
+          "tiny-stories-1m-baseline-float-selftest-all-memory-saved-vs-live"
+          { } ''
+            mkdir -p "$out"
+            cp ${task3TinyStories1mBaselineFloatSavedUtilization}/summary.json "$out/saved-summary.json"
+            cp ${task3TinyStories1mBaselineFloatLiveStatus}/summary.json "$out/live-summary.json"
+            OUT="$out" ${python}/bin/python3 - <<'PY'
+            import json
+            import os
+            from pathlib import Path
+
+            out = Path(os.environ["OUT"])
+            saved = json.loads((out / "saved-summary.json").read_text())
+            live = json.loads((out / "live-summary.json").read_text())
+            usage = saved.get("usage", {})
+            payload = {
+                "status": "not-reproduced",
+                "saved_status": saved.get("status", "final-report"),
+                "live_status": live.get("status"),
+                "saved_usage": usage,
+                "live_failure": live.get("failure", {}),
+                "conclusion": (
+                    "The saved FTS final report has utilization numbers, but "
+                    "the live FTS derivation does not reproduce them on this "
+                    "host/toolchain because it fails before RTLIL."
+                ),
+            }
+            (out / "summary.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            lines = [
+                "# Saved vs Live FTS Task 3",
+                "",
+                f"- status: `{payload['status']}`",
+                "- saved artifact: final utilization report is present",
+                f"- live derivation status: `{payload['live_status']}`",
+                f"- live failure stage: `{payload['live_failure'].get('stage', 'unknown')}`",
+                f"- live failure exit code: `{payload['live_failure'].get('observed_exit_code', 'unknown')}`",
+                "",
+                "| metric | saved FTS | live FTS |",
+                "| --- | ---: | ---: |",
+                f"| lut_total | {usage.get('lut_total', 'unknown')} | unknown |",
+                f"| ff_total | {usage.get('ff_total', 'unknown')} | unknown |",
+                "",
+                payload["conclusion"],
+                "",
+            ]
+            (out / "summary.md").write_text("\n".join(lines))
+            (out / "summary.txt").write_text("\n".join(lines))
+            PY
+          '';
         task3RepresentativeCoreSelftestAllMemory = mkTask3SelftestBundle {
           name =
             "tinystories-representative-core-task3-baseline-float-selftest-all-memory";
@@ -1481,7 +1599,15 @@
           "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence" =
             tinystoriesIntegerSvEquivalenceReport;
           "tiny-stories-1m-baseline-float-selftest-all-memory-utilization" =
-            task3TinyStories1mBaselineFloatUtilization;
+            task3TinyStories1mBaselineFloatLiveUtilization;
+          "tiny-stories-1m-baseline-float-selftest-all-memory-live-utilization" =
+            task3TinyStories1mBaselineFloatLiveUtilization;
+          "tiny-stories-1m-baseline-float-selftest-all-memory-live-status" =
+            task3TinyStories1mBaselineFloatLiveStatus;
+          "tiny-stories-1m-baseline-float-selftest-all-memory-saved-utilization" =
+            task3TinyStories1mBaselineFloatSavedUtilization;
+          "tiny-stories-1m-baseline-float-selftest-all-memory-saved-vs-live" =
+            task3TinyStories1mBaselineFloatSavedVsLive;
           "tinystories-representative-core-task3-baseline-float-selftest-all-memory-utilization" =
             task3RepresentativeCoreUtilization;
           "tinystories-representative-core-task3-baseline-float-selftest-all-memory-live-utilization" =
