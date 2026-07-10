@@ -147,6 +147,31 @@ in {
     '';
   };
 
+  "tiny-stories-1m-baseline-float" = registerModel {
+    key = "tiny-stories-1m-baseline-float";
+    name = "tiny-stories-1m-baseline-float";
+    description =
+      "Task 3/old Task 6 baseline TinyStories-1M FP32 ExportedProgram through the baseline lowering pipeline.";
+    source = {
+      type = "huggingface";
+      model_id = tinyStories1m.modelId;
+      inherit (tinyStories1m) revision;
+      quantization = "none";
+    };
+    allowHwExterns = true;
+    slangPerFileExternModules = true;
+    inherit fpPrimsSv;
+    hfSnapshot = tinyStories1m.snapshot;
+    pytorchToolchain = [ pythonWithTinyStories torchMlir ];
+    pytorchExportedCommand = ''
+      export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
+      python ${materializePyTorchExported} \
+        --adapter ${tinyStories1m.adapterPy} \
+        --model-path ${tinyStories1m.snapshot} \
+        --out-dir "$out"
+    '';
+  };
+
   "tinystories-representative-core-fp32" = registerModel {
     key = "tinystories-representative-core-fp32";
     name = "tinystories-representative-core-fp32";

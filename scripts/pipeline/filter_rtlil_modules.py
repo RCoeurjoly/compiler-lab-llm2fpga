@@ -26,6 +26,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Drop module definitions whose RTLIL name starts with a backslash followed by an uppercase letter.",
     )
+    parser.add_argument(
+        "--drop-attributes",
+        action="store_true",
+        help="Drop RTLIL attribute lines while preserving module/cell/netlist structure.",
+    )
     return parser.parse_args()
 
 
@@ -34,10 +39,14 @@ def main() -> None:
     input_path = Path(args.input)
     output_path = Path(args.output)
 
-    if args.drop_module_regex is None and not args.drop_escaped_uppercase_modules:
+    if (
+        args.drop_module_regex is None
+        and not args.drop_escaped_uppercase_modules
+        and not args.drop_attributes
+    ):
         raise SystemExit(
             "filter_rtlil_modules.py requires either --drop-module-regex or "
-            "--drop-escaped-uppercase-modules"
+            "--drop-escaped-uppercase-modules or --drop-attributes"
         )
 
     drop_re = re.compile(args.drop_module_regex) if args.drop_module_regex is not None else None
@@ -75,6 +84,10 @@ def main() -> None:
                 if line == "end\n":
                     dropping = False
                     at_top_level = True
+                continue
+
+            if args.drop_attributes and ATTRIBUTE_RE.match(line):
+                pending_attributes.clear()
                 continue
 
             if at_top_level and ATTRIBUTE_RE.match(line):
