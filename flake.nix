@@ -12,6 +12,7 @@
       url = "github:fossi-foundation/nix-eda";
       inputs.nixpkgs.follows = "nixpkgs-nix-eda";
     };
+    task3-main-pipeline.url = "path:./task3-main";
   };
 
   outputs = inputs@{ nixpkgs, nixpkgs-llvm21, nixpkgs-nix-eda, flake-utils
@@ -19,6 +20,8 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
+        task3MainPackages =
+          inputs.task3-main-pipeline.packages.${system};
         pkgsLlvm21 = import nixpkgs-llvm21 {
           inherit system;
           config.allowUnfreePredicate = pkg:
@@ -1599,7 +1602,7 @@
           "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence" =
             tinystoriesIntegerSvEquivalenceReport;
           "tiny-stories-1m-baseline-float-selftest-all-memory-utilization" =
-            task3TinyStories1mBaselineFloatLiveUtilization;
+            task3MainPackages."tiny-stories-1m-baseline-float-selftest-all-memory-utilization";
           "tiny-stories-1m-baseline-float-selftest-all-memory-live-utilization" =
             task3TinyStories1mBaselineFloatLiveUtilization;
           "tiny-stories-1m-baseline-float-selftest-all-memory-live-status" =
@@ -1609,11 +1612,11 @@
           "tiny-stories-1m-baseline-float-selftest-all-memory-saved-vs-live" =
             task3TinyStories1mBaselineFloatSavedVsLive;
           "tinystories-representative-core-task3-baseline-float-selftest-all-memory-utilization" =
-            task3RepresentativeCoreUtilization;
+            task3MainPackages."tinystories-representative-core-task3-baseline-float-selftest-all-memory-utilization";
           "tinystories-representative-core-task3-baseline-float-selftest-all-memory-live-utilization" =
             task3RepresentativeCoreLiveUtilization;
           "tinystories-representative-core-task3-baseline-float-selftest-all-memory-parity" =
-            task3RepresentativeCoreParity;
+            task3MainPackages."tinystories-representative-core-task3-baseline-float-selftest-all-memory-parity";
           model-registry = modelRegistryJson;
           default = modelRegistryJson;
         } // pipelineStagePackages // pipelineMetadataPackages

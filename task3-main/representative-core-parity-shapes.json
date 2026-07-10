@@ -1,0 +1,27 @@
+{
+  "full_tinystories": {
+    "model": "roneneldan/TinyStories-1M",
+    "vocab_size": 50257,
+    "hidden_size": 64,
+    "num_layers": 8,
+    "num_attention_heads": 16,
+    "max_position_embeddings": 512,
+    "tied_embedding_output_projection": true,
+    "positional_embeddings": "full TinyStories-1M configuration"
+  },
+  "representative_core": {
+    "model": "tinystories-representative-core-fp32",
+    "adapter": "TinyStories/model_adapter_representative_core.py",
+    "vocab_size": 32,
+    "hidden_size": 2,
+    "num_layers": 2,
+    "num_attention_heads": 1,
+    "max_position_embeddings": 4,
+    "window_size": 2,
+    "tied_embedding_output_projection": "reduced with representative-core vocabulary",
+    "positional_embeddings": "reduced with representative-core max positions"
+  },
+  "notes": [
+    "Shape metadata is checked-in manual context for the Task 3 parity report."
+  ]
+}
