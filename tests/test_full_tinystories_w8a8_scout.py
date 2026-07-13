@@ -115,6 +115,15 @@ class FullTinyStoriesW8A8ScoutTest(unittest.TestCase):
         self.assertIn("stages = handshakeSvStages;", body)
         self.assertNotIn("calyx", body.lower())
 
+    def test_current_baseline_records_w8a8_tosa_handshake_scout(self) -> None:
+        baseline = (REPO_ROOT / "docs" / "current-baseline.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("tinystories-w8a8-via-tosa-yosys-stat", baseline)
+        self.assertIn("TOSA -> Linalg -> CF -> Handshake -> HW -> SV", baseline)
+        self.assertIn("Calyx: not used", baseline)
+
     def test_graph_shape_audit_reports_qdq_wrapped_float_matmul(self) -> None:
         script = REPO_ROOT / "scripts" / "pipeline" / "pt2e_graph_shape_audit.py"
 

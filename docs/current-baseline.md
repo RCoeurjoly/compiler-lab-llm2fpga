@@ -1,5 +1,24 @@
 # Current Baseline
 
+## Full TinyStories PT2E W8A8, TOSA Handshake scout
+
+Recorded on 2026-07-13.
+
+- Target: `tinystories-w8a8-via-tosa-yosys-stat`
+- Route: `TOSA -> Linalg -> CF -> Handshake -> HW -> SV`
+- Calyx: not used
+- Last successful stage: Handshake external-memory preparation (`hs-ext`)
+- First failing stage: `lower-handshake-to-hw` (`hw0`), killed with exit 137
+- Largest observed compiler RSS: at least 27,373,360 KiB
+- SV generated: no
+- Yosys statistics generated: no
+
+TOSA successfully rejoins the Task 3 Handshake backend, but CF-to-Handshake
+expands the model from 33,326,877 bytes to 1,766,701,841 bytes and more than
+30 million lines. Handshake-to-HW then exhausts host memory. This is a
+Handshake scalability frontier, not a TOSA legality or Calyx frontier. See the
+[full scout report](results/2026-07-13-full-tinystories-pt2e-w8a8-tosa-handshake-scout.md).
+
 ## Full TinyStories PT2E W8A8, TOSA no-handshake scout
 
 Recorded on 2026-07-13.
