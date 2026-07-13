@@ -38,12 +38,11 @@ For a match, the pass creates:
 tosa.cast rounded_float -> i32
 tosa.const zero_point : i32
 tosa.add i32, i32 -> i32
-tosa.clamp i32 to [-128, 127]
-tosa.cast i32 -> i8
+tosa.rescale i32 -> i8 with identity scale and zero input/output zero points
 tosa.cast i8 -> i32
 ```
 
-The final existing widening cast is retained so downstream dequantization has the same graph boundary. The clamp makes narrowing explicitly saturating. The pass does not match `i8` additions lacking the complete provenance/use signature and does not attempt scale alignment.
+The final existing widening cast is retained so downstream dequantization has the same graph boundary. `tosa.rescale` performs the profile-valid saturating narrowing; TOSA does not permit `tosa.clamp` on `i32`. The pass does not match `i8` additions lacking the complete provenance/use signature and does not attempt scale alignment.
 
 ## Pipeline integration
 
@@ -57,7 +56,7 @@ The public model aliases remain unchanged. The validated/legalized TOSA replaces
 
 ## Tests
 
-- A minimal positive reproducer proves the recognized PT2E pattern is rewritten to `i32` add, clamp, and `i8` narrowing.
+- A minimal positive reproducer proves the recognized PT2E pattern is rewritten to an `i32` add and identity `tosa.rescale` narrowing to `i8`.
 - A negative reproducer proves an arbitrary `i8 tosa.add` is unchanged and therefore still rejected by `tosa-validate`.
 - A second negative case proves a zero-point-like add with multiple uses is not rewritten.
 - Repository tests assert pass registration and pipeline ordering.

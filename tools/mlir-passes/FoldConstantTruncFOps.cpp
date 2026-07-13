@@ -18,6 +18,8 @@
 
 using namespace mlir;
 
+void registerLegalizePt2eTosaZeroPointPass();
+
 namespace {
 struct StaticMemRefView {
   Value base;
@@ -566,5 +568,6 @@ extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo mlirGetPassPluginInfo() {
             PassRegistration<LowerStaticMemRefViewsForCalyxPass>();
             PassRegistration<DropCalyxUnsupportedAssertOpsPass>();
             PassRegistration<LowerRoundEvenForCalyxPass>();
+            registerLegalizePt2eTosaZeroPointPass();
           }};
 }

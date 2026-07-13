@@ -13,6 +13,7 @@ add_definitions(${MLIR_DEFINITIONS})
 
 add_mlir_library(LLM2FPGAMLIRPasses
   FoldConstantTruncFOps.cpp
+  LegalizePt2eTosaZeroPoint.cpp
   MODULE
 
   LINK_LIBS PUBLIC
@@ -24,4 +25,5 @@ add_mlir_library(LLM2FPGAMLIRPasses
   MLIRMemRefDialect
   MLIRPass
   MLIRSCFDialect
+  MLIRTosaDialect
 )

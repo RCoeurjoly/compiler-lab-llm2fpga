@@ -36,7 +36,7 @@ class FullTinyStoriesW8A8ScoutTest(unittest.TestCase):
 
         self.assertIn("llm2fpga-legalize-pt2e-tosa-zero-point", source)
         self.assertIn("tosa::AddOp", source)
-        self.assertIn("tosa::ClampOp", source)
+        self.assertIn("tosa::RescaleOp", source)
         self.assertIn("registerLegalizePt2eTosaZeroPointPass", source)
         self.assertIn("LegalizePt2eTosaZeroPoint.cpp", cmake)
         self.assertIn("MLIRTosaDialect", cmake)
