@@ -1,5 +1,32 @@
 # Current Baseline
 
+## Full TinyStories PT2E W8A8, TOSA no-handshake scout
+
+Recorded on 2026-07-13.
+
+The PT2E zero-point legalization now accepts quantized values with arbitrary
+consumers: it no longer requires `hasOneUse()` or an immediate `i8 -> i32`
+cast user. Producer provenance remains narrow: an `i8` result formed by adding
+a float-derived cast and a splat zero-point constant. The validated TOSA
+rewrites all 236 matching `i8 tosa.add` operations to saturating
+`tosa.rescale`; zero illegal `i8 tosa.add` operations remain.
+
+The full pipeline now succeeds through TOSA validation, Linalg, SCF, and
+flat-SCF. Calyx lowering is the current frontier:
+
+```text
+Unhandled operation during BuildOpGroups()
+math.floor
+```
+
+The flat-SCF input contains 5,922 float operations, including 478
+`math.floor`, 478 `arith.fptosi`, and 17 `math.rsqrt`. No Calyx, SV, or Yosys
+statistics were produced. This is therefore a compiler-frontier result, not a
+hardware-resource result. See
+[`docs/results/2026-07-13-full-tinystories-pt2e-w8a8-scout.md`](results/2026-07-13-full-tinystories-pt2e-w8a8-scout.md)
+and
+[`artifacts/full-tinystories-pt2e-w8a8-scout/result.json`](../artifacts/full-tinystories-pt2e-w8a8-scout/result.json).
+
 ## Representative-core W4A8, TOSA no-handshake Calyx-SV
 
 Recorded on 2026-07-08.

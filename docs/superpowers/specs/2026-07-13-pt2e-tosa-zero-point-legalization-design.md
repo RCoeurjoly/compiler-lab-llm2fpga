@@ -29,7 +29,6 @@ Add `llm2fpga-legalize-pt2e-tosa-zero-point` to the existing MLIR pass plugin. T
 - Both operands and the result are ranked tensors with `i8` elements.
 - One operand is produced by `tosa.cast` from a floating-point tensor.
 - The other operand is a splat `tosa.const` representing a scalar/broadcast zero point.
-- The add result has one use, a `tosa.cast` to a ranked tensor with `i32` elements.
 - Shapes are broadcast-compatible under the already valid TOSA add.
 
 For a match, the pass creates:
@@ -42,7 +41,7 @@ tosa.rescale i32 -> i8 with identity scale and zero input/output zero points
 tosa.cast i8 -> i32
 ```
 
-The final existing widening cast is retained so downstream dequantization has the same graph boundary. `tosa.rescale` performs the profile-valid saturating narrowing; TOSA does not permit `tosa.clamp` on `i32`. The pass does not match `i8` additions lacking the complete provenance/use signature and does not attempt scale alignment.
+All existing consumers are retained and receive the same `i8` boundary, whether they dequantize, reshape, feed integer matmul, or share the value. Consumer count and kind are not part of quantization semantics. `tosa.rescale` performs the profile-valid saturating narrowing; TOSA does not permit `tosa.clamp` on `i32`. The pass does not match `i8` additions lacking the producer provenance signature and does not attempt scale alignment.
 
 ## Pipeline integration
 

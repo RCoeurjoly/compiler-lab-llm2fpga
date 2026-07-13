@@ -71,7 +71,7 @@ git commit -m "test: reproduce PT2E TOSA zero-point add"
 
 - [ ] **Step 1: Add the pass implementation**
 
-Walk `tosa::AddOp` operations and require `i8` ranked operands/result, one float-producing `tosa::CastOp`, one splat `tosa::ConstOp`, and one sole widening `tosa::CastOp` user. Create an `i32` cast, `i32` zero-point constant, `i32 tosa.add`, and identity `tosa.rescale` from `i32` to `i8`, then replace only the original add result. The rescale provides profile-valid saturating narrowing because TOSA rejects `i32 tosa.clamp`.
+Walk `tosa::AddOp` operations and require `i8` ranked operands/result, one float-producing `tosa::CastOp`, and one splat `tosa::ConstOp`. Do not constrain the number or kind of consumers. Create an `i32` cast, `i32` zero-point constant, `i32 tosa.add`, and identity `tosa.rescale` from `i32` to `i8`, then replace only the original add result. The rescale provides profile-valid saturating narrowing because TOSA rejects `i32 tosa.clamp`.
 
 - [ ] **Step 2: Register and link the pass**
 

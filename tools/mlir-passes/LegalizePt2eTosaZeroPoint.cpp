@@ -5,6 +5,7 @@
 #include "mlir/Pass/Pass.h"
 
 #include "llvm/ADT/APInt.h"
+#include "llvm/Config/llvm-config.h"
 
 using namespace mlir;
 
@@ -31,11 +32,7 @@ struct Pt2eZeroPointMatch {
 static std::optional<Pt2eZeroPointMatch> matchPt2eZeroPointAdd(tosa::AddOp add) {
   if (!hasIntegerElementWidth(add.getInput1(), 8) ||
       !hasIntegerElementWidth(add.getInput2(), 8) ||
-      !hasIntegerElementWidth(add.getOutput(), 8) || !add->hasOneUse())
-    return std::nullopt;
-
-  auto wideningCast = dyn_cast<tosa::CastOp>(*add->user_begin());
-  if (!wideningCast || !hasIntegerElementWidth(wideningCast.getOutput(), 32))
+      !hasIntegerElementWidth(add.getOutput(), 8))
     return std::nullopt;
 
   auto matchOperands = [](Value rounded, Value zeroPoint)
@@ -131,12 +128,20 @@ struct LegalizePt2eTosaZeroPointPass
           rewriter, add.getLoc(), outputZeroPointType,
           DenseElementsAttr::get(outputZeroPointType,
                                  rewriter.getI8IntegerAttr(0)));
+      auto scale32 = rewriter.getBoolAttr(true);
+      auto perChannel = rewriter.getBoolAttr(false);
+      auto inputUnsigned = rewriter.getBoolAttr(false);
+      auto outputUnsigned = rewriter.getBoolAttr(false);
+#if LLVM_VERSION_MAJOR >= 23
+      auto roundingMode = tosa::RoundingModeAttr::get(
+          rewriter.getContext(), tosa::RoundingMode::SINGLE_ROUND);
+#else
+      auto roundingMode = rewriter.getStringAttr("SINGLE_ROUND");
+#endif
       auto narrowedI8 = tosa::RescaleOp::create(
           rewriter, add.getLoc(), narrowResultType, addedI32, multiplier,
-          shift, inputZeroPoint, outputZeroPoint,
-          /*scale32=*/true, /*rounding_mode=*/"SINGLE_ROUND",
-          /*per_channel=*/false, /*input_unsigned=*/false,
-          /*output_unsigned=*/false);
+          shift, inputZeroPoint, outputZeroPoint, scale32, roundingMode,
+          perChannel, inputUnsigned, outputUnsigned);
 
       rewriter.replaceOp(add, narrowedI8.getOutput());
     }

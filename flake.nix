@@ -161,6 +161,11 @@
         llm2fpgaMlirPasses = pkgsLlvm21.callPackage ./nix/mlir-passes.nix {
           inherit mlir llvmPackages;
         };
+        llm2fpgaTorchMlirPasses =
+          pkgsLlvm21.callPackage ./nix/mlir-passes.nix {
+            mlir = mlirForTorchMlir;
+            llvmPackages = torchMlirLlvmPackages;
+          };
         llm2fpgaCirctPasses = pkgs.callPackage ./nix/circt-passes.nix {
           inherit circt;
           mlir = circtMlir;
@@ -256,7 +261,7 @@
           inherit pipelineScripts svProvenanceReport noHandshakeLinalgToScf
             noHandshakeScfToFlatScf noHandshakeScfToCalyx calyxToSvNoHandshake
             calyxToHwSvNoHandshake noHandshakeLinalgToLlvm;
-          mlirPasses = llm2fpgaMlirPasses;
+          mlirPasses = llm2fpgaTorchMlirPasses;
           circtPasses = llm2fpgaCirctPasses;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
@@ -1616,7 +1621,8 @@
       in {
         packages = {
           inherit circt mlir torchMlir yosysPkg modelRegistryJson
-            llm2fpgaMlirPasses llm2fpgaCirctPasses calyx;
+            llm2fpgaMlirPasses llm2fpgaTorchMlirPasses llm2fpgaCirctPasses
+            calyx;
           "active-pipeline-variants" = activePipelineVariantsJson;
           "tinystories-w8a8-pt2e-graph-shape-audit" =
             tinystoriesW8A8Pt2eGraphShapeAudit;

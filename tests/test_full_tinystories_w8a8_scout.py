@@ -42,6 +42,31 @@ class FullTinyStoriesW8A8ScoutTest(unittest.TestCase):
         self.assertIn("MLIRTosaDialect", cmake)
         self.assertIn("registerLegalizePt2eTosaZeroPointPass", plugin)
 
+    def test_pt2e_zero_point_match_does_not_depend_on_consumers(self) -> None:
+        source = (
+            REPO_ROOT / "tools" / "mlir-passes" / "LegalizePt2eTosaZeroPoint.cpp"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("hasOneUse", source)
+        self.assertNotIn("user_begin", source)
+        self.assertNotIn("wideningCast", source)
+
+    def test_tosa_pipeline_uses_plugin_built_for_torch_mlir_abi(self) -> None:
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+
+        self.assertIn("llm2fpgaTorchMlirPasses =", flake)
+        self.assertIn("mlir = mlirForTorchMlir", flake)
+        self.assertIn("llvmPackages = torchMlirLlvmPackages", flake)
+        tosa_pipeline = re.search(
+            r"pipelineLibTosa = import ./nix/pipeline.nix \{.*?^        \};",
+            flake,
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(tosa_pipeline)
+        self.assertIn(
+            "mlirPasses = llm2fpgaTorchMlirPasses", tosa_pipeline.group(0)
+        )
+
     def test_full_model_w8a8_is_registered_with_existing_pt2e_adapter(self) -> None:
         models = (REPO_ROOT / "nix" / "models.nix").read_text(encoding="utf-8")
 

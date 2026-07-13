@@ -1,17 +1,27 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "date": "2026-07-13",
   "model": "tinystories-w8a8",
   "quantization": {
     "method": "XNNPACK PT2E static W8A8",
     "calibration": "frozen-single-token-zero-input"
   },
-  "pipeline": "pytorch-exported -> torch -> tosa -> linalg -> scf -> flat-scf -> calyx -> hw -> sv -> yosys-stat",
+  "pipeline": "pytorch-exported -> torch -> tosa -> validated-tosa -> linalg -> scf -> flat-scf -> calyx -> sv -> yosys-stat",
   "status": "failed",
-  "last_successful_stage": "tosa",
-  "failed_stage": "tosa-to-linalg",
-  "first_error": "'tosa.add' op illegal: operation operand/result data types did not align with any profile or extension, got (i8,i8,i8), did you mean (i32,i32,i32)?",
+  "last_successful_stage": "flat-scf",
+  "failed_stage": "calyx",
+  "first_error": "Unhandled operation during BuildOpGroups(): math.floor",
+  "legalization": {
+    "pass": "llm2fpga-legalize-pt2e-tosa-zero-point",
+    "raw_i8_tosa_adds": 236,
+    "validated_i8_tosa_adds": 0,
+    "validated_tosa_rescales": 236,
+    "validation_status": "passed",
+    "consumer_restrictions": false,
+    "unrelated_i8_add_regression_remains_illegal": true
+  },
   "downstream": {
+    "calyx_artifact_generated": false,
     "systemverilog_generated": false,
     "yosys_reached": false,
     "resource_statistics_available": false
@@ -19,20 +29,45 @@
   "build": {
     "command": "nix build .#tinystories-w8a8-via-tosa-no-handshake-yosys-stat --no-link --print-out-paths -L",
     "exit_status": 1,
-    "wall_seconds": 15,
+    "wall_seconds": 363,
     "sample_interval_seconds": 5,
-    "peak_vmrss_kb": 565472,
-    "note": "Successful upstream stages were cached; timing is not a clean end-to-end cold-build measurement."
+    "peak_vmrss_kb": 565228,
+    "note": "Torch/TOSA inputs were cached; this run built the ABI-matched pass plugin and the Linalg-through-Calyx frontier, so it is not a cold end-to-end measurement."
   },
   "artifacts": {
     "torch_mlir": {
       "lines": 3025,
       "bytes": 27233314
     },
-    "tosa_mlir": {
+    "raw_tosa_mlir": {
       "lines": 6155,
       "bytes": 27430773
+    },
+    "validated_tosa_mlir": {
+      "lines": 6311,
+      "bytes": 27488188
+    },
+    "linalg_mlir": {
+      "lines": 30019,
+      "bytes": 28911438
+    },
+    "scf_mlir": {
+      "lines": 38806,
+      "bytes": 28939165
+    },
+    "flat_scf_mlir": {
+      "bytes": 29192575
     }
+  },
+  "calyx_frontier": {
+    "status": "has-unsupported-calyx-float-frontier",
+    "total_float_ops": 5922,
+    "total_unsupported_ops": 17,
+    "unsupported_ops": {
+      "math.rsqrt": 17
+    },
+    "first_runtime_rejection": "math.floor",
+    "secondary_error": "unused calyx.group init_for_100_induction_var"
   },
   "graph_audit": {
     "status": "fail",
