@@ -16,14 +16,26 @@ class CalyxMemrefResultWrapperTest(unittest.TestCase):
         self.assertIn("func.func @kernel", source)
         self.assertIn("memref<4xi32>", source)
         self.assertIn("-> i32", source)
-        kernel = re.search(r"calyx.component @kernel.*?^  }", output, re.M | re.S)
-        main = re.search(r"calyx.component @main.*?^  }", output, re.M | re.S)
+        kernel = re.search(
+            r"calyx\.component\s+@kernel\b\s*\([^)]*\)\s*->\s*\(([^)]*)\)",
+            output,
+            re.S,
+        )
+        main = re.search(
+            r"calyx\.component\s+@main\b\s*\([^)]*\)\s*->\s*\(([^)]*)\)",
+            output,
+            re.S,
+        )
         self.assertIsNotNone(kernel)
         self.assertIsNotNone(main)
-        kernel_interface = kernel.group(0).splitlines()[0]
-        main_interface = main.group(0).splitlines()[0]
-        self.assertRegex(kernel_interface, r"out0[^\n]*i32")
-        self.assertNotRegex(main_interface, r"out0[^\n]*i32")
+        self.assertRegex(
+            kernel.group(1),
+            r"^\s*%out0\s*:\s*i32\s*,\s*%done\s*:\s*i1\s*\{\s*done\s*\}\s*$",
+        )
+        self.assertRegex(
+            main.group(1),
+            r"^\s*%done\s*:\s*i1\s*\{\s*done\s*\}\s*$",
+        )
         self.assertIn("--lower-scf-to-calyx='top-level-function=kernel'", readme)
 
 
