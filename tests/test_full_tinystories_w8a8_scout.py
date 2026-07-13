@@ -11,6 +11,37 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class FullTinyStoriesW8A8ScoutTest(unittest.TestCase):
+    def test_pt2e_zero_point_legalization_has_positive_and_negative_reproducers(self) -> None:
+        reproducer = REPO_ROOT / "reproducers" / "pt2e-tosa-zero-point"
+        positive = (reproducer / "input.mlir").read_text(encoding="utf-8")
+        negative = (reproducer / "unrelated-add.mlir").read_text(encoding="utf-8")
+
+        self.assertIn("tosa.cast %arg0", positive)
+        self.assertIn("dense<26>", positive)
+        self.assertIn("tosa.add %rounded_i8, %zero_point", positive)
+        self.assertIn("tosa.cast %quantized_i8", positive)
+        self.assertIn("tosa.add %lhs, %rhs", negative)
+        self.assertNotIn("tosa.const", negative)
+
+    def test_mlir_plugin_registers_pt2e_zero_point_legalization(self) -> None:
+        source = (
+            REPO_ROOT / "tools" / "mlir-passes" / "LegalizePt2eTosaZeroPoint.cpp"
+        ).read_text(encoding="utf-8")
+        cmake = (
+            REPO_ROOT / "tools" / "mlir-passes" / "CMakeLists.txt"
+        ).read_text(encoding="utf-8")
+        plugin = (
+            REPO_ROOT / "tools" / "mlir-passes" / "FoldConstantTruncFOps.cpp"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("llm2fpga-legalize-pt2e-tosa-zero-point", source)
+        self.assertIn("tosa::AddOp", source)
+        self.assertIn("tosa::ClampOp", source)
+        self.assertIn("registerLegalizePt2eTosaZeroPointPass", source)
+        self.assertIn("LegalizePt2eTosaZeroPoint.cpp", cmake)
+        self.assertIn("MLIRTosaDialect", cmake)
+        self.assertIn("registerLegalizePt2eTosaZeroPointPass", plugin)
+
     def test_full_model_w8a8_is_registered_with_existing_pt2e_adapter(self) -> None:
         models = (REPO_ROOT / "nix" / "models.nix").read_text(encoding="utf-8")
 
