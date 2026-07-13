@@ -411,6 +411,14 @@
             stages = noHandshakeStages;
           }
           {
+            alias = "tinystories-w8a8-via-tosa-no-handshake";
+            model = "tinystories-w8a8";
+            frontend = "tosa";
+            backend = "calyx-native-sv";
+            packages = pipelineStagePackagesTosaNoHandshake;
+            stages = noHandshakeStages;
+          }
+          {
             alias =
               "tinystories-representative-core-w4a8-via-linalg-no-handshake";
             model = "tinystories-representative-core-w4a8";

@@ -172,6 +172,33 @@ in {
     '';
   };
 
+  "tinystories-w8a8" = registerModel {
+    key = "tinystories-w8a8";
+    name = "tinystories-w8a8";
+    description =
+      "Full TinyStories-1M XNNPACK PT2E static W8A8 ExportedProgram for the provisional TOSA no-handshake resource scout.";
+    source = {
+      type = "huggingface";
+      model_id = tinyStories1m.modelId;
+      inherit (tinyStories1m) revision;
+      quantization = "pt2e-static-w8a8";
+      calibration = "frozen-single-token-zero-input";
+      evidence = "provisional-resource-scout";
+    };
+    allowHwExterns = true;
+    slangPerFileExternModules = true;
+    inherit fpPrimsSv;
+    hfSnapshot = tinyStories1m.snapshot;
+    pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
+    pytorchExportedCommand = ''
+      export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
+      python ${materializePyTorchExported} \
+        --adapter ${tinyStories1m.sourceDir}/model_adapter_pt2e_static_quant.py \
+        --model-path ${tinyStories1m.snapshot} \
+        --out-dir "$out"
+    '';
+  };
+
   "tinystories-representative-core-fp32" = registerModel {
     key = "tinystories-representative-core-fp32";
     name = "tinystories-representative-core-fp32";
