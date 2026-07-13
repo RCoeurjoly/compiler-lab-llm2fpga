@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-13",
+  "model": "tinystories-w8a8",
+  "quantization": {
+    "method": "XNNPACK PT2E static W8A8",
+    "calibration": "frozen-single-token-zero-input"
+  },
+  "pipeline": "pytorch-exported -> torch -> tosa -> linalg -> scf -> flat-scf -> calyx -> hw -> sv -> yosys-stat",
+  "status": "failed",
+  "last_successful_stage": "tosa",
+  "failed_stage": "tosa-to-linalg",
+  "first_error": "'tosa.add' op illegal: operation operand/result data types did not align with any profile or extension, got (i8,i8,i8), did you mean (i32,i32,i32)?",
+  "downstream": {
+    "systemverilog_generated": false,
+    "yosys_reached": false,
+    "resource_statistics_available": false
+  },
+  "build": {
+    "command": "nix build .#tinystories-w8a8-via-tosa-no-handshake-yosys-stat --no-link --print-out-paths -L",
+    "exit_status": 1,
+    "wall_seconds": 15,
+    "sample_interval_seconds": 5,
+    "peak_vmrss_kb": 565472,
+    "note": "Successful upstream stages were cached; timing is not a clean end-to-end cold-build measurement."
+  },
+  "artifacts": {
+    "torch_mlir": {
+      "lines": 3025,
+      "bytes": 27233314
+    },
+    "tosa_mlir": {
+      "lines": 6155,
+      "bytes": 27430773
+    }
+  },
+  "graph_audit": {
+    "status": "fail",
+    "line_count": 1189,
+    "op_counts": {
+      "aten.linear": 49,
+      "aten.matmul": 16,
+      "aten.layer_norm": 17,
+      "aten.pow": 8,
+      "aten.softmax": 8,
+      "aten.tanh": 8,
+      "aten.to.dtype": 24,
+      "quantized_decomposed.dequantize_per_tensor": 374,
+      "quantized_decomposed.quantize_per_tensor": 246
+    },
+    "failure_reasons": [
+      "float_matmul_after_dequant",
+      "float_linear_after_dequant",
+      "float_layer_norm",
+      "float_gelu_or_tanh"
+    ]
+  },
+  "deferred": [
+    "functional equivalence",
+    "board validation",
+    "SmoothQuant"
+  ]
+}
