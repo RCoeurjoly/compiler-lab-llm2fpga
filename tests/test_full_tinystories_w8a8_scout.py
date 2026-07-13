@@ -98,6 +98,23 @@ class FullTinyStoriesW8A8ScoutTest(unittest.TestCase):
         self.assertIn("packages = pipelineStagePackagesTosaNoHandshake", block)
         self.assertIn("stages = noHandshakeStages", block)
 
+    def test_full_model_w8a8_has_tosa_handshake_sv_alias(self) -> None:
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+        match = re.search(
+            r'\{\s*alias = "tinystories-w8a8-via-tosa";(?P<body>.*?)\n\s*\}',
+            flake,
+            re.DOTALL,
+        )
+
+        self.assertIsNotNone(match)
+        body = match.group("body")
+        self.assertIn('model = "tinystories-w8a8";', body)
+        self.assertIn('frontend = "tosa";', body)
+        self.assertIn('backend = "handshake-sv";', body)
+        self.assertIn("packages = pipelineStagePackagesTosa;", body)
+        self.assertIn("stages = handshakeSvStages;", body)
+        self.assertNotIn("calyx", body.lower())
+
     def test_graph_shape_audit_reports_qdq_wrapped_float_matmul(self) -> None:
         script = REPO_ROOT / "scripts" / "pipeline" / "pt2e_graph_shape_audit.py"
 

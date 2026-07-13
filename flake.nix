@@ -383,6 +383,14 @@
             stages = handshakeHwStages;
           }
           {
+            alias = "tinystories-w8a8-via-tosa";
+            model = "tinystories-w8a8";
+            frontend = "tosa";
+            backend = "handshake-sv";
+            packages = pipelineStagePackagesTosa;
+            stages = handshakeSvStages;
+          }
+          {
             alias = "pattern-linear-w4a8-core-via-tosa-no-handshake";
             model = "pattern-linear-w4a8-core";
             frontend = "tosa";
