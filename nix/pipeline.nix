@@ -104,10 +104,12 @@ let
 
   mkTosaToLinalgDerivation = { name, tosa }:
     pkgs.runCommand "${name}-linalg.mlir" {
-      buildInputs = [ tosaToLinalgMlir ];
+      buildInputs = [ tosaToLinalgMlir mlirPasses ];
     } ''
       ${pkgs.bash}/bin/bash ${pipelineScripts}/tosa_to_linalg.sh \
-        ${tosaToLinalgMlir}/bin/mlir-opt ${tosa} "$out"
+        ${tosaToLinalgMlir}/bin/mlir-opt \
+        ${mlirPasses}/lib/LLM2FPGAMLIRPasses.so \
+        ${tosa} "$out"
     '';
 
   mkCfDerivation = { name, linalg }:

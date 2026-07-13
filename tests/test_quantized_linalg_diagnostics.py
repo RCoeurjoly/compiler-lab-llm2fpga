@@ -89,10 +89,17 @@ class QuantizedLinalgDiagnosticsTest(unittest.TestCase):
     def test_tosa_pipeline_rejoins_sv_path(self) -> None:
         pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
         tosa_to_linalg = REPO_ROOT / "scripts" / "pipeline" / "tosa_to_linalg.sh"
+        script = tosa_to_linalg.read_text(encoding="utf-8")
 
         self.assertTrue(tosa_to_linalg.exists())
-        self.assertIn("--tosa-to-linalg-pipeline", tosa_to_linalg.read_text(encoding="utf-8"))
-        self.assertIn("--tosa-to-arith='include-apply-rescale'", tosa_to_linalg.read_text(encoding="utf-8"))
+        self.assertIn("--load-pass-plugin", script)
+        legalization = script.index("llm2fpga-legalize-pt2e-tosa-zero-point")
+        validation = script.index("tosa-validate")
+        lowering = script.index("tosa-to-linalg-pipeline")
+        self.assertLess(legalization, validation)
+        self.assertLess(validation, lowering)
+        self.assertIn("--tosa-to-arith='include-apply-rescale'", script)
+        self.assertIn("${mlirPasses}/lib/LLM2FPGAMLIRPasses.so", pipeline)
         self.assertIn("registerTosaModel", pipeline)
         self.assertIn("mkTosaToLinalgDerivation", pipeline)
 
