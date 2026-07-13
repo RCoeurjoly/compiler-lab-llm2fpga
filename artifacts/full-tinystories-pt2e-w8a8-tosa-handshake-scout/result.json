@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-13",
+  "target": "tinystories-w8a8-via-tosa-yosys-stat",
+  "route": [
+    "torch",
+    "tosa",
+    "linalg",
+    "cf",
+    "handshake",
+    "hs-ext",
+    "hw0",
+    "hw",
+    "hw-clean",
+    "sv-mlir",
+    "sv",
+    "yosys-stat"
+  ],
+  "uses_calyx": false,
+  "status": "failed",
+  "last_successful_stage": "hs-ext",
+  "first_failure": {
+    "stage": "hw0",
+    "pass": "lower-handshake-to-hw",
+    "message": "circt-opt was killed while lowering Handshake to HW",
+    "exit_code": 137
+  },
+  "monitor": {
+    "exit_code": 1,
+    "wall_seconds": 1339,
+    "sample_period_seconds": 5,
+    "frontend_peak_sampled_vmrss_kib": 552804,
+    "worker_peak_observed_vmrss_kib_lower_bound": 27373360,
+    "worker_peak_observation_method": "ps point observation; the Nix-daemon worker was outside monitor_build.sh's descendant tree"
+  },
+  "artifacts": {
+    "torch": {
+      "path": "/nix/store/hnlj9dv35jg933mlvhn4abzv3lfcxn0m-tinystories-w8a8-torch.mlir",
+      "lines": 3025,
+      "bytes": 27233314
+    },
+    "tosa": {
+      "path": "/nix/store/n03aaqby2q0f0lz09f63n5xbfmii6ylp-tinystories-w8a8-tosa.mlir",
+      "lines": 6155,
+      "bytes": 27430773
+    },
+    "linalg": {
+      "path": "/nix/store/k3bmxpwzzvyhsfrgnaqigzwrr58cx7fn-tinystories-w8a8-linalg.mlir",
+      "lines": 30019,
+      "bytes": 28911438
+    },
+    "cf": {
+      "path": "/nix/store/v8wyjqafzr05qmpxnzjhd4j0fwz7kvh0-tinystories-w8a8-cf.mlir",
+      "lines": 131303,
+      "bytes": 33326877
+    },
+    "handshake": {
+      "path": "/nix/store/16hr8mmf61gnyq22m6pkzhxgllmynb30-tinystories-w8a8-handshake.mlir",
+      "lines": 30556692,
+      "bytes": 1766701841
+    },
+    "hs-ext": {
+      "path": "/nix/store/m6s35idqaxlzzqhdh8iynmsy5zhyb8vy-tinystories-w8a8-hs-ext.mlir",
+      "lines": 30718121,
+      "bytes": 1805393024
+    }
+  },
+  "float_frontier": {
+    "stage": "cf",
+    "float_type_lines": 4652,
+    "total_float_ops": 4252,
+    "op_counts": {
+      "arith.addf": 141,
+      "arith.cmpf": 953,
+      "arith.divf": 8,
+      "arith.fptosi": 239,
+      "arith.maximumf": 239,
+      "arith.minimumf": 3,
+      "arith.mulf": 1129,
+      "arith.sitofp": 279,
+      "arith.subf": 264,
+      "math.ceil": 239,
+      "math.exp": 8,
+      "math.floor": 478,
+      "math.powf": 8,
+      "math.roundeven": 239,
+      "math.rsqrt": 17,
+      "math.tanh": 8
+    },
+    "external_fp_primitives_observed": null,
+    "external_fp_primitives_note": "HW and SV were not generated, so no final external primitive mapping exists to inspect."
+  },
+  "sv_generated": false,
+  "yosys_statistics_generated": false,
+  "yosys_statistics": null
+}
