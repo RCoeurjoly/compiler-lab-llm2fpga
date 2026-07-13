@@ -7,10 +7,10 @@
     "calibration": "frozen-single-token-zero-input"
   },
   "pipeline": "pytorch-exported -> torch -> tosa -> validated-tosa -> linalg -> scf -> flat-scf -> calyx -> sv -> yosys-stat",
-  "status": "failed",
-  "last_successful_stage": "flat-scf",
-  "failed_stage": "calyx",
-  "first_error": "Unhandled operation during BuildOpGroups(): math.floor",
+  "status": "structural-utilization-complete",
+  "last_successful_stage": "yosys-slang-structural-stat",
+  "failed_stage": null,
+  "first_error": null,
   "legalization": {
     "pass": "llm2fpga-legalize-pt2e-tosa-zero-point",
     "raw_i8_tosa_adds": 236,
@@ -21,12 +21,13 @@
     "unrelated_i8_add_regression_remains_illegal": true
   },
   "downstream": {
-    "calyx_artifact_generated": false,
-    "systemverilog_generated": false,
-    "yosys_reached": false,
-    "resource_statistics_available": false
+    "calyx_artifact_generated": true,
+    "systemverilog_generated": true,
+    "yosys_reached": true,
+    "resource_statistics_available": true,
+    "technology_mapped_utilization_available": false
   },
-  "build": {
+  "initial_build_frontier": {
     "command": "nix build .#tinystories-w8a8-via-tosa-no-handshake-yosys-stat --no-link --print-out-paths -L",
     "exit_status": 1,
     "wall_seconds": 363,
@@ -59,7 +60,7 @@
       "bytes": 29192575
     }
   },
-  "calyx_frontier": {
+  "initial_calyx_frontier": {
     "status": "has-unsupported-calyx-float-frontier",
     "total_float_ops": 5922,
     "total_unsupported_ops": 17,
@@ -68,6 +69,45 @@
     },
     "first_runtime_rejection": "math.floor",
     "secondary_error": "unused calyx.group init_for_100_induction_var"
+  },
+  "calyx_continuation": {
+    "exact_legalization": ["math.floor", "math.ceil", "math.rsqrt"],
+    "resource_scout_approximations": {
+      "math.powf": "x * x * x for observed pow(x, 3)",
+      "math.exp": "1 + x",
+      "math.tanh": "clamp(x, -1, 1)"
+    },
+    "equivalence_eligible": false,
+    "status": "completed-after-extended-run",
+    "former_cutoff_seconds": 2400,
+    "calyx_artifact_generated": true,
+    "calyx_mlir_bytes": 36139994,
+    "futil_bytes": 18613321,
+    "systemverilog_generated": true,
+    "systemverilog_bytes": 74132122,
+    "yosys_reached": true,
+    "liveness_comparison_reached": true,
+    "conclusion": "The 40-minute cutoff was an iteration policy rather than a compiler failure. The user-completed extended SCF-to-Calyx run emitted the full artifact; native Calyx and yosys-slang then produced structural utilization evidence."
+  },
+  "yosys_slang_structural_utilization": {
+    "status": "ok",
+    "scope": "pre-proc structural RTL; not technology-mapped FPGA utilization",
+    "top": "main",
+    "top_ports": ["clk", "reset", "go", "done"],
+    "frontend_errors": 0,
+    "frontend_warnings": 0,
+    "wall_seconds": 2851.57,
+    "peak_memory_mb": 25400.48,
+    "num_cells": 5938460,
+    "num_processes": 46982,
+    "num_memories": 10199,
+    "num_memory_bits": 236744916,
+    "num_wire_bits": 57641597,
+    "done_wire_asserted": true,
+    "done_keep_attribute_asserted": true,
+    "ordinary_and_done_kept_stats_identical": true,
+    "deeper_proc_expansion_status": "oom-killed-exit-137",
+    "evidence": "yosys-slang-structural-utilization.json"
   },
   "graph_audit": {
     "status": "fail",

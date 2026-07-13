@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 compile_primitives_to_sv="${CALYX_COMPILE_PRIMITIVES_TO_SV:-$SCRIPT_DIR/calyx_compile_primitives_to_sv.py}"
+normalize_for_export="${CALYX_NORMALIZE_FOR_EXPORT:-$SCRIPT_DIR/normalize_calyx_for_export.py}"
+normalize_futil_constants="${CALYX_NORMALIZE_FUTIL_CONSTANTS:-$SCRIPT_DIR/normalize_futil_float_constants.py}"
 
 circt_translate="${1:?usage: calyx_to_sv <circt-translate> <calyx-bin> <calyx-lib-dir> <calyx-dir> <output-dir>}"
 calyx_bin="${2:?usage: calyx_to_sv <circt-translate> <calyx-bin> <calyx-lib-dir> <calyx-dir> <output-dir>}"
@@ -57,27 +59,35 @@ fi
 
 tmp_export_log="$(mktemp /tmp/calyx_export_XXXXXX.log)"
 tmp_calyx_log="$(mktemp /tmp/calyx_to_sv_XXXXXX.log)"
+tmp_normalized="$(mktemp /tmp/calyx_normalized_XXXXXX.mlir)"
+tmp_exported_futil="$(mktemp /tmp/calyx_exported_XXXXXX.futil)"
 cleanup() {
-  rm -f "$tmp_export_log" "$tmp_calyx_log"
+  rm -f "$tmp_export_log" "$tmp_calyx_log" "$tmp_normalized" "$tmp_exported_futil"
 }
 trap cleanup EXIT
 
 mkdir -p "$output_dir/sv"
 
+python3 "$normalize_for_export" "$input" "$tmp_normalized" \
+  >"$output_dir/logs/normalize-calyx-for-export.log" 2>&1
+
 set +e
-"$circt_translate" --export-calyx "$input" \
-  -o "$output_dir/model.futil" >"$tmp_export_log" 2>&1
+"$circt_translate" --export-calyx "$tmp_normalized" \
+  -o "$tmp_exported_futil" >"$tmp_export_log" 2>&1
 rc=$?
 set -e
 
 cp "$tmp_export_log" "$output_dir/logs/export-calyx.log"
 
-if [[ "$rc" -ne 0 || ! -s "$output_dir/model.futil" ]]; then
+if [[ "$rc" -ne 0 || ! -s "$tmp_exported_futil" ]]; then
   echo "CIRCT Calyx export failed." >&2
   sed -n '1,160p' "$tmp_export_log" >&2
   rm -f "$output_dir/model.futil"
   exit 1
 fi
+
+python3 "$normalize_futil_constants" "$tmp_exported_futil" "$output_dir/model.futil" \
+  >"$output_dir/logs/normalize-futil-float-constants.log" 2>&1
 
 missing_imports=()
 while IFS= read -r import_path; do
@@ -100,6 +110,7 @@ if [[ "${#missing_imports[@]}" -ne 0 ]]; then
 fi
 
 set +e
+ulimit -s unlimited
 "$calyx_bin" "$output_dir/model.futil" \
   -l "$calyx_lib" \
   -b verilog \

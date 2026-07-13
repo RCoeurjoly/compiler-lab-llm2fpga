@@ -22,6 +22,15 @@ module undef #(parameter WIDTH = 32) (
   assign out = 'x;
 endmodule
 
+module std_const #(
+  parameter WIDTH = 32,
+  parameter VALUE = 0
+) (
+  output logic [WIDTH-1:0] out
+);
+  assign out = VALUE;
+endmodule
+
 module std_wire #(parameter WIDTH = 32) (
   input wire logic [WIDTH-1:0] in,
   output logic [WIDTH-1:0] out

@@ -550,6 +550,141 @@ private:
     rewriter.replaceOp(op, roundedF);
   }
 };
+
+struct LowerExactMathForCalyxPass
+    : public PassWrapper<LowerExactMathForCalyxPass, OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerExactMathForCalyxPass)
+
+  StringRef getArgument() const final {
+    return "llm2fpga-lower-exact-math-for-calyx";
+  }
+  StringRef getDescription() const final {
+    return "Lower scalar f32 floor, ceil, and rsqrt to arithmetic supported by "
+           "SCF-to-Calyx.";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<arith::ArithDialect, math::MathDialect>();
+  }
+
+  void runOnOperation() final {
+    SmallVector<Operation *> ops;
+    getOperation().walk([&](Operation *op) {
+      if (isa<math::FloorOp, math::CeilOp, math::RsqrtOp>(op))
+        ops.push_back(op);
+    });
+
+    IRRewriter rewriter(getOperation().getContext());
+    for (Operation *op : ops) {
+      auto floatType = dyn_cast<FloatType>(op->getResult(0).getType());
+      if (!floatType || !floatType.isF32())
+        continue;
+
+      Location loc = op->getLoc();
+      Value input = op->getOperand(0);
+      rewriter.setInsertionPoint(op);
+
+      if (isa<math::RsqrtOp>(op)) {
+        Value one = arith::ConstantOp::create(
+            rewriter, loc, floatType, rewriter.getFloatAttr(floatType, 1.0));
+        Value root = math::SqrtOp::create(rewriter, loc, input);
+        Value result = arith::DivFOp::create(rewriter, loc, one, root);
+        rewriter.replaceOp(op, result);
+        continue;
+      }
+
+      auto intType = rewriter.getI32Type();
+      Value zero = arith::ConstantOp::create(
+          rewriter, loc, intType, rewriter.getIntegerAttr(intType, 0));
+      Value step = arith::ConstantOp::create(
+          rewriter, loc, intType,
+          rewriter.getIntegerAttr(intType, isa<math::FloorOp>(op) ? -1 : 1));
+      Value truncI = arith::FPToSIOp::create(rewriter, loc, intType, input);
+      Value truncF = arith::SIToFPOp::create(rewriter, loc, floatType, truncI);
+      auto predicate = isa<math::FloorOp>(op) ? arith::CmpFPredicate::OLT
+                                              : arith::CmpFPredicate::OGT;
+      Value needsAdjustment =
+          arith::CmpFOp::create(rewriter, loc, predicate, input, truncF);
+      Value adjustment = arith::SelectOp::create(
+          rewriter, loc, needsAdjustment, step, zero);
+      Value roundedI =
+          arith::AddIOp::create(rewriter, loc, truncI, adjustment);
+      Value roundedF =
+          arith::SIToFPOp::create(rewriter, loc, floatType, roundedI);
+      rewriter.replaceOp(op, roundedF);
+    }
+  }
+};
+
+struct LowerScoutMathForCalyxPass
+    : public PassWrapper<LowerScoutMathForCalyxPass, OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerScoutMathForCalyxPass)
+
+  StringRef getArgument() const final {
+    return "llm2fpga-lower-scout-math-for-calyx";
+  }
+  StringRef getDescription() const final {
+    return "Apply explicitly approximate nonlinear arithmetic for the "
+           "provisional resource scout only.";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<arith::ArithDialect, math::MathDialect>();
+  }
+
+  void runOnOperation() final {
+    SmallVector<Operation *> ops;
+    getOperation().walk([&](Operation *op) {
+      if (isa<math::ExpOp, math::PowFOp, math::TanhOp>(op))
+        ops.push_back(op);
+    });
+
+    IRRewriter rewriter(getOperation().getContext());
+    for (Operation *op : ops) {
+      auto floatType = dyn_cast<FloatType>(op->getResult(0).getType());
+      if (!floatType || !floatType.isF32())
+        continue;
+      rewriter.setInsertionPoint(op);
+      Location loc = op->getLoc();
+      Value x = op->getOperand(0);
+
+      if (isa<math::PowFOp>(op)) {
+        // The observed TinyStories GELU graph uses pow(x, 3). This resource
+        // scout deliberately materializes x^3 and is not an equivalence path.
+        Value square = arith::MulFOp::create(rewriter, loc, x, x);
+        Value cube = arith::MulFOp::create(rewriter, loc, square, x);
+        rewriter.replaceOp(op, cube);
+        continue;
+      }
+
+      if (isa<math::ExpOp>(op)) {
+        // First-order exp approximation used only to retain a live arithmetic
+        // datapath during the resource scout.
+        Value one = arith::ConstantOp::create(
+            rewriter, loc, floatType, rewriter.getFloatAttr(floatType, 1.0));
+        Value result = arith::AddFOp::create(rewriter, loc, one, x);
+        rewriter.replaceOp(op, result);
+        continue;
+      }
+
+      // Saturating linear tanh approximation: clamp(x, -1, 1). This is
+      // intentionally provisional and must not be used for equivalence claims.
+      Value negOne = arith::ConstantOp::create(
+          rewriter, loc, floatType, rewriter.getFloatAttr(floatType, -1.0));
+      Value one = arith::ConstantOp::create(
+          rewriter, loc, floatType, rewriter.getFloatAttr(floatType, 1.0));
+      Value below = arith::CmpFOp::create(
+          rewriter, loc, arith::CmpFPredicate::OLT, x, negOne);
+      Value lowerClamped =
+          arith::SelectOp::create(rewriter, loc, below, negOne, x);
+      Value above = arith::CmpFOp::create(
+          rewriter, loc, arith::CmpFPredicate::OGT, lowerClamped, one);
+      Value result =
+          arith::SelectOp::create(rewriter, loc, above, one, lowerClamped);
+      rewriter.replaceOp(op, result);
+    }
+  }
+};
 } // namespace
 
 MLIR_DECLARE_EXPLICIT_TYPE_ID(FoldConstantTruncFOpsPass)
@@ -560,6 +695,10 @@ MLIR_DECLARE_EXPLICIT_TYPE_ID(DropCalyxUnsupportedAssertOpsPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(DropCalyxUnsupportedAssertOpsPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerRoundEvenForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerRoundEvenForCalyxPass)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerExactMathForCalyxPass)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerExactMathForCalyxPass)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerScoutMathForCalyxPass)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerScoutMathForCalyxPass)
 
 extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo mlirGetPassPluginInfo() {
   return {MLIR_PLUGIN_API_VERSION, "LLM2FPGAMLIRPasses", LLVM_VERSION_STRING,
@@ -568,6 +707,8 @@ extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo mlirGetPassPluginInfo() {
             PassRegistration<LowerStaticMemRefViewsForCalyxPass>();
             PassRegistration<DropCalyxUnsupportedAssertOpsPass>();
             PassRegistration<LowerRoundEvenForCalyxPass>();
+            PassRegistration<LowerExactMathForCalyxPass>();
+            PassRegistration<LowerScoutMathForCalyxPass>();
             registerLegalizePt2eTosaZeroPointPass();
           }};
 }

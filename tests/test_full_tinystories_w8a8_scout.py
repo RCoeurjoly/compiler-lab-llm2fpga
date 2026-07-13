@@ -176,6 +176,41 @@ class FullTinyStoriesW8A8ScoutTest(unittest.TestCase):
             flake,
         )
 
+    def test_completed_calyx_scout_records_slang_liveness_evidence(self) -> None:
+        artifact_dir = (
+            REPO_ROOT / "artifacts" / "full-tinystories-pt2e-w8a8-scout"
+        )
+        result = json.loads((artifact_dir / "result.json").read_text(encoding="utf-8"))
+        utilization = json.loads(
+            (artifact_dir / "yosys-slang-structural-utilization.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        doc = (
+            REPO_ROOT
+            / "docs"
+            / "results"
+            / "2026-07-13-full-tinystories-pt2e-w8a8-scout.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(result["status"], "structural-utilization-complete")
+        self.assertTrue(result["downstream"]["systemverilog_generated"])
+        self.assertTrue(result["downstream"]["resource_statistics_available"])
+        self.assertFalse(
+            result["downstream"]["technology_mapped_utilization_available"]
+        )
+        self.assertEqual(utilization["frontend"]["name"], "yosys-slang")
+        self.assertEqual(utilization["frontend"]["errors"], 0)
+        self.assertEqual(utilization["statistics"]["num_cells"], 5_938_460)
+        self.assertEqual(utilization["statistics"]["num_memory_bits"], 236_744_916)
+        self.assertTrue(
+            utilization["liveness_checks"][
+                "ordinary_and_done_kept_stats_identical"
+            ]
+        )
+        self.assertIn("Yosys native SystemVerilog frontend was not used", doc)
+        self.assertIn("not technology-mapped FPGA utilization", doc)
+
 
 if __name__ == "__main__":
     unittest.main()

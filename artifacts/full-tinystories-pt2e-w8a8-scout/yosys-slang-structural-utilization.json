@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-13",
+  "model": "tinystories-w8a8",
+  "pipeline": "pytorch-exported -> torch -> tosa -> validated-tosa -> linalg -> scf -> flat-scf -> calyx -> futil -> systemverilog -> yosys-slang structural stat",
+  "status": "ok",
+  "scope": "pre-proc structural RTL; not technology-mapped FPGA utilization",
+  "frontend": {
+    "name": "yosys-slang",
+    "yosys_version": "0.66",
+    "yosys_git": "7f8fdfd8d7bc08c749a2a969388d3425d4f369d5",
+    "options": ["--threads", "1", "--no-proc", "--max-parse-depth", "1000000", "--top", "main", "--single-unit"],
+    "errors": 0,
+    "warnings": 0
+  },
+  "runtime": {
+    "wall_seconds": 2851.57,
+    "read_slang_seconds": 2837,
+    "peak_memory_mb": 25400.48
+  },
+  "systemverilog": {
+    "main_sv_bytes": 74132122,
+    "main_sv_sha256": "e18cf49d1f0d7b4fd714079314602c106cbd66e015381ae0bce56b69764f5772",
+    "top": "main",
+    "top_ports": ["clk", "reset", "go", "done"]
+  },
+  "liveness_checks": {
+    "top_module_count": 1,
+    "done_wire_count": 1,
+    "done_keep_attribute_count": 1,
+    "ordinary_and_done_kept_stats_identical": true,
+    "ordinary_stat_sha256": "1104fb8cca35d8e1b706962ffb6af8691c6ab772e44c73efabf6b8945b6215fd",
+    "done_kept_stat_sha256": "1104fb8cca35d8e1b706962ffb6af8691c6ab772e44c73efabf6b8945b6215fd"
+  },
+  "statistics": {
+    "num_wires": 5739631,
+    "num_wire_bits": 57641597,
+    "num_public_wires": 2385417,
+    "num_public_wire_bits": 16736975,
+    "num_ports": 4,
+    "num_port_bits": 4,
+    "num_memories": 10199,
+    "num_memory_bits": 236744916,
+    "num_processes": 46982,
+    "num_cells": 5938460,
+    "num_submodules": 0,
+    "num_cells_by_type": {
+      "$add": 51647,
+      "$aldff": 42,
+      "$and": 553375,
+      "$buf": 2644567,
+      "$dff": 61547,
+      "$eq": 322590,
+      "$ge": 3034,
+      "$gt": 45,
+      "$le": 3269,
+      "$logic_and": 259881,
+      "$logic_not": 168437,
+      "$logic_or": 131357,
+      "$lt": 26409,
+      "$memrd_v2": 18265,
+      "$memwr_v2": 34397,
+      "$mul": 1147,
+      "$mux": 708653,
+      "$ne": 3945,
+      "$neg": 2843,
+      "$not": 141056,
+      "$or": 614840,
+      "$reduce_and": 4780,
+      "$reduce_or": 43256,
+      "$shl": 32048,
+      "$shr": 74013,
+      "$sshr": 6212,
+      "$sub": 11941,
+      "$xor": 14864
+    }
+  },
+  "deeper_synthesis_attempt": {
+    "status": "oom-killed",
+    "passes": ["proc", "opt", "memory", "opt_clean"],
+    "exit_status": 137,
+    "approximate_resident_memory_gib": 25.4,
+    "interpretation": "Technology-independent process expansion did not complete; the reported counts are structural frontend counts."
+  }
+}

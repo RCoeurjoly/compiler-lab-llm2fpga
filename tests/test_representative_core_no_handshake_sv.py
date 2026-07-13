@@ -133,6 +133,7 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("--synthesis", script)
         self.assertIn("-d papercut", script)
         self.assertIn("compile.sv", script)
+        self.assertIn("module std_const", generator)
         self.assertIn("CALYX_COMPILE_PRIMITIVES_TO_SV", script)
         self.assertIn("CALYX_COMPILE_PRIMITIVES_TO_SV", pipeline)
         self.assertIn("calyx_compile_primitives_to_sv.py", script)

@@ -135,11 +135,14 @@ let
     '';
 
   mkScfToCalyxDerivation = { name, flatScf }:
-    pkgs.runCommand "${name}-calyx" { buildInputs = [ mlir circt python ]; } ''
+    let
+      scoutMathPass = pkgs.lib.optionalString (name == "tinystories-w8a8")
+        ",llm2fpga-lower-scout-math-for-calyx";
+    in pkgs.runCommand "${name}-calyx" { buildInputs = [ mlir circt python ]; } ''
       tmp_pre_calyx="$(mktemp /tmp/no_handshake_pre_calyx_XXXXXX.mlir)"
       ${mlir}/bin/mlir-opt ${flatScf}/flat.scf.mlir \
         --load-pass-plugin=${mlirPasses}/lib/LLM2FPGAMLIRPasses.so \
-        --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,canonicalize,cse)' \
+        --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx${scoutMathPass},canonicalize,cse)' \
         -o "$tmp_pre_calyx"
       ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
         ${circt}/bin/circt-opt "$tmp_pre_calyx" "$out"
@@ -164,6 +167,8 @@ let
       buildInputs = [ circt calyxTool python ];
     } ''
       export CALYX_COMPILE_PRIMITIVES_TO_SV=${pipelineScripts}/calyx_compile_primitives_to_sv.py
+      export CALYX_NORMALIZE_FOR_EXPORT=${pipelineScripts}/normalize_calyx_for_export.py
+      export CALYX_NORMALIZE_FUTIL_CONSTANTS=${pipelineScripts}/normalize_futil_float_constants.py
       ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
         ${circt}/bin/circt-translate \
         ${calyxTool}/bin/calyx \
