@@ -492,6 +492,19 @@
                 --fail-on-float-after-quantized-matmul
             '';
         };
+        tinystoriesW8A8Pt2eGraphShapeAudit =
+          pkgs.runCommand "tinystories-w8a8-pt2e-graph-shape-audit" { } ''
+            mkdir -p "$out"
+            ${python}/bin/python3 ${
+              ./scripts/pipeline/pt2e_graph_shape_audit.py
+            } \
+              --graph ${
+                pipelineStagePackages."tinystories-w8a8-pytorch-exported"
+              }/graph.txt \
+              --json-out "$out/report.json" \
+              --markdown-out "$out/report.md" \
+              --model-label tinystories-w8a8
+          '';
         resourceBaselineYosysStatMatrix =
           pkgs.runCommand "resource-baseline-yosys-stat-matrix" { } ''
             mkdir -p "$out"
@@ -1605,6 +1618,8 @@
           inherit circt mlir torchMlir yosysPkg modelRegistryJson
             llm2fpgaMlirPasses llm2fpgaCirctPasses calyx;
           "active-pipeline-variants" = activePipelineVariantsJson;
+          "tinystories-w8a8-pt2e-graph-shape-audit" =
+            tinystoriesW8A8Pt2eGraphShapeAudit;
           "resource-baseline-yosys-stat-matrix" =
             resourceBaselineYosysStatMatrix;
           "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence" =
