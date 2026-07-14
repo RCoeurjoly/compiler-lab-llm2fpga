@@ -18,7 +18,7 @@
   "resources": null,
   "route": "PyTorch PT2E W8A8 -> Torch-MLIR -> TOSA -> Linalg -> SCF -> Calyx -> native SV -> Task 3 Xilinx synthesis",
   "schema_version": 1,
-  "stage": "sv-to-rtlil-import",
+  "stage": "native-sv-generation",
   "status": "frontier",
   "toolchain": {
     "schema_version": 1,

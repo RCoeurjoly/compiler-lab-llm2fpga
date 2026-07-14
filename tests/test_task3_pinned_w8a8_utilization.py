@@ -162,6 +162,44 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         self.assertIsNone(result["resources"])
         self.assertFalse(result["downstream"]["technology_mapped_utilization_available"])
 
+    def test_evidence_writer_records_native_sv_generation_frontier(self) -> None:
+        script = ROOT / "scripts/pipeline/write_task3_pinned_utilization_result.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            toolchain = work / "toolchain.json"
+            interface = work / "interface.json"
+            output = work / "result.json"
+            toolchain.write_text(json.dumps({}), encoding="utf-8")
+            interface.write_text(
+                json.dumps({"top": "main_1", "port_count": 1, "port_bits": 1}),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--status",
+                    "frontier",
+                    "--stage",
+                    "native-sv-generation",
+                    "--exit-status",
+                    "1",
+                    "--toolchain-manifest",
+                    str(toolchain),
+                    "--interface",
+                    str(interface),
+                    "--command",
+                    "nix build example",
+                    "--out",
+                    str(output),
+                ],
+                check=True,
+            )
+            result = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["stage"], "native-sv-generation")
+        self.assertEqual(result["completed_stages"], [])
+
     def test_evidence_writer_records_mapped_resources(self) -> None:
         script = ROOT / "scripts/pipeline/write_task3_pinned_utilization_result.py"
         with tempfile.TemporaryDirectory() as tmp:

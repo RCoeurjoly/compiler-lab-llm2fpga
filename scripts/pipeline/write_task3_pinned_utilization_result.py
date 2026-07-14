@@ -50,7 +50,11 @@ def load_json(path: str) -> dict[str, Any]:
 def completed_stages(status: str, stage: str) -> list[str]:
     if status == "mapped" and stage != "stage9":
         raise SystemExit("mapped status requires stage9")
-    if stage in {"sv-to-rtlil-import", "interface-verify"}:
+    if stage in {
+        "native-sv-generation",
+        "sv-to-rtlil-import",
+        "interface-verify",
+    }:
         return []
     try:
         index = STAGE_ORDER.index(stage)
