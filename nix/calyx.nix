@@ -1,9 +1,10 @@
-{ lib, rustPlatform, calyxSrc, hardfloat }:
+{ lib, rustPlatform, makeWrapper, calyxSrc, hardfloat }:
 
 rustPlatform.buildRustPackage rec {
   pname = "calyx";
   version = "0.7.1";
   src = calyxSrc;
+  nativeBuildInputs = [ makeWrapper ];
   cargoLock = {
     lockFile = "${calyxSrc}/Cargo.lock";
     extraRegistries = {
@@ -68,6 +69,8 @@ rustPlatform.buildRustPackage rec {
     mkdir -p "$out/share/calyx/primitives/float/HardFloat-1"
     cp -r ${hardfloat}/. \
       "$out/share/calyx/primitives/float/HardFloat-1/"
+    wrapProgram "$out/bin/calyx" \
+      --set CALYX_PRIMITIVES_DIR "$out/share/calyx"
     test -x "$out/bin/calyx"
     test -f "$out/share/calyx/primitives/float/addFN.futil"
     test -f "$out/share/calyx/primitives/float/fpToInt.futil"

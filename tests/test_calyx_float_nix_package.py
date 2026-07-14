@@ -34,6 +34,9 @@ class CalyxFloatNixPackageTest(unittest.TestCase):
         self.assertNotIn('crates.io/api/v1/crates', calyx)
         self.assertIn('HardFloat-1', calyx)
         self.assertIn('primitives/float/HardFloat-1', calyx)
+        self.assertIn('nativeBuildInputs = [ makeWrapper ];', calyx)
+        self.assertIn('wrapProgram "$out/bin/calyx" \\', calyx)
+        self.assertIn('--set CALYX_PRIMITIVES_DIR "$out/share/calyx"', calyx)
         self.assertIn(HARDFLOAT_HASH, hardfloat)
         self.assertNotIn('get_hardfloat.sh', calyx)
         self.assertNotIn('curl', hardfloat)
@@ -51,18 +54,43 @@ class CalyxFloatNixPackageTest(unittest.TestCase):
         self.assertIn('std_addFN(8, 24, 32)', source)
         self.assertIn("library closure", readme_text)
         self.assertIn("not numerical-equivalence evidence", readme_text)
-        self.assertIn('calyx-float-library-selftest', flake)
-        self.assertIn('module std_addFN', flake)
-        self.assertIn('module fNToRecFN', flake)
-        self.assertIn('yosysSlang', flake)
+        self.assertIn('calyxFloatLibrarySelftest = pkgs.runCommand', flake)
+        self.assertIn('"calyx-float-library-selftest"', flake)
+        self.assertIn('${calyx}/bin/calyx \\', flake)
+        self.assertIn(
+            '${./reproducers/calyx-float-library-selftest/input.futil} \\', flake
+        )
+        self.assertIn('-l ${calyx}/share/calyx \\', flake)
+        self.assertIn('nativeBuildInputs = [ calyx yosysPkg python ];', flake)
+        self.assertIn('${python}/bin/python3 - "$out/main.sv" <<\'PY\'', flake)
+        self.assertIn('Path(sys.argv[1]).read_text(encoding="utf-8")', flake)
+        self.assertIn('for module in ("std_addFN", "fNToRecFN"):', flake)
+        self.assertIn(
+            're.search(r"module\\s+" + re.escape(module) + r"\\b", source)',
+            flake,
+        )
+        self.assertNotIn("grep -q 'module std_addFN'", flake)
+        self.assertNotIn("grep -q 'module fNToRecFN'", flake)
+        self.assertIn('${yosysPkg}/bin/yosys \\', flake)
+        self.assertIn('-m ${yosysSlang}/share/yosys/plugins/slang.so \\', flake)
+        self.assertIn('"calyx-float-library" = calyxFloatLibrarySelftest;', flake)
 
     def test_float_exports_use_the_tested_main_sv_closure(self) -> None:
         script = (ROOT / "scripts/pipeline/calyx_to_sv_no_handshake.sh").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn('primitives/float/*', script)
-        self.assertIn('"$output_dir/sv/main.sv" >"$output_dir/sources.f"', script)
+        self.assertIn('uses_float_extern=0', script)
+        self.assertIn(
+            'if [[ "$import_path" == primitives/float/* ]]; then', script
+        )
+        self.assertNotIn('primitives/float.futil', script)
+        self.assertIn('if [[ "$uses_float_extern" -eq 1 ]]; then', script)
+        self.assertIn('printf \'%s\\n\' "$output_dir/sv/main.sv" >"$output_dir/sources.f"', script)
+        self.assertIn('"$output_dir/sv/compile.sv"', script)
+        self.assertIn('$calyx_lib/primitives/core.sv', script)
+        self.assertIn('$calyx_lib/primitives/binary_operators.sv', script)
+        self.assertIn('$calyx_lib/primitives/memories/seq.sv', script)
         self.assertNotIn('mktemp /tmp/calyx_', script)
 
 

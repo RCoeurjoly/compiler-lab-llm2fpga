@@ -57,12 +57,14 @@ if [[ ! -f "$input" ]]; then
   exit 2
 fi
 
-tmp_export_log="$(mktemp /tmp/calyx_export_XXXXXX.log)"
-tmp_calyx_log="$(mktemp /tmp/calyx_to_sv_XXXXXX.log)"
-tmp_normalized="$(mktemp /tmp/calyx_normalized_XXXXXX.mlir)"
-tmp_exported_futil="$(mktemp /tmp/calyx_exported_XXXXXX.futil)"
+scratch_dir="$(mktemp -d "$output_dir/.calyx-native-sv.XXXXXX")"
+tmp_export_log="$scratch_dir/export.log"
+tmp_calyx_log="$scratch_dir/native-calyx.log"
+tmp_normalized="$scratch_dir/normalized.mlir"
+tmp_exported_futil="$scratch_dir/model.futil"
 cleanup() {
   rm -f "$tmp_export_log" "$tmp_calyx_log" "$tmp_normalized" "$tmp_exported_futil"
+  rmdir "$scratch_dir"
 }
 trap cleanup EXIT
 
@@ -90,9 +92,13 @@ python3 "$normalize_futil_constants" "$tmp_exported_futil" "$output_dir/model.fu
   >"$output_dir/logs/normalize-futil-float-constants.log" 2>&1
 
 missing_imports=()
+uses_float_extern=0
 while IFS= read -r import_path; do
   if [[ ! -f "$calyx_lib/$import_path" ]]; then
     missing_imports+=("$import_path")
+  fi
+  if [[ "$import_path" == primitives/float/* ]]; then
+    uses_float_extern=1
   fi
 done < <(sed -n 's/^import "\([^"]*\)";$/\1/p' "$output_dir/model.futil")
 
@@ -129,10 +135,6 @@ if [[ "$rc" -ne 0 || ! -s "$output_dir/sv/main.sv" ]]; then
   rm -f "$output_dir/sv/main.sv"
   exit 1
 fi
-
-python3 "$compile_primitives_to_sv" \
-  --compile-futil "$calyx_lib/primitives/compile.futil" \
-  --output "$output_dir/sv/compile.sv"
 
 set +e
 "$calyx_bin" "$output_dir/model.futil" \
@@ -173,13 +175,20 @@ if external:
 Path(sys.argv[2]).write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
 PY
 
-cat >"$output_dir/sources.f" <<EOF
+if [[ "$uses_float_extern" -eq 1 ]]; then
+  printf '%s\n' "$output_dir/sv/main.sv" >"$output_dir/sources.f"
+else
+  python3 "$compile_primitives_to_sv" \
+    --compile-futil "$calyx_lib/primitives/compile.futil" \
+    --output "$output_dir/sv/compile.sv"
+  cat >"$output_dir/sources.f" <<EOF
 $output_dir/sv/compile.sv
 $calyx_lib/primitives/core.sv
 $calyx_lib/primitives/binary_operators.sv
 $calyx_lib/primitives/memories/seq.sv
 $output_dir/sv/main.sv
 EOF
+fi
 
 cat >"$output_dir/manifest.json" <<'JSON'
 {"backend":"native-calyx","resources":"resources.json","stage":"calyx-sv","status":"ok","sources":"sources.f"}

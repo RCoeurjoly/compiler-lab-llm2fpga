@@ -181,6 +181,33 @@
           calyxSrc = inputs.calyx-src;
           inherit hardfloat;
         };
+        calyxFloatLibrarySelftest = pkgs.runCommand
+          "calyx-float-library-selftest" {
+            nativeBuildInputs = [ calyx yosysPkg python ];
+          } ''
+            mkdir -p "$out"
+            ${calyx}/bin/calyx \
+              ${./reproducers/calyx-float-library-selftest/input.futil} \
+              -l ${calyx}/share/calyx \
+              -b verilog --synthesis --nested -d papercut \
+              -o "$out/main.sv" >"$out/calyx.log" 2>&1
+            test -s "$out/main.sv"
+            ${python}/bin/python3 - "$out/main.sv" <<'PY'
+            import re
+            import sys
+            from pathlib import Path
+
+            source = Path(sys.argv[1]).read_text(encoding="utf-8")
+            for module in ("std_addFN", "fNToRecFN"):
+                if not re.search(r"module\s+" + re.escape(module) + r"\b", source):
+                    raise SystemExit(f"missing module definition: {module}")
+            PY
+            printf '%s\n' "$out/main.sv" >"$out/sources.f"
+            ${yosysPkg}/bin/yosys \
+              -m ${yosysSlang}/share/yosys/plugins/slang.so \
+              -p "read_slang --threads 1 --no-proc --max-parse-depth 20000 --top main $out/main.sv; hierarchy -top main -check; stat" \
+              >"$out/yosys-slang.log" 2>&1
+          '';
 
         pipelineScripts = ./scripts/pipeline;
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
@@ -1727,6 +1754,7 @@
           inherit circt mlir torchMlir yosysPkg modelRegistryJson
             llm2fpgaMlirPasses llm2fpgaTorchMlirPasses llm2fpgaCirctPasses
             calyx;
+          "calyx-float-library-selftest" = calyxFloatLibrarySelftest;
           "active-pipeline-variants" = activePipelineVariantsJson;
           "tinystories-w8a8-pt2e-graph-shape-audit" =
             tinystoriesW8A8Pt2eGraphShapeAudit;
@@ -1769,7 +1797,10 @@
         } // pipelineStagePackages // pipelineMetadataPackages
           // quantizedLinalgDiagnosticPackages // pipelineAliasPackages;
 
-        checks.default = modelRegistryJson;
+        checks = {
+          default = modelRegistryJson;
+          "calyx-float-library" = calyxFloatLibrarySelftest;
+        };
 
         devShells.default = pkgs.mkShell {
           packages = [
