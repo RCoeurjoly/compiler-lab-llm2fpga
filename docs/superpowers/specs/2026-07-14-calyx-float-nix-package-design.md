@@ -1,0 +1,123 @@
+# Reproducible Calyx Float-Library Package Design
+
+## Objective
+
+Replace the current crates.io-only Calyx package with an in-tree, fully pinned
+Nix package that can satisfy the floating-point Futil imports emitted by the
+current CIRCT Calyx exporter. The package must include the native Calyx
+compiler, the complete upstream primitive library, and the compatible
+HardFloat RTL source tree.
+
+The immediate success condition is a small, reproducible native-Calyx float
+test that reaches `yosys-slang` through an explicit source file list. The
+full TinyStories PT2E W8A8 -> TOSA -> no-Handshake -> Calyx route is retried
+only after that package-level boundary works.
+
+## Evidence and root cause
+
+The current package in `nix/calyx.nix` builds the crates.io `calyx` 0.7.1
+crate and copies its bundled `primitives/` tree into the package output. That
+tree lacks `primitives/float/`, so the native-SV exporter correctly stops when
+CIRCT-generated Futil imports `primitives/float.futil` and float wrapper
+files such as `primitives/float/addFN.futil`.
+
+Upstream Calyx `v0.7.1` also lacks that directory. A later upstream source
+revision, `07a0dc19269cb28b869693eb9d1c8a2f12bc3a78`, contains the precise
+float Futil files and SystemVerilog wrappers requested by the exporter.
+Those wrappers instantiate Berkeley HardFloat modules. Upstream's helper
+script obtains `HardFloat-1.zip` dynamically over HTTP; that dynamic script
+is not acceptable as a project dependency.
+
+The current native-SV script also writes a fixed source list containing only
+the core, binary-operator, and sequential-memory primitives. Resolving the
+Futil imports alone would therefore be insufficient: the resulting list must
+also supply the float wrapper SV and the HardFloat modules to `yosys-slang`.
+
+## Options considered
+
+1. Build a pinned upstream Calyx source revision and a separately
+   fixed-hash HardFloat archive in Nix. Install both as one library bundle and
+   generate a complete deterministic source list. This is the selected
+   approach.
+2. Overlay only the newer `primitives/float` directory onto the existing
+   crates.io compiler package. This is smaller, but it leaves an unproven
+   compiler/library version mismatch and provides no principled HardFloat
+   provenance.
+3. Copy the needed Futil and SystemVerilog files into this repository. This
+   would make the files visible, but creates an unmaintained fork of Calyx and
+   HardFloat. It is rejected.
+
+## Selected design
+
+### Pinned source and library closure
+
+Add a non-flake `calyx-src` input locked to upstream revision
+`07a0dc19269cb28b869693eb9d1c8a2f12bc3a78`. Use it as the source of the
+local `calyx` package rather than fetching a crates.io archive. The Nix lock
+records the exact upstream tree; no source clone, compiler build, or library
+assembly is performed manually outside the repository's Nix expressions.
+
+Add a small `nix/hardfloat.nix` fixed-output derivation. It fetches the exact
+archive expected by Calyx with a content hash, unpacks it during the Nix build,
+and exposes only the `HardFloat-1` tree. The Calyx package copies that tree to
+the path expected by upstream wrappers:
+
+```text
+$out/share/calyx/primitives/float/HardFloat-1
+```
+
+The Calyx package installs the entire upstream `primitives/` hierarchy,
+including `float.futil`, all `float/*.futil` files, wrapper SystemVerilog, and
+the HardFloat source tree. It retains an explicit package version/provenance
+record so a result can identify the Calyx revision and HardFloat fixed-output
+input.
+
+No build may run upstream `get_hardfloat.sh`, `curl`, or an unpinned source
+fetch. The only durable inputs are the locked flake source, Nix expression,
+and fixed content hash; build products live in the Nix store. New pipeline
+work must not make `/tmp` a source of truth. Any scratch files are scoped to
+their derivation and removed after their declared output has been produced.
+
+### Native-SV source-list closure
+
+Keep the existing Futil import audit immediately after CIRCT export. Extend
+the native-SV path so `sources.f` is derived from the actual imported
+primitive set, not a fixed three-file list. For each required float import it
+must include the corresponding Calyx wrapper SV, the HardFloat source files,
+and the required include search paths in a deterministic order.
+
+The generator must preserve the established integer-only source list for
+integer pipelines and must not silently omit an imported primitive. It should
+fail with a clear diagnostic on an import that has no known synthesizable SV
+closure. The full generated file list, rather than an undocumented shell
+environment, is the contract consumed by the Task 3 `yosys-slang` route.
+
+### Verification ladder
+
+Tests precede package changes. They must establish that:
+
+1. the flake declares and locks the upstream Calyx source;
+2. `nix/calyx.nix` installs the float Futil directory and the separately
+   pinned HardFloat tree;
+3. the package exposes every Futil path currently imported by the CIRCT
+   exporter;
+4. a minimal float Futil fixture compiles through native Calyx and produces a
+   deterministic source list; and
+5. `yosys-slang` can read that exact source list without missing modules or
+   include files.
+
+Only after the small self-test passes will the existing full-model derivation
+be rerun. A full-model failure remains a recorded compiler frontier; it is not
+papered over by changing quantization, lowering, memory externalization, or
+the model interface in this package task.
+
+## Scope and non-goals
+
+This change restores a reproducible Calyx float-library dependency boundary.
+It does not claim that the W8A8 model is integer-only, that its floating-point
+operations are desirable hardware, that native Calyx handles every exported
+operation, or that TinyStories is functionally equivalent to SystemVerilog.
+Those questions remain separate milestones.
+
+The existing user modification to `docs/glossary.md` is outside this work and
+must remain untouched.
