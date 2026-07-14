@@ -12,6 +12,10 @@
       url = "github:fossi-foundation/nix-eda";
       inputs.nixpkgs.follows = "nixpkgs-nix-eda";
     };
+    calyx-src = {
+      url = "github:calyxir/calyx/5a4303847392609cad83dda6f4bdffc8cc0e5c89";
+      flake = false;
+    };
     task3-main-pipeline.url = "path:./task3-main";
   };
 
@@ -172,7 +176,11 @@
           mlir = circtMlir;
           llvm = circtLlvm;
         };
-        calyx = pkgs.callPackage ./nix/calyx.nix { };
+        hardfloat = pkgsLlvm21.callPackage ./nix/hardfloat.nix { };
+        calyx = pkgsLlvm21.callPackage ./nix/calyx.nix {
+          calyxSrc = inputs.calyx-src;
+          inherit hardfloat;
+        };
 
         pipelineScripts = ./scripts/pipeline;
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;

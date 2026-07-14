@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CALYX_REV = "5a4303847392609cad83dda6f4bdffc8cc0e5c89"
 HARDFLOAT_HASH = "sha256-azdXyfv6IjDGorhGBeOTcstYnddQDpecTwuOzIoDsUs="
+DAP_GIT_HASH = "sha256-oJHeY9Hm8DMC1T9flRyjf6EmBcJc3tuvcPlZXtHTGqs="
 
 
 class CalyxFloatNixPackageTest(unittest.TestCase):
@@ -20,6 +21,17 @@ class CalyxFloatNixPackageTest(unittest.TestCase):
         self.assertIn('pkgsLlvm21.callPackage ./nix/calyx.nix', flake)
         self.assertIn('calyxSrc = inputs.calyx-src;', flake)
         self.assertIn('src = calyxSrc;', calyx)
+        self.assertIn('cargoLock = {', calyx)
+        self.assertIn('lockFile = "${calyxSrc}/Cargo.lock";', calyx)
+        self.assertIn('"https://github.com/rust-lang/crates.io-index"', calyx)
+        self.assertIn('"https://static.crates.io/crates"', calyx)
+        self.assertIn(f'"dap-0.4.1-alpha1" = "{DAP_GIT_HASH}";', calyx)
+        self.assertIn('preBuild = \'\'', calyx)
+        self.assertIn('$0 ~ /^\\[source\\./ && state == 1', calyx)
+        self.assertIn('checking for redundant crates.io source stanza', calyx)
+        self.assertIn('removed redundant crates.io source stanza', calyx)
+        self.assertNotIn('cargoHash', calyx)
+        self.assertNotIn('crates.io/api/v1/crates', calyx)
         self.assertIn('HardFloat-1', calyx)
         self.assertIn('primitives/float/HardFloat-1', calyx)
         self.assertIn(HARDFLOAT_HASH, hardfloat)
@@ -34,8 +46,11 @@ class CalyxFloatNixPackageTest(unittest.TestCase):
         self.assertTrue(fixture.exists())
         self.assertTrue(readme.exists())
         source = fixture.read_text(encoding="utf-8")
+        readme_text = readme.read_text(encoding="utf-8")
         self.assertIn('import "primitives/float/addFN.futil";', source)
         self.assertIn('std_addFN(8, 24, 32)', source)
+        self.assertIn("library closure", readme_text)
+        self.assertIn("not numerical-equivalence evidence", readme_text)
         self.assertIn('calyx-float-library-selftest', flake)
         self.assertIn('module std_addFN', flake)
         self.assertIn('module fNToRecFN', flake)

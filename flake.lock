@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "calyx-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1746217889,
+        "narHash": "sha256-KhhauTPaiheDajXsjYPt6U2xOe2r6PovMimGCgLofmk=",
+        "owner": "calyxir",
+        "repo": "calyx",
+        "rev": "5a4303847392609cad83dda6f4bdffc8cc0e5c89",
+        "type": "github"
+      },
+      "original": {
+        "owner": "calyxir",
+        "repo": "calyx",
+        "rev": "5a4303847392609cad83dda6f4bdffc8cc0e5c89",
+        "type": "github"
+      }
+    },
     "circt-nix": {
       "inputs": {
         "circt-src": "circt-src",
@@ -496,6 +513,7 @@
     },
     "root": {
       "inputs": {
+        "calyx-src": "calyx-src",
         "circt-nix": "circt-nix",
         "flake-utils": "flake-utils_2",
         "nix-eda": "nix-eda",
