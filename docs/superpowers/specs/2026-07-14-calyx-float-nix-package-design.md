@@ -21,17 +21,20 @@ tree lacks `primitives/float/`, so the native-SV exporter correctly stops when
 CIRCT-generated Futil imports `primitives/float.futil` and float wrapper
 files such as `primitives/float/addFN.futil`.
 
-Upstream Calyx `v0.7.1` also lacks that directory. A later upstream source
-revision, `07a0dc19269cb28b869693eb9d1c8a2f12bc3a78`, contains the precise
-float Futil files and SystemVerilog wrappers requested by the exporter.
-Those wrappers instantiate Berkeley HardFloat modules. Upstream's helper
-script obtains `HardFloat-1.zip` dynamically over HTTP; that dynamic script
-is not acceptable as a project dependency.
+Upstream Calyx `v0.7.1` also lacks that directory. The first later upstream
+source revision that contains every Futil file requested by the current CIRCT
+exporter is `5a4303847392609cad83dda6f4bdffc8cc0e5c89`. It contains the
+precise float Futil files and SystemVerilog wrappers requested by the
+exporter. Those wrappers instantiate Berkeley HardFloat modules. Upstream's
+helper script obtains `HardFloat-1.zip` dynamically over HTTP; that dynamic
+script is not acceptable as a project dependency.
 
-The current native-SV script also writes a fixed source list containing only
-the core, binary-operator, and sequential-memory primitives. Resolving the
-Futil imports alone would therefore be insufficient: the resulting list must
-also supply the float wrapper SV and the HardFloat modules to `yosys-slang`.
+The selected Calyx backend embeds Morty as a Rust dependency. When it detects
+float externs, Morty resolves the Calyx wrappers, HardFloat source directory,
+and RISC-V include directory, then pickles that closure into the emitted SV.
+The native-SV package self-test must prove that the resulting source list is
+complete for `yosys-slang`; it must not rely on an unverified hand-maintained
+HardFloat file list.
 
 ## Options considered
 
@@ -52,10 +55,15 @@ also supply the float wrapper SV and the HardFloat modules to `yosys-slang`.
 ### Pinned source and library closure
 
 Add a non-flake `calyx-src` input locked to upstream revision
-`07a0dc19269cb28b869693eb9d1c8a2f12bc3a78`. Use it as the source of the
+`5a4303847392609cad83dda6f4bdffc8cc0e5c89`. Use it as the source of the
 local `calyx` package rather than fetching a crates.io archive. The Nix lock
 records the exact upstream tree; no source clone, compiler build, or library
 assembly is performed manually outside the repository's Nix expressions.
+
+This Calyx revision declares Rust 1.85. The root Nixpkgs input supplies Rust
+1.77.2, so build the package from the already-pinned LLVM21 Nixpkgs scope,
+which supplies Rust 1.91.1. The package remains a normal local flake output;
+only its Rust build platform changes.
 
 Add a small `nix/hardfloat.nix` fixed-output derivation. It fetches the exact
 archive expected by Calyx with a content hash, unpacks it during the Nix build,
@@ -80,17 +88,19 @@ their derivation and removed after their declared output has been produced.
 
 ### Native-SV source-list closure
 
-Keep the existing Futil import audit immediately after CIRCT export. Extend
-the native-SV path so `sources.f` is derived from the actual imported
-primitive set, not a fixed three-file list. For each required float import it
-must include the corresponding Calyx wrapper SV, the HardFloat source files,
-and the required include search paths in a deterministic order.
+Keep the existing Futil import audit immediately after CIRCT export. Do not
+hand-enumerate the HardFloat closure in the pipeline: the selected native
+Calyx backend uses its embedded Morty library to resolve and pickle float
+externs into the emitted `main.sv`. The package installs HardFloat at exactly
+the path Morty checks.
 
-The generator must preserve the established integer-only source list for
-integer pipelines and must not silently omit an imported primitive. It should
-fail with a clear diagnostic on an import that has no known synthesizable SV
-closure. The full generated file list, rather than an undocumented shell
-environment, is the contract consumed by the Task 3 `yosys-slang` route.
+The self-test establishes the smallest deterministic `sources.f` accepted by
+`yosys-slang` for a real float operator. The native-SV script then uses that
+tested closure for float exports while retaining the established integer-only
+list for integer pipelines. It must fail with a clear diagnostic on an import
+that has no known synthesizable SV closure. The full generated file list,
+rather than an undocumented shell environment, is the contract consumed by
+the Task 3 `yosys-slang` route.
 
 ### Verification ladder
 
