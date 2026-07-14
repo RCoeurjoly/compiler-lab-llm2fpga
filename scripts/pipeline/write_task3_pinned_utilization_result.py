@@ -48,20 +48,31 @@ def load_json(path: str) -> dict[str, Any]:
 
 
 def completed_stages(status: str, stage: str) -> list[str]:
+    if status == "mapped" and stage != "stage9":
+        raise SystemExit("mapped status requires stage9")
     if stage in {"sv-to-rtlil-import", "interface-verify"}:
         return []
     try:
         index = STAGE_ORDER.index(stage)
     except ValueError as error:
         raise SystemExit(f"unrecognized Task 3 stage: {stage}") from error
-    if status == "mapped" and stage != "stage9":
-        raise SystemExit("mapped status requires stage9")
     end = index + 1 if status == "mapped" else index
     return STAGE_ORDER[:end]
 
 
+def validate_result(status: str, stage: str, exit_status: int) -> None:
+    if status == "mapped":
+        if stage != "stage9":
+            raise SystemExit("mapped status requires stage9")
+        if exit_status != 0:
+            raise SystemExit("mapped status requires exit status 0")
+    elif exit_status == 0:
+        raise SystemExit("frontier status requires a nonzero exit status")
+
+
 def main() -> None:
     args = parse_args()
+    validate_result(args.status, args.stage, args.exit_status)
     toolchain = load_json(args.toolchain_manifest)
     interface = load_json(args.interface)
     if args.status == "mapped" and not args.utilization_summary:

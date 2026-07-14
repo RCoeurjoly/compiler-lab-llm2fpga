@@ -219,6 +219,125 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         self.assertEqual(result["resources"]["clb_luts"]["used"], 12)
         self.assertTrue(result["downstream"]["technology_mapped_utilization_available"])
 
+    def test_evidence_writer_rejects_mapped_interface_verify_stage(self) -> None:
+        script = ROOT / "scripts/pipeline/write_task3_pinned_utilization_result.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            toolchain = work / "toolchain.json"
+            interface = work / "interface.json"
+            utilization = work / "summary.json"
+            output = work / "result.json"
+            toolchain.write_text(json.dumps({}), encoding="utf-8")
+            interface.write_text(
+                json.dumps({"top": "main_1", "port_count": 1, "port_bits": 1}),
+                encoding="utf-8",
+            )
+            utilization.write_text(json.dumps({"resources": {}}), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--status",
+                    "mapped",
+                    "--stage",
+                    "interface-verify",
+                    "--exit-status",
+                    "0",
+                    "--toolchain-manifest",
+                    str(toolchain),
+                    "--interface",
+                    str(interface),
+                    "--utilization-summary",
+                    str(utilization),
+                    "--command",
+                    "nix build example",
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_evidence_writer_rejects_mapped_nonzero_exit_status(self) -> None:
+        script = ROOT / "scripts/pipeline/write_task3_pinned_utilization_result.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            toolchain = work / "toolchain.json"
+            interface = work / "interface.json"
+            utilization = work / "summary.json"
+            output = work / "result.json"
+            toolchain.write_text(json.dumps({}), encoding="utf-8")
+            interface.write_text(
+                json.dumps({"top": "main_1", "port_count": 1, "port_bits": 1}),
+                encoding="utf-8",
+            )
+            utilization.write_text(json.dumps({"resources": {}}), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--status",
+                    "mapped",
+                    "--stage",
+                    "stage9",
+                    "--exit-status",
+                    "137",
+                    "--toolchain-manifest",
+                    str(toolchain),
+                    "--interface",
+                    str(interface),
+                    "--utilization-summary",
+                    str(utilization),
+                    "--command",
+                    "nix build example",
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_evidence_writer_rejects_frontier_zero_exit_status(self) -> None:
+        script = ROOT / "scripts/pipeline/write_task3_pinned_utilization_result.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            toolchain = work / "toolchain.json"
+            interface = work / "interface.json"
+            output = work / "result.json"
+            toolchain.write_text(json.dumps({}), encoding="utf-8")
+            interface.write_text(
+                json.dumps({"top": "main_1", "port_count": 1, "port_bits": 1}),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--status",
+                    "frontier",
+                    "--stage",
+                    "stage2",
+                    "--exit-status",
+                    "0",
+                    "--toolchain-manifest",
+                    str(toolchain),
+                    "--interface",
+                    str(interface),
+                    "--command",
+                    "nix build example",
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
