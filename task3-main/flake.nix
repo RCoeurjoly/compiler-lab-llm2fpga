@@ -293,6 +293,40 @@
             fi
           '';
 
+        mkTask3RtlilFromSlangFilelist = { name, svFilelist, topName
+          , postReadCommands ? [ ], quiet ? false, memoryLimitKb ? null }:
+          pkgs.runCommand "${name}.il" { } ''
+            {
+              printf 'read_slang --threads 1 --no-proc --max-parse-depth 20000 --top %q' \
+                ${topName}
+              while IFS= read -r line; do
+                if [ -z "''${line//[[:space:]]/}" ]; then
+                  continue
+                fi
+                if [ "''${line#\#}" != "$line" ]; then
+                  continue
+                fi
+                printf ' %q' "$line"
+              done < ${svFilelist}
+              printf '\n'
+              printf '%s\n' "hierarchy -top ${topName} -check"
+              printf '%s\n' "${builtins.concatStringsSep "\n" postReadCommands}"
+              printf '%s\n' "write_rtlil $out"
+            } > run.ys
+
+            ${pkgs.lib.optionalString (memoryLimitKb != null) ''
+              ulimit -v ${toString memoryLimitKb}
+            ''}
+            ${yosysPkg}/bin/yosys ${pkgs.lib.optionalString quiet "-q"} \
+              -m ${yosysSlang}/share/yosys/plugins/slang.so -s run.ys
+
+            if [ ! -e "$out" ]; then
+              echo "mkTask3RtlilFromSlangFilelist did not create $out" >&2
+              cat run.ys >&2
+              exit 1
+            fi
+          '';
+
         mkSynthStageIl = { name, stageId, stageLabel, inputIl, topName
           , topSv ? null, quiet ? false, memoryLimitKb ? null, preCommands ? [ ]
           , commands }:
@@ -564,6 +598,41 @@
               --capacity-bram-kb ${toString capacities.bram_kb}
           '';
 
+        task3Toolchain = {
+          manifest = pkgs.writeText "task3-yosys-toolchain.json"
+            (builtins.toJSON {
+              schema_version = 1;
+              source = "task3-main";
+              yosys = {
+                source_rev = (builtins.fromJSON
+                  (builtins.readFile ./flake.lock)).nodes.yosys.locked.rev;
+                package_version = yosysPkg.version;
+              };
+              yosys_slang = {
+                source_rev = (builtins.fromJSON (builtins.readFile
+                  ./flake.lock)).nodes."yosys-slang".locked.rev;
+                package_version = yosysSlang.version;
+              };
+            });
+          yosys = yosysPkg;
+          yosysSlang = yosysSlang;
+        };
+
+        mkTask3XilinxUtilization = { name, modelIl, topName, capacities
+          , topSv ? null, quiet ? false, memoryLimitKb ? null }:
+          let
+            stages = mkSynthJsonStages {
+              inherit name modelIl topName topSv quiet memoryLimitKb;
+            };
+            utilization = mkMappedJsonUtilizationReport {
+              inherit name capacities topName;
+              designJson = stages.json;
+            };
+          in {
+            inherit stages utilization;
+            json = stages.json;
+          };
+
         mkExternalizedMemoryPlan =
           { name, modelIl, minModuleBits ? (128 * 1024) }:
           pkgs.runCommand "${name}-external-memory-plan" { } ''
@@ -625,20 +694,20 @@
           name = "docs-md";
           runtimeInputs = [ pkgs.pandoc pkgs.coreutils ];
           text = ''
-          set -euo pipefail
+            set -euo pipefail
 
-          repo="$(pwd -P)"
-          if [ "$#" -gt 0 ]; then
-            repo="$1"
-          fi
-          repo="$(cd "$repo" && pwd -P)"
+            repo="$(pwd -P)"
+            if [ "$#" -gt 0 ]; then
+              repo="$1"
+            fi
+            repo="$(cd "$repo" && pwd -P)"
 
-          while IFS= read -r src; do
-            [ -f "$src" ] || continue
-            dst="''${src%.org}.md"
-            pandoc "$src" -f org -t gfm -o "$dst"
-          done < <(printf '%s\n' "$repo/README.org" "$repo"/deliverables/*.org "$repo"/docs/*.org)
-          echo "Generated markdown docs in: $repo"
+            while IFS= read -r src; do
+              [ -f "$src" ] || continue
+              dst="''${src%.org}.md"
+              pandoc "$src" -f org -t gfm -o "$dst"
+            done < <(printf '%s\n' "$repo/README.org" "$repo"/deliverables/*.org "$repo"/docs/*.org)
+            echo "Generated markdown docs in: $repo"
           '';
         };
 
@@ -710,23 +779,15 @@
             ${pkgs.python311}/bin/python3 ${
               ./scripts/pipeline/compare_task3_representative_core_parity.py
             } \
-              --baseline-dir ${
-                tinyStories1mBaselineFloatSelftestAllMemory.utilizationReport
-              } \
-              --candidate-dir ${
-                tinyStoriesRepresentativeCoreSelftestAllMemory.utilizationReport
-              } \
+              --baseline-dir ${tinyStories1mBaselineFloatSelftestAllMemory.utilizationReport} \
+              --candidate-dir ${tinyStoriesRepresentativeCoreSelftestAllMemory.utilizationReport} \
               --shape-json ${./representative-core-parity-shapes.json} \
               --baseline-label tiny-stories-1m-baseline-float-selftest-all-memory-utilization \
               --candidate-label tinystories-representative-core-task3-baseline-float-selftest-all-memory-utilization \
               --summary-json "$out/parity-summary.json" \
               --summary-md "$out/parity-summary.md"
-            cp ${
-              tinyStories1mBaselineFloatSelftestAllMemory.utilizationReport
-            }/summary.json "$out/baseline-summary.json"
-            cp ${
-              tinyStoriesRepresentativeCoreSelftestAllMemory.utilizationReport
-            }/summary.json "$out/representative-core-summary.json"
+            cp ${tinyStories1mBaselineFloatSelftestAllMemory.utilizationReport}/summary.json "$out/baseline-summary.json"
+            cp ${tinyStoriesRepresentativeCoreSelftestAllMemory.utilizationReport}/summary.json "$out/representative-core-summary.json"
           '';
 
         matmulSelftestTop = ./fpga/rtl/matmul_selftest_top.sv;
@@ -840,6 +901,11 @@
         };
 
         formatter = pkgs.nixfmt-classic;
+
+        lib = {
+          inherit mkTask3RtlilFromSlangFilelist mkTask3XilinxUtilization
+            task3Toolchain;
+        };
 
         packages = {
           matmul-sv-sim = matmulSvSim;
