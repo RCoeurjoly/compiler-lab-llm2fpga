@@ -1,5 +1,21 @@
 # Current Baseline
 
+## Full TinyStories PT2E W8A8, Task 3 pinned Calyx utilization frontier
+
+Recorded on 2026-07-14.
+
+- Target package: `tinystories-w8a8-via-tosa-no-handshake-calyx-task3-utilization`
+- Target device: XC7K480T
+- Status: `frontier` at `native-sv-generation`
+- Result: no mapped resource estimate
+
+The Task 3 pinned route reached `lower-scf-to-calyx`, then stopped during
+native-SV generation because CIRCT-exported Futil depends on float primitive
+files absent from the pinned Calyx 0.7.1 library. RTLIL, Yosys, mapped resource
+estimation, nextpnr, board validation, and equivalence did not run. This is a
+compiler compatibility frontier, not an out-of-context resource estimate. See
+the [bounded Task 3 result report](results/2026-07-14-tinystories-w8a8-calyx-task3-utilization.md).
+
 ## Full TinyStories PT2E W8A8, TOSA Handshake scout
 
 Recorded on 2026-07-13.

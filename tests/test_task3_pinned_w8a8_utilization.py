@@ -376,6 +376,22 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
 
+    def test_current_baseline_and_adr_keep_task3_result_scoped(self) -> None:
+        baseline = read("docs/current-baseline.md")
+        adr = read("docs/adr/2026-07-13-calyx-memory-blackbox-diagnostic.md")
+
+        self.assertIn(
+            "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-utilization",
+            baseline,
+        )
+        self.assertIn("XC7K480T", baseline)
+        self.assertIn("native-sv-generation", baseline)
+        self.assertIn("no mapped resource estimate", baseline)
+        self.assertIn("Task 3 pinned", adr)
+        self.assertIn("not a final mapped utilization result", adr)
+        self.assertIn("native-SV generation", adr)
+        self.assertNotIn("already prove that this", adr)
+
 
 if __name__ == "__main__":
     unittest.main()
