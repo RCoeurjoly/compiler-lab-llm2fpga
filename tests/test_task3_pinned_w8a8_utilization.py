@@ -576,21 +576,28 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
 
     def test_committed_toolchain_manifest_matches_task3_lock_pins(self) -> None:
+        manifest = json.loads(
+            read(
+                "artifacts/tinystories-w8a8-calyx-task3-utilization/"
+                "task3-yosys-toolchain.json"
+            )
+        )
         result = json.loads(
             read("artifacts/tinystories-w8a8-calyx-task3-utilization/result.json")
         )
         lock = json.loads(read("task3-main/flake.lock"))
 
-        self.assertEqual(result["toolchain"]["schema_version"], 1)
-        self.assertEqual(result["toolchain"]["source"], "task3-main")
+        self.assertEqual(manifest["schema_version"], 1)
+        self.assertEqual(manifest["source"], "task3-main")
         self.assertEqual(
-            result["toolchain"]["yosys"]["source_rev"],
+            manifest["yosys"]["source_rev"],
             lock["nodes"]["yosys"]["locked"]["rev"],
         )
         self.assertEqual(
-            result["toolchain"]["yosys_slang"]["source_rev"],
+            manifest["yosys_slang"]["source_rev"],
             lock["nodes"]["yosys-slang"]["locked"]["rev"],
         )
+        self.assertEqual(result["toolchain"], manifest)
 
     def test_current_baseline_and_adr_keep_task3_result_scoped(self) -> None:
         result = json.loads(
