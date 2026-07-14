@@ -73,6 +73,8 @@ class CalyxFloatNixPackageTest(unittest.TestCase):
         self.assertNotIn("grep -q 'module fNToRecFN'", flake)
         self.assertIn('${yosysPkg}/bin/yosys \\', flake)
         self.assertIn('-m ${yosysSlang}/share/yosys/plugins/slang.so \\', flake)
+        self.assertIn('read_slang --threads 1 --no-proc --max-parse-depth 20000 --top main $out/main.sv', flake)
+        self.assertIn('hierarchy -top main -check', flake)
         self.assertIn('"calyx-float-library" = calyxFloatLibrarySelftest;', flake)
 
     def test_float_exports_use_the_tested_main_sv_closure(self) -> None:
