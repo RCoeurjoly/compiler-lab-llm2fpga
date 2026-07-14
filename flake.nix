@@ -22,6 +22,7 @@
         pkgs = import nixpkgs { inherit system; };
         task3MainPackages =
           inputs.task3-main-pipeline.packages.${system};
+        task3MainLib = inputs.task3-main-pipeline.lib.${system};
         pkgsLlvm21 = import nixpkgs-llvm21 {
           inherit system;
           config.allowUnfreePredicate = pkg:
@@ -570,6 +571,48 @@
           dsp = 1920;
           bram36 = 955;
           bram_kb = 34380;
+        };
+        task3W8A8RouteName = "tinystories-w8a8-via-tosa-no-handshake-calyx-task3";
+        task3W8A8CalyxSv =
+          pipelineAliasPackages."tinystories-w8a8-via-tosa-no-handshake-calyx-native-sv";
+        task3W8A8ExpectedInterface =
+          pkgs.writeText "${task3W8A8RouteName}-expected-interface.json"
+          (builtins.toJSON {
+            schema_version = 1;
+            verification = "expected-unverified";
+            top = "main_1";
+            port_count = 12802;
+            port_bits = 115933;
+            required_outputs = [ "done" ];
+          });
+        task3W8A8Main1Il = task3MainLib.mkTask3RtlilFromSlangFilelist {
+          name = "${task3W8A8RouteName}-main1";
+          svFilelist = "${task3W8A8CalyxSv}/sources.f";
+          topName = "main_1";
+          quiet = true;
+          postReadCommands = [
+            "select -assert-count 1 main_1"
+            "select -assert-count 1 main_1/w:done"
+          ];
+        };
+        task3W8A8Main1Interface =
+          pkgs.runCommand "${task3W8A8RouteName}-main1-interface.json" { } ''
+            ${python}/bin/python3 ${
+              ./scripts/pipeline/verify_rtlil_top_interface.py
+            } \
+              --rtlil ${task3W8A8Main1Il} \
+              --top main_1 \
+              --expected-port-count 12802 \
+              --expected-port-bits 115933 \
+              --required-output done \
+              --out "$out"
+          '';
+        task3W8A8Synthesis = task3MainLib.mkTask3XilinxUtilization {
+          name = task3W8A8RouteName;
+          modelIl = task3W8A8Main1Il;
+          topName = "main_1";
+          capacities = task3TinyStoriesCapacities;
+          quiet = true;
         };
         task3BaselineFloatReference =
           ./references/task3/tiny-stories-1m-baseline-float-selftest-all-memory-utilization;
@@ -1638,6 +1681,18 @@
             resourceBaselineYosysStatMatrix;
           "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence" =
             tinystoriesIntegerSvEquivalenceReport;
+          "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-main1-il" =
+            task3W8A8Main1Il;
+          "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-main1-interface" =
+            task3W8A8Main1Interface;
+          "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-expected-interface" =
+            task3W8A8ExpectedInterface;
+          "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-stage1" =
+            task3W8A8Synthesis.stages.stage1;
+          "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-stage2" =
+            task3W8A8Synthesis.stages.stage2;
+          "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-toolchain-manifest" =
+            task3MainLib.task3Toolchain.manifest;
           "tiny-stories-1m-baseline-float-selftest-all-memory-utilization" =
             task3MainPackages."tiny-stories-1m-baseline-float-selftest-all-memory-utilization";
           "tiny-stories-1m-baseline-float-selftest-all-memory-live-utilization" =
