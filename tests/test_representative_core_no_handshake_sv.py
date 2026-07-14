@@ -272,7 +272,12 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn('version = "0.7.1"', derivation)
-        self.assertIn("cargoHash =", derivation)
+        self.assertIn("cargoLock =", derivation)
+        self.assertIn("outputHashes = {", derivation)
+        self.assertIn(
+            '"dap-0.4.1-alpha1" = "sha256-oJHeY9Hm8DMC1T9flRyjf6EmBcJc3tuvcPlZXtHTGqs=";',
+            derivation,
+        )
         self.assertIn("CALYX_PRIMITIVES_DIR", derivation)
         self.assertIn("calyxTool", pipeline)
         self.assertIn("circt-translate", pipeline)
