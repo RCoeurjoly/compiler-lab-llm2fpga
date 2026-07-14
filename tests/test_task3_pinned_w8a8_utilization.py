@@ -13,6 +13,22 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
+def normalize_whitespace(prose: str) -> str:
+    return " ".join(prose.split())
+
+
+def select_level_two_section(document: str, heading: str) -> str:
+    start = document.index(f"## {heading}")
+    end = document.find("\n## ", start + 1)
+    return document[start:] if end == -1 else document[start:end]
+
+
+def select_paragraph_starting_with(document: str, opening: str) -> str:
+    start = document.index(opening)
+    end = document.find("\n\n", start)
+    return document[start:] if end == -1 else document[start:end]
+
+
 class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
     def test_nested_task3_flake_exports_pinned_import_and_mapping_api(self) -> None:
         flake = read("task3-main/flake.nix")
@@ -415,17 +431,51 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         self.assertIn("native-SV generation", adr)
         self.assertIn("FPGA fit remains unresolved", adr)
 
+        baseline_scope = select_level_two_section(
+            baseline,
+            "Full TinyStories PT2E W8A8, Task 3 pinned Calyx utilization frontier",
+        )
+        adr_scope = select_paragraph_starting_with(
+            adr,
+            "Those pre-mapping counts are a structural diagnostic",
+        )
         structural_fit_claim = (
-            r"(?i)\b(?:structural|pre-mapping)\b[^.\n]*"
-            r"\b(?:proves?|confirms?)\b[^.\n]*"
+            r"(?i)\b(?:structural|pre-mapping)\b[^.]*"
+            r"\b(?:proves?|confirms?)\b[^.]*"
             r"\b(?:does\s+not\s+|non-?)?fit\b"
+        )
+        self.assertRegex(
+            normalize_whitespace(
+                "Structural evidence\nconfirms the kernel does not fit"
+            ),
+            structural_fit_claim,
+        )
+        fixture = (
+            "## Historical W8A8 run\n\n"
+            "Structural evidence confirms the kernel does not fit.\n\n"
+            "## Full TinyStories PT2E W8A8, Task 3 pinned Calyx utilization frontier\n\n"
+            "FPGA fit remains unresolved.\n\n"
+            "## Later material\n\n"
+            "Unrelated historical context.\n"
+        )
+        self.assertRegex(normalize_whitespace(fixture), structural_fit_claim)
+        self.assertNotRegex(
+            normalize_whitespace(
+                select_level_two_section(
+                    fixture,
+                    "Full TinyStories PT2E W8A8, Task 3 pinned Calyx utilization frontier",
+                )
+            ),
+            structural_fit_claim,
         )
         for path, prose in {
             "result report": report,
-            "current baseline": baseline,
-            "ADR": adr,
+            "current baseline W8A8 section": baseline_scope,
+            "ADR Task 3 scope paragraph": adr_scope,
         }.items():
-            self.assertNotRegex(prose, structural_fit_claim, path)
+            self.assertNotRegex(
+                normalize_whitespace(prose), structural_fit_claim, path
+            )
 
 
 if __name__ == "__main__":
