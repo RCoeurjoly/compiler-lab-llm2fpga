@@ -8,6 +8,7 @@ Recorded on 2026-07-14.
 - Target device: XC7K480T
 - Status: `frontier` at `native-sv-generation`
 - Result: no mapped resource estimate
+- Compact evidence: `completed_stages: []`; `resources: null`; FPGA fit remains unresolved.
 
 The Task 3 pinned route reached `lower-scf-to-calyx`, then stopped during
 native-SV generation because CIRCT-exported Futil depends on float primitive

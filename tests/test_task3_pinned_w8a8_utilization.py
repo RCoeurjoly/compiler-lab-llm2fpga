@@ -377,9 +377,27 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
 
     def test_current_baseline_and_adr_keep_task3_result_scoped(self) -> None:
+        result = json.loads(
+            read("artifacts/tinystories-w8a8-calyx-task3-utilization/result.json")
+        )
+        report = read(
+            "docs/results/2026-07-14-tinystories-w8a8-calyx-task3-utilization.md"
+        )
         baseline = read("docs/current-baseline.md")
         adr = read("docs/adr/2026-07-13-calyx-memory-blackbox-diagnostic.md")
 
+        self.assertEqual(result["status"], "frontier")
+        self.assertEqual(result["stage"], "native-sv-generation")
+        self.assertEqual(result["completed_stages"], [])
+        self.assertEqual(result["exit_status"], 1)
+        self.assertIsNone(result["resources"])
+
+        self.assertIn('status: "frontier"', report)
+        self.assertIn("completed_stages: []", report)
+        self.assertIn('"native-sv-generation"', report)
+        self.assertIn("exit_status: 1", report)
+        self.assertIn("resources: null", report)
+        self.assertIn("No mapped resource estimate exists", report)
         self.assertIn(
             "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-utilization",
             baseline,
@@ -387,10 +405,27 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         self.assertIn("XC7K480T", baseline)
         self.assertIn("native-sv-generation", baseline)
         self.assertIn("no mapped resource estimate", baseline)
+        self.assertIn(
+            "Compact evidence: `completed_stages: []`; `resources: null`; "
+            "FPGA fit remains unresolved.",
+            baseline,
+        )
         self.assertIn("Task 3 pinned", adr)
         self.assertIn("not a final mapped utilization result", adr)
         self.assertIn("native-SV generation", adr)
-        self.assertNotIn("already prove that this", adr)
+        self.assertIn("FPGA fit remains unresolved", adr)
+
+        structural_fit_claim = (
+            r"(?i)\b(?:structural|pre-mapping)\b[^.\n]*"
+            r"\b(?:proves?|confirms?)\b[^.\n]*"
+            r"\b(?:does\s+not\s+|non-?)?fit\b"
+        )
+        for path, prose in {
+            "result report": report,
+            "current baseline": baseline,
+            "ADR": adr,
+        }.items():
+            self.assertNotRegex(prose, structural_fit_claim, path)
 
 
 if __name__ == "__main__":
