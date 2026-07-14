@@ -1,0 +1,36 @@
+{
+  "command": "nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-task3-main1-il --out-link /tmp/llm2fpga-gcroots/tinystories-w8a8-calyx-task3-main1-il -L",
+  "completed_stages": [],
+  "downstream": {
+    "ddr3_controller_present": false,
+    "equivalence_attempted": false,
+    "nextpnr_attempted": false,
+    "technology_mapped_utilization_available": false
+  },
+  "exit_status": 1,
+  "external_memory_boundary": {
+    "logical_memories": 2133,
+    "port_bits": 115933,
+    "port_count": 12802,
+    "verification": "expected-unverified"
+  },
+  "monitor_summary": "command: nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-task3-main1-il --out-link /tmp/llm2fpga-gcroots/tinystories-w8a8-calyx-task3-main1-il -L \nexit_status: 1\nwall_seconds: 13899\nsample_interval_seconds: 5\npeak_vmrss_kb: 567136\npeak_vmrss_pid: 2238579\npeak_vmrss_name: nix\npeak_vmhwm_kb: 567136\npeak_vmhwm_pid: 2238579\npeak_vmhwm_name: nix\nlast_stage_line: \n",
+  "resources": null,
+  "route": "PyTorch PT2E W8A8 -> Torch-MLIR -> TOSA -> Linalg -> SCF -> Calyx -> native SV -> Task 3 Xilinx synthesis",
+  "schema_version": 1,
+  "stage": "sv-to-rtlil-import",
+  "status": "frontier",
+  "toolchain": {
+    "schema_version": 1,
+    "source": "task3-main",
+    "yosys": {
+      "package_version": "unstable-4716f441",
+      "source_rev": "4716f4410f1508cad384d2f8542ada9f61bb7339"
+    },
+    "yosys_slang": {
+      "package_version": "flake-input",
+      "source_rev": "d82b0b163a725fc1a401fbb6b465cd862517ec1f"
+    }
+  },
+  "top": "main_1"
+}

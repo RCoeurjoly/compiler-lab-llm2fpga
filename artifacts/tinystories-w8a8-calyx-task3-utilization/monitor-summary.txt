@@ -1,0 +1,11 @@
+command: nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-task3-main1-il --out-link /tmp/llm2fpga-gcroots/tinystories-w8a8-calyx-task3-main1-il -L 
+exit_status: 1
+wall_seconds: 13899
+sample_interval_seconds: 5
+peak_vmrss_kb: 567136
+peak_vmrss_pid: 2238579
+peak_vmrss_name: nix
+peak_vmhwm_kb: 567136
+peak_vmhwm_pid: 2238579
+peak_vmhwm_name: nix
+last_stage_line: 
