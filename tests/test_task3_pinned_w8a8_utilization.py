@@ -111,6 +111,114 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         self.assertNotIn("task3W8A8Synthesis = mkTask3SynthJsonStages", flake)
         self.assertNotIn("task3W8A8Main1Il = mkTask3YosysRtlil", flake)
 
+    def test_evidence_writer_records_a_frontier_without_resources(self) -> None:
+        script = ROOT / "scripts/pipeline/write_task3_pinned_utilization_result.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            toolchain = work / "toolchain.json"
+            interface = work / "interface.json"
+            output = work / "result.json"
+            toolchain.write_text(
+                json.dumps(
+                    {
+                        "yosys": {"source_rev": "pin"},
+                        "yosys_slang": {"source_rev": "slang"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            interface.write_text(
+                json.dumps(
+                    {"top": "main_1", "port_count": 12802, "port_bits": 115933}
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--status",
+                    "frontier",
+                    "--stage",
+                    "stage2",
+                    "--exit-status",
+                    "137",
+                    "--toolchain-manifest",
+                    str(toolchain),
+                    "--interface",
+                    str(interface),
+                    "--command",
+                    "nix build example",
+                    "--out",
+                    str(output),
+                ],
+                check=True,
+            )
+            result = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["status"], "frontier")
+        self.assertEqual(result["stage"], "stage2")
+        self.assertEqual(result["completed_stages"], ["stage1"])
+        self.assertIsNone(result["resources"])
+        self.assertFalse(result["downstream"]["technology_mapped_utilization_available"])
+
+    def test_evidence_writer_records_mapped_resources(self) -> None:
+        script = ROOT / "scripts/pipeline/write_task3_pinned_utilization_result.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            toolchain = work / "toolchain.json"
+            interface = work / "interface.json"
+            utilization = work / "summary.json"
+            output = work / "result.json"
+            toolchain.write_text(
+                json.dumps({"yosys": {"source_rev": "pin"}}), encoding="utf-8"
+            )
+            interface.write_text(
+                json.dumps(
+                    {"top": "main_1", "port_count": 12802, "port_bits": 115933}
+                ),
+                encoding="utf-8",
+            )
+            utilization.write_text(
+                json.dumps(
+                    {
+                        "resources": {
+                            "clb_luts": {"used": 12, "capacity": 298600}
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--status",
+                    "mapped",
+                    "--stage",
+                    "stage9",
+                    "--exit-status",
+                    "0",
+                    "--toolchain-manifest",
+                    str(toolchain),
+                    "--interface",
+                    str(interface),
+                    "--utilization-summary",
+                    str(utilization),
+                    "--command",
+                    "nix build example",
+                    "--out",
+                    str(output),
+                ],
+                check=True,
+            )
+            result = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["status"], "mapped")
+        self.assertEqual(result["completed_stages"][-1], "stage9")
+        self.assertEqual(result["resources"]["clb_luts"]["used"], 12)
+        self.assertTrue(result["downstream"]["technology_mapped_utilization_available"])
+
 
 if __name__ == "__main__":
     unittest.main()

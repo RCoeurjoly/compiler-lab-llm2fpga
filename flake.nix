@@ -614,6 +614,51 @@
           capacities = task3TinyStoriesCapacities;
           quiet = true;
         };
+        task3W8A8Manifest = pkgs.writeText
+          "${task3W8A8RouteName}-manifest.json"
+          (builtins.toJSON {
+            schema_version = 1;
+            route =
+              "PT2E W8A8 -> TOSA -> no Handshake -> Calyx native SV -> Task 3";
+            top = "main_1";
+            source_filelist = "${task3W8A8CalyxSv}/sources.f";
+            logical_external_memories = 2133;
+            expected_port_count = 12802;
+            expected_port_bits = 115933;
+            stage_order = [
+              "stage1"
+              "stage2"
+              "stage3"
+              "stage4"
+              "stage5"
+              "stage6"
+              "stage7"
+              "stage8"
+              "stage9"
+            ];
+          });
+        task3W8A8UtilizationBundle = pkgs.runCommand
+          "${task3W8A8RouteName}-utilization" { } ''
+            mkdir -p "$out"
+            cp ${task3W8A8Manifest} "$out/manifest.json"
+            cp ${task3W8A8Main1Interface} "$out/interface.json"
+            cp ${task3MainLib.task3Toolchain.manifest} \
+              "$out/task3-yosys-toolchain.json"
+            cp ${task3W8A8Synthesis.utilization}/summary.json "$out/summary.json"
+            cp ${task3W8A8Synthesis.utilization}/summary.txt "$out/summary.txt"
+            cp ${task3W8A8Synthesis.utilization}/stat.json "$out/stat.json"
+            ${python}/bin/python3 ${
+              ./scripts/pipeline/write_task3_pinned_utilization_result.py
+            } \
+              --status mapped \
+              --stage stage9 \
+              --exit-status 0 \
+              --toolchain-manifest ${task3MainLib.task3Toolchain.manifest} \
+              --interface ${task3W8A8Main1Interface} \
+              --utilization-summary ${task3W8A8Synthesis.utilization}/summary.json \
+              --command "nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-task3-utilization -L" \
+              --out "$out/result.json"
+          '';
         task3BaselineFloatReference =
           ./references/task3/tiny-stories-1m-baseline-float-selftest-all-memory-utilization;
         task3RepresentativeCoreShapeMetadata =
@@ -1693,6 +1738,8 @@
             task3W8A8Synthesis.stages.stage2;
           "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-toolchain-manifest" =
             task3MainLib.task3Toolchain.manifest;
+          "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-utilization" =
+            task3W8A8UtilizationBundle;
           "tiny-stories-1m-baseline-float-selftest-all-memory-utilization" =
             task3MainPackages."tiny-stories-1m-baseline-float-selftest-all-memory-utilization";
           "tiny-stories-1m-baseline-float-selftest-all-memory-live-utilization" =
