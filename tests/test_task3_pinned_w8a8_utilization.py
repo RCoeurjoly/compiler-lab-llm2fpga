@@ -234,6 +234,89 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         self.assertEqual(result["stage"], "native-sv-generation")
         self.assertEqual(result["completed_stages"], [])
 
+    def test_evidence_writer_rejects_boolean_toolchain_schema_version(self) -> None:
+        script = ROOT / "scripts/pipeline/write_task3_pinned_utilization_result.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            toolchain = work / "toolchain.json"
+            interface = work / "interface.json"
+            output = work / "result.json"
+            invalid_toolchain = valid_toolchain_manifest()
+            invalid_toolchain["schema_version"] = True
+            toolchain.write_text(json.dumps(invalid_toolchain), encoding="utf-8")
+            interface.write_text(
+                json.dumps(valid_interface_manifest("expected-unverified")),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--status",
+                    "frontier",
+                    "--stage",
+                    "native-sv-generation",
+                    "--exit-status",
+                    "1",
+                    "--toolchain-manifest",
+                    str(toolchain),
+                    "--interface",
+                    str(interface),
+                    "--command",
+                    "nix build example",
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("toolchain manifest schema", result.stderr)
+
+    def test_evidence_writer_rejects_boolean_interface_schema_version(self) -> None:
+        script = ROOT / "scripts/pipeline/write_task3_pinned_utilization_result.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            toolchain = work / "toolchain.json"
+            interface = work / "interface.json"
+            output = work / "result.json"
+            invalid_interface = valid_interface_manifest("expected-unverified")
+            invalid_interface["schema_version"] = True
+            toolchain.write_text(
+                json.dumps(valid_toolchain_manifest()), encoding="utf-8"
+            )
+            interface.write_text(json.dumps(invalid_interface), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--status",
+                    "frontier",
+                    "--stage",
+                    "native-sv-generation",
+                    "--exit-status",
+                    "1",
+                    "--toolchain-manifest",
+                    str(toolchain),
+                    "--interface",
+                    str(interface),
+                    "--command",
+                    "nix build example",
+                    "--out",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("interface manifest schema", result.stderr)
+
     def test_evidence_writer_records_mapped_resources(self) -> None:
         script = ROOT / "scripts/pipeline/write_task3_pinned_utilization_result.py"
         with tempfile.TemporaryDirectory() as tmp:

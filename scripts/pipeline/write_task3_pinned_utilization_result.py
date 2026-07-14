@@ -82,7 +82,11 @@ def validate_result(status: str, stage: str, exit_status: int) -> None:
 
 
 def validate_toolchain_manifest(toolchain: dict[str, Any]) -> None:
-    if toolchain.get("schema_version") != 1 or toolchain.get("source") != "task3-main":
+    if (
+        type(toolchain.get("schema_version")) is not int
+        or toolchain["schema_version"] != 1
+        or toolchain.get("source") != "task3-main"
+    ):
         raise SystemExit("invalid toolchain manifest schema or source")
     for name, revision, display_name in [
         ("yosys", YOSYS_REV, "Yosys"),
@@ -105,7 +109,10 @@ def validate_toolchain_manifest(toolchain: dict[str, Any]) -> None:
 def validate_interface_manifest(
     interface: dict[str, Any], status: str, stage: str
 ) -> None:
-    if interface.get("schema_version") != 1:
+    if (
+        type(interface.get("schema_version")) is not int
+        or interface["schema_version"] != 1
+    ):
         raise SystemExit("invalid interface manifest schema version")
     if interface.get("top") != "main_1":
         raise SystemExit("invalid interface manifest top")
