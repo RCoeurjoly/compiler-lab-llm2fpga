@@ -24,6 +24,13 @@ STAGE_ORDER = [
     "stage8",
     "stage9",
 ]
+YOSYS_REV = "4716f4410f1508cad384d2f8542ada9f61bb7339"
+YOSYS_SLANG_REV = "d82b0b163a725fc1a401fbb6b465cd862517ec1f"
+PRE_IMPORT_FRONTIERS = {
+    "native-sv-generation",
+    "sv-to-rtlil-import",
+    "interface-verify",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -74,11 +81,72 @@ def validate_result(status: str, stage: str, exit_status: int) -> None:
         raise SystemExit("frontier status requires a nonzero exit status")
 
 
+def validate_toolchain_manifest(toolchain: dict[str, Any]) -> None:
+    if toolchain.get("schema_version") != 1 or toolchain.get("source") != "task3-main":
+        raise SystemExit("invalid toolchain manifest schema or source")
+    for name, revision, display_name in [
+        ("yosys", YOSYS_REV, "Yosys"),
+        ("yosys_slang", YOSYS_SLANG_REV, "yosys-slang"),
+    ]:
+        package = toolchain.get(name)
+        if not isinstance(package, dict):
+            raise SystemExit(f"invalid toolchain manifest: missing {display_name} object")
+        package_version = package.get("package_version")
+        if not isinstance(package_version, str) or not package_version.strip():
+            raise SystemExit(
+                f"invalid toolchain manifest: {display_name} package_version is required"
+            )
+        if package.get("source_rev") != revision:
+            raise SystemExit(
+                f"invalid toolchain manifest: {display_name} source revision must equal {revision}"
+            )
+
+
+def validate_interface_manifest(
+    interface: dict[str, Any], status: str, stage: str
+) -> None:
+    if interface.get("schema_version") != 1:
+        raise SystemExit("invalid interface manifest schema version")
+    if interface.get("top") != "main_1":
+        raise SystemExit("invalid interface manifest top")
+    if interface.get("port_count") != 12802 or type(interface["port_count"]) is not int:
+        raise SystemExit("invalid interface manifest port count")
+    if interface.get("port_bits") != 115933 or type(interface["port_bits"]) is not int:
+        raise SystemExit("invalid interface manifest port bits")
+    required_outputs = interface.get("required_outputs")
+    if not isinstance(required_outputs, list) or "done" not in required_outputs:
+        raise SystemExit("invalid interface manifest required output")
+    verification = interface.get("verification")
+    if verification not in {"expected-unverified", "verified-after-import"}:
+        raise SystemExit("invalid interface manifest verification")
+    if verification == "verified-after-import":
+        direction_counts = interface.get("direction_counts")
+        if not isinstance(direction_counts, dict) or any(
+            type(direction_counts.get(direction)) is not int
+            or direction_counts[direction] < 0
+            for direction in ("input", "output")
+        ):
+            raise SystemExit("invalid verified interface manifest direction counts")
+    if status == "mapped" or stage in STAGE_ORDER:
+        if verification != "verified-after-import":
+            raise SystemExit(
+                "invalid interface manifest: mapped results and Task 3 stages "
+                "require verification verified-after-import"
+            )
+    elif stage in PRE_IMPORT_FRONTIERS and verification != "expected-unverified":
+        raise SystemExit(
+            "invalid interface manifest: pre-import frontiers require verification "
+            "expected-unverified"
+        )
+
+
 def main() -> None:
     args = parse_args()
     validate_result(args.status, args.stage, args.exit_status)
     toolchain = load_json(args.toolchain_manifest)
     interface = load_json(args.interface)
+    validate_toolchain_manifest(toolchain)
+    validate_interface_manifest(interface, args.status, args.stage)
     if args.status == "mapped" and not args.utilization_summary:
         raise SystemExit("--utilization-summary is required for mapped status")
     if args.status == "frontier" and args.utilization_summary:
