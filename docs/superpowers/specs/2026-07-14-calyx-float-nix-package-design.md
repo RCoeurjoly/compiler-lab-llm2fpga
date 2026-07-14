@@ -121,6 +121,34 @@ be rerun. A full-model failure remains a recorded compiler frontier; it is not
 papered over by changing quantization, lowering, memory externalization, or
 the model interface in this package task.
 
+## Verified package outcome (Task 4)
+
+The package boundary was verified on 2026-07-14 with the named Nix
+derivation:
+
+```text
+nix build .#calyx-float-library-selftest -L
+```
+
+The command exited 0 and produced
+`/nix/store/7cafwhjb6srwb05pvh46c6amd2xlyds6-calyx-float-library-selftest`.
+Its derivation-produced `main.sv`, `sources.f`, `calyx.log`, and
+`yosys-slang.log` confirm that the fixture reached `yosys-slang`; the latter
+reports `Build succeeded: 0 errors, 0 warnings` for top `main`.
+
+This result uses Calyx revision
+`5a4303847392609cad83dda6f4bdffc8cc0e5c89` from the locked `calyx-src`
+input, built in the `pkgsLlvm21` package scope. HardFloat remains the
+fixed-output archive with hash
+`sha256-azdXyfv6IjDGorhGBeOTcstYnddQDpecTwuOzIoDsUs=` and is installed at
+`$out/share/calyx/primitives/float/HardFloat-1` in the Calyx package (observed
+package output:
+`/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1`).
+
+The fixture establishes only the Calyx/HardFloat library and native-SV source
+closure. It is not evidence that the full TinyStories W8A8 route emits SV,
+that Yosys accepts that full design, or that it fits an FPGA.
+
 ## Scope and non-goals
 
 This change restores a reproducible Calyx float-library dependency boundary.
