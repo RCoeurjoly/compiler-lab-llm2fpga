@@ -12,6 +12,9 @@ SCRIPT = ROOT / "task3-main" / "scripts" / "pipeline" / "write_nextpnr_xilinx_re
 RTLIL_FILTER = (
     ROOT / "task3-main" / "scripts" / "pipeline" / "filter_rtlil_modules.py"
 )
+UTILIZATION_REPORT = (
+    ROOT / "task3-main" / "scripts" / "pipeline" / "write_utilization_report.py"
+)
 
 
 class DirectLinalgXc7k480tUtilizationTest(unittest.TestCase):
@@ -161,6 +164,78 @@ class DirectLinalgXc7k480tUtilizationTest(unittest.TestCase):
         )
         self.assertEqual(payload["route"]["reason"], "nextpnr exited with status 1")
         self.assertEqual(payload["fasm"]["status"], "missing")
+
+    def test_utilization_counts_boxed_xilinx_modules_as_leaf_primitives(self) -> None:
+        design = {
+            "modules": {
+                "main": {
+                    "cells": {
+                        "lut": {"type": "LUT6"},
+                        "register": {"type": "FDRE"},
+                        "wrapper": {"type": "wrapper"},
+                    }
+                },
+                "LUT6": {
+                    "attributes": {"blackbox": "1"},
+                    "cells": {"simulation_body": {"type": "$not"}},
+                },
+                "FDRE": {
+                    "attributes": {"whitebox": "1"},
+                    "cells": {"simulation_body": {"type": "$dff"}},
+                },
+                "wrapper": {"cells": {"small_lut": {"type": "LUT2"}}},
+                "LUT2": {
+                    "attributes": {"blackbox": "1"},
+                    "cells": {"simulation_body": {"type": "$not"}},
+                },
+            }
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            design_json = work / "design.json"
+            summary_json = work / "summary.json"
+            summary_txt = work / "summary.txt"
+            stat_json = work / "stat.json"
+            design_json.write_text(json.dumps(design), encoding="utf-8")
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(UTILIZATION_REPORT),
+                    "--design-json",
+                    str(design_json),
+                    "--top",
+                    "main",
+                    "--summary-json",
+                    str(summary_json),
+                    "--summary-txt",
+                    str(summary_txt),
+                    "--stat-json",
+                    str(stat_json),
+                    "--capacity-slices",
+                    "100",
+                    "--capacity-clb-luts",
+                    "100",
+                    "--capacity-clb-ffs",
+                    "100",
+                    "--capacity-dsp",
+                    "10",
+                    "--capacity-bram36",
+                    "10",
+                    "--capacity-bram-kb",
+                    "360",
+                ],
+                check=True,
+            )
+            summary = json.loads(summary_json.read_text(encoding="utf-8"))
+            stats = json.loads(stat_json.read_text(encoding="utf-8"))
+
+        self.assertEqual(summary["resources"]["clb_luts"]["used"], 2)
+        self.assertEqual(summary["resources"]["clb_ffs"]["used"], 1)
+        self.assertEqual(
+            stats["top_leaf_cell_counts"],
+            {"FDRE": 1, "LUT2": 1, "LUT6": 1},
+        )
 
     def test_nested_flake_exports_report_helper_with_pinned_pnr_inputs(self) -> None:
         flake = (ROOT / "task3-main" / "flake.nix").read_text(encoding="utf-8")

@@ -51,6 +51,13 @@ def cell_counts(module: dict[str, Any]) -> Counter[str]:
     return counts
 
 
+def is_boxed_module(module: dict[str, Any]) -> bool:
+    attributes = module.get("attributes")
+    return isinstance(attributes, dict) and (
+        "blackbox" in attributes or "whitebox" in attributes
+    )
+
+
 def leaf_counts(
     modules: dict[str, dict[str, Any]],
     name: str,
@@ -67,7 +74,7 @@ def leaf_counts(
     stack.add(name)
     counts: Counter[str] = Counter()
     for cell_type, instances in cell_counts(modules[name]).items():
-        if cell_type not in modules:
+        if cell_type not in modules or is_boxed_module(modules[cell_type]):
             counts[cell_type] += instances
             continue
         for leaf_type, leaves_per_instance in leaf_counts(modules, cell_type, memo, stack).items():
