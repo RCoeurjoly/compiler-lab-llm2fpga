@@ -633,6 +633,38 @@
             json = stages.json;
           };
 
+        mkTask3XilinxPnrReport = { name, xdc, designJson }:
+          pkgs.runCommand "${name}-nextpnr-xilinx-report" { } ''
+            mkdir -p "$out"
+            : > "$out/nextpnr.log"
+            : > "$out/stdout.log"
+            : > "$out/stderr.log"
+
+            # Preserve a machine-readable frontier for callers even if P&R
+            # fails; successful routing is defined by route.json, not this
+            # derivation's exit status alone.
+            set +e
+            ${openXC7Nextpnr}/bin/nextpnr-xilinx \
+              --chipdb "${fpgaChipdb}" \
+              --xdc "${xdc}" \
+              --json "${designJson}" \
+              --fasm "$out/design.fasm" \
+              --log "$out/nextpnr.log" \
+              >"$out/stdout.log" 2>"$out/stderr.log"
+            route_exit_status=$?
+            set -e
+
+            ${pkgs.python311}/bin/python3 ${
+              ./scripts/pipeline/write_nextpnr_xilinx_report.py
+            } \
+              --nextpnr-log "$out/nextpnr.log" \
+              --stdout-log "$out/stdout.log" \
+              --stderr-log "$out/stderr.log" \
+              --exit-status "$route_exit_status" \
+              --fasm "$out/design.fasm" \
+              --out "$out/route.json"
+          '';
+
         mkExternalizedMemoryPlan =
           { name, modelIl, minModuleBits ? (128 * 1024) }:
           pkgs.runCommand "${name}-external-memory-plan" { } ''
@@ -904,7 +936,7 @@
 
         lib = {
           inherit mkTask3RtlilFromSlangFilelist mkTask3XilinxUtilization
-            task3Toolchain;
+            mkTask3XilinxPnrReport task3Toolchain;
         };
 
         packages = {
