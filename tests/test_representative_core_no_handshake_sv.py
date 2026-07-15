@@ -115,6 +115,8 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn('"num_memory_bits": 4580', baseline)
         self.assertIn('"num_cells": 43269', baseline)
         self.assertIn('"num_memory_bits": 4644', baseline)
+        self.assertIn("historical / pre-current-source-pin", baseline)
+        self.assertIn("pending-rerun", baseline)
         self.assertIn("mkIlDerivation", pipeline)
         self.assertIn("mkYosysStatDerivation", pipeline)
 

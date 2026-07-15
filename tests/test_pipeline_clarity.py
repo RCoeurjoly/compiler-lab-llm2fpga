@@ -184,6 +184,11 @@ class PipelineClarityTest(unittest.TestCase):
 
     def test_current_baseline_records_fixed_layernorm_frontier(self) -> None:
         doc = read("docs/current-baseline.md")
+        fixed_layernorm = doc[
+            doc.index("## Fixed-LayerNorm Representative-Core Follow-Up") : doc.index(
+                "## Explicit-Integer Representative-Core Slice"
+            )
+        ]
 
         self.assertIn(
             "tinystories-representative-core-w4a8-fixed-layernorm-calyx", doc
@@ -196,6 +201,8 @@ class PipelineClarityTest(unittest.TestCase):
         self.assertIn(
             "tinystories-representative-core-w4a8-fixed-layernorm-calyx-sv", doc
         )
+        self.assertIn("historical / pre-current-source-pin", fixed_layernorm)
+        self.assertIn("pending-rerun", fixed_layernorm)
 
 
 if __name__ == "__main__":

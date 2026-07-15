@@ -711,6 +711,8 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         self.assertIn("XC7K480T", baseline)
         self.assertIn("native-sv-generation", baseline)
         self.assertIn("no mapped resource estimate", baseline)
+        self.assertIn("native Calyx was killed during SV emission", baseline)
+        self.assertIn("5a4303847392609cad83dda6f4bdffc8cc0e5c89", baseline)
         self.assertIn(
             "Compact evidence: `completed_stages: []`; `resources: null`; "
             "FPGA fit remains unresolved.",

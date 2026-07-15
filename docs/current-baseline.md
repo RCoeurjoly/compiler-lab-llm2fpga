@@ -10,12 +10,13 @@ Recorded on 2026-07-14.
 - Result: no mapped resource estimate
 - Compact evidence: `completed_stages: []`; `resources: null`; FPGA fit remains unresolved.
 
-The Task 3 pinned route reached `lower-scf-to-calyx`, then stopped during
-native-SV generation because CIRCT-exported Futil depends on float primitive
-files absent from the pinned Calyx 0.7.1 library. RTLIL, Yosys, mapped resource
-estimation, nextpnr, board validation, and equivalence did not run. This is a
-compiler compatibility frontier, not an out-of-context resource estimate. See
-the [bounded Task 3 result report](results/2026-07-14-tinystories-w8a8-calyx-task3-utilization.md).
+The current source provenance is upstream Calyx pinned at
+`5a4303847392609cad83dda6f4bdffc8cc0e5c89`; `0.7.1` is only its package-version
+label. The package-level float closure succeeds, and the full route produced
+Futil; native Calyx was killed during SV emission. No full-model SV, Yosys,
+mapping, FPGA utilization, nextpnr, board, equivalence, or SmoothQuant result
+exists. This is a compiler-execution frontier, not an out-of-context resource
+estimate. See the [bounded Task 3 result report](results/2026-07-14-tinystories-w8a8-calyx-task3-utilization.md).
 
 ## Full TinyStories PT2E W8A8, TOSA Handshake scout
 
@@ -67,6 +68,10 @@ and
 
 Recorded on 2026-07-08.
 
+**Scope: historical / pre-current-source-pin; pending-rerun.** This retained
+baseline predates the repaired source-list path and is not current reproducible
+output.
+
 - Repository commit: `f02fdee3132071d31ef9a1b9d64ff09b98ab0765`
 - Worktree before baseline build: clean
 - Target package: `tinystories-representative-core-w4a8-via-tosa-no-handshake-calyx-sv`
@@ -88,9 +93,9 @@ The intended active pipeline is:
 7. Calyx
 8. Calyx-SV
 
-This is the baseline to debug from for the resource-minimization work. It is
-not yet a resource result for the board, because the current run fails before
-Calyx or SystemVerilog generation.
+This is an archival baseline for the resource-minimization work. It is not a
+resource result for the board and remains pending-rerun under the current source
+pin.
 
 ## Outcome
 
@@ -374,27 +379,31 @@ exists to prove that a pass plugin built against the same CIRCT/MLIR 23 stack as
 fixes for the `calyx.invoke`/reference-cell assertion or Calyx memory lowering
 should be added there as real CIRCT passes, not as textual Calyx MLIR edits.
 
-## Calyx Backend Naming Split
+## Calyx Backend Naming Split — Historical / pre-current-source-pin
 
-The current working native route remains available, but it is now named
-`calyx-native-sv` instead of being treated as the only Calyx SV route. It lowers
-through:
+**Scope: historical / pre-current-source-pin; pending-rerun.** The native-SV
+resource observations in this section are preserved archival evidence. Their
+counts have not been rerun on the repaired source-list path and must not be
+treated as current reproducible output.
+
+The native route used for these observations was named `calyx-native-sv` rather
+than being treated as the only Calyx SV route. It lowers through:
 
 ```text
 CIRCT Calyx MLIR -> circt-translate --export-calyx -> native Calyx Verilog
 ```
 
-The native Calyx compiler is packaged as `.#calyx` from the official `calyx`
-crate version `0.7.1`. The no-handshake `calyx-native-sv` stage runs native
-Calyx with `--synthesis` and disables only the `papercut` checker. That checker
-rejects CIRCT-exported memory groups before native Calyx adds default
-assignments, while the same program still compiles to Verilog and to the native
-resource report.
+The historical native Calyx package label was `0.7.1`; it is not source
+provenance. The current source provenance is the pinned upstream revision in the
+full W8A8 frontier above. The historical no-handshake `calyx-native-sv` stage
+ran native Calyx with `--synthesis` and disabled only the `papercut` checker.
+That checker rejected CIRCT-exported memory groups before native Calyx added
+default assignments, while the same program compiled to Verilog and to the
+native resource report.
 
-The legacy `calyx-sv` package name is currently kept as a compatibility alias
-for `calyx-native-sv`. New work should use one of the explicit route names:
-`calyx-native-sv` for the current working route, or `calyx-hw-sv` for the direct
-CIRCT route under debug.
+The legacy `calyx-sv` package name was kept as a compatibility alias for
+`calyx-native-sv`. These route observations are pending-rerun; do not use them
+to characterize the current full-model frontier.
 
 Verified package:
 
@@ -491,7 +500,7 @@ primitives. Hardware-bound integer core models use single-shot slang ingestion;
 the per-file extern mode made generated Calyx memory and primitive modules
 invisible to `main.sv`.
 
-The current reproducible aggregate baseline is exposed as:
+The archival aggregate baseline was exposed as:
 
 ```text
 resource-baseline-yosys-stat-matrix
@@ -503,7 +512,8 @@ Verified output path:
 /nix/store/7fiwg27zzj7lsz05nc9g2z4x51mhjqrq-resource-baseline-yosys-stat-matrix
 ```
 
-It contains `summary.json` and `summary.md`. The current summary table is:
+It contains `summary.json` and `summary.md`. The retained historical summary
+table is:
 
 | alias | frontend | backend | status | cells | memories | memory bits |
 | --- | --- | --- | --- | ---: | ---: | ---: |
@@ -515,7 +525,12 @@ It contains `summary.json` and `summary.md`. The current summary table is:
 
 ## Fixed-LayerNorm Representative-Core Follow-Up
 
-The experimental direct-Linalg route:
+**Scope: historical / pre-current-source-pin; pending-rerun.** The
+missing-float-import diagnosis and all observations in this section predate the
+repaired source-list path; they are retained for context, not as the current
+full-model cause.
+
+The historical experimental direct-Linalg route:
 
 ```text
 tinystories-representative-core-w4a8-fixed-layernorm-via-linalg-no-handshake-calyx-sv
@@ -543,8 +558,8 @@ from the exported graph and reduced the Linalg op-stat surface from 424 to 404
 does not remove the remaining SoftFloat dependency, because the dominant QDQ
 islands are still around linear/requantization/residual paths.
 
-The Calyx stage now writes `float-frontier.json` next to `model.calyx.mlir`.
-For the current fixed-LayerNorm route, the Calyx stage succeeds:
+The Calyx stage wrote `float-frontier.json` next to `model.calyx.mlir`. For the
+historical fixed-LayerNorm route, the Calyx stage succeeded:
 
 ```text
 /nix/store/1pxnywss7xqr82w6q9ygc8az4w1b52yc-tinystories-representative-core-w4a8-fixed-layernorm-calyx
@@ -598,7 +613,7 @@ primitives/float/addFN.futil
 primitives/float/divSqrtFN.futil
 ```
 
-Current failed Calyx-SV diagnostic output:
+Historical failed Calyx-SV diagnostic output:
 
 ```text
 /nix/store/xyxzd4sa0ljdqk1dmnfjz1gvk8hn23hv-tinystories-representative-core-w4a8-fixed-layernorm-calyx-sv
@@ -616,18 +631,19 @@ The minimal native-Calyx reproducer is:
 reproducers/calyx-native-float-const/
 ```
 
-This is the current frontier for this route. It is after Calyx MLIR generation
-but before native Calyx SV generation, so representative-core resource
-measurement is still blocked. Do not fix it with textual Futil rewriting.
-Replacing only float constants is insufficient because the generated Futil still
-depends on missing float primitive files. Acceptable next fixes are to remove the
-remaining float path from the model/core semantics, version-align native Calyx
-with CIRCT's exporter, or fix the exporter/backend through an actual
-compiler/backend change.
+This was the historical frontier for this route, after Calyx MLIR generation
+but before native Calyx SV generation. It remains pending-rerun. The current
+pinned full W8A8 route has package-level float closure and produced Futil before
+native Calyx was killed during SV emission; the historical missing-import claim
+is not its current cause. Do not fix either route with textual Futil rewriting.
 
 ## Explicit-Integer Representative-Core Slice
 
-The first representative-core-shaped route that reaches Calyx-SV is now a
+**Scope: historical / pre-current-source-pin; pending-rerun.** Preserve the
+following explicit-integer results and counts as archival observations; none has
+been rerun on the repaired source-list path.
+
+The first representative-core-shaped route recorded as reaching Calyx-SV was a
 separate explicit-integer hardware slice:
 
 ```text
@@ -725,8 +741,12 @@ this slice toward the full representative-core computation.
 
 ## Explicit-Integer SV Equivalence Baseline
 
-The frozen direct-Linalg integer route now has a first machine-readable
-equivalence baseline package:
+**Scope: historical / pre-current-source-pin; pending-rerun.** This equivalence
+snapshot is retained as archival evidence and is not a current result under the
+repaired source-list path.
+
+The frozen direct-Linalg integer route had a first machine-readable equivalence
+baseline package:
 
 ```text
 tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence
