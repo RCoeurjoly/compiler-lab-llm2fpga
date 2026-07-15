@@ -308,6 +308,19 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("arith.constant 1.000000e-05 : f32", passing_shape)
         self.assertIn("Do not fix this with textual MLIR rewriting", readme)
 
+    def test_calyx_i1_uitofp_frontier_is_minimized(self) -> None:
+        reproducer_dir = REPO_ROOT / "reproducers" / "calyx-i1-uitofp"
+        input_mlir = (reproducer_dir / "input.mlir").read_text(encoding="utf-8")
+        readme = (reproducer_dir / "README.md").read_text(encoding="utf-8")
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+
+        self.assertIn("arith.uitofp", input_mlir)
+        self.assertIn(": i1 to f32", input_mlir)
+        self.assertIn("extui", readme)
+        self.assertIn("sitofp", readme)
+        self.assertIn("Textual MLIR substitution is not an acceptable fix", readme)
+        self.assertIn('"calyx-i1-uitofp-upstream-reproducer"', flake)
+
     def test_current_calyx_memref_view_port_blocker_is_minimized(self) -> None:
         reproducer_dir = REPO_ROOT / "reproducers" / "calyx-memref-view-port"
         ranked_port = (reproducer_dir / "ranked-port.mlir").read_text(

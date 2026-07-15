@@ -239,6 +239,22 @@
               -p "read_slang --threads 1 --no-proc --max-parse-depth 20000 --top main $out/main.sv; hierarchy -top main -check; stat" \
               >"$out/yosys-slang.log" 2>&1
           '';
+        calyxI1UiToFpUpstreamReproducer = pkgs.runCommand
+          "calyx-i1-uitofp-upstream-reproducer" {
+            nativeBuildInputs = [ circt pkgs.gnugrep ];
+          } ''
+            mkdir -p "$out"
+            set +e
+            ${circt}/bin/circt-opt \
+              ${./reproducers/calyx-i1-uitofp/input.mlir} \
+              --lower-scf-to-calyx='top-level-function=main' \
+              -o "$out/model.calyx.mlir" >"$out/lower.log" 2>&1
+            rc=$?
+            set -e
+            test "$rc" -ne 0
+            ${pkgs.gnugrep}/bin/grep -F \
+              "failed to legalize operation 'arith.uitofp'" "$out/lower.log"
+          '';
 
         pipelineScripts = ./scripts/pipeline;
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
@@ -1858,6 +1874,8 @@
             calyx;
           "calyx-float-library-selftest" = calyxFloatLibrarySelftest;
           "calyx-integer-library-selftest" = calyxIntegerLibrarySelftest;
+          "calyx-i1-uitofp-upstream-reproducer" =
+            calyxI1UiToFpUpstreamReproducer;
           "active-pipeline-variants" = activePipelineVariantsJson;
           "tinystories-w8a8-pt2e-graph-shape-audit" =
             tinystoriesW8A8Pt2eGraphShapeAudit;
@@ -1912,6 +1930,8 @@
           default = modelRegistryJson;
           "calyx-float-library" = calyxFloatLibrarySelftest;
           "calyx-integer-library" = calyxIntegerLibrarySelftest;
+          "calyx-i1-uitofp-upstream-reproducer" =
+            calyxI1UiToFpUpstreamReproducer;
         };
 
         devShells.default = pkgs.mkShell {
