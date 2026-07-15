@@ -13,6 +13,17 @@
   loop outputs to measure resource utilization and final hardware behavior.
 - **Validated optimization claim** — A change whose semantic behavior,
   resource effect, and iteration cost are all measured and reported.
+- **Calyx-external memory** — A Calyx memory cell marked `@external(1)` and
+  moved to the generated top-level wrapper. This creates an explicit memory-port
+  boundary around the compute component, but does not imply off-chip DDR memory.
+- **Memory-blackbox diagnostic** — A synthesis ablation that preserves a memory
+  module's interface while omitting its implementation to isolate storage-driven
+  compiler cost and retained shell logic. It is not a completed external-memory
+  optimization claim.
+- **External-memory architecture** — A realizable mapping from logical model
+  memories onto a bounded physical memory service, including protocol, port
+  scheduling, storage placement, bandwidth, latency, and retained on-chip
+  buffering. DDR3 is one possible implementation of that service.
 - **PT2E W8A8** — The primary Task 6 numerical reference: PyTorch PT2E static
   quantization configured for 8-bit weights and activations, with frozen
   calibration and a recorded converted graph.
