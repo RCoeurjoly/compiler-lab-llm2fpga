@@ -220,7 +220,7 @@ class DirectLinalgXc7k480tUtilizationTest(unittest.TestCase):
             body,
             r'read_rtlil stage8-reachable\.il\s+'
             r'hierarchy -top \$\{topName\} -check\s+'
-            r'proc\s+'
+            r'proc =\*\s+'
             r'write_json \$out',
         )
         self.assertRegex(

@@ -411,7 +411,7 @@
             cat > run.ys <<EOF
             read_rtlil stage8-reachable.il
             hierarchy -top ${topName} -check
-            proc
+            proc =*
             write_json $out
             EOF
 
