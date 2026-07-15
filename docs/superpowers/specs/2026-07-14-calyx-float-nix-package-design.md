@@ -151,7 +151,7 @@ that Yosys accepts that full design, or that it fits an FPGA.
 
 ## Full W8A8 native-SV retry (Task 4)
 
-The required full-model command was run outside the workspace sandbox:
+The required full-model command was run:
 
 ```text
 nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-native-sv -L
