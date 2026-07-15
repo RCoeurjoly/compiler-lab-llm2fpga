@@ -10,12 +10,13 @@ from pathlib import Path
 
 FLOAT_OP_RE = re.compile(
     r"\b("
-    r"arith\.(?:sitofp|fptosi|mulf|divf|addf|subf|cmpf|maximumf|minimumf|truncf)"
+    r"arith\.(?:sitofp|uitofp|fptosi|mulf|divf|addf|subf|cmpf|maximumf|minimumf|truncf)"
     r"|math\.[A-Za-z0-9_]+"
     r")\b"
 )
 FLOAT_TYPE_RE = re.compile(r"\b(?:f16|f32|f64)\b")
 UNSUPPORTED_CALYX_FLOAT_OPS = {
+    "arith.uitofp",
     "math.rsqrt",
 }
 

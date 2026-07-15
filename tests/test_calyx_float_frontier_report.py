@@ -75,6 +75,22 @@ module {
         self.assertEqual(report["unsupported_samples"][0]["ops"], ["math.rsqrt"])
         self.assertIn("math.rsqrt", report["unsupported_samples"][0]["text"])
 
+    def test_classifies_uitofp_as_unsupported_calyx_frontier(self) -> None:
+        report, _ = self.run_report(
+            """
+module {
+  func.func @main(%arg0: i1) -> f32 {
+    %0 = arith.uitofp %arg0 : i1 to f32
+    return %0 : f32
+  }
+}
+"""
+        )
+
+        self.assertEqual(report["status"], "has-unsupported-calyx-float-frontier")
+        self.assertEqual(report["op_counts"]["arith.uitofp"], 1)
+        self.assertEqual(report["unsupported_ops"]["arith.uitofp"], 1)
+
     def test_can_merge_compact_frontier_summary_into_manifest(self) -> None:
         _, manifest = self.run_report(
             """

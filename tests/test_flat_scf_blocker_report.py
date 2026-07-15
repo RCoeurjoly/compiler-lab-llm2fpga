@@ -11,6 +11,43 @@ SCRIPT = REPO_ROOT / "scripts" / "diagnostics" / "flat_scf_blocker_report.py"
 
 
 class FlatScfBlockerReportTest(unittest.TestCase):
+    def test_manifest_reports_completed_with_residuals(self) -> None:
+        mlir = """\
+module {
+  func.func @main(%arg0: memref<1xi8>, %arg1: memref<1xi8>) {
+    memref.copy %arg0, %arg1 : memref<1xi8> to memref<1xi8>
+    return
+  }
+}
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            input_path = Path(tmp) / "flat.scf.mlir"
+            output_path = Path(tmp) / "blockers.json"
+            manifest_path = Path(tmp) / "manifest.json"
+            input_path.write_text(mlir, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--input",
+                    str(input_path),
+                    "--output",
+                    str(output_path),
+                    "--manifest-output",
+                    str(manifest_path),
+                ],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(manifest["status"], "completed-with-residuals")
+
     def test_reports_blocker_locations_with_context(self) -> None:
         mlir = """\
 module {

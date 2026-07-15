@@ -4,6 +4,7 @@ set -euo pipefail
 circt_opt="${1:?usage: scf_to_calyx_no_handshake.sh <circt-opt> <input-flat-scf-mlir> <output-dir>}"
 input="${2:?usage: scf_to_calyx_no_handshake.sh <circt-opt> <input-flat-scf-mlir> <output-dir>}"
 output_dir="${3:?usage: scf_to_calyx_no_handshake.sh <circt-opt> <input-flat-scf-mlir> <output-dir>}"
+calyx_preflight_report="${CALYX_PREFLIGHT_REPORT:-}"
 
 if [[ ! -x "$circt_opt" ]]; then
   echo "not executable: $circt_opt" >&2
@@ -24,6 +25,21 @@ trap cleanup EXIT
 mkdir -p "$output_dir"
 
 cp "$input" "$output_dir/flat.scf.mlir"
+
+if [[ -n "$calyx_preflight_report" ]]; then
+  set +e
+  python3 "$calyx_preflight_report" "$input" \
+    "$output_dir/pre-calyx-legality.json" --require-clean
+  preflight_rc=$?
+  set -e
+
+  if [[ "$preflight_rc" -ne 0 ]]; then
+    printf '%s\n' \
+      '{"stage":"calyx","status":"failed","reason":"pre-Calyx legality census found prohibited operations","normalized_input":"flat.scf.mlir","preflight":"pre-calyx-legality.json"}' \
+      >"$output_dir/manifest.json"
+    exit 0
+  fi
+fi
 
 set +e
 "$circt_opt" "$input" \

@@ -219,7 +219,7 @@ def build_report(text: str) -> dict:
 
 
 def build_manifest(report: dict) -> dict:
-    status = "ok" if not report["blockers"] else "blocked"
+    status = "ok" if not report["blockers"] else "completed-with-residuals"
     return {
         "stage": "flat-scf",
         "status": status,

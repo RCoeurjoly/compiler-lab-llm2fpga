@@ -228,6 +228,9 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
 
     def test_pre_calyx_uses_checked_in_mlir_pass_plugin(self) -> None:
         pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
+        calyx_script = (
+            REPO_ROOT / "scripts" / "pipeline" / "scf_to_calyx_no_handshake.sh"
+        ).read_text(encoding="utf-8")
         pass_source = (
             REPO_ROOT / "tools" / "mlir-passes" / "FoldConstantTruncFOps.cpp"
         ).read_text(encoding="utf-8")
@@ -239,6 +242,9 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("llm2fpga-lower-roundeven-for-calyx", pipeline)
         self.assertIn("calyx_float_frontier_report.py", pipeline)
         self.assertIn("float-frontier.json", pipeline)
+        self.assertIn("CALYX_PREFLIGHT_REPORT", pipeline)
+        self.assertIn("calyx_preflight_report.py", pipeline)
+        self.assertIn("pre-calyx-legality.json", pipeline)
         self.assertIn("--manifest-json", pipeline)
         self.assertIn("PassRegistration<LowerStaticMemRefViewsForCalyxPass>", pass_source)
         self.assertIn("PassRegistration<DropCalyxUnsupportedAssertOpsPass>", pass_source)
@@ -251,6 +257,12 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("DenseF32ResourceElementsAttr", pass_source)
         self.assertIn("tryGetAsArrayRef", pass_source)
         self.assertNotIn("python3 -", pipeline)
+        self.assertIn("CALYX_PREFLIGHT_REPORT", calyx_script)
+        self.assertIn("--require-clean", calyx_script)
+        self.assertIn("pre-calyx-legality.json", calyx_script)
+        self.assertIn(
+            "pre-Calyx legality census found prohibited operations", calyx_script
+        )
 
     def test_calyx_backend_has_checked_in_circt_pass_plugin_home(self) -> None:
         derivation = (REPO_ROOT / "nix" / "circt-passes.nix").read_text(
