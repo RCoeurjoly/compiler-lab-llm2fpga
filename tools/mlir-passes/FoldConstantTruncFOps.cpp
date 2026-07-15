@@ -616,6 +616,55 @@ struct LowerExactMathForCalyxPass
   }
 };
 
+struct LowerI1UIToFPForCalyxPass
+    : public PassWrapper<LowerI1UIToFPForCalyxPass,
+                         OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerI1UIToFPForCalyxPass)
+
+  StringRef getArgument() const final {
+    return "llm2fpga-lower-i1-uitofp-for-calyx";
+  }
+  StringRef getDescription() const final {
+    return "Lower exact arith.uitofp i1 to f32 operations through i32 before "
+           "Calyx lowering.";
+  }
+
+  void runOnOperation() final {
+    SmallVector<arith::UIToFPOp> ops;
+    getOperation().walk([&](arith::UIToFPOp op) {
+      auto sourceType = dyn_cast<IntegerType>(op.getIn().getType());
+      auto resultType = dyn_cast<FloatType>(op.getType());
+      if (sourceType && sourceType.isInteger(1) && resultType &&
+          resultType.isF32())
+        ops.push_back(op);
+    });
+
+    IRRewriter rewriter(getOperation().getContext());
+    for (arith::UIToFPOp op : ops)
+      lower(op, rewriter);
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<arith::ArithDialect>();
+  }
+
+private:
+  void lower(arith::UIToFPOp op, IRRewriter &rewriter) {
+    auto sourceType = dyn_cast<IntegerType>(op.getIn().getType());
+    auto resultType = dyn_cast<FloatType>(op.getType());
+    if (!sourceType || !sourceType.isInteger(1) || !resultType ||
+        !resultType.isF32())
+      return;
+
+    rewriter.setInsertionPoint(op);
+    Value widened = arith::ExtUIOp::create(
+        rewriter, op.getLoc(), rewriter.getI32Type(), op.getIn());
+    Value replacement =
+        arith::SIToFPOp::create(rewriter, op.getLoc(), resultType, widened);
+    rewriter.replaceOp(op, replacement);
+  }
+};
+
 struct LowerScoutMathForCalyxPass
     : public PassWrapper<LowerScoutMathForCalyxPass, OperationPass<ModuleOp>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerScoutMathForCalyxPass)
@@ -697,6 +746,8 @@ MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerRoundEvenForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerRoundEvenForCalyxPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerExactMathForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerExactMathForCalyxPass)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerI1UIToFPForCalyxPass)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerI1UIToFPForCalyxPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerScoutMathForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerScoutMathForCalyxPass)
 
@@ -708,6 +759,7 @@ extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo mlirGetPassPluginInfo() {
             PassRegistration<DropCalyxUnsupportedAssertOpsPass>();
             PassRegistration<LowerRoundEvenForCalyxPass>();
             PassRegistration<LowerExactMathForCalyxPass>();
+            PassRegistration<LowerI1UIToFPForCalyxPass>();
             PassRegistration<LowerScoutMathForCalyxPass>();
             registerLegalizePt2eTosaZeroPointPass();
           }};

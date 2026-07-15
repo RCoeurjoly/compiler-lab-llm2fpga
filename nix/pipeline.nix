@@ -142,7 +142,7 @@ let
       tmp_pre_calyx="$(mktemp /tmp/no_handshake_pre_calyx_XXXXXX.mlir)"
       ${mlir}/bin/mlir-opt ${flatScf}/flat.scf.mlir \
         --load-pass-plugin=${mlirPasses}/lib/LLM2FPGAMLIRPasses.so \
-        --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx${scoutMathPass},canonicalize,cse)' \
+        --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx${scoutMathPass},llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
         -o "$tmp_pre_calyx"
       ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
         ${circt}/bin/circt-opt "$tmp_pre_calyx" "$out"

@@ -255,6 +255,34 @@
             ${pkgs.gnugrep}/bin/grep -F \
               "failed to legalize operation 'arith.uitofp'" "$out/lower.log"
           '';
+        calyxI1UiToFpLegalizationSelftest = pkgs.runCommand
+          "calyx-i1-uitofp-legalization-selftest" {
+            nativeBuildInputs = [ mlir circt llm2fpgaMlirPasses pkgs.gnugrep ];
+          } ''
+            mkdir -p "$out"
+            ${mlir}/bin/mlir-opt \
+              ${./reproducers/calyx-i1-uitofp/input.mlir} \
+              --load-pass-plugin=${llm2fpgaMlirPasses}/lib/LLM2FPGAMLIRPasses.so \
+              --pass-pipeline='builtin.module(llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
+              -o "$out/lowered.mlir"
+            ${pkgs.gnugrep}/bin/grep -F "arith.extui" "$out/lowered.mlir"
+            ${pkgs.gnugrep}/bin/grep -F "arith.sitofp" "$out/lowered.mlir"
+            if ${pkgs.gnugrep}/bin/grep -Fq "arith.uitofp" "$out/lowered.mlir"; then
+              echo "matching arith.uitofp remained after legalization" >&2
+              exit 1
+            fi
+            ${mlir}/bin/mlir-opt \
+              ${./reproducers/calyx-i1-uitofp/nonmatching.mlir} \
+              --load-pass-plugin=${llm2fpgaMlirPasses}/lib/LLM2FPGAMLIRPasses.so \
+              --pass-pipeline='builtin.module(llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
+              -o "$out/nonmatching.lowered.mlir"
+            test "$( ${pkgs.gnugrep}/bin/grep -Fc "arith.uitofp" \
+              "$out/nonmatching.lowered.mlir" )" -eq 2
+            ${circt}/bin/circt-opt "$out/lowered.mlir" \
+              --lower-scf-to-calyx='top-level-function=main' \
+              -o "$out/model.calyx.mlir" >"$out/lower.log" 2>&1
+            test -s "$out/model.calyx.mlir"
+          '';
 
         pipelineScripts = ./scripts/pipeline;
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
@@ -1876,6 +1904,8 @@
           "calyx-integer-library-selftest" = calyxIntegerLibrarySelftest;
           "calyx-i1-uitofp-upstream-reproducer" =
             calyxI1UiToFpUpstreamReproducer;
+          "calyx-i1-uitofp-legalization-selftest" =
+            calyxI1UiToFpLegalizationSelftest;
           "active-pipeline-variants" = activePipelineVariantsJson;
           "tinystories-w8a8-pt2e-graph-shape-audit" =
             tinystoriesW8A8Pt2eGraphShapeAudit;
@@ -1932,6 +1962,8 @@
           "calyx-integer-library" = calyxIntegerLibrarySelftest;
           "calyx-i1-uitofp-upstream-reproducer" =
             calyxI1UiToFpUpstreamReproducer;
+          "calyx-i1-uitofp-legalization-selftest" =
+            calyxI1UiToFpLegalizationSelftest;
         };
 
         devShells.default = pkgs.mkShell {

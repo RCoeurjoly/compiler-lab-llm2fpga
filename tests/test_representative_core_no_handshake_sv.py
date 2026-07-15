@@ -321,6 +321,25 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("Textual MLIR substitution is not an acceptable fix", readme)
         self.assertIn('"calyx-i1-uitofp-upstream-reproducer"', flake)
 
+    def test_pre_calyx_legalizes_only_i1_uitofp_to_f32(self) -> None:
+        source = (
+            REPO_ROOT / "tools" / "mlir-passes" / "FoldConstantTruncFOps.cpp"
+        ).read_text(encoding="utf-8")
+        pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(
+            encoding="utf-8"
+        )
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+
+        self.assertIn("llm2fpga-lower-i1-uitofp-for-calyx", source)
+        self.assertIn("arith::UIToFPOp", source)
+        self.assertIn("isInteger(1)", source)
+        self.assertIn("isF32()", source)
+        self.assertIn("arith::ExtUIOp", source)
+        self.assertIn("arith::SIToFPOp", source)
+        self.assertIn("PassRegistration<LowerI1UIToFPForCalyxPass>", source)
+        self.assertIn("llm2fpga-lower-i1-uitofp-for-calyx", pipeline)
+        self.assertIn('"calyx-i1-uitofp-legalization-selftest"', flake)
+
     def test_current_calyx_memref_view_port_blocker_is_minimized(self) -> None:
         reproducer_dir = REPO_ROOT / "reproducers" / "calyx-memref-view-port"
         ranked_port = (reproducer_dir / "ranked-port.mlir").read_text(
