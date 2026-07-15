@@ -162,19 +162,16 @@ It exited 1 at the native-SV generation frontier. The failed derivation was
 its inspectable failed output is
 `/nix/store/2mrlpwn1ibvxsfxhqp6j1jfv66vmrvjk-tinystories-w8a8-calyx-native-sv`.
 
-The W8A8 Linalg, SCF, flat-SCF, and lower-SCF-to-Calyx stages completed. The
-named output contains the resulting `model.futil` (18,613,223 bytes) and a
-Calyx manifest with `stage: "calyx"` and `status: "ok"`. Native Calyx then
-started `calyx model.futil -l <packaged calyx library> -b verilog --synthesis
---nested -d papercut -o sv/main.sv`. The operating system killed that process
-during SV emission. Immediately before the kill, live telemetry reported about
-28.6 GiB RSS, about 450 MiB host RAM available, and no usable swap. The native
-log also records that data-path inference did not converge after five
-iterations, `cell-share` took 103999 ms, and `compile-invoke` took 121417 ms.
+The named output contains `model.futil` (18,613,223 bytes) and a Calyx
+manifest with `stage: "calyx"` and `status: "ok"`. It has no `sv/main.sv`.
+The named derivation log's first failure is:
 
-This is a full-model native-Calyx memory frontier. The failed output has no
-generated `main.sv`; consequently the route did not reach full TinyStories
-SV/Yosys, Task 3 mapping, or any FPGA-fit result.
+```text
+... Killed "$calyx_bin" ... -b verilog ... -o "$output_dir/sv/main.sv" ...
+Native Calyx-to-SV failed.
+```
+
+No full-model SV, Yosys, mapping, or utilization result exists.
 
 ## Scope and non-goals
 

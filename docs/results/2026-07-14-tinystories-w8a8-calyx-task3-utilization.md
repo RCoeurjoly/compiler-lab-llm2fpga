@@ -25,21 +25,23 @@ records `status: "frontier"`, `completed_stages: []`, terminal stage
 nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-native-sv -L
 ```
 
-`completed_stages: []` means that no Task 3 mapping stage completed. Before
-the frontier, the full W8A8 Linalg, SCF, flat-SCF, and lower-SCF-to-Calyx
-stages completed and produced a 18,613,223-byte `model.futil`. The failed
-derivation was
+`completed_stages: []` means that no Task 3 mapping stage completed. The named
+output contains a 18,613,223-byte `model.futil` and a Calyx manifest with
+`stage: "calyx"` and `status: "ok"`. The failed derivation was
 `/nix/store/2zmb3z0602x6s109j8mmcw9l7fg1j0vc-tinystories-w8a8-calyx-native-sv.drv`;
 its inspectable failed output is
 `/nix/store/2mrlpwn1ibvxsfxhqp6j1jfv66vmrvjk-tinystories-w8a8-calyx-native-sv`.
 
-Native Calyx began the Verilog export and was killed by the operating system
-during SV emission. The named output has no `sv/main.sv`, so the full model did
-not reach SystemVerilog, RTLIL, or Yosys. Its native-Calyx log records
-data-path inference not converging after five iterations, `cell-share:
-103999ms`, and `compile-invoke: 121417ms`. Live telemetry immediately before
-the kill reported about 28.6 GiB RSS, about 450 MiB available host RAM, and no
-usable swap. The detailed command and failure record is in
+The named output has no `sv/main.sv`. The named derivation log's first failure
+is:
+
+```text
+... Killed "$calyx_bin" ... -b verilog ... -o "$output_dir/sv/main.sv" ...
+Native Calyx-to-SV failed.
+```
+
+No full-model SV, Yosys, mapping, or utilization result exists. The detailed
+command and failure record is in
 `.superpowers/sdd/calyx-float-task-4-report.md`; raw logs are intentionally not
 copied into this documentation or the compact artifact bundle.
 
@@ -50,7 +52,7 @@ route has no LUT, FF, BRAM, DSP, nextpnr, or board figures.
 
 ## Interpretation
 
-This is a native-Calyx memory frontier, not an out-of-context resource
+This is a native-SV generation frontier, not an out-of-context resource
 estimate. It is not a DDR3 controller, board implementation, nextpnr result,
 or numerical-equivalence result.
 
