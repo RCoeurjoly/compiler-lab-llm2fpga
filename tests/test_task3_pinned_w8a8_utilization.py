@@ -711,8 +711,6 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         self.assertIn("XC7K480T", baseline)
         self.assertIn("native-sv-generation", baseline)
         self.assertIn("no mapped resource estimate", baseline)
-        self.assertIn("native Calyx was killed during SV emission", baseline)
-        self.assertIn("5a4303847392609cad83dda6f4bdffc8cc0e5c89", baseline)
         self.assertIn(
             "Compact evidence: `completed_stages: []`; `resources: null`; "
             "FPGA fit remains unresolved.",
@@ -727,6 +725,8 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
             baseline,
             "Full TinyStories PT2E W8A8, Task 3 pinned Calyx utilization frontier",
         )
+        self.assertIn("native Calyx was killed during SV emission", baseline_scope)
+        self.assertIn("5a4303847392609cad83dda6f4bdffc8cc0e5c89", baseline_scope)
         adr_scope = select_paragraph_starting_with(
             adr,
             "Those pre-mapping counts are a structural diagnostic",

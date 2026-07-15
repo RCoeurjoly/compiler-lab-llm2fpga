@@ -103,20 +103,25 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         baseline = (REPO_ROOT / "docs" / "current-baseline.md").read_text(
             encoding="utf-8"
         )
+        integer_slice = baseline[
+            baseline.index("## Explicit-Integer Representative-Core Slice") : baseline.index(
+                "## Explicit-Integer SV Equivalence Baseline"
+            )
+        ]
         pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
 
-        self.assertIn("Explicit-Integer Representative-Core Slice", baseline)
-        self.assertIn("Native Calyx resource estimate", baseline)
-        self.assertIn("Yosys `stat` output", baseline)
-        self.assertIn("tinystories-representative-core-w4a8-integer", baseline)
-        self.assertIn('"estimated_internal_bits": 652', baseline)
-        self.assertIn('"estimated_external_bits": 4576', baseline)
-        self.assertIn('"num_cells": 41652', baseline)
-        self.assertIn('"num_memory_bits": 4580', baseline)
-        self.assertIn('"num_cells": 43269', baseline)
-        self.assertIn('"num_memory_bits": 4644', baseline)
-        self.assertIn("historical / pre-current-source-pin", baseline)
-        self.assertIn("pending-rerun", baseline)
+        self.assertIn("Explicit-Integer Representative-Core Slice", integer_slice)
+        self.assertIn("Native Calyx resource estimate", integer_slice)
+        self.assertIn("Yosys `stat` output", integer_slice)
+        self.assertIn("tinystories-representative-core-w4a8-integer", integer_slice)
+        self.assertIn('"estimated_internal_bits": 652', integer_slice)
+        self.assertIn('"estimated_external_bits": 4576', integer_slice)
+        self.assertIn('"num_cells": 41652', integer_slice)
+        self.assertIn('"num_memory_bits": 4580', integer_slice)
+        self.assertIn('"num_cells": 43269', integer_slice)
+        self.assertIn('"num_memory_bits": 4644', integer_slice)
+        self.assertIn("historical / pre-current-source-pin", integer_slice)
+        self.assertIn("pending-rerun", integer_slice)
         self.assertIn("mkIlDerivation", pipeline)
         self.assertIn("mkYosysStatDerivation", pipeline)
 

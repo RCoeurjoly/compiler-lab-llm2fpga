@@ -765,7 +765,7 @@ reference.json
 report.json
 ```
 
-The PyTorch integer reference for the current fixed input is:
+The historical report's PyTorch integer reference for its fixed input was:
 
 ```json
 {
@@ -775,7 +775,7 @@ The PyTorch integer reference for the current fixed input is:
 }
 ```
 
-The report status is currently:
+The historical report recorded this status:
 
 ```json
 {
@@ -790,9 +790,9 @@ The report status is currently:
 }
 ```
 
-This is not a passing equivalence result yet. It is the first gate result:
-Calyx-SV emits, but native Calyx currently generates a top-level module with
-only control ports, so the harness cannot compare PyTorch output against SV
-output without either an observable result port, a stable generated memory ABI,
-or an explicit test wrapper. Treat any future equivalence pass as invalid unless
-it compares functional output data, not just `done`.
+This historical snapshot was not a passing equivalence result. In that report,
+Calyx-SV emitted, but native Calyx generated a top-level module with only
+control ports, so the harness could not compare PyTorch output against SV output
+without either an observable result port, a stable generated memory ABI, or an
+explicit test wrapper. Treat any future equivalence pass as invalid unless it
+compares functional output data, not just `done`.
