@@ -776,7 +776,7 @@
         directLinalgXc7k480tPnrUtilization = pkgs.runCommand
           "${directLinalgXc7k480tRouteName}-nextpnr-utilization" { } ''
             mkdir -p "$out"
-            cp -a ${directLinalgXc7k480tPnrReport}/. "$out"
+            cp -r ${directLinalgXc7k480tPnrReport}/. "$out"
             cp ${directLinalgXc7k480tSynthesis.utilization}/summary.json \
               "$out/summary.json"
             cp ${directLinalgXc7k480tSynthesis.utilization}/summary.txt \

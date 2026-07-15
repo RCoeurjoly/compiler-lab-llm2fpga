@@ -400,18 +400,12 @@
             fi
           '';
 
-        mkSynthStageJson = { name, stageId, stageLabel, inputIl, quiet ? false
-          , memoryLimitKb ? null }:
+        mkSynthStageJson = { name, stageId, stageLabel, inputIl, topName
+          , quiet ? false, memoryLimitKb ? null }:
           pkgs.runCommand "${name}.json" { } ''
-            ${pkgs.python311}/bin/python3 ${
-              ./scripts/pipeline/filter_rtlil_modules.py
-            } \
-              --input ${inputIl} \
-              --output stage8-stripped.il \
-              --drop-escaped-uppercase-modules
-
             cat > run.ys <<EOF
-            read_rtlil stage8-stripped.il
+            read_rtlil ${inputIl}
+            hierarchy -top ${topName} -check
             proc
             write_json $out
             EOF
@@ -512,7 +506,7 @@
             };
 
             stage9 = mkSynthStageJson {
-              inherit name quiet memoryLimitKb;
+              inherit name topName quiet memoryLimitKb;
               stageId = "stage9";
               stageLabel = "stage9 write_json";
               inputIl = stage8;

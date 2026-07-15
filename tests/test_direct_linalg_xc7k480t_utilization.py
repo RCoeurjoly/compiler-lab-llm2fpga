@@ -196,6 +196,36 @@ class DirectLinalgXc7k480tUtilizationTest(unittest.TestCase):
             r'--out "\$out/route\.json"',
         )
 
+    def test_staged_json_preserves_xilinx_primitive_port_directions(self) -> None:
+        flake = (ROOT / "task3-main" / "flake.nix").read_text(encoding="utf-8")
+        helper = re.search(
+            r'mkSynthStageJson\s*=\s*(?P<body>[\s\S]*?)\n\n'
+            r'        mkSynthJsonStages\s*=',
+            flake,
+        )
+
+        self.assertIsNotNone(helper)
+        body = helper.group("body")
+        self.assertRegex(
+            body,
+            r'\{\s*name,\s*stageId,\s*stageLabel,\s*inputIl,\s*topName',
+        )
+        self.assertNotIn("filter_rtlil_modules.py", body)
+        self.assertNotIn("drop-escaped-uppercase-modules", body)
+        self.assertRegex(
+            body,
+            r'read_rtlil \$\{inputIl\}\s+'
+            r'hierarchy -top \$\{topName\} -check\s+'
+            r'proc\s+'
+            r'write_json \$out',
+        )
+        self.assertRegex(
+            flake,
+            r'stage9\s*=\s*mkSynthStageJson\s*\{[\s\S]*?'
+            r'inherit name topName quiet memoryLimitKb;[\s\S]*?'
+            r'inputIl\s*=\s*stage8;',
+        )
+
     def test_root_flake_wires_direct_linalg_xc7k480t_mapper_and_pnr(self) -> None:
         flake = (ROOT / "flake.nix").read_text(encoding="utf-8")
         route_name = (
@@ -271,7 +301,7 @@ class DirectLinalgXc7k480tUtilizationTest(unittest.TestCase):
         self.assertRegex(
             flake,
             r'directLinalgXc7k480tPnrUtilization\s*=\s*pkgs\.runCommand[\s\S]*?'
-            r'cp -a \$\{directLinalgXc7k480tPnrReport\}/\. "\$out"[\s\S]*?'
+            r'cp -r \$\{directLinalgXc7k480tPnrReport\}/\. "\$out"[\s\S]*?'
             r'cp \$\{directLinalgXc7k480tSynthesis\.utilization\}/summary\.json\s*\\?\s*'
             r'"\$out/summary\.json"[\s\S]*?'
             r'cp \$\{directLinalgXc7k480tSynthesis\.utilization\}/summary\.txt\s*\\?\s*'
@@ -282,6 +312,9 @@ class DirectLinalgXc7k480tUtilizationTest(unittest.TestCase):
             r'cp \$\{directLinalgXc7k480tManifest\} "\$out/manifest\.json"[\s\S]*?'
             r'cp \$\{task3MainLib\.task3Toolchain\.manifest\}\s*\\?\s*'
             r'"\$out/task3-yosys-toolchain\.json"',
+        )
+        self.assertNotIn(
+            'cp -a ${directLinalgXc7k480tPnrReport}/. "$out"', flake
         )
 
 
