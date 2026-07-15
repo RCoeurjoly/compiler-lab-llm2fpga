@@ -9,6 +9,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "task3-main" / "scripts" / "pipeline" / "write_nextpnr_xilinx_report.py"
+RTLIL_FILTER = (
+    ROOT / "task3-main" / "scripts" / "pipeline" / "filter_rtlil_modules.py"
+)
 
 
 class DirectLinalgXc7k480tUtilizationTest(unittest.TestCase):
@@ -210,11 +213,12 @@ class DirectLinalgXc7k480tUtilizationTest(unittest.TestCase):
             body,
             r'\{\s*name,\s*stageId,\s*stageLabel,\s*inputIl,\s*topName',
         )
-        self.assertNotIn("filter_rtlil_modules.py", body)
+        self.assertIn("filter_rtlil_modules.py", body)
+        self.assertIn("--keep-reachable-from ${topName}", body)
         self.assertNotIn("drop-escaped-uppercase-modules", body)
         self.assertRegex(
             body,
-            r'read_rtlil \$\{inputIl\}\s+'
+            r'read_rtlil stage8-reachable\.il\s+'
             r'hierarchy -top \$\{topName\} -check\s+'
             r'proc\s+'
             r'write_json \$out',
@@ -225,6 +229,135 @@ class DirectLinalgXc7k480tUtilizationTest(unittest.TestCase):
             r'inherit name topName quiet memoryLimitKb;[\s\S]*?'
             r'inputIl\s*=\s*stage8;',
         )
+
+    def test_reachable_rtlil_filter_keeps_only_transitive_module_closure(self) -> None:
+        source = """\\
+autoidx 17
+attribute \\top 1
+module \\main
+  wire input 1 \\clk
+  cell \\FDCE \\state
+    connect \\C \\clk
+  end
+  cell \\wrapper \\wrapped
+  end
+end
+# preserved inter-module comment
+attribute \\primitive_kind \"flipflop\"
+module \\FDCE
+  wire input 1 \\C
+end
+attribute \\wrapper_attribute 1
+module \\wrapper
+  cell \\leaf \\child
+  end
+end
+attribute \\leaf_attribute 1
+module \\leaf
+  wire input 1 \\I
+end
+module \\unused
+  process $proc$unused
+    switch \\never
+      case 1'0
+        assign \\never 1'0
+    end
+  end
+end
+# preserved trailing comment
+
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            input_il = work / "input.il"
+            output_il = work / "reachable.il"
+            input_il.write_text(source, encoding="utf-8")
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(RTLIL_FILTER),
+                    "--input",
+                    str(input_il),
+                    "--output",
+                    str(output_il),
+                    "--keep-reachable-from",
+                    "main",
+                ],
+                check=True,
+            )
+
+            filtered = output_il.read_text(encoding="utf-8")
+
+        self.assertIn("autoidx 17\n", filtered)
+        for text in [
+            "attribute \\top 1\nmodule \\main\n",
+            'attribute \\primitive_kind "flipflop"\nmodule \\FDCE\n',
+            "attribute \\wrapper_attribute 1\nmodule \\wrapper\n",
+            "attribute \\leaf_attribute 1\nmodule \\leaf\n",
+        ]:
+            self.assertIn(text, filtered)
+        self.assertNotIn("module \\unused", filtered)
+        self.assertNotIn("process $proc$unused", filtered)
+        self.assertIn("# preserved inter-module comment\n", filtered)
+        self.assertIn("# preserved trailing comment\n\n", filtered)
+        self.assertLess(filtered.index("module \\main"), filtered.index("module \\FDCE"))
+        self.assertLess(
+            filtered.index("module \\main"),
+            filtered.index("# preserved inter-module comment"),
+        )
+        self.assertLess(
+            filtered.index("# preserved inter-module comment"),
+            filtered.index("module \\FDCE"),
+        )
+        self.assertLess(filtered.index("module \\FDCE"), filtered.index("module \\wrapper"))
+        self.assertLess(filtered.index("module \\wrapper"), filtered.index("module \\leaf"))
+
+    def test_legacy_filter_drops_only_escaped_uppercase_modules(self) -> None:
+        source = """\\
+autoidx 3
+# before modules
+module \\keep
+  wire input 1 \\I
+end
+# between modules
+module \\DropMe
+  process $proc$drop
+    switch \\I
+      case 1'1
+        assign \\O 1'0
+      end
+    end
+end
+# after modules
+
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            input_il = work / "input.il"
+            output_il = work / "filtered.il"
+            input_il.write_text(source, encoding="utf-8")
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(RTLIL_FILTER),
+                    "--input",
+                    str(input_il),
+                    "--output",
+                    str(output_il),
+                    "--drop-escaped-uppercase-modules",
+                ],
+                check=True,
+            )
+
+            filtered = output_il.read_text(encoding="utf-8")
+
+        self.assertIn("autoidx 3\n# before modules\n", filtered)
+        self.assertIn("module \\keep\n", filtered)
+        self.assertNotIn("module \\DropMe", filtered)
+        self.assertNotIn("process $proc$drop", filtered)
+        self.assertIn("# between modules\n# after modules\n\n", filtered)
 
     def test_root_flake_wires_direct_linalg_xc7k480t_mapper_and_pnr(self) -> None:
         flake = (ROOT / "flake.nix").read_text(encoding="utf-8")

@@ -403,8 +403,13 @@
         mkSynthStageJson = { name, stageId, stageLabel, inputIl, topName
           , quiet ? false, memoryLimitKb ? null }:
           pkgs.runCommand "${name}.json" { } ''
+            ${pkgs.python311}/bin/python3 ${pipelineScripts}/filter_rtlil_modules.py \
+              --input ${inputIl} \
+              --output stage8-reachable.il \
+              --keep-reachable-from ${topName}
+
             cat > run.ys <<EOF
-            read_rtlil ${inputIl}
+            read_rtlil stage8-reachable.il
             hierarchy -top ${topName} -check
             proc
             write_json $out
