@@ -122,6 +122,13 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn('"num_memory_bits": 4644', integer_slice)
         self.assertIn("historical / pre-current-source-pin", integer_slice)
         self.assertIn("pending-rerun", integer_slice)
+        self.assertIn("source-closure regression check", integer_slice)
+        self.assertIn("41,451 cells", integer_slice)
+        self.assertIn(
+            "not been accepted or promoted as a durable current resource baseline",
+            integer_slice,
+        )
+        self.assertNotIn("none has been rerun", integer_slice)
         self.assertIn("mkIlDerivation", pipeline)
         self.assertIn("mkYosysStatDerivation", pipeline)
 

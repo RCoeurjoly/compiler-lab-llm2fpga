@@ -168,19 +168,31 @@ class PipelineClarityTest(unittest.TestCase):
         for text in expected:
             self.assertIn(text, doc)
 
-    def test_current_baseline_records_flat_scf_fix_and_current_frontier(self) -> None:
+    def test_current_baseline_records_historical_direct_linalg_frontier(self) -> None:
         doc = read("docs/current-baseline.md")
+        direct_linalg = doc[
+            doc.index("## Direct-Linalg No-Handshake Follow-Up") : doc.index(
+                "## Calyx Backend Naming Split"
+            )
+        ]
 
-        self.assertIn("reproducers/flat-scf-expand-shape-materialization/input.mlir", doc)
-        self.assertIn("mlir-opt --flatten-memref", doc)
-        self.assertIn("tinystories-representative-core-w4a8-flat-scf", doc)
-        self.assertIn("tinystories-representative-core-w4a8-calyx", doc)
-        self.assertIn("Calyx-stage diagnostic directory", doc)
-        self.assertIn("status: failed", doc)
-        self.assertIn("has-unsupported-calyx-float-frontier", doc)
-        self.assertIn('"unsupported_ops": {"math.rsqrt": 5}', doc)
-        self.assertIn("math.rsqrt", doc)
-        self.assertIn("no longer flat-SCF", doc)
+        self.assertIn(
+            "reproducers/flat-scf-expand-shape-materialization/input.mlir",
+            direct_linalg,
+        )
+        self.assertIn("mlir-opt --flatten-memref", direct_linalg)
+        self.assertIn("tinystories-representative-core-w4a8-flat-scf", direct_linalg)
+        self.assertIn("tinystories-representative-core-w4a8-calyx", direct_linalg)
+        self.assertIn("Calyx-stage diagnostic directory", direct_linalg)
+        self.assertIn("status: failed", direct_linalg)
+        self.assertIn("has-unsupported-calyx-float-frontier", direct_linalg)
+        self.assertIn('"unsupported_ops": {"math.rsqrt": 5}', direct_linalg)
+        self.assertIn("math.rsqrt", direct_linalg)
+        self.assertIn("no longer flat-SCF", direct_linalg)
+        self.assertIn("historical / pre-current-source-pin", direct_linalg)
+        self.assertIn("pending-rerun", direct_linalg)
+        self.assertIn("Historical verified flat-SCF output", direct_linalg)
+        self.assertNotIn("Current verified flat-SCF output", direct_linalg)
 
     def test_current_baseline_records_fixed_layernorm_frontier(self) -> None:
         doc = read("docs/current-baseline.md")
@@ -191,15 +203,20 @@ class PipelineClarityTest(unittest.TestCase):
         ]
 
         self.assertIn(
-            "tinystories-representative-core-w4a8-fixed-layernorm-calyx", doc
+            "tinystories-representative-core-w4a8-fixed-layernorm-calyx",
+            fixed_layernorm,
         )
-        self.assertIn('{"stage":"calyx","status":"ok","artifact":"model.calyx.mlir"}', doc)
-        self.assertIn('"status": "has-float-frontier"', doc)
-        self.assertIn('"total_float_ops": 883', doc)
-        self.assertIn('"total_unsupported_ops": 0', doc)
-        self.assertIn("primitives/float/divSqrtFN.futil", doc)
         self.assertIn(
-            "tinystories-representative-core-w4a8-fixed-layernorm-calyx-sv", doc
+            '{"stage":"calyx","status":"ok","artifact":"model.calyx.mlir"}',
+            fixed_layernorm,
+        )
+        self.assertIn('"status": "has-float-frontier"', fixed_layernorm)
+        self.assertIn('"total_float_ops": 883', fixed_layernorm)
+        self.assertIn('"total_unsupported_ops": 0', fixed_layernorm)
+        self.assertIn("primitives/float/divSqrtFN.futil", fixed_layernorm)
+        self.assertIn(
+            "tinystories-representative-core-w4a8-fixed-layernorm-calyx-sv",
+            fixed_layernorm,
         )
         self.assertIn("historical / pre-current-source-pin", fixed_layernorm)
         self.assertIn("pending-rerun", fixed_layernorm)

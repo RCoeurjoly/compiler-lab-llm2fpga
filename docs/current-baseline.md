@@ -13,9 +13,7 @@ Recorded on 2026-07-14.
 The current source provenance is upstream Calyx pinned at
 `5a4303847392609cad83dda6f4bdffc8cc0e5c89`; `0.7.1` is only its package-version
 label. The package-level float closure succeeds, and the full route produced
-Futil; native Calyx was killed during SV emission. No full-model SV, Yosys,
-mapping, FPGA utilization, nextpnr, board, equivalence, or SmoothQuant result
-exists. This is a compiler-execution frontier, not an out-of-context resource
+Futil; native Calyx was killed during SV emission. No full-model SV, RTLIL, Yosys, mapping, FPGA utilization, nextpnr, board, equivalence, or SmoothQuant result exists. This is a compiler-execution frontier, not an out-of-context resource
 estimate. See the [bounded Task 3 result report](results/2026-07-14-tinystories-w8a8-calyx-task3-utilization.md).
 
 ## Full TinyStories PT2E W8A8, TOSA Handshake scout
@@ -160,50 +158,57 @@ No textual MLIR rewrite is allowed as the fix. Acceptable fix classes are:
 5. After the legality blocker is fixed, rerun the same Calyx-SV package and
    record the next baseline.
 
-## Direct-Linalg No-Handshake Follow-Up
+## Direct-Linalg No-Handshake Follow-Up — Historical / pre-current-source-pin
 
-The TOSA failure is avoided by changing frontend dialects, not by rewriting
-MLIR text. The direct torch-to-Linalg no-handshake variant is exposed as:
+**Scope: historical / pre-current-source-pin; pending-rerun.** This entire
+section retains pre-current-source-pin direct-Linalg execution evidence. The
+source-code descriptions identify architectural facts; recorded output paths,
+diagnostics, and float-frontier counts are historical observations pending rerun
+and do not establish current execution results.
+
+In the historical route, the TOSA failure was avoided by changing frontend
+dialects, not by rewriting MLIR text. The checked-in direct torch-to-Linalg
+no-handshake route definition exposes:
 
 ```text
 tinystories-representative-core-w4a8-via-linalg-no-handshake
 ```
 
-The `linalg`, `scf`, and `flat-scf` stages build for this variant. The
-`flat-scf` blocker was minimized in:
+In the historical run, the `linalg`, `scf`, and `flat-scf` stages built for this
+variant. The `flat-scf` blocker was minimized in:
 
 ```text
 reproducers/flat-scf-expand-shape-materialization/input.mlir
 ```
 
-The fix is to use upstream MLIR `mlir-opt --flatten-memref` for the flat-SCF
-stage instead of CIRCT `circt-opt --flatten-memref`.
+The checked-in route definition uses upstream MLIR `mlir-opt --flatten-memref`
+for the flat-SCF stage instead of CIRCT `circt-opt --flatten-memref`; that is an
+architectural source-code fact, not current execution evidence.
 
-Current verified flat-SCF output for the original direct-Linalg W4A8
+Historical verified flat-SCF output for the original direct-Linalg W4A8
 representative-core route:
 
 ```text
 /nix/store/mhyl0plx7qsq655bpvs2829ndwkjq6hh-tinystories-representative-core-w4a8-flat-scf
 ```
 
-The same route now builds a Calyx-stage diagnostic directory:
+The same historical route produced a Calyx-stage diagnostic directory:
 
 ```text
 /nix/store/aghpvrlvjbflc0y4zwp8s3m03nkirx1v-tinystories-representative-core-w4a8-calyx
 ```
 
-Its `manifest.json` has `status: failed`, because `--lower-scf-to-calyx` does
-not produce `model.calyx.mlir` for this original PT2E route. The next
-direct-Linalg Calyx-SV frontier is therefore no longer flat-SCF. It is the
-pre-Calyx float/math path:
+Its recorded `manifest.json` had `status: failed`, because
+`--lower-scf-to-calyx` did not produce `model.calyx.mlir` for this original PT2E
+route. The recorded next direct-Linalg Calyx-SV frontier was therefore no longer flat-SCF; it was the pre-Calyx float/math path:
 
 ```text
 Unhandled operation during BuildOpGroups()
 math.rsqrt
 ```
 
-The generated `float-frontier.json` now records this as a machine-readable
-unsupported Calyx float frontier:
+The historical generated `float-frontier.json` recorded this as a
+machine-readable unsupported Calyx float frontier:
 
 ```json
 {
@@ -214,16 +219,16 @@ unsupported Calyx float frontier:
 }
 ```
 
-The Calyx-stage `manifest.json` also carries this compact summary under
-`float_frontier`, so the failing package can be triaged without parsing the full
-sample report.
+The historical Calyx-stage `manifest.json` also carried this compact summary
+under `float_frontier`, so the failing package could be triaged without parsing
+the full sample report.
 
-The constant `arith.truncf` blocker was fixed by adding a checked-in MLIR pass
-plugin, `llm2fpga-fold-constant-truncf`, and running it before Calyx lowering.
-The pass folds constant floating-point truncations in the compiler pipeline
-instead of rewriting MLIR text.
+The historical `arith.truncf` blocker was addressed with the checked-in MLIR
+pass plugin `llm2fpga-fold-constant-truncf` before Calyx lowering. The plugin
+encodes that source-code approach by folding constant floating-point truncations
+in the compiler pipeline instead of rewriting MLIR text.
 
-The direct-Linalg route previously failed at `calyx` on memref view/port
+The historical direct-Linalg route failed at `calyx` on memref view/port
 legality:
 
 ```text
@@ -231,58 +236,59 @@ Unhandled operation during BuildOpGroups()
 memref.reinterpret_cast
 ```
 
-The same Calyx attempt also reports:
+The same historical Calyx attempt also reported:
 
 ```text
 input memory dimension must be empty or one
 ```
 
-The current normalized input no longer contains the earlier
+The historical normalized input no longer contained the earlier
 `memref.extract_strided_metadata` crash pattern, because no-handshake
-bufferization now requests identity-layout function boundaries and the flat-SCF
-stage lowers affine index expressions after flattening.
+bufferization requested identity-layout function boundaries and the flat-SCF
+stage lowered affine index expressions after flattening.
 
-Static memref view and ranked-port failures are minimized in:
+Historical static memref view and ranked-port failures were minimized in:
 
 ```text
 reproducers/calyx-memref-view-port/
 ```
 
-The current compiler-pipeline fix is a checked-in MLIR pass plugin,
-`llm2fpga-lower-static-memref-views-for-calyx`, which presents static
-identity-layout function memrefs as one-dimensional Calyx memories and rewrites
-loads, stores, and copies through static views. `cf.assert` failures are
-minimized in:
+The checked-in MLIR pass plugin
+`llm2fpga-lower-static-memref-views-for-calyx` captured the historical route's
+compiler-pipeline fix: it presented static
+identity-layout function memrefs as one-dimensional Calyx memories and rewrote
+loads, stores, and copies through static views. Historical `cf.assert` failures
+were minimized in:
 
 ```text
 reproducers/calyx-cf-assert/
 ```
 
-The current compiler-pipeline fix is
-`llm2fpga-drop-calyx-unsupported-asserts`, which drops asserts under the valid
+The checked-in `llm2fpga-drop-calyx-unsupported-asserts` captured the
+historical route's compiler-pipeline fix by dropping asserts under the valid
 input-domain contract. This is only acceptable for generated guards that are
 already guaranteed by the exported model's shape/value domain.
 
-After those fixes, the direct-Linalg route reached:
+After those historical fixes, the direct-Linalg route reached:
 
 ```text
 Unhandled operation during BuildOpGroups()
 math.roundeven
 ```
 
-The first reduced reproducer is:
+The first reduced reproducer was:
 
 ```text
 reproducers/calyx-math-roundeven/input.mlir
 ```
 
-That is now handled by the checked-in
-`llm2fpga-lower-roundeven-for-calyx` MLIR pass. The pass lowers scalar `f32`
-round-to-nearest-even into explicit arith operations before Calyx lowering,
-under the finite `i32`-range contract used by the quantization pattern.
+The checked-in `llm2fpga-lower-roundeven-for-calyx` MLIR pass handled that
+historical blocker by lowering scalar `f32` round-to-nearest-even into explicit
+arith operations before Calyx lowering, under the finite `i32`-range contract
+used by the quantization pattern.
 
-After `roundeven` is lowered, the direct-Linalg representative-core route
-reaches the next Calyx blocker:
+After `roundeven` was lowered, the historical direct-Linalg representative-core
+route reached the next Calyx blocker:
 
 ```text
 Unhandled operation during BuildOpGroups()
@@ -295,36 +301,36 @@ The reduced reproducer is:
 reproducers/calyx-math-rsqrt/input.mlir
 ```
 
-The same normalized representative-core input also contains other `math`
+The same historical normalized representative-core input contained other `math`
 dialect operations, including `math.exp`, `math.fpowi`, and `math.tanh`. This
-makes a one-off floating-point workaround insufficient for getting
-representative-core to SV. The most promising route is to move the
+made a one-off floating-point workaround insufficient for getting
+representative-core to SV. The historical conclusion was to move the
 representative-core quantized model toward explicit integer hardware-core
-semantics, matching the existing `patterns/*/adapter_w4a8_core.py` direction,
-instead of trying to make Calyx accept floating-point quantization scaffolding.
+semantics, matching the `patterns/*/adapter_w4a8_core.py` direction, instead of
+trying to make Calyx accept floating-point quantization scaffolding.
 
-The direct CIRCT Calyx-to-HW/SV route is now exposed as the explicit
-`calyx-hw-sv` stage. This is the desired compiler-internal route:
+The checked-in source exposes the direct CIRCT Calyx-to-HW/SV route as the
+explicit `calyx-hw-sv` stage. This is an architectural route definition:
 
 ```text
 CIRCT Calyx MLIR -> --calyx-remove-groups -> --lower-calyx-to-hw
 -> --lower-seq-to-sv -> --lower-hw-to-sv -> --export-verilog
 ```
 
-It still fails on memory primitives:
+The recorded direct-CIRCT route failure was on memory primitives:
 
 ```text
 'calyx.seq_mem' op couldn't convert to core primitive
 ```
 
-The failure is not limited to external memories. A reduced documented
-`calyx.memory` case is tracked in:
+The historical failure was not limited to external memories. A reduced
+documented `calyx.memory` case was tracked in:
 
 ```text
 reproducers/calyx-memory-sv/input.mlir
 ```
 
-That reproducer also fails with:
+That reproducer also failed with:
 
 ```text
 'calyx.memory' op couldn't convert to core primitive
@@ -333,24 +339,24 @@ That reproducer also fails with:
 That backend issue needs an official Calyx/CIRCT lowering path or an actual
 CIRCT pass. Textual Calyx MLIR editing is not acceptable.
 
-A memory-free Calyx smoke test is tracked in:
+A memory-free Calyx smoke test remains tracked in:
 
 ```text
 reproducers/calyx-register-sv/input.mlir
 ```
 
-It emits SystemVerilog with this official CIRCT sequence:
+Its documented historical run emitted SystemVerilog with this official CIRCT
+sequence:
 
 ```text
 --calyx-remove-groups --lower-calyx-to-hw --lower-hw-to-sv --lower-seq-to-sv --export-verilog
 ```
 
-That sequence is not yet sufficient for the generated integer-core pattern:
-`--calyx-remove-groups` currently asserts on the full pattern Calyx artifact,
-while direct `--lower-calyx-to-hw` reports the clearer `calyx.seq_mem`
-legalization failure. The most promising short route to SV is therefore to keep
-debugging on the small integer-core pattern, using this reduced assertion
-target:
+For the historical generated integer-core pattern, that sequence was
+insufficient: `--calyx-remove-groups` asserted on the full pattern Calyx
+artifact, while direct `--lower-calyx-to-hw` reported the clearer
+`calyx.seq_mem` legalization failure. The documented short route to SV was to
+debug the small integer-core pattern using this reduced assertion target:
 
 ```text
 reproducers/calyx-remove-groups-invoke-memory/input.mlir
@@ -362,22 +368,25 @@ A smaller memory-free assertion target is:
 reproducers/calyx-remove-groups-invoke-ref/input.mlir
 ```
 
-That shows the assertion is caused by `calyx.invoke` with reference-cell
-bindings, not by memory ports specifically. After that assertion is fixed or
-avoided by an official pass sequence, address Calyx memory lowering or the
-external-memory ABI with an official pass sequence or a real CIRCT pass.
+That historical reproducer showed the assertion was caused by `calyx.invoke`
+with reference-cell bindings, not by memory ports specifically. After that
+assertion is fixed or avoided by an official pass sequence, address Calyx memory
+lowering or the external-memory ABI with an official pass sequence or a real
+CIRCT pass.
 
-The repo now has a checked-in CIRCT pass plugin home for that work:
+The repository contains a checked-in CIRCT pass plugin home for that work:
 
 ```text
 tools/circt-passes/
 ```
 
 The first pass, `llm2fpga-calyx-pipeline-sanity`, is intentionally a no-op. It
-exists to prove that a pass plugin built against the same CIRCT/MLIR 23 stack as
-`circt-opt` can be packaged by Nix and loaded by the backend tool. Semantic
-fixes for the `calyx.invoke`/reference-cell assertion or Calyx memory lowering
-should be added there as real CIRCT passes, not as textual Calyx MLIR edits.
+is a source-code fact that it proves a pass plugin built against the same
+CIRCT/MLIR 23 stack as `circt-opt` can be packaged by Nix and loaded by the
+backend tool; it is not current execution evidence for this historical route.
+Semantic fixes for the `calyx.invoke`/reference-cell assertion or Calyx memory
+lowering should be added there as real CIRCT passes, not as textual Calyx MLIR
+edits.
 
 ## Calyx Backend Naming Split — Historical / pre-current-source-pin
 
@@ -494,11 +503,11 @@ Yosys summary:
 ```
 
 These are Calyx/Yosys resource estimates, not placed FPGA utilization results.
-The native Calyx SV bundles are now synthesis-ingested by Yosys with the official
-primitive SV files plus generated definitions for official inline `compile.futil`
-primitives. Hardware-bound integer core models use single-shot slang ingestion;
-the per-file extern mode made generated Calyx memory and primitive modules
-invisible to `main.sv`.
+In these archival bundles, Yosys synthesis ingested native Calyx SV with the
+official primitive SV files plus generated `compile.sv` definitions for official
+inline `compile.futil` primitives. Hardware-bound integer core models used
+single-shot slang ingestion; the per-file extern mode made generated Calyx
+memory and primitive modules invisible to `main.sv`.
 
 The archival aggregate baseline was exposed as:
 
@@ -640,8 +649,7 @@ is not its current cause. Do not fix either route with textual Futil rewriting.
 ## Explicit-Integer Representative-Core Slice
 
 **Scope: historical / pre-current-source-pin; pending-rerun.** Preserve the
-following explicit-integer results and counts as archival observations; none has
-been rerun on the repaired source-list path.
+following explicit-integer results and counts as archival observations. The direct-Linalg Yosys-stat route was rerun only as a source-closure regression check and observed 41,451 cells. That source-closure smoke has not been accepted or promoted as a durable current resource baseline; it does not replace or alter the archival 41,652-cell table value below.
 
 The first representative-core-shaped route recorded as reaching Calyx-SV was a
 separate explicit-integer hardware slice:
@@ -658,7 +666,7 @@ compiler pipeline reach SV without textual rewrites or floating-point Futil
 patches, and to provide a concrete target for later equivalence testing against
 the quantized TinyStories subgraph.
 
-Verified direct-Linalg output:
+Historical verified direct-Linalg output:
 
 ```text
 /nix/store/kzfamfbxkp61ri2ng8gba630ch21iin0-tinystories-representative-core-w4a8-integer-calyx-sv
@@ -670,7 +678,7 @@ Native Calyx resource estimate:
 {"estimated_internal_bits": 652, "estimated_external_bits": 4576}
 ```
 
-The same direct-Linalg route now reaches RTLIL and Yosys `stat` through the
+The historical direct-Linalg route reached RTLIL and Yosys `stat` through the
 no-handshake alias:
 
 ```text
@@ -678,13 +686,13 @@ tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-il
 tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-yosys-stat
 ```
 
-Verified RTLIL output:
+Historical verified RTLIL output:
 
 ```text
 /nix/store/y633w90aa1qrqf39n0gvs6zh51szvqkj-tinystories-representative-core-w4a8-integer.il
 ```
 
-Verified Yosys `stat` output:
+Historical verified Yosys `stat` output:
 
 ```text
 /nix/store/093g854ypln2zfwnr6x7lpjv8i648bdj-tinystories-representative-core-w4a8-integer-yosys.stat
@@ -696,7 +704,7 @@ Yosys summary:
 {"num_cells": 41652, "num_memories": 85, "num_memory_bits": 4580}
 ```
 
-Verified TOSA output:
+Historical verified TOSA output:
 
 ```text
 /nix/store/v383f760ylzg6xpg5zld6gz7cfvr379z-tinystories-representative-core-w4a8-integer-calyx-sv
@@ -708,7 +716,7 @@ Native Calyx resource estimate:
 {"estimated_internal_bits": 696, "estimated_external_bits": 4640}
 ```
 
-Verified TOSA Yosys `stat` output:
+Historical verified TOSA Yosys `stat` output:
 
 ```text
 /nix/store/hnbv22sc5za4p7ynwb6b11gambf8jk0p-tinystories-representative-core-w4a8-integer-yosys.stat
@@ -720,24 +728,25 @@ Yosys summary:
 {"num_cells": 43269, "num_memories": 86, "num_memory_bits": 4644}
 ```
 
-Both frontend routes produce a clean Calyx-stage float frontier:
+Both historical frontend routes produced a clean Calyx-stage float frontier:
 
 ```json
 {"float_type_lines": 0, "op_counts": {}, "status": "ok", "total_float_ops": 0}
 ```
 
-The native Calyx SV bundle now includes generated `compile.sv` definitions for
-the official inline `compile.futil` primitives used by the emitted design:
-`undef`, `std_wire`, `std_add`, and `std_reg`. The no-handshake Calyx-SV stage
-also asks native Calyx for nested assignments, and the Yosys/slang scripts raise
-`--max-parse-depth` to handle generated Calyx expressions. These are packaging
-and frontend-ingestion fixes, not textual rewrites of model IR or Futil.
+The archival native Calyx SV bundle included generated `compile.sv` definitions
+for the official inline `compile.futil` primitives used by the emitted design:
+`undef`, `std_wire`, `std_add`, and `std_reg`. The historical no-handshake
+Calyx-SV stage asked native Calyx for nested assignments, and the Yosys/slang
+scripts raised `--max-parse-depth` to handle generated Calyx expressions. These
+were archival packaging and frontend-ingestion fixes, not textual rewrites of
+model IR or Futil.
 
-This validates the route choice: moving the representative core toward explicit
-integer hardware semantics removes the SoftFloat import blocker and allows the
-existing no-handshake Calyx-SV backend to emit `sv/main.sv`. The remaining work
-is to tighten the equivalence story against the quantized model and then expand
-this slice toward the full representative-core computation.
+These historical observations supported the route choice: moving the
+representative core toward explicit integer hardware semantics removed the
+SoftFloat import blocker and allowed the then-existing no-handshake Calyx-SV
+backend to emit `sv/main.sv`. They do not promote the archived counts or the
+source-closure smoke to a current resource baseline.
 
 ## Explicit-Integer SV Equivalence Baseline
 

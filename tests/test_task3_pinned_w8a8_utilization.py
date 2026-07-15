@@ -691,6 +691,10 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         )
         baseline = read("docs/current-baseline.md")
         adr = read("docs/adr/2026-07-13-calyx-memory-blackbox-diagnostic.md")
+        no_full_model_result = (
+            "No full-model SV, RTLIL, Yosys, mapping, FPGA utilization, "
+            "nextpnr, board, equivalence, or SmoothQuant result exists."
+        )
 
         self.assertEqual(result["status"], "frontier")
         self.assertEqual(result["stage"], "native-sv-generation")
@@ -704,18 +708,7 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
         self.assertIn("exit_status: 1", report)
         self.assertIn("resources: null", report)
         self.assertIn("No mapped resource estimate exists", report)
-        self.assertIn(
-            "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-utilization",
-            baseline,
-        )
-        self.assertIn("XC7K480T", baseline)
-        self.assertIn("native-sv-generation", baseline)
-        self.assertIn("no mapped resource estimate", baseline)
-        self.assertIn(
-            "Compact evidence: `completed_stages: []`; `resources: null`; "
-            "FPGA fit remains unresolved.",
-            baseline,
-        )
+        self.assertIn(no_full_model_result, report)
         self.assertIn("Task 3 pinned", adr)
         self.assertIn("not a final mapped utilization result", adr)
         self.assertIn("native-SV generation", adr)
@@ -725,6 +718,16 @@ class Task3PinnedW8A8UtilizationTest(unittest.TestCase):
             baseline,
             "Full TinyStories PT2E W8A8, Task 3 pinned Calyx utilization frontier",
         )
+        for text in [
+            "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-utilization",
+            "XC7K480T",
+            "native-sv-generation",
+            "no mapped resource estimate",
+            "Compact evidence: `completed_stages: []`; `resources: null`; "
+            "FPGA fit remains unresolved.",
+            no_full_model_result,
+        ]:
+            self.assertIn(text, baseline_scope)
         self.assertIn("native Calyx was killed during SV emission", baseline_scope)
         self.assertIn("5a4303847392609cad83dda6f4bdffc8cc0e5c89", baseline_scope)
         adr_scope = select_paragraph_starting_with(

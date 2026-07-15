@@ -40,8 +40,7 @@ is:
 Native Calyx-to-SV failed.
 ```
 
-No full-model SV, Yosys, mapping, or utilization result exists. The detailed
-command and failure record is in
+No full-model SV, RTLIL, Yosys, mapping, FPGA utilization, nextpnr, board, equivalence, or SmoothQuant result exists. The detailed command and failure record is in
 `.superpowers/sdd/calyx-float-task-4-report.md`; raw logs are intentionally not
 copied into this documentation or the compact artifact bundle.
 
