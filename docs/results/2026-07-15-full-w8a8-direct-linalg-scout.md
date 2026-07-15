@@ -74,10 +74,17 @@ error: failed to legalize operation 'arith.uitofp' that was explicitly marked
 illegal: ... (i1) -> f32
 ```
 
-Its accompanying float-frontier report has 4,061 float operations and zero
-operations classified as unsupported. The immediate failure is therefore an
-integer-to-float legalization gap at the Calyx boundary, rather than a TOSA
-failure or an unsupported-math classification.
+Its accompanying float-frontier scanner counted 4,061 recognized floating-point
+operations and zero operations in its narrow unsupported-operation
+classification. That scanner does not recognize `arith.uitofp`; the input
+nevertheless contains the failing `i1`-to-`f32` conversion. The count is
+therefore not a complete float/conversion frontier. The immediate failure is
+an integer-to-float legalization gap at the Calyx boundary, rather than a TOSA
+failure; its absence from the unsupported-math classification does not imply
+that the conversion is supported.
+
+Native-SV lowering was not attempted because `lower-scf-to-calyx` did not
+produce a Calyx artifact.
 
 The existing [pre-Calyx resource-scout pass](../../nix/pipeline.nix),
 `llm2fpga-lower-scout-math-for-calyx`, remains active for
