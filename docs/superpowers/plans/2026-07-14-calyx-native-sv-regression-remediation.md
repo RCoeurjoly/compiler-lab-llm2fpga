@@ -45,15 +45,20 @@
   ```futil
   import "primitives/core.futil";
 
-  component main(@go go: 1) -> (@done done: 1) {
-    cells { add = std_add(32); }
-    wires {
-      group add_constants {
-        add.left = 32'd1;
-        add.right = 32'd2;
-        add_constants[done] = 1'd1;
-      }
+component main(@go go: 1) -> (@done done: 1) {
+  cells {
+    add = std_add(32);
+    result = std_reg(32);
+  }
+  wires {
+    group add_constants {
+      add.left = 32'd1;
+      add.right = 32'd2;
+      result.in = add.out;
+      result.write_en = 1'd1;
+      add_constants[done] = result.done;
     }
+  }
     control { seq { add_constants; } }
   }
   ```
@@ -72,7 +77,7 @@
 
 - [ ] **Step 3: Add the native integer Nix self-test**
 
-  In `flake.nix`, mirror `calyxFloatLibrarySelftest` with `calyxIntegerLibrarySelftest`. It must run the pinned `calyx` on the new Futil, write `main.sv`, assert it contains both `module std_add` and `module std_fp_add` with a whitespace-aware Python regex, write a one-line `sources.f`, then invoke `yosys-slang` with:
+  In `flake.nix`, mirror `calyxFloatLibrarySelftest` with `calyxIntegerLibrarySelftest`. It must run the pinned `calyx` on the new Futil, write `main.sv`, assert it contains both `module std_add` and `module std_reg` with a whitespace-aware Python regex, write a one-line `sources.f`, then invoke `yosys-slang` with:
 
   ```text
   read_slang --threads 1 --no-proc --max-parse-depth 20000 --top main $out/main.sv
@@ -99,7 +104,7 @@
   python3 -m unittest tests.test_calyx_float_nix_package tests.test_representative_core_no_handshake_sv -v
   nix build .#calyx-float-library-selftest -L
   nix build .#calyx-integer-library-selftest -L
-  nix build .#pattern-linear-w4a8-core-via-tosa-no-handshake-yosys-stat -L
+  nix build .#tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-yosys-stat -L
   git diff --check
   ```
 
