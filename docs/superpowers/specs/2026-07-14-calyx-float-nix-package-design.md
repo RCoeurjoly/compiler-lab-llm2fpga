@@ -149,6 +149,33 @@ The fixture establishes only the Calyx/HardFloat library and native-SV source
 closure. It is not evidence that the full TinyStories W8A8 route emits SV,
 that Yosys accepts that full design, or that it fits an FPGA.
 
+## Full W8A8 native-SV retry (Task 4)
+
+The required full-model command was run outside the workspace sandbox:
+
+```text
+nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-native-sv -L
+```
+
+It exited 1 at the native-SV generation frontier. The failed derivation was
+`/nix/store/2zmb3z0602x6s109j8mmcw9l7fg1j0vc-tinystories-w8a8-calyx-native-sv.drv`;
+its inspectable failed output is
+`/nix/store/2mrlpwn1ibvxsfxhqp6j1jfv66vmrvjk-tinystories-w8a8-calyx-native-sv`.
+
+The W8A8 Linalg, SCF, flat-SCF, and lower-SCF-to-Calyx stages completed. The
+named output contains the resulting `model.futil` (18,613,223 bytes) and a
+Calyx manifest with `stage: "calyx"` and `status: "ok"`. Native Calyx then
+started `calyx model.futil -l <packaged calyx library> -b verilog --synthesis
+--nested -d papercut -o sv/main.sv`. The operating system killed that process
+during SV emission. Immediately before the kill, live telemetry reported about
+28.6 GiB RSS, about 450 MiB host RAM available, and no usable swap. The native
+log also records that data-path inference did not converge after five
+iterations, `cell-share` took 103999 ms, and `compile-invoke` took 121417 ms.
+
+This is a full-model native-Calyx memory frontier. The failed output has no
+generated `main.sv`; consequently the route did not reach full TinyStories
+SV/Yosys, Task 3 mapping, or any FPGA-fit result.
+
 ## Scope and non-goals
 
 This change restores a reproducible Calyx float-library dependency boundary.

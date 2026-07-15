@@ -22,28 +22,35 @@ records `status: "frontier"`, `completed_stages: []`, terminal stage
 `"native-sv-generation"`, and `exit_status: 1`. Its exact command was:
 
 ```text
-nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-task3-main1-il --out-link /tmp/llm2fpga-gcroots/tinystories-w8a8-calyx-task3-main1-il -L
+nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-native-sv -L
 ```
 
-`lower-scf-to-calyx` completed. The following native-SV generation failed
-before RTLIL or Yosys because CIRCT-exported Futil imports float primitive files
-that are absent from the pinned Calyx 0.7.1 library. The detailed diagnostic is
-recorded in `.superpowers/sdd/task-4-report.md`; raw logs are intentionally not
+`completed_stages: []` means that no Task 3 mapping stage completed. Before
+the frontier, the full W8A8 Linalg, SCF, flat-SCF, and lower-SCF-to-Calyx
+stages completed and produced a 18,613,223-byte `model.futil`. The failed
+derivation was
+`/nix/store/2zmb3z0602x6s109j8mmcw9l7fg1j0vc-tinystories-w8a8-calyx-native-sv.drv`;
+its inspectable failed output is
+`/nix/store/2mrlpwn1ibvxsfxhqp6j1jfv66vmrvjk-tinystories-w8a8-calyx-native-sv`.
+
+Native Calyx began the Verilog export and was killed by the operating system
+during SV emission. The named output has no `sv/main.sv`, so the full model did
+not reach SystemVerilog, RTLIL, or Yosys. Its native-Calyx log records
+data-path inference not converging after five iterations, `cell-share:
+103999ms`, and `compile-invoke: 121417ms`. Live telemetry immediately before
+the kill reported about 28.6 GiB RSS, about 450 MiB available host RAM, and no
+usable swap. The detailed command and failure record is in
+`.superpowers/sdd/calyx-float-task-4-report.md`; raw logs are intentionally not
 copied into this documentation or the compact artifact bundle.
 
 ## Resources
 
-No mapped resource estimate exists (`resources: null`). The monitor recorded a
-frontend peak of `peak_vmrss_kb: 567136` for `nix` and an empty
-`last_stage_line: ""`. Consequently this route has no LUT, FF, BRAM, DSP,
-nextpnr, or board figures.
-
-The monitor inputs briefly overlapped during execution; this is an execution
-caveat only and does not change the recorded frontier.
+No mapped resource estimate exists (`resources: null`). Consequently this
+route has no LUT, FF, BRAM, DSP, nextpnr, or board figures.
 
 ## Interpretation
 
-This is a compiler compatibility frontier, not an out-of-context resource
+This is a native-Calyx memory frontier, not an out-of-context resource
 estimate. It is not a DDR3 controller, board implementation, nextpnr result,
 or numerical-equivalence result.
 

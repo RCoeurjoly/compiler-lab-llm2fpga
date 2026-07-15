@@ -1,5 +1,5 @@
 {
-  "command": "nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-task3-main1-il --out-link /tmp/llm2fpga-gcroots/tinystories-w8a8-calyx-task3-main1-il -L",
+  "command": "nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-native-sv -L",
   "completed_stages": [],
   "downstream": {
     "ddr3_controller_present": false,
@@ -14,7 +14,29 @@
     "port_count": 12802,
     "verification": "expected-unverified"
   },
-  "monitor_summary": "command: nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-task3-main1-il --out-link /tmp/llm2fpga-gcroots/tinystories-w8a8-calyx-task3-main1-il -L \nexit_status: 1\nwall_seconds: 13899\nsample_interval_seconds: 5\npeak_vmrss_kb: 567136\npeak_vmrss_pid: 2238579\npeak_vmrss_name: nix\npeak_vmhwm_kb: 567136\npeak_vmhwm_pid: 2238579\npeak_vmhwm_name: nix\nlast_stage_line: \n",
+  "monitor_summary": "command: nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-native-sv -L\nexit_status: 1\ntelemetry_source: privileged controller\npeak_rss: approximately 28.6 GiB during native Calyx SV emission\nhost_available_ram: approximately 450 MiB immediately before kill\nusable_swap: none\n",
+  "native_sv_frontier": {
+    "calyx_manifest": {
+      "stage": "calyx",
+      "status": "ok"
+    },
+    "failed_derivation": "/nix/store/2zmb3z0602x6s109j8mmcw9l7fg1j0vc-tinystories-w8a8-calyx-native-sv.drv",
+    "failed_output": "/nix/store/2mrlpwn1ibvxsfxhqp6j1jfv66vmrvjk-tinystories-w8a8-calyx-native-sv",
+    "failure": "operating system killed native Calyx during SystemVerilog emission",
+    "model_futil_bytes": 18613223,
+    "native_calyx_log": {
+      "cell_share_ms": 103999,
+      "compile_invoke_ms": 121417,
+      "data_path_infer": "did not converge after 5 iterations"
+    },
+    "sv_main_produced": false,
+    "upstream_completed_stages": [
+      "linalg",
+      "scf",
+      "flat-scf",
+      "lower-scf-to-calyx"
+    ]
+  },
   "resources": null,
   "route": "PyTorch PT2E W8A8 -> Torch-MLIR -> TOSA -> Linalg -> SCF -> Calyx -> native SV -> Task 3 Xilinx synthesis",
   "schema_version": 1,
