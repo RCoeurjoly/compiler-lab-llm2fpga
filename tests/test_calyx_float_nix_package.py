@@ -77,22 +77,46 @@ class CalyxFloatNixPackageTest(unittest.TestCase):
         self.assertIn('hierarchy -top main -check', flake)
         self.assertIn('"calyx-float-library" = calyxFloatLibrarySelftest;', flake)
 
-    def test_float_exports_use_the_tested_main_sv_closure(self) -> None:
+    def test_integer_reproducer_and_native_selftest_are_declared(self) -> None:
+        fixture = (ROOT / "reproducers/calyx-integer-library-selftest/input.futil")
+        readme = (ROOT / "reproducers/calyx-integer-library-selftest/README.md")
+        flake = (ROOT / "flake.nix").read_text(encoding="utf-8")
+
+        self.assertTrue(fixture.exists())
+        self.assertTrue(readme.exists())
+        source = fixture.read_text(encoding="utf-8")
+        readme_text = readme.read_text(encoding="utf-8")
+        self.assertIn('import "primitives/core.futil";', source)
+        self.assertIn('add = std_add(32);', source)
+        self.assertIn("library closure", readme_text)
+        self.assertIn("not numerical-equivalence evidence", readme_text)
+        self.assertIn('calyxIntegerLibrarySelftest = pkgs.runCommand', flake)
+        self.assertIn('"calyx-integer-library-selftest"', flake)
+        self.assertIn(
+            '${./reproducers/calyx-integer-library-selftest/input.futil} \\', flake
+        )
+        self.assertIn('for module in ("std_add", "std_reg"):', flake)
+        self.assertIn('"calyx-integer-library" = calyxIntegerLibrarySelftest;', flake)
+
+    def test_native_exports_use_the_tested_main_sv_closure(self) -> None:
         script = (ROOT / "scripts/pipeline/calyx_to_sv_no_handshake.sh").read_text(
             encoding="utf-8"
         )
+        pipeline = (ROOT / "nix/pipeline.nix").read_text(encoding="utf-8")
 
-        self.assertIn('uses_float_extern=0', script)
-        self.assertIn(
-            'if [[ "$import_path" == primitives/float/* ]]; then', script
-        )
-        self.assertNotIn('primitives/float.futil', script)
-        self.assertIn('if [[ "$uses_float_extern" -eq 1 ]]; then', script)
         self.assertIn('printf \'%s\\n\' "$output_dir/sv/main.sv" >"$output_dir/sources.f"', script)
-        self.assertIn('"$output_dir/sv/compile.sv"', script)
-        self.assertIn('$calyx_lib/primitives/core.sv', script)
-        self.assertIn('$calyx_lib/primitives/binary_operators.sv', script)
-        self.assertIn('$calyx_lib/primitives/memories/seq.sv', script)
+        self.assertNotIn('uses_float_extern', script)
+        self.assertNotIn('CALYX_COMPILE_PRIMITIVES_TO_SV', script)
+        self.assertNotIn('calyx_compile_primitives_to_sv.py', script)
+        self.assertNotIn('compile.futil', script)
+        self.assertNotIn('compile.sv', script)
+        self.assertNotIn('primitives/core.sv', script)
+        self.assertNotIn('primitives/binary_operators.sv', script)
+        self.assertNotIn('primitives/memories/seq.sv', script)
+        self.assertNotIn('CALYX_COMPILE_PRIMITIVES_TO_SV', pipeline)
+        self.assertFalse(
+            (ROOT / "scripts/pipeline/calyx_compile_primitives_to_sv.py").exists()
+        )
         self.assertNotIn('mktemp /tmp/calyx_', script)
 
 

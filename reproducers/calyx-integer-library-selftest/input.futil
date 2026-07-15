@@ -1,0 +1,18 @@
+import "primitives/core.futil";
+
+component main(@go go: 1) -> (@done done: 1) {
+  cells {
+    add = std_add(32);
+    result = std_reg(32);
+  }
+  wires {
+    group add_constants {
+      add.left = 32'd1;
+      add.right = 32'd2;
+      result.in = add.out;
+      result.write_en = 1'd1;
+      add_constants[done] = result.done;
+    }
+  }
+  control { seq { add_constants; } }
+}

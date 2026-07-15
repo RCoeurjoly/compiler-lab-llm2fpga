@@ -2,7 +2,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-compile_primitives_to_sv="${CALYX_COMPILE_PRIMITIVES_TO_SV:-$SCRIPT_DIR/calyx_compile_primitives_to_sv.py}"
 normalize_for_export="${CALYX_NORMALIZE_FOR_EXPORT:-$SCRIPT_DIR/normalize_calyx_for_export.py}"
 normalize_futil_constants="${CALYX_NORMALIZE_FUTIL_CONSTANTS:-$SCRIPT_DIR/normalize_futil_float_constants.py}"
 
@@ -92,13 +91,9 @@ python3 "$normalize_futil_constants" "$tmp_exported_futil" "$output_dir/model.fu
   >"$output_dir/logs/normalize-futil-float-constants.log" 2>&1
 
 missing_imports=()
-uses_float_extern=0
 while IFS= read -r import_path; do
   if [[ ! -f "$calyx_lib/$import_path" ]]; then
     missing_imports+=("$import_path")
-  fi
-  if [[ "$import_path" == primitives/float/* ]]; then
-    uses_float_extern=1
   fi
 done < <(sed -n 's/^import "\([^"]*\)";$/\1/p' "$output_dir/model.futil")
 
@@ -175,20 +170,7 @@ if external:
 Path(sys.argv[2]).write_text(json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8")
 PY
 
-if [[ "$uses_float_extern" -eq 1 ]]; then
-  printf '%s\n' "$output_dir/sv/main.sv" >"$output_dir/sources.f"
-else
-  python3 "$compile_primitives_to_sv" \
-    --compile-futil "$calyx_lib/primitives/compile.futil" \
-    --output "$output_dir/sv/compile.sv"
-  cat >"$output_dir/sources.f" <<EOF
-$output_dir/sv/compile.sv
-$calyx_lib/primitives/core.sv
-$calyx_lib/primitives/binary_operators.sv
-$calyx_lib/primitives/memories/seq.sv
-$output_dir/sv/main.sv
-EOF
-fi
+printf '%s\n' "$output_dir/sv/main.sv" >"$output_dir/sources.f"
 
 cat >"$output_dir/manifest.json" <<'JSON'
 {"backend":"native-calyx","resources":"resources.json","stage":"calyx-sv","status":"ok","sources":"sources.f"}

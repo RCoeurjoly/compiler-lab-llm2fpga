@@ -166,7 +166,6 @@ let
     pkgs.runCommand "${name}-calyx-native-sv" {
       buildInputs = [ circt calyxTool python ];
     } ''
-      export CALYX_COMPILE_PRIMITIVES_TO_SV=${pipelineScripts}/calyx_compile_primitives_to_sv.py
       export CALYX_NORMALIZE_FOR_EXPORT=${pipelineScripts}/normalize_calyx_for_export.py
       export CALYX_NORMALIZE_FUTIL_CONSTANTS=${pipelineScripts}/normalize_futil_float_constants.py
       ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \

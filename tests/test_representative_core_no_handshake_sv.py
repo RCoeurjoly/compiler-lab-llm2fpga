@@ -123,23 +123,26 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
             REPO_ROOT / "scripts" / "pipeline" / "calyx_to_sv_no_handshake.sh"
         ).read_text(encoding="utf-8")
         pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
-        generator = (
-            REPO_ROOT / "scripts" / "pipeline" / "calyx_compile_primitives_to_sv.py"
-        ).read_text(encoding="utf-8")
 
         self.assertIn("--export-calyx", script)
         self.assertIn("-b verilog", script)
         self.assertIn("--nested", script)
         self.assertIn("--synthesis", script)
         self.assertIn("-d papercut", script)
-        self.assertIn("compile.sv", script)
-        self.assertIn("module std_const", generator)
-        self.assertIn("CALYX_COMPILE_PRIMITIVES_TO_SV", script)
-        self.assertIn("CALYX_COMPILE_PRIMITIVES_TO_SV", pipeline)
-        self.assertIn("calyx_compile_primitives_to_sv.py", script)
-        self.assertIn("primitives/core.sv", script)
-        self.assertIn("primitives/binary_operators.sv", script)
-        self.assertIn("primitives/memories/seq.sv", script)
+        self.assertIn(
+            "printf '%s\\n' \"$output_dir/sv/main.sv\" >\"$output_dir/sources.f\"",
+            script,
+        )
+        self.assertNotIn("CALYX_COMPILE_PRIMITIVES_TO_SV", script)
+        self.assertNotIn("CALYX_COMPILE_PRIMITIVES_TO_SV", pipeline)
+        self.assertNotIn("calyx_compile_primitives_to_sv.py", script)
+        self.assertNotIn("compile.sv", script)
+        self.assertNotIn("primitives/core.sv", script)
+        self.assertNotIn("primitives/binary_operators.sv", script)
+        self.assertNotIn("primitives/memories/seq.sv", script)
+        self.assertFalse(
+            (REPO_ROOT / "scripts/pipeline/calyx_compile_primitives_to_sv.py").exists()
+        )
         self.assertIn("-b resources", script)
         self.assertIn("resources.json", script)
         self.assertIn("missing-calyx-imports.txt", script)
@@ -147,11 +150,6 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("Use a version-aligned official Calyx library", script)
         self.assertIn("json.load", script)
         self.assertNotIn('grep -q \'"status":"ok"\'', script)
-        self.assertIn("std_reg", generator)
-        self.assertIn("std_wire", generator)
-        self.assertIn("std_add", generator)
-        self.assertIn("undef", generator)
-        self.assertIn("compile.futil", generator)
         self.assertNotIn("handshake", script.lower())
 
     def test_no_handshake_backends_are_named_by_calyx_route(self) -> None:
