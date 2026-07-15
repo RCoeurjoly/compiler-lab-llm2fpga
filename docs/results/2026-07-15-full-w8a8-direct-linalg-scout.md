@@ -55,7 +55,7 @@ package. The immutable active-variant record is:
 | flat-SCF | `/nix/store/1pnjvyyzm4249rk7qs8gwimn9nk4k9pb-tinystories-w8a8-flat-scf` | Artifact produced, but `manifest.json` has `status: blocked`; its diagnostic reports 339 `memref.reinterpret_cast`, 115 `memref.copy`, 43 `memref.expand_shape`, and 13 `memref.collapse_shape`. |
 | Calyx | `/nix/store/c7slna7w1vw6bhvsdn505w001igsl17x-tinystories-w8a8-calyx` | Frontier; its manifest records `status: failed`, `exit_code: 1`, and reason `lower-scf-to-calyx did not produce a Calyx artifact`. |
 
-Commands executed:
+Reproduction commands:
 
 ```sh
 nix build .#tinystories-w8a8-via-linalg-no-handshake-torch -L --no-link
