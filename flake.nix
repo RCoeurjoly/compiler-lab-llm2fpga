@@ -499,6 +499,14 @@
             stages = noHandshakeStages;
           }
           {
+            alias = "tinystories-w8a8-via-linalg-no-handshake";
+            model = "tinystories-w8a8";
+            frontend = "linalg";
+            backend = "calyx-native-sv";
+            packages = pipelineStagePackagesNoHandshake;
+            stages = noHandshakeLinalgStages;
+          }
+          {
             alias =
               "tinystories-representative-core-w4a8-via-linalg-no-handshake";
             model = "tinystories-representative-core-w4a8";

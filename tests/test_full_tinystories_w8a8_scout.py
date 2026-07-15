@@ -98,6 +98,25 @@ class FullTinyStoriesW8A8ScoutTest(unittest.TestCase):
         self.assertIn("packages = pipelineStagePackagesTosaNoHandshake", block)
         self.assertIn("stages = noHandshakeStages", block)
 
+    def test_full_model_w8a8_has_public_linalg_no_handshake_alias(self) -> None:
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+
+        match = re.search(
+            r'alias = "tinystories-w8a8-via-linalg-no-handshake";.*?^          \}',
+            flake,
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        block = match.group(0)
+
+        self.assertIn('model = "tinystories-w8a8"', block)
+        self.assertIn('frontend = "linalg"', block)
+        self.assertIn('backend = "calyx-native-sv"', block)
+        self.assertIn("packages = pipelineStagePackagesNoHandshake", block)
+        self.assertIn("stages = noHandshakeLinalgStages", block)
+        self.assertNotIn('frontend = "tosa"', block)
+        self.assertNotIn("pipelineStagePackagesTosaNoHandshake", block)
+
     def test_full_model_w8a8_has_tosa_handshake_sv_alias(self) -> None:
         flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
         match = re.search(
