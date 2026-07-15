@@ -117,6 +117,18 @@ class FullTinyStoriesW8A8ScoutTest(unittest.TestCase):
         self.assertNotIn('frontend = "tosa"', block)
         self.assertNotIn("pipelineStagePackagesTosaNoHandshake", block)
 
+    def test_full_linalg_scout_records_postfix_boundary(self) -> None:
+        doc = (
+            REPO_ROOT
+            / "docs"
+            / "results"
+            / "2026-07-15-full-w8a8-direct-linalg-scout.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("completed-with-residuals", doc)
+        self.assertIn("pre-calyx-legality.json", doc)
+        self.assertNotIn("flat-SCF artifact whose manifest is `blocked`", doc)
+
     def test_full_model_w8a8_has_tosa_handshake_sv_alias(self) -> None:
         flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
         match = re.search(

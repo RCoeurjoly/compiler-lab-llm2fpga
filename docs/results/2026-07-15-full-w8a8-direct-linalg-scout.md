@@ -2,104 +2,105 @@
 
 ## Result
 
-**Frontier:** `lower-scf-to-calyx` failed. The actual frozen full TinyStories
-PT2E W8A8 export produced Direct-Linalg and SCF artifacts, then a flat-SCF
-artifact whose manifest is `blocked`, without a TOSA stage. Calyx lowering
-then failed because it cannot legalize `arith.uitofp` from `i1` to `f32`.
+**Frontier:** the frozen full TinyStories PT2E W8A8 graph now crosses the
+previous `arith.uitofp i1 -> f32` Calyx boundary. Its normalized pre-Calyx
+input has a clean census for that conversion and the selected residual memref
+forms. CIRCT instead stops at eight `math.fpowi` operations, all with a
+constant integer exponent of three.
 
-The terminal Calyx manifest says that lowering did not produce a Calyx
-artifact. This report therefore contains no SystemVerilog, RTLIL, Yosys
-statistic, technology-mapping, or XC7K480T-utilization result for this route.
+This is a real full-model result for the deliberately non-TOSA route:
+
+```text
+PyTorch ExportedProgram -> Torch-MLIR -> Direct Linalg -> SCF -> flat-SCF -> Calyx
+```
+
+It is not yet a Calyx, SystemVerilog, RTLIL, Yosys, technology-mapping, or
+XC7K480T-utilization result. The stage stopped before any of those artifacts
+could exist.
 
 ## Input and route
 
-The [existing `tinystories-w8a8` registration](../../nix/models.nix) defines
-the input as:
+The [existing `tinystories-w8a8` registration](../../nix/models.nix) supplies:
 
-- full `roneneldan/TinyStories-1M` checkpoint;
+- the full `roneneldan/TinyStories-1M` checkpoint;
 - XNNPACK PT2E static W8A8 export;
-- frozen single-token zero-input calibration;
-- exported example input shape `[1, 1]`, `torch.int64`;
-- immutable model-registry metadata:
-  `/nix/store/rw92gzhvn79sr08kywssh04fm3kazzwd-model-registry.json`;
-- immutable exported-program output:
-  `/nix/store/z7jmd8998f0xbz6qy3gcmx9r2s616m0h-tinystories-w8a8-pytorch-exported`.
+- frozen single-token zero-input calibration; and
+- exported example input shape `[1, 1]`, `torch.int64`.
 
-The [new public alias](../../flake.nix) is:
+The public alias is:
 
 ```text
 tinystories-w8a8-via-linalg-no-handshake
 ```
 
-Its route is deliberately:
+It selects `pipelineStagePackagesNoHandshake` and `noHandshakeLinalgStages`.
+There is no TOSA stage in this experiment. It must not be conflated with the
+separate explicit-integer representative-core experiment, which is a
+micro-slice with literal tensors rather than this checkpoint-backed PT2E
+graph.
 
-```text
-PyTorch ExportedProgram → Torch-MLIR → Direct Linalg → SCF → flat-SCF → Calyx
-```
-
-It uses `pipelineStagePackagesNoHandshake` and `noHandshakeLinalgStages`; the
-[alias and stage list](../../flake.nix) contain no TOSA stage or TOSA pipeline
-package. The immutable active-variant record is:
-
-```text
-/nix/store/bz5h2f6ndv3bsibka07kcl8ybxgssi6z-active-pipeline-variants.json
-```
-
-## Completed stages
+## Current stage evidence
 
 | Stage | Immutable Nix output | Observation |
 |---|---|---|
 | Torch MLIR | `/nix/store/hnlj9dv35jg933mlvhn4abzv3lfcxn0m-tinystories-w8a8-torch.mlir` | Completed. |
-| Direct Linalg | `/nix/store/dq4smgfzgi03kpnq10dklzmw6iam3bsx-tinystories-w8a8-linalg.mlir` | Completed, with Torch-MLIR warnings that several attention matmuls have partially traced quantized operands and remain QDQ-shaped. |
-| SCF | `/nix/store/am3cz1bh69ahp4xn8n5y7vksjilb7qq3-tinystories-w8a8-scf.mlir` | Completed. |
-| flat-SCF | `/nix/store/1pnjvyyzm4249rk7qs8gwimn9nk4k9pb-tinystories-w8a8-flat-scf` | Artifact produced, but `manifest.json` has `status: blocked`; its diagnostic reports 339 `memref.reinterpret_cast`, 115 `memref.copy`, 43 `memref.expand_shape`, and 13 `memref.collapse_shape`. |
-| Calyx | `/nix/store/c7slna7w1vw6bhvsdn505w001igsl17x-tinystories-w8a8-calyx` | Frontier; its manifest records `status: failed`, `exit_code: 1`, and reason `lower-scf-to-calyx did not produce a Calyx artifact`. |
+| Direct Linalg | `/nix/store/rl3zkby142if1wzy6f1663lxx4nslgk2-tinystories-w8a8-linalg.mlir` | Completed. Torch-MLIR still warns that several attention matmuls have partially traced quantized operands and remain QDQ-shaped. |
+| SCF | `/nix/store/zbgi6sa7dcg0q3c6w6grz7b1713yhizh-tinystories-w8a8-scf.mlir` | Completed. |
+| flat-SCF | `/nix/store/wfrf67k43gvas5fr5v326jh6y3cmnz24-tinystories-w8a8-flat-scf` | `manifest.json` is `completed-with-residuals`. Its raw blocker report records 339 `memref.reinterpret_cast`, 115 `memref.copy`, 43 `memref.expand_shape`, and 13 `memref.collapse_shape` operations. |
+| Pre-Calyx legality census | `/nix/store/bsvxck5ij1gkj2csmwjxivk4q5830nnl-tinystories-w8a8-calyx/pre-calyx-legality.json` | `status: ok`; no selected prohibited operations in the normalized input, including no `arith.uitofp`. This narrow census does not assert general Calyx legality. |
+| Calyx | `/nix/store/bsvxck5ij1gkj2csmwjxivk4q5830nnl-tinystories-w8a8-calyx` | `manifest.json` is `failed`, with `exit_code: 1`: `lower-scf-to-calyx` did not produce `model.calyx.mlir`. |
 
-Reproduction commands:
+The raw flat-SCF residual report and the clean pre-Calyx census describe
+different boundaries: the former preserves raw lowering diagnostics; the
+latter examines the normalized input actually handed to CIRCT. The latter is
+clean only for its deliberately narrow list, not a claim that every operation
+is supported.
+
+Reproduce the evaluated boundary with:
 
 ```sh
-nix build .#tinystories-w8a8-via-linalg-no-handshake-torch -L --no-link
-nix build .#tinystories-w8a8-via-linalg-no-handshake-linalg -L --no-link --print-out-paths
-nix build .#tinystories-w8a8-via-linalg-no-handshake-scf -L --no-link --print-out-paths
-nix build .#tinystories-w8a8-via-linalg-no-handshake-flat-scf -L --no-link --print-out-paths
 nix build .#tinystories-w8a8-via-linalg-no-handshake-calyx -L --no-link --print-out-paths
 ```
 
 ## Terminal diagnostic
 
-The Calyx-stage `lower-scf-to-calyx.log` reports:
+`lower-scf-to-calyx.log` reports its first substantive failure in CIRCT's
+`BuildOpGroups()`:
 
 ```text
-error: failed to legalize operation 'arith.uitofp' that was explicitly marked
-illegal: ... (i1) -> f32
+error: Unhandled operation during BuildOpGroups()
+%608 = math.fpowi %607, %c3_i64 : f32, i64
 ```
 
-Its accompanying float-frontier scanner counted 4,061 recognized floating-point
-operations and zero operations in its narrow unsupported-operation
-classification. That scanner does not recognize `arith.uitofp`; the input
-nevertheless contains the failing `i1`-to-`f32` conversion. The count is
-therefore not a complete float/conversion frontier. The immediate failure is
-an integer-to-float legalization gap at the Calyx boundary, rather than a TOSA
-failure; its absence from the unsupported-math classification does not imply
-that the conversion is supported.
+The normalized pre-Calyx input contains eight such `math.fpowi` operations;
+each has `%c3_i64` as its exponent. The later diagnostic about an unused
+`calyx.group` is a cascade from this failure, not an independent frontier.
 
-Native-SV lowering was not attempted because `lower-scf-to-calyx` did not
-produce a Calyx artifact.
+The previous exact `i1 -> f32` problem is not present: the new pre-Calyx
+legalization rewrites that form through `i32` before CIRCT sees it. The active
+scout-math pass currently recognizes `math.exp`, `math.powf`, and `math.tanh`,
+but not `math.fpowi`; that omission explains why this is the next frontier.
 
-The existing [pre-Calyx resource-scout pass](../../nix/pipeline.nix),
-`llm2fpga-lower-scout-math-for-calyx`, remains active for
-`tinystories-w8a8`. Its [implementation](../../tools/mlir-passes/FoldConstantTruncFOps.cpp)
-uses explicitly approximate `pow`, `exp`, and `tanh` replacements. This scout
-is consequently not an equivalence result even before the terminal
-legalization failure.
+`float-frontier.json` reports 4,062 recognized floating-point operations and
+zero operations in its narrow unsupported classification. It counts
+`math.fpowi` among the recognized math operations but does not classify it as
+unsupported. Therefore that zero is a scanner-coverage limitation, not
+evidence that Calyx supports `math.fpowi`.
 
-## Interpretation
+## Downstream status
 
-This is the first full-model Direct-Linalg/no-handshake result. It proves that
-the full frozen PT2E W8A8 input can reach flat-SCF without TOSA. It does not
-support a resource-utilization claim yet.
+No `model.calyx.mlir` was generated. Accordingly, native-SV lowering, RTLIL
+generation, Yosys statistics, XC7K480T LUT/FF/BRAM/DSP mapping, and
+nextpnr-xilinx packing/place/route were intentionally not attempted. There
+is no resource-utilization claim for this full-model route.
 
-In particular, it must not be compared numerically with the successful
-`tinystories-representative-core-w4a8-integer-via-linalg-no-handshake`
-XC7K480T run. That earlier result is an explicit-integer micro-slice with
-literal tensors, not this full checkpoint-backed PT2E W8A8 graph.
+The existing scout-math replacements are explicitly approximate, so this
+experiment also makes no PyTorch-to-SV functional-equivalence claim.
+
+## Next decision
+
+The next bounded investigation is to minimize and classify the eight
+constant-exponent `math.fpowi` operations, then decide whether a narrow
+constant-exponent legalization is appropriate. It should be designed and
+tested separately; this scout does not silently generalize it to arbitrary
+integer powers or float operations.
