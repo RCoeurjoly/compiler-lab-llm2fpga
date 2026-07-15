@@ -27,6 +27,10 @@
         task3MainPackages =
           inputs.task3-main-pipeline.packages.${system};
         task3MainLib = inputs.task3-main-pipeline.lib.${system};
+        task3MainLock = builtins.fromJSON
+          (builtins.readFile ./task3-main/flake.lock);
+        nextpnrXilinxForkLock =
+          task3MainLock.nodes.nextpnrXilinxFork.locked;
         pkgsLlvm21 = import nixpkgs-llvm21 {
           inherit system;
           config.allowUnfreePredicate = pkg:
@@ -720,6 +724,69 @@
               --utilization-summary ${task3W8A8Synthesis.utilization}/summary.json \
               --command "nix build .#tinystories-w8a8-via-tosa-no-handshake-calyx-task3-utilization -L" \
               --out "$out/result.json"
+          '';
+        directLinalgXc7k480tRouteName =
+          "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-xc7k480t";
+        directLinalgXc7k480tSynthesis = task3MainLib.mkTask3XilinxUtilization {
+          name = directLinalgXc7k480tRouteName;
+          modelIl =
+            pipelineAliasPackages."tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-il";
+          topName = "main";
+          capacities = task3TinyStoriesCapacities;
+          quiet = true;
+        };
+        directLinalgXc7k480tProbeXdc = pkgs.writeText
+          "${directLinalgXc7k480tRouteName}-probe.xdc" ''
+            # P&R-only / not a board-function or equivalence interface.
+            # This directly constrains the measured core ports without a wrapper.
+            set_property PACKAGE_PIN AA28 [get_ports {clk}]
+            set_property PACKAGE_PIN R28 [get_ports {reset}]
+            set_property PACKAGE_PIN P30 [get_ports {go}]
+            set_property PACKAGE_PIN M30 [get_ports {done}]
+            set_property IOSTANDARD LVCMOS18 [get_ports {clk}]
+            set_property IOSTANDARD LVCMOS18 [get_ports {reset}]
+            set_property IOSTANDARD LVCMOS18 [get_ports {go}]
+            set_property IOSTANDARD LVCMOS18 [get_ports {done}]
+          '';
+        directLinalgXc7k480tManifest = pkgs.writeText
+          "${directLinalgXc7k480tRouteName}-manifest.json"
+          (builtins.toJSON {
+            schema_version = 1;
+            target = {
+              family = "kintex7";
+              part = "xc7k480tffg1156-1";
+              chipdb = "xc7k480tffg1156.bin";
+            };
+            provenance = {
+              source_il =
+                "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-il";
+              top = "main";
+              nextpnr = {
+                url = nextpnrXilinxForkLock.url;
+                ref = nextpnrXilinxForkLock.ref;
+                revision = nextpnrXilinxForkLock.rev;
+              };
+            };
+          });
+        directLinalgXc7k480tPnrReport = task3MainLib.mkTask3XilinxPnrReport {
+          name = directLinalgXc7k480tRouteName;
+          xdc = directLinalgXc7k480tProbeXdc;
+          designJson = directLinalgXc7k480tSynthesis.json;
+        };
+        directLinalgXc7k480tPnrUtilization = pkgs.runCommand
+          "${directLinalgXc7k480tRouteName}-nextpnr-utilization" { } ''
+            mkdir -p "$out"
+            cp -a ${directLinalgXc7k480tPnrReport}/. "$out"
+            cp ${directLinalgXc7k480tSynthesis.utilization}/summary.json \
+              "$out/summary.json"
+            cp ${directLinalgXc7k480tSynthesis.utilization}/summary.txt \
+              "$out/summary.txt"
+            cp ${directLinalgXc7k480tSynthesis.utilization}/stat.json \
+              "$out/stat.json"
+            cp ${directLinalgXc7k480tProbeXdc} "$out/probe.xdc"
+            cp ${directLinalgXc7k480tManifest} "$out/manifest.json"
+            cp ${task3MainLib.task3Toolchain.manifest} \
+              "$out/task3-yosys-toolchain.json"
           '';
         task3BaselineFloatReference =
           ./references/task3/tiny-stories-1m-baseline-float-selftest-all-memory-utilization;
@@ -1804,6 +1871,14 @@
             task3MainLib.task3Toolchain.manifest;
           "tinystories-w8a8-via-tosa-no-handshake-calyx-task3-utilization" =
             task3W8A8UtilizationBundle;
+          "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-xc7k480t-mapped-utilization" =
+            directLinalgXc7k480tSynthesis.utilization;
+          "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-xc7k480t-mapped-json" =
+            directLinalgXc7k480tSynthesis.json;
+          "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-xc7k480t-probe-xdc" =
+            directLinalgXc7k480tProbeXdc;
+          "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-xc7k480t-nextpnr-utilization" =
+            directLinalgXc7k480tPnrUtilization;
           "tiny-stories-1m-baseline-float-selftest-all-memory-utilization" =
             task3MainPackages."tiny-stories-1m-baseline-float-selftest-all-memory-utilization";
           "tiny-stories-1m-baseline-float-selftest-all-memory-live-utilization" =
