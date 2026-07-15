@@ -2,17 +2,18 @@
 
 ## Result
 
-**Frontier:** `lower-scf-to-calyx` failed.  The actual frozen full TinyStories
-PT2E W8A8 export reached Direct-Linalg, SCF, and flat-SCF without a TOSA stage,
-then failed because Calyx lowering cannot legalize `arith.uitofp` from `i1` to
-`f32`.
+**Frontier:** `lower-scf-to-calyx` failed. The actual frozen full TinyStories
+PT2E W8A8 export produced Direct-Linalg and SCF artifacts, then a flat-SCF
+artifact whose manifest is `blocked`, without a TOSA stage. Calyx lowering
+then failed because it cannot legalize `arith.uitofp` from `i1` to `f32`.
 
 No Calyx MLIR, SystemVerilog, RTLIL, Yosys statistic, technology mapping, or
 XC7K480T utilization result exists for this route.
 
 ## Input and route
 
-The input is the existing `tinystories-w8a8` registration:
+The [existing `tinystories-w8a8` registration](../../nix/models.nix) defines
+the input as:
 
 - full `roneneldan/TinyStories-1M` checkpoint;
 - XNNPACK PT2E static W8A8 export;
@@ -21,7 +22,7 @@ The input is the existing `tinystories-w8a8` registration:
 - immutable exported-program output:
   `/nix/store/z7jmd8998f0xbz6qy3gcmx9r2s616m0h-tinystories-w8a8-pytorch-exported`.
 
-The new public alias is:
+The [new public alias](../../flake.nix) is:
 
 ```text
 tinystories-w8a8-via-linalg-no-handshake
@@ -33,8 +34,9 @@ Its route is deliberately:
 PyTorch ExportedProgram → Torch-MLIR → Direct Linalg → SCF → flat-SCF → Calyx
 ```
 
-It uses `pipelineStagePackagesNoHandshake` and `noHandshakeLinalgStages`; it
-does **not** contain a TOSA stage or use the TOSA pipeline package.
+It uses `pipelineStagePackagesNoHandshake` and `noHandshakeLinalgStages`; the
+[alias and stage list](../../flake.nix) contain no TOSA stage or TOSA pipeline
+package.
 
 ## Completed stages
 
@@ -43,8 +45,8 @@ does **not** contain a TOSA stage or use the TOSA pipeline package.
 | Torch MLIR | `/nix/store/hnlj9dv35jg933mlvhn4abzv3lfcxn0m-tinystories-w8a8-torch.mlir` | Completed. |
 | Direct Linalg | `/nix/store/dq4smgfzgi03kpnq10dklzmw6iam3bsx-tinystories-w8a8-linalg.mlir` | Completed, with Torch-MLIR warnings that several attention matmuls have partially traced quantized operands and remain QDQ-shaped. |
 | SCF | `/nix/store/am3cz1bh69ahp4xn8n5y7vksjilb7qq3-tinystories-w8a8-scf.mlir` | Completed. |
-| flat-SCF | `/nix/store/1pnjvyyzm4249rk7qs8gwimn9nk4k9pb-tinystories-w8a8-flat-scf` | Completed with diagnostic layout blockers: 339 `memref.reinterpret_cast`, 115 `memref.copy`, 43 `memref.expand_shape`, and 13 `memref.collapse_shape`. |
-| Calyx | `/nix/store/c7slna7w1vw6bhvsdn505w001igsl17x-tinystories-w8a8-calyx` | Frontier; its manifest records `status: failed`, `exit_code: 1`, and no `model.calyx.mlir`. |
+| flat-SCF | `/nix/store/1pnjvyyzm4249rk7qs8gwimn9nk4k9pb-tinystories-w8a8-flat-scf` | Artifact produced, but `manifest.json` has `status: blocked`; its diagnostic reports 339 `memref.reinterpret_cast`, 115 `memref.copy`, 43 `memref.expand_shape`, and 13 `memref.collapse_shape`. |
+| Calyx | `/nix/store/c7slna7w1vw6bhvsdn505w001igsl17x-tinystories-w8a8-calyx` | Frontier; its manifest records `status: failed` and `exit_code: 1`, and the output directory contains no `model.calyx.mlir`. |
 
 Commands executed:
 
@@ -58,7 +60,7 @@ nix build .#tinystories-w8a8-via-linalg-no-handshake-calyx -L --no-link --print-
 
 ## Terminal diagnostic
 
-The Calyx-stage `lower-scf-to-calyx.log` ends with:
+The Calyx-stage `lower-scf-to-calyx.log` reports:
 
 ```text
 error: failed to legalize operation 'arith.uitofp' that was explicitly marked
@@ -70,10 +72,11 @@ operations classified as unsupported. The immediate failure is therefore an
 integer-to-float legalization gap at the Calyx boundary, rather than a TOSA
 failure or an unsupported-math classification.
 
-The existing pre-Calyx resource-scout pass
-`llm2fpga-lower-scout-math-for-calyx` remains active for `tinystories-w8a8`.
-It uses explicitly approximate `pow`, `exp`, and `tanh` replacements. This
-scout is consequently not an equivalence result even before the terminal
+The existing [pre-Calyx resource-scout pass](../../nix/pipeline.nix),
+`llm2fpga-lower-scout-math-for-calyx`, remains active for
+`tinystories-w8a8`. Its [implementation](../../tools/mlir-passes/FoldConstantTruncFOps.cpp)
+uses explicitly approximate `pow`, `exp`, and `tanh` replacements. This scout
+is consequently not an equivalence result even before the terminal
 legalization failure.
 
 ## Interpretation
