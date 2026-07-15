@@ -80,7 +80,9 @@ The packed design has 5,323 `SLICE_LUTX` cells: 1,131 `LUT1`, 949 `LUT2`,
 617 `LUT3`, 572 `LUT4`, 612 `LUT5`, and 1,442 `LUT6`.  It has 645 `FDRE`
 cells and 940 `SELMUX2_1` cells from 686 `MUXF7` plus 254 `MUXF8` instances.
 The post-route log reports 100.03 MHz for its `main_1_instance_clk` domain and
-a pass at the 12 MHz probe constraint.
+a pass at nextpnr's reported 12 MHz target.  The probe XDC has no explicit
+clock constraint, so this is diagnostic router output rather than a timing
+constraint or timing-closure claim.
 
 The mapper's 4,192 CLB-LUT estimate and nextpnr's 5,323 `SLICE_LUTX` count
 are intentionally reported as different metrics.  nextpnr packs mapped
@@ -91,7 +93,7 @@ this exact implementation run.
 ## Boundary of the claim
 
 This result establishes that the selected representative core can be mapped
-and routed on the target device with the stated probe constraints.  It does
+and routed on the target device with the stated probe pin/I/O constraints.  It does
 not establish any of the following:
 
 - functional equivalence to PyTorch or to the PT2E W8A8 reference;
