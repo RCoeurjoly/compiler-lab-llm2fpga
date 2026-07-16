@@ -61,6 +61,13 @@ operators, or substitute a dummy memory service. Memory-blackbox and
 operator-blackbox variants remain allowed only as explicitly labelled
 diagnostics; they do not satisfy the complete RC-on-FPGA checkpoint.
 
+“The complete V=6 RC fits” is a target-specific claim: the reproducible
+XC7K480T implementation must complete place-and-route without resource
+oversubscription and meet every required timing constraint. RTLIL size,
+Yosys statistics, and pre-P&R estimates remain valuable scouting evidence but
+cannot establish fit. The P&R result and the observable board checkpoint
+together establish the baseline implementation claim.
+
 At that later stage, the image-backed SV fixture must consume the exact packed
 byte image and address map intended for the DDR3 driver, produced by one
 versioned packer. It may not use a simulator-only convenient representation.
@@ -82,5 +89,8 @@ the real DDR3 service is introduced on board.
   XC7K480T bitstream, not merely an implementation artifact or completion pin.
 - The complete baseline RC claim excludes black-boxed model compute, weights,
   and dummy memory services. Those are diagnostics only.
+- RTLIL/Yosys resource estimates are scouts; only successful constrained
+  XC7K480T P&R, followed by the observable board checkpoint, supports a
+  complete-baseline fit claim.
 - The same fixture may then be rerun with the exact packed-image SV service and
   with the real DDR3 service as distinct external-memory checkpoints.

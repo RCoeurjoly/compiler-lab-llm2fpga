@@ -70,6 +70,10 @@
 - **Complete baseline RC** — The V=6 RC with all compute and frozen model
   storage physically implemented as synthesizable logic/memory. A black-boxed
   weight/operator/memory design is a diagnostic, never this checkpoint.
+- **Complete-baseline fit claim** — A constrained target-specific XC7K480T
+  place-and-route result with no resource oversubscription and all required
+  timing met, followed by the observable RC FPGA checkpoint. RTLIL/Yosys
+  reports are preliminary resource scouts.
 - **RC counterexample packet** — A durable mismatch or timeout record with its
   token context, PT2E and SV outputs, provenance hashes, timing contract, and
   cycle/handshake trace. It rejects the candidate but is a reusable research
