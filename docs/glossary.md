@@ -57,3 +57,7 @@
 - **RC exhaustive-sweep manifest** — The durable record that hashes and joins
   deterministic base-six context-range shards, proving disjoint complete
   coverage of the `6^8` RC inputs and recording reference/DUT provenance.
+- **RC counterexample packet** — A durable mismatch or timeout record with its
+  token context, PT2E and SV outputs, provenance hashes, timing contract, and
+  cycle/handshake trace. It rejects the candidate but is a reusable research
+  result.

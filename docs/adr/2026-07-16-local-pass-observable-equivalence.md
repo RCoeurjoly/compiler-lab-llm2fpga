@@ -100,6 +100,14 @@ shard digest and proves that the shard ranges are disjoint and cover exactly
 artifacts; transient working files are not evidence. This permits resumption
 and parallel execution without relaxing the exhaustive requirement.
 
+One raw-code mismatch, token-ID mismatch, invalid completion sequence, or
+timeout rejects the candidate. The runner emits a durable counterexample packet
+before any route is changed: token context and lexical index, PT2E and SV raw
+codes and token IDs, reference/image/SV/tool hashes, declared timing contract,
+and a cycle/handshake trace sufficient to replay the failure. A failed run may
+stop at its first counterexample to conserve compute, but it cannot emit a
+passing coverage manifest or be represented as partially accepted.
+
 ## Consequences
 
 - A primitive MRC, an emitted HardFloat module, a successful compiler pass,
@@ -125,6 +133,8 @@ and parallel execution without relaxing the exhaustive requirement.
   is the promotion gate.
 - Interrupted or parallel exhaustive runs remain auditable only through the
   deterministic shard records and final complete-coverage manifest.
+- A mismatch or timeout is a reusable negative result, not noise to suppress:
+  it rejects the route and yields a replayable counterexample packet.
 - The RC is valuable precisely because it makes this much stronger gate
   finite and potentially tractable; the same method is not automatically
   feasible for the full 50,257-token model.
