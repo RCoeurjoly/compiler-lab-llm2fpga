@@ -75,6 +75,15 @@ separate physical-integration gate: it establishes service protocol, timing,
 and hardware behavior, but does not replace the exhaustive image-backed
 numerical comparison.
 
+A candidate is a **testable RC SV implementation** only when its documented
+top-level interface makes the eight token inputs controllable and makes all six
+raw output codes plus the token ID observable. It must also define clock,
+reset, launch, completion, and the cycle or handshake condition at which those
+outputs are sampled. Internal hierarchical probes and an otherwise opaque
+`done`-only interface do not satisfy this contract. Such output may still be
+kept as a resource-only scout, but it cannot claim RC observable functional
+equivalence or become a canonical RC implementation.
+
 ## Consequences
 
 - A primitive MRC, an emitted HardFloat module, a successful compiler pass,
@@ -92,6 +101,9 @@ numerical comparison.
 - An external-memory change needs two kinds of evidence: exhaustive equality
   with the deterministic image-backed fixture and separate DDR3/board evidence.
   Passing either one alone is not the complete claim.
+- A Calyx, CIRCT, or other generated SV module with only a `done`-style visible
+  interface is a resource scout rather than a functional RC candidate until a
+  documented testable wrapper exposes the RC inputs and outputs.
 - The RC is valuable precisely because it makes this much stronger gate
   finite and potentially tractable; the same method is not automatically
   feasible for the full 50,257-token model.
