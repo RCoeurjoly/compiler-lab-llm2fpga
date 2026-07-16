@@ -51,3 +51,6 @@
   testbench-accessible eight-token inputs; six raw output codes and token-ID
   outputs; and deterministic clock, reset, launch, completion, and sampling
   semantics. A `done`-only or internally probed module is not testable RC SV.
+- **Provisional RC candidate** — A testable experimental route that has passed
+  only the four-case frozen PT2E smoke oracle. It cannot be called canonical or
+  RC observably functionally equivalent until it passes the full `6^8` sweep.

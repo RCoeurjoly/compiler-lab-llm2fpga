@@ -84,6 +84,13 @@ outputs are sampled. Internal hierarchical probes and an otherwise opaque
 kept as a resource-only scout, but it cannot claim RC observable functional
 equivalence or become a canonical RC implementation.
 
+Verification has two explicit tiers. Every experiment first uses the frozen
+four-case PT2E smoke oracle for rapid regression feedback. The complete
+1,679,616-context comparison is required before a candidate is called
+canonical, is adopted as the next baseline, or is described as RC observably
+functionally equivalent. Until then it is labelled **provisional** regardless
+of how many smoke cases pass.
+
 ## Consequences
 
 - A primitive MRC, an emitted HardFloat module, a successful compiler pass,
@@ -104,6 +111,9 @@ equivalence or become a canonical RC implementation.
 - A Calyx, CIRCT, or other generated SV module with only a `done`-style visible
   interface is a resource scout rather than a functional RC candidate until a
   documented testable wrapper exposes the RC inputs and outputs.
+- Four matching smoke cases make an experiment suitable for rapid iteration,
+  not for a canonical or functional-equivalence claim. The full finite sweep
+  is the promotion gate.
 - The RC is valuable precisely because it makes this much stronger gate
   finite and potentially tractable; the same method is not automatically
   feasible for the full 50,257-token model.
