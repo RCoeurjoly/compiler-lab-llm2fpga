@@ -51,7 +51,12 @@ The exact no-Handshake route reaches a pre-Calyx program with:
 - 2 'math.exp' operations, which are the first operations rejected by
   CIRCT's '--lower-scf-to-calyx';
 - additional future nonlinear operations: 2 'math.fpowi', 2 'math.tanh',
-  and 5 'math.sqrt'.
+  and 5 source `math.rsqrt` operations, which the existing local pre-Calyx
+  helper rewrites into a `math.sqrt`-based control path; this is not an
+  end-to-end equivalence result.
+
+The named-route investigation and its frozen-source provenance are recorded in
+[the nonlinear lowering frontier result](2026-07-16-quantized-rc-nonlinear-lowering-frontier.md).
 
 The captured first diagnostic is:
 

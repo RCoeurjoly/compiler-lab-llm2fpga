@@ -98,6 +98,19 @@ class QuantizedRcNonlinearFrontierResultTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "approximate or scout"):
             module.build_result(matrix, {"composites": []}, {"results": []})
 
+    def test_published_result_keeps_the_bounded_claim(self) -> None:
+        result = (
+            ROOT
+            / "docs"
+            / "results"
+            / "2026-07-16-quantized-rc-nonlinear-lowering-frontier.md"
+        )
+        text = result.read_text(encoding="utf-8")
+        self.assertIn("tinystories-w8a8-rc-study-mask9-vocab6-width2", text)
+        self.assertIn("not numerical equivalence evidence", text)
+        self.assertIn("No SV, DDR3, host, board, or FPGA-utilization claim", text)
+        self.assertNotIn("resource-scout approximation", text.lower())
+
 
 if __name__ == "__main__":
     unittest.main()
