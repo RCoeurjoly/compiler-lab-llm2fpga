@@ -1,13 +1,10 @@
 # Calyx `math.rsqrt` Reproducer
 
-This isolates the direct-Linalg no-handshake Calyx blocker that appears after
-`math.roundeven` is lowered by `llm2fpga-lower-roundeven-for-calyx`.
+The frozen RC source contains scalar `math.rsqrt` in its LayerNorm-like paths.
+The active pre-Calyx helper currently rewrites this source form to `1.0 /
+math.sqrt`; the separate `calyx-math-sqrt` MRC verifies only that current CIRCT
+accepts the resulting `math.sqrt` primitive. Neither fact is a raw-code
+equivalence result for the rewrite.
 
-The representative-core flat-SCF has scalar `math.rsqrt` operations in
-normalization-like variance paths. `circt-opt --lower-scf-to-calyx` rejects the
-operation during Calyx op grouping. Acceptable fixes are to choose a frontend or
-dialect path that represents normalization in supported integer/fixed-point
-operations, use an official MLIR/CIRCT lowering for reciprocal square root, or
-add an actual MLIR pass with a documented numerical contract.
-
+The raw input remains checked in because it documents the source signature.
 Textual MLIR substitution is not an acceptable fix.
