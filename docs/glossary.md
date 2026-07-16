@@ -64,6 +64,9 @@
 - **Baseline RC memory stage** — The initial complete V=6 RC implementation
   using its frozen baseline memory realization. It must be lowered, verified,
   and tested on FPGA before DDR3 externalization becomes an experiment.
+- **RC FPGA checkpoint** — A reproducible XC7K480T bitstream plus a board-captured
+  vertical-slice result containing the six raw codes, token ID, and latency
+  compared with frozen PT2E. Build success or `done` alone does not qualify.
 - **RC counterexample packet** — A durable mismatch or timeout record with its
   token context, PT2E and SV outputs, provenance hashes, timing contract, and
   cycle/handshake trace. It rejects the candidate but is a reusable research

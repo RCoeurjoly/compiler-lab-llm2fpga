@@ -47,6 +47,14 @@ same complete RC on the FPGA using its baseline frozen-memory implementation.
 Only after that board checkpoint may memory externalization become the next
 semantic transformation.
 
+The baseline board checkpoint requires a reproducible XC7K480T bitstream and
+must capture the vertical-slice fixture's six raw output codes and token ID
+from the actual board. The host compares those values against frozen PT2E for
+the fixture and records the observed latency. A successful synthesis,
+configuration, or `done` signal alone is not a board result. The record
+includes bitstream, place-and-route, constraint, host-program, fixture, and
+tool provenance sufficient to repeat the transaction.
+
 At that later stage, the image-backed SV fixture must consume the exact packed
 byte image and address map intended for the DDR3 driver, produced by one
 versioned packer. It may not use a simulator-only convenient representation.
@@ -64,5 +72,7 @@ the real DDR3 service is introduced on board.
 - DDR3 work is deliberately deferred until the complete baseline V=6 RC has
   been tested on FPGA; this avoids mixing lowering/compute risk with
   external-memory risk.
+- A baseline FPGA claim requires observed logits/token ID from a reproducible
+  XC7K480T bitstream, not merely an implementation artifact or completion pin.
 - The same fixture may then be rerun with the exact packed-image SV service and
   with the real DDR3 service as distinct external-memory checkpoints.
