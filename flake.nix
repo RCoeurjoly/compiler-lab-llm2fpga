@@ -212,6 +212,38 @@
               -p "read_slang --threads 1 --no-proc --max-parse-depth 20000 --top main $out/main.sv; hierarchy -top main -check; stat" \
               >"$out/yosys-slang.log" 2>&1
           '';
+        calyxRcBasicFloatBindingsSelftest = pkgs.runCommand
+          "calyx-rc-basic-float-bindings-selftest" {
+            nativeBuildInputs = [ calyx yosysPkg python ];
+          } ''
+            mkdir -p "$out"
+            ${calyx}/bin/calyx \
+              ${./reproducers/calyx-rc-basic-float-bindings/input.futil} \
+              -l ${calyx}/share/calyx \
+              -b verilog --synthesis --nested -d papercut \
+              -o "$out/main.sv" >"$out/calyx.log" 2>&1
+            test -s "$out/main.sv"
+            ${python}/bin/python3 - "$out/main.sv" <<'PY'
+            import re
+            import sys
+            from pathlib import Path
+
+            source = Path(sys.argv[1]).read_text(encoding="utf-8")
+            required = (
+                "std_addFN", "std_mulFN", "std_divSqrtFN", "std_compareFN",
+                "std_intToFp", "std_fpToInt", "addRecFN", "mulRecFN",
+                "divSqrtRecFNToRaw_small", "compareRecFN", "iNToRecFN",
+                "recFNToIN", "fNToRecFN", "recFNToFN",
+            )
+            for module in required:
+                if not re.search(r"module\s+" + re.escape(module) + r"\b", source):
+                    raise SystemExit(f"missing module definition: {module}")
+            PY
+            ${yosysPkg}/bin/yosys \
+              -m ${yosysSlang}/share/yosys/plugins/slang.so \
+              -p "read_slang --threads 1 --no-proc --max-parse-depth 20000 --allow-merging-ansi-ports --top main $out/main.sv; hierarchy -top main -check; stat" \
+              >"$out/yosys-slang.log" 2>&1
+          '';
         calyxIntegerLibrarySelftest = pkgs.runCommand
           "calyx-integer-library-selftest" {
             nativeBuildInputs = [ calyx yosysPkg python ];
@@ -695,6 +727,32 @@
             test -f "$out/matrix/oracle-comparison.json"
             test -f "$out/result.json"
             test -f "$out/result.md"
+          '';
+        rcCalyxHardfloatBindings = pkgs.runCommand
+          "tinystories-w8a8-rc-calyx-hardfloat-bindings" {
+            nativeBuildInputs = [ circt calyx yosysPkg python pkgs.bash ];
+          } ''
+            set -euo pipefail
+            ${python}/bin/python3 ${./scripts/pipeline/run_rc_calyx_hardfloat_bindings.py} \
+              --flat-scf ${pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-flat-scf"}/flat.scf.mlir \
+              --circt-opt ${circt}/bin/circt-opt \
+              --circt-translate ${circt}/bin/circt-translate \
+              --calyx-bin ${calyx}/bin/calyx \
+              --calyx-lib ${calyx}/share/calyx \
+              --calyx-to-sv-script ${pipelineScripts}/calyx_to_sv_no_handshake.sh \
+              --bash ${pkgs.bash}/bin/bash \
+              --yosys ${yosysPkg}/bin/yosys \
+              --yosys-slang-plugin ${yosysSlang}/share/yosys/plugins/slang.so \
+              --mrc addf-f32=${./reproducers/calyx-rc-basic-float-mrcs/addf-f32.mlir} \
+              --mrc subf-f32=${./reproducers/calyx-rc-basic-float-mrcs/subf-f32.mlir} \
+              --mrc mulf-f32=${./reproducers/calyx-rc-basic-float-mrcs/mulf-f32.mlir} \
+              --mrc divf-f32=${./reproducers/calyx-rc-basic-float-mrcs/divf-f32.mlir} \
+              --mrc cmpf-ugt-f32=${./reproducers/calyx-rc-basic-float-mrcs/cmpf-ugt-f32.mlir} \
+              --mrc sitofp-i32-f32=${./reproducers/calyx-rc-basic-float-mrcs/sitofp-i32-f32.mlir} \
+              --mrc fptosi-f32-i8=${./reproducers/calyx-rc-basic-float-mrcs/fptosi-f32-i8.mlir} \
+              --mrc uitofp-i1-f32=${./reproducers/calyx-rc-basic-float-mrcs/uitofp-i1-f32.mlir} \
+              --out-dir "$out"
+            test -s "$out/report.json"
           '';
         activePipelineVariantsJson =
           pkgs.writeText "active-pipeline-variants.json" (builtins.toJSON {
@@ -2176,6 +2234,8 @@
             llm2fpgaMlirPasses llm2fpgaTorchMlirPasses llm2fpgaCirctPasses
             calyx;
           "calyx-float-library-selftest" = calyxFloatLibrarySelftest;
+          "calyx-rc-basic-float-bindings-selftest" =
+            calyxRcBasicFloatBindingsSelftest;
           "calyx-integer-library-selftest" = calyxIntegerLibrarySelftest;
           "calyx-i1-uitofp-upstream-reproducer" =
             calyxI1UiToFpUpstreamReproducer;
@@ -2192,6 +2252,8 @@
           "tinystories-w8a8-rc-nonlinear-slices" = quantizedRcNonlinearSlices;
           "tinystories-w8a8-rc-nonlinear-lowering-frontier" =
             quantizedRcNonlinearFrontier;
+          "tinystories-w8a8-rc-calyx-hardfloat-bindings" =
+            rcCalyxHardfloatBindings;
           "resource-baseline-yosys-stat-matrix" =
             resourceBaselineYosysStatMatrix;
           "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence" =
@@ -2243,6 +2305,7 @@
         checks = {
           default = modelRegistryJson;
           "calyx-float-library" = calyxFloatLibrarySelftest;
+          "calyx-rc-basic-float-bindings" = calyxRcBasicFloatBindingsSelftest;
           "calyx-integer-library" = calyxIntegerLibrarySelftest;
           "calyx-i1-uitofp-upstream-reproducer" =
             calyxI1UiToFpUpstreamReproducer;

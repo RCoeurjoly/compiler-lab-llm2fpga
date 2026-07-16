@@ -1,0 +1,132 @@
+import "primitives/core.futil";
+import "primitives/memories/comb.futil";
+import "primitives/float/addFN.futil";
+import "primitives/float/mulFN.futil";
+import "primitives/float/divSqrtFN.futil";
+import "primitives/float/compareFN.futil";
+import "primitives/float/intToFp.futil";
+import "primitives/float/fpToInt.futil";
+
+component main(@go go: 1) -> (@done done: 1) {
+  cells {
+    add = std_addFN(8, 24, 32);
+    sub = std_addFN(8, 24, 32);
+    mul = std_mulFN(8, 24, 32);
+    div = std_divSqrtFN(8, 24, 32);
+    sqrt = std_divSqrtFN(8, 24, 32);
+    cmp = std_compareFN(8, 24, 32);
+    int_to_fp = std_intToFp(32, 8, 24, 32);
+    fp_to_int = std_fpToInt(8, 24, 32, 8);
+    @external sink_add = comb_mem_d1(32, 1, 1);
+    @external sink_sub = comb_mem_d1(32, 1, 1);
+    @external sink_mul = comb_mem_d1(32, 1, 1);
+    @external sink_div = comb_mem_d1(32, 1, 1);
+    @external sink_sqrt = comb_mem_d1(32, 1, 1);
+    @external sink_cmp = comb_mem_d1(1, 1, 1);
+    @external sink_int_to_fp = comb_mem_d1(32, 1, 1);
+    @external sink_fp_to_int = comb_mem_d1(8, 1, 1);
+  }
+
+  wires {
+    group add_group {
+      add.go = 1'b1;
+      add.control = 1'b0;
+      add.subOp = 1'b0;
+      add.left = 32'd1065353216;
+      add.right = 32'd1073741824;
+      add.roundingMode = 3'b000;
+      sink_add.addr0 = 1'd0;
+      sink_add.write_data = add.out;
+      sink_add.write_en = 1'b1;
+      add_group[done] = (add.done & sink_add.done) ? 1'd1;
+    }
+    group sub_group {
+      sub.go = 1'b1;
+      sub.control = 1'b0;
+      sub.subOp = 1'b1;
+      sub.left = 32'd1073741824;
+      sub.right = 32'd1065353216;
+      sub.roundingMode = 3'b000;
+      sink_sub.addr0 = 1'd0;
+      sink_sub.write_data = sub.out;
+      sink_sub.write_en = 1'b1;
+      sub_group[done] = (sub.done & sink_sub.done) ? 1'd1;
+    }
+    group mul_group {
+      mul.go = 1'b1;
+      mul.control = 1'b0;
+      mul.left = 32'd1065353216;
+      mul.right = 32'd1073741824;
+      mul.roundingMode = 3'b000;
+      sink_mul.addr0 = 1'd0;
+      sink_mul.write_data = mul.out;
+      sink_mul.write_en = 1'b1;
+      mul_group[done] = (mul.done & sink_mul.done) ? 1'd1;
+    }
+    group div_group {
+      div.go = 1'b1;
+      div.control = 1'b0;
+      div.sqrtOp = 1'b0;
+      div.left = 32'd1073741824;
+      div.right = 32'd1065353216;
+      div.roundingMode = 3'b000;
+      sink_div.addr0 = 1'd0;
+      sink_div.write_data = div.out;
+      sink_div.write_en = 1'b1;
+      div_group[done] = (div.done & sink_div.done) ? 1'd1;
+    }
+    group sqrt_group {
+      sqrt.go = 1'b1;
+      sqrt.control = 1'b0;
+      sqrt.sqrtOp = 1'b1;
+      sqrt.left = 32'd1073741824;
+      sqrt.right = 32'd1065353216;
+      sqrt.roundingMode = 3'b000;
+      sink_sqrt.addr0 = 1'd0;
+      sink_sqrt.write_data = sqrt.out;
+      sink_sqrt.write_en = 1'b1;
+      sqrt_group[done] = (sqrt.done & sink_sqrt.done) ? 1'd1;
+    }
+    group cmp_group {
+      cmp.go = 1'b1;
+      cmp.left = 32'd1065353216;
+      cmp.right = 32'd1073741824;
+      cmp.signaling = 1'b0;
+      sink_cmp.addr0 = 1'd0;
+      sink_cmp.write_data = cmp.lt;
+      sink_cmp.write_en = 1'b1;
+      cmp_group[done] = (cmp.done & sink_cmp.done) ? 1'd1;
+    }
+    group int_to_fp_group {
+      int_to_fp.go = 1'b1;
+      int_to_fp.in = 32'd1;
+      int_to_fp.signedIn = 1'b1;
+      sink_int_to_fp.addr0 = 1'd0;
+      sink_int_to_fp.write_data = int_to_fp.out;
+      sink_int_to_fp.write_en = 1'b1;
+      int_to_fp_group[done] = (int_to_fp.done & sink_int_to_fp.done) ? 1'd1;
+    }
+    group fp_to_int_group {
+      fp_to_int.go = 1'b1;
+      fp_to_int.in = 32'd1065353216;
+      fp_to_int.signedOut = 1'b1;
+      sink_fp_to_int.addr0 = 1'd0;
+      sink_fp_to_int.write_data = fp_to_int.out;
+      sink_fp_to_int.write_en = 1'b1;
+      fp_to_int_group[done] = (fp_to_int.done & sink_fp_to_int.done) ? 1'd1;
+    }
+  }
+
+  control {
+    seq {
+      add_group;
+      sub_group;
+      mul_group;
+      div_group;
+      sqrt_group;
+      cmp_group;
+      int_to_fp_group;
+      fp_to_int_group;
+    }
+  }
+}

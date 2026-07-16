@@ -65,9 +65,12 @@ class CalyxFloatNixPackageTest(unittest.TestCase):
         self.assertIn('${python}/bin/python3 - "$out/main.sv" <<\'PY\'', flake)
         self.assertIn('Path(sys.argv[1]).read_text(encoding="utf-8")', flake)
         self.assertIn('for module in ("std_addFN", "fNToRecFN"):', flake)
+        binding_section = flake.split(
+            "calyxRcBasicFloatBindingsSelftest = pkgs.runCommand", 1
+        )[1].split("calyxIntegerLibrarySelftest = pkgs.runCommand", 1)[0]
         self.assertIn(
             're.search(r"module\\s+" + re.escape(module) + r"\\b", source)',
-            flake,
+            binding_section,
         )
         self.assertNotIn("grep -q 'module std_addFN'", flake)
         self.assertNotIn("grep -q 'module fNToRecFN'", flake)
@@ -76,6 +79,80 @@ class CalyxFloatNixPackageTest(unittest.TestCase):
         self.assertIn('read_slang --threads 1 --no-proc --max-parse-depth 20000 --top main $out/main.sv', flake)
         self.assertIn('hierarchy -top main -check', flake)
         self.assertIn('"calyx-float-library" = calyxFloatLibrarySelftest;', flake)
+
+    def test_basic_float_binding_fixture_covers_every_rc_wrapper(self) -> None:
+        fixture = ROOT / "reproducers/calyx-rc-basic-float-bindings/input.futil"
+        readme = ROOT / "reproducers/calyx-rc-basic-float-bindings/README.md"
+
+        self.assertTrue(fixture.exists())
+        self.assertTrue(readme.exists())
+        source = fixture.read_text(encoding="utf-8")
+        readme_text = readme.read_text(encoding="utf-8")
+        for primitive in (
+            "primitives/float/addFN.futil",
+            "primitives/float/mulFN.futil",
+            "primitives/float/divSqrtFN.futil",
+            "primitives/float/compareFN.futil",
+            "primitives/float/intToFp.futil",
+            "primitives/float/fpToInt.futil",
+        ):
+            self.assertIn(f'import "{primitive}";', source)
+        for instantiation in (
+            "std_addFN(8, 24, 32)",
+            "std_mulFN(8, 24, 32)",
+            "std_divSqrtFN(8, 24, 32)",
+            "std_compareFN(8, 24, 32)",
+            "std_intToFp(32, 8, 24, 32)",
+            "std_fpToInt(8, 24, 32, 8)",
+        ):
+            self.assertIn(instantiation, source)
+        self.assertIn(
+            "not numerical-equivalence evidence", " ".join(readme_text.split())
+        )
+
+    def test_hardfloat_binding_derivation_is_declared(self) -> None:
+        flake = (ROOT / "flake.nix").read_text(encoding="utf-8")
+
+        self.assertIn("calyx-rc-basic-float-bindings-selftest", flake)
+        self.assertIn("tinystories-w8a8-rc-calyx-hardfloat-bindings", flake)
+        self.assertIn("run_rc_calyx_hardfloat_bindings.py", flake)
+        for filename in (
+            "addf-f32.mlir",
+            "subf-f32.mlir",
+            "mulf-f32.mlir",
+            "divf-f32.mlir",
+            "cmpf-ugt-f32.mlir",
+            "sitofp-i32-f32.mlir",
+            "fptosi-f32-i8.mlir",
+            "uitofp-i1-f32.mlir",
+        ):
+            self.assertIn(filename, flake)
+        self.assertIn("calyx_to_sv_no_handshake.sh", flake)
+        self.assertIn("yosysSlang", flake)
+        closure_section = flake.split(
+            "calyxRcBasicFloatBindingsSelftest = pkgs.runCommand", 1
+        )[1].split("calyxIntegerLibrarySelftest = pkgs.runCommand", 1)[0]
+        self.assertIn("--allow-merging-ansi-ports", closure_section)
+        evidence_section = flake.split(
+            "rcCalyxHardfloatBindings = pkgs.runCommand", 1
+        )[1].split("activePipelineVariantsJson", 1)[0]
+        self.assertIn(
+            "--calyx-to-sv-script ${pipelineScripts}/calyx_to_sv_no_handshake.sh",
+            evidence_section,
+        )
+        self.assertIn(
+            're.search(r"module\\s+" + re.escape(module) + r"\\b", source)',
+            closure_section,
+        )
+
+    def test_basic_float_binding_fixture_uses_calyx_decimal_ieee_literals(self) -> None:
+        source = (
+            ROOT / "reproducers/calyx-rc-basic-float-bindings/input.futil"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("32'h", source)
+        self.assertIn("32'd1065353216", source)
+        self.assertIn("32'd1073741824", source)
 
     def test_integer_reproducer_and_native_selftest_are_declared(self) -> None:
         fixture = (ROOT / "reproducers/calyx-integer-library-selftest/input.futil")

@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 import tempfile
 import unittest
@@ -99,6 +100,114 @@ class RcCalyxHardfloatBindingsTest(unittest.TestCase):
             ),
             "accepted-with-hardfloat-binding",
         )
+
+    def test_mrc_assignments_require_the_exact_unique_declared_set(self) -> None:
+        module = load_module()
+        expected = [f"{mrc_id}=/tmp/{mrc_id}.mlir" for mrc_id in module.MRC_SPECS]
+
+        parsed = module.parse_mrc_assignments(expected)
+
+        self.assertEqual(set(parsed), set(module.MRC_SPECS))
+        with self.assertRaisesRegex(ValueError, "duplicate MRC ID: addf-f32"):
+            module.parse_mrc_assignments(expected + ["addf-f32=/tmp/other.mlir"])
+        with self.assertRaisesRegex(ValueError, "missing MRC IDs"):
+            module.parse_mrc_assignments(expected[:-1])
+
+    def test_yosys_slang_uses_calyx_ansi_port_compatibility_mode(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            fake_yosys = directory / "fake-yosys"
+            fake_yosys.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            os.chmod(fake_yosys, 0o755)
+            source = directory / "main.sv"
+            source.write_text("module main; endmodule\n", encoding="utf-8")
+
+            result = module.run_yosys_slang(
+                str(fake_yosys), "unused-slang-plugin", source, directory / "yosys.log"
+            )
+
+        self.assertEqual(result["status"], "accepted")
+        self.assertIn("--allow-merging-ansi-ports", result["command"][-1])
+
+    def test_native_export_runs_the_existing_script_under_explicit_bash(self) -> None:
+        module = load_module()
+
+        command = module.native_export_command(
+            Path("/nix/store/bash/bin/bash"),
+            Path("/nix/store/calyx-to-sv.sh"),
+            Path("/nix/store/circt-translate"),
+            Path("/nix/store/calyx"),
+            Path("/nix/store/calyx-lib"),
+            Path("/nix/store/calyx-dir"),
+            Path("/nix/store/native-sv"),
+        )
+
+        self.assertEqual(
+            command[:2],
+            ["/nix/store/bash/bin/bash", "/nix/store/calyx-to-sv.sh"],
+        )
+
+    def test_cli_writes_rejected_rows_when_circt_emits_partial_diagnostic_output(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            flat_scf = directory / "flat.scf.mlir"
+            flat_scf.write_text(SAMPLE_FLAT_SCF, encoding="utf-8")
+            fake_circt = directory / "fake-circt-opt"
+            fake_circt.write_text(
+                "#!/usr/bin/env python3\n"
+                "import pathlib\n"
+                "import sys\n"
+                "output = pathlib.Path(sys.argv[sys.argv.index('-o') + 1])\n"
+                "output.write_text('partial', encoding='utf-8')\n"
+                "print('error: unsupported', file=sys.stderr)\n",
+                encoding="utf-8",
+            )
+            os.chmod(fake_circt, 0o755)
+            calyx_lib = directory / "calyx-lib"
+            (calyx_lib / "primitives").mkdir(parents=True)
+            plugin = directory / "slang.so"
+            plugin.write_text("placeholder", encoding="utf-8")
+            out_dir = directory / "out"
+            mrc_args = []
+            for mrc_id in module.MRC_SPECS:
+                path = directory / f"{mrc_id}.mlir"
+                path.write_text("module {}\n", encoding="utf-8")
+                mrc_args.extend(["--mrc", f"{mrc_id}={path}"])
+
+            result = module.main(
+                [
+                    "--flat-scf",
+                    str(flat_scf),
+                    "--circt-opt",
+                    str(fake_circt),
+                    "--circt-translate",
+                    "/bin/true",
+                    "--calyx-bin",
+                    "/bin/true",
+                    "--calyx-lib",
+                    str(calyx_lib),
+                    "--calyx-to-sv-script",
+                    "/bin/true",
+                    "--bash",
+                    "/bin/true",
+                    "--yosys",
+                    "/bin/true",
+                    "--yosys-slang-plugin",
+                    str(plugin),
+                    *mrc_args,
+                    "--out-dir",
+                    str(out_dir),
+                ]
+            )
+            report = json.loads((out_dir / "report.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 0)
+        self.assertEqual(report["schema_version"], 1)
+        self.assertEqual(len(report["mrcs"]), len(module.MRC_SPECS))
+        self.assertTrue(all(row["circt"]["status"] == "rejected" for row in report["mrcs"]))
+        self.assertTrue(all(row["binding_status"] == "not-attempted" for row in report["mrcs"]))
 
 
 if __name__ == "__main__":
