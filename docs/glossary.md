@@ -57,6 +57,10 @@
 - **RC exhaustive-sweep manifest** — The durable record that hashes and joins
   deterministic base-six context-range shards, proving disjoint complete
   coverage of the `6^8` RC inputs and recording reference/DUT provenance.
+- **RC vertical-slice prompt fixture** — A fixed tiny V=6 prompt traversing the
+  versioned host tokenizer, eight-token SV interface, frozen image, and host
+  detokenizer to demonstrate one generated token at reproducible latency. It
+  complements rather than replaces exhaustive token-level equivalence.
 - **RC counterexample packet** — A durable mismatch or timeout record with its
   token context, PT2E and SV outputs, provenance hashes, timing contract, and
   cycle/handshake trace. It rejects the candidate but is a reusable research
