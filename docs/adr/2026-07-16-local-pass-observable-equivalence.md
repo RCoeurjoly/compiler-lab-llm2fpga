@@ -124,6 +124,13 @@ peak resource use where available, and the projected cost of all `6^8`
 contexts. The probe does not replace any smoke or exhaustive result; it
 measures whether the verification contract itself is practical.
 
+If the measured complete-sweep cost is impractical, record verification
+scalability as a blocker with the probe, attempted execution strategy, and
+limiting resource. The candidate remains provisional. Improve, shard, or
+parallelize the verifier, or investigate a stronger proof method, but do not
+substitute sampled testing for the exhaustive promotion gate or call the route
+equivalent on smoke evidence alone.
+
 Every newly observed lowering blocker follows an evidence ladder:
 
 1. an existing upstream semantics-preserving dialect, pass, or library route;
@@ -175,6 +182,8 @@ testable-SV candidate for the normal promotion gates.
 - The first testable SV also produces a bounded verification-throughput probe,
   making the cost of the exhaustive gate a published result rather than an
   untested assumption.
+- An impractical full sweep is a documented verification-scalability blocker;
+  it does not weaken the definition of RC observable functional equivalence.
 - The blocker evidence ladder makes upstream and published routes preferred
   investigative starting points, but no provenance class bypasses RC
   functional-equivalence evidence.

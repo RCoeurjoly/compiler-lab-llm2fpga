@@ -93,6 +93,10 @@
   records simulator/host provenance, contexts per second, cycles per context,
   and projected `6^8` sweep cost. It measures feasibility but never replaces
   exhaustive equivalence.
+- **Verification-scalability blocker** — Evidence that the defined exhaustive
+  RC sweep cannot yet be completed practically. It keeps a candidate
+  provisional and drives verifier improvements; it never silently permits a
+  sampled-equivalence claim.
 - **Blocker evidence ladder** — The required investigation order for a lowering
   blocker: upstream semantics-preserving route, established published/open
   route, then local implementation. It never relaxes the RC acceptance gates.
