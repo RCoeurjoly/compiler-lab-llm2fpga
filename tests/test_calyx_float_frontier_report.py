@@ -75,6 +75,22 @@ module {
         self.assertEqual(report["unsupported_samples"][0]["ops"], ["math.rsqrt"])
         self.assertIn("math.rsqrt", report["unsupported_samples"][0]["text"])
 
+    def test_classifies_exp_rejected_by_current_calyx_lowering(self) -> None:
+        report, _ = self.run_report(
+            """
+module {
+  func.func @main(%arg0: f32) -> f32 {
+    %0 = math.exp %arg0 : f32
+    return %0 : f32
+  }
+}
+"""
+        )
+
+        self.assertEqual(report["status"], "has-unsupported-calyx-float-frontier")
+        self.assertEqual(report["unsupported_ops"]["math.exp"], 1)
+        self.assertEqual(report["unsupported_samples"][0]["ops"], ["math.exp"])
+
     def test_classifies_uitofp_as_unsupported_calyx_frontier(self) -> None:
         report, _ = self.run_report(
             """

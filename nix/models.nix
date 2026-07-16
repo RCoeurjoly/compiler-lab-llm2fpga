@@ -9,6 +9,58 @@ let
     export TINYSTORIES_CORE_HIDDEN_SIZE=2
     export TINYSTORIES_CORE_NUM_HEADS=1
   '';
+
+  rcStudyEnv = { vocabSize, numLayers, maxPositionEmbeddings, windowSize
+    , hiddenSize, numHeads }:
+    ''
+      export TINYSTORIES_RC_STUDY_CONTEXT_LENGTH=8
+      export TINYSTORIES_RC_STUDY_VOCAB_SIZE=${toString vocabSize}
+      export TINYSTORIES_RC_STUDY_NUM_LAYERS=${toString numLayers}
+      export TINYSTORIES_RC_STUDY_MAX_POSITION_EMBEDDINGS=${toString maxPositionEmbeddings}
+      export TINYSTORIES_RC_STUDY_WINDOW_SIZE=${toString windowSize}
+      export TINYSTORIES_RC_STUDY_HIDDEN_SIZE=${toString hiddenSize}
+      export TINYSTORIES_RC_STUDY_NUM_HEADS=${toString numHeads}
+    '';
+
+  registerRcStudyCore = { key, vocabSize, numLayers, maxPositionEmbeddings
+    , windowSize, hiddenSize, numHeads }:
+    registerModel {
+      inherit key;
+      name = key;
+      description =
+        "Structure-preserving TinyStories PT2E W8A8 representative-core study profile.";
+      source = {
+        type = "derived";
+        base_model_id = tinyStories1m.modelId;
+        inherit (tinyStories1m) revision;
+        profile = "quantized-representative-core-structural-study";
+        quantization = "pt2e-static-w8a8";
+        calibration = "frozen-structural-eight-token-v1";
+        context_length = 8;
+        vocab_size = vocabSize;
+        num_layers = numLayers;
+        max_position_embeddings = maxPositionEmbeddings;
+        window_size = windowSize;
+        hidden_size = hiddenSize;
+        num_heads = numHeads;
+      };
+      allowHwExterns = true;
+      slangPerFileExternModules = true;
+      inherit fpPrimsSv;
+      hfSnapshot = tinyStories1m.snapshot;
+      pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
+      pytorchExportedCommand = ''
+        export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
+        ${rcStudyEnv {
+          inherit vocabSize numLayers maxPositionEmbeddings windowSize hiddenSize
+            numHeads;
+        }}
+        python ${materializePyTorchExported} \
+          --adapter ${tinyStories1m.sourceDir}/model_adapter_quantized_representative_core_pt2e_w8a8.py \
+          --model-path ${tinyStories1m.snapshot} \
+          --out-dir "$out"
+      '';
+    };
 in {
   "pattern-linear-fp32" = registerModel {
     key = "pattern-linear-fp32";
@@ -197,6 +249,185 @@ in {
         --model-path ${tinyStories1m.snapshot} \
         --out-dir "$out"
     '';
+  };
+
+  "tinystories-w8a8-rc-study-full" = registerModel {
+    key = "tinystories-w8a8-rc-study-full";
+    name = "tinystories-w8a8-rc-study-full";
+    description =
+      "Full pretrained TinyStories PT2E W8A8 profile for the eight-token representative-core structural study.";
+    source = {
+      type = "huggingface";
+      model_id = tinyStories1m.modelId;
+      inherit (tinyStories1m) revision;
+      profile = "quantized-representative-core-structural-study";
+      quantization = "pt2e-static-w8a8";
+      calibration = "frozen-structural-eight-token-v1";
+      context_length = 8;
+    };
+    allowHwExterns = true;
+    slangPerFileExternModules = true;
+    inherit fpPrimsSv;
+    hfSnapshot = tinyStories1m.snapshot;
+    pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
+    pytorchExportedCommand = ''
+      export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
+      export TINYSTORIES_RC_STUDY_CONTEXT_LENGTH=8
+      python ${materializePyTorchExported} \
+        --adapter ${tinyStories1m.sourceDir}/model_adapter_pt2e_w8a8_study.py \
+        --model-path ${tinyStories1m.snapshot} \
+        --out-dir "$out"
+    '';
+  };
+
+  "tinystories-w8a8-rc-study-anchor" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-anchor";
+    vocabSize = 32;
+    numLayers = 2;
+    maxPositionEmbeddings = 8;
+    windowSize = 4;
+    hiddenSize = 4;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-vocab128" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-vocab128";
+    vocabSize = 128;
+    numLayers = 2;
+    maxPositionEmbeddings = 8;
+    windowSize = 4;
+    hiddenSize = 4;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-vocab512" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-vocab512";
+    vocabSize = 512;
+    numLayers = 2;
+    maxPositionEmbeddings = 8;
+    windowSize = 4;
+    hiddenSize = 4;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-width8" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-width8";
+    vocabSize = 32;
+    numLayers = 2;
+    maxPositionEmbeddings = 8;
+    windowSize = 4;
+    hiddenSize = 8;
+    numHeads = 2;
+  };
+
+  "tinystories-w8a8-rc-study-width16" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-width16";
+    vocabSize = 32;
+    numLayers = 2;
+    maxPositionEmbeddings = 8;
+    windowSize = 4;
+    hiddenSize = 16;
+    numHeads = 4;
+  };
+
+  "tinystories-w8a8-rc-study-layers4" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-layers4";
+    vocabSize = 32;
+    numLayers = 4;
+    maxPositionEmbeddings = 8;
+    windowSize = 4;
+    hiddenSize = 4;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-window8" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-window8";
+    vocabSize = 32;
+    numLayers = 2;
+    maxPositionEmbeddings = 8;
+    windowSize = 8;
+    hiddenSize = 4;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-mask2048" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-mask2048";
+    vocabSize = 32;
+    numLayers = 2;
+    maxPositionEmbeddings = 2048;
+    windowSize = 256;
+    hiddenSize = 4;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-mask9" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-mask9";
+    vocabSize = 32;
+    numLayers = 2;
+    maxPositionEmbeddings = 9;
+    windowSize = 256;
+    hiddenSize = 4;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-mask9-vocab6" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-mask9-vocab6";
+    vocabSize = 6;
+    numLayers = 2;
+    maxPositionEmbeddings = 9;
+    windowSize = 256;
+    hiddenSize = 4;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-mask9-vocab6-width1" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-mask9-vocab6-width1";
+    vocabSize = 6;
+    numLayers = 2;
+    maxPositionEmbeddings = 9;
+    windowSize = 256;
+    hiddenSize = 1;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-mask9-vocab6-width2" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-mask9-vocab6-width2";
+    vocabSize = 6;
+    numLayers = 2;
+    maxPositionEmbeddings = 9;
+    windowSize = 256;
+    hiddenSize = 2;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-mask9-vocab6-width3" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-mask9-vocab6-width3";
+    vocabSize = 6;
+    numLayers = 2;
+    maxPositionEmbeddings = 9;
+    windowSize = 256;
+    hiddenSize = 3;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-mask9-vocab6-width2-window1" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-mask9-vocab6-width2-window1";
+    vocabSize = 6;
+    numLayers = 2;
+    maxPositionEmbeddings = 9;
+    windowSize = 1;
+    hiddenSize = 2;
+    numHeads = 1;
+  };
+
+  "tinystories-w8a8-rc-study-minimum" = registerRcStudyCore {
+    key = "tinystories-w8a8-rc-study-minimum";
+    vocabSize = 6;
+    numLayers = 2;
+    maxPositionEmbeddings = 9;
+    windowSize = 1;
+    hiddenSize = 1;
+    numHeads = 1;
   };
 
   "tinystories-representative-core-fp32" = registerModel {

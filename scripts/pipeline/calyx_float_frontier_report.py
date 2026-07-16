@@ -17,6 +17,7 @@ FLOAT_OP_RE = re.compile(
 FLOAT_TYPE_RE = re.compile(r"\b(?:f16|f32|f64)\b")
 UNSUPPORTED_CALYX_FLOAT_OPS = {
     "arith.uitofp",
+    "math.exp",
     "math.rsqrt",
 }
 

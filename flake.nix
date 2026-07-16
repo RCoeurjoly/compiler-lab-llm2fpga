@@ -255,6 +255,32 @@
             ${pkgs.gnugrep}/bin/grep -F \
               "failed to legalize operation 'arith.uitofp'" "$out/lower.log"
           '';
+        calyxMathExpUpstreamReproducer = pkgs.runCommand
+          "calyx-math-exp-upstream-reproducer" {
+            nativeBuildInputs = [ circt pkgs.gnugrep ];
+          } ''
+            mkdir -p "$out"
+            set +e
+            ${circt}/bin/circt-opt \
+              ${./reproducers/calyx-math-exp/input.mlir} \
+              --lower-scf-to-calyx='top-level-function=main' \
+              -o "$out/partial.calyx.mlir" >"$out/lower.log" 2>&1
+            rc=$?
+            set -e
+            ${pkgs.gnugrep}/bin/grep -F \
+              "Unhandled operation during BuildOpGroups()" "$out/lower.log"
+            ${pkgs.gnugrep}/bin/grep -F "math.exp" "$out/lower.log"
+            test -s "$out/partial.calyx.mlir"
+            printf '%s\n' "$rc" >"$out/exit-code.txt"
+            cat > "$out/manifest.json" <<'JSON'
+            {
+              "status": "diagnostic-observed",
+              "valid_lowering": false,
+              "partial_output": "partial.calyx.mlir",
+              "diagnostic": "math.exp is unhandled during BuildOpGroups"
+            }
+            JSON
+          '';
         calyxI1UiToFpLegalizationSelftest = pkgs.runCommand
           "calyx-i1-uitofp-legalization-selftest" {
             nativeBuildInputs = [ mlir circt llm2fpgaMlirPasses pkgs.gnugrep ];
@@ -551,6 +577,14 @@
             stages = noHandshakeLinalgStages;
           }
           {
+            alias = "tinystories-w8a8-rc-working-via-linalg-no-handshake";
+            model = "tinystories-w8a8-rc-study-mask9-vocab6-width2";
+            frontend = "linalg";
+            backend = "calyx-native-sv";
+            packages = pipelineStagePackagesNoHandshake;
+            stages = noHandshakeLinalgStages;
+          }
+          {
             alias =
               "tinystories-representative-core-w4a8-via-linalg-no-handshake";
             model = "tinystories-representative-core-w4a8";
@@ -597,6 +631,18 @@
           }
         ];
         pipelineAliasPackages = mkPipelineAliases pipelineAliasSpecs;
+        rcWorkingSystem = import ./nix/rc-working-system.nix {
+          inherit pkgs pythonWithTinyStoriesTorchAO;
+          exportedProgram =
+            pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-pytorch-exported";
+          flatScf =
+            pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-flat-scf";
+          calyx =
+            pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-calyx";
+          sourceRoot = ./.;
+          sourceModelKey = "tinystories-w8a8-rc-study-mask9-vocab6-width2";
+          pipelineAlias = "tinystories-w8a8-rc-working-via-linalg-no-handshake";
+        };
         activePipelineVariantsJson =
           pkgs.writeText "active-pipeline-variants.json" (builtins.toJSON {
             schemaVersion = 1;
@@ -624,6 +670,182 @@
                 --fail-on-float-after-quantized-matmul
             '';
         };
+        mkMeasuredTorchMlirStudyStage = { name, exportedProgram }:
+          pkgs.runCommand "${name}-torch-mlir-study" {
+            buildInputs = [ pythonWithTinyStoriesTorchAO torchMlir ];
+          } ''
+            set -euo pipefail
+            mkdir -p "$out"
+            export PYTHONPATH="${torchMlir}/${python.sitePackages}:${torchMlir}/${python.sitePackages}/torch_mlir:''${PYTHONPATH:-}"
+            start_ns="$(${pkgs.coreutils}/bin/date +%s%N)"
+            ${pythonWithTinyStoriesTorchAO}/bin/python ${
+              ./scripts/compile-pytorch.py
+            } \
+              --exported-program-dir ${exportedProgram} \
+              --out "$out/model.torch.mlir" \
+              --timing-json "$out/phase-timing.json" >/dev/null
+            elapsed_ns="$(( $(${pkgs.coreutils}/bin/date +%s%N) - start_ns ))"
+            ${pythonWithTinyStoriesTorchAO}/bin/python ${
+              ./scripts/pipeline/write_torch_mlir_study_metrics.py
+            } \
+              --mlir "$out/model.torch.mlir" \
+              --elapsed-ns "$elapsed_ns" \
+              --phase-timing "$out/phase-timing.json" \
+              --out "$out/metrics.json"
+            ${pythonWithTinyStoriesTorchAO}/bin/python ${
+              ./scripts/pipeline/torch_mlir_fingerprint.py
+            } \
+              --input "$out/model.torch.mlir" \
+              --label ${name} \
+              --out "$out/fingerprint.json"
+            cp ${exportedProgram}/manifest.json "$out/pytorch-exported-manifest.json"
+          '';
+        rcStudyCandidates = [
+          {
+            key = "anchor";
+            model = "tinystories-w8a8-rc-study-anchor";
+          }
+          {
+            key = "vocab128";
+            model = "tinystories-w8a8-rc-study-vocab128";
+          }
+          {
+            key = "vocab512";
+            model = "tinystories-w8a8-rc-study-vocab512";
+          }
+          {
+            key = "width8";
+            model = "tinystories-w8a8-rc-study-width8";
+          }
+          {
+            key = "width16";
+            model = "tinystories-w8a8-rc-study-width16";
+          }
+          {
+            key = "layers4";
+            model = "tinystories-w8a8-rc-study-layers4";
+          }
+          {
+            key = "window8";
+            model = "tinystories-w8a8-rc-study-window8";
+          }
+          {
+            key = "mask2048";
+            model = "tinystories-w8a8-rc-study-mask2048";
+          }
+          {
+            key = "mask9";
+            model = "tinystories-w8a8-rc-study-mask9";
+          }
+          {
+            key = "mask9-vocab6";
+            model = "tinystories-w8a8-rc-study-mask9-vocab6";
+          }
+          {
+            key = "mask9-vocab6-width1";
+            model = "tinystories-w8a8-rc-study-mask9-vocab6-width1";
+          }
+          {
+            key = "mask9-vocab6-width2";
+            model = "tinystories-w8a8-rc-study-mask9-vocab6-width2";
+          }
+          {
+            key = "mask9-vocab6-width3";
+            model = "tinystories-w8a8-rc-study-mask9-vocab6-width3";
+          }
+          {
+            key = "mask9-vocab6-width2-window1";
+            model = "tinystories-w8a8-rc-study-mask9-vocab6-width2-window1";
+          }
+          {
+            key = "minimum";
+            model = "tinystories-w8a8-rc-study-minimum";
+          }
+        ];
+        rcStudyFullStage = mkMeasuredTorchMlirStudyStage {
+          name = "tinystories-w8a8-rc-study-full";
+          exportedProgram =
+            pipelineStagePackages."tinystories-w8a8-rc-study-full-pytorch-exported";
+        };
+        rcStudyCandidateStages = builtins.listToAttrs (map (candidate: {
+          name = candidate.key;
+          value = mkMeasuredTorchMlirStudyStage {
+            name = candidate.model;
+            exportedProgram = pipelineStagePackages."${candidate.model}-pytorch-exported";
+          };
+        }) rcStudyCandidates);
+        mkRcStudyQualification = candidate:
+          pkgs.runCommand "tinystories-w8a8-rc-study-${candidate.key}-qualification" { } ''
+            mkdir -p "$out"
+            ${python}/bin/python3 ${
+              ./scripts/pipeline/qualify_quantized_representative_core.py
+            } \
+              --baseline ${rcStudyFullStage}/fingerprint.json \
+              --candidate ${rcStudyCandidateStages.${candidate.key}}/fingerprint.json \
+              --baseline-metrics ${rcStudyFullStage}/metrics.json \
+              --candidate-metrics ${rcStudyCandidateStages.${candidate.key}}/metrics.json \
+              --out "$out/report.json" \
+              --markdown-out "$out/report.md"
+          '';
+        rcStudyQualifications = builtins.listToAttrs (map (candidate: {
+          name = candidate.key;
+          value = mkRcStudyQualification candidate;
+        }) rcStudyCandidates);
+        quantizedRepresentativeCoreStudy =
+          pkgs.runCommand "tinystories-w8a8-rc-study" { } ''
+            set -euo pipefail
+            mkdir -p "$out/candidates"
+            ${python}/bin/python3 ${
+              ./scripts/pipeline/summarize_quantized_representative_core_study.py
+            } \
+              --full-stage ${rcStudyFullStage} \
+              --candidate anchor=${rcStudyQualifications.anchor} \
+              --candidate vocab128=${rcStudyQualifications.vocab128} \
+              --candidate vocab512=${rcStudyQualifications.vocab512} \
+              --candidate width8=${rcStudyQualifications.width8} \
+              --candidate width16=${rcStudyQualifications.width16} \
+              --candidate layers4=${rcStudyQualifications.layers4} \
+              --candidate window8=${rcStudyQualifications.window8} \
+              --candidate mask2048=${rcStudyQualifications.mask2048} \
+              --candidate mask9=${rcStudyQualifications.mask9} \
+              --candidate mask9-vocab6=${rcStudyQualifications.mask9-vocab6} \
+              --candidate mask9-vocab6-width1=${rcStudyQualifications.mask9-vocab6-width1} \
+              --candidate mask9-vocab6-width2=${rcStudyQualifications.mask9-vocab6-width2} \
+              --candidate mask9-vocab6-width3=${rcStudyQualifications.mask9-vocab6-width3} \
+              --candidate mask9-vocab6-width2-window1=${rcStudyQualifications.mask9-vocab6-width2-window1} \
+              --candidate minimum=${rcStudyQualifications.minimum} \
+              --out "$out/summary.json" \
+              --markdown-out "$out/summary.md"
+            ln -s ${rcStudyFullStage} "$out/full-stage"
+            ln -s ${rcStudyQualifications.anchor} "$out/candidates/anchor"
+            ln -s ${rcStudyQualifications.vocab128} "$out/candidates/vocab128"
+            ln -s ${rcStudyQualifications.vocab512} "$out/candidates/vocab512"
+            ln -s ${rcStudyQualifications.width8} "$out/candidates/width8"
+            ln -s ${rcStudyQualifications.width16} "$out/candidates/width16"
+            ln -s ${rcStudyQualifications.layers4} "$out/candidates/layers4"
+            ln -s ${rcStudyQualifications.window8} "$out/candidates/window8"
+            ln -s ${rcStudyQualifications.mask2048} "$out/candidates/mask2048"
+            ln -s ${rcStudyQualifications.mask9} "$out/candidates/mask9"
+            ln -s ${rcStudyQualifications.mask9-vocab6} "$out/candidates/mask9-vocab6"
+            ln -s ${rcStudyQualifications.mask9-vocab6-width1} \
+              "$out/candidates/mask9-vocab6-width1"
+            ln -s ${rcStudyQualifications.mask9-vocab6-width2} \
+              "$out/candidates/mask9-vocab6-width2"
+            ln -s ${rcStudyQualifications.mask9-vocab6-width3} \
+              "$out/candidates/mask9-vocab6-width3"
+            ln -s ${rcStudyQualifications.mask9-vocab6-width2-window1} \
+              "$out/candidates/mask9-vocab6-width2-window1"
+            ln -s ${rcStudyQualifications.minimum} "$out/candidates/minimum"
+          '';
+        quantizedRepresentativeCoreStudyStagePackages = {
+          "tinystories-w8a8-rc-study-full-torch-mlir" = rcStudyFullStage;
+        } // builtins.listToAttrs (map (candidate: {
+          name = "tinystories-w8a8-rc-study-${candidate.key}-torch-mlir";
+          value = rcStudyCandidateStages.${candidate.key};
+        }) rcStudyCandidates) // builtins.listToAttrs (map (candidate: {
+          name = "tinystories-w8a8-rc-study-${candidate.key}-qualification";
+          value = rcStudyQualifications.${candidate.key};
+        }) rcStudyCandidates);
         tinystoriesW8A8Pt2eGraphShapeAudit =
           pkgs.runCommand "tinystories-w8a8-pt2e-graph-shape-audit" { } ''
             mkdir -p "$out"
@@ -1904,11 +2126,16 @@
           "calyx-integer-library-selftest" = calyxIntegerLibrarySelftest;
           "calyx-i1-uitofp-upstream-reproducer" =
             calyxI1UiToFpUpstreamReproducer;
+          "calyx-math-exp-upstream-reproducer" =
+            calyxMathExpUpstreamReproducer;
           "calyx-i1-uitofp-legalization-selftest" =
             calyxI1UiToFpLegalizationSelftest;
           "active-pipeline-variants" = activePipelineVariantsJson;
           "tinystories-w8a8-pt2e-graph-shape-audit" =
             tinystoriesW8A8Pt2eGraphShapeAudit;
+          "tinystories-w8a8-rc-study" = quantizedRepresentativeCoreStudy;
+          "tinystories-w8a8-rc-reference-image" = rcWorkingSystem.referenceImage;
+          "tinystories-w8a8-rc-abi-audit" = rcWorkingSystem.abiAudit;
           "resource-baseline-yosys-stat-matrix" =
             resourceBaselineYosysStatMatrix;
           "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence" =
@@ -1954,7 +2181,8 @@
           model-registry = modelRegistryJson;
           default = modelRegistryJson;
         } // pipelineStagePackages // pipelineMetadataPackages
-          // quantizedLinalgDiagnosticPackages // pipelineAliasPackages;
+          // quantizedLinalgDiagnosticPackages // pipelineAliasPackages
+          // quantizedRepresentativeCoreStudyStagePackages;
 
         checks = {
           default = modelRegistryJson;
@@ -1962,6 +2190,8 @@
           "calyx-integer-library" = calyxIntegerLibrarySelftest;
           "calyx-i1-uitofp-upstream-reproducer" =
             calyxI1UiToFpUpstreamReproducer;
+          "calyx-math-exp-upstream-reproducer" =
+            calyxMathExpUpstreamReproducer;
           "calyx-i1-uitofp-legalization-selftest" =
             calyxI1UiToFpLegalizationSelftest;
         };

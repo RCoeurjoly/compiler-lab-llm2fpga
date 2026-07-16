@@ -404,6 +404,18 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("documented numerical contract", readme)
         self.assertIn("Textual MLIR substitution is not an acceptable fix", readme)
 
+    def test_current_calyx_math_exp_blocker_is_minimized(self) -> None:
+        reproducer_dir = REPO_ROOT / "reproducers" / "calyx-math-exp"
+        failing = (reproducer_dir / "input.mlir").read_text(encoding="utf-8")
+        readme = (reproducer_dir / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("math.exp", failing)
+        self.assertIn("PT2E W8A8", readme)
+        self.assertIn("documented numerical contract", readme)
+        self.assertIn("Textual MLIR substitution is not an acceptable fix", readme)
+        flake = (REPO_ROOT / "flake.nix").read_text(encoding="utf-8")
+        self.assertIn('"calyx-math-exp-upstream-reproducer"', flake)
+
     def test_calyx_dense_resource_crash_regression_is_tracked(self) -> None:
         reproducer_dir = REPO_ROOT / "reproducers" / "calyx-unnamed-crash"
         input_mlir = (reproducer_dir / "input.mlir").read_text(encoding="utf-8")

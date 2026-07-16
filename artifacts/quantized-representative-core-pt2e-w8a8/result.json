@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-16",
+  "command": "nix build .#tinystories-w8a8-rc-study -L --no-link --print-out-paths",
+  "status": "coverage-valid-finalist-without-speed-eligibility",
+  "scope": "Torch-MLIR only; not an FPGA resource or equivalence result",
+  "study_input": {
+    "path": "TinyStories/quantized_rc_study_input.json",
+    "context_length": 8,
+    "purpose": "structural-pt2e-calibration",
+    "full_token_equality_classes": 6
+  },
+  "full_structural_baseline": {
+    "label": "tinystories-w8a8-rc-study-full",
+    "configuration": {
+      "vocab_size": 50257,
+      "num_layers": 8,
+      "max_position_embeddings": 2048,
+      "window_size": 256,
+      "hidden_size": 64,
+      "num_heads": 16
+    },
+    "metrics": {
+      "lowering_elapsed_ns": 5888979909,
+      "torch_export_load_elapsed_ns": 702952272,
+      "torch_mlir_import_elapsed_ns": 2467468410,
+      "mlir_text_render_elapsed_ns": 42874149,
+      "mlir_bytes": 27235171,
+      "mlir_sha256": "ba31a2caa6e67e53bde6fab86f685be2af8e74ecf69ace890fa62d71229702e0"
+    }
+  },
+  "thresholds": {
+    "minimum_lowering_speedup": 10.0,
+    "maximum_ir_size_ratio": 0.1,
+    "preferred_lowering_speedup": 100.0
+  },
+  "selected_candidate": null,
+  "structural_finalist": {
+    "key": "mask9-vocab6-width2",
+    "label": "tinystories-w8a8-rc-study-mask9-vocab6-width2",
+    "configuration": {
+      "vocab_size": 6,
+      "num_layers": 2,
+      "max_position_embeddings": 9,
+      "window_size": 256,
+      "hidden_size": 2,
+      "num_heads": 1
+    },
+    "coverage_complete": true,
+    "missing_operation_names": [],
+    "missing_operation_signatures": [],
+    "missing_producer_consumer_edges": [],
+    "metrics": {
+      "lowering_elapsed_ns": 3712216360,
+      "torch_export_load_elapsed_ns": 262004989,
+      "torch_mlir_import_elapsed_ns": 819570750,
+      "mlir_text_render_elapsed_ns": 2723110,
+      "mlir_bytes": 109426,
+      "mlir_sha256": "0437be0a227396daaa88b78f7f42335f6a1db21e30538a6e5c5e726fc5490c13"
+    },
+    "lowering_speedup": 1.586378415992973,
+    "torch_mlir_import_speedup": 3.0106838366303337,
+    "ir_size_ratio": 0.004017819458522952,
+    "eligible": false,
+    "failure_reasons": [
+      "lowering_speedup_below_10x"
+    ]
+  },
+  "minimization_frontiers": {
+    "position_table_8": {
+      "coverage_complete": false,
+      "missing": [
+        "torch.aten.slice.Tensor on i1 tensor",
+        "torch.aten.slice.Tensor -> torch.aten.slice.Tensor",
+        "torch.aten.slice.Tensor -> torch.aten.where.self"
+      ]
+    },
+    "hidden_width_1": {
+      "coverage_complete": false,
+      "missing": [
+        "torch.aten.broadcast_to",
+        "LayerNorm-related broadcast_to edges"
+      ]
+    },
+    "hidden_width_2": {
+      "coverage_complete": true
+    },
+    "window_size_1_at_width_2": {
+      "coverage_complete": true,
+      "mlir_bytes": 109446,
+      "note": "The final candidate retains window_size 256 because it is closer to the full configuration and 20 bytes smaller."
+    }
+  },
+  "evidence": {
+    "nix_result_bundle": "/nix/store/04iqhbwlgpf1fq9zr82m59sbr1knkg9i-tinystories-w8a8-rc-study",
+    "full_stage": "/nix/store/5sffm7j7zggi9a2g2k0sx0x7f46pc67n-tinystories-w8a8-rc-study-full-torch-mlir-study",
+    "finalist_stage": "/nix/store/c7xibbw2vwjby6nwr8l1h06warnn29id-tinystories-w8a8-rc-study-mask9-vocab6-width2-torch-mlir-study",
+    "finalist_qualification": "/nix/store/wdajzf2gg58mz2sgi9y4j8lhqqr1ji71-tinystories-w8a8-rc-study-mask9-vocab6-width2-qualification"
+  },
+  "deferred": [
+    "functional equivalence",
+    "quantized accuracy",
+    "SmoothQuant profile",
+    "TOSA and downstream lowering comparison",
+    "RTLIL/SV generation",
+    "FPGA utilization",
+    "DDR3 integration",
+    "board validation"
+  ]
+}

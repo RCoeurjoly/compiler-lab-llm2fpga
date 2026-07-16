@@ -1,0 +1,6 @@
+{
+  "context_length": 8,
+  "full_token_ids": [464, 3290, 318, 257, 3290, 286, 257, 1290],
+  "purpose": "structural-pt2e-calibration",
+  "schema_version": 1
+}
