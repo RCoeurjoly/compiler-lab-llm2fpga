@@ -74,6 +74,9 @@
   place-and-route result with no resource oversubscription and all required
   timing met, followed by the observable RC FPGA checkpoint. RTLIL/Yosys
   reports are preliminary resource scouts.
+- **Baseline RC failure packet** — The published non-black-boxed XC7K480T P&R
+  failure record: design/constraint/tool provenance, resource/timing reports,
+  and limiting condition. It precedes and remains distinct from any DDR3 branch.
 - **RC counterexample packet** — A durable mismatch or timeout record with its
   token context, PT2E and SV outputs, provenance hashes, timing contract, and
   cycle/handshake trace. It rejects the candidate but is a reusable research

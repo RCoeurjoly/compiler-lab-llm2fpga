@@ -68,6 +68,14 @@ Yosys statistics, and pre-P&R estimates remain valuable scouting evidence but
 cannot establish fit. The P&R result and the observable board checkpoint
 together establish the baseline implementation claim.
 
+If the complete baseline RC fails constrained P&R, publish that failure as its
+own result before beginning DDR3 work. Its packet records the complete,
+non-black-boxed design provenance, target constraints, resource/timing
+reports, and the limiting condition. An external-memory experiment may then
+begin as an explicitly separate non-baseline branch, with its own equivalence
+and integration gates; it cannot substitute for or erase the missing baseline
+checkpoint.
+
 At that later stage, the image-backed SV fixture must consume the exact packed
 byte image and address map intended for the DDR3 driver, produced by one
 versioned packer. It may not use a simulator-only convenient representation.
@@ -92,5 +100,7 @@ the real DDR3 service is introduced on board.
 - RTLIL/Yosys resource estimates are scouts; only successful constrained
   XC7K480T P&R, followed by the observable board checkpoint, supports a
   complete-baseline fit claim.
+- A complete-baseline P&R failure is published before any early DDR3 branch;
+  that branch remains a separate experiment rather than a retroactive baseline.
 - The same fixture may then be rerun with the exact packed-image SV service and
   with the real DDR3 service as distinct external-memory checkpoints.
