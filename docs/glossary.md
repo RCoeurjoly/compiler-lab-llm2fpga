@@ -89,6 +89,10 @@
   from documented launch to documented output sampling. The verifier records
   observed latency and rejects completion beyond this bound; it does not try to
   match PyTorch cycle timing.
+- **RC verification-throughput probe** — A bounded deterministic SV run that
+  records simulator/host provenance, contexts per second, cycles per context,
+  and projected `6^8` sweep cost. It measures feasibility but never replaces
+  exhaustive equivalence.
 - **Blocker evidence ladder** — The required investigation order for a lowering
   blocker: upstream semantics-preserving route, established published/open
   route, then local implementation. It never relaxes the RC acceptance gates.

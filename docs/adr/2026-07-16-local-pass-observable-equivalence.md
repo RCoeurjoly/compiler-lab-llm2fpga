@@ -116,6 +116,14 @@ that bound. PT2E supplies numerical behavior, not hardware-cycle timing, so
 the gate requires correct bounded completion rather than cycle-for-cycle
 agreement with PyTorch.
 
+As soon as a first testable SV candidate exists, run a bounded deterministic
+throughput probe before treating the full sweep as a routine promotion gate.
+Its durable report records the candidate/SV/simulator/host provenance, sampled
+context range and count, wall time, contexts per second, cycles per context,
+peak resource use where available, and the projected cost of all `6^8`
+contexts. The probe does not replace any smoke or exhaustive result; it
+measures whether the verification contract itself is practical.
+
 Every newly observed lowering blocker follows an evidence ladder:
 
 1. an existing upstream semantics-preserving dialect, pass, or library route;
@@ -164,6 +172,9 @@ testable-SV candidate for the normal promotion gates.
   it rejects the route and yields a replayable counterexample packet.
 - Latency is a recorded implementation metric with a declared worst-case bound;
   it is not compared to PyTorch cycle-for-cycle.
+- The first testable SV also produces a bounded verification-throughput probe,
+  making the cost of the exhaustive gate a published result rather than an
+  untested assumption.
 - The blocker evidence ladder makes upstream and published routes preferred
   investigative starting points, but no provenance class bypasses RC
   functional-equivalence evidence.
