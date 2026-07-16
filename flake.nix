@@ -645,6 +645,57 @@
           sourceModelKey = "tinystories-w8a8-rc-study-mask9-vocab6-width2";
           pipelineAlias = "tinystories-w8a8-rc-working-via-linalg-no-handshake";
         };
+        quantizedRcNonlinearSlices = pkgs.runCommand
+          "tinystories-w8a8-rc-nonlinear-slices" {
+            nativeBuildInputs = [ python ];
+          } ''
+            set -euo pipefail
+            ${python}/bin/python3 ${./scripts/pipeline/extract_quantized_rc_nonlinear_slices.py} \
+              --torch-mlir ${pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-torch"} \
+              --flat-scf ${pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-flat-scf"}/flat.scf.mlir \
+              --model-key tinystories-w8a8-rc-study-mask9-vocab6-width2 \
+              --out-dir "$out"
+          '';
+        quantizedRcNonlinearFrontier = pkgs.runCommand
+          "tinystories-w8a8-rc-nonlinear-lowering-frontier" {
+            nativeBuildInputs = [
+              python
+              torchMlir
+              mlirForTorchMlir
+              circt
+              pkgs.bash
+            ];
+          } ''
+            set -euo pipefail
+            mkdir -p "$out"
+            ${python}/bin/python3 ${./scripts/pipeline/run_quantized_rc_nonlinear_matrix.py} \
+              --torch-mlir ${pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-torch"} \
+              --flat-scf ${pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-flat-scf"}/flat.scf.mlir \
+              --slices ${quantizedRcNonlinearSlices}/slices.json \
+              --reference ${rcWorkingSystem.referenceImage}/reference.json \
+              --torch-mlir-opt ${torchMlir}/bin/torch-mlir-opt \
+              --mlir-opt ${mlirForTorchMlir}/bin/mlir-opt \
+              --circt-opt ${circt}/bin/circt-opt \
+              --pass-plugin ${llm2fpgaTorchMlirPasses}/lib/LLM2FPGAMLIRPasses.so \
+              --linalg-to-scf-script ${noHandshakeLinalgToScf} \
+              --scf-to-flat-scf-script ${noHandshakeScfToFlatScf} \
+              --flat-scf-blocker-report ${flatScfBlockerReport} \
+              --primitive exp=${./reproducers/calyx-math-exp/input.mlir} \
+              --primitive tanh=${./reproducers/calyx-math-tanh/input.mlir} \
+              --primitive fpowi-cube=${./reproducers/calyx-math-fpowi-cube/input.mlir} \
+              --primitive sqrt=${./reproducers/calyx-math-sqrt/input.mlir} \
+              --out-dir "$out/matrix"
+            ${python}/bin/python3 ${./scripts/pipeline/render_quantized_rc_nonlinear_frontier.py} \
+              --matrix "$out/matrix/matrix.json" \
+              --slices ${quantizedRcNonlinearSlices}/slices.json \
+              --reference ${rcWorkingSystem.referenceImage}/reference.json \
+              --out-json "$out/result.json" \
+              --out-markdown "$out/result.md"
+            test -f "$out/matrix/matrix.json"
+            test -f "$out/matrix/oracle-comparison.json"
+            test -f "$out/result.json"
+            test -f "$out/result.md"
+          '';
         activePipelineVariantsJson =
           pkgs.writeText "active-pipeline-variants.json" (builtins.toJSON {
             schemaVersion = 1;
@@ -2138,6 +2189,9 @@
           "tinystories-w8a8-rc-study" = quantizedRepresentativeCoreStudy;
           "tinystories-w8a8-rc-reference-image" = rcWorkingSystem.referenceImage;
           "tinystories-w8a8-rc-abi-audit" = rcWorkingSystem.abiAudit;
+          "tinystories-w8a8-rc-nonlinear-slices" = quantizedRcNonlinearSlices;
+          "tinystories-w8a8-rc-nonlinear-lowering-frontier" =
+            quantizedRcNonlinearFrontier;
           "resource-baseline-yosys-stat-matrix" =
             resourceBaselineYosysStatMatrix;
           "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence" =

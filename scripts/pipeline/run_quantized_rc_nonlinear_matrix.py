@@ -124,6 +124,12 @@ def skipped_attempt(label: str, blocked_by: str) -> dict[str, object]:
     }
 
 
+def bash_script_command(script: str, *args: str) -> list[str]:
+    """Run repository pipeline helpers like the established Nix pipeline."""
+
+    return ["bash", script, *args]
+
+
 def not_run_oracle() -> dict[str, str]:
     return {
         "status": "not-run",
@@ -493,7 +499,9 @@ def run_full_rc_routes(
     if tosa_to_linalg["status"] == "accepted":
         linalg_to_scf = run_command(
             "tosa-linalg-to-scf",
-            [linalg_to_scf_script, mlir_opt, str(tosa_linalg), str(tosa_scf)],
+            bash_script_command(
+                linalg_to_scf_script, mlir_opt, str(tosa_linalg), str(tosa_scf)
+            ),
             tosa_scf.parent / "lower.log",
             tosa_scf,
         )
@@ -518,7 +526,9 @@ def run_full_rc_routes(
         flatten_env["FLAT_SCF_BLOCKER_REPORT"] = flat_scf_blocker_report
         scf_to_flat = run_command(
             "tosa-scf-to-flat-scf",
-            [scf_to_flat_scf_script, mlir_opt, str(tosa_scf), str(flat_dir)],
+            bash_script_command(
+                scf_to_flat_scf_script, mlir_opt, str(tosa_scf), str(flat_dir)
+            ),
             flat_dir / "lower.log",
             tosa_flat,
             env=flatten_env,

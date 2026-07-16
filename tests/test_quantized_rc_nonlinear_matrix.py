@@ -103,6 +103,25 @@ class QuantizedRcNonlinearMatrixTest(unittest.TestCase):
         candidate["results"][0]["output_codes_i8"] = [1, 2, 3]
         self.assertEqual(module.compare_oracle(reference, candidate)["status"], "fail")
 
+    def test_non_executable_pipeline_helpers_are_invoked_via_bash(self) -> None:
+        module = load_module()
+        command = module.bash_script_command(
+            "/nix/store/source/linalg_to_scf_no_handshake.sh",
+            "/nix/store/mlir-opt",
+            "/nix/store/input.mlir",
+            "/nix/store/output.mlir",
+        )
+        self.assertEqual(
+            command,
+            [
+                "bash",
+                "/nix/store/source/linalg_to_scf_no_handshake.sh",
+                "/nix/store/mlir-opt",
+                "/nix/store/input.mlir",
+                "/nix/store/output.mlir",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
