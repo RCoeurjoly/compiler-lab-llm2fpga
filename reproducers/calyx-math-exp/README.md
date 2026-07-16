@@ -26,10 +26,11 @@ explicit hardware implementation with a documented numerical contract that is
 validated against the frozen PT2E W8A8 oracle. Replacing exp textually, or
 using a resource-scout approximation, is not an equivalence fix.
 
-Current CIRCT may still print a partial Calyx module after this diagnostic.
-That output is not a valid lowered artifact; the repository pipeline treats
-the diagnostic/no-artifact condition as a failure and refuses to emit
-placeholder SV.
+Current CIRCT may print a partial Calyx module after this diagnostic and still
+return exit status zero. That output is not a valid lowered artifact. The
+repository wrapper accepts Calyx only when the lowerer returns zero, writes a
+non-empty artifact, and emits no MLIR `error:` diagnostic; otherwise it
+discards the partial file and records a failed manifest.
 
 The checked-in Nix artifact preserves this observation without treating it as
 a successful lower:

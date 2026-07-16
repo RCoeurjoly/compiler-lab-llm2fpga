@@ -267,6 +267,7 @@
               -o "$out/partial.calyx.mlir" >"$out/lower.log" 2>&1
             rc=$?
             set -e
+            test "$rc" -eq 0
             ${pkgs.gnugrep}/bin/grep -F \
               "Unhandled operation during BuildOpGroups()" "$out/lower.log"
             ${pkgs.gnugrep}/bin/grep -F "math.exp" "$out/lower.log"
@@ -276,6 +277,7 @@
             {
               "status": "diagnostic-observed",
               "valid_lowering": false,
+              "exit_code_observed": 0,
               "partial_output": "partial.calyx.mlir",
               "diagnostic": "math.exp is unhandled during BuildOpGroups"
             }

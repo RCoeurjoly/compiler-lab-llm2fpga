@@ -50,15 +50,25 @@ set -e
 
 cp "$tmp_log" "$output_dir/lower-scf-to-calyx.log"
 
-if [[ "$rc" -eq 0 && -s "$output_dir/model.calyx.mlir" ]]; then
+diagnostic_error=0
+if grep -Eq '(^|: )error:' "$tmp_log"; then
+  diagnostic_error=1
+fi
+
+if [[ "$rc" -eq 0 && "$diagnostic_error" -eq 0 && -s "$output_dir/model.calyx.mlir" ]]; then
   cat >"$output_dir/manifest.json" <<'JSON'
 {"stage":"calyx","status":"ok","artifact":"model.calyx.mlir"}
 JSON
   exit 0
 fi
 
-rm -f "$output_dir/model.calyx.mlir"
-python3 - "$output_dir/manifest.json" "$rc" <<'PY'
+partial_output_discarded=false
+if [[ -e "$output_dir/model.calyx.mlir" ]]; then
+  partial_output_discarded=true
+  rm -f "$output_dir/model.calyx.mlir"
+fi
+
+python3 - "$output_dir/manifest.json" "$rc" "$diagnostic_error" "$partial_output_discarded" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -69,7 +79,9 @@ Path(sys.argv[1]).write_text(
             "stage": "calyx",
             "status": "failed",
             "exit_code": int(sys.argv[2]),
-            "reason": "lower-scf-to-calyx did not produce a Calyx artifact",
+            "diagnostic_error": sys.argv[3] == "1",
+            "partial_output_discarded": sys.argv[4] == "true",
+            "reason": "lower-scf-to-calyx emitted an error diagnostic or did not produce a valid Calyx artifact",
             "log": "lower-scf-to-calyx.log",
             "normalized_input": "flat.scf.mlir",
         },

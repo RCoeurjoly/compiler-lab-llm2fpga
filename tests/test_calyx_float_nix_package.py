@@ -119,6 +119,22 @@ class CalyxFloatNixPackageTest(unittest.TestCase):
         )
         self.assertNotIn('mktemp /tmp/calyx_', script)
 
+    def test_math_exp_reproducer_records_zero_exit_as_invalid_lowering(self) -> None:
+        fixture = ROOT / "reproducers" / "calyx-math-exp" / "input.mlir"
+        readme = ROOT / "reproducers" / "calyx-math-exp" / "README.md"
+        flake = (ROOT / "flake.nix").read_text(encoding="utf-8")
+
+        self.assertTrue(fixture.exists())
+        self.assertIn("math.exp", fixture.read_text(encoding="utf-8"))
+        self.assertIn(
+            "emits no MLIR `error:` diagnostic", readme.read_text(encoding="utf-8")
+        )
+        self.assertIn('calyxMathExpUpstreamReproducer = pkgs.runCommand', flake)
+        self.assertIn('test "$rc" -eq 0', flake)
+        self.assertIn('printf \'%s\\n\' "$rc" >"$out/exit-code.txt"', flake)
+        self.assertIn('"valid_lowering": false', flake)
+        self.assertIn('"exit_code_observed": 0', flake)
+
 
 if __name__ == "__main__":
     unittest.main()
