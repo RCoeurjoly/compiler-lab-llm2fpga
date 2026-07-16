@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - The DUT is exactly `tinystories-w8a8-rc-study-mask9-vocab6-width2`: static XNNPACK PT2E W8A8, vocabulary 6, two layers, context length 8, hidden width 2, one attention head, seed 0. Do not create or substitute a look-alike model.
-- The frozen PT2E W8A8 reference image remains the numerical authority. A later hardware-equivalence claim requires all four cases, six final raw int8 codes, and the lowest-index argmax token ID; this iteration does not make that claim.
+- The frozen PT2E W8A8 reference image remains the numerical authority. Its four cases are a fast smoke oracle. A local transform can become canonical only after valid SV and exhaustive RC observable functional equivalence over all `6^8 = 1,679,616` length-eight V=6 contexts, comparing six final raw int8 codes and the lowest-index argmax token ID after deterministic reset; this iteration does not make that claim.
 - A census of floating operations is informational source provenance, never a pass/fail lowering gate. A source form is acceptable when it has a named, reproducible hardware path.
 - Do not modify the PT2E graph, calibration, quantization parameters, model source, memory layout, host software, DDR3 driver, or board design in this iteration.
 - Do not add `lower-scout-math-for-calyx`, textual substitution of `math.exp`, `tosa.table`, polynomial, LUT, clamp, range-reduction, or other approximation to the canonical RC pipeline.
@@ -731,7 +731,7 @@ git commit -m "feat: screen local FPGA LLM corpus for math exp"
 **Interfaces:**
 - Consumes: the Task 2 Nix binding report, Task 3 paper-screen JSON, existing nonlinear provenance slices and frontier result, existing `calyx-math-exp-upstream-reproducer`, and the full RC Calyx stage manifest/log.
 - Produces: a complete first-blocker packet and one decision: a named candidate is either a direct lowerer/library route, a named composition needing a semantics review, or an approximation/changed-contract route. No row may be labelled exact.
-- Contract: the packet identifies the next full-RC action, and it makes no claim that a primitive probe, library closure, paper, or successful compiler boundary proves PT2E-to-SV equivalence.
+- Contract: the packet identifies the next full-RC action, and it makes no claim that a primitive probe, library closure, paper, compiler boundary, or four-case smoke result proves PT2E-to-SV equivalence. Any local candidate must name the later exhaustive RC observable-functional-equivalence gate.
 
 - [ ] **Step 1: Write a documentation-claim guard**
 
@@ -816,8 +816,8 @@ Create `docs/results/2026-07-16-rc-math-exp-blocker-packet.md` with these exact 
 3. `## Operation context`: identify `math.exp` as f32 in Softmax after maximum subtraction and before sum/normalization, using the mechanically derived provenance metadata. Record the source artifact SHA-256, source line range, retained external values, operand/result type, and any surrounding constants/shapes present in the existing attention-Softmax slice. Include the exact sentence: `The scalar MRC and native Futil closure are not numerical-equivalence evidence.`
 4. `## Toolchain and library matrix`: one row each for direct CIRCT, Calyx Futil, HardFloat, MLIR `convert-math-to-funcs`, MLIR `convert-math-to-libm`, Torch-MLIR/TOSA, and checked-in local compatibility passes. For each, include observed result and whether it is upstream, local, or not applicable. Do not call generic HardFloat arithmetic an `exp` implementation.
 5. `## Local paper corpus evidence`: link the corpus result and summarize its classification counts, not paper text.
-6. `## Candidate decision`: list every candidate in exactly one of three classes: direct lowerer/library route; named composition; approximation or changed semantic contract. Mark a class with no candidates as `none observed in this iteration`. No candidate is `exact`; the hardware-oracle gate has not run.
-7. `## Next full-RC action`: if a direct route was observed and emits a concrete hardware implementation, state that it needs a separately reviewed integration-and-oracle plan before changing the pipeline. If no direct route was observed, state that the canonical route remains blocked at `math.exp` and that the next decision is either upstream/compiler work for canonical semantics or separately approved approximation research. Do not integrate a paper technique in this task.
+6. `## Candidate decision`: list every candidate in exactly one of three classes: direct lowerer/library route; named composition; approximation or changed semantic contract. Mark a class with no candidates as `none observed in this iteration`. No candidate is `exact`; the hardware-oracle gate has not run. For a local candidate, explicitly state that four-case smoke conformance is insufficient and name the `6^8` exhaustive RC observable-functional-equivalence gate.
+7. `## Next full-RC action`: if a direct route was observed and emits a concrete hardware implementation, state that it needs a separately reviewed integration-and-oracle plan before changing the pipeline. If that plan integrates a local transform, it must implement the deterministic-reset exhaustive `6^8` checker from `docs/adr/2026-07-16-local-pass-observable-equivalence.md`. If no direct route was observed, state that the canonical route remains blocked at `math.exp` and that the next decision is either upstream/compiler work for canonical semantics or separately approved approximation research. Do not integrate a paper technique in this task.
 
 - [ ] **Step 7: Run all focused verification and inspect the clean tree**
 
@@ -852,7 +852,7 @@ Expected: the final status command prints no paths.
 
 ## Execution-boundary decision
 
-This plan intentionally stops after the first evidence packet. Its direct-route outcome is data-dependent: a valid candidate must first establish what CIRCT/Calyx emits and what numerical contract it carries. If the packet identifies a route that can be integrated without changing canonical semantics, write a focused integration-and-oracle implementation plan before modifying the pipeline. If it identifies only approximations or no implementation route, keep the full RC blocked at `math.exp` and use the packet as the decision record for either upstream work or a separately approved fidelity contract.
+This plan intentionally stops after the first evidence packet. Its direct-route outcome is data-dependent: a valid candidate must first establish what CIRCT/Calyx emits and what numerical contract it carries. If the packet identifies a route that can be integrated without changing canonical semantics, write a focused integration-and-oracle implementation plan before modifying the pipeline. A local integration plan must include the deterministic-reset exhaustive `6^8` RC observable-functional-equivalence gate recorded in `docs/adr/2026-07-16-local-pass-observable-equivalence.md`. If it identifies only approximations or no implementation route, keep the full RC blocked at `math.exp` and use the packet as the decision record for either upstream work or a separately approved fidelity contract.
 
 ## Self-review
 

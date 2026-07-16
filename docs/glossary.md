@@ -3,8 +3,9 @@
 - **FTS** — Full TinyStories model and pipeline, using the 50,257-token
   vocabulary configuration.
 - **RC** — Representative core, the reduced TinyStories-derived model used for
-  rapid experimentation; current minimum shape uses vocabulary 32, hidden size
-  2, two layers, one attention head, and four positions.
+  rapid experimentation. The current frozen quantized RC is
+  `tinystories-w8a8-rc-study-mask9-vocab6-width2`: vocabulary 6, hidden size
+  2, two layers, one attention head, and eight-token context.
 - **Fast compiler loop** — The model/frontend through MLIR, Calyx, and RTLIL,
   stopping before Yosys technology mapping and FPGA synthesis.
 - **RTLIL** — The hardware-oriented intermediate representation used as the
@@ -31,3 +32,10 @@
   before PT2E W8A8; it is not part of the primary reference by default.
 - **Test target** — One of the full-model, representative-core, or isolated
   component scopes used to evaluate an optimization claim.
+- **Frozen-oracle smoke conformance** — Equality of the frozen reference
+  cases' six raw int8 output codes and lowest-index argmax token IDs. It is a
+  fast regression gate, not general functional equivalence.
+- **RC observable functional equivalence** — For the fixed V=6, context-8 RC,
+  exhaustive equality of six raw int8 output codes and the lowest-index argmax
+  token ID for all `6^8 = 1,679,616` token contexts after deterministic reset.
+  It proves observable behavior only at that fixed RC interface.
