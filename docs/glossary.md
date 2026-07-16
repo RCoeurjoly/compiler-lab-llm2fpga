@@ -61,6 +61,9 @@
   versioned host tokenizer, eight-token SV interface, frozen image, and host
   detokenizer to demonstrate one generated token at reproducible latency. It
   complements rather than replaces exhaustive token-level equivalence.
+- **Baseline RC memory stage** — The initial complete V=6 RC implementation
+  using its frozen baseline memory realization. It must be lowered, verified,
+  and tested on FPGA before DDR3 externalization becomes an experiment.
 - **RC counterexample packet** — A durable mismatch or timeout record with its
   token context, PT2E and SV outputs, provenance hashes, timing contract, and
   cycle/handshake trace. It rejects the candidate but is a reusable research

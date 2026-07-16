@@ -39,6 +39,20 @@ exhaustive `6^8` token-level RC observable-equivalence gate. Its immediate
 demonstration claim is deliberately bounded to one correct generated token at
 reproducible latency for the fixed RC.
 
+## Sequencing
+
+DDR3 is not a prerequisite for the first RC vertical slice. First lower the
+complete frozen V=6 RC to testable SV, pass its simulation gates, and test the
+same complete RC on the FPGA using its baseline frozen-memory implementation.
+Only after that board checkpoint may memory externalization become the next
+semantic transformation.
+
+At that later stage, the image-backed SV fixture must consume the exact packed
+byte image and address map intended for the DDR3 driver, produced by one
+versioned packer. It may not use a simulator-only convenient representation.
+The external-memory route then repeats its image-backed equivalence gate before
+the real DDR3 service is introduced on board.
+
 ## Consequences
 
 - The tiny V=6 tokenizer is a real, versioned host component rather than an
@@ -47,5 +61,8 @@ reproducible latency for the fixed RC.
   at least one host-to-SV-to-host transaction.
 - Passing the prompt fixture does not establish behavior for arbitrary text,
   full TinyStories vocabulary, multi-token generation, or DDR3 hardware.
-- The same fixture may later be rerun with the image-backed memory service and
-  with the real DDR3 service as distinct integration checkpoints.
+- DDR3 work is deliberately deferred until the complete baseline V=6 RC has
+  been tested on FPGA; this avoids mixing lowering/compute risk with
+  external-memory risk.
+- The same fixture may then be rerun with the exact packed-image SV service and
+  with the real DDR3 service as distinct external-memory checkpoints.
