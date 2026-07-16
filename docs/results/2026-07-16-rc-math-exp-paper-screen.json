@@ -1,0 +1,1808 @@
+{
+  "blocker": "math.exp",
+  "corpus": {
+    "catalog_records": 50,
+    "catalog_sha256": "8a3da5382b1506acef6c8997d9f2b0f7c7fdc9113091fa2060a7b39697a98d31",
+    "unavailable_pdf_records": 1,
+    "verified_pdf_records": 49
+  },
+  "papers": {
+    "2310.09949v4": {
+      "abs_url": "https://arxiv.org/abs/2310.09949v4",
+      "arxiv_id": "2310.09949",
+      "byte_count": 1592267,
+      "cache_filename": "2310.09949v4.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "69f12ada1de5ccd0fc5d9e806330b936ac3cef66df6e252175c483394428e009",
+      "pdf_url": "https://arxiv.org/pdf/2310.09949v4",
+      "receipt_sha256": "69f12ada1de5ccd0fc5d9e806330b936ac3cef66df6e252175c483394428e009",
+      "term_counts": {
+        "lookup-table": 8
+      },
+      "term_pages": {
+        "lookup-table": [
+          3,
+          4,
+          5
+        ]
+      },
+      "title": "Chameleon: a Heterogeneous and Disaggregated Accelerator System for Retrieval-Augmented Language Models",
+      "version": 4
+    },
+    "2312.15159v2": {
+      "abs_url": "https://arxiv.org/abs/2312.15159v2",
+      "arxiv_id": "2312.15159",
+      "byte_count": 3457444,
+      "cache_filename": "2312.15159v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "75a69ed82c570491fb481fa149e635695cc0c583f071e7717a21931b131754cd",
+      "pdf_url": "https://arxiv.org/pdf/2312.15159v2",
+      "receipt_sha256": "75a69ed82c570491fb481fa149e635695cc0c583f071e7717a21931b131754cd",
+      "term_counts": {
+        "exp": 1,
+        "floating-point": 1,
+        "lookup-table": 6,
+        "normalization": 12,
+        "softmax": 15
+      },
+      "term_pages": {
+        "exp": [
+          21
+        ],
+        "floating-point": [
+          17
+        ],
+        "lookup-table": [
+          18,
+          19,
+          21
+        ],
+        "normalization": [
+          4,
+          5,
+          17,
+          21,
+          28
+        ],
+        "softmax": [
+          4,
+          5,
+          6,
+          17,
+          21
+        ]
+      },
+      "title": "Understanding the Potential of FPGA-Based Spatial Acceleration for Large Language Model Inference",
+      "version": 2
+    },
+    "2401.03868v2": {
+      "abs_url": "https://arxiv.org/abs/2401.03868v2",
+      "arxiv_id": "2401.03868",
+      "byte_count": 2170642,
+      "cache_filename": "2401.03868v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "e0d38c8754516973d62749c846ebe63ea3984b569a1613b98340ef13249fd4da",
+      "pdf_url": "https://arxiv.org/pdf/2401.03868v2",
+      "receipt_sha256": "e0d38c8754516973d62749c846ebe63ea3984b569a1613b98340ef13249fd4da",
+      "term_counts": {
+        "floating-point": 1,
+        "lookup-table": 2,
+        "normalization": 8,
+        "softmax": 16
+      },
+      "term_pages": {
+        "floating-point": [
+          3
+        ],
+        "lookup-table": [
+          6,
+          8
+        ],
+        "normalization": [
+          5,
+          6,
+          7
+        ],
+        "softmax": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      "title": "FlightLLM: Efficient Large Language Model Inference with a Complete Mapping Flow on FPGAs",
+      "version": 2
+    },
+    "2405.00738v1": {
+      "abs_url": "https://arxiv.org/abs/2405.00738v1",
+      "arxiv_id": "2405.00738",
+      "byte_count": 563456,
+      "cache_filename": "2405.00738v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "d4d5f70aefc7116006fb7d87d3db35824d057ada6b4225ad6dcff7a1130096fc",
+      "pdf_url": "https://arxiv.org/pdf/2405.00738v1",
+      "receipt_sha256": "d4d5f70aefc7116006fb7d87d3db35824d057ada6b4225ad6dcff7a1130096fc",
+      "term_counts": {
+        "exp": 1,
+        "floating-point": 1,
+        "normalization": 8,
+        "piecewise": 1,
+        "softmax": 1
+      },
+      "term_pages": {
+        "exp": [
+          9
+        ],
+        "floating-point": [
+          3
+        ],
+        "normalization": [
+          3,
+          4,
+          9
+        ],
+        "piecewise": [
+          2
+        ],
+        "softmax": [
+          3
+        ]
+      },
+      "title": "HLSTransform: Energy-Efficient Llama 2 Inference on FPGAs Via High Level Synthesis",
+      "version": 1
+    },
+    "2408.00462v1": {
+      "abs_url": "https://arxiv.org/abs/2408.00462v1",
+      "arxiv_id": "2408.00462",
+      "byte_count": 937757,
+      "cache_filename": "2408.00462v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "d78ea89f94fab1034d11eb9823e2e8710b1e8db3518afe1ab958836ebd165809",
+      "pdf_url": "https://arxiv.org/pdf/2408.00462v1",
+      "receipt_sha256": "d78ea89f94fab1034d11eb9823e2e8710b1e8db3518afe1ab958836ebd165809",
+      "term_counts": {
+        "floating-point": 3
+      },
+      "term_pages": {
+        "floating-point": [
+          1,
+          4
+        ]
+      },
+      "title": "Designing Efficient LLM Accelerators for Edge Devices",
+      "version": 1
+    },
+    "2409.00661v1": {
+      "abs_url": "https://arxiv.org/abs/2409.00661v1",
+      "arxiv_id": "2409.00661",
+      "byte_count": 741721,
+      "cache_filename": "2409.00661v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "5a86cbf7e409b775e6b559e98d7d9305d851c45f92ca1f0a0e4cb5e731f52097",
+      "pdf_url": "https://arxiv.org/pdf/2409.00661v1",
+      "receipt_sha256": "5a86cbf7e409b775e6b559e98d7d9305d851c45f92ca1f0a0e4cb5e731f52097",
+      "term_counts": {
+        "lookup-table": 2,
+        "normalization": 1
+      },
+      "term_pages": {
+        "lookup-table": [
+          7
+        ],
+        "normalization": [
+          3
+        ]
+      },
+      "title": "Research on LLM Acceleration Using the High-Performance RISC-V Processor \"Xiangshan\" (Nanhu Version) Based on the Open-Source Matrix Instruction Set Extension (Vector Dot Product)",
+      "version": 1
+    },
+    "2409.11424v1": {
+      "abs_url": "https://arxiv.org/abs/2409.11424v1",
+      "arxiv_id": "2409.11424",
+      "byte_count": 460602,
+      "cache_filename": "2409.11424v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "863004facf1b502140ad2d0c556897f42d8773d2218ed83ee84ca5a7ed574796",
+      "pdf_url": "https://arxiv.org/pdf/2409.11424v1",
+      "receipt_sha256": "863004facf1b502140ad2d0c556897f42d8773d2218ed83ee84ca5a7ed574796",
+      "term_counts": {
+        "floating-point": 2,
+        "lookup-table": 1,
+        "normalization": 11,
+        "softmax": 2
+      },
+      "term_pages": {
+        "floating-point": [
+          3,
+          6
+        ],
+        "lookup-table": [
+          6
+        ],
+        "normalization": [
+          2,
+          3,
+          4,
+          7
+        ],
+        "softmax": [
+          3,
+          6
+        ]
+      },
+      "title": "LlamaF: An Efficient Llama2 Architecture Accelerator on Embedded FPGAs",
+      "version": 1
+    },
+    "2410.04466v4": {
+      "abs_url": "https://arxiv.org/abs/2410.04466v4",
+      "arxiv_id": "2410.04466",
+      "byte_count": 3076172,
+      "cache_filename": "2410.04466v4.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "4b333f4626217c98a866f2f0244ba3a7b888c17153d7f9d1f0088a46e8f2fea3",
+      "pdf_url": "https://arxiv.org/pdf/2410.04466v4",
+      "receipt_sha256": "4b333f4626217c98a866f2f0244ba3a7b888c17153d7f9d1f0088a46e8f2fea3",
+      "term_counts": {
+        "exp": 6,
+        "floating-point": 9,
+        "lookup-table": 17,
+        "normalization": 8,
+        "softmax": 12
+      },
+      "term_pages": {
+        "exp": [
+          2,
+          5,
+          25,
+          37
+        ],
+        "floating-point": [
+          2,
+          6,
+          10,
+          12,
+          32,
+          44,
+          46
+        ],
+        "lookup-table": [
+          7,
+          9,
+          10,
+          13,
+          25,
+          26,
+          44,
+          50
+        ],
+        "normalization": [
+          5,
+          10,
+          24,
+          25,
+          50
+        ],
+        "softmax": [
+          4,
+          16,
+          24,
+          25,
+          26,
+          46,
+          50
+        ]
+      },
+      "title": "Large Language Model Inference Acceleration: A Comprehensive Hardware Perspective",
+      "version": 4
+    },
+    "2410.10714v2": {
+      "abs_url": "https://arxiv.org/abs/2410.10714v2",
+      "arxiv_id": "2410.10714",
+      "byte_count": 433486,
+      "cache_filename": "2410.10714v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "445816d21cfc5353d247e410625fe62f9ac3ed9585efbf0a4ca769c969f7ca9c",
+      "pdf_url": "https://arxiv.org/pdf/2410.10714v2",
+      "receipt_sha256": "445816d21cfc5353d247e410625fe62f9ac3ed9585efbf0a4ca769c969f7ca9c",
+      "term_counts": {
+        "floating-point": 1,
+        "lookup-table": 3,
+        "normalization": 1,
+        "polynomial": 7
+      },
+      "term_pages": {
+        "floating-point": [
+          10
+        ],
+        "lookup-table": [
+          9
+        ],
+        "normalization": [
+          5
+        ],
+        "polynomial": [
+          4,
+          13
+        ]
+      },
+      "title": "SeedLM: Compressing LLM Weights into Seeds of Pseudo-Random Generators",
+      "version": 2
+    },
+    "2410.15008v1": {
+      "abs_url": "https://arxiv.org/abs/2410.15008v1",
+      "arxiv_id": "2410.15008",
+      "byte_count": 1467645,
+      "cache_filename": "2410.15008v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "8784eb97fcc319f2f850345db59529c5050b58ec0167c9ff8cb39a33e46c253a",
+      "pdf_url": "https://arxiv.org/pdf/2410.15008v1",
+      "receipt_sha256": "8784eb97fcc319f2f850345db59529c5050b58ec0167c9ff8cb39a33e46c253a",
+      "term_counts": {
+        "lookup-table": 4,
+        "normalization": 7,
+        "softmax": 15
+      },
+      "term_pages": {
+        "lookup-table": [
+          5,
+          16
+        ],
+        "normalization": [
+          4,
+          5,
+          7,
+          10,
+          13
+        ],
+        "softmax": [
+          4,
+          5,
+          8
+        ]
+      },
+      "title": "IANUS: Integrated Accelerator based on NPU-PIM Unified Memory System",
+      "version": 1
+    },
+    "2501.14512v1": {
+      "abs_url": "https://arxiv.org/abs/2501.14512v1",
+      "arxiv_id": "2501.14512",
+      "byte_count": 3957979,
+      "cache_filename": "2501.14512v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "8035ba895a16fb2995917d80847234dc9648f81f2c75a7436b2d2c8bf19fb83d",
+      "pdf_url": "https://arxiv.org/pdf/2501.14512v1",
+      "receipt_sha256": "8035ba895a16fb2995917d80847234dc9648f81f2c75a7436b2d2c8bf19fb83d",
+      "term_counts": {
+        "floating-point": 2
+      },
+      "term_pages": {
+        "floating-point": [
+          1,
+          14
+        ]
+      },
+      "title": "Real-world Edge Neural Network Implementations Leak Private Interactions Through Physical Side Channel",
+      "version": 1
+    },
+    "2501.19135v1": {
+      "abs_url": "https://arxiv.org/abs/2501.19135v1",
+      "arxiv_id": "2501.19135",
+      "byte_count": 515877,
+      "cache_filename": "2501.19135v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "f5537770a482adb8996867a7ef57a9358263195f3d58f81f019806bb048d5aeb",
+      "pdf_url": "https://arxiv.org/pdf/2501.19135v1",
+      "receipt_sha256": "f5537770a482adb8996867a7ef57a9358263195f3d58f81f019806bb048d5aeb",
+      "term_counts": {
+        "floating-point": 4,
+        "lookup-table": 1,
+        "normalization": 4,
+        "softmax": 7
+      },
+      "term_pages": {
+        "floating-point": [
+          1,
+          5
+        ],
+        "lookup-table": [
+          5
+        ],
+        "normalization": [
+          1,
+          2,
+          3
+        ],
+        "softmax": [
+          1,
+          2,
+          3,
+          6
+        ]
+      },
+      "title": "A Tensor-Train Decomposition based Compression of LLMs on Group Vector Systolic Accelerator",
+      "version": 1
+    },
+    "2502.00026v2": {
+      "abs_url": "https://arxiv.org/abs/2502.00026v2",
+      "arxiv_id": "2502.00026",
+      "byte_count": 691455,
+      "cache_filename": "2502.00026v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "25375c05b86a920846336db56abffea501f3591949fb02b3d123763940194fe6",
+      "pdf_url": "https://arxiv.org/pdf/2502.00026v2",
+      "receipt_sha256": "25375c05b86a920846336db56abffea501f3591949fb02b3d123763940194fe6",
+      "term_counts": {
+        "exp": 18,
+        "floating-point": 27,
+        "lookup-table": 40,
+        "maximum-subtraction": 1,
+        "normalization": 3,
+        "softmax": 46
+      },
+      "term_pages": {
+        "exp": [
+          3,
+          4,
+          5,
+          7
+        ],
+        "floating-point": [
+          1,
+          2,
+          4,
+          5,
+          6,
+          8,
+          9
+        ],
+        "lookup-table": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "maximum-subtraction": [
+          4
+        ],
+        "normalization": [
+          5
+        ],
+        "softmax": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ]
+      },
+      "title": "Pushing the Limits of BFP on Narrow Precision LLM Inference",
+      "version": 2
+    },
+    "2502.10659v1": {
+      "abs_url": "https://arxiv.org/abs/2502.10659v1",
+      "arxiv_id": "2502.10659",
+      "byte_count": 859908,
+      "cache_filename": "2502.10659v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "56f87fc2a5c31e8ceddab7c4319d4fc44cff1d76f09b6b4877ed4423ab296072",
+      "pdf_url": "https://arxiv.org/pdf/2502.10659v1",
+      "receipt_sha256": "56f87fc2a5c31e8ceddab7c4319d4fc44cff1d76f09b6b4877ed4423ab296072",
+      "term_counts": {
+        "floating-point": 3,
+        "lookup-table": 4,
+        "normalization": 11,
+        "softmax": 15
+      },
+      "term_pages": {
+        "floating-point": [
+          3,
+          4
+        ],
+        "lookup-table": [
+          2,
+          5,
+          6
+        ],
+        "normalization": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          7
+        ],
+        "softmax": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          7
+        ]
+      },
+      "title": "Pushing up to the Limit of Memory Bandwidth and Capacity Utilization for Efficient LLM Decoding on Embedded FPGA",
+      "version": 1
+    },
+    "2502.15260v2": {
+      "abs_url": "https://arxiv.org/abs/2502.15260v2",
+      "arxiv_id": "2502.15260",
+      "byte_count": 3367020,
+      "cache_filename": "2502.15260v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "b2f47583ba25d22b9dc697acebebf544098359fe4869b2d4b4be3f8142c0b849",
+      "pdf_url": "https://arxiv.org/pdf/2502.15260v2",
+      "receipt_sha256": "b2f47583ba25d22b9dc697acebebf544098359fe4869b2d4b4be3f8142c0b849",
+      "term_counts": {
+        "exp": 3,
+        "floating-point": 2,
+        "lookup-table": 4,
+        "normalization": 9
+      },
+      "term_pages": {
+        "exp": [
+          1,
+          4,
+          6
+        ],
+        "floating-point": [
+          2,
+          3
+        ],
+        "lookup-table": [
+          3,
+          6
+        ],
+        "normalization": [
+          1,
+          3,
+          4
+        ]
+      },
+      "title": "LightMamba: Efficient Mamba Acceleration on FPGA with Quantization and Hardware Co-design",
+      "version": 2
+    },
+    "2502.16473v2": {
+      "abs_url": "https://arxiv.org/abs/2502.16473v2",
+      "arxiv_id": "2502.16473",
+      "byte_count": 1225332,
+      "cache_filename": "2502.16473v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "56625cc3468ae5d9de4eba7f39d3c78f794cc19df815288298f0dce1c6a0464d",
+      "pdf_url": "https://arxiv.org/pdf/2502.16473v2",
+      "receipt_sha256": "56625cc3468ae5d9de4eba7f39d3c78f794cc19df815288298f0dce1c6a0464d",
+      "term_counts": {
+        "lookup-table": 4,
+        "normalization": 10
+      },
+      "term_pages": {
+        "lookup-table": [
+          4,
+          6,
+          7
+        ],
+        "normalization": [
+          2,
+          3,
+          6,
+          10
+        ]
+      },
+      "title": "TerEffic: Highly Efficient Ternary LLM Inference on FPGA",
+      "version": 2
+    },
+    "2503.16731v3": {
+      "abs_url": "https://arxiv.org/abs/2503.16731v3",
+      "arxiv_id": "2503.16731",
+      "byte_count": 668549,
+      "cache_filename": "2503.16731v3.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "4ba5241559e66e8d0fee5ab7e80ed31d8b9462f117ef4fce73d0e905a837d61a",
+      "pdf_url": "https://arxiv.org/pdf/2503.16731v3",
+      "receipt_sha256": "4ba5241559e66e8d0fee5ab7e80ed31d8b9462f117ef4fce73d0e905a837d61a",
+      "term_counts": {
+        "floating-point": 1,
+        "lookup-table": 1,
+        "normalization": 1,
+        "softmax": 5
+      },
+      "term_pages": {
+        "floating-point": [
+          6
+        ],
+        "lookup-table": [
+          5
+        ],
+        "normalization": [
+          2
+        ],
+        "softmax": [
+          2,
+          6,
+          7
+        ]
+      },
+      "title": "Design and Implementation of an FPGA-Based Hardware Accelerator for Transformer",
+      "version": 3
+    },
+    "2504.09561v1": {
+      "abs_url": "https://arxiv.org/abs/2504.09561v1",
+      "arxiv_id": "2504.09561",
+      "byte_count": 2606688,
+      "cache_filename": "2504.09561v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "ec1414a11856842e6ae5bc705891fed12649b8ad422e464b6da5bd0b6fd2e937",
+      "pdf_url": "https://arxiv.org/pdf/2504.09561v1",
+      "receipt_sha256": "ec1414a11856842e6ae5bc705891fed12649b8ad422e464b6da5bd0b6fd2e937",
+      "term_counts": {
+        "lookup-table": 2,
+        "normalization": 3,
+        "softmax": 8
+      },
+      "term_pages": {
+        "lookup-table": [
+          5,
+          6
+        ],
+        "normalization": [
+          2,
+          3,
+          4
+        ],
+        "softmax": [
+          3,
+          4
+        ]
+      },
+      "title": "LoopLynx: A Scalable Dataflow Architecture for Efficient LLM Inference",
+      "version": 1
+    },
+    "2504.16112v2": {
+      "abs_url": "https://arxiv.org/abs/2504.16112v2",
+      "arxiv_id": "2504.16112",
+      "byte_count": 4689734,
+      "cache_filename": "2504.16112v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "213bc5f4839143796fc7f26ab61a4de490f60adccd62dea250305148fa88d733",
+      "pdf_url": "https://arxiv.org/pdf/2504.16112v2",
+      "receipt_sha256": "213bc5f4839143796fc7f26ab61a4de490f60adccd62dea250305148fa88d733",
+      "term_counts": {
+        "exp": 1,
+        "normalization": 2,
+        "softmax": 4
+      },
+      "term_pages": {
+        "exp": [
+          1
+        ],
+        "normalization": [
+          2
+        ],
+        "softmax": [
+          2,
+          3,
+          4
+        ]
+      },
+      "title": "HPU: High-Bandwidth Processing Unit for Scalable, Cost-effective LLM Inference via GPU Co-processing",
+      "version": 2
+    },
+    "2504.16266v2": {
+      "abs_url": "https://arxiv.org/abs/2504.16266v2",
+      "arxiv_id": "2504.16266",
+      "byte_count": 2264233,
+      "cache_filename": "2504.16266v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "9e4ecda5d05cebf946e014f071dd1c7935092d022b5b36fa74bb15254eab6b34",
+      "pdf_url": "https://arxiv.org/pdf/2504.16266v2",
+      "receipt_sha256": "9e4ecda5d05cebf946e014f071dd1c7935092d022b5b36fa74bb15254eab6b34",
+      "term_counts": {
+        "floating-point": 1,
+        "lookup-table": 8,
+        "normalization": 9,
+        "softmax": 8
+      },
+      "term_pages": {
+        "floating-point": [
+          3
+        ],
+        "lookup-table": [
+          3,
+          4,
+          8
+        ],
+        "normalization": [
+          1,
+          2,
+          4,
+          7,
+          8
+        ],
+        "softmax": [
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "title": "TeLLMe: An Energy-Efficient Ternary LLM Accelerator for Prefilling and Decoding on Edge FPGAs",
+      "version": 2
+    },
+    "2504.17376v1": {
+      "abs_url": "https://arxiv.org/abs/2504.17376v1",
+      "arxiv_id": "2504.17376",
+      "byte_count": 970618,
+      "cache_filename": "2504.17376v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "9598e3dae377a1c5e9549f9008db106b08a36a47dd84f365ac2bb664527967c9",
+      "pdf_url": "https://arxiv.org/pdf/2504.17376v1",
+      "receipt_sha256": "9598e3dae377a1c5e9549f9008db106b08a36a47dd84f365ac2bb664527967c9",
+      "term_counts": {
+        "floating-point": 1,
+        "lookup-table": 1,
+        "normalization": 1
+      },
+      "term_pages": {
+        "floating-point": [
+          1
+        ],
+        "lookup-table": [
+          4
+        ],
+        "normalization": [
+          3
+        ]
+      },
+      "title": "On-Device Qwen2.5: Efficient LLM Inference with Model Compression and Hardware Acceleration",
+      "version": 1
+    },
+    "2505.03745v1": {
+      "abs_url": "https://arxiv.org/abs/2505.03745v1",
+      "arxiv_id": "2505.03745",
+      "byte_count": 2808096,
+      "cache_filename": "2505.03745v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "9d183689febd28655e39b0b35fddc464d32306e4138f8817d2c269f96f1c4aca",
+      "pdf_url": "https://arxiv.org/pdf/2505.03745v1",
+      "receipt_sha256": "9d183689febd28655e39b0b35fddc464d32306e4138f8817d2c269f96f1c4aca",
+      "term_counts": {
+        "exp": 22,
+        "floating-point": 4,
+        "lookup-table": 1,
+        "normalization": 4,
+        "softmax": 10
+      },
+      "term_pages": {
+        "exp": [
+          8,
+          9
+        ],
+        "floating-point": [
+          3,
+          6,
+          7
+        ],
+        "lookup-table": [
+          9
+        ],
+        "normalization": [
+          3,
+          7
+        ],
+        "softmax": [
+          3,
+          7,
+          8,
+          12
+        ]
+      },
+      "title": "AccLLM: Accelerating Long-Context LLM Inference Via Algorithm-Hardware Co-Design",
+      "version": 1
+    },
+    "2507.01035v1": {
+      "abs_url": "https://arxiv.org/abs/2507.01035v1",
+      "arxiv_id": "2507.01035",
+      "byte_count": 1808881,
+      "cache_filename": "2507.01035v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "87b6c8071413c6eab1235b197913c601ad5ee6b8bf9b7d46f9e8771f300316ae",
+      "pdf_url": "https://arxiv.org/pdf/2507.01035v1",
+      "receipt_sha256": "87b6c8071413c6eab1235b197913c601ad5ee6b8bf9b7d46f9e8771f300316ae",
+      "term_counts": {
+        "softmax": 1
+      },
+      "term_pages": {
+        "softmax": [
+          3
+        ]
+      },
+      "title": "Research on Low-Latency Inference and Training Efficiency Optimization for Graph Neural Network and Large Language Model-Based Recommendation Systems",
+      "version": 1
+    },
+    "2507.03308v2": {
+      "abs_url": "https://arxiv.org/abs/2507.03308v2",
+      "arxiv_id": "2507.03308",
+      "byte_count": 643694,
+      "cache_filename": "2507.03308v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "1d0c9d601f45699e3cb326f2c791a9c54c12249a108f12b62ef770d5b62e3b2e",
+      "pdf_url": "https://arxiv.org/pdf/2507.03308v2",
+      "receipt_sha256": "1d0c9d601f45699e3cb326f2c791a9c54c12249a108f12b62ef770d5b62e3b2e",
+      "term_counts": {
+        "exp": 1,
+        "floating-point": 1,
+        "lookup-table": 8,
+        "normalization": 7,
+        "softmax": 14
+      },
+      "term_pages": {
+        "exp": [
+          7
+        ],
+        "floating-point": [
+          3
+        ],
+        "lookup-table": [
+          1,
+          2,
+          4,
+          5,
+          7,
+          8
+        ],
+        "normalization": [
+          3,
+          6,
+          9
+        ],
+        "softmax": [
+          3,
+          6,
+          7,
+          9
+        ]
+      },
+      "title": "Hummingbird: A Smaller and Faster Large Language Model Accelerator on Embedded FPGA",
+      "version": 2
+    },
+    "2507.14139v1": {
+      "abs_url": "https://arxiv.org/abs/2507.14139v1",
+      "arxiv_id": "2507.14139",
+      "byte_count": 1201182,
+      "cache_filename": "2507.14139v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "1e6f55eab43699e6f5ed9f76a8ad76e36e2ac2a87cee0bc2e74c9e601444dd37",
+      "pdf_url": "https://arxiv.org/pdf/2507.14139v1",
+      "receipt_sha256": "1e6f55eab43699e6f5ed9f76a8ad76e36e2ac2a87cee0bc2e74c9e601444dd37",
+      "term_counts": {},
+      "term_pages": {},
+      "title": "SpeedLLM: An FPGA Co-design of Large Language Model Inference Accelerator",
+      "version": 1
+    },
+    "2508.07431v1": {
+      "abs_url": "https://arxiv.org/abs/2508.07431v1",
+      "arxiv_id": "2508.07431",
+      "byte_count": 718192,
+      "cache_filename": "2508.07431v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "b0556cc38bf4dd1632bef0030c5a3c07cc4540778b16ec326e9aa6dd91cfbb92",
+      "pdf_url": "https://arxiv.org/pdf/2508.07431v1",
+      "receipt_sha256": "b0556cc38bf4dd1632bef0030c5a3c07cc4540778b16ec326e9aa6dd91cfbb92",
+      "term_counts": {
+        "normalization": 7,
+        "softmax": 1
+      },
+      "term_pages": {
+        "normalization": [
+          3,
+          4
+        ],
+        "softmax": [
+          3
+        ]
+      },
+      "title": "Investigating 1-Bit Quantization in Transformer-Based Top Tagging",
+      "version": 1
+    },
+    "2508.10303v1": {
+      "abs_url": "https://arxiv.org/abs/2508.10303v1",
+      "arxiv_id": "2508.10303",
+      "byte_count": 4460241,
+      "cache_filename": "2508.10303v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "6666bba0612a0b2b9225dd2fa4ec8141a1092c3ad50dbd8b4b336c02b21acc02",
+      "pdf_url": "https://arxiv.org/pdf/2508.10303v1",
+      "receipt_sha256": "6666bba0612a0b2b9225dd2fa4ec8141a1092c3ad50dbd8b4b336c02b21acc02",
+      "term_counts": {
+        "floating-point": 1,
+        "lookup-table": 1,
+        "normalization": 2
+      },
+      "term_pages": {
+        "floating-point": [
+          12
+        ],
+        "lookup-table": [
+          13
+        ],
+        "normalization": [
+          6,
+          8
+        ]
+      },
+      "title": "DiffAxE: Diffusion-driven Hardware Accelerator Generation and Design Space Exploration",
+      "version": 1
+    },
+    "2509.13765v1": {
+      "abs_url": "https://arxiv.org/abs/2509.13765v1",
+      "arxiv_id": "2509.13765",
+      "byte_count": 3105415,
+      "cache_filename": "2509.13765v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "6e30b46b859e0f59d219cb23fb26ab187a64e831f0e39bb91a3b4338cc26f2b5",
+      "pdf_url": "https://arxiv.org/pdf/2509.13765v1",
+      "receipt_sha256": "6e30b46b859e0f59d219cb23fb26ab187a64e831f0e39bb91a3b4338cc26f2b5",
+      "term_counts": {
+        "lookup-table": 55,
+        "normalization": 2,
+        "softmax": 7
+      },
+      "term_pages": {
+        "lookup-table": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          11,
+          12
+        ],
+        "normalization": [
+          7
+        ],
+        "softmax": [
+          3,
+          6,
+          7,
+          8
+        ]
+      },
+      "title": "TENET: An Efficient Sparsity-Aware LUT-Centric Architecture for Ternary LLM Inference On Edge",
+      "version": 1
+    },
+    "2509.17355v1": {
+      "abs_url": "https://arxiv.org/abs/2509.17355v1",
+      "arxiv_id": "2509.17355",
+      "byte_count": 4157574,
+      "cache_filename": "2509.17355v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "bb31697dcf483937435bddcc73df86ad6a52070d1bbce408d4066a90cb51d72f",
+      "pdf_url": "https://arxiv.org/pdf/2509.17355v1",
+      "receipt_sha256": "bb31697dcf483937435bddcc73df86ad6a52070d1bbce408d4066a90cb51d72f",
+      "term_counts": {
+        "exp": 1
+      },
+      "term_pages": {
+        "exp": [
+          32
+        ]
+      },
+      "title": "CMOS Implementation of Field Programmable Spiking Neural Network for Hardware Reservoir Computing",
+      "version": 1
+    },
+    "2510.15926v2": {
+      "abs_url": "https://arxiv.org/abs/2510.15926v2",
+      "arxiv_id": "2510.15926",
+      "byte_count": 5240216,
+      "cache_filename": "2510.15926v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "510e249e529748795cf6544efe41473ee18bf0ffd943e37974f76afc3064f14d",
+      "pdf_url": "https://arxiv.org/pdf/2510.15926v2",
+      "receipt_sha256": "510e249e529748795cf6544efe41473ee18bf0ffd943e37974f76afc3064f14d",
+      "term_counts": {
+        "exp": 3,
+        "floating-point": 3,
+        "lookup-table": 25,
+        "normalization": 12,
+        "softmax": 11
+      },
+      "term_pages": {
+        "exp": [
+          8,
+          11
+        ],
+        "floating-point": [
+          1,
+          5,
+          8
+        ],
+        "lookup-table": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          9,
+          10,
+          11
+        ],
+        "normalization": [
+          3,
+          4,
+          5,
+          7,
+          9
+        ],
+        "softmax": [
+          2,
+          3,
+          7,
+          8
+        ]
+      },
+      "title": "TeLLMe v2: An Efficient End-to-End Ternary LLM Prefill and Decode Accelerator with Table-Lookup Matmul on Edge FPGAs",
+      "version": 2
+    },
+    "2510.16418v1": {
+      "abs_url": "https://arxiv.org/abs/2510.16418v1",
+      "arxiv_id": "2510.16418",
+      "byte_count": 5579373,
+      "cache_filename": "2510.16418v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "a23eee48b75491840525a04923f353e106c7fd43fad675abe257ecae6f05b013",
+      "pdf_url": "https://arxiv.org/pdf/2510.16418v1",
+      "receipt_sha256": "a23eee48b75491840525a04923f353e106c7fd43fad675abe257ecae6f05b013",
+      "term_counts": {},
+      "term_pages": {},
+      "title": "FourierCompress: Layer-Aware Spectral Activation Compression for Efficient and Accurate Collaborative LLM Inference",
+      "version": 1
+    },
+    "2511.06174v2": {
+      "abs_url": "https://arxiv.org/abs/2511.06174v2",
+      "arxiv_id": "2511.06174",
+      "byte_count": 4657518,
+      "cache_filename": "2511.06174v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "6afab4bb78b9b92fa017b6c8aeed642b388d936f43054d76498f2fe9a1b1183c",
+      "pdf_url": "https://arxiv.org/pdf/2511.06174v2",
+      "receipt_sha256": "6afab4bb78b9b92fa017b6c8aeed642b388d936f43054d76498f2fe9a1b1183c",
+      "term_counts": {
+        "floating-point": 3,
+        "lookup-table": 77,
+        "normalization": 3,
+        "softmax": 3
+      },
+      "term_pages": {
+        "floating-point": [
+          4,
+          9
+        ],
+        "lookup-table": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "normalization": [
+          5,
+          7
+        ],
+        "softmax": [
+          1,
+          5
+        ]
+      },
+      "title": "LUT-LLM: Efficient Large Language Model Inference with Memory-based Computations on FPGAs",
+      "version": 2
+    },
+    "2511.13676v1": {
+      "abs_url": "https://arxiv.org/abs/2511.13676v1",
+      "arxiv_id": "2511.13676",
+      "byte_count": 698171,
+      "cache_filename": "2511.13676v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "89d312c2110b48628e1ea647b1e9d777fedd7d1f5e097c7b8d686774db5b6393",
+      "pdf_url": "https://arxiv.org/pdf/2511.13676v1",
+      "receipt_sha256": "89d312c2110b48628e1ea647b1e9d777fedd7d1f5e097c7b8d686774db5b6393",
+      "term_counts": {
+        "floating-point": 1,
+        "lookup-table": 48
+      },
+      "term_pages": {
+        "floating-point": [
+          2
+        ],
+        "lookup-table": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "title": "T-SAR: A Full-Stack Co-design for CPU-Only Ternary LLM Inference via In-Place SIMD ALU Reorganization",
+      "version": 1
+    },
+    "2512.00016v1": {
+      "abs_url": "https://arxiv.org/abs/2512.00016v1",
+      "arxiv_id": "2512.00016",
+      "byte_count": 355139,
+      "cache_filename": "2512.00016v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "a4fdecb03f912bd2305348d10cfb6b61cc2297bc660d3f8b1411ac6e23ceeae6",
+      "pdf_url": "https://arxiv.org/pdf/2512.00016v1",
+      "receipt_sha256": "a4fdecb03f912bd2305348d10cfb6b61cc2297bc660d3f8b1411ac6e23ceeae6",
+      "term_counts": {},
+      "term_pages": {},
+      "title": "Architect in the Loop Agentic Hardware Design and Verification",
+      "version": 1
+    },
+    "2512.00335v1": {
+      "abs_url": "https://arxiv.org/abs/2512.00335v1",
+      "arxiv_id": "2512.00335",
+      "byte_count": 5312157,
+      "cache_filename": "2512.00335v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "14323a980ac2e5eabc7a3c7b276eee0c05aae9fe683a9565f5002c51124047d8",
+      "pdf_url": "https://arxiv.org/pdf/2512.00335v1",
+      "receipt_sha256": "14323a980ac2e5eabc7a3c7b276eee0c05aae9fe683a9565f5002c51124047d8",
+      "term_counts": {
+        "floating-point": 2,
+        "lookup-table": 2,
+        "normalization": 8,
+        "softmax": 3
+      },
+      "term_pages": {
+        "floating-point": [
+          6,
+          8
+        ],
+        "lookup-table": [
+          7
+        ],
+        "normalization": [
+          3,
+          6
+        ],
+        "softmax": [
+          3,
+          6
+        ]
+      },
+      "title": "Efficient Kernel Mapping and Comprehensive System Evaluation of LLM Acceleration on a CGLA",
+      "version": 1
+    },
+    "2512.11550v1": {
+      "abs_url": "https://arxiv.org/abs/2512.11550v1",
+      "arxiv_id": "2512.11550",
+      "byte_count": 3123306,
+      "cache_filename": "2512.11550v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "30a6b838fa8f0850f4ba96fe00df2edb992e4caf783cf349b2a0cdd20b874937",
+      "pdf_url": "https://arxiv.org/pdf/2512.11550v1",
+      "receipt_sha256": "30a6b838fa8f0850f4ba96fe00df2edb992e4caf783cf349b2a0cdd20b874937",
+      "term_counts": {
+        "floating-point": 1,
+        "lookup-table": 13,
+        "normalization": 7,
+        "softmax": 7
+      },
+      "term_pages": {
+        "floating-point": [
+          2
+        ],
+        "lookup-table": [
+          1,
+          2,
+          4,
+          6,
+          13
+        ],
+        "normalization": [
+          2,
+          3,
+          6
+        ],
+        "softmax": [
+          2,
+          4
+        ]
+      },
+      "title": "PD-Swap: Prefill-Decode Logic Swapping for End-to-End LLM Inference on Edge FPGAs via Dynamic Partial Reconfiguration",
+      "version": 1
+    },
+    "2512.23914v3": {
+      "abs_url": "https://arxiv.org/abs/2512.23914v3",
+      "arxiv_id": "2512.23914",
+      "byte_count": 40837923,
+      "cache_filename": "2512.23914v3.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "42a39a9e7b48f6ddd9d418863d7ca114cfc9464bc6de599c734253a109d6a8f1",
+      "pdf_url": "https://arxiv.org/pdf/2512.23914v3",
+      "receipt_sha256": "42a39a9e7b48f6ddd9d418863d7ca114cfc9464bc6de599c734253a109d6a8f1",
+      "term_counts": {
+        "floating-point": 10,
+        "lookup-table": 4,
+        "normalization": 13,
+        "softmax": 18
+      },
+      "term_pages": {
+        "floating-point": [
+          2,
+          21,
+          24,
+          47,
+          48,
+          49
+        ],
+        "lookup-table": [
+          11,
+          21,
+          37,
+          49
+        ],
+        "normalization": [
+          3,
+          5,
+          7,
+          9,
+          17,
+          18,
+          23,
+          26,
+          30,
+          33,
+          36,
+          41,
+          43
+        ],
+        "softmax": [
+          1,
+          6,
+          9,
+          16,
+          18,
+          21,
+          22,
+          23,
+          25,
+          26,
+          27,
+          30,
+          41,
+          43,
+          44
+        ]
+      },
+      "title": "Hardware Acceleration for Neural Networks: A Comprehensive Survey",
+      "version": 3
+    },
+    "2512.24713v2": {
+      "abs_url": "https://arxiv.org/abs/2512.24713v2",
+      "arxiv_id": "2512.24713",
+      "byte_count": null,
+      "cache_filename": null,
+      "cache_status": "missing-cache-receipt",
+      "deep_read_candidate": false,
+      "observed_sha256": null,
+      "pdf_url": "https://arxiv.org/pdf/2512.24713v2",
+      "receipt_sha256": null,
+      "term_counts": {},
+      "term_pages": {},
+      "title": "FPGA Co-Design for Efficient N:M Sparse and Quantized Model Inference",
+      "version": 2
+    },
+    "2601.15710v1": {
+      "abs_url": "https://arxiv.org/abs/2601.15710v1",
+      "arxiv_id": "2601.15710",
+      "byte_count": 2207810,
+      "cache_filename": "2601.15710v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "68a8c0f9f483718cdf2ea63657253814536302c8648f77491d75446ba0af92c1",
+      "pdf_url": "https://arxiv.org/pdf/2601.15710v1",
+      "receipt_sha256": "68a8c0f9f483718cdf2ea63657253814536302c8648f77491d75446ba0af92c1",
+      "term_counts": {
+        "floating-point": 1,
+        "lookup-table": 1,
+        "normalization": 3,
+        "softmax": 2
+      },
+      "term_pages": {
+        "floating-point": [
+          3
+        ],
+        "lookup-table": [
+          7
+        ],
+        "normalization": [
+          2,
+          5,
+          6
+        ],
+        "softmax": [
+          5,
+          6
+        ]
+      },
+      "title": "FlexLLM: Composable HLS Library for Flexible Hybrid LLM Accelerator Design",
+      "version": 1
+    },
+    "2602.18750v2": {
+      "abs_url": "https://arxiv.org/abs/2602.18750v2",
+      "arxiv_id": "2602.18750",
+      "byte_count": 2952730,
+      "cache_filename": "2602.18750v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "14de02c67faa855c01bc5eb59a99594ba4cffc608f471cf2e452cea3f329eeaf",
+      "pdf_url": "https://arxiv.org/pdf/2602.18750v2",
+      "receipt_sha256": "14de02c67faa855c01bc5eb59a99594ba4cffc608f471cf2e452cea3f329eeaf",
+      "term_counts": {
+        "floating-point": 2,
+        "softmax": 3
+      },
+      "term_pages": {
+        "floating-point": [
+          10,
+          11
+        ],
+        "softmax": [
+          2,
+          9,
+          12
+        ]
+      },
+      "title": "HillInfer: Efficient Long-Context LLM Inference on the Edge with Hierarchical KV Eviction using SmartSSD",
+      "version": 2
+    },
+    "2602.20515v1": {
+      "abs_url": "https://arxiv.org/abs/2602.20515v1",
+      "arxiv_id": "2602.20515",
+      "byte_count": 401638,
+      "cache_filename": "2602.20515v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "356b7b18b092d53cf6235515f2b465bf56631696b650d94ff4192cf623b62d96",
+      "pdf_url": "https://arxiv.org/pdf/2602.20515v1",
+      "receipt_sha256": "356b7b18b092d53cf6235515f2b465bf56631696b650d94ff4192cf623b62d96",
+      "term_counts": {
+        "exp": 1,
+        "floating-point": 1,
+        "lookup-table": 9,
+        "normalization": 3,
+        "softmax": 9
+      },
+      "term_pages": {
+        "exp": [
+          5
+        ],
+        "floating-point": [
+          5
+        ],
+        "lookup-table": [
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "normalization": [
+          5,
+          6,
+          7
+        ],
+        "softmax": [
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "title": "FAST-Prefill: FPGA Accelerated Sparse Attention for Long Context LLM Prefill",
+      "version": 1
+    },
+    "2603.14785v1": {
+      "abs_url": "https://arxiv.org/abs/2603.14785v1",
+      "arxiv_id": "2603.14785",
+      "byte_count": 4824175,
+      "cache_filename": "2603.14785v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "b06f4ef2507a7a9714e7a78e70352ffefa280e75e57220f6b79ec47640a31170",
+      "pdf_url": "https://arxiv.org/pdf/2603.14785v1",
+      "receipt_sha256": "b06f4ef2507a7a9714e7a78e70352ffefa280e75e57220f6b79ec47640a31170",
+      "term_counts": {
+        "exp": 5,
+        "floating-point": 8,
+        "lookup-table": 9,
+        "normalization": 22,
+        "softmax": 13
+      },
+      "term_pages": {
+        "exp": [
+          7,
+          8,
+          11
+        ],
+        "floating-point": [
+          3,
+          5,
+          10,
+          21
+        ],
+        "lookup-table": [
+          11,
+          15,
+          16
+        ],
+        "normalization": [
+          3,
+          6,
+          7,
+          10,
+          11,
+          15,
+          16
+        ],
+        "softmax": [
+          2,
+          3,
+          5,
+          7,
+          11,
+          15,
+          20
+        ]
+      },
+      "title": "SkipOPU: An FPGA-based Overlay Processor for Large Language Models with Dynamically Allocated Computation",
+      "version": 1
+    },
+    "2603.23668v1": {
+      "abs_url": "https://arxiv.org/abs/2603.23668v1",
+      "arxiv_id": "2603.23668",
+      "byte_count": 208045,
+      "cache_filename": "2603.23668v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "c8aa883ca6baa7ed5fcd8c1c73c3f9c7469f59069fd6762cf080c901ac55f2e0",
+      "pdf_url": "https://arxiv.org/pdf/2603.23668v1",
+      "receipt_sha256": "c8aa883ca6baa7ed5fcd8c1c73c3f9c7469f59069fd6762cf080c901ac55f2e0",
+      "term_counts": {
+        "exp": 1,
+        "normalization": 1,
+        "softmax": 3
+      },
+      "term_pages": {
+        "exp": [
+          3
+        ],
+        "normalization": [
+          3
+        ],
+        "softmax": [
+          3,
+          4,
+          5
+        ]
+      },
+      "title": "Energy Efficient Software Hardware CoDesign for Machine Learning: From TinyML to Large Language Models",
+      "version": 1
+    },
+    "2603.28239v3": {
+      "abs_url": "https://arxiv.org/abs/2603.28239v3",
+      "arxiv_id": "2603.28239",
+      "byte_count": 2976825,
+      "cache_filename": "2603.28239v3.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "5185b310fab06f7da3551c4b0f66e407940869b24e2d71b0ba955239a791ff2f",
+      "pdf_url": "https://arxiv.org/pdf/2603.28239v3",
+      "receipt_sha256": "5185b310fab06f7da3551c4b0f66e407940869b24e2d71b0ba955239a791ff2f",
+      "term_counts": {
+        "floating-point": 1,
+        "lookup-table": 1,
+        "normalization": 2
+      },
+      "term_pages": {
+        "floating-point": [
+          13
+        ],
+        "lookup-table": [
+          8
+        ],
+        "normalization": [
+          3
+        ]
+      },
+      "title": "A Switch-Centric In-Network Architecture for Accelerating LLM Inference in Shared-Memory Network",
+      "version": 3
+    },
+    "2603.29002v3": {
+      "abs_url": "https://arxiv.org/abs/2603.29002v3",
+      "arxiv_id": "2603.29002",
+      "byte_count": 3594462,
+      "cache_filename": "2603.29002v3.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "f34c5eeb201a05888db9b02db4ed4675d1b68e8452b7ebe09df9aa96667a8af8",
+      "pdf_url": "https://arxiv.org/pdf/2603.29002v3",
+      "receipt_sha256": "f34c5eeb201a05888db9b02db4ed4675d1b68e8452b7ebe09df9aa96667a8af8",
+      "term_counts": {
+        "exp": 5,
+        "lookup-table": 2,
+        "normalization": 2
+      },
+      "term_pages": {
+        "exp": [
+          7,
+          17,
+          24
+        ],
+        "lookup-table": [
+          10,
+          18
+        ],
+        "normalization": [
+          18,
+          19
+        ]
+      },
+      "title": "Understand and Accelerate Memory Processing Pipeline for Large Language Model Inference",
+      "version": 3
+    },
+    "2605.05170v1": {
+      "abs_url": "https://arxiv.org/abs/2605.05170v1",
+      "arxiv_id": "2605.05170",
+      "byte_count": 3223790,
+      "cache_filename": "2605.05170v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "4066a9d1063ab6648e4ad7de63bb591ef065876727fdaa77fcc8effe2d2a829b",
+      "pdf_url": "https://arxiv.org/pdf/2605.05170v1",
+      "receipt_sha256": "4066a9d1063ab6648e4ad7de63bb591ef065876727fdaa77fcc8effe2d2a829b",
+      "term_counts": {
+        "floating-point": 14,
+        "lookup-table": 3,
+        "polynomial": 3,
+        "softmax": 13
+      },
+      "term_pages": {
+        "floating-point": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          11,
+          12
+        ],
+        "lookup-table": [
+          3,
+          6
+        ],
+        "polynomial": [
+          5,
+          10
+        ],
+        "softmax": [
+          2,
+          3,
+          5
+        ]
+      },
+      "title": "Design Conductor 2.0: An agent builds a TurboQuant inference accelerator in 80 hours",
+      "version": 1
+    },
+    "2605.06052v1": {
+      "abs_url": "https://arxiv.org/abs/2605.06052v1",
+      "arxiv_id": "2605.06052",
+      "byte_count": 1319487,
+      "cache_filename": "2605.06052v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": true,
+      "observed_sha256": "e44b845e218984c129a21b5da62b02f5d26cc0b3e8292453c0b0a8dddfe0d75e",
+      "pdf_url": "https://arxiv.org/pdf/2605.06052v1",
+      "receipt_sha256": "e44b845e218984c129a21b5da62b02f5d26cc0b3e8292453c0b0a8dddfe0d75e",
+      "term_counts": {
+        "exp": 2,
+        "floating-point": 55,
+        "lookup-table": 45,
+        "normalization": 14,
+        "polynomial": 1
+      },
+      "term_pages": {
+        "exp": [
+          6
+        ],
+        "floating-point": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "lookup-table": [
+          1,
+          2,
+          5,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13
+        ],
+        "normalization": [
+          4,
+          5,
+          7,
+          8,
+          9,
+          14
+        ],
+        "polynomial": [
+          5
+        ]
+      },
+      "title": "XtraMAC: An Efficient MAC Architecture for Mixed-Precision LLM Inference on FPGA",
+      "version": 1
+    },
+    "2606.12556v2": {
+      "abs_url": "https://arxiv.org/abs/2606.12556v2",
+      "arxiv_id": "2606.12556",
+      "byte_count": 2879868,
+      "cache_filename": "2606.12556v2.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "c8f29ee52bfaef00bd2b26bf2e71e49eda394d6e85b7fc9975fa5fd9a24a94d7",
+      "pdf_url": "https://arxiv.org/pdf/2606.12556v2",
+      "receipt_sha256": "c8f29ee52bfaef00bd2b26bf2e71e49eda394d6e85b7fc9975fa5fd9a24a94d7",
+      "term_counts": {},
+      "term_pages": {},
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "version": 2
+    },
+    "2606.13708v1": {
+      "abs_url": "https://arxiv.org/abs/2606.13708v1",
+      "arxiv_id": "2606.13708",
+      "byte_count": 682551,
+      "cache_filename": "2606.13708v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "1cdbb3638e32a2b9fdebcc0a004023e63c3654e3e362e4f0aaf4bfa369553b05",
+      "pdf_url": "https://arxiv.org/pdf/2606.13708v1",
+      "receipt_sha256": "1cdbb3638e32a2b9fdebcc0a004023e63c3654e3e362e4f0aaf4bfa369553b05",
+      "term_counts": {
+        "floating-point": 1,
+        "lookup-table": 4
+      },
+      "term_pages": {
+        "floating-point": [
+          6
+        ],
+        "lookup-table": [
+          3,
+          5
+        ]
+      },
+      "title": "Tiara: A Programmable Line-Rate ISA for Remote Memory Access",
+      "version": 1
+    },
+    "2606.22621v1": {
+      "abs_url": "https://arxiv.org/abs/2606.22621v1",
+      "arxiv_id": "2606.22621",
+      "byte_count": 685997,
+      "cache_filename": "2606.22621v1.pdf",
+      "cache_status": "verified",
+      "deep_read_candidate": false,
+      "observed_sha256": "4fd6fe2db6db542b20231ce537a413092d721c4fab21fe7851f3945b5c39a25c",
+      "pdf_url": "https://arxiv.org/pdf/2606.22621v1",
+      "receipt_sha256": "4fd6fe2db6db542b20231ce537a413092d721c4fab21fe7851f3945b5c39a25c",
+      "term_counts": {
+        "exp": 4,
+        "normalization": 4,
+        "softmax": 8
+      },
+      "term_pages": {
+        "exp": [
+          5,
+          6
+        ],
+        "normalization": [
+          20,
+          23
+        ],
+        "softmax": [
+          3,
+          19,
+          20
+        ]
+      },
+      "title": "Multi-Level Resistive Synapses for On-Chip Neural Networks: A Physics-Based Design of a Memristive Crossbar Fabric with Quasi-Continuous Conductance States",
+      "version": 1
+    }
+  },
+  "schema_version": 1,
+  "terms": {
+    "implementation": {
+      "floating-point": "\\bfloating[ -]point\\b",
+      "lookup-table": "\\b(?:lookup table|lut)\\b",
+      "piecewise": "\\bpiecewise(?:[- ]linear)?\\b",
+      "polynomial": "\\bpolynomial\\b",
+      "range-reduction": "\\brange reduction\\b"
+    },
+    "semantic": {
+      "exp": "\\bexp(?:onential)?\\b",
+      "maximum-subtraction": "(?:subtract(?:ion)?[^\\f]{0,80}maximum|maximum[^\\f]{0,80}subtract)",
+      "normalization": "\\b(?:layernorm|rmsnorm|normalization)\\b",
+      "softmax": "\\bsoftmax\\b"
+    }
+  }
+}
