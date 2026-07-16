@@ -12,6 +12,7 @@
 
 - The DUT is exactly `tinystories-w8a8-rc-study-mask9-vocab6-width2`: static XNNPACK PT2E W8A8, vocabulary 6, two layers, context length 8, hidden width 2, one attention head, seed 0. Do not create or substitute a look-alike model.
 - The frozen PT2E W8A8 reference image remains the numerical authority. Its four cases are a fast smoke oracle. A local transform can become canonical only after valid SV and exhaustive RC observable functional equivalence over all `6^8 = 1,679,616` length-eight V=6 contexts, comparing six final raw int8 codes and the lowest-index argmax token ID after deterministic reset; this iteration does not make that claim.
+- If a later local `math.exp` implementation uses an approximation, passing that exhaustive gate may admit it only as an RC-observationally equivalent implementation. It must publish its source, numerical contract, range assumptions, and result; it does not establish operation-level or Full TinyStories equivalence.
 - A census of floating operations is informational source provenance, never a pass/fail lowering gate. A source form is acceptable when it has a named, reproducible hardware path.
 - Do not modify the PT2E graph, calibration, quantization parameters, model source, memory layout, host software, DDR3 driver, or board design in this iteration.
 - Do not add `lower-scout-math-for-calyx`, textual substitution of `math.exp`, `tosa.table`, polynomial, LUT, clamp, range-reduction, or other approximation to the canonical RC pipeline.

@@ -38,4 +38,6 @@
 - **RC observable functional equivalence** — For the fixed V=6, context-8 RC,
   exhaustive equality of six raw int8 output codes and the lowest-index argmax
   token ID for all `6^8 = 1,679,616` token contexts after deterministic reset.
-  It proves observable behavior only at that fixed RC interface.
+  It proves observable behavior only at that fixed RC interface. A local
+  approximation that passes this gate is RC-observationally equivalent, not
+  thereby operation-semantic or Full TinyStories equivalent.

@@ -47,9 +47,15 @@ for a changed model image.
 Established upstream lowering remains preferred because it reduces the
 semantic and maintenance burden. A local transform that passes this gate is
 not hidden: its source, provenance, result, and limitations remain published.
-This decision does not approve a changed numerical contract or an
-approximation; those require their separate decision under the existing
-canonical-PT2E policy.
+
+For this fixed RC, a local implementation may use an approximation or a
+custom special-function algorithm if, and only if, it passes the exhaustive
+gate above. That admission establishes *RC observable functional equivalence*,
+not operation-level equivalence to `math.exp` or a general PT2E semantics
+claim. The implementation must be labelled accordingly and publish its exact
+source, numerical contract, range assumptions, and exhaustive-test result. It
+cannot be described as a canonical Full TinyStories transform or promoted to a
+larger model without a new equivalence argument and test.
 
 ## Consequences
 
@@ -59,6 +65,9 @@ canonical-PT2E policy.
 - The first `math.exp` blocker investigation may continue without an SV
   result. Any future integration plan for a local transform must include the
   exhaustive checker before making a canonical claim.
+- A local `math.exp` replacement that meets the exhaustive fixed-RC gate can
+  become canonical for the RC even if it does not preserve an operation-level
+  `math.exp` contract. Its claim must remain bounded to the fixed RC.
 - The RC is valuable precisely because it makes this much stronger gate
   finite and potentially tractable; the same method is not automatically
   feasible for the full 50,257-token model.
