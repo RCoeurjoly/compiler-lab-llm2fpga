@@ -68,3 +68,6 @@
 - **Blocker evidence ladder** — The required investigation order for a lowering
   blocker: upstream semantics-preserving route, established published/open
   route, then local implementation. It never relaxes the RC acceptance gates.
+- **One-blocker iteration** — A causal loop that addresses one independent
+  lowering-operation family, records its minimal reproducer and evidence, then
+  reruns the complete RC to reveal the next frontier before changing another.

@@ -127,6 +127,14 @@ The ladder decides investigation order, not acceptance evidence. Every route,
 including an upstream one, still needs the same smoke, interface, timing, and
 exhaustive-promotion gates before it can become canonical for the RC.
 
+Blocker work proceeds one independent operation family at a time. An iteration
+records the exact full-RC blocker, creates the corresponding minimal
+reproducer and evidence-ladder result, integrates only the selected route and
+its necessary documented dependencies, then reruns the complete RC lowering.
+It must not bundle independent families such as `math.exp`, `math.tanh`, and
+`math.fpowi`. The rerun produces either the next concrete frontier or a
+testable-SV candidate for the normal promotion gates.
+
 ## Consequences
 
 - A primitive MRC, an emitted HardFloat module, a successful compiler pass,
@@ -159,6 +167,8 @@ exhaustive-promotion gates before it can become canonical for the RC.
 - The blocker evidence ladder makes upstream and published routes preferred
   investigative starting points, but no provenance class bypasses RC
   functional-equivalence evidence.
+- One-blocker iterations preserve causality: a full-RC rerun after each
+  intervention identifies the next frontier rather than hiding it in a bundle.
 - The RC is valuable precisely because it makes this much stronger gate
   finite and potentially tractable; the same method is not automatically
   feasible for the full 50,257-token model.
