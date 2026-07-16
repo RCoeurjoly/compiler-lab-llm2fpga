@@ -91,6 +91,15 @@ canonical, is adopted as the next baseline, or is described as RC observably
 functionally equivalent. Until then it is labelled **provisional** regardless
 of how many smoke cases pass.
 
+The complete sweep is partitioned into deterministic, durable shards of the
+base-six lexical token-context enumeration. Each shard records its inclusive
+context-index range, expected count, reference and DUT provenance, result
+digest, completion state, and any mismatch. A final manifest records every
+shard digest and proves that the shard ranges are disjoint and cover exactly
+`[0, 6^8)`. Shards and manifest are checked-in or Nix-produced durable
+artifacts; transient working files are not evidence. This permits resumption
+and parallel execution without relaxing the exhaustive requirement.
+
 ## Consequences
 
 - A primitive MRC, an emitted HardFloat module, a successful compiler pass,
@@ -114,6 +123,8 @@ of how many smoke cases pass.
 - Four matching smoke cases make an experiment suitable for rapid iteration,
   not for a canonical or functional-equivalence claim. The full finite sweep
   is the promotion gate.
+- Interrupted or parallel exhaustive runs remain auditable only through the
+  deterministic shard records and final complete-coverage manifest.
 - The RC is valuable precisely because it makes this much stronger gate
   finite and potentially tractable; the same method is not automatically
   feasible for the full 50,257-token model.

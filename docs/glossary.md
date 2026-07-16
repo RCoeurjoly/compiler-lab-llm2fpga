@@ -54,3 +54,6 @@
 - **Provisional RC candidate** — A testable experimental route that has passed
   only the four-case frozen PT2E smoke oracle. It cannot be called canonical or
   RC observably functionally equivalent until it passes the full `6^8` sweep.
+- **RC exhaustive-sweep manifest** — The durable record that hashes and joins
+  deterministic base-six context-range shards, proving disjoint complete
+  coverage of the `6^8` RC inputs and recording reference/DUT provenance.

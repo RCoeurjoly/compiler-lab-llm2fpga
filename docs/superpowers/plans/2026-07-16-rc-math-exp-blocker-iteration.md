@@ -17,6 +17,7 @@
 - The exhaustive image-backed SV gate is repeated after every semantics-affecting RC change, including base lowering, local math implementation, and memory externalization. DDR3/board validation is a separate physical-service gate and never substitutes for this numerical gate.
 - A canonical candidate must expose the eight token inputs and all six raw codes plus token ID through a documented testbench-accessible SV interface, with deterministic reset, launch, completion, and sampling semantics. Done-only or internally probed SV is resource-scout evidence only.
 - Use the frozen four-case PT2E oracle for each rapid experiment. Require the full `6^8` sweep before calling any route canonical, adopting it as the next baseline, or claiming RC observable functional equivalence; label it provisional until then.
+- Implement any future full sweep as deterministic durable base-six lexical context-range shards with result digests and a final manifest proving disjoint complete `[0, 6^8)` coverage. Temporary files are not proof artifacts.
 - A census of floating operations is informational source provenance, never a pass/fail lowering gate. A source form is acceptable when it has a named, reproducible hardware path.
 - Do not modify the PT2E graph, calibration, quantization parameters, model source, memory layout, host software, DDR3 driver, or board design in this iteration.
 - Do not add `lower-scout-math-for-calyx`, textual substitution of `math.exp`, `tosa.table`, polynomial, LUT, clamp, range-reduction, or other approximation to the canonical RC pipeline.
