@@ -88,6 +88,9 @@ the real DDR3 service is introduced on board.
   untracked testbench convenience.
 - A canonical RC route requires both exhaustive compute-interface evidence and
   at least one host-to-SV-to-host transaction.
+- A successful RC vertical slice is scoped to this exact RC. Full TinyStories
+  fit or performance remains a separate controlled full-versus-finalist
+  measurement under the representative-core study.
 - Passing the prompt fixture does not establish behavior for arbitrary text,
   full TinyStories vocabulary, multi-token generation, or DDR3 hardware.
 - DDR3 work is deliberately deferred until the complete baseline V=6 RC has

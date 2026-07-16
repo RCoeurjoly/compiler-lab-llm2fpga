@@ -28,6 +28,7 @@
 - The baseline V=6 FPGA route implements all RC compute and frozen storage as synthesizable logic/memory: no black-boxed weights, operators, or dummy memory service. Keep any black-box route explicitly diagnostic only.
 - Call the complete V=6 RC a fit only after constrained XC7K480T P&R has no resource oversubscription and meets required timing, then the observable board checkpoint passes. Treat RTLIL/Yosys measures as resource scouts only.
 - If the complete non-black-boxed baseline fails constrained P&R, publish its failure packet before beginning any DDR3 work. An early DDR3 route is then a separately labelled non-baseline branch with its own gates, never a substitute for the baseline result.
+- Treat all successful V=6 vertical-slice results as RC-only. Do not extrapolate full TinyStories fit/performance until a separately recorded controlled frozen-full-versus-exact-finalist comparison measures structural and downstream resource scaling under the same route/tool versions.
 - A census of floating operations is informational source provenance, never a pass/fail lowering gate. A source form is acceptable when it has a named, reproducible hardware path.
 - Do not modify the PT2E graph, calibration, quantization parameters, model source, memory layout, host software, DDR3 driver, or board design in this iteration.
 - Do not add `lower-scout-math-for-calyx`, textual substitution of `math.exp`, `tosa.table`, polynomial, LUT, clamp, range-reduction, or other approximation to the canonical RC pipeline.

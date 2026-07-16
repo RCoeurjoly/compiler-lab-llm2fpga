@@ -77,6 +77,10 @@
 - **Baseline RC failure packet** — The published non-black-boxed XC7K480T P&R
   failure record: design/constraint/tool provenance, resource/timing reports,
   and limiting condition. It precedes and remains distinct from any DDR3 branch.
+- **RC-to-full predictive-validity comparison** — A controlled measurement of
+  frozen full PT2E W8A8 versus the exact structural-finalist RC under the same
+  downstream route/tool versions. It is required before extrapolating any RC
+  fit, latency, throughput, or resource result to full TinyStories.
 - **RC counterexample packet** — A durable mismatch or timeout record with its
   token context, PT2E and SV outputs, provenance hashes, timing contract, and
   cycle/handshake trace. It rejects the candidate but is a reusable research

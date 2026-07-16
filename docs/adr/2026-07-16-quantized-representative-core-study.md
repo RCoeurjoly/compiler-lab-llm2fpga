@@ -81,6 +81,15 @@ orders-of-magnitude iteration loop originally sought.
 The old W4A8 RCs remain historical hardware experiments and must not be used
 as this study's baseline or be described as clean quantized representatives.
 
+A successful V=6 vertical slice is an RC-only result. It does not establish
+full TinyStories fit, latency, throughput, or resource use merely because this
+structural finalist covers the full model's Torch-MLIR operation names,
+signatures, and edges. Any full-model claim requires a separately recorded,
+controlled full-versus-finalist comparison using the frozen full PT2E W8A8
+reference, the exact finalist, the same downstream route/tool versions, and
+reported structural and resource scaling. The RC is a fast test vehicle, not
+an extrapolation shortcut.
+
 This decision makes no functional-equivalence, quantized-accuracy, integer
 compute, TOSA, RTLIL, SV, LUT/FF/BRAM/DSP, DDR3, board, or latency claim. The
 project's canonical full frozen PT2E W8A8 reference remains the numerical
