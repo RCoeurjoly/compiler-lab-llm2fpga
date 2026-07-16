@@ -344,6 +344,13 @@
             test -s "$out/model.calyx.mlir"
           '';
 
+        rcMathExpPaperScreen = pkgs.writeShellApplication {
+          name = "rc-math-exp-paper-screen";
+          runtimeInputs = [ python pkgs.poppler_utils ];
+          text = ''
+            exec ${python}/bin/python3 ${./scripts/pipeline/screen_fpga_llm_math_exp_corpus.py} "$@"
+          '';
+        };
         pipelineScripts = ./scripts/pipeline;
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
         noHandshakeLinalgToScf =
@@ -2233,6 +2240,7 @@
           inherit circt mlir torchMlir yosysPkg modelRegistryJson
             llm2fpgaMlirPasses llm2fpgaTorchMlirPasses llm2fpgaCirctPasses
             calyx;
+          "rc-math-exp-paper-screen" = rcMathExpPaperScreen;
           "calyx-float-library-selftest" = calyxFloatLibrarySelftest;
           "calyx-rc-basic-float-bindings-selftest" =
             calyxRcBasicFloatBindingsSelftest;
@@ -2301,6 +2309,11 @@
         } // pipelineStagePackages // pipelineMetadataPackages
           // quantizedLinalgDiagnosticPackages // pipelineAliasPackages
           // quantizedRepresentativeCoreStudyStagePackages;
+
+        apps."rc-math-exp-paper-screen" = {
+          type = "app";
+          program = "${rcMathExpPaperScreen}/bin/rc-math-exp-paper-screen";
+        };
 
         checks = {
           default = modelRegistryJson;
