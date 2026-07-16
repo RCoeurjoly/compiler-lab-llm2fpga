@@ -55,6 +55,12 @@ configuration, or `done` signal alone is not a board result. The record
 includes bitstream, place-and-route, constraint, host-program, fixture, and
 tool provenance sufficient to repeat the transaction.
 
+The baseline V=6 FPGA candidate contains all RC compute and its frozen model
+storage as real synthesizable logic or memories. It may not black-box weights,
+operators, or substitute a dummy memory service. Memory-blackbox and
+operator-blackbox variants remain allowed only as explicitly labelled
+diagnostics; they do not satisfy the complete RC-on-FPGA checkpoint.
+
 At that later stage, the image-backed SV fixture must consume the exact packed
 byte image and address map intended for the DDR3 driver, produced by one
 versioned packer. It may not use a simulator-only convenient representation.
@@ -74,5 +80,7 @@ the real DDR3 service is introduced on board.
   external-memory risk.
 - A baseline FPGA claim requires observed logits/token ID from a reproducible
   XC7K480T bitstream, not merely an implementation artifact or completion pin.
+- The complete baseline RC claim excludes black-boxed model compute, weights,
+  and dummy memory services. Those are diagnostics only.
 - The same fixture may then be rerun with the exact packed-image SV service and
   with the real DDR3 service as distinct external-memory checkpoints.

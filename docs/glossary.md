@@ -67,6 +67,9 @@
 - **RC FPGA checkpoint** — A reproducible XC7K480T bitstream plus a board-captured
   vertical-slice result containing the six raw codes, token ID, and latency
   compared with frozen PT2E. Build success or `done` alone does not qualify.
+- **Complete baseline RC** — The V=6 RC with all compute and frozen model
+  storage physically implemented as synthesizable logic/memory. A black-boxed
+  weight/operator/memory design is a diagnostic, never this checkpoint.
 - **RC counterexample packet** — A durable mismatch or timeout record with its
   token context, PT2E and SV outputs, provenance hashes, timing contract, and
   cycle/handshake trace. It rejects the candidate but is a reusable research
