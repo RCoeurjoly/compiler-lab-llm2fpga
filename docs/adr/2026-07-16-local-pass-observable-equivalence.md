@@ -66,6 +66,15 @@ source, numerical contract, range assumptions, and exhaustive-test result. It
 cannot be described as a canonical Full TinyStories transform or promoted to a
 larger model without a new equivalence argument and test.
 
+The exhaustive gate is reusable, not exceptional. It must be rerun after each
+semantics-affecting frozen-RC transformation, including base lowering, a local
+math implementation, and memory externalization. For external memory, the
+gate uses an image-backed SV memory fixture that serves the same immutable
+frozen model image to both candidates. A DDR3-controller or board run is a
+separate physical-integration gate: it establishes service protocol, timing,
+and hardware behavior, but does not replace the exhaustive image-backed
+numerical comparison.
+
 ## Consequences
 
 - A primitive MRC, an emitted HardFloat module, a successful compiler pass,
@@ -80,6 +89,9 @@ larger model without a new equivalence argument and test.
 - A local `math.exp` replacement that meets the exhaustive fixed-RC gate can
   become canonical for the RC even if it does not preserve an operation-level
   `math.exp` contract. Its claim must remain bounded to the fixed RC.
+- An external-memory change needs two kinds of evidence: exhaustive equality
+  with the deterministic image-backed fixture and separate DDR3/board evidence.
+  Passing either one alone is not the complete claim.
 - The RC is valuable precisely because it makes this much stronger gate
   finite and potentially tractable; the same method is not automatically
   feasible for the full 50,257-token model.

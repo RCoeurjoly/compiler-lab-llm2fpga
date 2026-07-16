@@ -43,3 +43,7 @@
   It proves observable behavior only at that fixed RC interface. A local
   approximation that passes this gate is RC-observationally equivalent, not
   thereby operation-semantic or Full TinyStories equivalent.
+- **Image-backed SV fixture** — A deterministic SV memory service that supplies
+  the frozen RC model image. It enables exhaustive numerical comparison after
+  lowering or memory externalization; it is distinct from DDR3-controller and
+  board validation.
