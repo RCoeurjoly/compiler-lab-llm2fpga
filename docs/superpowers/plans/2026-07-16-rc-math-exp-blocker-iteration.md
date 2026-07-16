@@ -19,6 +19,7 @@
 - Use the frozen four-case PT2E oracle for each rapid experiment. Require the full `6^8` sweep before calling any route canonical, adopting it as the next baseline, or claiming RC observable functional equivalence; label it provisional until then.
 - Implement any future full sweep as deterministic durable base-six lexical context-range shards with result digests and a final manifest proving disjoint complete `[0, 6^8)` coverage. Temporary files are not proof artifacts.
 - Treat one raw-code or token-ID mismatch, invalid completion sequence, or timeout as candidate rejection. Emit a durable counterexample packet with context/index, PT2E/SV outputs, provenance hashes, declared timing contract, and replayable cycle/handshake trace before changing the route.
+- Every future testable candidate declares a versioned conservative worst-case SV cycle bound from launch to sampling. Record observed latency/max in smoke and full-sweep artifacts; timeout beyond the bound rejects it, while PyTorch is never treated as a cycle-timing oracle.
 - A census of floating operations is informational source provenance, never a pass/fail lowering gate. A source form is acceptable when it has a named, reproducible hardware path.
 - Do not modify the PT2E graph, calibration, quantization parameters, model source, memory layout, host software, DDR3 driver, or board design in this iteration.
 - Do not add `lower-scout-math-for-calyx`, textual substitution of `math.exp`, `tosa.table`, polynomial, LUT, clamp, range-reduction, or other approximation to the canonical RC pipeline.

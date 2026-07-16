@@ -61,3 +61,7 @@
   token context, PT2E and SV outputs, provenance hashes, timing contract, and
   cycle/handshake trace. It rejects the candidate but is a reusable research
   result.
+- **RC timing contract** — A versioned conservative maximum number of SV cycles
+  from documented launch to documented output sampling. The verifier records
+  observed latency and rejects completion beyond this bound; it does not try to
+  match PyTorch cycle timing.

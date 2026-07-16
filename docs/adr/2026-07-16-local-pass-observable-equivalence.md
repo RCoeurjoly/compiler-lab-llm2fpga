@@ -108,6 +108,14 @@ and a cycle/handshake trace sufficient to replay the failure. A failed run may
 stop at its first counterexample to conserve compute, but it cannot emit a
 passing coverage manifest or be represented as partially accepted.
 
+Each candidate declares a conservative, versioned worst-case cycle bound from
+its documented launch event to its documented output-sampling event. Completion
+outside that bound is a timeout and therefore a rejection. The smoke and
+exhaustive artifacts record observed latency (including the maximum) against
+that bound. PT2E supplies numerical behavior, not hardware-cycle timing, so
+the gate requires correct bounded completion rather than cycle-for-cycle
+agreement with PyTorch.
+
 ## Consequences
 
 - A primitive MRC, an emitted HardFloat module, a successful compiler pass,
@@ -135,6 +143,8 @@ passing coverage manifest or be represented as partially accepted.
   deterministic shard records and final complete-coverage manifest.
 - A mismatch or timeout is a reusable negative result, not noise to suppress:
   it rejects the route and yields a replayable counterexample packet.
+- Latency is a recorded implementation metric with a declared worst-case bound;
+  it is not compared to PyTorch cycle-for-cycle.
 - The RC is valuable precisely because it makes this much stronger gate
   finite and potentially tractable; the same method is not automatically
   feasible for the full 50,257-token model.
