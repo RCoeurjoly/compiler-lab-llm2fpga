@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "context_length": 8,
+  "vocabulary": ["tok0", "tok1", "tok2", "tok3", "tok4", "tok5"],
+  "cases": [
+    {
+      "id": "ascending",
+      "text": "tok0 tok1 tok2 tok3 tok4 tok5 tok0 tok1"
+    },
+    {
+      "id": "descending",
+      "text": "tok5 tok4 tok3 tok2 tok1 tok0 tok5 tok4"
+    },
+    {
+      "id": "zeros",
+      "text": "tok0 tok0 tok0 tok0 tok0 tok0 tok0 tok0"
+    },
+    {
+      "id": "alternating",
+      "text": "tok0 tok5 tok0 tok5 tok0 tok5 tok0 tok5"
+    }
+  ]
+}
