@@ -27,7 +27,9 @@
   buffering. DDR3 is one possible implementation of that service.
 - **PT2E W8A8** — The primary Task 6 numerical reference: PyTorch PT2E static
   quantization configured for 8-bit weights and activations, with frozen
-  calibration and a recorded converted graph.
+  calibration and a recorded converted graph. For the frozen RC it is the sole
+  acceptance oracle; any exhaustive expected-output shards are derived directly
+  from it rather than from a hand-written integer model.
 - **SmoothQuant W8A8** — A separate scale-migration variant that may be applied
   before PT2E W8A8; it is not part of the primary reference by default.
 - **Test target** — One of the full-model, representative-core, or isolated

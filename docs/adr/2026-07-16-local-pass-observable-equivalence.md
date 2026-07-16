@@ -16,6 +16,12 @@ core over all of its possible token inputs. A local transformation that happens
 to match those four cases would not have enough evidence to become a canonical
 pipeline component.
 
+The project needs one numerical authority, not several mutually unverified
+implementations. The frozen PT2E W8A8 evaluator is that authority. A
+hand-written integer model, hardware-oriented reference model, or independent
+approximation may help diagnose a failure, but cannot become an acceptance
+oracle for the canonical RC route.
+
 The frozen RC has a finite, small externally visible input domain: vocabulary
 size six and context length eight. There are exactly `6^8 = 1,679,616` token
 contexts when every position ranges over token IDs `0..5`.
@@ -29,6 +35,9 @@ functional equivalence at the RC token interface:
 1. For every one of the 1,679,616 length-eight token contexts, reset the DUT
    to the same deterministic state and use the same frozen model image.
 2. Run the frozen PT2E W8A8 reference and the generated SV for that context.
+   Any stored or sharded expected-output corpus must be generated directly
+   from that evaluator and record its evaluator, converted-graph, model-image,
+   enumeration, and shard hashes.
 3. Require equality of all six final raw int8 output codes and the
    lowest-index argmax token ID.
 4. Record tool versions, pass provenance, generated-SV hash, reference-image
@@ -62,6 +71,9 @@ larger model without a new equivalence argument and test.
 - A primitive MRC, an emitted HardFloat module, a successful compiler pass,
   and four matching reference cases are useful evidence but cannot promote a
   local transform into the canonical RC route.
+- A separately implemented integer or hardware-style model cannot replace
+  PT2E as the acceptance oracle. It may be retained only as diagnostic evidence
+  whose disagreement triggers investigation, not a vote over correctness.
 - The first `math.exp` blocker investigation may continue without an SV
   result. Any future integration plan for a local transform must include the
   exhaustive checker before making a canonical claim.
