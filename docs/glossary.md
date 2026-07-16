@@ -65,3 +65,6 @@
   from documented launch to documented output sampling. The verifier records
   observed latency and rejects completion beyond this bound; it does not try to
   match PyTorch cycle timing.
+- **Blocker evidence ladder** — The required investigation order for a lowering
+  blocker: upstream semantics-preserving route, established published/open
+  route, then local implementation. It never relaxes the RC acceptance gates.

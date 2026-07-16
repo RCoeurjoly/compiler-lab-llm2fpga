@@ -116,6 +116,17 @@ that bound. PT2E supplies numerical behavior, not hardware-cycle timing, so
 the gate requires correct bounded completion rather than cycle-for-cycle
 agreement with PyTorch.
 
+Every newly observed lowering blocker follows an evidence ladder:
+
+1. an existing upstream semantics-preserving dialect, pass, or library route;
+2. an established published and openly inspectable implementation; then
+3. a local implementation only when the earlier routes do not reach valid,
+   testable SV.
+
+The ladder decides investigation order, not acceptance evidence. Every route,
+including an upstream one, still needs the same smoke, interface, timing, and
+exhaustive-promotion gates before it can become canonical for the RC.
+
 ## Consequences
 
 - A primitive MRC, an emitted HardFloat module, a successful compiler pass,
@@ -145,6 +156,9 @@ agreement with PyTorch.
   it rejects the route and yields a replayable counterexample packet.
 - Latency is a recorded implementation metric with a declared worst-case bound;
   it is not compared to PyTorch cycle-for-cycle.
+- The blocker evidence ladder makes upstream and published routes preferred
+  investigative starting points, but no provenance class bypasses RC
+  functional-equivalence evidence.
 - The RC is valuable precisely because it makes this much stronger gate
   finite and potentially tractable; the same method is not automatically
   feasible for the full 50,257-token model.
