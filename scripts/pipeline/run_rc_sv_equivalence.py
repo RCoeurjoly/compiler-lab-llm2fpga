@@ -203,15 +203,32 @@ def main() -> None:
             binary = root / "tb.vvp"
             subprocess.run([args.iverilog, "-g2012", "-s", "tb", "-o", str(binary), str(normalized_sv), str(tb)], check=True)
             output = subprocess.check_output([args.vvp, str(binary)], text=True)
-        expected = {row["case_id"]: row["output_codes_i8"] for row in json.loads(args.reference.read_text())["results"]}
+        expected_rows = json.loads(args.reference.read_text())["results"]
+        expected = {row["case_id"]: row["output_codes_i8"] for row in expected_rows}
+        expected_token_ids = {row["case_id"]: row["token_id"] for row in expected_rows}
         observed = {}
         for line in output.splitlines():
             match = re.match(r"RESULT (\S+) ([-0-9 ]+)$", line)
             if match:
                 observed[match.group(1)] = [int(x) for x in match.group(2).split()]
-        if observed != expected:
-            raise SystemExit(json.dumps({"status": "fail", "expected": expected, "observed": observed}, sort_keys=True))
-        print(json.dumps({"status": "pass", "cases": len(expected), "logits": 6, "token_id": "argmax(output_codes_i8)"}, sort_keys=True))
+        observed_token_ids = {
+            case_id: max(range(len(codes)), key=lambda index: codes[index])
+            for case_id, codes in observed.items()
+        }
+        if observed != expected or observed_token_ids != expected_token_ids:
+            raise SystemExit(json.dumps({
+                "status": "fail",
+                "expected": expected,
+                "observed": observed,
+                "expected_token_ids": expected_token_ids,
+                "observed_token_ids": observed_token_ids,
+            }, sort_keys=True))
+        print(json.dumps({
+            "status": "pass",
+            "cases": len(expected),
+            "logits": 6,
+            "token_ids": observed_token_ids,
+        }, sort_keys=True))
 
 
 if __name__ == "__main__":
