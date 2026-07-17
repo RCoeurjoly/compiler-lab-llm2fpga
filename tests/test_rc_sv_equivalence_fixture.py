@@ -32,6 +32,11 @@ class RcSvEquivalenceFixtureTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             module._fixture("module main(input logic clk); endmodule", b"", {"segments": []}, {}, Path("/tmp"))
 
+    def test_large_fsm_rewrite_does_not_rewrite_wide_or_trees(self):
+        source = "logic scalar; logic [12:0] wide; assign scalar = a | b; assign wide = c ? 13'd1 : 13'd0;"
+        normalized = module._normalize_large_or_assignments(source)
+        self.assertEqual(normalized, source)
+
 
 if __name__ == "__main__":
     unittest.main()

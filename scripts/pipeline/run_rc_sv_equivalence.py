@@ -69,7 +69,7 @@ def _fixture(sv: str, image: bytes, manifest: dict, reference: dict, root: Path)
         declarations += [
             f"logic [{width-1}:0] mem{number} [0:{depth-1}];",
             f"wire [{addr_width-1}:0] a{number}_addr; wire a{number}_en, a{number}_we;",
-            f"wire [{width-1}:0] a{number}_wdata; wire [{width-1}:0] a{number}_rdata; wire a{number}_done;",
+            f"wire [{width-1}:0] a{number}_wdata; logic [{width-1}:0] a{number}_rdata; logic a{number}_done;",
         ]
         connections += [
             f".arg_mem_{number}_addr0(a{number}_addr), .arg_mem_{number}_content_en(a{number}_en),",
@@ -90,7 +90,7 @@ def _fixture(sv: str, image: bytes, manifest: dict, reference: dict, root: Path)
             f"  for (int i=0; i<8; i++) mem25[i] = 0;\n"
             + "  " + " ".join(f"mem25[{i}] = 64'sd{v};" for i, v in enumerate(tokens)) + "\n"
             + "  reset = 1; repeat (3) @(posedge clk); reset = 0; go = 1; @(posedge clk); go = 0;\n"
-            + "  wait(done); repeat (2) @(posedge clk);\n"
+            + "  fork begin wait(done); end begin repeat (100000) @(posedge clk); $display(\"TIMEOUT " + case["case_id"] + "\"); $finish; end join_any disable fork; repeat (2) @(posedge clk);\n"
             + f'  $display("RESULT {case["case_id"]} %0d %0d %0d %0d %0d %0d", '
             + ", ".join(f"$signed(mem26[{i}])" for i in range(6))
             + ");\n"
@@ -98,16 +98,72 @@ def _fixture(sv: str, image: bytes, manifest: dict, reference: dict, root: Path)
         )
     text = "`timescale 1ns/1ps\nmodule tb;\n" + "\n".join(declarations) + "\n"
     text += "logic clk=0, reset=0, go=0; wire done; always #5 clk=~clk;\n"
-    text += "always_comb begin\n" + "\n".join(
-        f"  a{n}_rdata = mem{n}[a{n}_addr]; a{n}_done = a{n}_en;" for n in ports
-    ) + "\nend\nalways_ff @(posedge clk) begin\n" + "\n".join(
-        f"  if (a{n}_we && a{n}_en) mem{n}[a{n}_addr] <= a{n}_wdata;" for n in ports
-    ) + "\nend\n"
+    text += "always_ff @(posedge clk) begin\n"
+    for n in ports:
+        text += f"  if (reset) begin a{n}_done <= 1'b0; a{n}_rdata <= '0; end\n"
+        text += f"  else if (a{n}_en) begin a{n}_done <= 1'b1;"
+        text += f" if (!a{n}_we) a{n}_rdata <= mem{n}[a{n}_addr];"
+        text += f" else mem{n}[a{n}_addr] <= a{n}_wdata; end\n"
+        text += f"  else a{n}_done <= 1'b0;\n"
+    text += "end\n"
+    connections[-1] = connections[-1].rstrip(",")
     text += "main_1 dut(.clk(clk), .reset(reset), .go(go), .done(done),\n" + "\n".join(connections) + ");\n"
     text += "initial begin\n" + "  " + "\n  ".join(initialization) + "\n  " + "\n  ".join(case_blocks) + "\n  $finish;\nend\nendmodule\n"
     path = root / "tb.sv"
     path.write_text(text, encoding="utf-8")
     return path
+
+
+def _normalize_large_or_assignments(source: str) -> str:
+    """Turn huge one-bit OR trees into equivalent procedural priority logic.
+
+    CIRCT's Calyx Verilog backend emits the FSM enable as one enormous
+    ``assign x = a | b | ...`` expression.  Splitting that expression is a
+    simulation-only lexical normalization; each term still drives the same
+    one-bit signal with the same OR semantics.
+    """
+    pattern = re.compile(r"assign\s+(\w+)\s*=\s*(\S[^;]*);", re.DOTALL)
+
+    def replace(match: re.Match[str]) -> str:
+        name, expression = match.group(1), match.group(2)
+        if len(match.group(0)) < 20000:
+            return match.group(0)
+        if "?" in expression:
+            # FSM state outputs are wide priority-ternary chains.  Convert
+            # them to reverse-order procedural assignments, which preserves
+            # the original priority while avoiding one enormous AST node.
+            pairs: list[tuple[str, str]] = []
+            rest = expression.strip()
+            while " ? " in rest:
+                condition, true_value, false_rest = re.split(
+                    r"\s*\?\s*|\s*:\s*", rest, maxsplit=2
+                )
+                pairs.append((condition, true_value))
+                rest = false_rest
+            if not pairs:
+                return match.group(0)
+            body = ["always_comb begin", f"  {name} = {rest.strip()};"]
+            body.extend(
+                f"  if ({condition.strip()}) {name} = {true_value.strip()};"
+                for condition, true_value in reversed(pairs)
+            )
+            body.append("end")
+            return "\n".join(body)
+        if " | " not in expression:
+            return match.group(0)
+        # The rewrite is valid only for scalar enables.  Wide data buses use
+        # the same textual OR operator but cannot be assigned 1'b1.
+        if re.search(r"\b(?:logic|wire)\s+" + re.escape(name) + r"\s*;", source) is None:
+            return match.group(0)
+        terms = expression.split(" | ")
+        if not all(term.strip() for term in terms):
+            return match.group(0)
+        body = ["always_comb begin", f"  {name} = 1'b0;"]
+        body.extend(f"  if ({term.strip()}) {name} = 1'b1;" for term in terms)
+        body.append("end")
+        return "\n".join(body)
+
+    return pattern.sub(replace, source)
 
 
 def main() -> None:
@@ -132,6 +188,7 @@ def main() -> None:
         # them before introducing statement boundaries.
         lexical_sv = re.sub(r"/\*.*?\*/", "", sv, flags=re.DOTALL)
         lexical_sv = re.sub(r"//[^\n]*", "", lexical_sv)
+        lexical_sv = _normalize_large_or_assignments(lexical_sv)
         normalized_sv.write_text(
             lexical_sv.replace(";", ";\n").replace(" | ", " |\n"),
             encoding="utf-8",
@@ -139,7 +196,7 @@ def main() -> None:
         tb = _fixture(sv, args.image.read_bytes(), json.loads(args.manifest.read_text()), json.loads(args.reference.read_text()), root)
         binary = root / "obj_dir" / "Vtb"
         if args.simulator == "verilator":
-            subprocess.run([args.verilator, "--binary", "--timing", "--Wno-fatal", "--top-module", "tb", str(normalized_sv), str(tb), "-Mdir", str(root / "obj_dir")], check=True)
+            subprocess.run([args.verilator, "--binary", "--timing", "--Wno-fatal", "-j", "4", "--top-module", "tb", str(normalized_sv), str(tb), "-Mdir", str(root / "obj_dir")], check=True)
             output = subprocess.check_output([str(binary)], text=True)
         else:
             binary = root / "tb.vvp"

@@ -53,6 +53,16 @@ blocker. The next intervention is structural partitioning or a different
 backend emission strategy, not another simulator choice or a P&R run on an
 unverified implementation.
 
+## Simulation-front-end normalization
+
+The fixture now applies a simulation-only normalization to the generated SV:
+large scalar OR trees and wide FSM priority-ternary chains are emitted as
+equivalent procedural assignments. Wide data-bus assignments are explicitly
+excluded from the scalar rewrite. This removes the immediate Verilator parser
+OOM, but the resulting model still requires a very large C++ compilation and
+has not yet produced a runtime equivalence result. The normalization must not
+be used as the synthesis/P&R artifact.
+
 ## CIRCT control-compilation probe
 
 The pinned CIRCT pass `--calyx-remove-groups-fsm` was tested on the actual
