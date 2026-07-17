@@ -112,11 +112,15 @@ fi
 
 set +e
 ulimit -s unlimited
+calyx_nested_args=()
+if [[ "${CALYX_EMIT_NESTED:-1}" == "1" ]]; then
+  calyx_nested_args+=(--nested)
+fi
 "$calyx_bin" "$output_dir/model.futil" \
   -l "$calyx_lib" \
   -b verilog \
   --synthesis \
-  --nested \
+  "${calyx_nested_args[@]}" \
   -d papercut \
   -o "$output_dir/sv/main.sv" >"$tmp_calyx_log" 2>&1
 rc=$?
