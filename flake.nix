@@ -799,11 +799,22 @@
             pre="$out/pre-calyx.mlir"
             ${mlir}/bin/mlir-opt "$input" \
               --load-pass-plugin=${llm2fpgaTorchMlirPasses}/lib/LLM2FPGAMLIRPasses.so \
-              --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-polynomial-exp-for-calyx,llm2fpga-lower-constant-fpowi-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
+              --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-polynomial-exp-for-calyx,llm2fpga-lower-constant-fpowi-for-calyx,llm2fpga-lower-rational-tanh-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
               -o "$pre"
             ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
               ${circt}/bin/circt-opt "$pre" "$out/calyx"
             cp "$out/calyx/manifest.json" "$out/manifest.json"
+          '';
+        rcPolynomialExpSv = pkgs.runCommand
+          "tinystories-w8a8-rc-polynomial-exp-calyx-native-sv" {
+            nativeBuildInputs = [ circt calyx python pkgs.bash ];
+          } ''
+            set -euo pipefail
+            export CALYX_NORMALIZE_FOR_EXPORT=${pipelineScripts}/normalize_calyx_for_export.py
+            export CALYX_NORMALIZE_FUTIL_CONSTANTS=${pipelineScripts}/normalize_futil_float_constants.py
+            ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
+              ${circt}/bin/circt-translate ${calyx}/bin/calyx \
+              ${calyx}/share/calyx ${rcPolynomialExpCalyx}/calyx "$out"
           '';
         activePipelineVariantsJson =
           pkgs.writeText "active-pipeline-variants.json" (builtins.toJSON {
@@ -2297,6 +2308,7 @@
             calyxI1UiToFpLegalizationSelftest;
           "active-pipeline-variants" = activePipelineVariantsJson;
           "tinystories-w8a8-rc-polynomial-exp-calyx" = rcPolynomialExpCalyx;
+          "tinystories-w8a8-rc-polynomial-exp-sv" = rcPolynomialExpSv;
           "tinystories-w8a8-pt2e-graph-shape-audit" =
             tinystoriesW8A8Pt2eGraphShapeAudit;
           "tinystories-w8a8-rc-study" = quantizedRepresentativeCoreStudy;

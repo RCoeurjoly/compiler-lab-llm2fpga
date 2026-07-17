@@ -7,7 +7,9 @@ import sys
 from pathlib import Path
 
 
-FLOAT_CONST = re.compile(r"std_float_const\(0,\s*32,\s*([+-]?[0-9.]+)\)")
+FLOAT_CONST = re.compile(
+    r"std_float_const\(0,\s*32,\s*([+-]?(?:[0-9.]+|inf|nan))\)"
+)
 
 
 def main() -> int:
