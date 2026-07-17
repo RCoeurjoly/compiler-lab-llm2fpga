@@ -38,6 +38,26 @@ No candidate has yet passed the LLM2FPGA equivalence gate. In particular, this
 experiment does not compare six final logits or token IDs, does not lower a
 candidate through MLIR/CIRCT, and makes no SV/resource claim.
 
+## Full frozen-model smoke gate
+
+The probe was extended to intercept Softmax inside the unchanged exported
+program, continue the original model execution, and compare the final output
+tensor against an untouched baseline execution. For all four deterministic
+contexts, all four candidates produced identical final tensors, including the
+six output codes at the final position:
+
+| Candidate | Full output tensor equality on 4 contexts |
+|---|---|
+| Streaming exact | pass |
+| LUT-256 | pass |
+| Polynomial-5 | pass |
+| CORDIC-12 stand-in | pass |
+
+This is a smoke equivalence result only. It is not exhaustive `6^8` coverage,
+and it does not establish that the LUT, polynomial, or CORDIC candidate is
+semantically valid for the full RC domain. The candidate implementation also
+runs in PyTorch; no generated RTL participates in this gate.
+
 ## Reproducibility
 
 - Probe: [`run_rc_softmax_candidates.py`](../../scripts/pipeline/run_rc_softmax_candidates.py)
