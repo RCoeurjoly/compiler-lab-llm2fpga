@@ -53,6 +53,22 @@ blocker. The next intervention is structural partitioning or a different
 backend emission strategy, not another simulator choice or a P&R run on an
 unverified implementation.
 
+## CIRCT HW/SV route
+
+The repository's standard `calyx_to_hw_sv_no_handshake.sh` route was also
+applied to the same RC Calyx MLIR. Its upstream-style preflight rejected the
+input before SV generation:
+
+```
+calyx.seq_mem blocks direct Calyx-HW lowering
+calyx.instance blocks direct Calyx-HW lowering
+calyx.invoke blocks direct Calyx-HW lowering
+```
+
+This is a precise backend boundary. The route requires memory lowering or an
+external-memory ABI, plus structuralizing/inlining component instances and
+invokes. It is not an equivalence result and does not justify running P&R.
+
 ## No-synthesis Calyx experiment
 
 The pinned Calyx command also supports omitting `--synthesis`, so the

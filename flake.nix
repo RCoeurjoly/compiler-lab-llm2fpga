@@ -841,6 +841,15 @@
               ${circt}/bin/circt-translate ${calyx}/bin/calyx \
               ${calyx}/share/calyx ${rcPolynomialExpCalyx}/calyx "$out"
           '';
+        rcPolynomialExpHwSv = pkgs.runCommand
+          "tinystories-w8a8-rc-polynomial-exp-calyx-hw-sv" {
+            nativeBuildInputs = [ circt python pkgs.bash ];
+          } ''
+            set -euo pipefail
+            export CIRCT_PASS_PLUGIN=${llm2fpgaCirctPasses}/lib/LLM2FPGACIRCTPasses.so
+            ${pkgs.bash}/bin/bash ${calyxToHwSvNoHandshake} \
+              ${circt}/bin/circt-opt ${rcPolynomialExpCalyx}/calyx "$out"
+          '';
         activePipelineVariantsJson =
           pkgs.writeText "active-pipeline-variants.json" (builtins.toJSON {
             schemaVersion = 1;
@@ -2336,6 +2345,7 @@
           "tinystories-w8a8-rc-polynomial-exp-sv" = rcPolynomialExpSv;
           "tinystories-w8a8-rc-polynomial-exp-sv-flat" = rcPolynomialExpSvFlat;
           "tinystories-w8a8-rc-polynomial-exp-sv-no-synthesis" = rcPolynomialExpSvNoSynthesis;
+          "tinystories-w8a8-rc-polynomial-exp-calyx-hw-sv" = rcPolynomialExpHwSv;
           "tinystories-w8a8-pt2e-graph-shape-audit" =
             tinystoriesW8A8Pt2eGraphShapeAudit;
           "tinystories-w8a8-rc-study" = quantizedRepresentativeCoreStudy;
