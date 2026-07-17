@@ -131,12 +131,29 @@ def compare_full_model(module: Any, contexts: list[list[int]], candidate_name: s
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--exported-program-dir", type=Path, required=True)
-    parser.add_argument("--contexts", type=Path, required=True, help="JSON array of token contexts")
+    parser.add_argument("--contexts", type=Path, help="JSON array of token contexts")
+    parser.add_argument("--context-count", type=int, help="lexical base-six contexts from zero")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
     candidate = _candidate_module()
-    contexts = json.loads(args.contexts.read_text(encoding="utf-8"))
+    if args.contexts is None and args.context_count is None:
+        raise ValueError("provide --contexts or --context-count")
+    if args.contexts is not None and args.context_count is not None:
+        raise ValueError("provide only one context source")
+    if args.context_count is not None:
+        if not 1 <= args.context_count <= 6**8:
+            raise ValueError("context-count must be in [1, 6^8]")
+        contexts = []
+        for index in range(args.context_count):
+            digits = [0] * 8
+            remaining = index
+            for position in range(7, -1, -1):
+                digits[position] = remaining % 6
+                remaining //= 6
+            contexts.append(digits)
+    else:
+        contexts = json.loads(args.contexts.read_text(encoding="utf-8"))
     if not isinstance(contexts, list) or not all(isinstance(row, list) for row in contexts):
         raise ValueError("contexts must be a JSON array of arrays")
     rows = observe_rows(load_module(args.exported_program_dir), contexts)

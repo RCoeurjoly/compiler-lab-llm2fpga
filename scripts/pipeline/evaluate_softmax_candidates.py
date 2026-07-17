@@ -92,7 +92,11 @@ def candidates() -> tuple[Candidate, ...]:
 
 def evaluate(rows: Sequence[Vector]) -> dict[str, object]:
     reference = [softmax(row, exact_exp) for row in rows]
-    output: dict[str, object] = {"row_count": len(rows), "row_widths": sorted({len(row) for row in rows}), "candidates": {}}
+    flat = [float(value) for row in rows for value in row]
+    output: dict[str, object] = {"row_count": len(rows), "row_widths": sorted({len(row) for row in rows}),
+                                 "input_min": min(flat) if flat else None,
+                                 "input_max": max(flat) if flat else None,
+                                 "distinct_input_values": len(set(flat)), "candidates": {}}
     for candidate in candidates():
         values = [streaming_softmax(row, candidate.exp_fn) for row in rows]
         errors = [abs(a - b) for expected, observed in zip(reference, values) for a, b in zip(expected, observed)]
