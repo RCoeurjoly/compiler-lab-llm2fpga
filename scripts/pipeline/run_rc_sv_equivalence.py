@@ -90,13 +90,13 @@ def _fixture(sv: str, image: bytes, manifest: dict, reference: dict, root: Path)
             f"  for (int i=0; i<8; i++) mem25[i] = 0;\n"
             + "  " + " ".join(f"mem25[{i}] = 64'sd{v};" for i, v in enumerate(tokens)) + "\n"
             + "  reset = 1; repeat (3) @(posedge clk); reset = 0; go = 1; @(posedge clk); go = 0;\n"
-            + "  fork begin wait(done); end begin repeat (100000) @(posedge clk); $display(\"TIMEOUT " + case["case_id"] + "\"); $finish; end join_any disable fork; repeat (2) @(posedge clk);\n"
+            + "  timeout_counter = 0; while (!done && timeout_counter < 100000) begin @(posedge clk); timeout_counter = timeout_counter + 1; end if (!done) begin $display(\"TIMEOUT " + case["case_id"] + "\"); $finish; end repeat (2) @(posedge clk);\n"
             + f'  $display("RESULT {case["case_id"]} %0d %0d %0d %0d %0d %0d", '
             + ", ".join(f"$signed(mem26[{i}])" for i in range(6))
             + ");\n"
             + "end"
         )
-    text = "`timescale 1ns/1ps\nmodule tb;\n" + "\n".join(declarations) + "\n"
+    text = "`timescale 1ns/1ps\nmodule tb;\ninteger timeout_counter;\n" + "\n".join(declarations) + "\n"
     text += "logic clk=0, reset=0, go=0; wire done; always #5 clk=~clk;\n"
     text += "always_ff @(posedge clk) begin\n"
     for n in ports:
@@ -196,7 +196,7 @@ def main() -> None:
         tb = _fixture(sv, args.image.read_bytes(), json.loads(args.manifest.read_text()), json.loads(args.reference.read_text()), root)
         binary = root / "obj_dir" / "Vtb"
         if args.simulator == "verilator":
-            subprocess.run([args.verilator, "--binary", "--timing", "--Wno-fatal", "-j", "4", "--top-module", "tb", str(normalized_sv), str(tb), "-Mdir", str(root / "obj_dir")], check=True)
+            subprocess.run([args.verilator, "--binary", "--timing", "--Wno-fatal", "-O0", "-j", "4", "--top-module", "tb", str(normalized_sv), str(tb), "-Mdir", str(root / "obj_dir")], check=True)
             output = subprocess.check_output([str(binary)], text=True)
         else:
             binary = root / "tb.vvp"

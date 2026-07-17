@@ -63,6 +63,11 @@ OOM, but the resulting model still requires a very large C++ compilation and
 has not yet produced a runtime equivalence result. The normalization must not
 be used as the synthesis/P&R artifact.
 
+Verilator `-O0 -j4` was also tried. It passes front-end processing and reaches
+C++ compilation of the generated `main_1` and primitive modules, but does not
+complete within a bounded several-minute run. This is a compilation-scale
+frontier, not a numerical equivalence result.
+
 ## CIRCT control-compilation probe
 
 The pinned CIRCT pass `--calyx-remove-groups-fsm` was tested on the actual
