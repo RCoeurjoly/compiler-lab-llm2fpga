@@ -734,6 +734,60 @@ struct LowerScoutMathForCalyxPass
     }
   }
 };
+
+struct LowerPolynomialExpForCalyxPass
+    : public PassWrapper<LowerPolynomialExpForCalyxPass,
+                         OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerPolynomialExpForCalyxPass)
+
+  StringRef getArgument() const final {
+    return "llm2fpga-lower-polynomial-exp-for-calyx";
+  }
+  StringRef getDescription() const final {
+    return "Replace f32 math.exp with a documented fifth-order Taylor candidate.";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<arith::ArithDialect, math::MathDialect>();
+  }
+
+  void runOnOperation() final {
+    SmallVector<math::ExpOp> ops;
+    getOperation().walk([&](math::ExpOp op) {
+      if (op.getResult().getType().isF32())
+        ops.push_back(op);
+    });
+    IRRewriter rewriter(getOperation().getContext());
+    for (math::ExpOp op : ops) {
+      rewriter.setInsertionPoint(op);
+      Location loc = op.getLoc();
+      Value x = op.getOperand();
+      auto type = rewriter.getF32Type();
+      auto constant = [&](double value) -> Value {
+        return arith::ConstantOp::create(
+            rewriter, loc, type, rewriter.getFloatAttr(type, value));
+      };
+      Value x2 = arith::MulFOp::create(rewriter, loc, x, x);
+      Value x3 = arith::MulFOp::create(rewriter, loc, x2, x);
+      Value x4 = arith::MulFOp::create(rewriter, loc, x3, x);
+      Value x5 = arith::MulFOp::create(rewriter, loc, x4, x);
+      Value result = arith::AddFOp::create(rewriter, loc, constant(1.0), x);
+      result = arith::AddFOp::create(
+          rewriter, loc, result,
+          arith::MulFOp::create(rewriter, loc, x2, constant(0.5)));
+      result = arith::AddFOp::create(
+          rewriter, loc, result,
+          arith::MulFOp::create(rewriter, loc, x3, constant(1.0 / 6.0)));
+      result = arith::AddFOp::create(
+          rewriter, loc, result,
+          arith::MulFOp::create(rewriter, loc, x4, constant(1.0 / 24.0)));
+      result = arith::AddFOp::create(
+          rewriter, loc, result,
+          arith::MulFOp::create(rewriter, loc, x5, constant(1.0 / 120.0)));
+      rewriter.replaceOp(op, result);
+    }
+  }
+};
 } // namespace
 
 MLIR_DECLARE_EXPLICIT_TYPE_ID(FoldConstantTruncFOpsPass)
@@ -750,6 +804,8 @@ MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerI1UIToFPForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerI1UIToFPForCalyxPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerScoutMathForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerScoutMathForCalyxPass)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerPolynomialExpForCalyxPass)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerPolynomialExpForCalyxPass)
 
 extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo mlirGetPassPluginInfo() {
   return {MLIR_PLUGIN_API_VERSION, "LLM2FPGAMLIRPasses", LLVM_VERSION_STRING,
@@ -761,6 +817,7 @@ extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo mlirGetPassPluginInfo() {
             PassRegistration<LowerExactMathForCalyxPass>();
             PassRegistration<LowerI1UIToFPForCalyxPass>();
             PassRegistration<LowerScoutMathForCalyxPass>();
+            PassRegistration<LowerPolynomialExpForCalyxPass>();
             registerLegalizePt2eTosaZeroPointPass();
           }};
 }

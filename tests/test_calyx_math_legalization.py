@@ -33,6 +33,17 @@ class CalyxMathLegalizationTest(unittest.TestCase):
         self.assertIn("math::TanhOp", source)
         self.assertIn("resource scout", source.lower())
 
+    def test_polynomial_exp_candidate_is_registered_but_not_canonical(self) -> None:
+        pipeline = (ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
+        source = (
+            ROOT / "tools" / "mlir-passes" / "FoldConstantTruncFOps.cpp"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("llm2fpga-lower-polynomial-exp-for-calyx", source)
+        self.assertIn("PassRegistration<LowerPolynomialExpForCalyxPass>", source)
+        self.assertIn("fifth-order Taylor candidate", source)
+        self.assertNotIn("llm2fpga-lower-polynomial-exp-for-calyx", pipeline)
+
 
 if __name__ == "__main__":
     unittest.main()
