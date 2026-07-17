@@ -177,6 +177,8 @@ def main() -> None:
     parser.add_argument("--vvp", default="vvp")
     parser.add_argument("--simulator", choices=("verilator", "iverilog"), default="verilator")
     parser.add_argument("--verilator-jobs", type=int, default=4)
+    parser.add_argument("--verilator-output-split", type=int, default=5000)
+    parser.add_argument("--verilator-output-split-cfuncs", type=int, default=2000)
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="rc-sv-equiv-") as directory:
         root = Path(directory)
@@ -197,7 +199,13 @@ def main() -> None:
         tb = _fixture(sv, args.image.read_bytes(), json.loads(args.manifest.read_text()), json.loads(args.reference.read_text()), root)
         binary = root / "obj_dir" / "Vtb"
         if args.simulator == "verilator":
-            subprocess.run([args.verilator, "--binary", "--timing", "--Wno-fatal", "-O0", "-j", str(args.verilator_jobs), "--top-module", "tb", str(normalized_sv), str(tb), "-Mdir", str(root / "obj_dir")], check=True)
+            subprocess.run([
+                args.verilator, "--binary", "--timing", "--Wno-fatal", "-O0",
+                "--output-split", str(args.verilator_output_split),
+                "--output-split-cfuncs", str(args.verilator_output_split_cfuncs),
+                "-j", str(args.verilator_jobs), "--top-module", "tb",
+                str(normalized_sv), str(tb), "-Mdir", str(root / "obj_dir")
+            ], check=True)
             output = subprocess.check_output([str(binary)], text=True)
         else:
             binary = root / "tb.vvp"
