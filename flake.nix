@@ -761,6 +761,34 @@
               --out-dir "$out"
             test -s "$out/report.json"
           '';
+        rcSoftmaxExpDomainPilot = pkgs.runCommand
+          "tinystories-w8a8-rc-softmax-exp-domain-pilot" {
+            nativeBuildInputs = [ pythonWithTinyStoriesTorchAO pkgs.bash pkgs.jq ];
+          } ''
+            set -euo pipefail
+            mkdir -p "$out"
+            export PYTHONPATH=${./.}:''${PYTHONPATH:-}
+            export_path=${pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-pytorch-exported"}
+            ${pythonWithTinyStoriesTorchAO}/bin/python ${./scripts/pipeline/characterize_rc_softmax_exp_domain.py} inspect --exported-program-dir "$export_path" > "$out/inspection.json"
+            ${pythonWithTinyStoriesTorchAO}/bin/python ${./scripts/pipeline/characterize_rc_softmax_exp_domain.py} characterize --exported-program-dir "$export_path" --start 0 --stop 4 --out "$out/first.json"
+            ${pythonWithTinyStoriesTorchAO}/bin/python ${./scripts/pipeline/characterize_rc_softmax_exp_domain.py} characterize --exported-program-dir "$export_path" --start 0 --stop 4 --out "$out/repeat.json"
+            jq -S 'del(.metrics)' "$out/first.json" > "$out/first.semantic.json"
+            jq -S 'del(.metrics)' "$out/repeat.json" > "$out/repeat.semantic.json"
+            cmp "$out/first.semantic.json" "$out/repeat.semantic.json"
+            echo '{"semantic_determinism":true}' > "$out/semantic-determinism.json"
+          '';
+        rcSoftmaxExpDomainExhaustive = pkgs.runCommand
+          "tinystories-w8a8-rc-softmax-exp-domain-exhaustive" {
+            nativeBuildInputs = [ pythonWithTinyStoriesTorchAO pkgs.bash ];
+          } ''
+            set -euo pipefail
+            mkdir -p "$out"
+            export PYTHONPATH=${./.}:''${PYTHONPATH:-}
+            export_path=${pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-pytorch-exported"}
+            ${pythonWithTinyStoriesTorchAO}/bin/python ${./scripts/pipeline/characterize_rc_softmax_exp_domain.py} characterize --exported-program-dir "$export_path" --start 0 --stop 1679616 --out "$out/full.shard.json"
+            ${pythonWithTinyStoriesTorchAO}/bin/python ${./scripts/pipeline/characterize_rc_softmax_exp_domain.py} merge --shard "$out/full.shard.json" --out "$out/summary.json"
+            test "$(jq -r .coverage.complete "$out/summary.json")" = true
+          '';
         activePipelineVariantsJson =
           pkgs.writeText "active-pipeline-variants.json" (builtins.toJSON {
             schemaVersion = 1;
@@ -2262,6 +2290,10 @@
             quantizedRcNonlinearFrontier;
           "tinystories-w8a8-rc-calyx-hardfloat-bindings" =
             rcCalyxHardfloatBindings;
+          "tinystories-w8a8-rc-softmax-exp-domain-pilot" =
+            rcSoftmaxExpDomainPilot;
+          "tinystories-w8a8-rc-softmax-exp-domain-exhaustive" =
+            rcSoftmaxExpDomainExhaustive;
           "resource-baseline-yosys-stat-matrix" =
             resourceBaselineYosysStatMatrix;
           "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence" =
