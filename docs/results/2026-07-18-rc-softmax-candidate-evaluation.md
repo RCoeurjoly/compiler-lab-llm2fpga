@@ -69,6 +69,11 @@ The next gate is to feed a wider, measured frozen-RC row corpus into the
 candidates, then run the complete model oracle comparison before selecting a
 candidate for MLIR/CIRCT lowering.
 
+That gate was widened to the first 64 lexical base-six contexts. All four
+candidates again passed full output-tensor equality against the untouched
+exported-program baseline for every context. This strengthens the smoke result,
+but remains far short of exhaustive `6^8` coverage.
+
 ## Polynomial lowering probe
 
 The fifth-order polynomial form was also instantiated as ordinary MLIR
