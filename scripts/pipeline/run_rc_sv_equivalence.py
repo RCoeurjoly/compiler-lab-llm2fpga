@@ -117,6 +117,9 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--verilator", default="verilator")
+    parser.add_argument("--iverilog", default="iverilog")
+    parser.add_argument("--vvp", default="vvp")
+    parser.add_argument("--simulator", choices=("verilator", "iverilog"), default="verilator")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="rc-sv-equiv-") as directory:
         root = Path(directory)
@@ -135,8 +138,13 @@ def main() -> None:
         )
         tb = _fixture(sv, args.image.read_bytes(), json.loads(args.manifest.read_text()), json.loads(args.reference.read_text()), root)
         binary = root / "obj_dir" / "Vtb"
-        subprocess.run([args.verilator, "--binary", "--timing", "--Wno-fatal", "--top-module", "tb", str(normalized_sv), str(tb), "-Mdir", str(root / "obj_dir")], check=True)
-        output = subprocess.check_output([str(binary)], text=True)
+        if args.simulator == "verilator":
+            subprocess.run([args.verilator, "--binary", "--timing", "--Wno-fatal", "--top-module", "tb", str(normalized_sv), str(tb), "-Mdir", str(root / "obj_dir")], check=True)
+            output = subprocess.check_output([str(binary)], text=True)
+        else:
+            binary = root / "tb.vvp"
+            subprocess.run([args.iverilog, "-g2012", "-s", "tb", "-o", str(binary), str(normalized_sv), str(tb)], check=True)
+            output = subprocess.check_output([args.vvp, str(binary)], text=True)
         expected = {row["case_id"]: row["output_codes_i8"] for row in json.loads(args.reference.read_text())["results"]}
         observed = {}
         for line in output.splitlines():

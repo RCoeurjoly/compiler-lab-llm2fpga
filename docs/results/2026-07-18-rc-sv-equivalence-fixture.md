@@ -34,3 +34,8 @@ failure is a simulator/parser scalability blocker, not evidence of a numerical
 mismatch or a pass.  The next intervention is to obtain a partitioned or
 otherwise simulator-tractable SV artifact, while preserving the same memory
 image and `arg_mem_25`/`arg_mem_26` observable contract.
+
+Icarus Verilog 13 was also tried as an independent simulator. It reported a
+few compatibility diagnostics for the emitted SV and then independently failed
+with `memory exhausted` while elaborating the same monolithic FSM. Switching
+simulators alone therefore does not remove the blocker.
