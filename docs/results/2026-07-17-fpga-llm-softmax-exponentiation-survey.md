@@ -1,99 +1,129 @@
-# FPGA LLM Softmax and exponentiation survey
+# FPGA transformer/LLM Softmax and exponentiation survey
 
-## Scope and method
+## Scope
 
-This is a local full-text screen of the 49 PDFs currently downloaded by the
-`LLM-inference-on-FPGA-papers` archive. The archive catalog contains 50 paper
-records; one record (`2512.24713`) has no cached PDF filename. PDFs were
-converted with `pdftotext -layout` and searched for `softmax`, `exp`,
-`exponential`, LUT/table, polynomial, piecewise, and compiler/dataflow terms.
-This report records implementation evidence, not claims inferred from an
-abstract or title.
+This revision covers the expanded local archive: 443 downloaded PDFs from 448
+catalogued arXiv records. The archive now uses a broad LLM/FPGA query plus
+RTL, compiler, operator, and transformer/FPGA supplementary queries. The
+search preserves query provenance but does not classify papers into mutually
+exclusive sets.
 
-StreamTensor is not among the current 50 catalog records, so it is not part of
-this local survey. Its compiler-specific treatment must be added separately.
+Each PDF was converted with `pdftotext -layout` and scanned for Softmax and
+related numerical/dataflow concepts. The counts below are document counts;
+they are a discovery screen, not proof that every hit implements the concept.
 
-## Main result
+| Concept | PDFs mentioning it |
+|---|---:|
+| Softmax | 134 |
+| `exp`, exponential, or exponentiation | 125 |
+| LUT or lookup table | 258 |
+| Polynomial or Taylor | 118 |
+| Piecewise approximation | 15 |
+| Range reduction | 1 |
+| Reciprocal/inverse/rsqrt | 127 |
+| Normalization/LayerNorm/RMSNorm | 168 |
+| GELU/SiLU/SwiGLU | 85 |
+| Online Softmax | 7 |
+| FlashAttention | 20 |
+| Compiler/MLIR/PyTorch/HLS/RTL/dataflow/fusion terms | 354 |
+| Approximation/fixed-point/integer/mixed precision | 344 |
 
-The papers do not generally lower a generic floating-point `math.exp` through
-an ML compiler into FPGA RTL. They use one of four strategies:
+The broad scan found 210 PDFs mentioning Softmax or exponentiation. Detailed
+manual extraction should focus on those papers, while the remaining papers
+remain part of the archive and can reveal compiler or numerical precedents that
+do not use the exact keyword.
 
-1. Treat Softmax as a dedicated accelerator subsystem.
-2. Use online/streaming Softmax to fuse max, exponent accumulation, and the
-   weighted-value computation.
-3. Replace exponentiation with a LUT, piecewise-linear approximation,
-   polynomial, or range-reduced approximation.
-4. Keep the special-function unit in a higher-precision format while
-   quantizing the surrounding matrix operations.
+## What the literature does with Softmax and `exp`
 
-This is consistent with our CIRCT result: `math.exp` is not an ordinary
-HardFloat arithmetic primitive. Hardware projects provide a special-purpose
-implementation or reformulate the operation before hardware generation.
+The consistent pattern is that FPGA designs do not pass a generic floating
+`math.exp` through a compiler backend and expect ordinary arithmetic lowering.
+They expose Softmax as a compound operation and use one or more of:
 
-## Evidence table
+- online/streaming max and exponential accumulation;
+- LUT or table-based exponentials;
+- piecewise-linear approximations;
+- polynomial/Taylor approximations;
+- range reduction before lookup or polynomial evaluation;
+- reciprocal/division units for the final normalization;
+- mixed-precision special-function units;
+- CPU/GPU delegation when the FPGA path does not support the operation.
 
-| Paper | FPGA/compiler relevance | Softmax/exponentiation treatment | Trust implication |
-|---|---|---|---|
-| FlightLLM (`2401.03868`) | Complete FPGA mapping flow; U280 | Stores small single-access Softmax, SiLU, and GELU lookup tables in DDR; large data such as weights/KV cache uses HBM | Explicit LUT subsystem and memory placement; not generic `exp` lowering |
-| HLSTransform (`2405.00738`) | HLS transformer implementation | Cites piecewise-linear approximations for nonlinear functions; the paper’s main flow does not establish a generic exact `exp` primitive | Approximation is an established accelerator choice, but its error contract must be measured |
-| DB-Attn / BFP nonlinear acceleration (`2502.00026`) | FPGA/ASIC-oriented nonlinear-operation engine | Dynamic Hierarchical LUT (DH-LUT) uses shared exponents and a two-dimensional LUT for exponential values in Softmax | Strong direct precedent for exponent approximation plus explicit numerical analysis |
-| LoopLynx (`2504.09561`) | Dataflow FPGA architecture | Identifies Softmax’s global sum dependency as a pipeline obstacle; addresses scheduling/dataflow rather than presenting a generic exponent primitive | The reduction dependency is as important as the exponential arithmetic |
-| TeLLMe (`2504.16266`) | Edge FPGA accelerator | Uses a special-function unit and table-oriented hardware around attention; Softmax is handled as part of a fused attention design | Special-function hardware is kept explicit in the architecture |
-| AccLLM (`2505.03745`) | U280 FPGA co-design | Uses a dedicated nonlinear processing engine for `exp(S')` and fuses attention stages around Softmax | Quantization does not eliminate the need for an exponentiation strategy |
-| Hummingbird (`2507.03308`) | Embedded FPGA LLM accelerator | Uses online Softmax, fusing maximum search and exponential accumulation in one pass | Streaming reformulation reduces buffering and latency, but still requires an exp implementation |
-| TENET (`2509.13765`) | LUT-centric ternary FPGA/ASIC design | Main LUT contribution targets ternary matmul; Softmax remains a separate attention/normalization concern | Do not confuse matmul LUTs with an exponentiation solution |
-| TeLLMe v2 (`2510.15926`) | End-to-end ternary edge FPGA accelerator | Uses a special-function unit; reverse attention adds exponential operations and consumes additional DSP resources | An explicit cost remains even when matmul is ternary |
-| LUT-LLM (`2511.06174`) | Memory-based FPGA LLM accelerator | LUTs target vector-quantized matmul and dequantization; Softmax is not shown as solved by the same LUT mechanism | Operator-specific LUTs are not automatically interchangeable |
-| PD-Swap (`2512.11550`) | FPGA prefill/decode reconfiguration | Uses online Softmax/FlashAttention-style blocking and fusion | Streaming/blocking changes the dataflow contract, not necessarily the numeric primitive |
-| Hardware acceleration survey (`2512.23914`) | Broad hardware survey | Identifies Softmax as a nonlinear operation that does not map naturally to many crossbar/matmul datapaths | Supports treating Softmax as a distinct hardware concern |
-| FAST-Prefill (`2602.20515`) | U280 sparse-attention accelerator | Uses LUT-based exponential approximation followed by running sum and reciprocal, explicitly avoiding floating-point Softmax units | Direct FPGA precedent for replacing float Softmax with bounded LUT hardware |
-| SkipOPU (`2603.14785`) | FPGA overlay with dynamic computation | Reformulates Softmax reductions using FlashAttention-style incremental max and exponential-sum updates; fuses them with adjacent linear work | Strong dataflow precedent; exact exp implementation still remains a design choice |
-| Design Conductor 2.0 / VerTQ (`2605.05170`) | Automated hardware-generation pipeline | Builds a specialized exponentiation unit for online Softmax; a lower-degree polynomial had excessive error and was replaced by a fifth-order Taylor/Horner implementation | Especially relevant compiler-generation precedent: approximation was validated and repaired against numerical error |
+The important decomposition is:
 
-## Compiler-pipeline interpretation
+```text
+scores → row maximum → stabilized scores → exp approximation
+       → sum/reduction → reciprocal or division → weighted values
+```
 
-The closest lessons for LLM2FPGA are not that a particular paper provides a
-drop-in MLIR pass. They are architectural:
+This is directly relevant to LLM2FPGA: CIRCT rejecting `math.exp` is not an
+unusual isolated compiler failure. The architecture needs a recognized
+Softmax lowering or an explicit special-function implementation.
 
-- The compiler should recognize Softmax as a compound pattern, not leave an
-  isolated generic `math.exp` operation for a backend that has no exponent
-  primitive.
-- A practical lowering target is an explicit Softmax subsystem containing
-  row-max reduction, stabilized exponentiation, sum reduction, reciprocal or
-  division, and the final weighting operation.
-- Online Softmax/FlashAttention-style recurrence is valuable because it
-  changes the intermediate-storage and dependency problem, even if the
-  exponent approximation is unchanged.
-- LUT, piecewise, and polynomial implementations are semantic replacements.
-  They must be compared against the frozen PT2E W8A8 PyTorch oracle at the
-  observable output boundary. Literature precedent makes the strategy
-  defensible; it does not prove our implementation correct.
-- The papers provide no basis for claiming that PT2E W8A8 alone makes
-  Softmax integer. Most retain a special-function path, mixed precision, or
-  an explicit approximation.
+## Strongest direct precedents
 
-## Consequence for the current blocker
+| Paper | Evidence | Relevance to LLM2FPGA |
+|---|---|---|
+| DB-Attn / Pushing the Limits of BFP (`2502.00026`) | Dynamic Hierarchical LUT (DH-LUT) uses shared exponents and lookup structures for Softmax exponentials | Direct precedent for a bounded, quantized exponent implementation |
+| CORDIC Is All You Need (`2503.11685`) | Uses CORDIC-style arithmetic for nonlinear functions | Standard hardware algorithm family worth testing against LUT/polynomial candidates |
+| LoopLynx (`2504.09561`) | Treats the global Softmax sum as a dataflow/pipeline dependency | Shows that reduction scheduling is a first-class issue, not just `exp` arithmetic |
+| AccLLM (`2505.03745`) | Dedicated nonlinear processing engine and fused attention stages | Supports explicit special-function hardware around quantized matmuls |
+| Hummingbird (`2507.03308`) | Online Softmax fuses maximum search and exponential accumulation | Strong streaming/dataflow precedent |
+| FAST-Prefill (`2602.20515`) | LUT-based exponential approximation plus running sum and reciprocal; avoids floating Softmax units | Very close to the desired hardware-looking route |
+| SkipOPU (`2603.14785`) | FlashAttention-style incremental max/exponential-sum updates fused with linear work | Shows how to hide reduction latency and reduce intermediate storage |
+| Design Conductor 2.0 / VerTQ (`2605.05170`) | Generated a polynomial exponent unit; a low-degree polynomial failed numerically and was replaced by fifth-order Taylor/Horner evaluation | Direct precedent for approximation validation and correction in an automated hardware pipeline |
+| QUARK (`2511.06767`) | Circuit sharing for repeated nonlinear transformer patterns | Relevant to resource reduction when multiple Softmax/nonlinear sites share hardware |
+| TATAA (`2411.03697`) | Programmable mixed-precision transformer arithmetic | Relevant to keeping special functions at a different precision from W8A8 matmuls |
+| DFX (`2209.10797`) | Transformer text-generation FPGA appliance with Softmax and nonlinear pipeline concerns | System-level precedent for treating Softmax as a distinct pipeline stage |
 
-The most defensible next candidate is not arbitrary textual replacement of
-`math.exp`. It is a documented Softmax pattern lowering with:
+Additional earlier evidence remains relevant: FlightLLM stores Softmax/SiLU/GELU
+tables as small single-access data in DDR; TeLLMe and TeLLMe v2 use explicit
+special-function structures; PD-Swap uses online/block attention; and the
+hardware surveys identify Softmax and normalization as operations that do not
+map naturally onto matmul-centric datapaths.
 
-1. the frozen PT2E graph as numerical oracle;
-2. stabilized inputs `x - rowmax(x)`;
-3. a clearly specified approximation family (LUT, piecewise-linear, or
-   polynomial);
-4. a bounded input domain and error measurement;
-5. PyTorch-versus-generated-SV comparison of logits and selected token;
-6. resource measurement after the complete RC lowers.
+## Compiler-pipeline evidence: StreamTensor
 
-The local evidence most directly supports two initial experiments: the
-LUT-based exponential route used by FAST-Prefill/DB-Attn, and the polynomial
-route illustrated by VerTQ. Neither should be integrated into the canonical
-pipeline until the observable equivalence gate passes.
+StreamTensor (`2509.13694`) is now included in the expanded archive. Its full
+text describes a compiler framework that constructs stream-based dataflow
+accelerators, uses an iterative tensor type system, performs kernel fusion,
+buffer allocation, and memory optimization, and applies MLIR Linalg passes to
+the intermediate representation.
+
+The paper is highly relevant to compiler architecture, but the PDF does not
+provide a direct `math.exp`/Softmax lowering recipe comparable to DH-LUT,
+FAST-Prefill, or VerTQ. Its lesson for LLM2FPGA is therefore structural:
+compiler IR and dataflow transformations can solve streaming, fusion, and
+buffer problems, but they do not remove the need for a numerical implementation
+of exponentiation.
+
+## Trust and equivalence implications
+
+Literature precedent makes LUT, polynomial, CORDIC, and online-Softmax routes
+defensible engineering choices. It does not prove that any candidate is
+equivalent to our frozen PT2E W8A8 model.
+
+For LLM2FPGA, each candidate must specify:
+
+1. stabilized input domain;
+2. numerical format and saturation behavior;
+3. approximation error versus the PyTorch PT2E oracle;
+4. effect on all logits and selected token ID;
+5. resource and latency cost after complete lowering.
+
+The most conservative next experiments are therefore:
+
+1. a standard LUT/range-bounded exponential candidate;
+2. a polynomial or CORDIC candidate;
+3. online Softmax/dataflow restructuring;
+4. PyTorch-versus-SV output comparison before accepting any route.
+
+No candidate should be silently substituted into the canonical PT2E graph.
 
 ## Limits
 
-The current archive does not contain StreamTensor. The survey therefore does
-not yet answer how StreamTensor’s compiler specifically represents or lowers
-Softmax. Also, papers that mention Softmax but delegate it to a CPU, GPU, or
-pre-existing library are counted as context, not as direct FPGA exponentiation
-precedents.
+The keyword counts include papers outside LLM inference, including vision
+transformers, generic FPGA neural-network work, surveys, and unrelated uses of
+“exponential.” They are intentionally recall-oriented. The next refinement is
+manual evidence extraction for the 134 Softmax papers, with separate fields for
+exact arithmetic, approximation family, input domain, error metric, and whether
+the implementation is compiler-generated or hand-designed.
