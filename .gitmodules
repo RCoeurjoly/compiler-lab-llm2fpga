@@ -1,0 +1,3 @@
+[submodule "LLM-inference-on-FPGA-papers"]
+	path = LLM-inference-on-FPGA-papers
+	url = git@github.com:RCoeurjoly/LLM-inference-on-FPGA-papers.git
