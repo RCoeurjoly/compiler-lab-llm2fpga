@@ -44,6 +44,16 @@ class CalyxMathLegalizationTest(unittest.TestCase):
         self.assertIn("fifth-order Taylor candidate", source)
         self.assertNotIn("llm2fpga-lower-polynomial-exp-for-calyx", pipeline)
 
+    def test_constant_fpowi_candidate_is_explicitly_opt_in(self) -> None:
+        pipeline = (ROOT / "flake.nix").read_text(encoding="utf-8")
+        source = (
+            ROOT / "tools" / "mlir-passes" / "FoldConstantTruncFOps.cpp"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("llm2fpga-lower-constant-fpowi-for-calyx", pipeline)
+        self.assertIn("PassRegistration<LowerConstantFPowIForCalyxPass>", source)
+        self.assertIn("math::FPowIOp", source)
+
 
 if __name__ == "__main__":
     unittest.main()

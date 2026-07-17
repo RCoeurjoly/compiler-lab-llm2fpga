@@ -789,6 +789,22 @@
             ${pythonWithTinyStoriesTorchAO}/bin/python ${./scripts/pipeline/characterize_rc_softmax_exp_domain.py} merge --shard "$out/full.shard.json" --out "$out/summary.json"
             test "$(jq -r .coverage.complete "$out/summary.json")" = true
           '';
+        rcPolynomialExpCalyx = pkgs.runCommand
+          "tinystories-w8a8-rc-polynomial-exp-calyx" {
+            nativeBuildInputs = [ mlir circt python pkgs.bash ];
+          } ''
+            set -euo pipefail
+            mkdir -p "$out"
+            input=${pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-flat-scf"}/flat.scf.mlir
+            pre="$out/pre-calyx.mlir"
+            ${mlir}/bin/mlir-opt "$input" \
+              --load-pass-plugin=${llm2fpgaTorchMlirPasses}/lib/LLM2FPGAMLIRPasses.so \
+              --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-polynomial-exp-for-calyx,llm2fpga-lower-constant-fpowi-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
+              -o "$pre"
+            ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
+              ${circt}/bin/circt-opt "$pre" "$out/calyx"
+            cp "$out/calyx/manifest.json" "$out/manifest.json"
+          '';
         activePipelineVariantsJson =
           pkgs.writeText "active-pipeline-variants.json" (builtins.toJSON {
             schemaVersion = 1;
@@ -2280,6 +2296,7 @@
           "calyx-i1-uitofp-legalization-selftest" =
             calyxI1UiToFpLegalizationSelftest;
           "active-pipeline-variants" = activePipelineVariantsJson;
+          "tinystories-w8a8-rc-polynomial-exp-calyx" = rcPolynomialExpCalyx;
           "tinystories-w8a8-pt2e-graph-shape-audit" =
             tinystoriesW8A8Pt2eGraphShapeAudit;
           "tinystories-w8a8-rc-study" = quantizedRepresentativeCoreStudy;

@@ -788,6 +788,54 @@ struct LowerPolynomialExpForCalyxPass
     }
   }
 };
+
+struct LowerConstantFPowIForCalyxPass
+    : public PassWrapper<LowerConstantFPowIForCalyxPass,
+                         OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerConstantFPowIForCalyxPass)
+
+  StringRef getArgument() const final {
+    return "llm2fpga-lower-constant-fpowi-for-calyx";
+  }
+  StringRef getDescription() const final {
+    return "Replace constant-exponent f32 math.fpowi with multiplications.";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<arith::ArithDialect, math::MathDialect>();
+  }
+
+  void runOnOperation() final {
+    SmallVector<math::FPowIOp> ops;
+    getOperation().walk([&](math::FPowIOp op) {
+      if (op.getResult().getType().isF32())
+        ops.push_back(op);
+    });
+    IRRewriter rewriter(getOperation().getContext());
+    for (math::FPowIOp op : ops) {
+      auto constant =
+          op.getOperand(1).getDefiningOp<arith::ConstantIntOp>();
+      if (!constant)
+        continue;
+      int64_t power = constant.value();
+      if (power < 0 || power > 3)
+        continue;
+      rewriter.setInsertionPoint(op);
+      Value base = op.getOperand(0);
+      Value result = base;
+      if (power == 0) {
+        auto type = rewriter.getF32Type();
+        result = arith::ConstantOp::create(
+            rewriter, op.getLoc(), type, rewriter.getFloatAttr(type, 1.0));
+      } else if (power >= 2) {
+        result = arith::MulFOp::create(rewriter, op.getLoc(), base, base);
+        if (power == 3)
+          result = arith::MulFOp::create(rewriter, op.getLoc(), result, base);
+      }
+      rewriter.replaceOp(op, result);
+    }
+  }
+};
 } // namespace
 
 MLIR_DECLARE_EXPLICIT_TYPE_ID(FoldConstantTruncFOpsPass)
@@ -806,6 +854,8 @@ MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerScoutMathForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerScoutMathForCalyxPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerPolynomialExpForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerPolynomialExpForCalyxPass)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerConstantFPowIForCalyxPass)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerConstantFPowIForCalyxPass)
 
 extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo mlirGetPassPluginInfo() {
   return {MLIR_PLUGIN_API_VERSION, "LLM2FPGAMLIRPasses", LLVM_VERSION_STRING,
@@ -818,6 +868,7 @@ extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo mlirGetPassPluginInfo() {
             PassRegistration<LowerI1UIToFPForCalyxPass>();
             PassRegistration<LowerScoutMathForCalyxPass>();
             PassRegistration<LowerPolynomialExpForCalyxPass>();
+            PassRegistration<LowerConstantFPowIForCalyxPass>();
             registerLegalizePt2eTosaZeroPointPass();
           }};
 }
