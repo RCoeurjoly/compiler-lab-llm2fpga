@@ -177,8 +177,8 @@ def main() -> None:
     parser.add_argument("--vvp", default="vvp")
     parser.add_argument("--simulator", choices=("verilator", "iverilog"), default="verilator")
     parser.add_argument("--verilator-jobs", type=int, default=4)
-    parser.add_argument("--verilator-output-split", type=int, default=1000)
-    parser.add_argument("--verilator-output-split-cfuncs", type=int, default=500)
+    parser.add_argument("--verilator-output-split", type=int, default=100)
+    parser.add_argument("--verilator-output-split-cfuncs", type=int, default=50)
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="rc-sv-equiv-") as directory:
         root = Path(directory)
