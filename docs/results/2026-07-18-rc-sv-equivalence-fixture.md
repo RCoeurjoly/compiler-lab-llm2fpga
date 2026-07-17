@@ -39,3 +39,16 @@ Icarus Verilog 13 was also tried as an independent simulator. It reported a
 few compatibility diagnostics for the emitted SV and then independently failed
 with `memory exhausted` while elaborating the same monolithic FSM. Switching
 simulators alone therefore does not remove the blocker.
+
+## Non-nested Calyx experiment
+
+The repository now exposes `tinystories-w8a8-rc-polynomial-exp-sv-flat`, which
+uses the same Calyx artifact without Calyx's `--nested` flag. It completed and
+produced a valid SV artifact, but the result grew from 9,955,404 bytes to
+18,894,272 bytes and retained the same `main`/`main_1` interface split. The
+fixture then failed in Verilator with `memory exhausted` in the larger FSM.
+
+Consequently, `--nested` is not the cause of the simulation scalability
+blocker. The next intervention is structural partitioning or a different
+backend emission strategy, not another simulator choice or a P&R run on an
+unverified implementation.
