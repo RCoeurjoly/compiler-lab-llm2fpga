@@ -52,3 +52,12 @@ Consequently, `--nested` is not the cause of the simulation scalability
 blocker. The next intervention is structural partitioning or a different
 backend emission strategy, not another simulator choice or a P&R run on an
 unverified implementation.
+
+## No-synthesis Calyx experiment
+
+The pinned Calyx command also supports omitting `--synthesis`, so the
+repository exposes `tinystories-w8a8-rc-polynomial-exp-sv-no-synthesis`. The
+derivation reached the native Calyx backend but produced no artifact or
+incremental diagnostic output during a bounded several-minute run and was
+terminated. This is evidence that omitting synthesis is not currently a fast
+or usable equivalence route for this RC; it is not a success claim.

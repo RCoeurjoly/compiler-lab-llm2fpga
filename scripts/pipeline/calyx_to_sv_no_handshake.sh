@@ -116,10 +116,14 @@ calyx_nested_args=()
 if [[ "${CALYX_EMIT_NESTED:-1}" == "1" ]]; then
   calyx_nested_args+=(--nested)
 fi
+calyx_synthesis_args=()
+if [[ "${CALYX_SYNTHESIS:-1}" == "1" ]]; then
+  calyx_synthesis_args+=(--synthesis)
+fi
 "$calyx_bin" "$output_dir/model.futil" \
   -l "$calyx_lib" \
   -b verilog \
-  --synthesis \
+  "${calyx_synthesis_args[@]}" \
   "${calyx_nested_args[@]}" \
   -d papercut \
   -o "$output_dir/sv/main.sv" >"$tmp_calyx_log" 2>&1
