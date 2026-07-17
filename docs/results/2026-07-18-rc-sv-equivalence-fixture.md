@@ -53,6 +53,19 @@ blocker. The next intervention is structural partitioning or a different
 backend emission strategy, not another simulator choice or a P&R run on an
 unverified implementation.
 
+## CIRCT control-compilation probe
+
+The pinned CIRCT pass `--calyx-remove-groups-fsm` was tested on the actual
+`model.calyx.mlir`. It rejected the input because the control did not yet
+contain exactly one FSM. Prepending the standard `--calyx-compile-control`
+pass did not produce an artifact: `circt-opt` aborted with exit code 134 in
+`CompileControlVisitor::visit(circt::calyx::SeqOp)`. The captured stack trace
+identifies the assertion inside CIRCT's Calyx control compiler.
+
+This rules out the obvious standard pass ordering for the current RC and gives
+us a minimal upstream-relevant failure boundary: Calyx `seq` control from the
+Torch/SCF lowering is not accepted by the pinned CIRCT control compiler.
+
 ## CIRCT HW/SV route
 
 The repository's standard `calyx_to_hw_sv_no_handshake.sh` route was also
