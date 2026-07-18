@@ -44,7 +44,14 @@ def _hex_words(payload: bytes, width: int, depth: int) -> list[str]:
     ]
 
 
-def _fixture(sv: str, image: bytes, manifest: dict, reference: dict, root: Path) -> Path:
+def _fixture(
+    sv: str,
+    image: bytes,
+    manifest: dict,
+    reference: dict,
+    root: Path,
+    timeout_cycles: int = 1_000_000,
+) -> Path:
     ports = _ports(sv)
     if 25 not in ports or 26 not in ports:
         raise RuntimeError("SV does not expose token arg_mem_25 and output arg_mem_26")
@@ -90,7 +97,7 @@ def _fixture(sv: str, image: bytes, manifest: dict, reference: dict, root: Path)
             f"  for (int i=0; i<8; i++) mem25[i] = 0;\n"
             + "  " + " ".join(f"mem25[{i}] = 64'sd{v};" for i, v in enumerate(tokens)) + "\n"
             + "  reset = 1; repeat (3) @(posedge clk); reset = 0; go = 1; @(posedge clk); go = 0;\n"
-            + "  timeout_counter = 0; while (!done && timeout_counter < 100000) begin @(posedge clk); timeout_counter = timeout_counter + 1; end if (!done) begin $display(\"TIMEOUT " + case["case_id"] + "\"); $finish; end repeat (2) @(posedge clk);\n"
+            + f"  timeout_counter = 0; while (!done && timeout_counter < {timeout_cycles}) begin @(posedge clk); timeout_counter = timeout_counter + 1; end if (!done) begin $display(\"TIMEOUT {case['case_id']} %0d\", timeout_counter); $finish; end repeat (2) @(posedge clk);\n"
             + f'  $display("RESULT {case["case_id"]} %0d %0d %0d %0d %0d %0d", '
             + ", ".join(f"$signed(mem26[{i}])" for i in range(6))
             + ");\n"
@@ -179,6 +186,7 @@ def main() -> None:
     parser.add_argument("--verilator-jobs", type=int, default=4)
     parser.add_argument("--verilator-output-split", type=int, default=100)
     parser.add_argument("--verilator-output-split-cfuncs", type=int, default=50)
+    parser.add_argument("--timeout-cycles", type=int, default=1_000_000)
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="rc-sv-equiv-") as directory:
         root = Path(directory)
@@ -196,7 +204,14 @@ def main() -> None:
             lexical_sv.replace(";", ";\n").replace(" | ", " |\n"),
             encoding="utf-8",
         )
-        tb = _fixture(sv, args.image.read_bytes(), json.loads(args.manifest.read_text()), json.loads(args.reference.read_text()), root)
+        tb = _fixture(
+            sv,
+            args.image.read_bytes(),
+            json.loads(args.manifest.read_text()),
+            json.loads(args.reference.read_text()),
+            root,
+            args.timeout_cycles,
+        )
         binary = root / "obj_dir" / "Vtb"
         if args.simulator == "verilator":
             subprocess.run([
@@ -231,6 +246,7 @@ def main() -> None:
                 "observed": observed,
                 "expected_token_ids": expected_token_ids,
                 "observed_token_ids": observed_token_ids,
+                "simulator_output": output.splitlines(),
             }, sort_keys=True))
         print(json.dumps({
             "status": "pass",
