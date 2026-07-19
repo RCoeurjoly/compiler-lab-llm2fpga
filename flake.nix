@@ -818,7 +818,13 @@
           '';
         rcPolynomialExpSvEquivalenceBuild = pkgs.runCommand
           "tinystories-w8a8-rc-polynomial-exp-sv-verilator-build" {
-            nativeBuildInputs = [ python pkgs.bash pkgs.verilator ];
+            nativeBuildInputs = [
+              python
+              pkgs.bash
+              pkgs.verilator
+              pkgs.gnumake
+              pkgs.stdenv.cc
+            ];
           } ''
             set -euo pipefail
             ${python}/bin/python3 ${./scripts/pipeline/run_rc_sv_equivalence.py} \
