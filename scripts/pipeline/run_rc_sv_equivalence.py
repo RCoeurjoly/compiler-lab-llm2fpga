@@ -195,7 +195,13 @@ def main() -> None:
     parser.add_argument("--timeout-cycles", type=int, default=1_000_000)
     parser.add_argument("--work-dir", type=Path)
     parser.add_argument("--result-json", type=Path)
+    parser.add_argument("--compile-only", action="store_true")
+    parser.add_argument("--run-only", action="store_true")
     args = parser.parse_args()
+    if args.compile_only and args.run_only:
+        parser.error("--compile-only and --run-only are mutually exclusive")
+    if args.run_only and args.work_dir is None:
+        parser.error("--run-only requires --work-dir")
     if args.work_dir is None:
         work_context = tempfile.TemporaryDirectory(prefix="rc-sv-equiv-")
     else:
@@ -203,30 +209,29 @@ def main() -> None:
         work_context = contextlib.nullcontext(str(args.work_dir))
     with work_context as directory:
         root = Path(directory)
-        sv = args.sv.read_text(encoding="utf-8")
-        # CIRCT's native Calyx printer can emit a very large single line of
-        # Verilog.  This is lexically equivalent and keeps Verilator below its
-        # per-line token limit; it does not alter the generated RTL.
         normalized_sv = root / "main.sv"
-        # Comments are not part of the RTL and can contain semicolons; remove
-        # them before introducing statement boundaries.
-        lexical_sv = re.sub(r"/\*.*?\*/", "", sv, flags=re.DOTALL)
-        lexical_sv = re.sub(r"//[^\n]*", "", lexical_sv)
-        lexical_sv = _normalize_large_or_assignments(lexical_sv)
-        normalized_sv.write_text(
-            lexical_sv.replace(";", ";\n").replace(" | ", " |\n"),
-            encoding="utf-8",
-        )
-        tb = _fixture(
-            sv,
-            args.image.read_bytes(),
-            json.loads(args.manifest.read_text()),
-            json.loads(args.reference.read_text()),
-            root,
-            args.timeout_cycles,
-        )
+        tb = root / "tb.sv"
+        if not args.run_only:
+            sv = args.sv.read_text(encoding="utf-8")
+            # CIRCT's native Calyx printer can emit a very large single line
+            # of Verilog. This is a simulation-only lexical normalization.
+            lexical_sv = re.sub(r"/\*.*?\*/", "", sv, flags=re.DOTALL)
+            lexical_sv = re.sub(r"//[^\n]*", "", lexical_sv)
+            lexical_sv = _normalize_large_or_assignments(lexical_sv)
+            normalized_sv.write_text(
+                lexical_sv.replace(";", ";\n").replace(" | ", " |\n"),
+                encoding="utf-8",
+            )
+            tb = _fixture(
+                sv,
+                args.image.read_bytes(),
+                json.loads(args.manifest.read_text()),
+                json.loads(args.reference.read_text()),
+                root,
+                args.timeout_cycles,
+            )
         binary = root / "obj_dir" / "Vtb"
-        if args.simulator == "verilator":
+        if args.simulator == "verilator" and not args.run_only:
             subprocess.run([
                 args.verilator, "--binary", "--timing", "--Wno-fatal", "-O0",
                 "--output-split", str(args.verilator_output_split),
@@ -235,11 +240,13 @@ def main() -> None:
                 "-j", str(args.verilator_jobs), "--top-module", "tb",
                 str(normalized_sv), str(tb), "-Mdir", str(root / "obj_dir")
             ], check=True)
-            output = subprocess.check_output([str(binary)], text=True)
-        else:
+        elif args.simulator == "iverilog" and not args.run_only:
             binary = root / "tb.vvp"
             subprocess.run([args.iverilog, "-g2012", "-s", "tb", "-o", str(binary), str(normalized_sv), str(tb)], check=True)
-            output = subprocess.check_output([args.vvp, str(binary)], text=True)
+        if args.compile_only:
+            print(json.dumps({"status": "compiled", "binary": str(binary)}, sort_keys=True))
+            return
+        output = subprocess.check_output([str(binary)], text=True) if args.simulator == "verilator" else subprocess.check_output([args.vvp, str(binary)], text=True)
         expected_rows = json.loads(args.reference.read_text())["results"]
         expected = {row["case_id"]: row["output_codes_i8"] for row in expected_rows}
         expected_token_ids = {row["case_id"]: row["token_id"] for row in expected_rows}

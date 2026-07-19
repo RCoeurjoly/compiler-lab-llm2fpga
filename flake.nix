@@ -816,6 +816,20 @@
               ${circt}/bin/circt-translate ${calyx}/bin/calyx \
               ${calyx}/share/calyx ${rcPolynomialExpCalyx}/calyx "$out"
           '';
+        rcPolynomialExpSvEquivalenceBuild = pkgs.runCommand
+          "tinystories-w8a8-rc-polynomial-exp-sv-verilator-build" {
+            nativeBuildInputs = [ python pkgs.bash pkgs.verilator ];
+          } ''
+            set -euo pipefail
+            ${python}/bin/python3 ${./scripts/pipeline/run_rc_sv_equivalence.py} \
+              --sv ${rcPolynomialExpSv}/sv/main.sv \
+              --image ${rcWorkingSystem.referenceImage}/rc-image.bin \
+              --manifest ${rcWorkingSystem.referenceImage}/rc-image-manifest.json \
+              --reference ${rcWorkingSystem.referenceImage}/reference.json \
+              --verilator ${pkgs.verilator}/bin/verilator \
+              --work-dir "$out/verilator-work" \
+              --compile-only
+          '';
         rcPolynomialExpSvEquivalence = pkgs.runCommand
           "tinystories-w8a8-rc-polynomial-exp-sv-equivalence" {
             nativeBuildInputs = [ python pkgs.bash pkgs.verilator ];
@@ -827,7 +841,8 @@
               --manifest ${rcWorkingSystem.referenceImage}/rc-image-manifest.json \
               --reference ${rcWorkingSystem.referenceImage}/reference.json \
               --verilator ${pkgs.verilator}/bin/verilator \
-              --work-dir "$out/verilator-work" \
+              --work-dir ${rcPolynomialExpSvEquivalenceBuild}/verilator-work \
+              --run-only \
               --result-json "$out/equivalence.json"
             test -s "$out/equivalence.json"
           '';
@@ -2358,6 +2373,8 @@
           "active-pipeline-variants" = activePipelineVariantsJson;
           "tinystories-w8a8-rc-polynomial-exp-calyx" = rcPolynomialExpCalyx;
           "tinystories-w8a8-rc-polynomial-exp-sv" = rcPolynomialExpSv;
+          "tinystories-w8a8-rc-polynomial-exp-sv-verilator-build" =
+            rcPolynomialExpSvEquivalenceBuild;
           "tinystories-w8a8-rc-polynomial-exp-sv-equivalence" =
             rcPolynomialExpSvEquivalence;
           "tinystories-w8a8-rc-polynomial-exp-sv-flat" = rcPolynomialExpSvFlat;
