@@ -84,6 +84,7 @@ def _fixture(
             f".arg_mem_{number}_read_data(a{number}_rdata), .arg_mem_{number}_done(a{number}_done),",
         ]
         initialization.append(f"for (int i=0; i<{depth}; i++) mem{number}[i] = '0;")
+    memory_enable_terms = " | ".join(f"a{number}_en" for number in sorted(ports))
     for number in range(21):
         initialization.append(f'$readmemh("{root / f"mem{number}.hex"}", mem{number});')
 
@@ -97,14 +98,14 @@ def _fixture(
             f"  for (int i=0; i<8; i++) mem25[i] = 0;\n"
             + "  " + " ".join(f"mem25[{i}] = 64'sd{v};" for i, v in enumerate(tokens)) + "\n"
             + "  reset = 1; repeat (3) @(posedge clk); reset = 0; go = 1; @(posedge clk); go = 0;\n"
-            + f"  timeout_counter = 0; while (!done && timeout_counter < {timeout_cycles}) begin @(posedge clk); timeout_counter = timeout_counter + 1; end if (!done) begin $display(\"TIMEOUT {case['case_id']} %0d\", timeout_counter); $finish; end repeat (2) @(posedge clk);\n"
+            + f"  request_count = 0; completion_count = 0; timeout_counter = 0; while (!done && timeout_counter < {timeout_cycles}) begin @(posedge clk); timeout_counter = timeout_counter + 1; if ((timeout_counter % 100000) == 0) $display(\"HEARTBEAT {case['case_id']} cycles=%0d mem_en=%b done=%b requests=%0d completions=%0d\", timeout_counter, any_mem_en, done, request_count, completion_count); end if (!done) begin $display(\"TIMEOUT {case['case_id']} %0d\", timeout_counter); $finish; end repeat (2) @(posedge clk);\n"
             + f'  $display("RESULT {case["case_id"]} %0d %0d %0d %0d %0d %0d", '
             + ", ".join(f"$signed(mem26[{i}])" for i in range(6))
             + ");\n"
             + "end"
         )
     text = "`timescale 1ns/1ps\nmodule tb;\ninteger timeout_counter;\n" + "\n".join(declarations) + "\n"
-    text += "logic clk=0, reset=0, go=0; wire done; always #5 clk=~clk;\n"
+    text += "logic clk=0, reset=0, go=0; wire done; integer request_count=0, completion_count=0; wire any_mem_en = " + memory_enable_terms + "; always #5 clk=~clk;\n"
     text += "always_ff @(posedge clk) begin\n"
     for n in ports:
         text += f"  if (reset) begin a{n}_done <= 1'b0; a{n}_rdata <= '0; end\n"
@@ -112,6 +113,10 @@ def _fixture(
         text += f" if (!a{n}_we) a{n}_rdata <= mem{n}[a{n}_addr];"
         text += f" else mem{n}[a{n}_addr] <= a{n}_wdata; end\n"
         text += f"  else a{n}_done <= 1'b0;\n"
+    text += "end\n"
+    text += "always_ff @(posedge clk) begin\n"
+    text += "  if (reset) begin request_count <= 0; completion_count <= 0; end\n"
+    text += "  else begin if (any_mem_en) request_count <= request_count + 1; if (done) completion_count <= completion_count + 1; end\n"
     text += "end\n"
     connections[-1] = connections[-1].rstrip(",")
     text += "main_1 dut(.clk(clk), .reset(reset), .go(go), .done(done),\n" + "\n".join(connections) + ");\n"
