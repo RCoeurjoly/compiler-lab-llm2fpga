@@ -10,6 +10,7 @@ case.  It deliberately fails if the expected functional ports are absent.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import re
@@ -192,8 +193,15 @@ def main() -> None:
     parser.add_argument("--verilator-output-split", type=int, default=100)
     parser.add_argument("--verilator-output-split-cfuncs", type=int, default=50)
     parser.add_argument("--timeout-cycles", type=int, default=1_000_000)
+    parser.add_argument("--work-dir", type=Path)
+    parser.add_argument("--result-json", type=Path)
     args = parser.parse_args()
-    with tempfile.TemporaryDirectory(prefix="rc-sv-equiv-") as directory:
+    if args.work_dir is None:
+        work_context = tempfile.TemporaryDirectory(prefix="rc-sv-equiv-")
+    else:
+        args.work_dir.mkdir(parents=True, exist_ok=True)
+        work_context = contextlib.nullcontext(str(args.work_dir))
+    with work_context as directory:
         root = Path(directory)
         sv = args.sv.read_text(encoding="utf-8")
         # CIRCT's native Calyx printer can emit a very large single line of
@@ -253,12 +261,17 @@ def main() -> None:
                 "observed_token_ids": observed_token_ids,
                 "simulator_output": output.splitlines(),
             }, sort_keys=True))
-        print(json.dumps({
+        result = {
             "status": "pass",
             "cases": len(expected),
             "logits": 6,
             "token_ids": observed_token_ids,
-        }, sort_keys=True))
+        }
+        rendered = json.dumps(result, sort_keys=True)
+        print(rendered)
+        if args.result_json is not None:
+            args.result_json.parent.mkdir(parents=True, exist_ok=True)
+            args.result_json.write_text(rendered + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

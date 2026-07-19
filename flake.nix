@@ -816,6 +816,21 @@
               ${circt}/bin/circt-translate ${calyx}/bin/calyx \
               ${calyx}/share/calyx ${rcPolynomialExpCalyx}/calyx "$out"
           '';
+        rcPolynomialExpSvEquivalence = pkgs.runCommand
+          "tinystories-w8a8-rc-polynomial-exp-sv-equivalence" {
+            nativeBuildInputs = [ python pkgs.bash pkgs.verilator ];
+          } ''
+            set -euo pipefail
+            ${python}/bin/python3 ${./scripts/pipeline/run_rc_sv_equivalence.py} \
+              --sv ${rcPolynomialExpSv}/sv/main.sv \
+              --image ${rcWorkingSystem.referenceImage}/rc-image.bin \
+              --manifest ${rcWorkingSystem.referenceImage}/rc-image-manifest.json \
+              --reference ${rcWorkingSystem.referenceImage}/reference.json \
+              --verilator ${pkgs.verilator}/bin/verilator \
+              --work-dir "$out/verilator-work" \
+              --result-json "$out/equivalence.json"
+            test -s "$out/equivalence.json"
+          '';
         rcPolynomialExpSvFlat = pkgs.runCommand
           "tinystories-w8a8-rc-polynomial-exp-calyx-native-sv-flat" {
             nativeBuildInputs = [ circt calyx python pkgs.bash ];
@@ -2343,6 +2358,8 @@
           "active-pipeline-variants" = activePipelineVariantsJson;
           "tinystories-w8a8-rc-polynomial-exp-calyx" = rcPolynomialExpCalyx;
           "tinystories-w8a8-rc-polynomial-exp-sv" = rcPolynomialExpSv;
+          "tinystories-w8a8-rc-polynomial-exp-sv-equivalence" =
+            rcPolynomialExpSvEquivalence;
           "tinystories-w8a8-rc-polynomial-exp-sv-flat" = rcPolynomialExpSvFlat;
           "tinystories-w8a8-rc-polynomial-exp-sv-no-synthesis" = rcPolynomialExpSvNoSynthesis;
           "tinystories-w8a8-rc-polynomial-exp-calyx-hw-sv" = rcPolynomialExpHwSv;
