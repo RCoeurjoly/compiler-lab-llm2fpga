@@ -52,6 +52,7 @@ def _fixture(
     reference: dict,
     root: Path,
     timeout_cycles: int = 1_000_000,
+    heartbeat_cycles: int = 100_000,
 ) -> Path:
     ports = _ports(sv)
     if 25 not in ports or 26 not in ports:
@@ -99,7 +100,7 @@ def _fixture(
             f"  for (int i=0; i<8; i++) mem25[i] = 0;\n"
             + "  " + " ".join(f"mem25[{i}] = 64'sd{v};" for i, v in enumerate(tokens)) + "\n"
             + "  reset = 1; repeat (3) @(posedge clk); reset = 0; go = 1; @(posedge clk); go = 0;\n"
-            + f"  request_count = 0; completion_count = 0; timeout_counter = 0; while (!done && timeout_counter < {timeout_cycles}) begin @(posedge clk); timeout_counter = timeout_counter + 1; if ((timeout_counter % 100000) == 0) $display(\"HEARTBEAT {case['case_id']} cycles=%0d mem_en=%b done=%b requests=%0d completions=%0d\", timeout_counter, any_mem_en, done, request_count, completion_count); end if (!done) begin $display(\"TIMEOUT {case['case_id']} %0d\", timeout_counter); $finish; end repeat (2) @(posedge clk);\n"
+            + f"  request_count = 0; completion_count = 0; timeout_counter = 0; while (!done && timeout_counter < {timeout_cycles}) begin @(posedge clk); timeout_counter = timeout_counter + 1; if ((timeout_counter % {heartbeat_cycles}) == 0) $display(\"HEARTBEAT {case['case_id']} cycles=%0d mem_en=%b done=%b requests=%0d completions=%0d\", timeout_counter, any_mem_en, done, request_count, completion_count); end if (!done) begin $display(\"TIMEOUT {case['case_id']} %0d\", timeout_counter); $finish; end repeat (2) @(posedge clk);\n"
             + f'  $display("RESULT {case["case_id"]} %0d %0d %0d %0d %0d %0d", '
             + ", ".join(f"$signed(mem26[{i}])" for i in range(6))
             + ");\n"
@@ -193,6 +194,7 @@ def main() -> None:
     parser.add_argument("--verilator-output-split", type=int, default=100)
     parser.add_argument("--verilator-output-split-cfuncs", type=int, default=50)
     parser.add_argument("--timeout-cycles", type=int, default=1_000_000)
+    parser.add_argument("--heartbeat-cycles", type=int, default=100_000)
     parser.add_argument("--work-dir", type=Path)
     parser.add_argument("--result-json", type=Path)
     parser.add_argument("--compile-only", action="store_true")
@@ -229,6 +231,7 @@ def main() -> None:
                 json.loads(args.reference.read_text()),
                 root,
                 args.timeout_cycles,
+                args.heartbeat_cycles,
             )
         binary = root / "obj_dir" / "Vtb"
         if args.simulator == "verilator" and not args.run_only:

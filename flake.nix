@@ -833,6 +833,7 @@
               --manifest ${rcWorkingSystem.referenceImage}/rc-image-manifest.json \
               --reference ${rcWorkingSystem.referenceImage}/reference.json \
               --verilator ${pkgs.verilator}/bin/verilator \
+              --heartbeat-cycles 1000 \
               --work-dir "$out/verilator-work" \
               --compile-only
           '';
