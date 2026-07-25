@@ -19,7 +19,10 @@ pkgs.runCommand "tinystories-w8a8-rc-frozen-sv-heartbeat-build" {
     --manifest ${image}/rc-image-manifest.json \
     --reference ${image}/reference.json \
     --verilator ${pkgs.verilator}/bin/verilator \
-    --heartbeat-cycles 1000 \
+    --verilator-output-split 10000 \
+    --verilator-output-split-cfuncs 10000 \
+    --verilator-jobs 8 \
+    --heartbeat-cycles 1 \
     --work-dir "$out/verilator-work" \
     --compile-only
 ''
