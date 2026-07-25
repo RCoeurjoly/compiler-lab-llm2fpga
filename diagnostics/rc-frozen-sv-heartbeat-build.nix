@@ -24,5 +24,6 @@ pkgs.runCommand "tinystories-w8a8-rc-frozen-sv-heartbeat-build" {
     --verilator-jobs 8 \
     --heartbeat-cycles 1 \
     --work-dir "$out/verilator-work" \
+    --timing-json "$out/compile-timing.json" \
     --compile-only
 ''

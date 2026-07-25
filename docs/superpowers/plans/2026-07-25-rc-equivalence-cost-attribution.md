@@ -17,7 +17,8 @@ Demonstrate exact PyTorch-versus-SV equivalence for the frozen V=6 PT2E W8A8 rep
 
 - [x] Inspect the existing generated SV: module counts, line/byte sizes, HardFloat usage, FSM/control structure, memory ports, and wide expressions.
 - [x] Build a Nix baseline profile for the exact existing SV, fixture, image, and pinned Verilator.
-- [ ] Measure SV normalization, Verilator translation, C++ compilation, peak memory, simulator startup, cycles/second, first memory request, first output, and terminal `done`.
+- [x] Measure SV normalization, Verilator translation, C++ compilation, simulator startup, and cycles/second on a bounded runtime probe.
+- [ ] Measure peak memory, first output, and terminal `done` on a completing query.
 - [ ] Inspect Verilator C++ partitions and identify the largest/slowest translation units and symbols.
 - [ ] Run the one-query smoke gate using the cached binary.
 - [ ] Run the four-query full gate using the same cached binary.

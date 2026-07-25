@@ -16,6 +16,7 @@ import json
 import re
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -197,6 +198,7 @@ def main() -> None:
     parser.add_argument("--heartbeat-cycles", type=int, default=100_000)
     parser.add_argument("--work-dir", type=Path)
     parser.add_argument("--result-json", type=Path)
+    parser.add_argument("--timing-json", type=Path)
     parser.add_argument("--compile-only", action="store_true")
     parser.add_argument("--run-only", action="store_true")
     args = parser.parse_args()
@@ -211,9 +213,11 @@ def main() -> None:
         work_context = contextlib.nullcontext(str(args.work_dir))
     with work_context as directory:
         root = Path(directory)
+        timings = {}
         normalized_sv = root / "main.sv"
         tb = root / "tb.sv"
         if not args.run_only:
+            normalize_start = time.perf_counter()
             sv = args.sv.read_text(encoding="utf-8")
             # CIRCT's native Calyx printer can emit a very large single line
             # of Verilog. This is a simulation-only lexical normalization.
@@ -233,8 +237,10 @@ def main() -> None:
                 args.timeout_cycles,
                 args.heartbeat_cycles,
             )
+            timings["normalization_seconds"] = time.perf_counter() - normalize_start
         binary = root / "obj_dir" / "Vtb"
         if args.simulator == "verilator" and not args.run_only:
+            compile_start = time.perf_counter()
             subprocess.run([
                 args.verilator, "--binary", "--timing", "--Wno-fatal", "-O3",
                 "--output-split", str(args.verilator_output_split),
@@ -243,11 +249,16 @@ def main() -> None:
                 "-j", str(args.verilator_jobs), "--top-module", "tb",
                 str(normalized_sv), str(tb), "-Mdir", str(root / "obj_dir")
             ], check=True)
+            timings["verilator_compile_seconds"] = time.perf_counter() - compile_start
         elif args.simulator == "iverilog" and not args.run_only:
             binary = root / "tb.vvp"
             subprocess.run([args.iverilog, "-g2012", "-s", "tb", "-o", str(binary), str(normalized_sv), str(tb)], check=True)
         if args.compile_only:
-            print(json.dumps({"status": "compiled", "binary": str(binary)}, sort_keys=True))
+            result = {"status": "compiled", "binary": str(binary), "timings": timings}
+            print(json.dumps(result, sort_keys=True))
+            if args.timing_json is not None:
+                args.timing_json.parent.mkdir(parents=True, exist_ok=True)
+                args.timing_json.write_text(json.dumps(result, sort_keys=True) + "\n", encoding="utf-8")
             return
         output = subprocess.check_output([str(binary)], text=True) if args.simulator == "verilator" else subprocess.check_output([args.vvp, str(binary)], text=True)
         expected_rows = json.loads(args.reference.read_text())["results"]
