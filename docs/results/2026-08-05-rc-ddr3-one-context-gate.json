@@ -1,0 +1,19 @@
+{
+  "schema": "rc-host-ddr3-one-context-gate-v1",
+  "status": "timeout",
+  "case_id": "ascending",
+  "simulator": "verilator-5.022",
+  "rtl": "/nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv",
+  "reference_image": "/nix/store/y6q3ghfzjy69hcqd1cnxwp3nf8sbk20l-tinystories-w8a8-rc-reference-image",
+  "memory_abi_sha256": "745309f9640d426c3ca262ba6708a01526896c1eea2784c63be6118755165012",
+  "timeout_cycles": 10000,
+  "expected_logits_i8": [-28, 127, 45, -12, -30, -3],
+  "expected_token_id": 1,
+  "observed_logits_i8": null,
+  "observed_token_id": null,
+  "simulator_output": [
+    "ABI_RECEIPT sha256=745309f9640d426c3ca262ba6708a01526896c1eea2784c63be6118755165012",
+    "TIMEOUT ascending 10000"
+  ],
+  "interpretation": "Generated polynomial-exp RC SV compiled successfully and ran, but produced no observable output within the bounded one-context run. This is a liveness/simulation-progress failure, not an equivalence pass."
+}
