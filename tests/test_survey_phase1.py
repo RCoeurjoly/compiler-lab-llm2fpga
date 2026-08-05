@@ -199,9 +199,9 @@ class DeduplicationTests(unittest.TestCase):
                 title="First title",
             ),
             self._canonical(
-                "2502.00002v1",
+                "journal-manuscript",
                 doi="https://doi.org/10.1000/same",
-                arxiv_id="2502.00002",
+                arxiv_id="2501.00001",
                 title="Journal title",
             ),
             self._canonical(
@@ -228,14 +228,18 @@ class DeduplicationTests(unittest.TestCase):
     def test_authoritative_identifier_precedes_exact_title(self) -> None:
         records = [
             self._canonical(
-                "2501.10001v1",
-                arxiv_id="2501.10001",
+                "authority-positive-a",
+                arxiv_id="",
+                abs_url="",
+                pdf_url="",
                 title="Different title one",
                 openalex_id="W123",
             ),
             self._canonical(
-                "2501.10002v1",
-                arxiv_id="2501.10002",
+                "authority-positive-b",
+                arxiv_id="",
+                abs_url="",
+                pdf_url="",
                 title="Different title two",
                 openalex_id="https://openalex.org/W123",
             ),
@@ -246,8 +250,20 @@ class DeduplicationTests(unittest.TestCase):
 
     def test_exact_normalized_titles_merge(self) -> None:
         records = [
-            self._canonical("2501.20001v1", arxiv_id="2501.20001", title="A Title: Here"),
-            self._canonical("2501.20002v1", arxiv_id="2501.20002", title="A title — here!"),
+            self._canonical(
+                "title-positive-a",
+                arxiv_id="",
+                abs_url="",
+                pdf_url="",
+                title="A Title: Here",
+            ),
+            self._canonical(
+                "title-positive-b",
+                arxiv_id="",
+                abs_url="",
+                pdf_url="",
+                title="A title — here!",
+            ),
         ]
         works, lineage = self.phase1.deduplicate(records)
         self.assertEqual(len(works), 1)
@@ -256,15 +272,19 @@ class DeduplicationTests(unittest.TestCase):
     def test_fuzzy_95_merge_records_similarity_author_and_year_evidence(self) -> None:
         records = [
             self._canonical(
-                "2501.30001v1",
-                arxiv_id="2501.30001",
+                "fuzzy95-positive-a",
+                arxiv_id="",
+                abs_url="",
+                pdf_url="",
                 title="Composable Accelerator Generation for Transformer Inference",
                 authors=["Ada Lovelace", "Grace Hopper"],
                 published_at="2024-01-01T00:00:00Z",
             ),
             self._canonical(
-                "2501.30002v1",
-                arxiv_id="2501.30002",
+                "fuzzy95-positive-b",
+                arxiv_id="",
+                abs_url="",
+                pdf_url="",
                 title="Composable Accelerator Generation for Transformers Inference",
                 authors=["Ada Lovelace", "Alan Turing"],
                 published_at="2025-01-01T00:00:00Z",
@@ -281,14 +301,18 @@ class DeduplicationTests(unittest.TestCase):
     def test_fuzzy_92_merge_requires_two_authors_and_distinctive_subtitle(self) -> None:
         records = [
             self._canonical(
-                "2501.31001v1",
-                arxiv_id="2501.31001",
+                "fuzzy92-positive-a",
+                arxiv_id="",
+                abs_url="",
+                pdf_url="",
                 title="Forge: A Reusable Architecture for Decoder Inference",
                 authors=["Ada Lovelace", "Grace Hopper"],
             ),
             self._canonical(
-                "2501.31002v1",
-                arxiv_id="2501.31002",
+                "fuzzy92-positive-b",
+                arxiv_id="",
+                abs_url="",
+                pdf_url="",
                 title="Forges: A Reusable Architecture for Decoder Inference",
                 authors=["Grace Hopper", "Ada Lovelace"],
             ),
@@ -328,7 +352,9 @@ class DeduplicationTests(unittest.TestCase):
         self.assertEqual(len({row["work_id"] for row in lineage}), 2)
         for row in lineage:
             evidence = json.loads(row["dedup_evidence_json"])
-            self.assertTrue(any(item["rule"] == "contradictory_identity" for item in evidence))
+            conflict = next(item for item in evidence if item["rule"] == "contradictory_identity")
+            self.assertEqual(conflict["attempted_rule"], "exact_doi")
+            self.assertEqual(conflict["alternative"], "manual_adjudication")
 
     def test_exact_arxiv_fails_closed_on_independent_identity_conflict(self) -> None:
         records = [
@@ -345,7 +371,7 @@ class DeduplicationTests(unittest.TestCase):
                 version=2,
                 doi="10.1000/second",
                 title="Unrelated Database Compiler",
-                authors=["Grace Hopper"],
+                authors=["Ada Lovelace"],
             ),
         ]
         works, lineage = self.phase1.deduplicate(records)
@@ -359,42 +385,232 @@ class DeduplicationTests(unittest.TestCase):
             self.assertEqual(conflict["attempted_rule"], "exact_arxiv")
             self.assertEqual(
                 set(conflict["conflicting_fields"]),
-                {"doi", "first_author", "title"},
+                {"doi", "title"},
             )
+
+    def test_authoritative_id_fails_closed_on_same_namespace_authority_conflict(self) -> None:
+        records = [
+            self._canonical(
+                "authority-record-a",
+                arxiv_id="",
+                abs_url="",
+                pdf_url="",
+                doi="",
+                openalex_id="W123",
+                semantic_scholar_id="S2-FIRST",
+                title="Shared System",
+                authors=["Ada Lovelace"],
+            ),
+            self._canonical(
+                "authority-record-b",
+                arxiv_id="",
+                abs_url="",
+                pdf_url="",
+                doi="",
+                openalex_id="https://openalex.org/W123",
+                semantic_scholar_id="S2-SECOND",
+                title="Shared System Extended",
+                authors=["Ada Lovelace"],
+            ),
+        ]
+        works, lineage = self.phase1.deduplicate(records)
+        self.assertEqual(len(works), 2)
+        for row in lineage:
+            conflict = next(
+                item
+                for item in json.loads(row["dedup_evidence_json"])
+                if item["rule"] == "contradictory_identity"
+            )
+            self.assertEqual(conflict["attempted_rule"], "exact_authoritative_id")
+            self.assertEqual(
+                conflict["conflicting_fields"],
+                ["authoritative_id:semantic_scholar"],
+            )
+
+    def test_every_identity_rule_veto_is_independent_of_author_relationship(self) -> None:
+        rules = (
+            "exact_doi",
+            "exact_arxiv",
+            "exact_authoritative_id",
+            "exact_title",
+            "fuzzy_title_95",
+            "fuzzy_title_92",
+        )
+        for rule in rules:
+            for same_author in (True, False):
+                with self.subTest(rule=rule, same_author=same_author):
+                    left = self._canonical(
+                        f"policy-{rule}-left-{same_author}",
+                        arxiv_id="",
+                        abs_url="",
+                        pdf_url="",
+                        openalex_id="W-LEFT",
+                        authors=["Ada Lovelace"],
+                    )
+                    right = self._canonical(
+                        f"policy-{rule}-right-{same_author}",
+                        arxiv_id="",
+                        abs_url="",
+                        pdf_url="",
+                        openalex_id="W-RIGHT",
+                        authors=["Ada Lovelace" if same_author else "Grace Hopper"],
+                    )
+                    conflict = self.phase1._pair_identity_conflict(left, right, rule)
+                    self.assertIsNotNone(conflict)
+                    assert conflict is not None
+                    self.assertEqual(
+                        conflict["authoritative_identifier_conflicts"],
+                        ["authoritative_id:openalex"],
+                    )
+                    self.assertEqual(conflict["same_first_author"], same_author)
+
+    def test_same_author_exact_title_fails_closed_on_doi_and_arxiv_conflicts(self) -> None:
+        records = [
+            self._canonical(
+                "2501.61201v1",
+                arxiv_id="2501.61201",
+                doi="10.1000/first",
+                title="Identical Accelerator Title",
+                authors=["Ada Lovelace"],
+            ),
+            self._canonical(
+                "2501.61202v1",
+                arxiv_id="2501.61202",
+                doi="10.1000/second",
+                title="Identical Accelerator Title",
+                authors=["Ada Lovelace"],
+            ),
+        ]
+        works, lineage = self.phase1.deduplicate(records)
+        self.assertEqual(len(works), 2)
+        for row in lineage:
+            conflict = next(
+                item
+                for item in json.loads(row["dedup_evidence_json"])
+                if item["rule"] == "contradictory_identity"
+            )
+            self.assertEqual(conflict["attempted_rule"], "exact_title")
+            self.assertEqual(set(conflict["conflicting_fields"]), {"doi", "arxiv_id"})
+
+    def test_fuzzy_95_same_author_fails_closed_on_authoritative_conflicts(self) -> None:
+        records = [
+            self._canonical(
+                "2501.61301v1",
+                arxiv_id="2501.61301",
+                doi="10.1000/first",
+                title="Composable Accelerator Generation for Transformer Inference",
+                authors=["Ada Lovelace"],
+                published_at="2024-01-01T00:00:00Z",
+            ),
+            self._canonical(
+                "2501.61302v1",
+                arxiv_id="2501.61302",
+                doi="10.1000/second",
+                title="Composable Accelerator Generation for Transformers Inference",
+                authors=["Ada Lovelace"],
+                published_at="2025-01-01T00:00:00Z",
+            ),
+        ]
+        works, lineage = self.phase1.deduplicate(records)
+        self.assertEqual(len(works), 2)
+        for row in lineage:
+            conflict = next(
+                item
+                for item in json.loads(row["dedup_evidence_json"])
+                if item["rule"] == "contradictory_identity"
+            )
+            self.assertEqual(conflict["attempted_rule"], "fuzzy_title_95")
+            self.assertGreaterEqual(conflict["similarity"], 95)
+
+    def test_fuzzy_92_same_author_fails_closed_on_authoritative_conflicts(self) -> None:
+        records = [
+            self._canonical(
+                "2501.61401v1",
+                arxiv_id="2501.61401",
+                doi="10.1000/first",
+                title="Forge: A Reusable Architecture for Decoder Inference",
+                authors=["Ada Lovelace", "Grace Hopper"],
+                published_at="2020-01-01T00:00:00Z",
+            ),
+            self._canonical(
+                "2501.61402v1",
+                arxiv_id="2501.61402",
+                doi="10.1000/second",
+                title="Forges: A Reusable Architecture for Decoder Inference",
+                authors=["Ada Lovelace", "Grace Hopper"],
+                published_at="2025-01-01T00:00:00Z",
+            ),
+        ]
+        works, lineage = self.phase1.deduplicate(records)
+        self.assertEqual(len(works), 2)
+        for row in lineage:
+            conflict = next(
+                item
+                for item in json.loads(row["dedup_evidence_json"])
+                if item["rule"] == "contradictory_identity"
+            )
+            self.assertEqual(conflict["attempted_rule"], "fuzzy_title_92")
+            self.assertGreaterEqual(conflict["similarity"], 92)
+
+    def test_legitimate_arxiv_versions_merge_when_identifiers_do_not_disagree(self) -> None:
+        records = [
+            self._canonical(
+                "2501.61501v1",
+                arxiv_id="2501.61501",
+                version=1,
+                doi="",
+                title="Initial Accelerator Design",
+                authors=["Ada Lovelace"],
+            ),
+            self._canonical(
+                "2501.61501v2",
+                arxiv_id="2501.61501",
+                version=2,
+                doi="10.1000/final",
+                title="Revised Accelerator Design",
+                authors=["Ada Lovelace"],
+            ),
+        ]
+        works, lineage = self.phase1.deduplicate(records)
+        self.assertEqual(len(works), 1)
+        self.assertIn("exact_arxiv", {row["dedup_rule"] for row in lineage})
 
     def test_transitive_union_checks_all_cross_component_identities(self) -> None:
         records = [
             self._canonical(
                 "2501.62001v1",
                 arxiv_id="2501.62001",
-                doi="10.1000/bridge",
-                title="Alpha Accelerator",
+                doi="10.1000/first",
+                title="Bridge Accelerator",
                 authors=["Ada Lovelace"],
             ),
             self._canonical(
-                "2501.62002v1",
-                arxiv_id="2501.62002",
-                doi="10.1000/bridge",
-                title="",
-                abstract="",
-                authors=[],
+                "bridge-manuscript",
+                arxiv_id="",
+                abs_url="",
+                pdf_url="",
+                doi="",
+                openalex_id="W-BRIDGE",
+                title="Bridge Accelerator",
+                authors=["Ada Lovelace"],
             ),
             self._canonical(
                 "2501.62002v2",
                 arxiv_id="2501.62002",
                 version=2,
-                doi="10.1000/other",
+                doi="10.1000/second",
+                openalex_id="W-BRIDGE",
                 title="Unrelated Database Compiler",
-                authors=["Grace Hopper"],
+                authors=["Ada Lovelace"],
             ),
         ]
         works, lineage = self.phase1.deduplicate(records)
         self.assertEqual(len(works), 2)
-        self.assertEqual(lineage[0]["work_id"], lineage[1]["work_id"])
-        self.assertNotEqual(lineage[1]["work_id"], lineage[2]["work_id"])
+        self.assertNotEqual(lineage[0]["work_id"], lineage[1]["work_id"])
+        self.assertEqual(lineage[1]["work_id"], lineage[2]["work_id"])
         bridge_evidence = json.loads(lineage[1]["dedup_evidence_json"])
         conflict = next(item for item in bridge_evidence if item["rule"] == "contradictory_identity")
-        self.assertEqual(conflict["attempted_rule"], "exact_arxiv")
+        self.assertEqual(conflict["attempted_rule"], "exact_title")
         self.assertTrue(conflict["component_level"])
         self.assertEqual(len(conflict["conflicting_record_pairs"]), 1)
 

@@ -394,19 +394,30 @@ def _pair_identity_conflict(
         conflicting_fields.append("first_author")
     conflicting_fields = identifier_conflicts + conflicting_fields
 
-    conclusive = False
-    if attempted_rule in {"exact_doi", "exact_arxiv", "exact_authoritative_id"}:
-        conclusive = bool(identifier_conflicts and title_conflict and first_author_conflict)
-    elif attempted_rule == "exact_title":
-        conclusive = bool(len(identifier_conflicts) >= 2 and first_author_conflict)
-    elif attempted_rule in {"fuzzy_title_95", "fuzzy_title_92"}:
-        conclusive = bool(len(identifier_conflicts) >= 2 and first_author_conflict)
+    conclusive = bool(
+        identifier_conflicts
+        and attempted_rule
+        in {
+            "exact_doi",
+            "exact_arxiv",
+            "exact_authoritative_id",
+            "exact_title",
+            "fuzzy_title_95",
+            "fuzzy_title_92",
+        }
+    )
     if not conclusive:
         return None
     return {
         "left_record_id": left["record_id"],
         "right_record_id": right["record_id"],
         "conflicting_fields": conflicting_fields,
+        "authoritative_identifier_conflicts": identifier_conflicts,
+        "same_first_author": bool(
+            left["first_author_normalized"]
+            and left["first_author_normalized"]
+            == right["first_author_normalized"]
+        ),
         "similarity": similarity,
     }
 
