@@ -1,0 +1,7 @@
+route_family,definition
+MLIR_CIRCT,Model or program lowering through MLIR and CIRCT to hardware
+PARAMETERIZED_RTL,Model-derived or configurable RTL generator without a required general HLS compiler
+HLS,C or DSL or scheduling based high-level synthesis to RTL
+DATAFLOW,Streaming graph or quantized dataflow accelerator construction
+OVERLAY,Programmable FPGA overlay vector engine or instruction-driven accelerator
+CPU_FPGA_FALLBACK,Software-controlled FPGA kernels used as a staged or fallback inference route

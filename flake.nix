@@ -117,6 +117,18 @@
         });
         inherit (llvmPackages) mlir;
         python = pkgsLlvm21.python311;
+        surveyPythonPackages = ps:
+          with ps; [
+            pandas
+            pyarrow
+            pyyaml
+            rapidfuzz
+            unidecode
+            requests
+            requests-cache
+            tabulate
+          ];
+        surveyPython = python.withPackages surveyPythonPackages;
 
         torchao = python.pkgs.buildPythonPackage rec {
           pname = "torchao";
@@ -132,8 +144,9 @@
           doCheck = false;
           pythonImportsCheck = [ "torchao" ];
         };
-        pythonWithTinyStories =
-          python.withPackages (ps: [ ps.torch ps.packaging ps.transformers ]);
+        pythonWithTinyStories = python.withPackages
+          (ps: [ ps.torch ps.packaging ps.transformers ]
+            ++ surveyPythonPackages ps);
         pythonWithTinyStoriesTorchAO = python.withPackages
           (ps: [ ps.torch ps.packaging ps.transformers torchao ]);
 
@@ -2433,7 +2446,7 @@ PY
           '';
       in {
         packages = {
-          inherit circt mlir torchMlir yosysPkg modelRegistryJson
+          inherit circt mlir torchMlir yosysPkg modelRegistryJson surveyPython
             llm2fpgaMlirPasses llm2fpgaTorchMlirPasses llm2fpgaCirctPasses
             calyx;
           "rc-math-exp-paper-screen" = rcMathExpPaperScreen;
@@ -2569,6 +2582,10 @@ PY
             pythonWithTinyStories
             pkgs.verilator
           ];
+        };
+
+        devShells.survey = pkgs.mkShell {
+          packages = [ surveyPython pkgs.git pkgs.nix ];
         };
 
         formatter = pkgs.nixfmt-classic;

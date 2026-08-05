@@ -1,0 +1,24 @@
+{
+  "flake_lock_sha256": "f45b41d88e84bd0378420214de5fdcd1bd663c405fa517bd4c630be750f46529",
+  "flake_nix_sha256": "43a9897bf3e27c634bd24578edd9c154940acd5168df8ff8707d3550583ac4cf",
+  "generated_at_utc": "2026-08-05T22:17:07.442481+00:00",
+  "interpreter": {
+    "implementation": "CPython",
+    "version": "3.11.14"
+  },
+  "python_packages": {
+    "pandas": "2.3.1",
+    "pyarrow": "20.0.0",
+    "pyyaml": "6.0.3",
+    "rapidfuzz": "3.14.1",
+    "requests": "2.32.5",
+    "requests-cache": "1.2.1",
+    "tabulate": "0.9.0",
+    "unidecode": "1.4.0"
+  },
+  "schema_version": 1,
+  "tools": {
+    "git": "git version 2.53.0",
+    "nix": "nix (Nix) 2.33.3"
+  }
+}
