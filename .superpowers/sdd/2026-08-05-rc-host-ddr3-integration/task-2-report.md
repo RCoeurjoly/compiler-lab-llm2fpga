@@ -19,10 +19,16 @@ UberDDR3 Wishbone interface.  It optionally binds the Task 1 source-closure
 manifest when supplied.
 
 The mapping generator emits only immutable learned tensor ports (`0..24` and
-`27..45`), in ABI order.  Regions are byte-addressed, little-endian, and
-16-byte aligned; the manifest retains raw Calyx tensor hashes where available
-and explicitly lists every local port exclusion (token, output, and mutable
-scratch).
+`27..45`), in ABI order.  It requires the exact source image and manifest,
+checks the image hash bound by the Calyx receipt, and uses each authoritative
+source-segment offset as the logical byte address.  It never invents a dense
+packed DDR address space.  Each bound row retains byte order, source segment,
+and raw Calyx tensor hash where available; the manifest explicitly lists every
+local port exclusion (token, output, and mutable scratch).
+
+When a Task 1 source closure is supplied, the audit requires its declared
+UberDDR3 checkout and invokes Task 1's `verify_manifest`, rejecting stale or
+tampered source files instead of accepting SHA-shaped fields.
 
 Tests run:
 
@@ -32,9 +38,12 @@ python3 -m py_compile scripts/pipeline/audit_rc_ddr3_compatibility.py scripts/pi
 git diff --check -- scripts/pipeline/audit_rc_ddr3_compatibility.py scripts/pipeline/generate_rc_ddr3_mapping.py tests/test_rc_ddr3_compatibility.py tests/test_rc_ddr3_mapping.py
 ```
 
-All passed (seven focused unit tests).
+All passed (nine focused unit tests).
 
 Concern: no generated RC receipt artifact is currently retained in this
 worktree.  The utilities therefore support both receipt forms and are covered
 with schema-faithful synthetic receipts; Task 3 must invoke them against the
-actual strict RC materialization before compiling the adapter.
+actual strict RC materialization before compiling the adapter.  The existing
+ABI/binding receipt schema contains no completion trace, so its single-request
+completion rule is an adapter constraint pending Task 3 transport evidence,
+not a measured timing claim.

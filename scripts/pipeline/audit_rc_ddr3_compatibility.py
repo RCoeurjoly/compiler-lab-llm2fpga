@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import re
+import importlib.util
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -119,16 +120,21 @@ def _sha_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def _source_closure_digest(source_closure: object | None) -> str | None:
+def _source_closure_digest(source_closure: object | None, uberddr3_root: Path | None) -> str | None:
     if source_closure is None:
         return None
-    if not isinstance(source_closure, Mapping):
+    if not isinstance(source_closure, Mapping) or uberddr3_root is None:
         raise ValueError("DDR3 source closure must be an object")
-    if source_closure.get("schema") != "uberddr3-source-closure-v1" or source_closure.get("uberddr3_revision") != UBERDDR3_REVISION:
-        raise ValueError("DDR3 source closure is not pinned to the required UberDDR3 revision")
-    sources = source_closure.get("sources")
-    if not isinstance(sources, list) or not sources or any(not isinstance(row, Mapping) or not _is_sha(row.get("sha256")) for row in sources):
-        raise ValueError("DDR3 source closure has malformed source hashes")
+    materializer_path = Path(__file__).with_name("materialize_ddr3_source_closure.py")
+    spec = importlib.util.spec_from_file_location("ddr3_source_closure", materializer_path)
+    if spec is None or spec.loader is None:
+        raise ValueError("unable to load the Task 1 source-closure validator")
+    materializer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(materializer)
+    try:
+        materializer.verify_manifest(uberddr3_root, source_closure)
+    except ValueError as error:
+        raise ValueError(f"DDR3 source closure fails Task 1 validation: {error}") from error
     return _sha(_canonical(source_closure))
 
 
@@ -151,7 +157,8 @@ def _port_contract(number: int, row: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def audit_compatibility(memory_abi: object, calyx_memory_bindings: object,
-                        source_closure: object | None = None) -> dict[str, Any]:
+                        source_closure: object | None = None,
+                        uberddr3_root: Path | None = None) -> dict[str, Any]:
     """Validate receipt linkage and return the immutable DDR3 routing contract."""
     abi = _normalise_memory_abi(memory_abi)
     bindings = _normalise_bindings(calyx_memory_bindings)
@@ -166,7 +173,7 @@ def audit_compatibility(memory_abi: object, calyx_memory_bindings: object,
         if abi_row["width"] != 32 or binding["word_count"] * 4 > (
                 abi_row["width"] // 8 * abi_row["depth"]):
             raise ValueError("Calyx binding does not fit its immutable RC memory port")
-    closure_digest = _source_closure_digest(source_closure)
+    closure_digest = _source_closure_digest(source_closure, uberddr3_root)
     rows = [_port_contract(number, row) for number, row in enumerate(abi["ports"])]
     payload: dict[str, Any] = {"schema": SCHEMA, "memory_abi_sha256": abi["sha256"],
                                "calyx_memory_bindings_sha256": bindings["sha256"], "wishbone": WISHBONE,
@@ -187,11 +194,15 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--memory-abi", required=True, type=Path)
     parser.add_argument("--calyx-memory-bindings", required=True, type=Path)
     parser.add_argument("--ddr3-source-closure", type=Path)
+    parser.add_argument("--uberddr3-root", type=Path)
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args(argv)
+    if args.ddr3_source_closure and args.uberddr3_root is None:
+        parser.error("--uberddr3-root is required with --ddr3-source-closure for Task 1 validation")
     closure = json.loads(args.ddr3_source_closure.read_text()) if args.ddr3_source_closure else None
     receipt = audit_compatibility(json.loads(args.memory_abi.read_text()),
-                                  json.loads(args.calyx_memory_bindings.read_text()), closure)
+                                  json.loads(args.calyx_memory_bindings.read_text()), closure,
+                                  args.uberddr3_root)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(render_receipt(receipt), encoding="utf-8")
 

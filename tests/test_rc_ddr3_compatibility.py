@@ -12,9 +12,13 @@ SCRIPT_PATH = REPO_ROOT / "scripts" / "pipeline" / "audit_rc_ddr3_compatibility.
 
 
 def _load_module():
-    spec = importlib.util.spec_from_file_location("audit_rc_ddr3_compatibility", SCRIPT_PATH)
+    return _load_module_from(SCRIPT_PATH, "audit_rc_ddr3_compatibility")
+
+
+def _load_module_from(path, name):
+    spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"unable to import {SCRIPT_PATH}")
+        raise RuntimeError(f"unable to import {path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -129,6 +133,22 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
                         "--out", str(out)])
             self.assertEqual(out.read_text(), audit.render_receipt(
                 audit.audit_compatibility(self.abi, self.bindings)))
+
+    def test_audit_invokes_task_one_source_closure_validator(self):
+        closure_path = REPO_ROOT / "scripts" / "pipeline" / "materialize_ddr3_source_closure.py"
+        closure = _load_module_from(closure_path, "ddr3_source_closure")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for logical_path in closure.SOURCE_PATHS:
+                path = root / logical_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(logical_path)
+            manifest = closure.build_manifest(root)
+            receipt = audit.audit_compatibility(self.abi, self.bindings, manifest, root)
+            self.assertIn("ddr3_source_closure_sha256", receipt)
+            (root / closure.SOURCE_PATHS[0]).write_text("tampered")
+            with self.assertRaisesRegex(ValueError, "Task 1 validation"):
+                audit.audit_compatibility(self.abi, self.bindings, manifest, root)
 
 
 if __name__ == "__main__":

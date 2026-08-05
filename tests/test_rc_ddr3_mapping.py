@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import unittest
 from pathlib import Path
 
@@ -27,9 +28,40 @@ class RcDdr3MappingTest(unittest.TestCase):
         self.abi = compat_tests._memory_abi()
         self.bindings = compat_tests._bindings(self.abi)
         self.compatibility = audit.audit_compatibility(self.abi, self.bindings)
+        self.image, self.manifest = self._image_evidence()
+        self.bindings["image_sha256"] = hashlib.sha256(self.image).hexdigest()
+        payload = {key: value for key, value in self.bindings.items() if key not in ("canonical_json", "sha256")}
+        self.bindings["canonical_json"] = audit._canonical(payload)
+        self.bindings["sha256"] = audit._sha(self.bindings["canonical_json"])
+        self.compatibility = audit.audit_compatibility(self.abi, self.bindings)
+
+    def _image_evidence(self):
+        payload = bytearray()
+        segments = []
+        names = [f"state/_frozen_param{port}" for port in range(21)] + [
+            "state/transformer.h.0.attn.attention.bias",
+            "state/transformer.h.0.attn.attention.lifted_tensor_0",
+            "state/transformer.h.1.attn.attention.bias",
+            "state/transformer.h.1.attn.attention.lifted_tensor_1",
+        ]
+        for port, name in enumerate(names):
+            offset = len(payload)
+            raw = bytes([port + 1]) * 16
+            payload.extend(raw)
+            segments.append({"name": name, "offset": offset, "byte_length": len(raw),
+                             "source_category": "state", "dtype": "float32", "shape": [4]})
+        for row in self.bindings["ports"]:
+            offset = len(payload)
+            raw = b"".join(word.to_bytes(4, "little") for word in row["words_u32"])
+            payload.extend(raw)
+            row["image_segment_aliases"] = [f"state/tensor_{row['port']}"]
+            segments.append({"name": row["image_segment_aliases"][0], "offset": offset,
+                             "byte_length": len(raw), "source_category": "state",
+                             "dtype": "float32", "shape": [4]})
+        return bytes(payload), {"segments": segments}
 
     def test_mapping_contains_only_learned_tensors_with_aligned_byte_layout(self):
-        receipt = mapping.generate_mapping(self.compatibility, self.bindings)
+        receipt = mapping.generate_mapping(self.compatibility, self.bindings, self.image, self.manifest)
         self.assertEqual(receipt["schema"], "rc-ddr3-learned-tensor-mapping-v1")
         self.assertEqual(len(receipt["ports"]), 44)
         self.assertEqual([row["port"] for row in receipt["ports"]],
@@ -37,7 +69,7 @@ class RcDdr3MappingTest(unittest.TestCase):
         self.assertEqual(receipt["ports"][0]["logical_byte_address"], 0)
         self.assertEqual(receipt["ports"][0]["byte_length"], 16)
         self.assertEqual(receipt["ports"][1]["logical_byte_address"], 16)
-        self.assertTrue(all(row["logical_byte_address"] % 16 == 0 for row in receipt["ports"]))
+        self.assertEqual(receipt["ports"][-1]["logical_byte_address"], 688)
         self.assertEqual(receipt["ports"][-1]["source"], "calyx-memory-binding")
         self.assertEqual(receipt["local_port_exclusions"], [25, 26] + list(range(46, 146)))
         self.assertEqual(receipt["compatibility_sha256"], self.compatibility["sha256"])
@@ -46,7 +78,11 @@ class RcDdr3MappingTest(unittest.TestCase):
     def test_mapping_rejects_tampered_compatibility_receipt(self):
         self.compatibility["ports"][0]["classification"] = "local-output"
         with self.assertRaisesRegex(ValueError, "canonical JSON"):
-            mapping.generate_mapping(self.compatibility, self.bindings)
+            mapping.generate_mapping(self.compatibility, self.bindings, self.image, self.manifest)
+
+    def test_mapping_rejects_image_evidence_that_does_not_match_the_binding_receipt(self):
+        with self.assertRaisesRegex(ValueError, "image SHA-256"):
+            mapping.generate_mapping(self.compatibility, self.bindings, self.image + b"x", self.manifest)
 
 
 if __name__ == "__main__":
