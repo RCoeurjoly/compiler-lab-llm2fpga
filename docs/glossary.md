@@ -8,6 +8,10 @@
   2, two layers, one attention head, and eight-token context.
 - **Fast compiler loop** — The model/frontend through MLIR, Calyx, and RTLIL,
   stopping before Yosys technology mapping and FPGA synthesis.
+- **Stateful serving RC** — tinystories-w8a8-rc-serving-mask10-vocab6-width2,
+  the independent V=6, two-layer, width-two source-model trace for one prefill
+  and two cached greedy decodes. It proves only the stated native/export state
+  protocol; it is not the static W8A8 RC oracle or an FPGA-serving result.
 - **RTLIL** — The hardware-oriented intermediate representation used as the
   fast-loop success boundary and as input to the deferred synthesis stages.
 - **Deferred validation** — Full Yosys/Xilinx synthesis run on selected fast

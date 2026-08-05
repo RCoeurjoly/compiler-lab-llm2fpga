@@ -431,6 +431,10 @@
         pipelineMetadataPackages =
           pipelineLib.metadataPackagesFromRegistry modelRegistry;
         modelRegistryJson = pipelineLib.registryIndexPackage modelRegistry;
+        rcServingSystem = import ./nix/rc-serving-system.nix {
+          inherit pkgs pythonWithTinyStoriesTorchAO tinyStories1m;
+          sourceRoot = ./.;
+        };
         modelRegistryNoHandshake = import ./nix/models.nix {
           registerModel = pipelineLib.registerNoHandshakeModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
@@ -2468,6 +2472,18 @@ PY
           "tinystories-w8a8-rc-study" = quantizedRepresentativeCoreStudy;
           "tinystories-w8a8-rc-reference-image" = rcWorkingSystem.referenceImage;
           "tinystories-w8a8-rc-abi-audit" = rcWorkingSystem.abiAudit;
+          "tinystories-w8a8-rc-serving-mask10-vocab6-width2-metadata" =
+            rcServingSystem.modelMetadata;
+          "tinystories-w8a8-rc-serving-mask10-vocab6-width2-native-reference" =
+            rcServingSystem.nativeReference;
+          "tinystories-w8a8-rc-serving-mask10-vocab6-width2-direct-export-bundle" =
+            rcServingSystem.directExportBundle;
+          "tinystories-w8a8-rc-serving-mask10-vocab6-width2-prefill-8-pytorch-exported" =
+            rcServingSystem.prefill8PytorchExported;
+          "tinystories-w8a8-rc-serving-mask10-vocab6-width2-decode-8-pytorch-exported" =
+            rcServingSystem.decode8PytorchExported;
+          "tinystories-w8a8-rc-serving-mask10-vocab6-width2-decode-9-pytorch-exported" =
+            rcServingSystem.decode9PytorchExported;
           "tinystories-w8a8-rc-nonlinear-slices" = quantizedRcNonlinearSlices;
           "tinystories-w8a8-rc-nonlinear-lowering-frontier" =
             quantizedRcNonlinearFrontier;

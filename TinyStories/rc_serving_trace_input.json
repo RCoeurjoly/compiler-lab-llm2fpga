@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "model_key": "tinystories-w8a8-rc-serving-mask10-vocab6-width2",
+  "purpose": "stateful-serving-native-cache-trace",
+  "prompt_token_ids": [0, 1, 2, 3, 4, 5, 0, 1],
+  "phases": [
+    {
+      "name": "prefill-8",
+      "input_length": 8,
+      "cache_length_before": 0,
+      "cache_length_after": 8,
+      "cache_positions": [0, 1, 2, 3, 4, 5, 6, 7]
+    },
+    {
+      "name": "decode-8",
+      "input_length": 1,
+      "cache_length_before": 8,
+      "cache_length_after": 9,
+      "cache_positions": [8]
+    },
+    {
+      "name": "decode-9",
+      "input_length": 1,
+      "cache_length_before": 9,
+      "cache_length_after": 10,
+      "cache_positions": [9]
+    }
+  ]
+}
