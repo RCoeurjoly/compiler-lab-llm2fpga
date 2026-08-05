@@ -4,11 +4,13 @@
 
 **Status:** approved design; implementation has not started.
 
-Keep the existing V=6, context-8, stateless PT2E W8A8 representative core as
-a fast compiler and equivalence fixture. Add a distinct **stateful serving
-RC** whose purpose is to exercise the control and state semantics of a small
-autoregressive workload: prompt prefill, cached decode, cache growth, reset,
-and host token feedback.
+Keep the existing `tinystories-w8a8-rc-study-mask9-vocab6-width2` V=6,
+context-8, stateless PT2E W8A8 representative core unchanged as a fast
+compiler and equivalence fixture. Add a separately registered model profile
+named `tinystories-w8a8-rc-serving-mask10-vocab6-width2`, called the
+**stateful serving RC**, whose purpose is to exercise the control and state
+semantics of a small autoregressive workload: prompt prefill, cached decode,
+cache growth, reset, and host token feedback.
 
 The serving RC is deliberately not a quality, resource-scaling, or
 full-TinyStories proxy. It may retain random deterministic weights, V=6, two
@@ -34,12 +36,15 @@ Torch-MLIR, MLIR, CIRCT, Calyx, and RTL verification.
    feedback, and every native cache tensor leaf.
 5. Introduce a persistent RTL cache store only after the direct cache-boundary
    trace passes.
+6. Give the serving RC independent model registration, artifacts, fixtures,
+   oracle records, and result names so no accepted result for the stateless RC
+   changes meaning.
 
 ## Non-goals
 
 - Predict full TinyStories or larger-model quality, fit, throughput, or power.
-- Change the existing stateless RC's reference, acceptance criteria, or
-  compiler-regression role.
+- Change, rename, or replace the existing stateless RC's reference, acceptance
+  criteria, model key, artifacts, or compiler-regression role.
 - Introduce dynamic prompt lengths, unbounded decoding, batching, sampling,
   beam search, or a full human tokenizer.
 - Reuse historical one-token attention simplifications or causal-mask removal.
@@ -50,10 +55,11 @@ Torch-MLIR, MLIR, CIRCT, Calyx, and RTL verification.
 
 ## Fixed workload contract
 
-The serving RC has a fixed maximum position capacity of ten. The current
-structural RC profile has nine position embeddings; it must not be reused
-unchanged because an eight-token prefill plus two decode inputs consumes
-positions zero through nine.
+The new `tinystories-w8a8-rc-serving-mask10-vocab6-width2` profile has a fixed
+maximum position capacity of ten. The existing structural RC profile has nine
+position embeddings and remains unchanged; a new profile is necessary because
+an eight-token prefill plus two decode inputs consumes positions zero through
+nine.
 
 The deterministic transaction is:
 
@@ -207,18 +213,19 @@ incompatible cache shapes.
 
 ## Implementation sequencing
 
-1. Create the native PyTorch use_cache=True reference and its immutable
-   serving-trace receipt.
-2. Probe direct torch.export for prefill-8, decode-8, and decode-9 before
+1. Register the new serving-RC model key and artifact namespace without
+   changing the existing stateless-RC registration or outputs.
+2. Create the new profile's native PyTorch use_cache=True reference and its
+   immutable serving-trace receipt.
+3. Probe direct torch.export for prefill-8, decode-8, and decode-9 before
    writing any shim.
-3. Add the conditional mechanical shim only if the probe identifies a concrete
+4. Add the conditional mechanical shim only if the probe identifies a concrete
    container limitation and Gate 2 is satisfiable.
-4. Add native-cache schema and lossless image-serialization tests.
-5. Extend the generated-SV harness to retain and refeed cache state across the
-   three calls.
-6. Implement the independent persistent RTL cache store and repeat the
+5. Add native-cache schema and lossless image-serialization tests.
+6. Extend the new serving-RC generated-SV harness to retain and refeed cache
+   state across the three calls.
+7. Implement the independent persistent RTL cache store and repeat the
    unchanged serving trace.
 
 The work stops and publishes a blocker at any failed gate. It does not solve
 frontend or RTL difficulties by changing the model's cache semantics.
-
