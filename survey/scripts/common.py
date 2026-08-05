@@ -135,7 +135,7 @@ def _sanitize_remote(remote: str) -> str:
     hostname = parsed.hostname or ""
     if parsed.port is not None:
         hostname = f"{hostname}:{parsed.port}"
-    return urlunsplit((parsed.scheme, hostname, parsed.path, parsed.query, parsed.fragment))
+    return urlunsplit((parsed.scheme, hostname, parsed.path, "", ""))
 
 
 def _source_path(root: Path, path: Path) -> str:
@@ -170,6 +170,23 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _reject_dirty_paths(repository: Path, paths: list[Path]) -> None:
+    relative_paths = [
+        path.resolve().relative_to(repository.resolve()).as_posix() for path in paths
+    ]
+    status = _run(
+        "git",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+        "--",
+        *relative_paths,
+        cwd=repository,
+    )
+    if status:
+        raise ValueError(f"dirty frozen inputs in {repository}:\n{status}")
 
 
 def _catalogue_record_count(path: Path) -> int:
@@ -228,14 +245,18 @@ def _atomic_write_json(path: Path, value: dict[str, object]) -> None:
 
 
 def _frozen_input_paths(root: Path, papers: Path, scope: dict[str, object]) -> list[Path]:
-    inputs = [
+    survey_inputs = [
         root / "survey/protocol.md",
         root / "survey/config/scope.yaml",
         root / "survey/data/manual_overrides.csv",
         root / "survey/data/route_vocabulary.csv",
     ]
     data_directory = papers / "data"
-    inputs.extend(path for path in data_directory.rglob("*") if path.is_file())
+    _reject_dirty_paths(root, survey_inputs)
+    _reject_dirty_paths(papers, [data_directory])
+    inputs = survey_inputs + [
+        path for path in data_directory.rglob("*") if path.is_file()
+    ]
     missing = [path for path in inputs if not path.is_file()]
     if missing:
         raise FileNotFoundError(f"missing frozen survey inputs: {missing}")
@@ -303,6 +324,7 @@ def write_environment_manifest(root: Path, output: Path) -> dict[str, object]:
     """Write the pinned survey interpreter and package manifest."""
 
     root = root.resolve()
+    _reject_dirty_paths(root, [root / "flake.nix", root / "flake.lock"])
     manifest: dict[str, object] = {
         "schema_version": 1,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),

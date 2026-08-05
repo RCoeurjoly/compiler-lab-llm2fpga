@@ -152,6 +152,30 @@ class SurveyScopeTests(unittest.TestCase):
 
 
 class SurveyProvenanceTests(unittest.TestCase):
+    def test_remote_sanitization_removes_all_http_credential_channels(self) -> None:
+        common = _load_common(self)
+        remote = (
+            "https://user:password@example.com/org/repository.git"
+            "?access_token=secret#credential-fragment"
+        )
+        self.assertEqual(
+            common._sanitize_remote(remote),
+            "https://example.com/org/repository.git",
+        )
+
+    def test_write_provenance_rejects_modified_papers_catalogue(self) -> None:
+        common = _load_common(self)
+        catalogue = ROOT / "LLM-inference-on-FPGA-papers/data/catalog.json"
+        original = catalogue.read_bytes()
+        try:
+            catalogue.write_bytes(original + b"\n")
+            with tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "provenance.json"
+                with self.assertRaisesRegex(ValueError, "dirty frozen inputs"):
+                    common.write_provenance(ROOT, output)
+        finally:
+            catalogue.write_bytes(original)
+
     def test_environment_manifest_pins_nix_definition_and_packages(self) -> None:
         common = _load_common(self)
         with tempfile.TemporaryDirectory() as directory:
