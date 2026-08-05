@@ -48,7 +48,11 @@ let
       slangPerFileExternModules = true;
       inherit fpPrimsSv;
       hfSnapshot = tinyStories1m.snapshot;
-      pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
+      # Export materialization uses torch.export and PT2E only.  Torch-MLIR
+      # remains a dependency of the later torch.mlir lowering stage, but must
+      # not be pulled into the frozen-export/image derivation through the
+      # shared pytorchExportedBuildInputs default.
+      pytorchToolchain = [ pythonWithTinyStoriesTorchAO ];
       pytorchExportedCommand = ''
         export PYTHONPATH="${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
         ${rcStudyEnv {

@@ -42,8 +42,17 @@ class CalyxExportNormalizationTest(unittest.TestCase):
         self.assertIn("normalize_calyx_for_export.py", pipeline)
         self.assertIn("CALYX_NORMALIZE_FOR_EXPORT", pipeline)
         self.assertIn("CALYX_NORMALIZE_FUTIL_CONSTANTS", pipeline)
+        self.assertIn("CALYX_VERIFY_F32_CONSTANT_BITS", script)
         self.assertIn('"$normalize_for_export" "$input"', script)
+        self.assertIn('cp "$tmp_normalized" "$output_dir/constant-proof/normalized.calyx.mlir"', script)
+        self.assertIn('cp "$tmp_exported_futil" "$output_dir/constant-proof/exported.raw.futil"', script)
+        self.assertIn('--calyx-mlir "$output_dir/constant-proof/normalized.calyx.mlir"', script)
+        self.assertIn('--futil "$output_dir/constant-proof/exported.raw.futil"', script)
         self.assertIn('"$normalize_futil_constants" "$tmp_exported_futil"', script)
+        self.assertLess(
+            script.index('"$verify_futil_bits"'),
+            script.index('"$normalize_futil_constants" "$tmp_exported_futil"'),
+        )
         self.assertIn("ulimit -s unlimited", script)
 
     def test_float_constants_become_exact_ieee_bit_constants(self) -> None:

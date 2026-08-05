@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 normalize_for_export="${CALYX_NORMALIZE_FOR_EXPORT:-$SCRIPT_DIR/normalize_calyx_for_export.py}"
 normalize_futil_constants="${CALYX_NORMALIZE_FUTIL_CONSTANTS:-$SCRIPT_DIR/normalize_futil_float_constants.py}"
+verify_futil_bits="${CALYX_VERIFY_F32_CONSTANT_BITS:-$SCRIPT_DIR/verify_calyx_f32_constant_bits.py}"
 
 circt_translate="${1:?usage: calyx_to_sv <circt-translate> <calyx-bin> <calyx-lib-dir> <calyx-dir> <output-dir>}"
 calyx_bin="${2:?usage: calyx_to_sv <circt-translate> <calyx-bin> <calyx-lib-dir> <calyx-dir> <output-dir>}"
@@ -86,6 +87,15 @@ if [[ "$rc" -ne 0 || ! -s "$tmp_exported_futil" ]]; then
   rm -f "$output_dir/model.futil"
   exit 1
 fi
+
+mkdir -p "$output_dir/constant-proof"
+cp "$tmp_normalized" "$output_dir/constant-proof/normalized.calyx.mlir"
+cp "$tmp_exported_futil" "$output_dir/constant-proof/exported.raw.futil"
+
+python3 "$verify_futil_bits" \
+  --calyx-mlir "$output_dir/constant-proof/normalized.calyx.mlir" \
+  --futil "$output_dir/constant-proof/exported.raw.futil" \
+  --receipt "$output_dir/f32-constant-bits.json"
 
 python3 "$normalize_futil_constants" "$tmp_exported_futil" "$output_dir/model.futil" \
   >"$output_dir/logs/normalize-futil-float-constants.log" 2>&1

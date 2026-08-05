@@ -1,7 +1,7 @@
-{ pkgs, circt }:
+{ pkgs, calyx, circt }:
 
 pkgs.runCommand "rc-calyx-exact-float-export" {
-  nativeBuildInputs = [ circt pkgs.python3 ];
+  nativeBuildInputs = [ calyx circt pkgs.python3 ];
 } ''
   set -euo pipefail
   mkdir -p "$out"
@@ -23,6 +23,9 @@ expected = {
     "nan": 2143289345,
     "four_point_two": 1082549862,
 }
+required_import = 'import "primitives/compile.futil";'
+if required_import not in exported:
+    raise SystemExit(f"missing required integer-constant import: {required_import}")
 for name, raw_word in expected.items():
     line = f"{name} = std_const(32, {raw_word});"
     if line not in exported:
@@ -39,4 +42,10 @@ receipt_path.write_text(
     encoding="utf-8",
 )
 PY
+  ${calyx}/bin/calyx "$out/export.futil" \
+    -l ${calyx}/share/calyx \
+    -b verilog \
+    --synthesis \
+    -o "$out/main.sv"
+  test -s "$out/main.sv"
 ''

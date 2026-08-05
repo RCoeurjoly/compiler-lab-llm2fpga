@@ -92,7 +92,7 @@ Use a temporary payload directory and a small injected batch-one evaluator. Test
         self.assertEqual(receipt["enumeration"]["start"], 4)
         self.assertEqual(receipt["payload"]["records"], 2)
         self.assertEqual((self.path / "shard-4-6.hex").read_text().splitlines(), [
-            "0000000504030201", "0000000504030201",
+            "0004000504030201", "0004000504030201",
         ])
 
 - [ ] **Step 5: Verify RED, implement PT2E generation, then verify GREEN**

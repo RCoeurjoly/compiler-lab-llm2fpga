@@ -2,29 +2,34 @@
 , sv
 , image
 , configurations ? [
+    # The validated baseline uses coarse C++ partitions and a threaded model.
+    # The next two points vary one factor at a time: model threads, then split
+    # granularity.  The earlier 100/50 point is intentionally opt-in: it
+    # produces tens of thousands of C++ files and is not a practical cold
+    # iteration baseline.
     {
-      name = "baseline";
+      name = "coarse-threaded";
       verilateJobs = 4;
       buildJobs = 4;
-      outputSplit = 100;
-      outputSplitCfuncs = 50;
+      outputSplit = 10000;
+      outputSplitCfuncs = 10000;
+      threads = 8;
+    }
+    {
+      name = "coarse-single-thread";
+      verilateJobs = 4;
+      buildJobs = 4;
+      outputSplit = 10000;
+      outputSplitCfuncs = 10000;
       threads = 1;
     }
     {
-      name = "build-jobs-8";
+      name = "split-500-threaded";
       verilateJobs = 4;
-      buildJobs = 8;
-      outputSplit = 100;
-      outputSplitCfuncs = 50;
-      threads = 1;
-    }
-    {
-      name = "threads-2";
-      verilateJobs = 4;
-      buildJobs = 8;
-      outputSplit = 100;
-      outputSplitCfuncs = 50;
-      threads = 2;
+      buildJobs = 4;
+      outputSplit = 500;
+      outputSplitCfuncs = 250;
+      threads = 8;
     }
   ]
 , caseId ? "ascending"
@@ -81,6 +86,8 @@ import time
 ) = sys.argv[1:]
 out = pathlib.Path(out_text)
 configurations = json.loads(configurations_text)
+if not configurations:
+    raise SystemExit("configuration matrix must contain a baseline configuration")
 timeout_cycles = int(timeout_cycles_text)
 probe_seconds = int(probe_seconds_text)
 heartbeat_cycles = int(heartbeat_cycles_text)
@@ -92,6 +99,9 @@ case_index = next(
 )
 if case_index is None:
     raise SystemExit(f"unknown reference case: {case_id}")
+expected_result_line = "RESULT " + case_id + " " + " ".join(
+    str(value) for value in reference["results"][case_index]["output_codes_i8"]
+)
 
 
 def error_text(process):
@@ -185,6 +195,27 @@ for config in configurations:
         for match in re.finditer(r"HEARTBEAT \S+ cycles=(\d+)", runtime_output)
     ]
     last_heartbeat = max(heartbeats) if heartbeats else None
+    result_lines = [
+        line for line in runtime_output.splitlines() if line.startswith("RESULT ")
+    ]
+    testbench_timeout = any(
+        line.startswith(f"TIMEOUT {case_id} ")
+        for line in runtime_output.splitlines()
+    )
+    result_validation = "not_reached"
+    if result_lines:
+        result_validation = (
+            "match" if result_lines == [expected_result_line] else "mismatch"
+        )
+    elif testbench_timeout:
+        result_validation = "testbench_timeout"
+    if result_validation == "mismatch":
+        runtime_status = "mismatch"
+    elif runtime_status == "finished":
+        if result_validation == "testbench_timeout":
+            runtime_status = "testbench_timeout"
+        elif result_validation == "not_reached":
+            runtime_status = "failed"
     runtime = {
         "status": runtime_status,
         "returncode": returncode,
@@ -192,8 +223,15 @@ for config in configurations:
         "last_heartbeat_cycles": last_heartbeat,
         "cycles_per_second": (last_heartbeat / runtime_seconds)
         if last_heartbeat is not None and runtime_seconds > 0 else None,
-        "result_lines": [line for line in runtime_output.splitlines() if line.startswith("RESULT ")],
+        "expected_result_line": expected_result_line,
+        "result_lines": result_lines,
+        "result_validation": result_validation,
     }
+    compile_result.pop("binary", None)
+    compile_json.write_text(
+        json.dumps(compile_result, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     results.append({
         "name": name,
         "configuration": config,
@@ -208,9 +246,11 @@ def compile_seconds(result):
 
 
 summary = {
+    "purpose": "compile and forward-progress probe; not an equivalence gate",
     "case_id": case_id,
     "probe_seconds": probe_seconds,
     "heartbeat_cycles": heartbeat_cycles,
+    "baseline_name": configurations[0]["name"],
     "results": sorted(results, key=compile_seconds),
 }
 (out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -222,8 +262,26 @@ for result in summary["results"]:
         f"- `{result['name']}`: compile={timing.get('verilator_compile_seconds')}, "
         f"codegen={timing.get('verilator_codegen_seconds')}, "
         f"C++={timing.get('cpp_build_seconds')}, "
-        f"runtime={runtime['status']}, cycles/s={runtime.get('cycles_per_second')}"
+        f"runtime={runtime['status']}, result={runtime.get('result_validation')}, "
+        f"cycles/s={runtime.get('cycles_per_second')}"
     )
 (out / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+baseline = next(
+    (result for result in results if result["name"] == summary["baseline_name"]),
+    None,
+)
+if baseline is None or baseline["compile"].get("status") != "compiled":
+    raise SystemExit(f"baseline configuration did not compile: {summary['baseline_name']}")
+baseline_runtime = baseline["runtime"]
+if (
+    baseline_runtime["status"] in {"failed", "mismatch"}
+    or (
+        not baseline_runtime["result_lines"]
+        and baseline_runtime["last_heartbeat_cycles"] is None
+    )
+):
+    raise SystemExit(
+        f"baseline configuration did not show runtime progress: {summary['baseline_name']}"
+    )
 PY
 ''

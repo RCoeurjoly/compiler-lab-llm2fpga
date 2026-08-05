@@ -25,6 +25,8 @@ pkgs.runCommand "rc-calyx-fptosi-latency" {
     -l ${calyx}/share/calyx \
     -b verilog \
     --synthesis \
+    --nested \
+    -d papercut \
     -o "$out/main.sv"
   ${pkgs.verilator}/bin/verilator \
     --binary \

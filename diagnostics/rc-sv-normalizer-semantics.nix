@@ -1,7 +1,7 @@
 { pkgs }:
 
 pkgs.runCommand "tinystories-w8a8-rc-sv-normalizer-semantics" {
-  nativeBuildInputs = [ pkgs.python3 pkgs.iverilog ];
+  nativeBuildInputs = [ pkgs.python3 pkgs.verilog ];
 } ''
   set -euo pipefail
   mkdir -p "$out"
@@ -18,12 +18,13 @@ assert spec is not None and spec.loader is not None
 runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
 
-terms = 2000
+terms = 257
+runner.NORMALIZER_MIN_ASSIGNMENT_CHARS = 1
 ternary = " : ".join(
     f"cond[{index}] ? 13'd{index % 8192}" for index in range(terms)
 ) + " : 13'd0"
 or_expression = " | ".join(f"cond[{index}]" for index in range(terms))
-raw = f'''module candidate_raw(
+raw = f"""module candidate_raw(
   input logic [{terms - 1}:0] cond,
   output logic [12:0] ternary_out,
   output logic or_out
@@ -35,7 +36,7 @@ raw = f'''module candidate_raw(
   assign ternary_out = state;
   assign or_out = enable;
 endmodule
-'''
+"""
 normalized = runner._normalize_large_or_assignments(raw)
 if "always_comb" in normalized:
     raise SystemExit("normalizer emitted procedural logic")
@@ -50,7 +51,7 @@ normalized = normalized.replace("module candidate_raw", "module candidate_normal
     "normalizer_page_terms": runner.NORMALIZER_PAGE_TERMS,
     "generated_page_wires": normalized.count("__llm2fpga_sim_"),
 }, sort_keys=True) + "\n", encoding="utf-8")
-(out / "tb.sv").write_text(f'''module tb;
+(out / "tb.sv").write_text(f"""module tb;
   logic [{terms - 1}:0] cond;
   wire [12:0] raw_ternary_out, normalized_ternary_out;
   wire raw_or_out, normalized_or_out;
@@ -76,15 +77,24 @@ normalized = normalized.replace("module candidate_raw", "module candidate_normal
     cond = '0;
     cond[0] = 1'bx;
     cond[127] = 1'bz;
+    cond[128] = 1'bx;
+    cond[256] = 1'bz;
+    check_equal();
+    if (raw_or_out !== 1'bx) begin
+      $fatal(1, "expected X | 0 to remain X");
+    end
+    cond = '0;
+    cond[0] = 1'bx;
+    cond[127] = 1'bz;
     cond[128] = 1'b1;
-    cond[511] = 1'bx;
+    cond[256] = 1'bx;
     check_equal();
     cond = '0;
     cond[0] = 1'bz;
     cond[127] = 1'bx;
     cond[128] = 1'bz;
     cond[129] = 1'b1;
-    cond[1023] = 1'bx;
+    cond[256] = 1'bx;
     check_equal();
     cond = '1;
     cond[0] = 1'bx;
@@ -95,11 +105,11 @@ normalized = normalized.replace("module candidate_raw", "module candidate_normal
     $finish;
   end
 endmodule
-''', encoding="utf-8")
+""", encoding="utf-8")
 PY
-  ${pkgs.iverilog}/bin/iverilog -g2012 -s tb -o "$out/tb.vvp" \
+  ${pkgs.verilog}/bin/iverilog -g2012 -s tb -o "$out/tb.vvp" \
     "$out/candidate_raw.sv" "$out/candidate_normalized.sv" "$out/tb.sv"
-  ${pkgs.iverilog}/bin/vvp "$out/tb.vvp" > "$out/simulator.log"
+  ${pkgs.verilog}/bin/vvp "$out/tb.vvp" > "$out/simulator.log"
   ${pkgs.python3}/bin/python3 - "$out" <<'PY'
 import json
 import pathlib

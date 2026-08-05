@@ -50,6 +50,7 @@
               ./archive/patches/unused/circt-upstream-task3-recovery/0011-rebased-handshaketohw-stack.patch
               ./archive/patches/unused/circt-upstream-task3-recovery/0012-update-buffer-lowering-test-for-constant-order.patch
               ./patches/circt/0001-export-calyx-float-constants-as-raw-bits.patch
+              ./patches/circt/0002-wait-for-fptosi-result.patch
             ];
           });
         circtMlir = circtPkgs.mlir;
@@ -346,6 +347,10 @@
           '';
 
         rcCalyxExactFloatExport = import ./diagnostics/rc-calyx-exact-float-export.nix {
+          inherit pkgs calyx circt;
+        };
+
+        rcCalyxFpToSiLatency = import ./diagnostics/rc-calyx-fptosi-regression.nix {
           inherit pkgs calyx circt;
         };
 
@@ -830,6 +835,9 @@
           exportedProgram =
             pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-pytorch-exported";
           f32ConstantBits = rcPolynomialExpSv + "/f32-constant-bits.json";
+          flatScf =
+            pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-flat-scf";
+          calyx = rcPolynomialExpCalyx;
         };
         rcPolynomialExpSvEquivalenceBuild = pkgs.runCommand
           "tinystories-w8a8-rc-polynomial-exp-sv-verilator-build" {
@@ -2427,6 +2435,7 @@ PY
           "calyx-i1-uitofp-legalization-selftest" =
             calyxI1UiToFpLegalizationSelftest;
           "rc-calyx-exact-float-export" = rcCalyxExactFloatExport;
+          "rc-calyx-fptosi-latency" = rcCalyxFpToSiLatency;
           "active-pipeline-variants" = activePipelineVariantsJson;
           "tinystories-w8a8-rc-polynomial-exp-calyx" = rcPolynomialExpCalyx;
           "tinystories-w8a8-rc-polynomial-exp-sv" = rcPolynomialExpSv;

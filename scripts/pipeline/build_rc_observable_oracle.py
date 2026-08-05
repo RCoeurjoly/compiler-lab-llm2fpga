@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import platform
 import sys
 import time
@@ -18,7 +19,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from TinyStories.rc_working_contract import argmax_lowest, validate_output_tensor  # noqa: E402
+from TinyStories.rc_working_contract import (  # noqa: E402
+    RC_WORKING_PIPELINE_ALIAS,
+    RC_WORKING_SOURCE_MODEL_KEY,
+    argmax_lowest,
+    load_corpus,
+    tokenize,
+    validate_output_qparams,
+    validate_output_tensor,
+)
 
 
 VOCAB_SIZE = 6
@@ -35,6 +44,15 @@ RECORD_FORMAT = {
     "reserved_bits": [56, 63],
 }
 ENUMERATION_KIND = "base-six-lexical-rightmost-fastest"
+_RECEIPT_HASH_FIELDS = (
+    "exported_program_sha256",
+    "export_manifest_sha256",
+    "reference_sha256",
+    "image_sha256",
+    "image_manifest_sha256",
+    "generator_sha256",
+    "contract_sha256",
+)
 
 
 def _is_plain_int(value: object) -> bool:
@@ -116,6 +134,32 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _is_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in _HEX_DIGITS for character in value)
+    )
+
+
+def _validate_receipt(receipt: object) -> Mapping[str, object]:
+    if not isinstance(receipt, Mapping):
+        raise ValueError("oracle receipt must be an object")
+    artifacts = receipt.get("artifacts")
+    if not isinstance(artifacts, Mapping):
+        raise ValueError("oracle receipt lacks artifact hashes")
+    for field in _RECEIPT_HASH_FIELDS:
+        if not _is_sha256(artifacts.get(field)):
+            raise ValueError(f"oracle receipt has invalid {field}")
+    if not isinstance(receipt.get("python_version"), str) or not receipt["python_version"]:
+        raise ValueError("oracle receipt has invalid Python version")
+    if not isinstance(receipt.get("pytorch_version"), str) or not receipt["pytorch_version"]:
+        raise ValueError("oracle receipt has invalid PyTorch version")
+    if not _is_plain_int(receipt.get("pytorch_num_threads")) or receipt["pytorch_num_threads"] < 1:
+        raise ValueError("oracle receipt has invalid PyTorch thread count")
+    return receipt
+
+
 def _validate_range(start: int, stop: int) -> None:
     if (
         not _is_plain_int(start)
@@ -137,28 +181,100 @@ def _evaluated_record(
     return list(codes), token_id
 
 
+def _canonical_corpus() -> list[dict[str, str]]:
+    return load_corpus(REPO_ROOT / "TinyStories" / "rc_working_corpus.json")
+
+
+def _validate_reference_row(
+    row: Mapping[str, object], *, case_id: str, tokens: list[int], output_qparams: Mapping[str, object]
+) -> str:
+    if (
+        row.get("schema_version") != SCHEMA_VERSION
+        or row.get("source_model_key") != RC_WORKING_SOURCE_MODEL_KEY
+        or row.get("pipeline_alias") != RC_WORKING_PIPELINE_ALIAS
+        or row.get("case_id") != case_id
+        or row.get("token_ids") != tokens
+        or row.get("output_qparams") != output_qparams
+    ):
+        raise ValueError("reference result does not match the canonical corpus")
+    codes = row.get("output_codes_i8")
+    token_id = row.get("token_id")
+    try:
+        word = pack_record(codes, token_id)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as error:
+        raise ValueError("reference result has invalid observable fields") from error
+    logits = row.get("logits")
+    if not isinstance(logits, list) or len(logits) != VOCAB_SIZE:
+        raise ValueError("reference result has invalid logits")
+    scale = float(output_qparams["scale"])
+    zero_point = output_qparams["zero_point"]
+    assert isinstance(codes, Sequence)
+    for code, logit in zip(codes, logits, strict=True):
+        if isinstance(logit, bool) or not isinstance(logit, (int, float)) or not math.isfinite(float(logit)):
+            raise ValueError("reference result has invalid logits")
+        if not math.isclose(float(logit), scale * (code - zero_point), rel_tol=0.0, abs_tol=0.0):
+            raise ValueError("reference result logits do not match raw codes")
+    return word
+
+
 def _preflight_reference(
-    evaluator: Callable[[list[int]], Any], reference: Mapping[str, object] | None
+    evaluator: Callable[[list[int]], Any],
+    reference: Mapping[str, object],
+    *,
+    exported_program_sha256: str,
+    export_manifest_sha256: str,
 ) -> None:
-    if reference is None:
-        return
-    rows = reference.get("results")
-    if not isinstance(rows, list):
-        raise ValueError("reference must contain a results list")
-    for row in rows:
-        if not isinstance(row, Mapping):
-            raise ValueError("reference result must be an object")
-        token_ids = row.get("token_ids")
-        expected_codes = row.get("output_codes_i8")
-        expected_token = row.get("token_id")
-        try:
-            tokens = list(token_ids)  # type: ignore[arg-type]
-            index_from_context(tokens)
-            expected_word = pack_record(expected_codes, expected_token)  # type: ignore[arg-type]
-        except (TypeError, ValueError) as error:
-            raise ValueError("reference result has invalid observable fields") from error
-        observed_codes, observed_token = _evaluated_record(evaluator, tokens)
-        if pack_record(observed_codes, observed_token) != expected_word:
+    """Bind a complete canonical frozen reference to this exact PT2E export."""
+
+    try:
+        if (
+            reference.get("schema_version") != SCHEMA_VERSION
+            or reference.get("source_model_key") != RC_WORKING_SOURCE_MODEL_KEY
+            or reference.get("pipeline_alias") != RC_WORKING_PIPELINE_ALIAS
+            or reference.get("exported_program_sha256") != exported_program_sha256
+            or reference.get("export_manifest_sha256") != export_manifest_sha256
+            or not _is_sha256(exported_program_sha256)
+            or not _is_sha256(export_manifest_sha256)
+        ):
+            raise ValueError("reference schema or export binding is invalid")
+        if not isinstance(reference.get("export_manifest"), Mapping):
+            raise ValueError("reference export manifest is invalid")
+        if not isinstance(reference.get("calibration_input_ids"), list):
+            raise ValueError("reference calibration inputs are invalid")
+        output_qparams = reference.get("output_qparams")
+        if not isinstance(output_qparams, Mapping):
+            raise ValueError("reference output quantization is invalid")
+        validate_output_qparams(output_qparams.get("scale"), output_qparams.get("zero_point"))
+        canonical = _canonical_corpus()
+        expected = {case["id"]: tokenize(case["text"]) for case in canonical}
+        if reference.get("corpus") != [
+            {"id": case["id"], "text": case["text"], "token_ids": expected[case["id"]]}
+            for case in canonical
+        ]:
+            raise ValueError("reference corpus is not canonical")
+        rows = reference.get("results")
+        if not isinstance(rows, list) or len(rows) != len(expected):
+            raise ValueError("reference must contain every canonical result")
+        seen_ids: set[str] = set()
+        expected_words: dict[str, str] = {}
+        for row in rows:
+            if not isinstance(row, Mapping):
+                raise ValueError("reference result must be an object")
+            case_id = row.get("case_id")
+            if not isinstance(case_id, str) or case_id in seen_ids or case_id not in expected:
+                raise ValueError("reference result case IDs are not canonical and unique")
+            seen_ids.add(case_id)
+            expected_words[case_id] = _validate_reference_row(
+                row, case_id=case_id, tokens=expected[case_id], output_qparams=output_qparams
+            )
+        if seen_ids != set(expected):
+            raise ValueError("reference is missing a canonical result")
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"reference preflight failed: {error}") from error
+    for case in canonical:
+        case_id = case["id"]
+        observed_codes, observed_token = _evaluated_record(evaluator, expected[case_id])
+        if pack_record(observed_codes, observed_token) != expected_words[case_id]:
             raise ValueError("reference preflight observable mismatch")
 
 
@@ -210,14 +326,27 @@ def generate_shard(
     stop: int,
     output_dir: Path,
     receipt: Mapping[str, object],
-    reference: Mapping[str, object] | None = None,
+    reference: Mapping[str, object],
+    exported_program_sha256: str,
+    export_manifest_sha256: str,
 ) -> dict[str, object]:
     """Stream one verified lexical shard from a batch-one observable evaluator."""
 
     _validate_range(start, stop)
-    if not isinstance(receipt, Mapping):
-        raise ValueError("oracle receipt must be an object")
-    _preflight_reference(evaluator, reference)
+    validated_receipt = _validate_receipt(receipt)
+    artifacts = validated_receipt["artifacts"]
+    assert isinstance(artifacts, Mapping)
+    if (
+        artifacts["exported_program_sha256"] != exported_program_sha256
+        or artifacts["export_manifest_sha256"] != export_manifest_sha256
+    ):
+        raise ValueError("oracle receipt export binding does not match preflight")
+    _preflight_reference(
+        evaluator,
+        reference,
+        exported_program_sha256=exported_program_sha256,
+        export_manifest_sha256=export_manifest_sha256,
+    )
     payload_name = _payload_name(start, stop)
     metadata_name = f"shard-{start}-{stop}.json"
     payload_path = output_dir / payload_name
@@ -246,7 +375,7 @@ def generate_shard(
     result: dict[str, object] = {
         "schema_version": SCHEMA_VERSION,
         "status": "complete",
-        "receipt": dict(receipt),
+        "receipt": dict(validated_receipt),
         "enumeration": {
             "kind": ENUMERATION_KIND,
             "start": start,
@@ -275,6 +404,15 @@ def verify_shard(metadata_path: Path) -> dict[str, object]:
         raise ValueError("oracle metadata is incomplete")
     if metadata.get("record_format") != RECORD_FORMAT:
         raise ValueError("oracle record format does not match")
+    _validate_receipt(metadata.get("receipt"))
+    elapsed_seconds = metadata.get("elapsed_seconds")
+    if (
+        isinstance(elapsed_seconds, bool)
+        or not isinstance(elapsed_seconds, (int, float))
+        or not math.isfinite(float(elapsed_seconds))
+        or elapsed_seconds < 0
+    ):
+        raise ValueError("oracle metadata has invalid elapsed_seconds")
     enumeration = metadata.get("enumeration")
     payload = metadata.get("payload")
     if not isinstance(enumeration, Mapping) or not isinstance(payload, Mapping):
@@ -322,19 +460,18 @@ def _validate_merge_receipt(metadata: Mapping[str, object]) -> tuple[int, int]:
     return start, stop
 
 
-def merge_oracle_receipts(receipts: Sequence[Mapping[str, object]]) -> dict[str, object]:
+def _merge_verified_oracle_receipts(receipts: Sequence[Mapping[str, object]]) -> dict[str, object]:
     """Prove that complete, matching shard receipts cover the full RC domain."""
 
     if not receipts:
         raise ValueError("oracle merge needs at least one shard receipt")
     normalized = [dict(receipt) for receipt in receipts]
-    first_receipt = normalized[0].get("receipt")
-    if not isinstance(first_receipt, Mapping):
-        raise ValueError("oracle merge received a missing receipt")
+    first_receipt = _validate_receipt(normalized[0].get("receipt"))
     ranges: list[tuple[int, int, dict[str, object]]] = []
     for metadata in normalized:
         if metadata.get("receipt") != first_receipt:
             raise ValueError("oracle merge received a changed receipt")
+        _validate_receipt(metadata.get("receipt"))
         start, stop = _validate_merge_receipt(metadata)
         ranges.append((start, stop, metadata))
     ranges.sort(key=lambda item: item[0])
@@ -371,7 +508,7 @@ def merge_oracle_files(metadata_paths: Sequence[Path], output_path: Path) -> dic
     """Load verified shard metadata, merge it, and write a coverage receipt."""
 
     metadata = [verify_shard(path) for path in metadata_paths]
-    merged = merge_oracle_receipts(metadata)
+    merged = _merge_verified_oracle_receipts(metadata)
     output_path.write_text(
         json.dumps(merged, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -456,13 +593,18 @@ def main() -> None:
         reference = json.loads(args.reference.read_text(encoding="utf-8"))
         if not isinstance(reference, dict):
             raise ValueError("reference must be an object")
+        receipt = _generation_receipt(args, torch_receipt)
+        artifacts = receipt["artifacts"]
+        assert isinstance(artifacts, Mapping)
         result = generate_shard(
             evaluator=evaluator,
             start=args.start,
             stop=args.stop,
             output_dir=args.output_dir,
-            receipt=_generation_receipt(args, torch_receipt),
+            receipt=receipt,
             reference=reference,
+            exported_program_sha256=str(artifacts["exported_program_sha256"]),
+            export_manifest_sha256=str(artifacts["export_manifest_sha256"]),
         )
     elif args.command == "verify":
         result = verify_shard(args.metadata)

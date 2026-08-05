@@ -12,30 +12,35 @@ This deliberately changes only the FpToInt lowering. IntToFp remains
 unconditional because it has its existing distinct primitive timing contract.
 
 ---
- lib/Conversion/SCFToCalyx/SCFToCalyx.cpp     | 6 +++++-
+ lib/Conversion/SCFToCalyx/SCFToCalyx.cpp     | 7 ++++++-
  test/Conversion/SCFToCalyx/convert_simple.mlir | 2 +-
  test/Dialect/Calyx/emit.mlir                  | 4 ++--
- 3 files changed, 8 insertions(+), 4 deletions(-)
+ 3 files changed, 9 insertions(+), 4 deletions(-)
 
 diff --git a/lib/Conversion/SCFToCalyx/SCFToCalyx.cpp b/lib/Conversion/SCFToCalyx/SCFToCalyx.cpp
-index 000000000..111111111 100644
+index 31c88cffc..7822845be 100644
 --- a/lib/Conversion/SCFToCalyx/SCFToCalyx.cpp
 +++ b/lib/Conversion/SCFToCalyx/SCFToCalyx.cpp
-@@ -714,7 +714,11 @@
+@@ -40,3 +40,4 @@
+ #include <locale>
+ #include <numeric>
++#include <type_traits>
+ #include <variant>
+@@ -714,7 +715,11 @@
      rewriter.replaceAllUsesWith(op.getResult(), reg.getOut());
  
      calyx::AssignOp::create(rewriter, loc, reg.getIn(), calyxOp.getOut());
 -    calyx::AssignOp::create(rewriter, loc, reg.getWriteEn(), c1);
-+    if (auto fpToInt = dyn_cast<calyx::FpToIntOpIEEE754>(calyxOp))
++    if constexpr (std::is_same_v<TCalyxLibOp, calyx::FpToIntOpIEEE754>)
 +      calyx::AssignOp::create(rewriter, loc, reg.getWriteEn(),
-+                              fpToInt.getDone());
++                              calyxOp.getDone());
 +    else
 +      calyx::AssignOp::create(rewriter, loc, reg.getWriteEn(), c1);
  
      calyx::AssignOp::create(
          rewriter, loc, calyxOp.getGo(), c1,
 diff --git a/test/Conversion/SCFToCalyx/convert_simple.mlir b/test/Conversion/SCFToCalyx/convert_simple.mlir
-index 000000000..111111111 100644
+index a435d2b70..cfccfdcf6 100644
 --- a/test/Conversion/SCFToCalyx/convert_simple.mlir
 +++ b/test/Conversion/SCFToCalyx/convert_simple.mlir
 @@ -555,7 +555,7 @@
@@ -48,7 +53,7 @@ index 000000000..111111111 100644
  // CHECK-DAG:        calyx.group_done %fptosi_0_reg.done : i1
  // CHECK-DAG:      }
 diff --git a/test/Dialect/Calyx/emit.mlir b/test/Dialect/Calyx/emit.mlir
-index 000000000..111111111 100644
+index 152a3f118..243edbe99 100644
 --- a/test/Dialect/Calyx/emit.mlir
 +++ b/test/Dialect/Calyx/emit.mlir
 @@ -468,7 +468,7 @@

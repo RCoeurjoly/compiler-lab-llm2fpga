@@ -3,3 +3,5 @@ result-*
 __pycache__/
 *.pyc
 .direnv/
+refresult
+rcsvresult

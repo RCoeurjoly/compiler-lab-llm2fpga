@@ -38,7 +38,7 @@ index c491aef7b..d4bce11d1 100644
          })
          .Case<AddFOpIEEE754>([&](auto op) -> FailureOr<StringRef> {
            static constexpr std::string_view sFloatingPoint = "float/addFN";
-@@ -971,15 +972,14 @@ void Emitter::emitConstant(ConstantOp constantOp) {
+@@ -971,14 +972,13 @@ void Emitter::emitConstant(ConstantOp constantOp) {
    auto fltAttr = cast<FloatAttr>(attr);
    APFloat value = fltAttr.getValue();
    auto type = cast<FloatType>(fltAttr.getType());
@@ -58,7 +58,6 @@ index c491aef7b..d4bce11d1 100644
 +  os << LParen() << floatBits << comma() << rawBitsDecimal << RParen()
 +     << semicolonEndL();
  }
- 
  /// Calling getName() on a calyx operation will return "calyx.${opname}". This
 diff --git a/test/Dialect/Calyx/emit.mlir b/test/Dialect/Calyx/emit.mlir
 index ed012d8ca..34c6dc013 100644
@@ -90,9 +89,7 @@ index ed012d8ca..34c6dc013 100644
      %cst = calyx.constant @cst_0 <4.200000e+00 : f32> : i32
      %true = hw.constant true
      // CHECK-DAG: mulf_0_reg = std_reg(32);
-@@ -628,11 +628,19 @@ module attributes {calyx.entrypoint = "main"} {
- // Emit negative, NaN, and infinite floating point values
- 
+@@ -630,9 +630,17 @@ module attributes {calyx.entrypoint = "main"} {
  module attributes {calyx.entrypoint = "main"} {
 +  // CHECK: import "primitives/compile.futil";
    calyx.component @main(%clk: i1 {clk}, %reset: i1 {reset}, %go: i1 {go}) -> (%done: i1 {done}) {
@@ -110,5 +107,5 @@ index ed012d8ca..34c6dc013 100644
      %cst_1 = calyx.constant @cst_0 <-4.200000e+00 : f32> : i32
      %c0_i32 = hw.constant 0 : i32
      %std_slice_1.in, %std_slice_1.out = calyx.std_slice @std_slice_1 : i1
--- 
+--
 2.53.0

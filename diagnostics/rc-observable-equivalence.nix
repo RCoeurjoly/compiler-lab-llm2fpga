@@ -5,6 +5,8 @@
 , image
 , exportedProgram
 , f32ConstantBits
+, flatScf
+, calyx
 , sourceRoot
 }:
 
@@ -45,6 +47,8 @@ let
       --f32-constant-bits ${f32ConstantBits} \
       --f32-calyx-mlir ${sv}/constant-proof/normalized.calyx.mlir \
       --f32-raw-futil ${sv}/constant-proof/exported.raw.futil \
+      --flat-scf ${flatScf}/flat.scf.mlir \
+      --pre-calyx ${calyx}/pre-calyx.mlir \
       --sv ${sv}/sv/main.sv \
       --image ${image}/rc-image.bin \
       --manifest ${image}/rc-image-manifest.json \
@@ -71,6 +75,8 @@ let
         --f32-constant-bits ${f32ConstantBits} \
         --f32-calyx-mlir ${sv}/constant-proof/normalized.calyx.mlir \
         --f32-raw-futil ${sv}/constant-proof/exported.raw.futil \
+        --flat-scf ${flatScf}/flat.scf.mlir \
+        --pre-calyx ${calyx}/pre-calyx.mlir \
         --sv ${sv}/sv/main.sv \
         --image ${image}/rc-image.bin \
         --manifest ${image}/rc-image-manifest.json \
@@ -88,6 +94,8 @@ let
       --f32-constant-bits ${f32ConstantBits} \
       --f32-calyx-mlir ${sv}/constant-proof/normalized.calyx.mlir \
       --f32-raw-futil ${sv}/constant-proof/exported.raw.futil \
+      --flat-scf ${flatScf}/flat.scf.mlir \
+      --pre-calyx ${calyx}/pre-calyx.mlir \
       --sv ${sv}/sv/main.sv \
       --image ${image}/rc-image.bin \
       --manifest ${image}/rc-image-manifest.json \
@@ -95,32 +103,15 @@ let
       --work-dir "$out/verilator-work" \
       --verify-cache --run-only \
       --result-json "$out/sequential-reset.json"
-    ${python}/bin/python3 - "$out" "${f32ConstantBits}" "${runner}" <<'PY'
-import hashlib
-import importlib.util
-import json
-import pathlib
-import sys
-
-out = pathlib.Path(sys.argv[1])
-proof_sha256 = hashlib.sha256(pathlib.Path(sys.argv[2]).read_bytes()).hexdigest()
-runner = pathlib.Path(sys.argv[3])
-spec = importlib.util.spec_from_file_location("rc_equivalence_runner", runner)
-if spec is None or spec.loader is None:
-    raise SystemExit("cannot load strict equivalence reducer")
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
-names = ["ascending", "descending", "zeros", "alternating"]
-fresh = {
-    name: json.loads((out / f"{name}.json").read_text(encoding="utf-8"))
-    for name in names
-}
-sequential = json.loads((out / "sequential-reset.json").read_text(encoding="utf-8"))
-summary = module._frozen_four_summary(names, fresh, sequential, proof_sha256)
-(out / "summary.json").write_text(
-    json.dumps(summary, sort_keys=True) + "\n", encoding="utf-8"
-)
-PY
+    ${python}/bin/python3 ${runner} \
+      --reduce-frozen-four \
+      --f32-constant-bits ${f32ConstantBits} \
+      --fresh-receipt ascending="$out/ascending.json" \
+      --fresh-receipt descending="$out/descending.json" \
+      --fresh-receipt zeros="$out/zeros.json" \
+      --fresh-receipt alternating="$out/alternating.json" \
+      --sequential-receipt "$out/sequential-reset.json" \
+      --result-json "$out/summary.json"
   '';
 in {
   inherit frozenOracle strictBuild frozenFour;
