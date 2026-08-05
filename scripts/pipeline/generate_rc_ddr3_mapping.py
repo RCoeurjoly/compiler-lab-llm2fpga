@@ -117,6 +117,9 @@ def generate_mapping(compatibility: object, calyx_memory_bindings: object,
                 raise ValueError("immutable RC port is missing its authoritative source image segment") from error
         if segment["byte_length"] != byte_length:
             raise ValueError("source image byte layout does not match immutable RC port dimensions")
+        dtype_widths = {"float32": 32, "int8": 8, "uint8": 8, "int16": 16, "int32": 32}
+        if segment["dtype"] not in dtype_widths or width != dtype_widths[segment["dtype"]]:
+            raise ValueError("immutable RC port width does not match authoritative source-image dtype")
         row = {"port": port, "logical_byte_address": segment["offset"],
                "wishbone_word_address": segment["offset"] // 16, "width_bits": width,
                "depth_words": depth, "byte_length": byte_length,

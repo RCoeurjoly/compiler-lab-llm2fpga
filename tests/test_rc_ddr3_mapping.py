@@ -94,6 +94,20 @@ class RcDdr3MappingTest(unittest.TestCase):
             mapping.generate_mapping(self.compatibility, self.bindings, self.image,
                                      json.dumps(tampered, sort_keys=True, separators=(",", ":")).encode())
 
+    def test_mapping_rejects_rehashed_learned_port_metadata_that_disagrees_with_source_dtype(self):
+        self.compatibility["ports"][0]["width_bits"] = 16
+        self.compatibility["ports"][0]["depth_words"] = 8
+        self.compatibility["learned_tensor_ports"] = [
+            row for row in self.compatibility["ports"]
+            if row["classification"] == "ddr3-learned-tensor"
+        ]
+        payload = {key: value for key, value in self.compatibility.items()
+                   if key not in ("canonical_json", "sha256")}
+        self.compatibility["canonical_json"] = mapping._canonical(payload)
+        self.compatibility["sha256"] = mapping._sha(self.compatibility["canonical_json"])
+        with self.assertRaisesRegex(ValueError, "authoritative source-image dtype"):
+            mapping.generate_mapping(self.compatibility, self.bindings, self.image, self.manifest_bytes)
+
 
 if __name__ == "__main__":
     unittest.main()
