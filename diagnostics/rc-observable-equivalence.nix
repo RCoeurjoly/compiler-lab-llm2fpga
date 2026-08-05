@@ -42,7 +42,14 @@ let
   } ''
     set -euo pipefail
     export PYTHONPATH="${sourceRoot}:''${PYTHONPATH:-}"
-    ${python}/bin/python3 ${runner} \
+    # Keep the runner and its verifier sibling in one closure.  The runner
+    # imports build_rc_observable_oracle.py relative to __file__; invoking a
+    # flattened store wrapper used to leave that sibling at /nix/store and
+    # fail strict preflight before Verilator was reached.
+    cp ${runner} "$out/run_rc_sv_equivalence.py"
+    cp ${oracleBuilder} "$out/build_rc_observable_oracle.py"
+    export RC_OBSERVABLE_ORACLE_HELPER="$out/build_rc_observable_oracle.py"
+    ${python}/bin/python3 "$out/run_rc_sv_equivalence.py" \
       --equivalence-shard ${frozenOracle}/zeros.json \
       --f32-constant-bits ${f32ConstantBits} \
       --f32-calyx-mlir ${sv}/constant-proof/normalized.calyx.mlir \
@@ -68,9 +75,12 @@ let
     set -euo pipefail
     mkdir -p "$out"
     export PYTHONPATH="${sourceRoot}:''${PYTHONPATH:-}"
+    cp ${runner} "$out/run_rc_sv_equivalence.py"
+    cp ${oracleBuilder} "$out/build_rc_observable_oracle.py"
+    export RC_OBSERVABLE_ORACLE_HELPER="$out/build_rc_observable_oracle.py"
     cp -r ${strictBuild}/verilator-work "$out/verilator-work"
     for case_name in ascending descending zeros alternating; do
-      ${python}/bin/python3 ${runner} \
+      ${python}/bin/python3 "$out/run_rc_sv_equivalence.py" \
         --equivalence-shard ${frozenOracle}/$case_name.json \
         --f32-constant-bits ${f32ConstantBits} \
         --f32-calyx-mlir ${sv}/constant-proof/normalized.calyx.mlir \
@@ -85,7 +95,7 @@ let
         --verify-cache --run-only \
         --result-json "$out/$case_name.json"
     done
-    ${python}/bin/python3 ${runner} \
+    ${python}/bin/python3 "$out/run_rc_sv_equivalence.py" \
       --equivalence-sequence \
         ${frozenOracle}/ascending.json \
         ${frozenOracle}/descending.json \
@@ -103,7 +113,7 @@ let
       --work-dir "$out/verilator-work" \
       --verify-cache --run-only \
       --result-json "$out/sequential-reset.json"
-    ${python}/bin/python3 ${runner} \
+    ${python}/bin/python3 "$out/run_rc_sv_equivalence.py" \
       --reduce-frozen-four \
       --f32-constant-bits ${f32ConstantBits} \
       --fresh-receipt ascending="$out/ascending.json" \

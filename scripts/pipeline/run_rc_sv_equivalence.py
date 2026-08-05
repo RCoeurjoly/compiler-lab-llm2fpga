@@ -2239,7 +2239,8 @@ def _validate_oracle_image_provenance(
 
 
 def _load_oracle_helper():
-    helper_path = Path(__file__).with_name("build_rc_observable_oracle.py")
+    configured = os.environ.get("RC_OBSERVABLE_ORACLE_HELPER")
+    helper_path = Path(configured) if configured else Path(__file__).with_name("build_rc_observable_oracle.py")
     spec = importlib.util.spec_from_file_location("rc_observable_oracle", helper_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load observable oracle helper: {helper_path}")
