@@ -74,7 +74,10 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
         self.abi = _memory_abi()
         self.bindings = _bindings(self.abi)
         pins = {"addr0": "output", "content_en": "output", "write_en": "output", "write_data": "output", "read_data": "input", "done": "input"}
-        self.evidence = {"source_sha256": "a" * 64, "memory_abi_sha256": self.abi["sha256"], "completion": {"max_outstanding": 1, "response": "one-done-per-accepted-request"}, "ports": [{"port": port, "pins": pins, "write_enable": "proven-zero" if port in audit.LEARNED_PORTS else "dynamic"} for port in range(146)]}
+        self.evidence = {"schema": "rc-sv-routing-evidence-v1", "source_sha256": "a" * 64, "memory_abi_sha256": self.abi["sha256"], "completion": {"max_outstanding": 1, "response": "one-done-per-accepted-request"}, "ports": [{"port": port, "pins": pins, "write_enable": "proven-zero" if port in audit.LEARNED_PORTS else "dynamic"} for port in range(146)]}
+        payload = dict(self.evidence)
+        self.evidence["canonical_json"] = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        self.evidence["sha256"] = _sha(self.evidence["canonical_json"])
 
     def _audit(self, abi=None, bindings=None, *args):
         return audit.audit_compatibility(abi or self.abi, bindings or self.bindings, *args, sv_evidence=self.evidence)
@@ -126,6 +129,9 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
         bindings["canonical_json"] = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         bindings["sha256"] = _sha(bindings["canonical_json"])
         self.evidence["memory_abi_sha256"] = changed["sha256"]
+        evidence_payload = {key: value for key, value in self.evidence.items() if key not in ("canonical_json", "sha256")}
+        self.evidence["canonical_json"] = json.dumps(evidence_payload, sort_keys=True, separators=(",", ":"))
+        self.evidence["sha256"] = _sha(self.evidence["canonical_json"])
         with self.assertRaisesRegex(ValueError, "128-bit DDR3"):
             self._audit(changed, bindings)
 
@@ -149,7 +155,7 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
             (root / "memory-abi.json").write_text(json.dumps(self.abi))
             (root / "calyx-memory-bindings.json").write_text(json.dumps(self.bindings))
             out = root / "ddr3-compatibility.json"
-            with self.assertRaisesRegex(ValueError, "explicit SV-derived"):
+            with self.assertRaises(SystemExit):
                 audit.main(["--memory-abi", str(root / "memory-abi.json"),
                             "--calyx-memory-bindings", str(root / "calyx-memory-bindings.json"),
                             "--out", str(out)])

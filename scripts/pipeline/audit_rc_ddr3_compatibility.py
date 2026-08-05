@@ -168,8 +168,14 @@ def audit_compatibility(memory_abi: object, calyx_memory_bindings: object,
     bindings = _normalise_bindings(calyx_memory_bindings)
     if bindings["memory_abi_sha256"] != abi["sha256"]:
         raise ValueError("Calyx memory binding receipt does not bind this memory ABI receipt")
-    if not isinstance(sv_evidence, Mapping) or set(sv_evidence) != {"source_sha256", "memory_abi_sha256", "ports", "completion"}:
+    evidence_keys = {"schema", "source_sha256", "memory_abi_sha256", "ports", "completion", "canonical_json", "sha256"}
+    if not isinstance(sv_evidence, Mapping) or set(sv_evidence) != evidence_keys:
         raise ValueError("DDR3 routing requires explicit SV-derived ABI evidence")
+    payload = {key: sv_evidence[key] for key in evidence_keys - {"canonical_json", "sha256"}}
+    if (sv_evidence["schema"] != "rc-sv-routing-evidence-v1"
+            or sv_evidence["canonical_json"] != _canonical(payload)
+            or sv_evidence["sha256"] != _sha(sv_evidence["canonical_json"])):
+        raise ValueError("SV-derived ABI evidence has an invalid canonical hash")
     if not _is_sha(sv_evidence["source_sha256"]) or sv_evidence["memory_abi_sha256"] != abi["sha256"]:
         raise ValueError("SV-derived ABI evidence does not bind this memory ABI receipt")
     if sv_evidence["completion"] != {"max_outstanding": 1, "response": "one-done-per-accepted-request"}:
@@ -211,6 +217,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--memory-abi", required=True, type=Path)
     parser.add_argument("--calyx-memory-bindings", required=True, type=Path)
+    parser.add_argument("--sv-evidence", required=True, type=Path)
     parser.add_argument("--ddr3-source-closure", type=Path)
     parser.add_argument("--uberddr3-root", type=Path)
     parser.add_argument("--out", required=True, type=Path)
@@ -220,7 +227,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     closure = json.loads(args.ddr3_source_closure.read_text()) if args.ddr3_source_closure else None
     receipt = audit_compatibility(json.loads(args.memory_abi.read_text()),
                                   json.loads(args.calyx_memory_bindings.read_text()), closure,
-                                  args.uberddr3_root)
+                                  args.uberddr3_root, json.loads(args.sv_evidence.read_text()))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(render_receipt(receipt), encoding="utf-8")
 
