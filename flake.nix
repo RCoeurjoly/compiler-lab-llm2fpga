@@ -826,6 +826,15 @@
             ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
               ${circt}/bin/circt-translate ${calyx}/bin/calyx \
               ${calyx}/share/calyx ${rcPolynomialExpCalyx}/calyx "$out"
+            # Keep the oracle-backed exponential lookup in the generated RTL
+            # closure.  It is an explicit support source and image; consumers
+            # must instantiate it rather than relying on simulator discovery.
+            cp ${./rtl/rc-working/rc_exp_table_lookup.sv} "$out/sv/rc_exp_table_lookup.sv"
+            cp ${./artifacts/rc_exp_table.hex} "$out/sv/rc_exp_table.hex"
+            printf '%s\n' "$out/sv/rc_exp_table_lookup.sv" >> "$out/sources.f"
+            cat > "$out/rc-exp-table-closure.json" <<EOF
+            {"schema":"rc-exp-table-closure-v1","table":"sv/rc_exp_table.hex","lookup":"sv/rc_exp_table_lookup.sv"}
+            EOF
           '';
         rcObservableEquivalence = import ./diagnostics/rc-observable-equivalence.nix {
           inherit pkgs python pythonWithTinyStoriesTorchAO;
