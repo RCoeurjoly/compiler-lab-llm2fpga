@@ -160,6 +160,20 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
                             "--calyx-memory-bindings", str(root / "calyx-memory-bindings.json"),
                             "--out", str(out)])
 
+    def test_cli_rejects_evidence_not_bound_to_the_supplied_sv_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "memory-abi.json").write_text(json.dumps(self.abi))
+            (root / "calyx-memory-bindings.json").write_text(json.dumps(self.bindings))
+            (root / "routing-evidence.json").write_text(json.dumps(self.evidence))
+            (root / "main_1.sv").write_text("module main_1; endmodule\n")
+            with self.assertRaisesRegex(ValueError, "does not match the supplied SV"):
+                audit.main(["--memory-abi", str(root / "memory-abi.json"),
+                            "--calyx-memory-bindings", str(root / "calyx-memory-bindings.json"),
+                            "--sv-evidence", str(root / "routing-evidence.json"),
+                            "--sv", str(root / "main_1.sv"),
+                            "--out", str(root / "ddr3-compatibility.json")])
+
     def test_audit_invokes_task_one_source_closure_validator(self):
         closure_path = REPO_ROOT / "scripts" / "pipeline" / "materialize_ddr3_source_closure.py"
         closure = _load_module_from(closure_path, "ddr3_source_closure")

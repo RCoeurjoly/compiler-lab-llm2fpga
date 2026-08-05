@@ -49,6 +49,7 @@
               ./archive/patches/unused/circt-upstream-task3-recovery/0005-handle-dense-resource-globals-in-flattenmemrefs.patch
               ./archive/patches/unused/circt-upstream-task3-recovery/0011-rebased-handshaketohw-stack.patch
               ./archive/patches/unused/circt-upstream-task3-recovery/0012-update-buffer-lowering-test-for-constant-order.patch
+              ./patches/circt/0001-export-calyx-float-constants-as-raw-bits.patch
             ];
           });
         circtMlir = circtPkgs.mlir;
@@ -343,6 +344,10 @@
               -o "$out/model.calyx.mlir" >"$out/lower.log" 2>&1
             test -s "$out/model.calyx.mlir"
           '';
+
+        rcCalyxExactFloatExport = import ./diagnostics/rc-calyx-exact-float-export.nix {
+          inherit pkgs calyx circt;
+        };
 
         rcMathExpPaperScreen = pkgs.writeShellApplication {
           name = "rc-math-exp-paper-screen";
@@ -812,10 +817,20 @@
             set -euo pipefail
             export CALYX_NORMALIZE_FOR_EXPORT=${pipelineScripts}/normalize_calyx_for_export.py
             export CALYX_NORMALIZE_FUTIL_CONSTANTS=${pipelineScripts}/normalize_futil_float_constants.py
+            export CALYX_VERIFY_F32_CONSTANT_BITS=${pipelineScripts}/verify_calyx_f32_constant_bits.py
             ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
               ${circt}/bin/circt-translate ${calyx}/bin/calyx \
               ${calyx}/share/calyx ${rcPolynomialExpCalyx}/calyx "$out"
           '';
+        rcObservableEquivalence = import ./diagnostics/rc-observable-equivalence.nix {
+          inherit pkgs python pythonWithTinyStoriesTorchAO;
+          sourceRoot = ./.;
+          sv = rcPolynomialExpSv;
+          image = rcWorkingSystem.referenceImage;
+          exportedProgram =
+            pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-pytorch-exported";
+          f32ConstantBits = rcPolynomialExpSv + "/f32-constant-bits.json";
+        };
         rcPolynomialExpSvEquivalenceBuild = pkgs.runCommand
           "tinystories-w8a8-rc-polynomial-exp-sv-verilator-build" {
             nativeBuildInputs = [
@@ -824,6 +839,7 @@
               pkgs.verilator
               pkgs.gnumake
               pkgs.stdenv.cc
+              rcSvNormalizerSemantics
             ];
           } ''
             set -euo pipefail
@@ -833,9 +849,31 @@
               --manifest ${rcWorkingSystem.referenceImage}/rc-image-manifest.json \
               --reference ${rcWorkingSystem.referenceImage}/reference.json \
               --verilator ${pkgs.verilator}/bin/verilator \
-              --heartbeat-cycles 1000 \
+              --verilate-jobs 4 \
+              --build-jobs 4 \
+              --verilator-threads 8 \
+              --verilator-output-split 10000 \
+              --verilator-output-split-cfuncs 10000 \
+              --heartbeat-cycles 0 \
               --work-dir "$out/verilator-work" \
+              --timing-json "$out/compile-timing.json" \
               --compile-only
+            ${python}/bin/python3 - "$out/compile-timing.json" "$out/verilator-work/main.sv" <<'PY'
+import json
+import pathlib
+import sys
+
+record = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+artifacts = record["artifacts"]
+if artifacts.get("normalizer_page_wires", 0) <= 0:
+    raise SystemExit("actual RC normalization did not emit any page wires")
+if artifacts.get("normalizer_added_always_comb_blocks") != 0:
+    raise SystemExit("actual RC normalization emitted procedural blocks")
+normalized_sv = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8")
+for target in ("fsm0_in", "fsm0_write_en"):
+    if f"__llm2fpga_sim_{target}_" not in normalized_sv:
+        raise SystemExit(f"actual RC normalization did not page {target}")
+PY
           '';
         rcPolynomialExpSvEquivalence = pkgs.runCommand
           "tinystories-w8a8-rc-polynomial-exp-sv-equivalence" {
@@ -849,10 +887,19 @@
               --reference ${rcWorkingSystem.referenceImage}/reference.json \
               --verilator ${pkgs.verilator}/bin/verilator \
               --work-dir ${rcPolynomialExpSvEquivalenceBuild}/verilator-work \
+              --verify-cache \
               --run-only \
               --result-json "$out/equivalence.json"
             test -s "$out/equivalence.json"
           '';
+        rcSvNormalizerSemantics = import ./diagnostics/rc-sv-normalizer-semantics.nix {
+          inherit pkgs;
+        };
+        rcVerilatorConfigMatrix = import ./diagnostics/rc-verilator-config-matrix.nix {
+          inherit pkgs;
+          sv = rcPolynomialExpSv;
+          image = rcWorkingSystem.referenceImage;
+        };
         rcPolynomialExpSvFlat = pkgs.runCommand
           "tinystories-w8a8-rc-polynomial-exp-calyx-native-sv-flat" {
             nativeBuildInputs = [ circt calyx python pkgs.bash ];
@@ -861,6 +908,7 @@
             export CALYX_EMIT_NESTED=0
             export CALYX_NORMALIZE_FOR_EXPORT=${pipelineScripts}/normalize_calyx_for_export.py
             export CALYX_NORMALIZE_FUTIL_CONSTANTS=${pipelineScripts}/normalize_futil_float_constants.py
+            export CALYX_VERIFY_F32_CONSTANT_BITS=${pipelineScripts}/verify_calyx_f32_constant_bits.py
             ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
               ${circt}/bin/circt-translate ${calyx}/bin/calyx \
               ${calyx}/share/calyx ${rcPolynomialExpCalyx}/calyx "$out"
@@ -874,6 +922,7 @@
             export CALYX_EMIT_NESTED=1
             export CALYX_NORMALIZE_FOR_EXPORT=${pipelineScripts}/normalize_calyx_for_export.py
             export CALYX_NORMALIZE_FUTIL_CONSTANTS=${pipelineScripts}/normalize_futil_float_constants.py
+            export CALYX_VERIFY_F32_CONSTANT_BITS=${pipelineScripts}/verify_calyx_f32_constant_bits.py
             ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
               ${circt}/bin/circt-translate ${calyx}/bin/calyx \
               ${calyx}/share/calyx ${rcPolynomialExpCalyx}/calyx "$out"
@@ -2377,13 +2426,22 @@
             calyxMathExpUpstreamReproducer;
           "calyx-i1-uitofp-legalization-selftest" =
             calyxI1UiToFpLegalizationSelftest;
+          "rc-calyx-exact-float-export" = rcCalyxExactFloatExport;
           "active-pipeline-variants" = activePipelineVariantsJson;
           "tinystories-w8a8-rc-polynomial-exp-calyx" = rcPolynomialExpCalyx;
           "tinystories-w8a8-rc-polynomial-exp-sv" = rcPolynomialExpSv;
           "tinystories-w8a8-rc-polynomial-exp-sv-verilator-build" =
-            rcPolynomialExpSvEquivalenceBuild;
+            rcObservableEquivalence.strictBuild;
           "tinystories-w8a8-rc-polynomial-exp-sv-equivalence" =
-            rcPolynomialExpSvEquivalence;
+            rcObservableEquivalence.frozenFour;
+          "tinystories-w8a8-rc-observable-oracle-frozen-four" =
+            rcObservableEquivalence.frozenOracle;
+          "tinystories-w8a8-rc-observable-equivalence-build" =
+            rcObservableEquivalence.strictBuild;
+          "tinystories-w8a8-rc-observable-equivalence-frozen-four" =
+            rcObservableEquivalence.frozenFour;
+          "tinystories-w8a8-rc-sv-normalizer-semantics" = rcSvNormalizerSemantics;
+          "tinystories-w8a8-rc-verilator-config-matrix" = rcVerilatorConfigMatrix;
           "tinystories-w8a8-rc-polynomial-exp-sv-flat" = rcPolynomialExpSvFlat;
           "tinystories-w8a8-rc-polynomial-exp-sv-no-synthesis" = rcPolynomialExpSvNoSynthesis;
           "tinystories-w8a8-rc-polynomial-exp-calyx-hw-sv" = rcPolynomialExpHwSv;

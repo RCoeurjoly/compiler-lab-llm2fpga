@@ -1,0 +1,114 @@
+From 88b34141b026d8cd356657b908393837419f0a30 Mon Sep 17 00:00:00 2001
+From: Roland Coeurjoly <rolandcoeurjoly@gmail.com>
+Date: Tue, 4 Aug 2026 12:00:00 +0200
+Subject: [PATCH] Export Calyx float constants as raw IEEE bits
+
+The native Calyx compiler consumes `std_const` as a raw bitvector.  Emitting
+an APFloat through a decimal `double` string loses small values and cannot
+represent every NaN payload or signed zero.  Preserve the source APFloat's
+storage bits instead.
+
+---
+ lib/Dialect/Calyx/Export/CalyxEmitter.cpp | 20 ++++++++++----------
+ test/Dialect/Calyx/emit.mlir               | 12 +++++++++---
+ 2 files changed, 19 insertions(+), 13 deletions(-)
+
+diff --git a/lib/Dialect/Calyx/Export/CalyxEmitter.cpp b/lib/Dialect/Calyx/Export/CalyxEmitter.cpp
+index c491aef7b..d4bce11d1 100644
+--- a/lib/Dialect/Calyx/Export/CalyxEmitter.cpp
++++ b/lib/Dialect/Calyx/Export/CalyxEmitter.cpp
+@@ -20,6 +20,7 @@
+ #include "mlir/IR/BuiltinTypes.h"
+ #include "mlir/Tools/mlir-translate/Translation.h"
+ #include "llvm/ADT/SmallSet.h"
++#include "llvm/ADT/SmallString.h"
+ #include "llvm/ADT/TypeSwitch.h"
+ #include "llvm/Support/Casting.h"
+ #include "llvm/Support/FormatVariadic.h"
+@@ -144,10 +145,10 @@ public:
+         .Case<SeqMemoryOp>([&](auto op) -> FailureOr<StringRef> {
+           static constexpr std::string_view sMemories = "memories/seq";
+           return {sMemories};
+         })
+         .Case<ConstantOp>([&](auto op) -> FailureOr<StringRef> {
+-          static constexpr std::string_view sFloat = "float";
+-          return {sFloat};
++          static constexpr std::string_view sCompile = "compile";
++          return {sCompile};
+         })
+         .Case<AddFOpIEEE754>([&](auto op) -> FailureOr<StringRef> {
+           static constexpr std::string_view sFloatingPoint = "float/addFN";
+@@ -971,15 +972,14 @@ void Emitter::emitConstant(ConstantOp constantOp) {
+   auto fltAttr = cast<FloatAttr>(attr);
+   APFloat value = fltAttr.getValue();
+   auto type = cast<FloatType>(fltAttr.getType());
+-  double doubleValue = value.convertToDouble();
+   auto floatBits = value.getSizeInBits(type.getFloatSemantics());
++  APInt rawBits = value.bitcastToAPInt();
++  SmallString<32> rawBitsDecimal;
++  rawBits.toStringUnsigned(rawBitsDecimal, /*Radix=*/10);
+   indent() << constantOp.instanceName() << space() << equals() << space()
+-           << "std_float_const";
+-  // Currently defaults to IEEE-754 representation [1].
+-  // [1]: https://github.com/calyxir/calyx/blob/main/primitives/float.futil
+-  static constexpr int32_t IEEE754 = 0;
+-  os << LParen() << std::to_string(IEEE754) << comma() << floatBits << comma()
+-     << std::to_string(doubleValue) << RParen() << semicolonEndL();
++           << "std_const";
++  os << LParen() << floatBits << comma() << rawBitsDecimal << RParen()
++     << semicolonEndL();
+ }
+ 
+ /// Calling getName() on a calyx operation will return "calyx.${opname}". This
+diff --git a/test/Dialect/Calyx/emit.mlir b/test/Dialect/Calyx/emit.mlir
+index ed012d8ca..34c6dc013 100644
+--- a/test/Dialect/Calyx/emit.mlir
++++ b/test/Dialect/Calyx/emit.mlir
+@@ -247,6 +247,6 @@ module attributes {calyx.entrypoint = "main"} {
+ module attributes {calyx.entrypoint = "main"} {
+   calyx.component @main(%clk: i1 {clk}, %reset: i1 {reset}, %go: i1 {go}) -> (%out0: i32, %out1: i32, %done: i1 {done}) {
+-    // CHECK: cst_0 = std_float_const(0, 32, 4.200000);
++    // CHECK: cst_0 = std_const(32, 1082549862);
+     %c42_i32 = hw.constant 42 : i32
+     %cst = calyx.constant @cst_0 <4.200000e+00 : f32> : i32
+     %true = hw.constant true
+@@ -286,7 +286,7 @@ module attributes {calyx.entrypoint = "main"} {
+ module attributes {calyx.entrypoint = "main"} {
+   // CHECK: import "primitives/float/addFN.futil";
+   calyx.component @main(%in0: i32, %clk: i1 {clk}, %reset: i1 {reset}, %go: i1 {go}) -> (%out0: i32, %done: i1 {done}) {
+-    // CHECK-DAG: cst_0 = std_float_const(0, 32, 4.200000);
++    // CHECK-DAG: cst_0 = std_const(32, 1082549862);
+     %cst = calyx.constant @cst_0 <4.200000e+00 : f32> : i32
+     %true = hw.constant true
+     %false = hw.constant false
+@@ -340,7 +340,7 @@ module attributes {calyx.entrypoint = "main"} {
+ module attributes {calyx.entrypoint = "main"} {
+   // CHECK: import "primitives/float/mulFN.futil";
+   calyx.component @main(%in0: i32, %clk: i1 {clk}, %reset: i1 {reset}, %go: i1 {go}) -> (%out0: i32, %done: i1 {done}) {
+-    // CHECK-DAG: cst_0 = std_float_const(0, 32, 4.200000);
++    // CHECK-DAG: cst_0 = std_const(32, 1082549862);
+     %cst = calyx.constant @cst_0 <4.200000e+00 : f32> : i32
+     %true = hw.constant true
+     // CHECK-DAG: mulf_0_reg = std_reg(32);
+@@ -628,11 +628,19 @@ module attributes {calyx.entrypoint = "main"} {
+ // Emit negative, NaN, and infinite floating point values
+ 
+ module attributes {calyx.entrypoint = "main"} {
++  // CHECK: import "primitives/compile.futil";
+   calyx.component @main(%clk: i1 {clk}, %reset: i1 {reset}, %go: i1 {go}) -> (%done: i1 {done}) {
+     %true = hw.constant true
+     %false = hw.constant false
++    // CHECK-DAG: cst_4 = std_const(32, 866258955);
++    %cst_4 = calyx.constant @cst_4 <7.54663105e-08 : f32> : i32
++    // CHECK-DAG: cst_3 = std_const(32, 2147483648);
++    %cst_3 = calyx.constant @cst_3 <0x80000000 : f32> : i32
++    // CHECK-DAG: cst_2 = std_const(32, 4286578688);
+     %cst = calyx.constant @cst_2 <0xFF800000 : f32> : i32
++    // CHECK-DAG: cst_1 = std_const(32, 2143289344);
+     %cst_0 = calyx.constant @cst_1 <0x7FC00000 : f32> : i32
++    // CHECK-DAG: cst_0 = std_const(32, 3230033510);
+     %cst_1 = calyx.constant @cst_0 <-4.200000e+00 : f32> : i32
+     %c0_i32 = hw.constant 0 : i32
+     %std_slice_1.in, %std_slice_1.out = calyx.std_slice @std_slice_1 : i1
+-- 
+2.53.0

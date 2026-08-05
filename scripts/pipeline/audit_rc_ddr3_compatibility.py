@@ -141,6 +141,17 @@ def _source_closure_digest(source_closure: object | None, uberddr3_root: Path | 
     return _sha(_canonical(source_closure))
 
 
+def _sv_source_sha256(sv_sources: Sequence[Path]) -> str:
+    """Use the extractor's byte-framed source hash for audit-time binding."""
+    extractor_path = Path(__file__).with_name("extract_rc_sv_routing_evidence.py")
+    spec = importlib.util.spec_from_file_location("rc_sv_routing_evidence", extractor_path)
+    if spec is None or spec.loader is None:
+        raise ValueError("unable to load the SV routing evidence extractor")
+    extractor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(extractor)
+    return extractor.source_sha256(sv_sources)
+
+
 def _port_contract(number: int, row: Mapping[str, Any]) -> dict[str, Any]:
     if number in LEARNED_PORTS:
         classification = "ddr3-learned-tensor"
@@ -162,7 +173,8 @@ def _port_contract(number: int, row: Mapping[str, Any]) -> dict[str, Any]:
 def audit_compatibility(memory_abi: object, calyx_memory_bindings: object,
                         source_closure: object | None = None,
                         uberddr3_root: Path | None = None,
-                        sv_evidence: object | None = None) -> dict[str, Any]:
+                        sv_evidence: object | None = None,
+                        sv_sources: Sequence[Path] | None = None) -> dict[str, Any]:
     """Validate receipt linkage and return the immutable DDR3 routing contract."""
     abi = _normalise_memory_abi(memory_abi)
     bindings = _normalise_bindings(calyx_memory_bindings)
@@ -178,6 +190,8 @@ def audit_compatibility(memory_abi: object, calyx_memory_bindings: object,
         raise ValueError("SV-derived ABI evidence has an invalid canonical hash")
     if not _is_sha(sv_evidence["source_sha256"]) or sv_evidence["memory_abi_sha256"] != abi["sha256"]:
         raise ValueError("SV-derived ABI evidence does not bind this memory ABI receipt")
+    if sv_sources is not None and sv_evidence["source_sha256"] != _sv_source_sha256(sv_sources):
+        raise ValueError("SV-derived ABI evidence source hash does not match the supplied SV bytes")
     if sv_evidence["completion"] != {"max_outstanding": 1, "response": "one-done-per-accepted-request"}:
         raise ValueError("SV-derived ABI evidence lacks the required completion semantics")
     evidence_ports = sv_evidence["ports"]
@@ -218,6 +232,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--memory-abi", required=True, type=Path)
     parser.add_argument("--calyx-memory-bindings", required=True, type=Path)
     parser.add_argument("--sv-evidence", required=True, type=Path)
+    parser.add_argument("--sv", required=True, action="append", type=Path,
+                        help="generated SV input used to extract --sv-evidence; repeat for each source")
     parser.add_argument("--ddr3-source-closure", type=Path)
     parser.add_argument("--uberddr3-root", type=Path)
     parser.add_argument("--out", required=True, type=Path)
@@ -227,7 +243,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     closure = json.loads(args.ddr3_source_closure.read_text()) if args.ddr3_source_closure else None
     receipt = audit_compatibility(json.loads(args.memory_abi.read_text()),
                                   json.loads(args.calyx_memory_bindings.read_text()), closure,
-                                  args.uberddr3_root, json.loads(args.sv_evidence.read_text()))
+                                  args.uberddr3_root, json.loads(args.sv_evidence.read_text()), args.sv)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(render_receipt(receipt), encoding="utf-8")
 

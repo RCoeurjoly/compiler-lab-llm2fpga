@@ -1,0 +1,74 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Roland Coeurjoly <rolandcoeurjoly@gmail.com>
+Date: Wed, 5 Aug 2026 12:00:00 +0200
+Subject: [PATCH] Wait for fpToInt output before latching fptosi result
+
+The Calyx std_fpToInt primitive registers its output and asserts done only
+after its result is valid. Lowering fptosi with an unconditional result
+register write enable samples the reset/stale output before that completion.
+Drive the fptosi result-register enable from fpToInt.done instead.
+
+This deliberately changes only the FpToInt lowering. IntToFp remains
+unconditional because it has its existing distinct primitive timing contract.
+
+---
+ lib/Conversion/SCFToCalyx/SCFToCalyx.cpp     | 6 +++++-
+ test/Conversion/SCFToCalyx/convert_simple.mlir | 2 +-
+ test/Dialect/Calyx/emit.mlir                  | 4 ++--
+ 3 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/lib/Conversion/SCFToCalyx/SCFToCalyx.cpp b/lib/Conversion/SCFToCalyx/SCFToCalyx.cpp
+index 000000000..111111111 100644
+--- a/lib/Conversion/SCFToCalyx/SCFToCalyx.cpp
++++ b/lib/Conversion/SCFToCalyx/SCFToCalyx.cpp
+@@ -714,7 +714,11 @@
+     rewriter.replaceAllUsesWith(op.getResult(), reg.getOut());
+ 
+     calyx::AssignOp::create(rewriter, loc, reg.getIn(), calyxOp.getOut());
+-    calyx::AssignOp::create(rewriter, loc, reg.getWriteEn(), c1);
++    if (auto fpToInt = dyn_cast<calyx::FpToIntOpIEEE754>(calyxOp))
++      calyx::AssignOp::create(rewriter, loc, reg.getWriteEn(),
++                              fpToInt.getDone());
++    else
++      calyx::AssignOp::create(rewriter, loc, reg.getWriteEn(), c1);
+ 
+     calyx::AssignOp::create(
+         rewriter, loc, calyxOp.getGo(), c1,
+diff --git a/test/Conversion/SCFToCalyx/convert_simple.mlir b/test/Conversion/SCFToCalyx/convert_simple.mlir
+index 000000000..111111111 100644
+--- a/test/Conversion/SCFToCalyx/convert_simple.mlir
++++ b/test/Conversion/SCFToCalyx/convert_simple.mlir
+@@ -555,7 +555,7 @@
+ // CHECK-DAG:        calyx.assign %std_fpToIntFN_0.signedOut = %true : i1
+ // CHECK-DAG:        %0 = comb.xor %std_fpToIntFN_0.done, %true : i1
+ // CHECK-DAG:        calyx.assign %fptosi_0_reg.in = %std_fpToIntFN_0.out : i64
+-// CHECK-DAG:        calyx.assign %fptosi_0_reg.write_en = %true : i1
++// CHECK-DAG:        calyx.assign %fptosi_0_reg.write_en = %std_fpToIntFN_0.done : i1
+ // CHECK-DAG:        calyx.assign %std_fpToIntFN_0.go = %0 ? %true : i1
+ // CHECK-DAG:        calyx.group_done %fptosi_0_reg.done : i1
+ // CHECK-DAG:      }
+diff --git a/test/Dialect/Calyx/emit.mlir b/test/Dialect/Calyx/emit.mlir
+index 000000000..111111111 100644
+--- a/test/Dialect/Calyx/emit.mlir
++++ b/test/Dialect/Calyx/emit.mlir
+@@ -468,7 +468,7 @@
+       // CHECK-NEXT:      std_fptointFN_0.in = in0;
+       // CHECK-NEXT:      std_fptointFN_0.signedOut = 1'b1;
+       // CHECK-NEXT:      fptosi_0_reg.in = std_fptointFN_0.out;
+-      // CHECK-NEXT:      fptosi_0_reg.write_en = 1'b1;
++      // CHECK-NEXT:      fptosi_0_reg.write_en = std_fptointFN_0.done;
+       // CHECK-NEXT:      std_fptointFN_0.go = !std_fptointFN_0.done ? 1'b1;
+       // CHECK-NEXT:      bb0_0[done] = fptosi_0_reg.done;
+       // CHECK-NEXT:    }
+@@ -476,7 +476,7 @@
+       calyx.group @bb0_0 {
+         calyx.assign %std_fptointFN_0.in = %in0 : i32
+         calyx.assign %std_fptointFN_0.signedOut = %true : i1
+         calyx.assign %fptosi_0_reg.in = %std_fptointFN_0.out : i64
+-        calyx.assign %fptosi_0_reg.write_en = %true : i1
++        calyx.assign %fptosi_0_reg.write_en = %std_fptointFN_0.done : i1
+         %0 = comb.xor %std_fptointFN_0.done, %true : i1
+         calyx.assign %std_fptointFN_0.go = %0 ? %true : i1
+         calyx.group_done %fptosi_0_reg.done : i1
+-- 
+2.53.0
