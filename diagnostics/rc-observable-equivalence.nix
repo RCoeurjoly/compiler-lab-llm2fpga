@@ -57,6 +57,8 @@ let
       --flat-scf ${flatScf}/flat.scf.mlir \
       --pre-calyx ${calyx}/pre-calyx.mlir \
       --sv ${sv}/sv/main.sv \
+      --support-sv ${sv}/sv/rc_exp_table_lookup.sv \
+      --support-file ${sv}/sv/rc_exp_table.hex \
       --image ${image}/rc-image.bin \
       --manifest ${image}/rc-image-manifest.json \
       --verilator ${pkgs.verilator}/bin/verilator \
@@ -88,6 +90,8 @@ let
         --flat-scf ${flatScf}/flat.scf.mlir \
         --pre-calyx ${calyx}/pre-calyx.mlir \
         --sv ${sv}/sv/main.sv \
+        --support-sv ${sv}/sv/rc_exp_table_lookup.sv \
+        --support-file ${sv}/sv/rc_exp_table.hex \
         --image ${image}/rc-image.bin \
         --manifest ${image}/rc-image-manifest.json \
         --verilator ${pkgs.verilator}/bin/verilator \
@@ -107,6 +111,8 @@ let
       --flat-scf ${flatScf}/flat.scf.mlir \
       --pre-calyx ${calyx}/pre-calyx.mlir \
       --sv ${sv}/sv/main.sv \
+      --support-sv ${sv}/sv/rc_exp_table_lookup.sv \
+      --support-file ${sv}/sv/rc_exp_table.hex \
       --image ${image}/rc-image.bin \
       --manifest ${image}/rc-image-manifest.json \
       --verilator ${pkgs.verilator}/bin/verilator \

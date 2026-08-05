@@ -18,6 +18,7 @@ import math
 import os
 import platform
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -3614,8 +3615,13 @@ def _run_strict_equivalence(
         image_bytes = args.image.read_bytes()
         manifest_bytes = args.manifest.read_bytes()
         manifest = json.loads(manifest_bytes)
+        support_sv = [path.read_bytes() for path in args.support_sv]
         raw_sv_bytes = args.sv.read_bytes()
+        if support_sv:
+            raw_sv_bytes += b"\n" + b"\n".join(support_sv)
         raw_sv = raw_sv_bytes.decode("utf-8")
+        for support in args.support_file:
+            shutil.copy2(support, root / support.name)
         flat_scf_bytes = args.flat_scf.read_bytes()
         pre_calyx_bytes = args.pre_calyx.read_bytes()
         args.strict_input_hashes = {
@@ -4021,6 +4027,8 @@ def _run_strict_equivalence(
 def main_from_args(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sv", type=Path)
+    parser.add_argument("--support-sv", type=Path, action="append", default=[])
+    parser.add_argument("--support-file", type=Path, action="append", default=[])
     parser.add_argument("--image", type=Path)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument(
@@ -4242,6 +4250,8 @@ def main_from_args(argv: list[str] | None = None) -> None:
         if not args.run_only:
             normalize_start = time.perf_counter()
             sv = args.sv.read_text(encoding="utf-8")
+            if args.support_sv:
+                sv += "\n" + "\n".join(path.read_text(encoding="utf-8") for path in args.support_sv)
             memory_abi = _memory_abi(sv)
             memory_abi_receipt = _memory_abi_receipt(memory_abi)
             # CIRCT's native Calyx printer can emit a very large single line
