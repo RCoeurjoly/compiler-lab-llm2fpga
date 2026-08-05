@@ -42,7 +42,9 @@ python3 -m py_compile scripts/pipeline/audit_rc_ddr3_compatibility.py scripts/pi
 git diff --check -- scripts/pipeline/audit_rc_ddr3_compatibility.py scripts/pipeline/generate_rc_ddr3_mapping.py tests/test_rc_ddr3_compatibility.py tests/test_rc_ddr3_mapping.py
 ```
 
-All passed (ten focused unit tests).
+All passed (twelve focused unit tests).  Immutable learned ports now require
+the canonical proven-zero write-enable evidence; a rehashed forged mutable
+write-enable digest rejects.
 
 Concern: no generated RC receipt artifact is currently retained in this
 worktree.  The utilities therefore support both receipt forms and are covered
