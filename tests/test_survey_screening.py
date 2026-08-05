@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import shutil
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -25,6 +28,9 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
                     "auto_level": "B",
                     "auto_route_family": "DATAFLOW",
                     "screen_priority_score": 12,
+                    "pdf_url": "https://arxiv.org/pdf/1234.00001v1",
+                    "cache_sha256": "1" * 64,
+                    "cache_json": json.dumps({"filename": "1234.00001v1.pdf"}),
                     "preferred_record_id": "REC-1",
                     "is_preferred_manifestation": True,
                     "dedup_rule": "unique",
@@ -38,6 +44,9 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
                     "auto_level": "X",
                     "auto_route_family": "",
                     "screen_priority_score": 1,
+                    "pdf_url": "https://arxiv.org/pdf/1234.00002v1",
+                    "cache_sha256": "2" * 64,
+                    "cache_json": json.dumps({"filename": "1234.00002v1.pdf"}),
                     "preferred_record_id": "REC-2",
                     "is_preferred_manifestation": True,
                     "dedup_rule": "unique",
@@ -142,6 +151,88 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
     def test_rejects_unknown_route_family(self) -> None:
         self.assert_invalid("controlled route family", route_family_final="OTHER")
 
+    def test_requires_route_family_for_levels_a_through_c(self) -> None:
+        self.assert_invalid("A-C records require", route_family_final="")
+
+    def test_full_text_basis_requires_portable_source_and_cache_identity(self) -> None:
+        decisions = self.decisions.copy()
+        decisions.loc[0, "review_basis"] = "title_abstract+local_full_text"
+        decisions.loc[0, "evidence_location"] = "/tmp/1234.00001v1.pdf#page=1"
+        with self.assertRaisesRegex(ValueError, "portable full-text evidence"):
+            validate_decisions(self.mapping, decisions)
+
+        decisions.loc[0, "evidence_location"] = (
+            "phase1_mapping.csv#REC-1:title+abstract;"
+            "source_url=https://arxiv.org/pdf/1234.00001v1;"
+            "cache_filename=1234.00001v1.pdf;"
+            f"cache_sha256={'1' * 64};locator=page 1"
+        )
+        validate_decisions(self.mapping, decisions)
+
+    def duplicate_fixture(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+        mapping = pd.concat(
+            [
+                self.mapping.iloc[[0]],
+                self.mapping.iloc[[0]].assign(
+                    record_index=2,
+                    record_id="REC-1-OLD",
+                    preferred_record_id="REC-1",
+                    is_preferred_manifestation=False,
+                    dedup_rule="exact_arxiv",
+                ),
+            ],
+            ignore_index=True,
+        )
+        mapping.loc[0, "preferred_record_id"] = "REC-1"
+        mapping.loc[0, "is_preferred_manifestation"] = True
+        mapping.loc[0, "dedup_rule"] = "preferred_manifestation"
+        decisions = pd.concat(
+            [
+                self.decisions.iloc[[0]],
+                self.decisions.iloc[[1]].assign(
+                    record_id="REC-1-OLD",
+                    work_id="WORK-1",
+                    exclusion_code="X_DUPLICATE",
+                    project_family_id="PF-1",
+                    family_is_primary_work=True,
+                    family_grouping_basis="single_work_family",
+                ),
+            ],
+            ignore_index=True,
+        )
+        return mapping, decisions
+
+    def test_rejects_invalid_preferred_and_duplicate_lineage(self) -> None:
+        mapping, decisions = self.duplicate_fixture()
+
+        included_duplicate = decisions.copy()
+        included_duplicate.loc[
+            1,
+            [
+                "final_level",
+                "include_final",
+                "exclusion_code",
+                "route_family_final",
+            ],
+        ] = ["B", True, "", "DATAFLOW"]
+        with self.assertRaisesRegex(ValueError, "non-preferred manifestations"):
+            validate_decisions(mapping, included_duplicate)
+
+        preferred_duplicate = self.decisions.copy()
+        preferred_duplicate.loc[1, "exclusion_code"] = "X_DUPLICATE"
+        with self.assertRaisesRegex(ValueError, "only on non-preferred"):
+            validate_decisions(self.mapping, preferred_duplicate)
+
+        split_family = decisions.copy()
+        split_family.loc[1, "project_family_id"] = "PF-OTHER"
+        with self.assertRaisesRegex(ValueError, "same project family"):
+            validate_decisions(mapping, split_family)
+
+        no_preferred = mapping.copy()
+        no_preferred["is_preferred_manifestation"] = False
+        with self.assertRaisesRegex(ValueError, "exactly one preferred"):
+            validate_decisions(no_preferred, decisions)
+
     def test_preserves_automatic_fields_as_source_metadata(self) -> None:
         screened = validate_decisions(self.mapping, self.decisions)
 
@@ -166,15 +257,41 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
     def test_writes_exclusion_family_and_traceable_audit_outputs(self) -> None:
         screened = validate_decisions(self.mapping, self.decisions)
         with TemporaryDirectory() as temporary:
-            write_screening_outputs(screened, Path(temporary))
+            output = Path(temporary)
+            source_counts = {
+                "auto_levels": {"A": 0, "B": 1, "C": 0, "D": 0, "X": 1},
+                "candidate_unique_works": 2,
+                "duplicate_manifestations": 0,
+                "duplicate_work_groups": 0,
+                "input_records": 2,
+                "manual_review_queue": 2,
+            }
+            flow_bytes = (
+                json.dumps(source_counts, indent=2, sort_keys=True) + "\n"
+            ).encode()
+            (output / "flow_counts.json").write_bytes(flow_bytes)
+            phase1_run = {
+                "output_sha256": {
+                    "flow_counts.json": hashlib.sha256(flow_bytes).hexdigest(),
+                    "phase1_mapping.csv": "fixture-mapping-sha256",
+                }
+            }
+            (output / "phase1_run.json").write_text(
+                json.dumps(phase1_run, indent=2, sort_keys=True) + "\n"
+            )
+            write_screening_outputs(screened, output)
 
             exclusions = pd.read_csv(
-                Path(temporary) / "phase1_exclusions.csv", keep_default_na=False
+                output / "phase1_exclusions.csv", keep_default_na=False
             )
             families = pd.read_csv(
-                Path(temporary) / "project_families.csv", keep_default_na=False
+                output / "project_families.csv", keep_default_na=False
             )
-            audit = (Path(temporary) / "screening_audit.md").read_text()
+            audit = (output / "screening_audit.md").read_text()
+            final_counts = json.loads((output / "final_flow_counts.json").read_text())
+            repeat_sample = pd.read_csv(
+                output / "repeat_review_sample.csv", keep_default_na=False
+            )
 
         self.assertEqual(["REC-2"], exclusions["record_id"].tolist())
         self.assertEqual(["X_SECONDARY"], exclusions["exclusion_code"].tolist())
@@ -182,7 +299,10 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
         self.assertIn("| B | 1 |", audit)
         self.assertIn("| X | 1 |", audit)
         self.assertIn("Duplicate/version decisions", audit)
+        self.assertIn("When the preferred manifestation is included", audit)
         self.assertIn("Reviewer sample / re-review design", audit)
+        self.assertIn("| B | 1 | 1 |", audit)
+        self.assertIn("| X | 1 | 1 |", audit)
         self.assertIn("Unresolved but non-blocking uncertainty", audit)
         self.assertIn("SHA-256(`project-family:` + `work_id`)", audit)
         self.assertIn(
@@ -192,6 +312,23 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
         self.assertIn(
             "phase1_mapping.csv#REC-2:title+abstract",
             audit,
+        )
+        self.assertEqual(source_counts["auto_levels"], final_counts["auto_levels"])
+        self.assertEqual(
+            {"A": 0, "B": 1, "C": 0, "D": 0, "X": 1},
+            final_counts["final_levels"],
+        )
+        self.assertEqual(1, final_counts["included_records"])
+        self.assertEqual(1, final_counts["excluded_records"])
+        self.assertEqual(1, final_counts["project_family_count"])
+        self.assertEqual(
+            hashlib.sha256(flow_bytes).hexdigest(),
+            final_counts["source_phase1_flow_counts_sha256"],
+        )
+        self.assertEqual({"REC-1", "REC-2"}, set(repeat_sample["record_id"]))
+        self.assertEqual(
+            {"lowest stable hashes; ceil(20%)"},
+            set(repeat_sample["selection_rule"]),
         )
 
 
@@ -251,6 +388,23 @@ class ProjectFamilyTests(unittest.TestCase):
             families["evidence_sources_json"].tolist(),
         )
 
+    def test_rejects_one_work_split_across_project_families(self) -> None:
+        screened = self.family_rows()
+        screened["work_id"] = "WORK-1"
+        screened["preferred_record_id"] = "REC-1"
+        screened.loc[1, "project_family_id"] = "PF-OTHER"
+        screened["family_is_primary_work"] = True
+
+        with self.assertRaisesRegex(ValueError, "exactly one project family"):
+            make_project_families(screened)
+
+    def test_rejects_primary_work_without_included_preferred_manifestation(self) -> None:
+        screened = self.family_rows()
+        screened.loc[0, "record_id"] = "REC-1-OLD"
+
+        with self.assertRaisesRegex(ValueError, "included preferred manifestation"):
+            make_project_families(screened)
+
 
 class FrozenScreeningArtifactTests(unittest.TestCase):
     def test_frozen_corpus_has_one_valid_traceable_decision_per_record(self) -> None:
@@ -265,6 +419,9 @@ class FrozenScreeningArtifactTests(unittest.TestCase):
 
         screened = validate_decisions(mapping, decisions)
         families = make_project_families(screened)
+        final_counts = json.loads(
+            (repository / "survey/build/final_flow_counts.json").read_text()
+        )
 
         self.assertEqual(461, len(screened))
         self.assertEqual(461, screened["record_id"].nunique())
@@ -283,6 +440,118 @@ class FrozenScreeningArtifactTests(unittest.TestCase):
         self.assertEqual(5, len(nonpreferred))
         self.assertEqual({"X"}, set(nonpreferred["final_level"]))
         self.assertEqual({"X_DUPLICATE"}, set(nonpreferred["exclusion_code"]))
+
+        full_text = screened.loc[
+            screened["review_basis"].eq("title_abstract+local_full_text"),
+            "evidence_location",
+        ]
+        self.assertEqual(50, len(full_text))
+        self.assertTrue(full_text.str.contains(";source_url=https://").all())
+        self.assertTrue(full_text.str.contains(";cache_filename=").all())
+        self.assertTrue(full_text.str.contains(";cache_sha256=").all())
+        self.assertTrue(full_text.str.contains(";locator=").all())
+        self.assertFalse(full_text.str.contains("/home/").any())
+        self.assertFalse(
+            full_text.str.contains("LLM-inference-on-FPGA-papers/papers/").any()
+        )
+
+        expected_extensions = [
+            (
+                "REC-0A35BCF12DE7E299",
+                "REC-48B14D3F981A4130",
+                "WORK-D98F092B3E212C22",
+            ),
+            (
+                "REC-0ED11F871A636313",
+                "REC-397AA2E8B322E5B6",
+                "WORK-76ACBFCD99E4F225",
+            ),
+            (
+                "REC-22B8F133078A7448",
+                "REC-0E5CD4ABE22322D8",
+                "WORK-674CDDB57508D5CE",
+            ),
+            (
+                "REC-8079DF7689E5D2AD",
+                "REC-361ADBB8874502B6",
+                "WORK-9EB01DDF67D140A4",
+            ),
+            (
+                "REC-4C2E95DDB8B7F21F",
+                "REC-66B094C6BAA51FA7",
+                "WORK-2D44FCCE8D9826E3",
+            ),
+        ]
+        for foundation_id, extension_id, primary_work_id in expected_extensions:
+            linked = screened.loc[
+                screened["record_id"].isin([foundation_id, extension_id])
+            ]
+            self.assertEqual(1, linked["project_family_id"].nunique())
+            self.assertEqual(
+                {False, True}, set(linked["family_is_primary_work"])
+            )
+            self.assertTrue(
+                linked["family_grouping_basis"]
+                .str.startswith("named_system_")
+                .all()
+            )
+            relation = families.loc[
+                families["project_family_id"].eq(
+                    linked["project_family_id"].iloc[0]
+                )
+            ]
+            self.assertEqual(2, len(relation))
+            self.assertEqual({primary_work_id}, set(relation["primary_work_id"]))
+
+        self.assertEqual(226, families["project_family_id"].nunique())
+
+        unrelated_pairs = [
+            ("REC-1D91E09883329FFA", "REC-A53433EACA5A3E39"),
+            ("REC-F95950AEA19221D0", "REC-6099EE66504F6EF2"),
+        ]
+        for left_id, right_id in unrelated_pairs:
+            unrelated = screened.loc[
+                screened["record_id"].isin([left_id, right_id]),
+                "project_family_id",
+            ]
+            self.assertEqual(2, unrelated.nunique())
+        self.assertEqual(461, final_counts["input_records"])
+        self.assertEqual(456, final_counts["candidate_unique_works"])
+        self.assertEqual(
+            {"A": 30, "B": 57, "C": 75, "D": 69, "X": 230},
+            final_counts["final_levels"],
+        )
+        self.assertEqual(226, final_counts["project_family_count"])
+        audit = (repository / "survey/build/screening_audit.md").read_text()
+        for expected in (
+            "| A | 30 | 30 |",
+            "| B | 57 | 12 |",
+            "| C | 75 | 75 |",
+            "| D | 69 | 14 |",
+            "| X | 230 | 46 |",
+        ):
+            self.assertIn(expected, audit)
+
+        with TemporaryDirectory() as temporary:
+            regenerated = Path(temporary)
+            for source_name in ("flow_counts.json", "phase1_run.json"):
+                shutil.copyfile(
+                    repository / "survey/build" / source_name,
+                    regenerated / source_name,
+                )
+            write_screening_outputs(screened, regenerated)
+            for artifact_name in (
+                "phase1_exclusions.csv",
+                "project_families.csv",
+                "screening_audit.md",
+                "final_flow_counts.json",
+                "repeat_review_sample.csv",
+            ):
+                self.assertEqual(
+                    (repository / "survey/build" / artifact_name).read_bytes(),
+                    (regenerated / artifact_name).read_bytes(),
+                    artifact_name,
+                )
 
 
 if __name__ == "__main__":

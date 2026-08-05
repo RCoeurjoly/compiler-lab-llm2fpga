@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections.abc import Iterable
 from pathlib import Path
@@ -85,11 +86,55 @@ def validate_decisions(
 ) -> pd.DataFrame:
     """Return mapping rows joined to one valid controlled final decision each."""
 
-    _require_columns(mapping, {"record_id", "work_id"}, "mapping")
+    _require_columns(
+        mapping,
+        {
+            "record_id",
+            "work_id",
+            "preferred_record_id",
+            "is_preferred_manifestation",
+            "pdf_url",
+            "cache_sha256",
+            "cache_json",
+        },
+        "mapping",
+    )
     _require_columns(decisions, DECISION_REQUIRED_COLUMNS, "decisions")
 
     if mapping["record_id"].duplicated().any():
         raise ValueError("mapping must contain exactly one row per record_id")
+    lineage = mapping[
+        [
+            "record_id",
+            "work_id",
+            "preferred_record_id",
+            "is_preferred_manifestation",
+        ]
+    ].copy()
+    lineage["is_preferred_manifestation"] = [
+        _parse_bool(
+            value,
+            column="is_preferred_manifestation",
+            record_id=str(record_id),
+        )
+        for value, record_id in zip(
+            lineage["is_preferred_manifestation"],
+            lineage["record_id"],
+            strict=True,
+        )
+    ]
+    for work_id, group in lineage.groupby("work_id", sort=False):
+        preferred_rows = group.loc[group["is_preferred_manifestation"]]
+        if len(preferred_rows) != 1:
+            raise ValueError(
+                f"work {work_id} must have exactly one preferred manifestation"
+            )
+        preferred_id = str(preferred_rows.iloc[0]["record_id"])
+        recorded_preferred_ids = set(group["preferred_record_id"].astype(str))
+        if recorded_preferred_ids != {preferred_id}:
+            raise ValueError(
+                f"work {work_id} has inconsistent preferred_record_id lineage"
+            )
     expected_ids = mapping["record_id"].astype(str).tolist()
     actual_ids = decisions["record_id"].astype(str).tolist()
     if len(actual_ids) != len(expected_ids) or set(actual_ids) != set(expected_ids):
@@ -148,6 +193,9 @@ def validate_decisions(
         raise ValueError("route_family_final must be a controlled route family")
     if (is_x & ordered["route_family_final"].ne("")).any():
         raise ValueError("X records cannot have a final route family")
+    requires_route = ordered["final_level"].isin({"A", "B", "C"})
+    if (requires_route & ordered["route_family_final"].eq("")).any():
+        raise ValueError("A-C records require a controlled final route family")
 
     ordered["project_family_id"] = (
         ordered["project_family_id"].fillna("").astype(str).str.strip()
@@ -179,9 +227,111 @@ def validate_decisions(
             record_id=str(record_id),
         )
 
+    preferred_by_record = lineage.set_index("record_id")[
+        "is_preferred_manifestation"
+    ]
+    decision_is_preferred = ordered["record_id"].map(preferred_by_record)
+    nonpreferred = ~decision_is_preferred
+    invalid_nonpreferred = nonpreferred & (
+        ordered["final_level"].ne("X")
+        | ordered["exclusion_code"].ne("X_DUPLICATE")
+    )
+    if invalid_nonpreferred.any():
+        raise ValueError(
+            "non-preferred manifestations must be X/X_DUPLICATE"
+        )
+    invalid_preferred_duplicate = decision_is_preferred & ordered[
+        "exclusion_code"
+    ].eq("X_DUPLICATE")
+    if invalid_preferred_duplicate.any():
+        raise ValueError(
+            "X_DUPLICATE is allowed only on non-preferred manifestations"
+        )
+
+    ordered_by_id = ordered.set_index("record_id")
+    lineage_by_id = lineage.set_index("record_id")
+    for duplicate in ordered.loc[nonpreferred].itertuples(index=False):
+        preferred_id = str(
+            lineage_by_id.loc[duplicate.record_id, "preferred_record_id"]
+        )
+        preferred = ordered_by_id.loc[preferred_id]
+        if preferred["final_level"] == "X":
+            if duplicate.project_family_id:
+                raise ValueError(
+                    "duplicates of an excluded preferred manifestation cannot "
+                    "retain a project family"
+                )
+            continue
+        if duplicate.project_family_id != preferred["project_family_id"]:
+            raise ValueError(
+                "a duplicate and its included preferred manifestation must share "
+                "the same project family"
+            )
+        if duplicate.family_grouping_basis != preferred["family_grouping_basis"]:
+            raise ValueError(
+                "a duplicate and its preferred manifestation must share the same "
+                "family grouping basis"
+            )
+
     for column in ("reviewer", "review_basis", "evidence_location"):
         if not _nonblank(ordered, column).all():
             raise ValueError(f"every final decision requires a nonblank {column}")
+
+    ordered["review_basis"] = (
+        ordered["review_basis"].fillna("").astype(str).str.strip()
+    )
+    controlled_review_bases = {
+        "title_abstract",
+        "title_abstract+local_full_text",
+    }
+    if not ordered["review_basis"].isin(controlled_review_bases).all():
+        raise ValueError("review_basis must use the controlled screening vocabulary")
+    source_by_record = mapping.set_index("record_id")
+    full_text_rows = ordered.loc[
+        ordered["review_basis"].eq("title_abstract+local_full_text")
+    ]
+    for decision in full_text_rows.itertuples(index=False):
+        source_row = source_by_record.loc[decision.record_id]
+        source_url = str(source_row["pdf_url"]).strip()
+        cache_sha256 = str(source_row["cache_sha256"]).strip().lower()
+        try:
+            cache_metadata = json.loads(str(source_row["cache_json"]))
+        except (json.JSONDecodeError, TypeError) as error:
+            raise ValueError(
+                f"portable full-text evidence lacks cache metadata for "
+                f"{decision.record_id}"
+            ) from error
+        if not isinstance(cache_metadata, dict):
+            raise ValueError(
+                f"portable full-text evidence lacks cache metadata for "
+                f"{decision.record_id}"
+            )
+        cache_filename = str(cache_metadata.get("filename", "")).strip()
+        valid_sha = len(cache_sha256) == 64 and all(
+            character in "0123456789abcdef" for character in cache_sha256
+        )
+        evidence = str(decision.evidence_location)
+        required_fragments = (
+            f"source_url={source_url}",
+            f"cache_filename={cache_filename}",
+            f"cache_sha256={cache_sha256}",
+            "locator=",
+        )
+        locator = evidence.split("locator=", 1)[-1].strip()
+        if (
+            not source_url.startswith(("https://", "http://"))
+            or not cache_filename.endswith(".pdf")
+            or not valid_sha
+            or not locator
+            or not all(fragment in evidence for fragment in required_fragments)
+            or "/home/" in evidence
+            or "LLM-inference-on-FPGA-papers/papers/" in evidence
+        ):
+            raise ValueError(
+                "portable full-text evidence requires the stable source URL, "
+                "cached PDF filename, cache SHA-256, and exact locator for "
+                f"{decision.record_id}"
+            )
 
     join_keys = {"record_id", "work_id"}
     decision_columns = [
@@ -255,6 +405,14 @@ def make_project_families(screened: pd.DataFrame) -> pd.DataFrame:
             ]
         )
 
+    families_per_work = rows.groupby("work_id")["project_family_id"].nunique()
+    split_works = sorted(families_per_work.loc[families_per_work.ne(1)].index)
+    if split_works:
+        raise ValueError(
+            "every linked work must belong to exactly one project family: "
+            + ", ".join(str(work_id) for work_id in split_works)
+        )
+
     rows["family_is_primary_work"] = [
         _parse_bool(
             value,
@@ -299,7 +457,12 @@ def make_project_families(screened: pd.DataFrame) -> pd.DataFrame:
         )
         preferred_id = str(included.iloc[0]["preferred_record_id"])
         preferred_rows = included.loc[included["record_id"].eq(preferred_id)]
-        chosen = preferred_rows.iloc[0] if not preferred_rows.empty else included.iloc[0]
+        if preferred_rows.empty:
+            raise ValueError(
+                f"project family {family_id} work {work_id} lacks its included "
+                "preferred manifestation"
+            )
+        chosen = preferred_rows.iloc[0]
         relations.append(
             {
                 "project_family_id": str(family_id),
@@ -362,6 +525,26 @@ def _count_table(counts: pd.Series, ordered_values: Iterable[str]) -> list[str]:
     return lines
 
 
+def _make_repeat_review_sample(screened: pd.DataFrame) -> pd.DataFrame:
+    selected: list[pd.DataFrame] = []
+    for level in ("A", "B", "C", "D", "X"):
+        candidates = screened.loc[screened["final_level"].eq(level)].copy()
+        candidates["sample_hash"] = candidates["record_id"].map(
+            lambda record_id: hashlib.sha256(str(record_id).encode()).hexdigest()
+        )
+        candidates = candidates.sort_values(
+            ["sample_hash", "record_id"], kind="stable"
+        )
+        if level in {"A", "C"}:
+            count = len(candidates)
+            candidates["selection_rule"] = "all final A/C"
+        else:
+            count = (len(candidates) + 4) // 5
+            candidates["selection_rule"] = "lowest stable hashes; ceil(20%)"
+        selected.append(candidates.iloc[:count])
+    return pd.concat(selected, ignore_index=True)
+
+
 def _make_screening_audit(
     screened: pd.DataFrame, families: pd.DataFrame
 ) -> str:
@@ -378,6 +561,13 @@ def _make_screening_audit(
                 record_id="audit-row",
             )
         )
+    ]
+    repeat_sample = _make_repeat_review_sample(screened)
+    sample_counts = repeat_sample["final_level"].value_counts()
+    multi_work_families = [
+        group
+        for _, group in families.groupby("project_family_id", sort=True)
+        if len(group) > 1
     ]
 
     lines = [
@@ -406,8 +596,10 @@ def _make_screening_audit(
         "## Duplicate/version decisions",
         "",
         "Every source manifestation remains in `screening_decisions.csv`. "
-        "Non-preferred duplicate manifestations use `X_DUPLICATE`; the family "
-        "map retains their record evidence beside the preferred manifestation.",
+        "Non-preferred duplicate manifestations use `X_DUPLICATE`. When the "
+        "preferred manifestation is included, the family map retains duplicate "
+        "record evidence beside it; excluded groups remain traceable here and in "
+        "the decision file.",
         "",
         "| Work ID | Record ID | Preferred record | Dedup rule | Final | Evidence |",
         "|---|---|---|---|---|---|",
@@ -443,10 +635,32 @@ def _make_screening_audit(
             "For conservative single-work families, the stable identifier is "
             "`PF-` followed by the first 16 uppercase hexadecimal characters of "
             "SHA-256(`project-family:` + `work_id`). "
+            "Named multi-work families use the same derivation with a canonical "
+            "`named-system:<slug>` key. "
             "The default is a conservative single-work family, explicitly marked "
             "`single_work_family`; multiple works share a family only when paper "
             "text identifies a named extension or release relationship. Repository "
             "URL equality is never used as family evidence.",
+            "",
+            f"Named multi-work families: {len(multi_work_families)}. Every linked "
+            "bibliographic work remains a separate row in `project_families.csv`.",
+            "",
+            "| Project family | Primary work | Linked works | Grouping basis |",
+            "|---|---|---|---|",
+            *[
+                "| "
+                + " | ".join(
+                    _markdown_cell(value)
+                    for value in (
+                        group.iloc[0]["project_family_id"],
+                        group.iloc[0]["primary_work_id"],
+                        ";".join(group["work_id"].astype(str)),
+                        group.iloc[0]["family_grouping_basis"],
+                    )
+                )
+                + " |"
+                for group in multi_work_families
+            ],
             "",
             "## Reviewer sample / re-review design",
             "",
@@ -456,11 +670,44 @@ def _make_screening_audit(
             "the locally cached PDF and marked `title_abstract+local_full_text`. "
             "Obvious exclusions may retain `title_abstract` as their accurate basis.",
             "",
-            "The frozen repeat-review set is every final A/C record plus the stable "
-            "20% sample of B/D/X for which the first byte of SHA-256(record_id) is "
-            "below 51. A second independent or one-week-delayed blind pass has not "
-            "been represented as completed; downstream reporting must preserve this "
+            "The frozen repeat-review set contains every final A/C record. Within "
+            "each of B, D, and X independently, records are sorted by "
+            "SHA-256(`record_id`) and the first `ceil(20%)` are selected. This "
+            "gives an exact, deterministic stratified sample rather than a pooled "
+            "Bernoulli approximation.",
+            "The exact selected IDs are committed in "
+            "`repeat_review_sample.csv` and enumerated below.",
+            "",
+            "| Level | Available | Frozen repeat-review sample |",
+            "|---|---:|---:|",
+            *[
+                f"| {level} | {int(final_counts.get(level, 0))} | "
+                f"{int(sample_counts.get(level, 0))} |"
+                for level in ("A", "B", "C", "D", "X")
+            ],
+            "",
+            "A second independent or one-week-delayed blind pass has not been "
+            "represented as completed; downstream reporting must preserve this "
             "single-reviewer limitation until that pass is performed.",
+            "",
+            "| Record ID | Final | Selection rule | SHA-256(record_id) |",
+            "|---|---|---|---|",
+            *[
+                "| "
+                + " | ".join(
+                    _markdown_cell(value)
+                    for value in (
+                        row.record_id,
+                        row.final_level,
+                        row.selection_rule,
+                        row.sample_hash,
+                    )
+                )
+                + " |"
+                for row in repeat_sample.sort_values(
+                    ["final_level", "sample_hash", "record_id"], kind="stable"
+                ).itertuples(index=False)
+            ],
             "",
             "## Unresolved but non-blocking uncertainty",
             "",
@@ -501,8 +748,86 @@ def _make_screening_audit(
     return "\n".join(lines) + "\n"
 
 
+def _write_final_flow_counts(
+    screened: pd.DataFrame, families: pd.DataFrame, out_dir: Path
+) -> None:
+    source_counts_path = out_dir / "flow_counts.json"
+    source_run_path = out_dir / "phase1_run.json"
+    if not source_counts_path.is_file() or not source_run_path.is_file():
+        raise ValueError(
+            "final flow counts require immutable flow_counts.json and "
+            "phase1_run.json Phase-1 evidence"
+        )
+
+    source_counts_bytes = source_counts_path.read_bytes()
+    source_run_bytes = source_run_path.read_bytes()
+    source_counts = json.loads(source_counts_bytes)
+    source_run = json.loads(source_run_bytes)
+    if not isinstance(source_counts, dict) or not isinstance(source_run, dict):
+        raise ValueError("Phase-1 count and run evidence must be JSON objects")
+
+    required_source_counts = {
+        "input_records",
+        "candidate_unique_works",
+        "duplicate_work_groups",
+        "duplicate_manifestations",
+        "manual_review_queue",
+    }
+    missing = sorted(required_source_counts - set(source_counts))
+    if missing:
+        raise ValueError(f"flow_counts.json is missing frozen counts: {missing}")
+    output_hashes = source_run.get("output_sha256", {})
+    expected_flow_hash = output_hashes.get("flow_counts.json", "")
+    actual_flow_hash = hashlib.sha256(source_counts_bytes).hexdigest()
+    if expected_flow_hash != actual_flow_hash:
+        raise ValueError(
+            "flow_counts.json no longer matches immutable phase1_run.json"
+        )
+
+    final_levels = screened["final_level"].value_counts()
+    exclusions = screened.loc[
+        screened["final_level"].eq("X"), "exclusion_code"
+    ].value_counts()
+    repeat_sample = _make_repeat_review_sample(screened)
+    repeat_counts = repeat_sample["final_level"].value_counts()
+    final_counts = dict(source_counts)
+    final_counts.update(
+        {
+            "excluded_records": int(screened["final_level"].eq("X").sum()),
+            "exclusion_counts": {
+                code: int(exclusions.get(code, 0))
+                for code in sorted(CONTROLLED_EXCLUSIONS)
+            },
+            "final_levels": {
+                level: int(final_levels.get(level, 0))
+                for level in ("A", "B", "C", "D", "X")
+            },
+            "final_screening_schema_version": 1,
+            "included_records": int(screened["include_final"].sum()),
+            "included_unique_works": int(
+                screened.loc[screened["include_final"], "work_id"].nunique()
+            ),
+            "project_family_count": int(families["project_family_id"].nunique()),
+            "repeat_review_sample_counts": {
+                level: int(repeat_counts.get(level, 0))
+                for level in ("A", "B", "C", "D", "X")
+            },
+            "source_phase1_flow_counts_sha256": actual_flow_hash,
+            "source_phase1_mapping_sha256": output_hashes.get(
+                "phase1_mapping.csv", ""
+            ),
+            "source_phase1_run": "survey/build/phase1_run.json",
+            "source_phase1_run_sha256": hashlib.sha256(source_run_bytes).hexdigest(),
+        }
+    )
+    (out_dir / "final_flow_counts.json").write_text(
+        json.dumps(final_counts, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def write_screening_outputs(screened: pd.DataFrame, out_dir: Path) -> None:
-    """Write deterministic exclusion, family, and audit evidence products."""
+    """Write deterministic products beside the immutable Phase-1 receipt."""
 
     out_dir.mkdir(parents=True, exist_ok=True)
     exclusion_columns = [
@@ -534,6 +859,26 @@ def write_screening_outputs(screened: pd.DataFrame, out_dir: Path) -> None:
     families.to_csv(
         out_dir / "project_families.csv", index=False, lineterminator="\n"
     )
+    repeat_sample = _make_repeat_review_sample(screened)
+    repeat_sample[
+        [
+            "record_index",
+            "record_id",
+            "work_id",
+            "title",
+            "final_level",
+            "reviewer",
+            "review_basis",
+            "evidence_location",
+            "selection_rule",
+            "sample_hash",
+        ]
+    ].sort_values(
+        ["final_level", "sample_hash", "record_id"], kind="stable"
+    ).to_csv(
+        out_dir / "repeat_review_sample.csv", index=False, lineterminator="\n"
+    )
+    _write_final_flow_counts(screened, families, out_dir)
     (out_dir / "screening_audit.md").write_text(
         _make_screening_audit(screened, families), encoding="utf-8"
     )
