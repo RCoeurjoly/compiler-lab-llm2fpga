@@ -6,6 +6,7 @@ __pycache__/
 refresult
 rcsvresult
 .nix-gc-roots/
+.worktrees/
 circt-toolchain
 mlir-toolchain
 torch-mlir-toolchain
