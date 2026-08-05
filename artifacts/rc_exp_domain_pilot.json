@@ -1,0 +1,75 @@
+{
+  "enumeration": {
+    "context_length": 8,
+    "radix": 6,
+    "start": 0,
+    "stop": 4,
+    "total_contexts": 1679616
+  },
+  "kind": "softmax-exp-domain-shard",
+  "metrics": {
+    "seconds": 0.07087727400357835
+  },
+  "receipt": {
+    "analyzer_sha256": "5448bffbfb04f401435e1c0326e33d0779b446af9f9fdb1bb54b52da5c56420b",
+    "export_manifest_sha256": "033851ba060fa3d16bc13c2aa3d9e7e92d6da5a1834c900ddcc0a553ca1530c1",
+    "exported_program_sha256": "60af40afb1a860ed97e6a14dd4b10f08c79f5cbcbe4719025ea023d43f2d9375",
+    "pipeline_alias": "tinystories-w8a8-rc-working-via-linalg-no-handshake",
+    "source_model_key": "tinystories-w8a8-rc-study-mask9-vocab6-width2"
+  },
+  "schema_version": 1,
+  "sites": {
+    "softmax": {
+      "boundary": {
+        "dim": -1,
+        "dtype": "torch.int8",
+        "node_name": "softmax",
+        "quant_max": 127,
+        "quant_min": -128,
+        "scale": 0.000244140625,
+        "zero_point": -124
+      },
+      "derived_pre_exp_bits": [
+        "0x00000000",
+        "0xba800000"
+      ],
+      "derived_pre_exp_finite_max": 0.0,
+      "derived_pre_exp_finite_min": -0.0009765625,
+      "derived_pre_exp_infinity_count": 0,
+      "derived_pre_exp_nan_count": 0,
+      "derived_pre_exp_positive_count": 0,
+      "derived_pre_exp_value_count": 256,
+      "input_bits": [
+        "0x00000000",
+        "0xba800000"
+      ],
+      "input_value_count": 256
+    },
+    "softmax_1": {
+      "boundary": {
+        "dim": -1,
+        "dtype": "torch.int8",
+        "node_name": "softmax_1",
+        "quant_max": 127,
+        "quant_min": -128,
+        "scale": 0.000244140625,
+        "zero_point": -124
+      },
+      "derived_pre_exp_bits": [
+        "0x00000000",
+        "0xba800000"
+      ],
+      "derived_pre_exp_finite_max": 0.0,
+      "derived_pre_exp_finite_min": -0.0009765625,
+      "derived_pre_exp_infinity_count": 0,
+      "derived_pre_exp_nan_count": 0,
+      "derived_pre_exp_positive_count": 0,
+      "derived_pre_exp_value_count": 256,
+      "input_bits": [
+        "0x00000000",
+        "0xba800000"
+      ],
+      "input_value_count": 256
+    }
+  }
+}

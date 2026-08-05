@@ -1,0 +1,19 @@
+{
+  "kind": "rc-exp-table",
+  "schema_version": 1,
+  "source": {
+    "domain_receipt": "/tmp/rc-exp-domain-pilot.json",
+    "domain_receipt_sha256": "9a6cf6b630aa95d3b8b0f6daf9ec9b172d8f2e0b85e52e4e60dbb4d4c34e9dd7",
+    "oracle": "python-math.exp",
+    "output_format": "float32"
+  },
+  "table": {
+    "address_bits": 8,
+    "entry_count": 256,
+    "input_max": 0.0,
+    "input_min": -0.001220703125,
+    "output_bytes": 4,
+    "payload_sha256": "410fe5a6ee6484bbaf1eac52cb37063aba06293d2eb2ca7920c52d232edeed36",
+    "rounding": "float32-round-to-nearest-even"
+  }
+}
