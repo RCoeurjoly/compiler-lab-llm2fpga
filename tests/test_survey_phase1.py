@@ -72,6 +72,34 @@ class CatalogueNormalizationTests(unittest.TestCase):
             ],
         )
 
+    def test_list_catalogue_disambiguates_work_id_across_arxiv_versions(self) -> None:
+        source = {
+            "papers": [
+                {
+                    "record_id": "shared-work-id",
+                    "arxiv_id": "2401.00001",
+                    "version": 1,
+                    "title": "A",
+                },
+                {
+                    "record_id": "shared-work-id",
+                    "arxiv_id": "2401.00001",
+                    "version": 2,
+                    "title": "A revised",
+                },
+            ]
+        }
+        extracted = self.phase1.extract_records(source)
+        self.assertEqual([key for key, _ in extracted], ["2401.00001v1", "2401.00001v2"])
+        normalized = [
+            self.phase1.canonicalize_record(key, record) for key, record in extracted
+        ]
+        self.assertEqual(
+            [row["source_record_id"] for row in normalized],
+            ["shared-work-id", "shared-work-id"],
+        )
+        self.assertEqual(len({row["record_id"] for row in normalized}), 2)
+
     def test_normalizes_doi_urls_and_trailing_citation_punctuation(self) -> None:
         self.assertEqual(
             self.phase1.normalize_doi(" HTTPS://DX.DOI.ORG/10.1109/ABC.123. "),
@@ -115,6 +143,30 @@ class CatalogueNormalizationTests(unittest.TestCase):
         )
         self.assertEqual(json.loads(row["authors_json"]), ["Ada Lovelace", "Grace Hopper"])
         self.assertNotIn("{'", row["authors_json"])
+
+    def test_generic_mapping_values_use_canonical_json_never_python_repr(self) -> None:
+        row = self.phase1.canonicalize_record(
+            "2501.00004v1",
+            _record(
+                title={"text": "Structured FPGA title", "language": "en"},
+                keywords={"topic": "FPGA", "kind": ["compiler", "HLS"]},
+                primary_category={"id": "cs.AR", "label": "Architecture"},
+            ),
+        )
+        self.assertEqual(
+            json.loads(row["title"]),
+            {"language": "en", "text": "Structured FPGA title"},
+        )
+        self.assertEqual(
+            json.loads(row["keywords"]),
+            {"kind": ["compiler", "HLS"], "topic": "FPGA"},
+        )
+        self.assertEqual(
+            json.loads(row["primary_category"]),
+            {"id": "cs.AR", "label": "Architecture"},
+        )
+        for field in ("title", "keywords", "primary_category"):
+            self.assertNotIn("{'", row[field])
 
     def test_repository_url_in_source_text_is_preserved_for_artifact_scoring(self) -> None:
         row = self.phase1.canonicalize_record(
@@ -276,7 +328,75 @@ class DeduplicationTests(unittest.TestCase):
         self.assertEqual(len({row["work_id"] for row in lineage}), 2)
         for row in lineage:
             evidence = json.loads(row["dedup_evidence_json"])
-            self.assertTrue(any(item["rule"] == "contradictory_exact_doi" for item in evidence))
+            self.assertTrue(any(item["rule"] == "contradictory_identity" for item in evidence))
+
+    def test_exact_arxiv_fails_closed_on_independent_identity_conflict(self) -> None:
+        records = [
+            self._canonical(
+                "2501.61001v1",
+                arxiv_id="2501.61001",
+                doi="10.1000/first",
+                title="Alpha FPGA Accelerator",
+                authors=["Ada Lovelace"],
+            ),
+            self._canonical(
+                "2501.61001v2",
+                arxiv_id="2501.61001",
+                version=2,
+                doi="10.1000/second",
+                title="Unrelated Database Compiler",
+                authors=["Grace Hopper"],
+            ),
+        ]
+        works, lineage = self.phase1.deduplicate(records)
+        self.assertEqual(len(works), 2)
+        for row in lineage:
+            conflict = next(
+                item
+                for item in json.loads(row["dedup_evidence_json"])
+                if item["rule"] == "contradictory_identity"
+            )
+            self.assertEqual(conflict["attempted_rule"], "exact_arxiv")
+            self.assertEqual(
+                set(conflict["conflicting_fields"]),
+                {"doi", "first_author", "title"},
+            )
+
+    def test_transitive_union_checks_all_cross_component_identities(self) -> None:
+        records = [
+            self._canonical(
+                "2501.62001v1",
+                arxiv_id="2501.62001",
+                doi="10.1000/bridge",
+                title="Alpha Accelerator",
+                authors=["Ada Lovelace"],
+            ),
+            self._canonical(
+                "2501.62002v1",
+                arxiv_id="2501.62002",
+                doi="10.1000/bridge",
+                title="",
+                abstract="",
+                authors=[],
+            ),
+            self._canonical(
+                "2501.62002v2",
+                arxiv_id="2501.62002",
+                version=2,
+                doi="10.1000/other",
+                title="Unrelated Database Compiler",
+                authors=["Grace Hopper"],
+            ),
+        ]
+        works, lineage = self.phase1.deduplicate(records)
+        self.assertEqual(len(works), 2)
+        self.assertEqual(lineage[0]["work_id"], lineage[1]["work_id"])
+        self.assertNotEqual(lineage[1]["work_id"], lineage[2]["work_id"])
+        bridge_evidence = json.loads(lineage[1]["dedup_evidence_json"])
+        conflict = next(item for item in bridge_evidence if item["rule"] == "contradictory_identity")
+        self.assertEqual(conflict["attempted_rule"], "exact_arxiv")
+        self.assertTrue(conflict["component_level"])
+        self.assertEqual(len(conflict["conflicting_record_pairs"]), 1)
 
 
 class TriageAndOutputTests(unittest.TestCase):
@@ -303,6 +423,27 @@ class TriageAndOutputTests(unittest.TestCase):
         self.assertIn(r"\bmlir\b", json.loads(classified["matched_compiler_terms_json"]))
         self.assertIn("token generation", json.loads(classified["matched_end_to_end_terms_json"]))
         self.assertIn(r"\bmatmul\b", json.loads(classified["matched_component_terms_json"]))
+        score_evidence = json.loads(classified["score_evidence_json"])
+        self.assertEqual(sum(item["contribution"] for item in score_evidence), 21)
+        fpga = next(item for item in score_evidence if item["category"] == "fpga_term")
+        self.assertEqual(
+            fpga,
+            {
+                "category": "fpga_term",
+                "matched_terms": [r"\bfpga(s)?\b"],
+                "weight": 4,
+                "contribution": 4,
+            },
+        )
+        compiler = next(
+            item for item in score_evidence if item["category"] == "compiler_or_generator_term"
+        )
+        self.assertEqual(compiler["weight"], 3)
+        self.assertEqual(compiler["contribution"], 3)
+        self.assertEqual(
+            compiler["matched_terms"],
+            [r"\bmlir\b", r"\bcirct\b"],
+        )
 
     def test_eda_agent_receives_named_llm_for_eda_penalty(self) -> None:
         row = self.phase1.canonicalize_record(
@@ -311,7 +452,18 @@ class TriageAndOutputTests(unittest.TestCase):
         )
         classified = self.phase1.classify_record(row, self.scope)
         self.assertEqual(classified["screen_priority_score"], 0)
-        self.assertIn("llm_for_eda_pattern", json.loads(classified["score_evidence_json"]))
+        evidence = json.loads(classified["score_evidence_json"])
+        penalty = next(item for item in evidence if item["category"] == "llm_for_eda_pattern")
+        self.assertEqual(
+            penalty,
+            {
+                "category": "llm_for_eda_pattern",
+                "matched_terms": ["eda agent"],
+                "weight": -5,
+                "contribution": -5,
+            },
+        )
+        self.assertEqual(sum(item["contribution"] for item in evidence), 0)
 
     def test_uncertain_queue_follows_protocol_lane_order_then_score(self) -> None:
         rows = [

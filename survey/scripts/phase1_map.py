@@ -41,8 +41,8 @@ def _text(value: object) -> str:
         return ""
     if isinstance(value, str):
         return value.strip()
-    if isinstance(value, (list, tuple)):
-        return "; ".join(str(item).strip() for item in value if str(item).strip())
+    if isinstance(value, (dict, list, tuple)):
+        return _json(value)
     return str(value).strip()
 
 
@@ -57,9 +57,9 @@ def _string_list(value: object) -> list[str]:
     if value is None or value == "":
         return []
     if isinstance(value, (list, tuple)):
-        return [str(item).strip() for item in value if str(item).strip()]
+        return [_text(item) for item in value if _text(item)]
     if isinstance(value, dict):
-        return [str(item).strip() for item in value.values() if str(item).strip()]
+        return [_json(value)]
     text = str(value).strip()
     if not text:
         return []
@@ -122,13 +122,19 @@ def extract_records(catalogue: object) -> list[tuple[str, dict[str, object]]]:
                 raise ValueError(f"catalogue record {index} is not a mapping")
             base = normalize_arxiv(_text(_first(value, "arxiv_id", "arxiv")))
             version = _integer(_first(value, "version", "arxiv_version"))
-            key = _text(_first(value, "catalog_key", "record_id", "id", "paper_id"))
+            source_id = _text(_first(value, "record_id", "id", "paper_id"))
+            key = _text(_first(value, "catalog_key"))
             if not key and base:
                 key = f"{base}v{version}" if version is not None else base
             if not key:
+                key = source_id
+            if not key:
                 key = f"record-{index:06d}"
             if key in seen:
-                raise ValueError(f"duplicate catalogue key in list schema: {key}")
+                suffix = hashlib.sha256(_json(value).encode("utf-8")).hexdigest()[:12]
+                key = f"{key}#{suffix}"
+                if key in seen:
+                    key = f"{key}-{index:06d}"
             seen.add(key)
             pairs.append((key, dict(value)))
         return pairs
@@ -232,6 +238,7 @@ def canonicalize_record(record_key: str, record: dict[str, object]) -> dict[str,
     return {
         "record_index": -1,
         "record_id": f"REC-{record_hash}",
+        "source_record_id": _text(_first(record, "record_id", "id", "paper_id")),
         "catalog_key": record_key,
         "arxiv_version_id": version_id,
         "arxiv_id": base_arxiv,
@@ -352,6 +359,58 @@ def _manifestation_rationale(record: dict[str, object]) -> str:
     }[int(tier)]
 
 
+def _pair_identity_conflict(
+    left: dict[str, object],
+    right: dict[str, object],
+    attempted_rule: str,
+) -> dict[str, object] | None:
+    """Return independent contradictory identity evidence, if conclusive."""
+
+    conflicting_fields: list[str] = []
+    identifier_conflicts: list[str] = []
+    if left["doi"] and right["doi"] and left["doi"] != right["doi"]:
+        identifier_conflicts.append("doi")
+    if left["arxiv_id"] and right["arxiv_id"] and left["arxiv_id"] != right["arxiv_id"]:
+        identifier_conflicts.append("arxiv_id")
+    left_authorities = json.loads(str(left["authoritative_ids_json"]))
+    right_authorities = json.loads(str(right["authoritative_ids_json"]))
+    for authority in sorted(set(left_authorities) & set(right_authorities)):
+        if left_authorities[authority] != right_authorities[authority]:
+            identifier_conflicts.append(f"authoritative_id:{authority}")
+
+    left_title, right_title = str(left["title_normalized"]), str(right["title_normalized"])
+    similarity = (
+        float(ratio(left_title, right_title)) if left_title and right_title else None
+    )
+    title_conflict = similarity is not None and similarity < 70
+    first_author_conflict = bool(
+        left["first_author_normalized"]
+        and right["first_author_normalized"]
+        and left["first_author_normalized"] != right["first_author_normalized"]
+    )
+    if title_conflict:
+        conflicting_fields.append("title")
+    if first_author_conflict:
+        conflicting_fields.append("first_author")
+    conflicting_fields = identifier_conflicts + conflicting_fields
+
+    conclusive = False
+    if attempted_rule in {"exact_doi", "exact_arxiv", "exact_authoritative_id"}:
+        conclusive = bool(identifier_conflicts and title_conflict and first_author_conflict)
+    elif attempted_rule == "exact_title":
+        conclusive = bool(len(identifier_conflicts) >= 2 and first_author_conflict)
+    elif attempted_rule in {"fuzzy_title_95", "fuzzy_title_92"}:
+        conclusive = bool(len(identifier_conflicts) >= 2 and first_author_conflict)
+    if not conclusive:
+        return None
+    return {
+        "left_record_id": left["record_id"],
+        "right_record_id": right["record_id"],
+        "conflicting_fields": conflicting_fields,
+        "similarity": similarity,
+    }
+
+
 def deduplicate(
     records: list[dict[str, object]],
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
@@ -360,12 +419,59 @@ def deduplicate(
     uf = _UnionFind(len(records))
     evidence: dict[int, list[dict[str, object]]] = defaultdict(list)
 
-    def add_edge(left: int, right: int, rule: str, details: dict[str, object]) -> None:
+    def component_members(index: int) -> list[int]:
+        root = uf.find(index)
+        return [candidate for candidate in range(len(records)) if uf.find(candidate) == root]
+
+    def try_add_edge(
+        left: int,
+        right: int,
+        rule: str,
+        details: dict[str, object],
+    ) -> bool:
+        left_members = component_members(left)
+        right_members = component_members(right)
+        conflicts = [
+            conflict
+            for left_member in left_members
+            for right_member in right_members
+            if (
+                conflict := _pair_identity_conflict(
+                    records[left_member], records[right_member], rule
+                )
+            )
+            is not None
+        ]
+        if conflicts:
+            conflict_fields = sorted(
+                {
+                    field
+                    for conflict in conflicts
+                    for field in conflict["conflicting_fields"]
+                }
+            )
+            conflict_evidence = {
+                "rule": "contradictory_identity",
+                "attempted_rule": rule,
+                "alternative": "manual_adjudication",
+                "component_level": len(left_members) > 1 or len(right_members) > 1,
+                "conflicting_fields": conflict_fields,
+                "conflicting_record_pairs": conflicts,
+                **details,
+            }
+            evidence[left].append(
+                {"other_record_id": records[right]["record_id"], **conflict_evidence}
+            )
+            evidence[right].append(
+                {"other_record_id": records[left]["record_id"], **conflict_evidence}
+            )
+            return False
         item_left = {"other_record_id": records[right]["record_id"], "rule": rule, **details}
         item_right = {"other_record_id": records[left]["record_id"], "rule": rule, **details}
         evidence[left].append(item_left)
         evidence[right].append(item_right)
         uf.union(left, right)
+        return True
 
     exact_rules: list[tuple[str, Any]] = [
         ("exact_doi", lambda row: [("doi", row["doi"])] if row["doi"] else []),
@@ -380,58 +486,25 @@ def deduplicate(
         ),
     ]
     for rule, key_function in exact_rules:
-        indexes: dict[tuple[str, str], int] = {}
+        indexes: dict[tuple[str, str], list[int]] = {}
         for index, record in enumerate(records):
             for namespace, value in key_function(record):
                 key = (str(namespace), str(value))
                 if key in indexes:
-                    other = indexes[key]
-                    details = {"identity_namespace": key[0], "identity_value": key[1]}
-                    if rule == "exact_doi":
-                        similarity = float(
-                            ratio(
-                                str(records[other]["title_normalized"]),
-                                str(record["title_normalized"]),
-                            )
-                        )
-                        contradictory = bool(
-                            similarity < 70
-                            and records[other]["arxiv_id"]
-                            and record["arxiv_id"]
-                            and records[other]["arxiv_id"] != record["arxiv_id"]
-                            and records[other]["first_author_normalized"]
-                            != record["first_author_normalized"]
-                        )
-                        if contradictory:
-                            conflict = {
-                                "identity_namespace": "doi",
-                                "identity_value": key[1],
-                                "similarity": similarity,
-                                "reason": "different_arxiv_ids_titles_and_first_authors",
-                            }
-                            evidence[other].append(
-                                {
-                                    "other_record_id": record["record_id"],
-                                    "rule": "contradictory_exact_doi",
-                                    **conflict,
-                                }
-                            )
-                            evidence[index].append(
-                                {
-                                    "other_record_id": records[other]["record_id"],
-                                    "rule": "contradictory_exact_doi",
-                                    **conflict,
-                                }
-                            )
-                            continue
-                    if not any(
-                        item["other_record_id"] == records[other]["record_id"]
-                        and item["rule"] == rule
-                        for item in evidence[index]
-                    ):
-                        add_edge(other, index, rule, details)
+                    for other in indexes[key]:
+                        details = {
+                            "identity_namespace": key[0],
+                            "identity_value": key[1],
+                        }
+                        if not any(
+                            item["other_record_id"] == records[other]["record_id"]
+                            and item["rule"] == rule
+                            for item in evidence[index]
+                        ):
+                            try_add_edge(other, index, rule, details)
+                    indexes[key].append(index)
                 else:
-                    indexes[key] = index
+                    indexes[key] = [index]
 
     for left in range(len(records)):
         for right in range(left + 1, len(records)):
@@ -479,9 +552,9 @@ def deduplicate(
                 "distinctive_subtitle_match": distinctive_subtitle_match,
             }
             if similarity >= 95 and same_first_author and year_difference is not None and year_difference <= 1:
-                add_edge(left, right, "fuzzy_title_95", details)
+                try_add_edge(left, right, "fuzzy_title_95", details)
             elif similarity >= 92 and len(author_overlap) >= 2 and identifier_support:
-                add_edge(left, right, "fuzzy_title_92", details)
+                try_add_edge(left, right, "fuzzy_title_92", details)
             elif similarity >= 85:
                 manual_left = {"other_record_id": records[right]["record_id"], "rule": "manual_adjudication_candidate", **details}
                 manual_right = {"other_record_id": records[left]["record_id"], "rule": "manual_adjudication_candidate", **details}
@@ -609,45 +682,64 @@ def classify_record(record: dict[str, object], config: dict[str, object]) -> dic
     else:
         route = ""
 
-    lm_or_causal = bool(re.search(r"large language model|causal language model|\bllm(?:s)?\b|\bgpt", combined))
-    transformer_attention = bool(re.search(r"\btransformers?\b|attention|\bbert\b", combined))
-    llm_for_eda = bool(
-        re.search(
-            r"llm assisted|large language model for hardware|rtl generation using|"
-            r"verilog generation using|hardware design agent|place and route agent|eda agent",
-            combined,
+    lm_score_terms = [
+        term
+        for term in matches["lm"]
+        if any(
+            marker in term.lower()
+            for marker in ("large language model", "llm", "gpt", "causal language model")
         )
+    ]
+    transformer_attention_terms = [
+        term
+        for term in matches["lm"]
+        if any(marker in term.lower() for marker in ("transformer", "attention", "bert"))
+    ]
+    unrelated_terms = [
+        term
+        for term in matches["negative"]
+        if "cryptograph" in term.lower() or "post[- ]quantum" in term.lower()
+    ]
+    llm_for_eda_terms = [
+        term for term in matches["negative"] if term not in unrelated_terms
+    ]
+    training_expression = r"\btraining(?: only)?\b|training-only"
+    training_terms = (
+        [training_expression]
+        if re.search(training_expression, combined) and not re.search(r"\binference\b", combined)
+        else []
     )
-    unrelated = bool(re.search(r"cryptograph|post quantum", combined))
-    training_only = bool(re.search(r"\btraining(?: only)?\b|training-only", combined)) and not bool(
-        re.search(r"\binference\b", combined)
+    identifier_terms = []
+    if record["doi"]:
+        identifier_terms.append(f"doi:{record['doi']}")
+    if record["arxiv_id"]:
+        identifier_terms.append(f"arxiv:{record['arxiv_id']}")
+
+    score_inputs = (
+        ("fpga_term", matches["fpga"], 4),
+        ("llm_or_causal_lm_term", lm_score_terms, 4),
+        ("transformer_or_attention_term", transformer_attention_terms, 3),
+        ("compiler_or_generator_term", matches["compiler"], 3),
+        ("end_to_end_term", matches["end_to_end"], 2),
+        ("component_term", matches["component"], 2),
+        ("public_code_url", [str(record["repo_url"])] if record["repo_url"] else [], 2),
+        ("doi_or_arxiv_identifier", identifier_terms, 1),
+        ("llm_for_eda_pattern", llm_for_eda_terms, -5),
+        ("unrelated_workload_pattern", unrelated_terms, -4),
+        ("training_only_pattern", training_terms, -3),
     )
-    score = (
-        4 * bool(matches["fpga"])
-        + 4 * lm_or_causal
-        + 3 * transformer_attention
-        + 3 * bool(matches["compiler"])
-        + 2 * bool(matches["end_to_end"])
-        + 2 * bool(matches["component"])
-        + 2 * bool(record["repo_url"])
-        + 1 * bool(record["doi"] or record["arxiv_id"])
-        - 5 * llm_for_eda
-        - 4 * unrelated
-        - 3 * training_only
-    )
-    weighted_conditions = (
-        (bool(matches["fpga"]), "fpga_term"),
-        (lm_or_causal, "llm_or_causal_lm_term"),
-        (transformer_attention, "transformer_or_attention_term"),
-        (bool(matches["compiler"]), "compiler_or_generator_term"),
-        (bool(matches["end_to_end"]), "end_to_end_term"),
-        (bool(matches["component"]), "component_term"),
-        (bool(record["repo_url"]), "public_code_url"),
-        (bool(record["doi"] or record["arxiv_id"]), "doi_or_arxiv_identifier"),
-        (llm_for_eda, "llm_for_eda_pattern"),
-        (unrelated, "unrelated_workload_pattern"),
-        (training_only, "training_only_pattern"),
-    )
+    score_evidence = [
+        {
+            "category": category,
+            "matched_terms": list(terms),
+            "weight": weight,
+            "contribution": weight,
+        }
+        for category, terms, weight in score_inputs
+        if terms
+    ]
+    score = sum(int(item["contribution"]) for item in score_evidence)
+    lm_or_causal = bool(lm_score_terms)
     positive_lane_count = sum((direct_lane, compiler_lane, component_lane))
     generic_only = bool(matches["fpga"] and matches["lm"] and not (
         lm_or_causal or matches["compiler"] or matches["component"] or matches["end_to_end"]
@@ -675,9 +767,7 @@ def classify_record(record: dict[str, object], config: dict[str, object]) -> dic
         "auto_level": auto_level,
         "auto_route_family": route,
         "screen_priority_score": score,
-        "score_evidence_json": _json(
-            [name for active, name in weighted_conditions if active]
-        ),
+        "score_evidence_json": _json(score_evidence),
         "needs_manual_review": bool(manual_reasons),
         "manual_review_reasons_json": _json(sorted(set(manual_reasons))),
     }
@@ -715,7 +805,7 @@ def prioritize_uncertain(rows: list[dict[str, object]]) -> list[dict[str, object
 
 
 NORMALIZED_FIELDS = [
-    "record_index", "record_id", "catalog_key", "arxiv_version_id", "arxiv_id",
+    "record_index", "record_id", "source_record_id", "catalog_key", "arxiv_version_id", "arxiv_id",
     "arxiv_version", "title", "title_normalized", "abstract", "abstract_length",
     "authors", "authors_json", "authors_normalized_json", "first_author_normalized",
     "categories_json", "primary_category", "keywords", "publication_year", "published_at",
@@ -852,11 +942,11 @@ def run_phase1(
         }
         evidence = json.loads(str(row["dedup_evidence_json"]))
         if any(
-            item.get("rule") in {"manual_adjudication_candidate", "contradictory_exact_doi"}
+            item.get("rule") in {"manual_adjudication_candidate", "contradictory_identity"}
             for item in evidence
         ):
             reasons = json.loads(str(row["manual_review_reasons_json"]))
-            if any(item.get("rule") == "contradictory_exact_doi" for item in evidence):
+            if any(item.get("rule") == "contradictory_identity" for item in evidence):
                 reasons.append("contradictory_exact_identity")
             else:
                 reasons.append("fuzzy_identity_candidate")
