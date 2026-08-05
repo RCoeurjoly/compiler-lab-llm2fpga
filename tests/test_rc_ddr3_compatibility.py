@@ -43,7 +43,8 @@ def _memory_abi():
         else:
             kind, width, depth = "scratch", 8, 4
         rows.append({"number": number, "width": width, "depth": depth,
-                     "kind": kind, "write_enable_sha256": "0" * 64})
+                     "kind": kind, "write_enable_sha256": (
+                         hashlib.sha256(b"1'd0").hexdigest() if kind == "image" else "0" * 64)})
     canonical = json.dumps(rows, sort_keys=True, separators=(",", ":"))
     return {"schema": "rc-sv-memory-abi-v1", "ports": rows,
             "canonical_json": canonical, "sha256": _sha(canonical)}
@@ -120,6 +121,20 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
         bindings["canonical_json"] = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         bindings["sha256"] = _sha(bindings["canonical_json"])
         with self.assertRaisesRegex(ValueError, "128-bit DDR3"):
+            audit.audit_compatibility(changed, bindings)
+
+    def test_audit_rejects_rehashed_forged_learned_write_enable_metadata(self):
+        changed = copy.deepcopy(self.abi)
+        changed["ports"][0]["write_enable_sha256"] = hashlib.sha256(b"1'd1").hexdigest()
+        canonical = json.dumps(changed["ports"], sort_keys=True, separators=(",", ":"))
+        changed["canonical_json"] = canonical
+        changed["sha256"] = _sha(canonical)
+        bindings = copy.deepcopy(self.bindings)
+        bindings["memory_abi_sha256"] = changed["sha256"]
+        payload = {key: value for key, value in bindings.items() if key not in ("canonical_json", "sha256")}
+        bindings["canonical_json"] = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        bindings["sha256"] = _sha(bindings["canonical_json"])
+        with self.assertRaisesRegex(ValueError, "proven-zero"):
             audit.audit_compatibility(changed, bindings)
 
     def test_cli_writes_deterministic_receipt(self):

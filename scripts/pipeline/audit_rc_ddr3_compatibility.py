@@ -28,6 +28,7 @@ WISHBONE = {
     "response": "ack-after-accepted-read",
     "write_supported": False,
 }
+PROVEN_ZERO_WRITE_ENABLE_SHA256 = hashlib.sha256(b"1'd0").hexdigest()
 
 
 def _canonical(value: object) -> str:
@@ -73,6 +74,8 @@ def _normalise_memory_abi(receipt: object) -> dict[str, Any]:
             "token" if number == TOKEN_PORT else "output" if number == OUTPUT_PORT else "scratch")
         if row["kind"] != expected:
             raise ValueError("memory ABI receipt has a changed memory classification")
+        if number in LEARNED_PORTS and row["write_enable_sha256"] != PROVEN_ZERO_WRITE_ENABLE_SHA256:
+            raise ValueError("learned-tensor write-enable lacks authenticated proven-zero evidence")
     if (rows[TOKEN_PORT]["width"], rows[TOKEN_PORT]["depth"]) != (64, 8):
         raise ValueError("memory ABI receipt has wrong token dimensions")
     if (rows[OUTPUT_PORT]["width"], rows[OUTPUT_PORT]["depth"]) != (8, 64):
