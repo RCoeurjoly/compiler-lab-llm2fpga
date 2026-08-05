@@ -28,7 +28,9 @@ class RcDdr3MappingTest(unittest.TestCase):
     def setUp(self):
         self.abi = compat_tests._memory_abi()
         self.bindings = compat_tests._bindings(self.abi)
-        self.compatibility = audit.audit_compatibility(self.abi, self.bindings)
+        pins = {"addr0": "output", "content_en": "output", "write_en": "output", "write_data": "output", "read_data": "input", "done": "input"}
+        evidence = {"source_sha256": "a" * 64, "memory_abi_sha256": self.abi["sha256"], "completion": {"max_outstanding": 1, "response": "one-done-per-accepted-request"}, "ports": [{"port": port, "pins": pins, "write_enable": "proven-zero" if port in audit.LEARNED_PORTS else "dynamic"} for port in range(146)]}
+        self.compatibility = audit.audit_compatibility(self.abi, self.bindings, sv_evidence=evidence)
         self.image, self.manifest = self._image_evidence()
         self.manifest_bytes = json.dumps(self.manifest, sort_keys=True, separators=(",", ":")).encode()
         self.bindings["image_sha256"] = hashlib.sha256(self.image).hexdigest()
@@ -36,7 +38,8 @@ class RcDdr3MappingTest(unittest.TestCase):
         payload = {key: value for key, value in self.bindings.items() if key not in ("canonical_json", "sha256")}
         self.bindings["canonical_json"] = audit._canonical(payload)
         self.bindings["sha256"] = audit._sha(self.bindings["canonical_json"])
-        self.compatibility = audit.audit_compatibility(self.abi, self.bindings)
+        evidence["memory_abi_sha256"] = self.abi["sha256"]
+        self.compatibility = audit.audit_compatibility(self.abi, self.bindings, sv_evidence=evidence)
 
     def _image_evidence(self):
         payload = bytearray()

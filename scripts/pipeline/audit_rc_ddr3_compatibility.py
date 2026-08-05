@@ -161,12 +161,27 @@ def _port_contract(number: int, row: Mapping[str, Any]) -> dict[str, Any]:
 
 def audit_compatibility(memory_abi: object, calyx_memory_bindings: object,
                         source_closure: object | None = None,
-                        uberddr3_root: Path | None = None) -> dict[str, Any]:
+                        uberddr3_root: Path | None = None,
+                        sv_evidence: object | None = None) -> dict[str, Any]:
     """Validate receipt linkage and return the immutable DDR3 routing contract."""
     abi = _normalise_memory_abi(memory_abi)
     bindings = _normalise_bindings(calyx_memory_bindings)
     if bindings["memory_abi_sha256"] != abi["sha256"]:
         raise ValueError("Calyx memory binding receipt does not bind this memory ABI receipt")
+    if not isinstance(sv_evidence, Mapping) or set(sv_evidence) != {"source_sha256", "memory_abi_sha256", "ports", "completion"}:
+        raise ValueError("DDR3 routing requires explicit SV-derived ABI evidence")
+    if not _is_sha(sv_evidence["source_sha256"]) or sv_evidence["memory_abi_sha256"] != abi["sha256"]:
+        raise ValueError("SV-derived ABI evidence does not bind this memory ABI receipt")
+    if sv_evidence["completion"] != {"max_outstanding": 1, "response": "one-done-per-accepted-request"}:
+        raise ValueError("SV-derived ABI evidence lacks the required completion semantics")
+    evidence_ports = sv_evidence["ports"]
+    if not isinstance(evidence_ports, list) or len(evidence_ports) != MEMORY_PORT_COUNT:
+        raise ValueError("SV-derived ABI evidence lacks all parsed memory ports")
+    for number, evidence in enumerate(evidence_ports):
+        if (not isinstance(evidence, Mapping) or evidence.get("port") != number
+                or evidence.get("pins") != {"addr0": "output", "content_en": "output", "write_en": "output", "write_data": "output", "read_data": "input", "done": "input"}
+                or (number in LEARNED_PORTS and evidence.get("write_enable") != "proven-zero")):
+            raise ValueError("SV-derived ABI evidence has unverified pins or write-enable semantics")
     for port in LEARNED_PORTS:
         row = abi["ports"][port]
         if row["width"] % 8 or row["width"] > WISHBONE["data_width_bits"]:

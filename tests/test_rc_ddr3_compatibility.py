@@ -73,9 +73,14 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
     def setUp(self):
         self.abi = _memory_abi()
         self.bindings = _bindings(self.abi)
+        pins = {"addr0": "output", "content_en": "output", "write_en": "output", "write_data": "output", "read_data": "input", "done": "input"}
+        self.evidence = {"source_sha256": "a" * 64, "memory_abi_sha256": self.abi["sha256"], "completion": {"max_outstanding": 1, "response": "one-done-per-accepted-request"}, "ports": [{"port": port, "pins": pins, "write_enable": "proven-zero" if port in audit.LEARNED_PORTS else "dynamic"} for port in range(146)]}
+
+    def _audit(self, abi=None, bindings=None, *args):
+        return audit.audit_compatibility(abi or self.abi, bindings or self.bindings, *args, sv_evidence=self.evidence)
 
     def test_audit_classifies_all_ports_and_emits_a_canonical_receipt(self):
-        receipt = audit.audit_compatibility(self.abi, self.bindings)
+        receipt = self._audit()
         self.assertEqual(receipt["schema"], "rc-ddr3-compatibility-v1")
         self.assertEqual(receipt["memory_abi_sha256"], self.abi["sha256"])
         self.assertEqual(receipt["calyx_memory_bindings_sha256"], self.bindings["sha256"])
@@ -101,13 +106,13 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
         stale["canonical_json"] = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         stale["sha256"] = _sha(stale["canonical_json"])
         with self.assertRaisesRegex(ValueError, "does not bind"):
-            audit.audit_compatibility(self.abi, stale)
+            self._audit(bindings=stale)
 
     def test_audit_rejects_noncanonical_or_changed_port_contract(self):
         changed = copy.deepcopy(self.abi)
         changed["ports"][0]["width"] = 24
         with self.assertRaisesRegex(ValueError, "canonical JSON"):
-            audit.audit_compatibility(changed, self.bindings)
+            self._audit(abi=changed)
 
     def test_audit_rejects_a_byte_incompatible_learned_tensor_width(self):
         changed = copy.deepcopy(self.abi)
@@ -120,8 +125,9 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
         payload = {key: value for key, value in bindings.items() if key not in ("canonical_json", "sha256")}
         bindings["canonical_json"] = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         bindings["sha256"] = _sha(bindings["canonical_json"])
+        self.evidence["memory_abi_sha256"] = changed["sha256"]
         with self.assertRaisesRegex(ValueError, "128-bit DDR3"):
-            audit.audit_compatibility(changed, bindings)
+            self._audit(changed, bindings)
 
     def test_audit_rejects_rehashed_forged_learned_write_enable_metadata(self):
         changed = copy.deepcopy(self.abi)
@@ -135,7 +141,7 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
         bindings["canonical_json"] = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         bindings["sha256"] = _sha(bindings["canonical_json"])
         with self.assertRaisesRegex(ValueError, "proven-zero"):
-            audit.audit_compatibility(changed, bindings)
+            self._audit(changed, bindings)
 
     def test_cli_writes_deterministic_receipt(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -143,11 +149,10 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
             (root / "memory-abi.json").write_text(json.dumps(self.abi))
             (root / "calyx-memory-bindings.json").write_text(json.dumps(self.bindings))
             out = root / "ddr3-compatibility.json"
-            audit.main(["--memory-abi", str(root / "memory-abi.json"),
-                        "--calyx-memory-bindings", str(root / "calyx-memory-bindings.json"),
-                        "--out", str(out)])
-            self.assertEqual(out.read_text(), audit.render_receipt(
-                audit.audit_compatibility(self.abi, self.bindings)))
+            with self.assertRaisesRegex(ValueError, "explicit SV-derived"):
+                audit.main(["--memory-abi", str(root / "memory-abi.json"),
+                            "--calyx-memory-bindings", str(root / "calyx-memory-bindings.json"),
+                            "--out", str(out)])
 
     def test_audit_invokes_task_one_source_closure_validator(self):
         closure_path = REPO_ROOT / "scripts" / "pipeline" / "materialize_ddr3_source_closure.py"
@@ -159,11 +164,11 @@ class RcDdr3CompatibilityTest(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(logical_path)
             manifest = closure.build_manifest(root)
-            receipt = audit.audit_compatibility(self.abi, self.bindings, manifest, root)
+            receipt = self._audit(self.abi, self.bindings, manifest, root)
             self.assertIn("ddr3_source_closure_sha256", receipt)
             (root / closure.SOURCE_PATHS[0]).write_text("tampered")
             with self.assertRaisesRegex(ValueError, "Task 1 validation"):
-                audit.audit_compatibility(self.abi, self.bindings, manifest, root)
+                self._audit(self.abi, self.bindings, manifest, root)
 
 
 if __name__ == "__main__":
