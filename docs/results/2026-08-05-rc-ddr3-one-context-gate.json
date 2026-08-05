@@ -6,14 +6,20 @@
   "rtl": "/nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv",
   "reference_image": "/nix/store/y6q3ghfzjy69hcqd1cnxwp3nf8sbk20l-tinystories-w8a8-rc-reference-image",
   "memory_abi_sha256": "745309f9640d426c3ca262ba6708a01526896c1eea2784c63be6118755165012",
-  "timeout_cycles": 10000,
+  "timeout_cycles": 600000,
+  "host_timeout_seconds": 300,
   "expected_logits_i8": [-28, 127, 45, -12, -30, -3],
   "expected_token_id": 1,
   "observed_logits_i8": null,
   "observed_token_id": null,
+  "heartbeat_samples": [
+    {"cycles": 10000, "state": 288, "requests": 1140, "completions": 1140, "output_writes": 0},
+    {"cycles": 50000, "state": 1314, "requests": 3932, "completions": 3932, "output_writes": 0},
+    {"cycles": 100000, "state": 1845, "requests": 7245, "completions": 7244, "output_writes": 0}
+  ],
   "simulator_output": [
     "ABI_RECEIPT sha256=745309f9640d426c3ca262ba6708a01526896c1eea2784c63be6118755165012",
-    "TIMEOUT ascending 10000"
+    "HOST_TIMEOUT 300 seconds; no output observed"
   ],
-  "interpretation": "Generated polynomial-exp RC SV compiled successfully and ran, but produced no observable output within the bounded one-context run. This is a liveness/simulation-progress failure, not an equivalence pass."
+  "interpretation": "Generated polynomial-exp RC SV compiled successfully and executed with the correct memory-file working directory. The DUT advances through its serialized schedule and memory completions track requests, but no observable output appears within the 600000-cycle/300-second bound. This is a runtime/liveness failure, not an equivalence pass."
 }
