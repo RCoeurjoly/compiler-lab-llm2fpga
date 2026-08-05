@@ -20,10 +20,11 @@ python3 scripts/pipeline/materialize_ddr3_source_closure.py --uberddr3-root /hom
 All commands passed against UberDDR3 revision
 `4a51b9671347130759c9980d6756918f084e2124`.
 
-Commit hash: `67e501d`.
+Implementation commits: `67e501d`, `1bffb56`.
 
-Concerns: the manifest deliberately records the YPCB wrapper and XDC as
-closure inputs even though the XDC is a board constraint rather than a host
-Verilator input. Later transport integration must consume the manifest's
-compile order appropriately and must not infer ambient sources from the local
+Concerns: the manifest records the YPCB XDC and Verilog headers as pinned
+support metadata, not host-Verilator source arguments. The compile order now
+contains only Verilator-consumable `.v`/`.sv` files, including the pinned
+Micron DIMM simulation wrapper; later transport integration must continue to
+consume these distinct fields rather than infer ambient files from the local
 UberDDR3 checkout.
