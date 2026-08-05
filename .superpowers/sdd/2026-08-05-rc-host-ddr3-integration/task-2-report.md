@@ -46,6 +46,11 @@ All passed (twelve focused unit tests).  Immutable learned ports now require
 the canonical proven-zero write-enable evidence; a rehashed forged mutable
 write-enable digest rejects.
 
+DDR3 routing now also requires explicit SV-derived evidence binding the ABI to
+a canonical source hash, parsed pin directions, proven-zero learned writes,
+and the declared completion constraint; a receipt lacking that evidence
+rejects conservatively.
+
 Concern: no generated RC receipt artifact is currently retained in this
 worktree.  The utilities therefore support both receipt forms and are covered
 with schema-faithful synthetic receipts; Task 3 must invoke them against the
