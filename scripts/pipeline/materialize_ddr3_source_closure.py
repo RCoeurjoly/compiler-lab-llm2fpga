@@ -47,7 +47,38 @@ SOURCE_PATHS = [
     "testbench/8192Mb_ddr3_parameters.vh",
     "testbench/ddr3.sv",
     "testbench/ddr3_module.sv",
+    "testbench/ddr3_dimm_micron_sim.sv",
     "testbench/xsim/glbl.v",
+]
+
+# Inputs passed as source files to the host simulator.  Headers are provided
+# through INCLUDE_PATHS and the board XDC remains closure provenance only.
+COMPILE_ORDER = [
+    "testbench/models/IDELAYCTRL_model.v",
+    "testbench/models/IDELAYE2_model.v",
+    "testbench/models/IOBUF_DCIEN_model.v",
+    "testbench/models/IOBUF_model.v",
+    "testbench/models/IOBUFDS_DCIEN_model.v",
+    "testbench/models/IOBUFDS_model.v",
+    "testbench/models/ISERDESE2_model.v",
+    "testbench/models/OBUFDS_model.v",
+    "testbench/models/ODELAYE2_model.v",
+    "testbench/models/OSERDESE2_model.v",
+    "testbench/models/OBUF_model.v",
+    "rtl/ddr3_controller.v",
+    "rtl/ddr3_phy.v",
+    "rtl/ddr3_top.v",
+    "example_demo/ypcb_00338_1p1/clk_wiz.v",
+    "example_demo/ypcb_00338_1p1/ypcb_00338_1p1_ddr3.v",
+    "testbench/ddr3.sv",
+    "testbench/ddr3_module.sv",
+    "testbench/ddr3_dimm_micron_sim.sv",
+    "testbench/xsim/glbl.v",
+]
+SUPPORT_PATHS = [
+    "example_demo/ypcb_00338_1p1/ypcb_00338_1p1_ddr3.xdc",
+    "testbench/sim_defines.vh",
+    "testbench/8192Mb_ddr3_parameters.vh",
 ]
 
 
@@ -85,7 +116,8 @@ def build_manifest(root: Path) -> dict[str, Any]:
         "include_paths": INCLUDE_PATHS,
         "macros": MACROS,
         "sources": sources,
-        "compile_order": list(SOURCE_PATHS),
+        "compile_order": COMPILE_ORDER,
+        "support_paths": SUPPORT_PATHS,
     }
 
 
@@ -97,6 +129,7 @@ def _require_exact_keys(manifest: Mapping[str, Any]) -> None:
         "macros",
         "sources",
         "compile_order",
+        "support_paths",
     }
     if set(manifest) != expected:
         raise ValueError("DDR3 source manifest has an unsupported field set")
@@ -114,8 +147,10 @@ def verify_manifest(root: Path, manifest: Mapping[str, Any]) -> None:
         raise ValueError("DDR3 source manifest has unexpected include paths")
     if manifest.get("macros") != MACROS:
         raise ValueError("DDR3 source manifest has unexpected macro definitions")
-    if manifest.get("compile_order") != SOURCE_PATHS:
+    if manifest.get("compile_order") != COMPILE_ORDER:
         raise ValueError("DDR3 source manifest has an unexpected compile order")
+    if manifest.get("support_paths") != SUPPORT_PATHS:
+        raise ValueError("DDR3 source manifest has unexpected support paths")
 
     sources = manifest.get("sources")
     if not isinstance(sources, list) or len(sources) != len(SOURCE_PATHS):

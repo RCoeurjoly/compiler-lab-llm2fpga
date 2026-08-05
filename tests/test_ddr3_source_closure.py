@@ -46,7 +46,37 @@ EXPECTED_PATHS = [
     "testbench/8192Mb_ddr3_parameters.vh",
     "testbench/ddr3.sv",
     "testbench/ddr3_module.sv",
+    "testbench/ddr3_dimm_micron_sim.sv",
     "testbench/xsim/glbl.v",
+]
+
+COMPILE_ORDER = [
+    "testbench/models/IDELAYCTRL_model.v",
+    "testbench/models/IDELAYE2_model.v",
+    "testbench/models/IOBUF_DCIEN_model.v",
+    "testbench/models/IOBUF_model.v",
+    "testbench/models/IOBUFDS_DCIEN_model.v",
+    "testbench/models/IOBUFDS_model.v",
+    "testbench/models/ISERDESE2_model.v",
+    "testbench/models/OBUFDS_model.v",
+    "testbench/models/ODELAYE2_model.v",
+    "testbench/models/OSERDESE2_model.v",
+    "testbench/models/OBUF_model.v",
+    "rtl/ddr3_controller.v",
+    "rtl/ddr3_phy.v",
+    "rtl/ddr3_top.v",
+    "example_demo/ypcb_00338_1p1/clk_wiz.v",
+    "example_demo/ypcb_00338_1p1/ypcb_00338_1p1_ddr3.v",
+    "testbench/ddr3.sv",
+    "testbench/ddr3_module.sv",
+    "testbench/ddr3_dimm_micron_sim.sv",
+    "testbench/xsim/glbl.v",
+]
+
+SUPPORT_PATHS = [
+    "example_demo/ypcb_00338_1p1/ypcb_00338_1p1_ddr3.xdc",
+    "testbench/sim_defines.vh",
+    "testbench/8192Mb_ddr3_parameters.vh",
 ]
 
 
@@ -73,7 +103,7 @@ class Ddr3SourceClosureTest(unittest.TestCase):
             first["uberddr3_revision"], "4a51b9671347130759c9980d6756918f084e2124"
         )
         self.assertEqual([row["logical_path"] for row in first["sources"]], EXPECTED_PATHS)
-        self.assertEqual([row["ordinal"] for row in first["sources"]], list(range(22)))
+        self.assertEqual([row["ordinal"] for row in first["sources"]], list(range(23)))
         self.assertEqual(first["include_paths"], ["testbench"])
         self.assertEqual(
             first["macros"],
@@ -86,9 +116,9 @@ class Ddr3SourceClosureTest(unittest.TestCase):
                 "x8": "",
             },
         )
-        self.assertEqual(
-            first["compile_order"], [row["logical_path"] for row in first["sources"]]
-        )
+        self.assertEqual(first["compile_order"], COMPILE_ORDER)
+        self.assertEqual(first["support_paths"], SUPPORT_PATHS)
+        self.assertFalse(any(path.endswith((".vh", ".xdc")) for path in first["compile_order"]))
         controller = first["sources"][11]
         self.assertEqual(controller["bytes"], len(b"source 11: rtl/ddr3_controller.v\n"))
         self.assertEqual(
