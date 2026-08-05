@@ -26,6 +26,10 @@ packed DDR address space.  Each bound row retains byte order, source segment,
 and raw Calyx tensor hash where available; the manifest explicitly lists every
 local port exclusion (token, output, and mutable scratch).
 
+The mapping also authenticates the exact image-manifest bytes against the
+`image_manifest_sha256` in the Calyx receipt before reading any offsets; a
+caller cannot re-point segment offsets by supplying a replacement manifest.
+
 When a Task 1 source closure is supplied, the audit requires its declared
 UberDDR3 checkout and invokes Task 1's `verify_manifest`, rejecting stale or
 tampered source files instead of accepting SHA-shaped fields.
@@ -38,7 +42,7 @@ python3 -m py_compile scripts/pipeline/audit_rc_ddr3_compatibility.py scripts/pi
 git diff --check -- scripts/pipeline/audit_rc_ddr3_compatibility.py scripts/pipeline/generate_rc_ddr3_mapping.py tests/test_rc_ddr3_compatibility.py tests/test_rc_ddr3_mapping.py
 ```
 
-All passed (nine focused unit tests).
+All passed (ten focused unit tests).
 
 Concern: no generated RC receipt artifact is currently retained in this
 worktree.  The utilities therefore support both receipt forms and are covered

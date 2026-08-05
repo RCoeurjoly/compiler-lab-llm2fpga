@@ -76,13 +76,20 @@ def _fixed_image_segment_name(port: int) -> str:
 
 
 def generate_mapping(compatibility: object, calyx_memory_bindings: object,
-                     image: bytes, image_manifest: object) -> dict[str, Any]:
+                     image: bytes, image_manifest_bytes: bytes) -> dict[str, Any]:
     compatibility = _validate_compatibility(compatibility)
     bindings = audit._normalise_bindings(calyx_memory_bindings)
     if bindings["sha256"] != compatibility["calyx_memory_bindings_sha256"]:
         raise ValueError("DDR3 compatibility receipt does not bind this Calyx memory binding receipt")
     if not isinstance(image, bytes) or hashlib.sha256(image).hexdigest() != bindings["image_sha256"]:
         raise ValueError("source image SHA-256 does not match the Calyx memory binding receipt")
+    if (not isinstance(image_manifest_bytes, bytes)
+            or hashlib.sha256(image_manifest_bytes).hexdigest() != bindings["image_manifest_sha256"]):
+        raise ValueError("source image manifest SHA-256 does not match the Calyx memory binding receipt")
+    try:
+        image_manifest = json.loads(image_manifest_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("source image manifest is not valid JSON") from error
     segments = _image_segments(image, image_manifest)
     binding_rows = {row["port"]: row for row in bindings["ports"]}
     ports = []
@@ -144,7 +151,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
     manifest = generate_mapping(json.loads(args.compatibility.read_text()),
                                 json.loads(args.calyx_memory_bindings.read_text()),
-                                args.image.read_bytes(), json.loads(args.image_manifest.read_text()))
+                                args.image.read_bytes(), args.image_manifest.read_bytes())
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(render_manifest(manifest), encoding="utf-8")
 

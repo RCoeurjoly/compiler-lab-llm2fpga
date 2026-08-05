@@ -1,5 +1,6 @@
 import importlib.util
 import hashlib
+import json
 import unittest
 from pathlib import Path
 
@@ -29,7 +30,9 @@ class RcDdr3MappingTest(unittest.TestCase):
         self.bindings = compat_tests._bindings(self.abi)
         self.compatibility = audit.audit_compatibility(self.abi, self.bindings)
         self.image, self.manifest = self._image_evidence()
+        self.manifest_bytes = json.dumps(self.manifest, sort_keys=True, separators=(",", ":")).encode()
         self.bindings["image_sha256"] = hashlib.sha256(self.image).hexdigest()
+        self.bindings["image_manifest_sha256"] = hashlib.sha256(self.manifest_bytes).hexdigest()
         payload = {key: value for key, value in self.bindings.items() if key not in ("canonical_json", "sha256")}
         self.bindings["canonical_json"] = audit._canonical(payload)
         self.bindings["sha256"] = audit._sha(self.bindings["canonical_json"])
@@ -61,7 +64,7 @@ class RcDdr3MappingTest(unittest.TestCase):
         return bytes(payload), {"segments": segments}
 
     def test_mapping_contains_only_learned_tensors_with_aligned_byte_layout(self):
-        receipt = mapping.generate_mapping(self.compatibility, self.bindings, self.image, self.manifest)
+        receipt = mapping.generate_mapping(self.compatibility, self.bindings, self.image, self.manifest_bytes)
         self.assertEqual(receipt["schema"], "rc-ddr3-learned-tensor-mapping-v1")
         self.assertEqual(len(receipt["ports"]), 44)
         self.assertEqual([row["port"] for row in receipt["ports"]],
@@ -78,11 +81,18 @@ class RcDdr3MappingTest(unittest.TestCase):
     def test_mapping_rejects_tampered_compatibility_receipt(self):
         self.compatibility["ports"][0]["classification"] = "local-output"
         with self.assertRaisesRegex(ValueError, "canonical JSON"):
-            mapping.generate_mapping(self.compatibility, self.bindings, self.image, self.manifest)
+            mapping.generate_mapping(self.compatibility, self.bindings, self.image, self.manifest_bytes)
 
     def test_mapping_rejects_image_evidence_that_does_not_match_the_binding_receipt(self):
         with self.assertRaisesRegex(ValueError, "image SHA-256"):
-            mapping.generate_mapping(self.compatibility, self.bindings, self.image + b"x", self.manifest)
+            mapping.generate_mapping(self.compatibility, self.bindings, self.image + b"x", self.manifest_bytes)
+
+    def test_mapping_rejects_tampered_source_manifest_offsets(self):
+        tampered = json.loads(self.manifest_bytes)
+        tampered["segments"][1]["offset"] = 0
+        with self.assertRaisesRegex(ValueError, "manifest SHA-256"):
+            mapping.generate_mapping(self.compatibility, self.bindings, self.image,
+                                     json.dumps(tampered, sort_keys=True, separators=(",", ":")).encode())
 
 
 if __name__ == "__main__":
