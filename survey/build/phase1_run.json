@@ -1,0 +1,52 @@
+{
+  "command": [
+    "survey-phase1",
+    "--catalog",
+    "LLM-inference-on-FPGA-papers/data/catalog.json",
+    "--config",
+    "survey/config/scope.yaml",
+    "--out",
+    "<OUT_DIR>",
+    "--expected-records",
+    "461"
+  ],
+  "counts": {
+    "auto_levels": {
+      "A": 46,
+      "B": 168,
+      "C": 28,
+      "D": 23,
+      "X": 196
+    },
+    "auto_route_families": {
+      "CPU_FPGA_FALLBACK": 5,
+      "DATAFLOW": 32,
+      "HLS": 48,
+      "MLIR_CIRCT": 3,
+      "OVERLAY": 11,
+      "PARAMETERIZED_RTL": 33,
+      "UNRESOLVED": 329
+    },
+    "candidate_unique_works": 456,
+    "duplicate_manifestations": 5,
+    "duplicate_work_groups": 5,
+    "input_records": 461,
+    "manual_review_queue": 374
+  },
+  "input_sha256": {
+    "catalog": "c2f4a91129647048fa2f5fdd66d05e4541f7e8e91ff7572c3333733c8b627485",
+    "config": "22164396b853b17deed440217ba4cdd465616b1d2b65a4067abd127fed7c86b3"
+  },
+  "output_sha256": {
+    "duplicate_groups.csv": "188453641d578d15fecc9369b5aebd7447b0bb1b7709f69335eeb1bcc479d301",
+    "flow_counts.json": "9144edef0c90b9d01c50130eba04c26031ad8d42c11a72fc7e391acf7b7a0b1a",
+    "phase1_mapping.csv": "7edfdd4c7779d11f6a16fef0f620f4e2317b1a3d3d8538c9248f72f159cbbc2f",
+    "phase1_mapping.parquet": "b4969f2ba521edd4cecbc205b309a45193d320ac889378806abe2dc4e3f1acba",
+    "phase1_uncertain.csv": "5638689c164785ae585c9085f05347939103180c722a6d2d7b9b3779c26397fe",
+    "records_normalized.csv": "9af87908d773bad3fb0179ad7b8a762ceb840280b02162a294bb6f7579a8ff43",
+    "works_deduplicated.csv": "ae014122d5b290c34dcf5187552d74d758cede07ba184aac1d3a1c67eff18478"
+  },
+  "schema_version": 1,
+  "stderr": "",
+  "stdout": "{\n  \"auto_levels\": {\n    \"A\": 46,\n    \"B\": 168,\n    \"C\": 28,\n    \"D\": 23,\n    \"X\": 196\n  },\n  \"auto_route_families\": {\n    \"CPU_FPGA_FALLBACK\": 5,\n    \"DATAFLOW\": 32,\n    \"HLS\": 48,\n    \"MLIR_CIRCT\": 3,\n    \"OVERLAY\": 11,\n    \"PARAMETERIZED_RTL\": 33,\n    \"UNRESOLVED\": 329\n  },\n  \"candidate_unique_works\": 456,\n  \"duplicate_manifestations\": 5,\n  \"duplicate_work_groups\": 5,\n  \"input_records\": 461,\n  \"manual_review_queue\": 374\n}\n"
+}

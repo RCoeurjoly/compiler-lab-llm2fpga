@@ -129,6 +129,13 @@
             tabulate
           ];
         surveyPython = python.withPackages surveyPythonPackages;
+        surveyPhase1 = pkgs.writeShellApplication {
+          name = "survey-phase1";
+          runtimeInputs = [ surveyPython ];
+          text = ''
+            exec python ${./survey/scripts/phase1_map.py} "$@"
+          '';
+        };
 
         torchao = python.pkgs.buildPythonPackage rec {
           pname = "torchao";
@@ -2447,6 +2454,7 @@ PY
       in {
         packages = {
           inherit circt mlir torchMlir yosysPkg modelRegistryJson surveyPython
+            surveyPhase1
             llm2fpgaMlirPasses llm2fpgaTorchMlirPasses llm2fpgaCirctPasses
             calyx;
           "rc-math-exp-paper-screen" = rcMathExpPaperScreen;
@@ -2580,12 +2588,13 @@ PY
             yosysPkg
             yosysSlang
             pythonWithTinyStories
+            surveyPhase1
             pkgs.verilator
           ];
         };
 
         devShells.survey = pkgs.mkShell {
-          packages = [ surveyPython pkgs.git pkgs.nix ];
+          packages = [ surveyPython surveyPhase1 pkgs.git pkgs.nix ];
         };
 
         formatter = pkgs.nixfmt-classic;

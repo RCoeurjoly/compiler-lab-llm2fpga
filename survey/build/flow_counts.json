@@ -1,0 +1,23 @@
+{
+  "auto_levels": {
+    "A": 46,
+    "B": 168,
+    "C": 28,
+    "D": 23,
+    "X": 196
+  },
+  "auto_route_families": {
+    "CPU_FPGA_FALLBACK": 5,
+    "DATAFLOW": 32,
+    "HLS": 48,
+    "MLIR_CIRCT": 3,
+    "OVERLAY": 11,
+    "PARAMETERIZED_RTL": 33,
+    "UNRESOLVED": 329
+  },
+  "candidate_unique_works": 456,
+  "duplicate_manifestations": 5,
+  "duplicate_work_groups": 5,
+  "input_records": 461,
+  "manual_review_queue": 374
+}
