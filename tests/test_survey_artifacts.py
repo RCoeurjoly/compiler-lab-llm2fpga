@@ -160,6 +160,7 @@ class ArtifactInventoryTests(unittest.TestCase):
             tree_truncated=True,
             submodules=[],
             vendor_ip=[],
+            binaries=[],
             omitted_markers=[],
         )
         self.assertEqual(state, "incomplete_indicators_observed")
@@ -265,6 +266,19 @@ class CommittedArtifactEvidenceTests(unittest.TestCase):
             "detected",
         )
         self.assertEqual(len(index["entries"]), len(retrievals))
+
+        hls_transform = next(
+            row for row in audits if row["project_family_id"] == "PF-E7AA5B0B1A09F007"
+        )
+        self.assertEqual(json.loads(hls_transform["vendor_ip_indicators_json"]), [])
+        self.assertEqual(
+            json.loads(hls_transform["binary_files_json"]),
+            [
+                "cpu_benchmarks/runq.exe",
+                "cpu_benchmarks/tokenizer.bin",
+                "llama_xrt/src/tokenizer.bin",
+            ],
+        )
 
         serialized = json.dumps(index, sort_keys=True) + "\n" + "".join(
             ",".join(row.values()) for row in retrievals

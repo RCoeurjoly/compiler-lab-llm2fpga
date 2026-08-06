@@ -76,6 +76,7 @@ REPOSITORY_AUDIT_FIELDS = [
     "ci_files_json",
     "tool_indicators_json",
     "vendor_ip_indicators_json",
+    "binary_files_json",
     "fpga_families_json",
     "tests_json",
     "limitations",
@@ -183,6 +184,7 @@ def _blank_repository_audit(url: str) -> dict[str, object]:
             "ci_files_json": "[]",
             "tool_indicators_json": "[]",
             "vendor_ip_indicators_json": "[]",
+            "binary_files_json": "[]",
             "fpga_families_json": "[]",
             "tests_json": "[]",
             "evidence_request_ids_json": "[]",
@@ -222,6 +224,7 @@ def repository_source_closure(
     tree_truncated: bool,
     submodules: list[str],
     vendor_ip: list[str],
+    binaries: list[str],
     omitted_markers: list[str],
 ) -> tuple[str, list[str]]:
     """Classify only what API/tree evidence can establish."""
@@ -229,7 +232,9 @@ def repository_source_closure(
     if tree_status != 200:
         return "unavailable", ["TREE_UNAVAILABLE"]
     failures = ["TREE_TRUNCATED"] if tree_truncated else []
-    incomplete = bool(failures or submodules or vendor_ip or omitted_markers)
+    incomplete = bool(
+        failures or submodules or vendor_ip or binaries or omitted_markers
+    )
     return (
         "incomplete_indicators_observed" if incomplete else "api_tree_observed",
         failures,
@@ -379,7 +384,13 @@ def audit_repository(url: str, commit: str | None) -> dict[str, object]:
     )
     vendor_ip = _paths_matching(
         paths,
-        (r"\.(xci|dcp|edf|edn|ngc|qip|sof|bit|bin)$", r"(^|/)(ip|ipcore|encrypted)(/|$)"),
+        (r"\.(xci|dcp|edf|edn|ngc|qip)$", r"(^|/)(ip|ipcore|encrypted)(/|$)"),
+    )
+    binaries = _paths_matching(
+        paths,
+        (
+            r"\.(bin|bit|sof|a|so|dll|exe|jar|pt|pth|onnx|npz|npy)$",
+        ),
     )
     tool_names = sorted(
         {
@@ -414,6 +425,7 @@ def audit_repository(url: str, commit: str | None) -> dict[str, object]:
         tree_truncated=tree_truncated,
         submodules=submodules,
         vendor_ip=vendor_ip,
+        binaries=binaries,
         omitted_markers=omitted_markers,
     )
     if state == "none_detected":
@@ -443,6 +455,7 @@ def audit_repository(url: str, commit: str | None) -> dict[str, object]:
             "ci_files_json": _json(ci_files),
             "tool_indicators_json": _json(tool_names),
             "vendor_ip_indicators_json": _json(vendor_ip),
+            "binary_files_json": _json(binaries),
             "fpga_families_json": _json(fpga_families),
             "tests_json": _json(tests),
             "limitations": (
