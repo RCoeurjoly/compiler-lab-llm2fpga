@@ -41,6 +41,17 @@ TEXTUAL_REPORT_ARTIFACTS = (
     "final_report_pdflatex.txt",
     "final_report_build.json",
 )
+REQUIRED_REPORT_GENERATOR_SOURCES = (
+    "survey/scripts/build_report.py",
+    "survey/scripts/make_figures.py",
+    "survey/scripts/audit_repositories.py",
+    "survey/scripts/common.py",
+    "survey/scripts/finalize_screening.py",
+    "survey/scripts/mlir_stage_matrix.py",
+    "survey/scripts/run_compatibility.py",
+    "survey/scripts/select_deep_review.py",
+)
+REPORT_GENERATOR_SOURCE_MANIFEST = "survey/build/report_generator_sources.json"
 
 
 def _sha256(path: Path) -> str:
@@ -73,6 +84,65 @@ def _refresh_report_metadata(out: Path, filenames: tuple[str, ...]) -> None:
     metadata_path.write_text(
         json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+
+
+def _refresh_report_input_hashes(
+    root: Path, out: Path, relative_paths: tuple[str, ...]
+) -> None:
+    """Refresh selected input hashes in deliberately tampered report metadata."""
+
+    metadata_path = out / "final_report_build.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    for relative_path in relative_paths:
+        metadata["input_sha256"][relative_path] = _sha256(root / relative_path)
+    metadata_without_hash = {
+        key: value for key, value in metadata.items() if key != "metadata_sha256"
+    }
+    metadata["metadata_sha256"] = _canonical_json_sha256(metadata_without_hash)
+    metadata_path.write_text(
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _refresh_existing_report_input_hashes(
+    root: Path, out: Path, relative_paths: tuple[str, ...]
+) -> None:
+    """Refresh only hashes already declared by the deliberately tampered build."""
+
+    metadata_path = out / "final_report_build.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    for relative_path in relative_paths:
+        if relative_path in metadata["input_sha256"]:
+            metadata["input_sha256"][relative_path] = _sha256(root / relative_path)
+    metadata_without_hash = {
+        key: value for key, value in metadata.items() if key != "metadata_sha256"
+    }
+    metadata["metadata_sha256"] = _canonical_json_sha256(metadata_without_hash)
+    metadata_path.write_text(
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _copy_root_with_rehashed_a_to_b_decision(directory: str) -> Path:
+    """Create a valid decision-level tamper that leaves inclusion unchanged."""
+
+    replay_root = Path(directory) / "replay"
+    shutil.copytree(
+        ROOT,
+        replay_root,
+        ignore=shutil.ignore_patterns(".git", ".pytest_cache", "__pycache__"),
+    )
+    decisions_path = replay_root / "survey/data/screening_decisions.csv"
+    decisions = pd.read_csv(decisions_path, keep_default_na=False)
+    source_index = decisions.index[decisions["final_level"].eq("A")][0]
+    decisions.loc[source_index, "final_level"] = "B"
+    decisions.to_csv(decisions_path, index=False, lineterminator="\n")
+    _refresh_report_input_hashes(
+        replay_root,
+        replay_root / "survey/build",
+        ("survey/data/screening_decisions.csv",),
+    )
+    return replay_root
 
 
 class SurveyFigureTests(unittest.TestCase):
@@ -151,6 +221,36 @@ class SurveyFigureTests(unittest.TestCase):
         self.assertIn("<OUTPUT_DIR>/corpus_flow.mmd", result.stdout)
         self.assertNotIn(str(output.parent), result.stdout)
 
+    def test_figure_writer_rejects_stale_final_flow_decision_levels(self) -> None:
+        with TemporaryDirectory() as directory:
+            replay_root = _copy_root_with_rehashed_a_to_b_decision(directory)
+
+            with self.assertRaisesRegex(
+                ValueError, "final flow screening levels.*controlled decisions"
+            ):
+                write_figures(replay_root, replay_root / "figure-output")
+
+    def test_figure_writer_rejects_a_stale_final_decision_receipt(self) -> None:
+        with TemporaryDirectory() as directory:
+            replay_root = Path(directory) / "replay"
+            shutil.copytree(
+                ROOT,
+                replay_root,
+                ignore=shutil.ignore_patterns(".git", ".pytest_cache", "__pycache__"),
+            )
+            decisions_path = replay_root / "survey/data/screening_decisions.csv"
+            decisions = pd.read_csv(decisions_path, keep_default_na=False)
+            decisions.loc[0, "reviewer"] = "forged-but-nonempty-reviewer"
+            decisions.to_csv(decisions_path, index=False, lineterminator="\n")
+            _refresh_report_input_hashes(
+                replay_root,
+                replay_root / "survey/build",
+                ("survey/data/screening_decisions.csv",),
+            )
+
+            with self.assertRaisesRegex(ValueError, "source screening decision hash"):
+                write_figures(replay_root, replay_root / "figure-output")
+
 
 class SurveyReportTests(unittest.TestCase):
     @classmethod
@@ -213,6 +313,9 @@ class SurveyReportTests(unittest.TestCase):
             "Primary route: none",
             "R1 is the ineligible next evidence-gathering route",
             "R2 is an ineligible different-family hypothesis",
+            "H1 — unsupported for the current route.",
+            "H2 — bounded/partial support only.",
+            "H3 — inconclusive.",
             "board remains unspecified",
             "flake.nix",
             "flake.lock",
@@ -235,6 +338,9 @@ class SurveyReportTests(unittest.TestCase):
         self.assertIn("flake.nix", latex)
         self.assertIn("flake.lock", latex)
         self.assertIn("declared pdflatex", latex)
+        self.assertIn("H1 --- unsupported for the current route.", latex)
+        self.assertIn("H2 --- bounded/partial support only.", latex)
+        self.assertIn("H3 --- inconclusive.", latex)
         self.assertIn("$ pdflatex", transcript)
         self.assertNotIn("/home/", transcript)
         self.assertNotIn("/home/", json.dumps(metadata, sort_keys=True))
@@ -253,6 +359,22 @@ class SurveyReportTests(unittest.TestCase):
     def test_report_inputs_close_every_substantive_source_citation(self) -> None:
         self.assertTrue(set(REPORT_CITATIONS).issubset(REPORT_INPUTS))
 
+    def test_report_inputs_bind_the_complete_generator_source_closure(self) -> None:
+        self.assertTrue(set(REQUIRED_REPORT_GENERATOR_SOURCES).issubset(REPORT_INPUTS))
+        manifest_path = ROOT / REPORT_GENERATOR_SOURCE_MANIFEST
+        self.assertTrue(manifest_path.is_file())
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["schema_version"], 1)
+        self.assertEqual(
+            set(manifest["source_sha256"]), set(REQUIRED_REPORT_GENERATOR_SOURCES)
+        )
+        for relative_path in REQUIRED_REPORT_GENERATOR_SOURCES:
+            with self.subTest(relative_path=relative_path):
+                self.assertEqual(
+                    manifest["source_sha256"][relative_path],
+                    _sha256(ROOT / relative_path),
+                )
+
     def test_environment_manifest_hashes_bind_the_current_flake_inputs(self) -> None:
         manifest = json.loads(
             (ROOT / "survey/build/environment_manifest.json").read_text(
@@ -261,6 +383,15 @@ class SurveyReportTests(unittest.TestCase):
         )
         self.assertEqual(manifest["flake_nix_sha256"], _sha256(ROOT / "flake.nix"))
         self.assertEqual(manifest["flake_lock_sha256"], _sha256(ROOT / "flake.lock"))
+
+    def test_final_flow_binds_the_controlled_screening_decision_bytes(self) -> None:
+        final_flow = json.loads(
+            (ROOT / "survey/build/final_flow_counts.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            final_flow.get("source_screening_decisions_sha256"),
+            _sha256(ROOT / "survey/data/screening_decisions.csv"),
+        )
 
     def test_report_rendering_does_not_rewrite_tracked_build_artifacts(self) -> None:
         self.assertNotEqual(self.out, ROOT / "survey/build")
@@ -304,7 +435,9 @@ class SurveyReportTests(unittest.TestCase):
                     ):
                         _render_pdf(ROOT, out, tex_path)
 
-    def test_fresh_copied_root_replay_is_deterministic_and_portable(self) -> None:
+    def test_fresh_git_free_nix_offline_replay_is_deterministic_and_portable(self) -> None:
+        if shutil.which("nix") is None:
+            self.skipTest("nix is unavailable; the declared Nix shell exercises this replay")
         with TemporaryDirectory() as directory:
             replay_root = Path(directory) / "replay"
             shutil.copytree(
@@ -312,9 +445,15 @@ class SurveyReportTests(unittest.TestCase):
                 replay_root,
                 ignore=shutil.ignore_patterns(".git", ".pytest_cache", "__pycache__"),
             )
+            self.assertFalse((replay_root / ".git").exists())
             result = subprocess.run(
                 [
-                    sys.executable,
+                    "nix",
+                    "develop",
+                    "--offline",
+                    "path:.",
+                    "-c",
+                    "python",
                     "survey/scripts/build_report.py",
                     "--root",
                     ".",
@@ -343,6 +482,97 @@ class SurveyReportTests(unittest.TestCase):
             )
             self.assertNotIn(str(replay_root), transcript)
             self.assertNotIn("/tmp/", transcript)
+
+    def test_generated_validation_rejects_rehashed_markdown_drift(self) -> None:
+        with TemporaryDirectory() as directory:
+            out = Path(directory) / "report-output"
+            build_report(ROOT, out)
+            markdown_path = out / "final_report.md"
+            markdown_path.write_text(
+                markdown_path.read_text(encoding="utf-8").replace(
+                    "The frozen protocol", "A forged protocol", 1
+                ),
+                encoding="utf-8",
+            )
+            _refresh_report_metadata(out, ("final_report.md",))
+
+            with self.assertRaisesRegex(ValueError, "D16.*Markdown.*canonical"):
+                _validate_generated_deliverables(ROOT, out)
+
+    def test_generated_validation_rejects_rehashed_latex_drift(self) -> None:
+        with TemporaryDirectory() as directory:
+            out = Path(directory) / "report-output"
+            build_report(ROOT, out)
+            latex_path = out / "final_report.tex"
+            latex_path.write_text(
+                latex_path.read_text(encoding="utf-8") + "% forged report source\n",
+                encoding="utf-8",
+            )
+            _refresh_report_metadata(out, ("final_report.tex",))
+
+            with self.assertRaisesRegex(ValueError, "D16.*LaTeX.*canonical"):
+                _validate_generated_deliverables(ROOT, out)
+
+    def test_generated_validation_rejects_rehashed_pdf_drift(self) -> None:
+        with TemporaryDirectory() as directory:
+            out = Path(directory) / "report-output"
+            build_report(ROOT, out)
+            pdf_path = out / "final_report.pdf"
+            pdf_path.write_bytes(pdf_path.read_bytes() + b"\nforged-pdf-tail\n")
+            _refresh_report_metadata(out, ("final_report.pdf",))
+
+            with self.assertRaisesRegex(ValueError, "D16.*deterministic PDF replay"):
+                _validate_generated_deliverables(ROOT, out)
+
+    def test_validation_rejects_generator_source_drift_after_metadata_refresh(self) -> None:
+        with TemporaryDirectory() as directory:
+            replay_root = Path(directory) / "replay"
+            shutil.copytree(
+                ROOT,
+                replay_root,
+                ignore=shutil.ignore_patterns(".git", ".pytest_cache", "__pycache__"),
+            )
+            source_relative_path = "survey/scripts/make_figures.py"
+            source_path = replay_root / source_relative_path
+            source_path.write_text(
+                source_path.read_text(encoding="utf-8") + "\n# forged generator source\n",
+                encoding="utf-8",
+            )
+            _refresh_existing_report_input_hashes(
+                replay_root,
+                replay_root / "survey/build",
+                (source_relative_path,),
+            )
+
+            with self.assertRaisesRegex(ValueError, "D16.*generator source hash drift"):
+                validate_deliverables(replay_root)
+
+    def test_validation_rejects_rehashed_hypothesis_markdown_drift(self) -> None:
+        with TemporaryDirectory() as directory:
+            replay_root = Path(directory) / "replay"
+            shutil.copytree(
+                ROOT,
+                replay_root,
+                ignore=shutil.ignore_patterns(".git", ".pytest_cache", "__pycache__"),
+            )
+            stage_markdown_relative_path = "survey/build/mlir_circt_stage_matrix.md"
+            stage_markdown_path = replay_root / stage_markdown_relative_path
+            stage_markdown_path.write_text(
+                stage_markdown_path.read_text(encoding="utf-8").replace(
+                    "H2 — bounded/partial support only.",
+                    "H2 — forged full support.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            _refresh_report_input_hashes(
+                replay_root,
+                replay_root / "survey/build",
+                (stage_markdown_relative_path,),
+            )
+
+            with self.assertRaisesRegex(ValueError, "D11.*canonical"):
+                validate_deliverables(replay_root)
 
     def test_generated_validation_rejects_corpus_flow_drift(self) -> None:
         with TemporaryDirectory() as directory:
@@ -388,6 +618,24 @@ class SurveyReportTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "D14.*canonical"):
                 _validate_generated_deliverables(ROOT, out)
+
+    def test_validate_deliverables_rejects_rehashed_a_to_b_decision_drift(self) -> None:
+        with TemporaryDirectory() as directory:
+            replay_root = _copy_root_with_rehashed_a_to_b_decision(directory)
+
+            with self.assertRaisesRegex(
+                ValueError, "D6.*final screening levels.*controlled decisions"
+            ):
+                validate_deliverables(replay_root)
+
+    def test_build_report_rejects_rehashed_a_to_b_decision_drift(self) -> None:
+        with TemporaryDirectory() as directory:
+            replay_root = _copy_root_with_rehashed_a_to_b_decision(directory)
+
+            with self.assertRaisesRegex(
+                ValueError, "D6.*final screening levels.*controlled decisions"
+            ):
+                build_report(replay_root, replay_root / "report-output")
 
     def test_textual_output_validation_rejects_secret_assignments_and_pem(self) -> None:
         with TemporaryDirectory() as directory:

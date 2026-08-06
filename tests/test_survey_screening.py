@@ -357,7 +357,14 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
             mapping_path, source_counts, flow_bytes = self._write_frozen_phase1_inputs(
                 output
             )
-            write_screening_outputs(screened, output, mapping_path=mapping_path)
+            decisions_path = output / "screening_decisions.csv"
+            self.decisions.to_csv(decisions_path, index=False, lineterminator="\n")
+            write_screening_outputs(
+                screened,
+                output,
+                mapping_path=mapping_path,
+                decisions_path=decisions_path,
+            )
 
             exclusions = pd.read_csv(
                 output / "phase1_exclusions.csv", keep_default_na=False
@@ -411,21 +418,43 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
             ).hexdigest(),
             final_counts["source_phase1_mapping_sha256"],
         )
+        self.assertEqual(
+            hashlib.sha256(
+                self.decisions.to_csv(index=False, lineterminator="\n").encode()
+            ).hexdigest(),
+            final_counts["source_screening_decisions_sha256"],
+        )
         self.assertEqual({"REC-1", "REC-2"}, set(repeat_sample["record_id"]))
         self.assertEqual(
             {"lowest stable hashes; ceil(20%)"},
             set(repeat_sample["selection_rule"]),
         )
 
+    def test_outputs_require_the_controlled_decision_receipt(self) -> None:
+        screened = validate_decisions(self.mapping, self.decisions)
+        with TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            mapping_path, _, _ = self._write_frozen_phase1_inputs(output)
+
+            with self.assertRaisesRegex(ValueError, "require the supplied decisions file"):
+                write_screening_outputs(screened, output, mapping_path=mapping_path)
+
     def test_rejects_mapping_bytes_that_do_not_match_phase1_receipt(self) -> None:
         screened = validate_decisions(self.mapping, self.decisions)
         with TemporaryDirectory() as temporary:
             output = Path(temporary)
             mapping_path, _, _ = self._write_frozen_phase1_inputs(output)
+            decisions_path = output / "screening_decisions.csv"
+            self.decisions.to_csv(decisions_path, index=False, lineterminator="\n")
             mapping_path.write_bytes(mapping_path.read_bytes() + b"\n")
 
             with self.assertRaisesRegex(ValueError, "phase1_mapping.csv no longer"):
-                write_screening_outputs(screened, output, mapping_path=mapping_path)
+                write_screening_outputs(
+                    screened,
+                    output,
+                    mapping_path=mapping_path,
+                    decisions_path=decisions_path,
+                )
 
     def test_mapping_receipt_mismatch_preserves_all_final_artifacts(self) -> None:
         """Receipt validation must precede every final-artifact write."""
@@ -441,6 +470,8 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
         with TemporaryDirectory() as temporary:
             output = Path(temporary)
             mapping_path, _, _ = self._write_frozen_phase1_inputs(output)
+            decisions_path = output / "screening_decisions.csv"
+            self.decisions.to_csv(decisions_path, index=False, lineterminator="\n")
             sentinels = {
                 artifact: f"unchanged sentinel for {artifact}\n".encode()
                 for artifact in final_artifacts
@@ -450,7 +481,12 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
             mapping_path.write_bytes(mapping_path.read_bytes() + b"\n")
 
             with self.assertRaisesRegex(ValueError, "phase1_mapping.csv no longer"):
-                write_screening_outputs(screened, output, mapping_path=mapping_path)
+                write_screening_outputs(
+                    screened,
+                    output,
+                    mapping_path=mapping_path,
+                    decisions_path=decisions_path,
+                )
 
             for artifact, sentinel in sentinels.items():
                 self.assertEqual(sentinel, (output / artifact).read_bytes())
@@ -726,6 +762,7 @@ class FrozenScreeningArtifactTests(unittest.TestCase):
                 screened,
                 regenerated,
                 mapping_path=regenerated / "phase1_mapping.csv",
+                decisions_path=repository / "survey/data/screening_decisions.csv",
             )
             for artifact_name in (
                 "phase1_exclusions.csv",

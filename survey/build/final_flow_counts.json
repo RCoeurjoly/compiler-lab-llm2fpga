@@ -55,5 +55,6 @@
   "source_phase1_flow_counts_sha256": "9144edef0c90b9d01c50130eba04c26031ad8d42c11a72fc7e391acf7b7a0b1a",
   "source_phase1_mapping_sha256": "48837842a3cd69f80ea4be7a8e040c1b464afef5ad627d66e17e47f815ccd4fd",
   "source_phase1_run": "survey/build/phase1_run.json",
-  "source_phase1_run_sha256": "cf3d693ad0009bb9f5baa018975be1108570c39a2128981d6442e75eb63a7c77"
+  "source_phase1_run_sha256": "cf3d693ad0009bb9f5baa018975be1108570c39a2128981d6442e75eb63a7c77",
+  "source_screening_decisions_sha256": "f421da5139fb144bd5db7e3f5e672fabe2c60578a5f4ce2189c17fcc581f5534"
 }

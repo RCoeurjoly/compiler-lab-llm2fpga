@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -19,6 +20,10 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from survey.scripts.common import load_scope
+from survey.scripts.finalize_screening import (
+    validate_decisions,
+    validate_final_flow_against_screened,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,6 +52,10 @@ def _load_json(path: Path) -> dict[str, object]:
     if not isinstance(loaded, dict):
         raise ValueError(f"JSON evidence must be an object: {path}")
     return loaded
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _integer(mapping: Mapping[str, object], key: str) -> int:
@@ -80,6 +89,23 @@ def _validate_final_flow(flow: Mapping[str, object]) -> None:
         )
     if sum(normalized_levels.values()) != _integer(flow, "input_records"):
         raise ValueError("final screening levels do not reconcile to source records")
+
+
+def _validate_final_flow_against_controlled_decisions(
+    root: Path, flow: Mapping[str, object]
+) -> None:
+    """Keep standalone D13 generation bound to screened source decisions."""
+
+    mapping_path = root / "survey/build/phase1_mapping.csv"
+    decisions_path = root / "survey/data/screening_decisions.csv"
+    mapping = pd.read_csv(mapping_path, keep_default_na=False)
+    decisions = pd.read_csv(decisions_path, keep_default_na=False)
+    screened = validate_decisions(mapping, decisions)
+    validate_final_flow_against_screened(flow, screened)
+    if flow.get("source_screening_decisions_sha256") != _sha256(decisions_path):
+        raise ValueError(
+            "final flow source screening decision hash must match controlled decisions"
+        )
 
 
 def _node(value: str) -> bool:
@@ -244,6 +270,7 @@ def write_figures(root: Path = ROOT, out: Path | None = None) -> dict[str, Path]
     out = out or root / "survey/build"
     out.mkdir(parents=True, exist_ok=True)
     final_flow = _load_json(root / "survey/build/final_flow_counts.json")
+    _validate_final_flow_against_controlled_decisions(root, final_flow)
     corpus_flow = render_corpus_flow(final_flow)
     validate_mermaid(corpus_flow)
     comparison, unassigned = build_route_family_comparison(root)

@@ -58,6 +58,9 @@ The source-faithful MLIR/CIRCT catalog is **3 projects x 20 canonical transforma
 `survey/build/mlir_circt_stage_matrix.md`, including the canonical
 weight-loading interface transformation.
 
+The bounded hypothesis outcomes are explicit: **H1 — unsupported for the current route.** **H2 — bounded/partial support only.** **H3 — inconclusive.** Their source-faithful evidence and limits are recorded in
+`survey/build/mlir_circt_stage_matrix.md#lines=90-94`.
+
 ## Selection result
 
 `survey/build/decision_matrix_scored.csv` evaluates the frozen hard gates

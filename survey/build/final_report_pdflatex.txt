@@ -106,7 +106,7 @@ Package rerunfilecheck Warning: File `final_report.out' has changed.
 23/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1095.600pk> <<LOCAL_PATH>
 2023/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1440.600pk> <<LOCAL_PATH>
 ve2023/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1728.600pk>
-Output written on ./final_report.pdf (2 pages, 55911 bytes).
+Output written on ./final_report.pdf (2 pages, 57188 bytes).
 Transcript written on ./final_report.log.
 
 # working directory: <OUTPUT_DIR>
@@ -211,5 +211,5 @@ l/share/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] [2] (./final_report.aux)
 23/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1095.600pk> <<LOCAL_PATH>
 2023/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1440.600pk> <<LOCAL_PATH>
 ve2023/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1728.600pk>
-Output written on ./final_report.pdf (2 pages, 56369 bytes).
+Output written on ./final_report.pdf (2 pages, 57653 bytes).
 Transcript written on ./final_report.log.

@@ -7,13 +7,14 @@ import argparse
 import hashlib
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import pandas as pd
 
 
 FINAL_LEVELS = frozenset({"A", "B", "C", "D", "X"})
+FINAL_LEVEL_ORDER = ("A", "B", "C", "D", "X")
 ROUTE_FAMILIES = frozenset(
     {
         "MLIR_CIRCT",
@@ -1019,6 +1020,47 @@ def _load_verified_phase1_receipt(
     )
 
 
+def summarize_final_screening(screened: pd.DataFrame) -> dict[str, object]:
+    """Return receipt-relevant counts from validated controlled decisions."""
+
+    _require_columns(screened, {"final_level", "include_final", "work_id"}, "screened")
+    final_levels = screened["final_level"].fillna("").astype(str).str.strip().str.upper()
+    if not final_levels.isin(FINAL_LEVELS).all():
+        raise ValueError("screened decisions contain an invalid final level")
+    return {
+        "final_levels": {
+            level: int(final_levels.eq(level).sum()) for level in FINAL_LEVEL_ORDER
+        },
+        "included_records": int(final_levels.ne("X").sum()),
+        "excluded_records": int(final_levels.eq("X").sum()),
+        "included_unique_works": int(
+            screened.loc[final_levels.ne("X"), "work_id"].nunique()
+        ),
+        "input_records": int(len(screened)),
+    }
+
+
+def validate_final_flow_against_screened(
+    final_flow: Mapping[str, object], screened: pd.DataFrame
+) -> dict[str, object]:
+    """Require a final-flow receipt to match its controlled decision summary."""
+
+    summary = summarize_final_screening(screened)
+    for field in (
+        "final_levels",
+        "included_records",
+        "excluded_records",
+        "included_unique_works",
+        "input_records",
+    ):
+        if final_flow.get(field) != summary[field]:
+            label = "screening levels" if field == "final_levels" else field
+            raise ValueError(
+                f"final flow {label} must match controlled decisions"
+            )
+    return summary
+
+
 def _write_final_flow_counts(
     screened: pd.DataFrame,
     families: pd.DataFrame,
@@ -1028,10 +1070,11 @@ def _write_final_flow_counts(
     source_flow_counts_sha256: str,
     source_mapping_sha256: str,
     source_run_sha256: str,
+    source_screening_decisions_sha256: str | None,
 ) -> None:
     """Write final counts using receipt data already verified before output writes."""
 
-    final_levels = screened["final_level"].value_counts()
+    summary = summarize_final_screening(screened)
     exclusions = screened.loc[
         screened["final_level"].eq("X"), "exclusion_code"
     ].value_counts()
@@ -1046,14 +1089,13 @@ def _write_final_flow_counts(
                 for code in sorted(CONTROLLED_EXCLUSIONS)
             },
             "final_levels": {
-                level: int(final_levels.get(level, 0))
-                for level in ("A", "B", "C", "D", "X")
+                level: int(summary["final_levels"][level])
+                for level in FINAL_LEVEL_ORDER
             },
             "final_screening_schema_version": 1,
-            "included_records": int(screened["include_final"].sum()),
-            "included_unique_works": int(
-                screened.loc[screened["include_final"], "work_id"].nunique()
-            ),
+            "included_records": summary["included_records"],
+            "included_unique_works": summary["included_unique_works"],
+            "input_records": summary["input_records"],
             "project_family_count": int(families["project_family_id"].nunique()),
             "repeat_review_sample_counts": {
                 level: int(repeat_counts.get(level, 0))
@@ -1065,6 +1107,10 @@ def _write_final_flow_counts(
             "source_phase1_run_sha256": source_run_sha256,
         }
     )
+    if source_screening_decisions_sha256 is not None:
+        final_counts["source_screening_decisions_sha256"] = (
+            source_screening_decisions_sha256
+        )
     (out_dir / "final_flow_counts.json").write_text(
         json.dumps(final_counts, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -1072,10 +1118,19 @@ def _write_final_flow_counts(
 
 
 def write_screening_outputs(
-    screened: pd.DataFrame, out_dir: Path, *, mapping_path: Path
+    screened: pd.DataFrame,
+    out_dir: Path,
+    *,
+    mapping_path: Path,
+    decisions_path: Path | None = None,
 ) -> None:
     """Write deterministic products beside the immutable Phase-1 receipt."""
 
+    if decisions_path is None or not decisions_path.is_file():
+        raise ValueError("final flow counts require the supplied decisions file")
+    source_screening_decisions_sha256 = hashlib.sha256(
+        decisions_path.read_bytes()
+    ).hexdigest()
     (
         source_counts,
         source_flow_counts_sha256,
@@ -1139,6 +1194,7 @@ def write_screening_outputs(
         source_flow_counts_sha256=source_flow_counts_sha256,
         source_mapping_sha256=source_mapping_sha256,
         source_run_sha256=source_run_sha256,
+        source_screening_decisions_sha256=source_screening_decisions_sha256,
     )
     (out_dir / "screening_audit.md").write_text(
         _make_screening_audit(screened, families), encoding="utf-8"
@@ -1162,7 +1218,12 @@ def main() -> None:
             f"Expected {args.expected_records} frozen records; found {len(mapping)}"
         )
     screened = validate_decisions(mapping, decisions)
-    write_screening_outputs(screened, args.out, mapping_path=args.mapping)
+    write_screening_outputs(
+        screened,
+        args.out,
+        mapping_path=args.mapping,
+        decisions_path=args.decisions,
+    )
     counts = screened["final_level"].value_counts().sort_index().to_dict()
     print(json.dumps({"records": len(screened), "final_levels": counts}, indent=2))
 

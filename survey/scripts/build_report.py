@@ -20,6 +20,7 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pandas as pd
 
@@ -35,7 +36,11 @@ from survey.scripts.audit_repositories import (
     validate_repository_audit,
 )
 from survey.scripts.common import load_scope
-from survey.scripts.finalize_screening import make_project_families, validate_decisions
+from survey.scripts.finalize_screening import (
+    make_project_families,
+    summarize_final_screening,
+    validate_decisions,
+)
 from survey.scripts.make_figures import (
     FINAL_LEVELS,
     ROUTE_TAXONOMY,
@@ -51,6 +56,7 @@ from survey.scripts.mlir_stage_matrix import (
     hard_gates_pass,
     validate_decision_matrix,
     validate_stage_matrix,
+    render_stage_markdown,
 )
 from survey.scripts.run_compatibility import ROUTES, validate_receipt
 from survey.scripts.select_deep_review import select_families, validate_reviews
@@ -67,9 +73,27 @@ ROUTE_RECEIPT_INPUTS = tuple(
     for filename in ("manifest.json", "README.md", "commands.sh", "stdout.log", "stderr.log")
 )
 
+# The report renderer and validators depend on this direct, versioned source
+# closure in addition to the frozen evidence files below. The separate source
+# manifest pins the expected bytes so a metadata refresh alone cannot bless a
+# modified generator.
+REPORT_GENERATOR_SOURCES = (
+    "survey/scripts/build_report.py",
+    "survey/scripts/make_figures.py",
+    "survey/scripts/audit_repositories.py",
+    "survey/scripts/common.py",
+    "survey/scripts/finalize_screening.py",
+    "survey/scripts/mlir_stage_matrix.py",
+    "survey/scripts/run_compatibility.py",
+    "survey/scripts/select_deep_review.py",
+)
+REPORT_GENERATOR_SOURCE_MANIFEST = "survey/build/report_generator_sources.json"
+
 REPORT_INPUTS = (
     "flake.nix",
     "flake.lock",
+    REPORT_GENERATOR_SOURCE_MANIFEST,
+    *REPORT_GENERATOR_SOURCES,
     "LLM-inference-on-FPGA-papers/data/catalog.json",
     "LLM-inference-on-FPGA-papers/data/survey.csv",
     "survey/protocol.md",
@@ -196,6 +220,9 @@ REQUIRED_REPORT_TEXT = (
     "Primary route: none",
     "R1 is the ineligible next evidence-gathering route",
     "R2 is an ineligible different-family hypothesis",
+    "H1 — unsupported for the current route.",
+    "H2 — bounded/partial support only.",
+    "H3 — inconclusive.",
     "board remains unspecified",
 )
 
@@ -293,6 +320,42 @@ def _validate_textual_outputs(out: Path) -> None:
             raise ValueError(f"D16: {filename} contains private-key material")
 
 
+def _validate_report_generator_source_manifest(root: Path) -> None:
+    """Bind report generation to the reviewed direct Python source closure."""
+
+    manifest = _read_json(
+        _require_file(root, REPORT_GENERATOR_SOURCE_MANIFEST, "D16"), "D16"
+    )
+    _require(
+        manifest.get("schema_version") == 1,
+        "D16",
+        "generator source manifest schema_version must be 1",
+    )
+    source_hashes = manifest.get("source_sha256")
+    _require(
+        isinstance(source_hashes, Mapping),
+        "D16",
+        "generator source manifest hashes are missing",
+    )
+    _require(
+        set(source_hashes) == set(REPORT_GENERATOR_SOURCES),
+        "D16",
+        "generator source manifest must list the exact direct source closure",
+    )
+    for relative_path in REPORT_GENERATOR_SOURCES:
+        expected_hash = source_hashes.get(relative_path)
+        _require(
+            isinstance(expected_hash, str),
+            "D16",
+            f"generator source hash is missing: {relative_path}",
+        )
+        _require(
+            _sha256(_require_file(root, relative_path, "D16")) == expected_hash,
+            "D16",
+            f"generator source hash drifted: {relative_path}",
+        )
+
+
 def _validate_final_flow(root: Path) -> dict[str, object]:
     flow = _read_json(
         _require_file(root, "survey/build/final_flow_counts.json", "D6"), "D6"
@@ -314,6 +377,62 @@ def _validate_final_flow(root: Path) -> dict[str, object]:
     _require(sum(normalized_levels.values()) == 461, "D6", "final levels must reconcile to 461 records")
     _require(230 + 231 == 461, "D6", "included and excluded counts must reconcile")
     return flow
+
+
+def _validate_final_flow_against_screened(
+    screened: pd.DataFrame, final_flow: Mapping[str, object]
+) -> None:
+    """Bind D13's frozen counts to the controlled final decisions."""
+
+    summary = summarize_final_screening(screened)
+    controlled_levels = summary["final_levels"]
+    _require(
+        isinstance(controlled_levels, Mapping),
+        "D6",
+        "controlled decisions lack final levels",
+    )
+    _require(
+        controlled_levels == FINAL_LEVELS,
+        "D6",
+        "final screening levels derived from controlled decisions must match frozen A/B/C/D/X counts",
+    )
+    flow_levels = final_flow.get("final_levels")
+    _require(isinstance(flow_levels, Mapping), "D6", "final flow lacks final levels")
+    normalized_flow_levels = {
+        str(level): _integer(value, f"D6 final_levels.{level}")
+        for level, value in flow_levels.items()
+    }
+    _require(
+        normalized_flow_levels == controlled_levels,
+        "D6",
+        "final flow screening levels must match controlled decisions",
+    )
+    controlled_included = _integer(summary["included_records"], "D6 included_records")
+    controlled_excluded = _integer(summary["excluded_records"], "D6 excluded_records")
+    _require(
+        (controlled_included, controlled_excluded) == (230, 231),
+        "D6",
+        "controlled decisions must contain exactly 230 included and 231 excluded records",
+    )
+    _require(
+        _integer(final_flow.get("included_records"), "D6 included_records")
+        == controlled_included,
+        "D6",
+        "final flow included_records must match controlled decisions",
+    )
+    _require(
+        _integer(final_flow.get("excluded_records"), "D6 excluded_records")
+        == controlled_excluded,
+        "D6",
+        "final flow excluded_records must match controlled decisions",
+    )
+    _require(
+        len(screened) == sum(controlled_levels.values()) == _integer(
+            final_flow.get("input_records"), "D6 input_records"
+        ),
+        "D6",
+        "controlled final levels must reconcile to the final flow input count",
+    )
 
 
 def _validate_d1_to_d6(root: Path) -> dict[str, object]:
@@ -404,13 +523,21 @@ def _validate_d1_to_d6(root: Path) -> dict[str, object]:
     _require(_integer(auto_flow.get("input_records"), "D5 input_records") == 461, "D5", "Phase 1 input count must be 461")
     _require(_integer(auto_flow.get("candidate_unique_works"), "D5 candidate_unique_works") == 456, "D5", "Phase 1 unique works must be 456")
 
-    decisions = _read_csv(root, "survey/data/screening_decisions.csv", "D6", keep_default_na=False)
+    decisions_path = _require_file(root, "survey/data/screening_decisions.csv", "D6")
+    decisions = pd.read_csv(decisions_path, keep_default_na=False)
     screened = validate_decisions(mapping, decisions)
     exclusions = _read_csv(root, "survey/build/phase1_exclusions.csv", "D6", keep_default_na=False)
     _require(len(exclusions) == 231, "D6", "controlled exclusions must contain 231 records")
     _require(not exclusions["record_id"].duplicated().any(), "D6", "exclusions must have unique record_id values")
     _require(set(exclusions["record_id"]) == set(screened.loc[screened["final_level"].eq("X"), "record_id"]), "D6", "exclusions must match final X decisions")
     final_flow = _validate_final_flow(root)
+    _validate_final_flow_against_screened(screened, final_flow)
+    _require(
+        final_flow.get("source_screening_decisions_sha256")
+        == _sha256(decisions_path),
+        "D6",
+        "final flow must pin the controlled screening decisions hash",
+    )
     _require(_sha256(_require_file(root, "survey/build/flow_counts.json", "D6")) == final_flow.get("source_phase1_flow_counts_sha256"), "D6", "final flow must pin the immutable Phase 1 flow hash")
     _require(_sha256(_require_file(root, "survey/build/phase1_mapping.csv", "D6")) == final_flow.get("source_phase1_mapping_sha256"), "D6", "final flow must pin the immutable Phase 1 mapping hash")
     _require(_sha256(_require_file(root, "survey/build/phase1_run.json", "D6")) == final_flow.get("source_phase1_run_sha256"), "D6", "final flow must pin the immutable Phase 1 receipt hash")
@@ -487,6 +614,11 @@ def _validate_d7_to_d12(root: Path, context: Mapping[str, object]) -> dict[str, 
     _require(len(stage_matrix) == 60, "D11", "stage matrix must have exactly 3 x 20 = 60 rows")
     _require(stage_matrix["project"].nunique() == 3 and stage_matrix["ordinal"].nunique() == 20, "D11", "stage matrix must preserve three projects and all 20 canonical transformations")
     stage_markdown = _require_file(root, "survey/build/mlir_circt_stage_matrix.md", "D11").read_text(encoding="utf-8")
+    _require(
+        stage_markdown == render_stage_markdown(stage_matrix, root),
+        "D11",
+        "stage report must exactly match the canonical MLIR/CIRCT renderer",
+    )
     _require("Weight-loading interface" in stage_markdown, "D11", "stage report must include the source-faithful weight-loading transformation")
     _require("60 assessment rows" in stage_markdown, "D11", "stage report must describe all 60 assessed cells")
 
@@ -513,10 +645,16 @@ def _validate_source_deliverables(root: Path) -> dict[str, object]:
     return {**initial, **_validate_d7_to_d12(root, initial)}
 
 
-def _validate_generated_deliverables(root: Path, out: Path) -> None:
+def _validate_generated_deliverables(
+    root: Path, out: Path, context: Mapping[str, object] | None = None
+) -> None:
     """Validate D13--D16 in a requested output directory."""
 
-    flow = _validate_final_flow(root)
+    root = root.resolve()
+    context = context or _validate_source_deliverables(root)
+    _validate_report_generator_source_manifest(root)
+    flow = context.get("final_flow")
+    _require(isinstance(flow, Mapping), "D13", "report context lacks final flow")
     corpus_flow = _require_file(out, "corpus_flow.mmd", "D13").read_text(encoding="utf-8")
     validate_mermaid(corpus_flow)
     _require(
@@ -551,6 +689,16 @@ def _validate_generated_deliverables(root: Path, out: Path) -> None:
     metadata_path = _require_file(out, "final_report_build.json", "D16")
     markdown = markdown_path.read_text(encoding="utf-8")
     latex = latex_path.read_text(encoding="utf-8")
+    _require(
+        markdown == _render_markdown(context),
+        "D16",
+        "Markdown report must exactly match the canonical generator output",
+    )
+    _require(
+        latex == _render_latex(context),
+        "D16",
+        "LaTeX report must exactly match the canonical generator output",
+    )
     _require(pdf_path.stat().st_size > 0, "D16", "rendered PDF is empty")
     transcript = transcript_path.read_text(encoding="utf-8")
     _require(bool(transcript.strip()), "D16", "pdflatex transcript is empty")
@@ -575,6 +723,7 @@ def _validate_generated_deliverables(root: Path, out: Path) -> None:
         "D16",
         "pdflatex transcript reports an error or unresolved reference",
     )
+    _validate_deterministic_pdf_replay(root, latex, pdf_path, transcript)
     _validate_textual_outputs(out)
     for text in REQUIRED_REPORT_TEXT:
         _require(text in markdown, "D16", f"report misses required conclusion: {text}")
@@ -658,8 +807,8 @@ def validate_deliverables(root: Path = ROOT) -> list[str]:
     """Confirm all D1--D16 artifacts, evidence links, counts, and report hashes."""
 
     root = root.resolve()
-    _validate_source_deliverables(root)
-    _validate_generated_deliverables(root, root / "survey/build")
+    context = _validate_source_deliverables(root)
+    _validate_generated_deliverables(root, root / "survey/build", context)
     return DELIVERABLES.copy()
 
 
@@ -727,6 +876,9 @@ The source-faithful MLIR/CIRCT catalog is **3 projects x 20 canonical transforma
 `survey/build/mlir_circt_stage_matrix.md`, including the canonical
 weight-loading interface transformation.
 
+The bounded hypothesis outcomes are explicit: **H1 — unsupported for the current route.** **H2 — bounded/partial support only.** **H3 — inconclusive.** Their source-faithful evidence and limits are recorded in
+`survey/build/mlir_circt_stage_matrix.md#lines=90-94`.
+
 ## Selection result
 
 `survey/build/decision_matrix_scored.csv` evaluates the frozen hard gates
@@ -786,7 +938,7 @@ def _render_latex(_: Mapping[str, object]) -> str:
             r"\section{Review and audit}",
             "The final grouping has 226 project families and the bounded review has 36 reviewed project-family/control rows. Evidence: " + path("survey/build/project_families.csv") + ", " + path("survey/build/deep_review.csv") + ", " + path("survey/build/artifact_inventory.csv") + ", and " + path("survey/build/repository_audit.csv") + ".",
             r"\section{Compatibility and MLIR/CIRCT}",
-            "R1--R8 receipts are validated before reporting. R1 stops at RTL generation rather than passing RTL; see " + path("survey/compatibility/R1-mlir-circt/manifest.json") + ", " + path("survey/compatibility/R1-mlir-circt/commands.sh") + ", and " + path("survey/compatibility/R1-mlir-circt/stderr.log") + ". The source-faithful MLIR/CIRCT catalog is 3 projects x 20 canonical transformations = 60 assessed cells; see " + path("survey/build/mlir_circt_stage_matrix.csv") + ".",
+            "R1--R8 receipts are validated before reporting. R1 stops at RTL generation rather than passing RTL; see " + path("survey/compatibility/R1-mlir-circt/manifest.json") + ", " + path("survey/compatibility/R1-mlir-circt/commands.sh") + ", and " + path("survey/compatibility/R1-mlir-circt/stderr.log") + ". The source-faithful MLIR/CIRCT catalog is 3 projects x 20 canonical transformations = 60 assessed cells; see " + path("survey/build/mlir_circt_stage_matrix.csv") + ". H1 --- unsupported for the current route. H2 --- bounded/partial support only. H3 --- inconclusive. Evidence: " + path("survey/build/mlir_circt_stage_matrix.md#lines=90-94") + ".",
             r"\section{Selection result and limits}",
             "The decision matrix at " + path("survey/build/decision_matrix_scored.csv") + " yields NO\_PRIMARY\_ROUTE\_PASSED. Primary route: none. R1 is the ineligible next evidence-gathering route; R2 is an ineligible different-family hypothesis. The route selection rationale is " + path("survey/build/route_selection.md") + ". The target board remains unspecified, and no route is claimed as an eligible end-to-end causal-LM implementation.",
             r"\section{Reproduction}",
@@ -922,6 +1074,28 @@ def _render_pdf(root: Path, out: Path, tex_path: Path) -> tuple[Path, str, dict[
     }
 
 
+def _validate_deterministic_pdf_replay(
+    root: Path, latex: str, pdf_path: Path, transcript: str
+) -> None:
+    """Re-render D16 outside its output tree and compare deterministic bytes."""
+
+    with TemporaryDirectory(prefix="survey-d16-pdf-") as directory:
+        replay_out = Path(directory)
+        replay_tex = replay_out / "final_report.tex"
+        _write_text(replay_tex, latex)
+        replay_pdf, replay_transcript, _ = _render_pdf(root, replay_out, replay_tex)
+        _require(
+            _sha256(replay_pdf) == _sha256(pdf_path),
+            "D16",
+            "PDF must exactly match the deterministic PDF replay",
+        )
+        _require(
+            replay_transcript == transcript,
+            "D16",
+            "pdflatex transcript must exactly match the deterministic PDF replay",
+        )
+
+
 def _input_hashes(root: Path) -> dict[str, str]:
     return {relative: _sha256(_require_file(root, relative, "D16")) for relative in REPORT_INPUTS}
 
@@ -932,6 +1106,7 @@ def build_report(root: Path = ROOT, out: Path | None = None) -> Path:
     root = root.resolve()
     out = (out or root / "survey/build").resolve()
     context = _validate_source_deliverables(root)
+    _validate_report_generator_source_manifest(root)
 
     figures = write_figures(root, out)
     for path in figures.values():
@@ -968,7 +1143,7 @@ def build_report(root: Path = ROOT, out: Path | None = None) -> Path:
         out / "final_report_build.json",
         json.dumps(metadata, indent=2, sort_keys=True) + "\n",
     )
-    _validate_generated_deliverables(root, out)
+    _validate_generated_deliverables(root, out, context)
     return pdf_path
 
 
