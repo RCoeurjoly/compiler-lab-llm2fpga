@@ -1360,7 +1360,7 @@ def _strict_fixture(
     text += "    reset_transaction(context_index);\n"
     text += "    launch_cycle = clock_cycle;\n"
     text += "    go = 1'b1;\n"
-    text += "    while (!done && case_cycles < cycle_bound) begin @(posedge clk); case_cycles = case_cycles + 1; end\n"
+    text += "    while (!done && case_cycles < cycle_bound) begin @(posedge clk); case_cycles = case_cycles + 1; if (heartbeat_cycles > 0 && (case_cycles % heartbeat_cycles) == 0) $display(\"HEARTBEAT context=%0d cycles=%0d done=%0d clock=%0d\", context_index, case_cycles, done, clock_cycle); end\n"
     text += "    if (!done) case_fail(\"TIMEOUT\");\n"
     text += "    done_seen = done;\n"
     text += "    go = 1'b0;\n"
