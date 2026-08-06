@@ -67,6 +67,15 @@ Named multi-work families: 5. Every linked bibliographic work remains a separate
 | PF-443A595D662099E7 | WORK-2D44FCCE8D9826E3 | WORK-2D44FCCE8D9826E3;WORK-5B6F84F0C6192010 | named_system_extension; Edge-MoE explicitly names M3ViT as its source model and solves its FPGA-deployment challenges with five shared authors |
 | PF-4814F9379C7A45A0 | WORK-674CDDB57508D5CE | WORK-674CDDB57508D5CE;WORK-769AF53322C4EFB1 | named_system_extension; both papers introduce the same HADDOC2 open-source CNN-to-VHDL tool with five core authors, and the later peer-reviewed work extends its direct-mapping tactics |
 
+## Explicit conservative non-merges
+
+Similar titles, authors, domains, or framework dependencies do not establish a shared implementation family without direct lineage evidence. These reviewed candidate pairs therefore remain separate.
+
+| Candidate records | Assigned families | Non-merge rationale |
+|---|---|---|
+| REC-1D91E09883329FFA; REC-A53433EACA5A3E39 | PF-5F8C88F4E63C8F53; PF-91EE3D151F49EC76 | The later paper cites a conference predecessor, but the cited conference predecessor is a different 2021 work; neither paper identifies the other as a release or extension. |
+| REC-F95950AEA19221D0; REC-6099EE66504F6EF2 | PF-A254A36430409187; PF-3DBBE522B68ECE13 | Both works use hls4ml in particle-physics transformer implementations, but shared use of hls4ml is insufficient without an explicit cross-citation or stated release/extension relationship. |
+
 ## Reviewer sample / re-review design
 
 The controlled pass is recorded as `codex-title-abstract-screen`. All provisional A and C records, conflicts, and route-boundary cases were individually adjudicated; material ambiguity was checked against the locally cached PDF and marked `title_abstract+local_full_text`. Obvious exclusions may retain `title_abstract` as their accurate basis.

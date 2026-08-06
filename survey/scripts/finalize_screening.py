@@ -57,6 +57,21 @@ DECISION_REQUIRED_COLUMNS = frozenset(
     }
 )
 
+EXPLICIT_NON_MERGES = (
+    (
+        ("REC-1D91E09883329FFA", "REC-A53433EACA5A3E39"),
+        "The later paper cites a conference predecessor, but the cited "
+        "conference predecessor is a different 2021 work; neither paper "
+        "identifies the other as a release or extension.",
+    ),
+    (
+        ("REC-F95950AEA19221D0", "REC-6099EE66504F6EF2"),
+        "Both works use hls4ml in particle-physics transformer implementations, "
+        "but shared use of hls4ml is insufficient without an explicit "
+        "cross-citation or stated release/extension relationship.",
+    ),
+)
+
 
 def _require_columns(frame: pd.DataFrame, required: Iterable[str], label: str) -> None:
     missing = sorted(set(required) - set(frame.columns))
@@ -79,6 +94,36 @@ def _parse_bool(value: object, *, column: str, record_id: str) -> bool:
 
 def _nonblank(frame: pd.DataFrame, column: str) -> pd.Series:
     return frame[column].fillna("").astype(str).str.strip().ne("")
+
+
+def _contains_local_path_reference(evidence: str) -> bool:
+    for segment in evidence.split(";"):
+        token = segment.strip()
+        lowered = token.lower()
+        if lowered.startswith("source_url=https://"):
+            continue
+        key, separator, raw_value = token.partition("=")
+        value = raw_value.strip() if separator else token
+        lowered_value = value.lower()
+        if key.strip().lower() in {
+            "file",
+            "file_path",
+            "local_cache",
+            "local_path",
+            "path",
+        }:
+            return True
+        if lowered_value.startswith(("/", "~/", "file://")):
+            return True
+        if (
+            len(value) >= 3
+            and value[1] == ":"
+            and value[2] in {"/", "\\"}
+        ):
+            return True
+        if lowered_value.endswith(".pdf") and ("/" in value or "\\" in value):
+            return True
+    return False
 
 
 def validate_decisions(
@@ -216,15 +261,23 @@ def validate_decisions(
     )
     if invalid_excluded_family.any():
         raise ValueError("only X_DUPLICATE records may retain a project family")
-    for value, record_id in zip(
-        ordered.loc[has_family, "family_is_primary_work"],
-        ordered.loc[has_family, "record_id"],
-        strict=True,
-    ):
+    ordered["family_is_primary_work"] = [
         _parse_bool(
             value,
             column="family_is_primary_work",
             record_id=str(record_id),
+        )
+        for value, record_id in zip(
+            ordered["family_is_primary_work"],
+            ordered["record_id"],
+            strict=True,
+        )
+    ]
+    if ((~has_family) & ordered["family_is_primary_work"]).any():
+        raise ValueError("a record without a project family cannot be primary")
+    if ((~has_family) & ordered["family_grouping_basis"].ne("")).any():
+        raise ValueError(
+            "a record without a project family cannot have a grouping basis"
         )
 
     preferred_by_record = lineage.set_index("record_id")[
@@ -326,10 +379,12 @@ def validate_decisions(
             or not all(fragment in evidence for fragment in required_fragments)
             or "/home/" in evidence
             or "LLM-inference-on-FPGA-papers/papers/" in evidence
+            or _contains_local_path_reference(evidence)
         ):
             raise ValueError(
                 "portable full-text evidence requires the stable source URL, "
-                "cached PDF filename, cache SHA-256, and exact locator for "
+                "cached PDF filename, cache SHA-256, and exact locator, and "
+                "cannot contain a local path for "
                 f"{decision.record_id}"
             )
 
@@ -569,6 +624,30 @@ def _make_screening_audit(
         for _, group in families.groupby("project_family_id", sort=True)
         if len(group) > 1
     ]
+    records_by_id = screened.set_index("record_id", drop=False)
+    explicit_non_merge_rows = []
+    for record_ids, rationale in EXPLICIT_NON_MERGES:
+        if not set(record_ids).issubset(records_by_id.index):
+            continue
+        pair = records_by_id.loc[list(record_ids)]
+        family_ids = pair["project_family_id"].astype(str).tolist()
+        if len(set(family_ids)) != len(record_ids):
+            raise ValueError(
+                "an explicit conservative non-merge pair shares a project "
+                f"family: {'; '.join(record_ids)}"
+            )
+        explicit_non_merge_rows.append(
+            "| "
+            + " | ".join(
+                _markdown_cell(value)
+                for value in (
+                    "; ".join(record_ids),
+                    "; ".join(family_ids),
+                    rationale,
+                )
+            )
+            + " |"
+        )
 
     lines = [
         "# Controlled Phase-1 screening audit",
@@ -661,6 +740,19 @@ def _make_screening_audit(
                 + " |"
                 for group in multi_work_families
             ],
+            "",
+            "## Explicit conservative non-merges",
+            "",
+            "Similar titles, authors, domains, or framework dependencies do not "
+            "establish a shared implementation family without direct lineage "
+            "evidence. These reviewed candidate pairs therefore remain separate.",
+            "",
+            "| Candidate records | Assigned families | Non-merge rationale |",
+            "|---|---|---|",
+            *(
+                explicit_non_merge_rows
+                or ["| — | — | No corpus-specific candidate pairs in this fixture. |"]
+            ),
             "",
             "## Reviewer sample / re-review design",
             "",

@@ -161,13 +161,43 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "portable full-text evidence"):
             validate_decisions(self.mapping, decisions)
 
-        decisions.loc[0, "evidence_location"] = (
+        valid_evidence = (
             "phase1_mapping.csv#REC-1:title+abstract;"
             "source_url=https://arxiv.org/pdf/1234.00001v1;"
             "cache_filename=1234.00001v1.pdf;"
             f"cache_sha256={'1' * 64};locator=page 1"
         )
+        decisions.loc[0, "evidence_location"] = valid_evidence
         validate_decisions(self.mapping, decisions)
+
+        local_references = (
+            "local_cache=/tmp/private-copy.pdf",
+            "source_copy=/home/reviewer/private-copy.pdf",
+            r"cache_filename=C:\reviewer\private-copy.pdf",
+            "source_url=file:///tmp/private-copy.pdf",
+        )
+        for local_reference in local_references:
+            with self.subTest(local_reference=local_reference):
+                decisions.loc[0, "evidence_location"] = (
+                    f"{valid_evidence};{local_reference}"
+                )
+                with self.assertRaisesRegex(ValueError, "local path"):
+                    validate_decisions(self.mapping, decisions)
+
+    def test_rejects_invalid_or_primary_flag_on_unlinked_record(self) -> None:
+        decisions = self.decisions.copy()
+        decisions["family_is_primary_work"] = decisions[
+            "family_is_primary_work"
+        ].astype(object)
+        decisions.loc[1, "family_is_primary_work"] = "not-a-boolean"
+        with self.assertRaisesRegex(
+            ValueError, "family_is_primary_work must be Boolean"
+        ):
+            validate_decisions(self.mapping, decisions)
+
+        decisions.loc[1, "family_is_primary_work"] = True
+        with self.assertRaisesRegex(ValueError, "without a project family"):
+            validate_decisions(self.mapping, decisions)
 
     def duplicate_fixture(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         mapping = pd.concat(
@@ -529,6 +559,11 @@ class FrozenScreeningArtifactTests(unittest.TestCase):
             "| C | 75 | 75 |",
             "| D | 69 | 14 |",
             "| X | 230 | 46 |",
+            "## Explicit conservative non-merges",
+            "REC-1D91E09883329FFA; REC-A53433EACA5A3E39",
+            "the cited conference predecessor is a different 2021 work",
+            "REC-F95950AEA19221D0; REC-6099EE66504F6EF2",
+            "shared use of hls4ml is insufficient without an explicit cross-citation",
         ):
             self.assertIn(expected, audit)
 
