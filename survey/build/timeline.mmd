@@ -1,0 +1,9 @@
+flowchart LR
+scope["Freeze scope and catalogue amendment"] --> triage["Automated triage"]
+triage --> screening["Manual screening"]
+screening --> lineage["Deduplication and lineage"]
+lineage --> review["Deep review and extraction"]
+review --> audit["Artifact and repository audit"]
+audit --> compatibility["Route compatibility"]
+compatibility --> mlir["MLIR/CIRCT sub-survey"]
+mlir --> decision["Decision matrix and report"]

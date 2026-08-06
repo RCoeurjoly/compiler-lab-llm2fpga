@@ -1,0 +1,6 @@
+flowchart TD
+source["Commit-pinned catalogue: 461 source records"] --> normalized["Normalized records: 461"]
+normalized --> works["Deduplicated works: 456 unique works; 5 duplicate manifestations"]
+works --> levels["Final screening: A: 30; B: 57; C: 75; D: 68; X: 231"]
+levels --> included["Included records: 230"]
+levels --> excluded["Excluded records: 231"]

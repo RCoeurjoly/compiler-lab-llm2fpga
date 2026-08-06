@@ -1,0 +1,215 @@
+# working directory: <OUTPUT_DIR>
+$ pdflatex -interaction=nonstopmode -halt-on-error -output-directory . final_report.tex
+# pdflatex pass 1
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/nixos.org) (preloaded format=pdflatex)
+ restricted \write18 enabled.
+entering extended mode
+(./final_report.tex
+LaTeX2e <2023-11-01> patch level 1
+L3 programming layer <2024-02-20>
+
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/article.cls
+Document Class: article 2023/05/17 v1.4n Standard LaTeX document class
+
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/size11.clo))
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/fontenc.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/geometry/geometry.sty
+(<LOCAL_PATH>
+texmfdist/tex/latex/graphics/keyval.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/iftex/ifvtex.sty
+(<LOCAL_PATH>
+texmfdist/tex/generic/iftex/iftex.sty)))
+(<LOCAL_PATH>
+texmfdist/tex/latex/hyperref/hyperref.sty
+(<LOCAL_PATH>
+texmfdist/tex/latex/kvsetkeys/kvsetkeys.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/kvdefinekeys/kvdefinekeys.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/pdfescape/pdfescape.sty
+(<LOCAL_PATH>
+texmfdist/tex/generic/ltxcmds/ltxcmds.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/pdftexcmds/pdftexcmds.sty
+(<LOCAL_PATH>
+texmfdist/tex/generic/infwarerr/infwarerr.sty)))
+(<LOCAL_PATH>
+texmfdist/tex/latex/hycolor/hycolor.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/auxhook/auxhook.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/hyperref/nameref.sty
+(<LOCAL_PATH>
+texmfdist/tex/latex/refcount/refcount.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/gettitlestring/gettitlestring.sty
+(<LOCAL_PATH>
+texmfdist/tex/latex/kvoptions/kvoptions.sty)))
+(<LOCAL_PATH>
+texmfdist/tex/latex/etoolbox/etoolbox.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/hyperref/pd1enc.def)
+(<LOCAL_PATH>
+texmfdist/tex/generic/intcalc/intcalc.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/hyperref/puenc.def)
+(<LOCAL_PATH>
+texmfdist/tex/latex/url/url.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/bitset/bitset.sty
+(<LOCAL_PATH>
+texmfdist/tex/generic/bigintcalc/bigintcalc.sty))
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/atbegshi-ltx.sty))
+(<LOCAL_PATH>
+texmfdist/tex/latex/hyperref/hpdftex.def
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/atveryend-ltx.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/rerunfilecheck/rerunfilecheck.sty
+(<LOCAL_PATH>
+texmfdist/tex/generic/uniquecounter/uniquecounter.sty)))
+(<LOCAL_PATH>
+texmfdist/tex/latex/l3backend/l3backend-pdftex.def)
+No file final_report.aux.
+*geometry* driver: auto-detecting
+*geometry* detected driver: pdftex
+
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/t1cmtt.fd)
+Underfull \hbox (badness 10000) in paragraph at lines 22--23
+\T1/cmr/m/n/10.95 The de-ci-sion ma-trix at $\T1/cmtt/m/n/10.95 survey / build
+/ decision _ matrix _ scored . csv$ \T1/cmr/m/n/10.95 yields
+
+Underfull \hbox (badness 10000) in paragraph at lines 24--25
+\T1/cmr/m/n/10.95 Run \T1/cmtt/m/n/10.95 nix develop -c python -m unittest disc
+over -s tests -p 'test_survey_*.py'
+
+Underfull \hbox (badness 10000) in paragraph at lines 24--25
+\T1/cmtt/m/n/10.95 -v\T1/cmr/m/n/10.95 , then \T1/cmtt/m/n/10.95 nix develop -c
+ python survey/scripts/build_report.py --root . --out
+[1{<LOCAL_PATH>
+l/share/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] [2] (./final_report.aux)
+
+Package rerunfilecheck Warning: File `final_report.out' has changed.
+(rerunfilecheck)                Rerun to get outlines right
+(rerunfilecheck)                or use package `bookmark'.
+
+ )
+(see the transcript file for additional information) <<LOCAL_PATH>
+<LOCAL_PATH>> <<LOCAL_PATH>
+23/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1095.600pk> <<LOCAL_PATH>
+2023/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1440.600pk> <<LOCAL_PATH>
+ve2023/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1728.600pk>
+Output written on ./final_report.pdf (2 pages, 55911 bytes).
+Transcript written on ./final_report.log.
+
+# working directory: <OUTPUT_DIR>
+$ pdflatex -interaction=nonstopmode -halt-on-error -output-directory . final_report.tex
+# pdflatex pass 2
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023/nixos.org) (preloaded format=pdflatex)
+ restricted \write18 enabled.
+entering extended mode
+(./final_report.tex
+LaTeX2e <2023-11-01> patch level 1
+L3 programming layer <2024-02-20>
+
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/article.cls
+Document Class: article 2023/05/17 v1.4n Standard LaTeX document class
+
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/size11.clo))
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/fontenc.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/geometry/geometry.sty
+(<LOCAL_PATH>
+texmfdist/tex/latex/graphics/keyval.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/iftex/ifvtex.sty
+(<LOCAL_PATH>
+texmfdist/tex/generic/iftex/iftex.sty)))
+(<LOCAL_PATH>
+texmfdist/tex/latex/hyperref/hyperref.sty
+(<LOCAL_PATH>
+texmfdist/tex/latex/kvsetkeys/kvsetkeys.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/kvdefinekeys/kvdefinekeys.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/pdfescape/pdfescape.sty
+(<LOCAL_PATH>
+texmfdist/tex/generic/ltxcmds/ltxcmds.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/pdftexcmds/pdftexcmds.sty
+(<LOCAL_PATH>
+texmfdist/tex/generic/infwarerr/infwarerr.sty)))
+(<LOCAL_PATH>
+texmfdist/tex/latex/hycolor/hycolor.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/auxhook/auxhook.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/hyperref/nameref.sty
+(<LOCAL_PATH>
+texmfdist/tex/latex/refcount/refcount.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/gettitlestring/gettitlestring.sty
+(<LOCAL_PATH>
+texmfdist/tex/latex/kvoptions/kvoptions.sty)))
+(<LOCAL_PATH>
+texmfdist/tex/latex/etoolbox/etoolbox.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/hyperref/pd1enc.def)
+(<LOCAL_PATH>
+texmfdist/tex/generic/intcalc/intcalc.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/hyperref/puenc.def)
+(<LOCAL_PATH>
+texmfdist/tex/latex/url/url.sty)
+(<LOCAL_PATH>
+texmfdist/tex/generic/bitset/bitset.sty
+(<LOCAL_PATH>
+texmfdist/tex/generic/bigintcalc/bigintcalc.sty))
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/atbegshi-ltx.sty))
+(<LOCAL_PATH>
+texmfdist/tex/latex/hyperref/hpdftex.def
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/atveryend-ltx.sty)
+(<LOCAL_PATH>
+texmfdist/tex/latex/rerunfilecheck/rerunfilecheck.sty
+(<LOCAL_PATH>
+texmfdist/tex/generic/uniquecounter/uniquecounter.sty)))
+(<LOCAL_PATH>
+texmfdist/tex/latex/l3backend/l3backend-pdftex.def) (./final_report.aux)
+*geometry* driver: auto-detecting
+*geometry* detected driver: pdftex
+(./final_report.out) (./final_report.out)
+(<LOCAL_PATH>
+texmfdist/tex/latex/base/t1cmtt.fd)
+Underfull \hbox (badness 10000) in paragraph at lines 22--23
+\T1/cmr/m/n/10.95 The de-ci-sion ma-trix at $\T1/cmtt/m/n/10.95 survey / build
+/ decision _ matrix _ scored . csv$ \T1/cmr/m/n/10.95 yields
+
+Underfull \hbox (badness 10000) in paragraph at lines 24--25
+\T1/cmr/m/n/10.95 Run \T1/cmtt/m/n/10.95 nix develop -c python -m unittest disc
+over -s tests -p 'test_survey_*.py'
+
+Underfull \hbox (badness 10000) in paragraph at lines 24--25
+\T1/cmtt/m/n/10.95 -v\T1/cmr/m/n/10.95 , then \T1/cmtt/m/n/10.95 nix develop -c
+ python survey/scripts/build_report.py --root . --out
+[1{<LOCAL_PATH>
+l/share/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] [2] (./final_report.aux)
+ )
+(see the transcript file for additional information) <<LOCAL_PATH>
+<LOCAL_PATH>> <<LOCAL_PATH>
+23/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1095.600pk> <<LOCAL_PATH>
+2023/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1440.600pk> <<LOCAL_PATH>
+ve2023/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1728.600pk>
+Output written on ./final_report.pdf (2 pages, 56369 bytes).
+Transcript written on ./final_report.log.

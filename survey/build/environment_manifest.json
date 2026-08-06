@@ -1,7 +1,7 @@
 {
   "flake_lock_sha256": "f45b41d88e84bd0378420214de5fdcd1bd663c405fa517bd4c630be750f46529",
-  "flake_nix_sha256": "43a9897bf3e27c634bd24578edd9c154940acd5168df8ff8707d3550583ac4cf",
-  "generated_at_utc": "2026-08-05T22:17:07.442481+00:00",
+  "flake_nix_sha256": "f87899275605362abd5e6977b8f57c49b1c5f5bb89b9918687439f4b86362bbb",
+  "generated_at_utc": "2026-08-06T05:13:45.961106+00:00",
   "interpreter": {
     "implementation": "CPython",
     "version": "3.11.14"
