@@ -365,6 +365,13 @@ class RcObservableDriverTest(unittest.TestCase):
         self.assertNotIn("ascending", tb)
         self.assertNotIn("token_ids", tb)
 
+    def test_strict_failure_dumps_complete_output_tensor(self):
+        """Catches losing the terminal tensor needed to localize a raw-code mismatch."""
+
+        tb = self._strict_fixture_text()
+        self.assertIn("OUTPUT_TENSOR context=%0d", tb)
+        self.assertIn("for (lane = 0; lane < 48; lane = lane + 1)", tb)
+
     def test_strict_fixture_lints_with_project_verilator_5022(self):
         """Catches malformed generated control flow before a real build."""
 

@@ -1276,7 +1276,7 @@ def _strict_fixture(
         + "\n".join(declarations)
         + "\n"
     )
-    text += f"integer cycle_bound = {cycle_bound};\n"
+    text += f"integer cycle_bound = {cycle_bound}; integer heartbeat_cycles = 0;\n"
     text += (
         "logic clk=0, reset=0, go=0; wire done; integer request_count=0, completion_count=0; "
         f"wire any_mem_en = {memory_enable_terms}; always #5 clk=~clk;\n"
@@ -1288,6 +1288,8 @@ def _strict_fixture(
         '    $display("CASE_FAIL index=%0d reason=%s cycles=%0d expected_codes=%0d,%0d,%0d,%0d,%0d,%0d observed_codes=%0d,%0d,%0d,%0d,%0d,%0d expected_token=%0d observed_token=%0d write_mask=%b", '
         "context_index, reason, case_cycles, $signed(expected_record[7:0]), $signed(expected_record[15:8]), $signed(expected_record[23:16]), $signed(expected_record[31:24]), $signed(expected_record[39:32]), $signed(expected_record[47:40]), $signed(mem26[42]), $signed(mem26[43]), $signed(mem26[44]), $signed(mem26[45]), $signed(mem26[46]), $signed(mem26[47]), expected_record[55:48], best_index, final_write_mask);\n"
     )
+    text += '    $write("OUTPUT_TENSOR context=%0d codes=", context_index);\n'
+    text += '    for (lane = 0; lane < 48; lane = lane + 1) $write("%0d%s", $signed(mem26[lane]), lane == 47 ? "\\n" : ",");\n'
     text += '    $fatal(1, "observable shard case failed: %s", reason);\n'
     text += "  end\nendtask\n"
     text += "always_ff @(posedge clk) begin clock_cycle <= clock_cycle + 1; end\n"
@@ -1344,6 +1346,7 @@ def _strict_fixture(
     text += "    record_count = shard_count; sequence_count = 0; context_index_fd = 0;\n"
     text += "  end\n"
     text += "  if (!$value$plusargs(\"cycle_bound=%d\", cycle_bound) || cycle_bound <= 0) begin context_index = shard_start; case_cycles = 0; case_fail(\"INVALID_CYCLE_BOUND\"); end\n"
+    text += "  void'($value$plusargs(\"heartbeat_cycles=%d\", heartbeat_cycles));\n"
     text += '  oracle_fd = $fopen(oracle_path, "r");\n'
     text += "  if (oracle_fd == 0) begin context_index = shard_start; case_cycles = 0; case_fail(\"ORACLE_OPEN_FAILED\"); end\n"
     text += "  completed_cases = 0; min_cycles = 0; max_cycles = 0;\n"
