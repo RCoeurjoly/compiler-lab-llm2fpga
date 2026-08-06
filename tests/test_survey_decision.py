@@ -237,6 +237,22 @@ class MlirStageMatrixTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "source test or example"):
             validate_stage_matrix(invalid)
 
+    def test_native_status_rejects_documentation_only_source_claims(self) -> None:
+        matrix = build_stage_matrix()
+        native_index = matrix.index[matrix["status"].eq("native")][0]
+        validate_stage_matrix(matrix)
+        for evidence_kind in ("source_example", "source_test"):
+            with self.subTest(evidence_kind=evidence_kind):
+                invalid = matrix.copy()
+                invalid.loc[native_index, "evidence_kind"] = evidence_kind
+                invalid.loc[native_index, "evidence_location"] = (
+                    "survey/compatibility/R1-mlir-circt/README.md#lines=1-16"
+                )
+                with self.assertRaisesRegex(
+                    ValueError, "concrete pinned source test or example"
+                ):
+                    validate_stage_matrix(invalid)
+
     def test_stage_markdown_discloses_source_faithful_protocol_correction(self) -> None:
         with TemporaryDirectory() as directory:
             write_outputs(ROOT, Path(directory))
@@ -392,6 +408,46 @@ class DecisionMatrixTests(unittest.TestCase):
                     evidence = str(row[f"{criterion}_evidence"])
                     self.assertTrue(evidence.strip())
                     self.assertTrue((ROOT / evidence.split("#", 1)[0]).exists())
+
+    def test_decision_validation_requires_each_frozen_route_exactly_once(self) -> None:
+        matrix = build_decision_matrix(ROOT)
+        missing_route = matrix.loc[~matrix["route_id"].eq("R8")].copy()
+        with self.assertRaisesRegex(ValueError, "exactly once"):
+            validate_decision_matrix(missing_route, ROOT)
+
+        duplicate_route = matrix.copy()
+        duplicate_route.loc[duplicate_route["route_id"].eq("R8"), "route_id"] = "R7"
+        with self.assertRaisesRegex(ValueError, "exactly once"):
+            validate_decision_matrix(duplicate_route, ROOT)
+
+    def test_decision_validation_binds_route_rows_to_persisted_receipts(self) -> None:
+        matrix = build_decision_matrix(ROOT)
+        r2 = matrix["route_id"].eq("R2")
+        for changes, error in (
+            ({"route_family": "HLS"}, "receipt route_family"),
+            (
+                {
+                    "receipt_manifest": "survey/compatibility/R1-mlir-circt/manifest.json"
+                },
+                "receipt_manifest",
+            ),
+            (
+                {"receipt_readme": "survey/compatibility/R1-mlir-circt/README.md"},
+                "receipt_readme",
+            ),
+            (
+                {"actual_stage": "SIMULATION", "failure_code": "F_NONE"},
+                "receipt actual_stage",
+            ),
+            ({"failure_code": "F_NONE"}, "receipt failure_code"),
+            ({"selection_status": "ELIGIBLE"}, "receipt decision"),
+        ):
+            with self.subTest(changes=changes):
+                invalid = matrix.copy()
+                for column, value in changes.items():
+                    invalid.loc[r2, column] = value
+                with self.assertRaisesRegex(ValueError, error):
+                    validate_decision_matrix(invalid, ROOT)
 
     def test_decision_validation_rejects_score_anchor_overclaims(self) -> None:
         matrix = build_decision_matrix(ROOT)

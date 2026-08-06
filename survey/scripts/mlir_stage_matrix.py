@@ -47,6 +47,9 @@ STAGE_STATUSES = frozenset(
     {"native", "extension_available", "manual_implementation", "missing"}
 )
 NATIVE_EVIDENCE_KINDS = frozenset({"source_test", "source_example"})
+NATIVE_IMPLEMENTATION_SUFFIXES = frozenset(
+    {".c", ".cc", ".cpp", ".mlir", ".py", ".sh", ".sv", ".v"}
+)
 
 HARD_GATES = (
     "source_access",
@@ -58,6 +61,7 @@ HARD_GATES = (
     "test_budget",
     "deterministic_reference",
 )
+FROZEN_ROUTE_IDS = tuple(f"R{number}" for number in range(1, 9))
 
 SCORE_WEIGHTS = {
     "demonstrator_score_0_5": 25,
@@ -892,15 +896,23 @@ def validate_stage_matrix(matrix: pd.DataFrame, root: Path = ROOT) -> None:
             raise ValueError(
                 f"{row['stage']} has status {status} without evidence_location"
             )
-        if _nonblank(evidence) and not all(
-            path.is_file() for path in _evidence_source_paths(evidence, root)
-        ):
+        evidence_paths = (
+            _evidence_source_paths(evidence, root) if _nonblank(evidence) else ()
+        )
+        if evidence_paths and not all(path.is_file() for path in evidence_paths):
             raise ValueError(
                 f"{row['stage']} evidence_location does not resolve to a local source"
             )
         if status == "native" and kind not in NATIVE_EVIDENCE_KINDS:
             raise ValueError(
                 f"native stage {row['stage']} requires a pinned source test or example"
+            )
+        if status == "native" and not any(
+            path.suffix.lower() in NATIVE_IMPLEMENTATION_SUFFIXES
+            for path in evidence_paths
+        ):
+            raise ValueError(
+                f"native stage {row['stage']} requires a concrete pinned source test or example"
             )
 
 
@@ -1007,6 +1019,15 @@ def validate_decision_matrix(matrix: pd.DataFrame, root: Path = ROOT) -> None:
 
     if tuple(matrix.columns) != DECISION_COLUMNS:
         raise ValueError("decision matrix columns do not match the Task 7 schema")
+    observed_route_ids = [str(route_id) for route_id in matrix["route_id"].tolist()]
+    if (
+        len(observed_route_ids) != len(FROZEN_ROUTE_IDS)
+        or set(observed_route_ids) != set(FROZEN_ROUTE_IDS)
+        or len(set(observed_route_ids)) != len(observed_route_ids)
+    ):
+        raise ValueError(
+            "decision matrix must contain exactly once each frozen route R1 through R8"
+        )
     for row in matrix.to_dict(orient="records"):
         route_id = str(row["route_id"])
         if not _nonblank(route_id):
@@ -1014,6 +1035,20 @@ def validate_decision_matrix(matrix: pd.DataFrame, root: Path = ROOT) -> None:
         assessment = _ROUTE_ASSESSMENT_BY_ID.get(route_id)
         if assessment is None:
             raise ValueError(f"decision matrix contains an unknown route: {route_id}")
+        receipt_manifest = str(assessment["receipt_manifest"])
+        if row["receipt_manifest"] != receipt_manifest:
+            raise ValueError(f"receipt_manifest for {route_id} is inconsistent")
+        manifest = _read_manifest(root, receipt_manifest)
+        _validate_route_assessment(assessment, manifest)
+        if row["route_family"] != manifest.get("route_family"):
+            raise ValueError(f"receipt route_family for {route_id} is inconsistent")
+        if row["receipt_readme"] != assessment["receipt_readme"]:
+            raise ValueError(f"receipt_readme for {route_id} is inconsistent")
+        for field in ("actual_stage", "failure_code"):
+            if row[field] != manifest.get(field):
+                raise ValueError(f"receipt {field} for {route_id} is inconsistent")
+        if row["selection_status"] != manifest.get("decision"):
+            raise ValueError(f"receipt decision for {route_id} is inconsistent")
         expected_gates = cast(Mapping[str, object], assessment["gates"])
         expected_gate_evidence = cast(
             Mapping[str, object], assessment["gate_evidence"]
@@ -1181,7 +1216,7 @@ def build_decision_matrix(root: Path = ROOT) -> pd.DataFrame:
         row["selection_status"] = "ELIGIBLE" if eligible else "INELIGIBLE"
         rows.append(row)
     matrix = pd.DataFrame(rows, columns=DECISION_COLUMNS)
-    if matrix["route_id"].tolist() != [f"R{number}" for number in range(1, 9)]:
+    if matrix["route_id"].tolist() != list(FROZEN_ROUTE_IDS):
         raise ValueError("decision matrix must retain exactly R1 through R8")
     validate_decision_matrix(matrix, root)
     return matrix
