@@ -1276,7 +1276,7 @@ def _strict_fixture(
         + "\n".join(declarations)
         + "\n"
     )
-    text += f"integer cycle_bound = {cycle_bound}; integer heartbeat_cycles = 0; integer dump_scratch = 0;\n"
+    text += f"integer cycle_bound = {cycle_bound}; integer heartbeat_cycles = 0; integer dump_scratch = 0; integer snapshot_cycle = 0;\n"
     text += (
         "logic clk=0, reset=0, go=0; wire done; integer request_count=0, completion_count=0; "
         f"wire any_mem_en = {memory_enable_terms}; always #5 clk=~clk;\n"
@@ -1354,6 +1354,7 @@ def _strict_fixture(
     text += "  if (!$value$plusargs(\"cycle_bound=%d\", cycle_bound) || cycle_bound <= 0) begin context_index = shard_start; case_cycles = 0; case_fail(\"INVALID_CYCLE_BOUND\"); end\n"
     text += "  void'($value$plusargs(\"heartbeat_cycles=%d\", heartbeat_cycles));\n"
     text += "  void'($value$plusargs(\"dump_scratch=%d\", dump_scratch));\n"
+    text += "  void'($value$plusargs(\"snapshot_cycle=%d\", snapshot_cycle));\n"
     text += '  oracle_fd = $fopen(oracle_path, "r");\n'
     text += "  if (oracle_fd == 0) begin context_index = shard_start; case_cycles = 0; case_fail(\"ORACLE_OPEN_FAILED\"); end\n"
     text += "  completed_cases = 0; min_cycles = 0; max_cycles = 0;\n"
@@ -1370,7 +1371,7 @@ def _strict_fixture(
     text += "    reset_transaction(context_index);\n"
     text += "    launch_cycle = clock_cycle;\n"
     text += "    go = 1'b1;\n"
-    text += "    while (!done && case_cycles < cycle_bound) begin @(posedge clk); case_cycles = case_cycles + 1; if (heartbeat_cycles > 0 && (case_cycles % heartbeat_cycles) == 0) $display(\"HEARTBEAT context=%0d cycles=%0d done=%0d clock=%0d\", context_index, case_cycles, done, clock_cycle); end\n"
+    text += "    while (!done && case_cycles < cycle_bound) begin @(posedge clk); case_cycles = case_cycles + 1; if (heartbeat_cycles > 0 && (case_cycles % heartbeat_cycles) == 0) $display(\"HEARTBEAT context=%0d cycles=%0d done=%0d clock=%0d\", context_index, case_cycles, done, clock_cycle); if (snapshot_cycle > 0 && case_cycles == snapshot_cycle) case_fail(\"SNAPSHOT\"); end\n"
     text += "    if (!done) case_fail(\"TIMEOUT\");\n"
     text += "    done_seen = done;\n"
     text += "    go = 1'b0;\n"

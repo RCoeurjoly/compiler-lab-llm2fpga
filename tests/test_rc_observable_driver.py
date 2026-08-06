@@ -380,6 +380,14 @@ class RcObservableDriverTest(unittest.TestCase):
         self.assertIn('SCRATCH port=46 values=', tb)
         self.assertIn('SCRATCH port=145 values=', tb)
 
+    def test_strict_fixture_can_stop_at_a_diagnostic_snapshot_cycle(self):
+        """Catches requiring a full-model completion before inspecting boundaries."""
+
+        tb = self._strict_fixture_text()
+        self.assertIn('$value$plusargs("snapshot_cycle=%d", snapshot_cycle)', tb)
+        self.assertIn('snapshot_cycle > 0 && case_cycles == snapshot_cycle', tb)
+        self.assertIn('case_fail("SNAPSHOT")', tb)
+
     def test_strict_fixture_lints_with_project_verilator_5022(self):
         """Catches malformed generated control flow before a real build."""
 
