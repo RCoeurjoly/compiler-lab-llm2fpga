@@ -1,0 +1,18 @@
+===== command 1: sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv =====
+7ec619fa52e3b83a24a4f4b25bc656de8bd9895b2c9d70b3688e98fc7e656a62  survey/protocol.md
+239c996d4f79364b3c261bf601a7a211104b2b60396ad8b4e00e00d7d7d472f5  survey/build/deep_review.csv
+4e06aed7708955484b2eb609034c822aec62acc47f3594fec901ae95d503b301  survey/build/artifact_inventory.csv
+be15ec353621597b379bd60bc859e8b95298cbf041b0a27ed49ae611a9b5c2e6  survey/build/repository_audit.csv
+===== command 2: curl -fsSL https://zenodo.org/api/records/10462167/files/README.md/content =====
+# FlightLLM Test Demo
+
+This demo is for testing FlightLLM implementation on the Xilinx Alveo U280 FPGA.
+Our submission can be divided into two parts.
+
+1. Performance profile (see `profile/README.md` for details): It is used to compare the performance of the GPU baseline with the simulation performance of the VHK158 FPGA and calculate the speedup ratio, which can verify Figure 11 in the paper (Throughput Speedup of LLaMA2-7B). The performance results of the VHK158 are based on the software run and no hardware is involved. 
+
+2. FPGA on-board testing (see `fpga_implementation/README.md` for details): It is a hardware on-board test on the U280 FPGA to measure the correctness and performance of the paper design. The performance can verify Figure 1 in the paper (55 token/s).
+
+The RTL implementation of this paper is the Intellectual Property (IP) of Infinigence-AI, thus no open-source verilog code can be provided. Instead, we provide the pre-generated bitstream on the U280 FPGA, the pre-compiled cases and the host file. We can assist the evaluators to generate different test cases in the environment at Infinigence-AI. The generated test cases can then be migrated to the evaluator's local environment with the pre-generated bitstream for further evaluation.
+===== command 3: python3 -c "import json; d=json.load(open('survey/build/api-cache/responses/zenodo/19f09e16466d9bcc9442e69b70f082e079eb5a6a349e4c225943c8366ac8a331.body')); print([(f['key'],f['size'],f['checksum']) for f in d['files']])" =====
+[('profile.zip', 2788671, 'md5:ac009e775c50475d0535adef534e024b'), ('fpga_implementation.zip', 6409565790, 'md5:78cbfb72abe678f6df94b344a571ef87'), ('README.md', 1269, 'md5:44f76a1d8fe7aad02473058a8bde8378')]

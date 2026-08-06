@@ -1,0 +1,65 @@
+{
+  "actual_stage": "CAUSAL_LM_COVERAGE",
+  "artifact_commit": "",
+  "artifact_sha256": "",
+  "budget_hours": 16,
+  "command_results": [
+    {
+      "command": "sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv",
+      "exit_code": 0,
+      "index": 1
+    },
+    {
+      "command": "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-E9C1300B04E80B95'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_state','licence_spdx_id','licence_evidence','source_closure_state','vendor_ip_indicators_json','failure_code')},sort_keys=True))\"",
+      "exit_code": 0,
+      "index": 2
+    },
+    {
+      "command": "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/deep_review.csv')) if x['project_family_id']=='PF-E9C1300B04E80B95'); print(json.dumps({k:r[k] for k in ('title','rq1_input_frontend','rq2_model_family','rq2_prefill','rq2_decode','rq2_token_loop','rq2_kv_cache','rq2_completeness','rq4_required_closed_tools_or_ip')},sort_keys=True))\"",
+      "exit_code": 0,
+      "index": 3
+    }
+  ],
+  "commands_sha256": "f0d4c8a080ed9da423320b5522c6ddaabc8326a5a7e3da8844dc31d36f9001ba",
+  "complete_elaboratable_rtl": false,
+  "decision": "INELIGIBLE",
+  "environment_manifest": {
+    "artifact_inventory_sha256": "4e06aed7708955484b2eb609034c822aec62acc47f3594fec901ae95d503b301",
+    "cwd_policy": "repository-relative commands",
+    "deep_review_sha256": "239c996d4f79364b3c261bf601a7a211104b2b60396ad8b4e00e00d7d7d472f5",
+    "platform": "Linux-7.0.0-28-generic-x86_64-with-glibc2.40",
+    "protocol_sha256": "7ec619fa52e3b83a24a4f4b25bc656de8bd9895b2c9d70b3688e98fc7e656a62",
+    "python": "3.11.14",
+    "repository_audit_sha256": "be15ec353621597b379bd60bc859e8b95298cbf041b0a27ed49ae611a9b5c2e6"
+  },
+  "evidence_files": [],
+  "executed_commands": [
+    "sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv",
+    "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-E9C1300B04E80B95'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_state','licence_spdx_id','licence_evidence','source_closure_state','vendor_ip_indicators_json','failure_code')},sort_keys=True))\"",
+    "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/deep_review.csv')) if x['project_family_id']=='PF-E9C1300B04E80B95'); print(json.dumps({k:r[k] for k in ('title','rq1_input_frontend','rq2_model_family','rq2_prefill','rq2_decode','rq2_token_loop','rq2_kv_cache','rq2_completeness','rq4_required_closed_tools_or_ip')},sort_keys=True))\""
+  ],
+  "expected_stage": "M2_STATEFUL_DECODE",
+  "failure_code": "F_INTERFACE",
+  "failure_detail": "The frozen source has a BSD-2 licence despite GitHub's NOASSERTION SPDX classification, but the audited Cascade artifact is a Verilog virtualization control and contains no causal-LM prefill/decode or token-loop implementation.",
+  "fixture": "M0-operators",
+  "frozen_tolerance": {
+    "fixed_point_lsb": 1,
+    "floating_absolute": 1e-05,
+    "floating_relative": 0.0001,
+    "integer": "identical"
+  },
+  "generated_rtl_paths": [],
+  "lint_evidence": [],
+  "m2_evidence": {},
+  "next_bounded_action": "Add and audit a causal-LM kernel with persistent KV state before evaluating the fallback runtime.",
+  "receipt_schema_version": 1,
+  "route_family": "CPU_FPGA_FALLBACK",
+  "route_id": "R8",
+  "route_title": "Cascade CPU/FPGA fallback control",
+  "simulation_evidence": [],
+  "source_commit": "e21dafa4d877c1dc7846f9e0b60c05a995d033eb",
+  "source_evidence": "survey/build/repository_audit.csv#repository_audit_id=REPO-PF-E9C1300B04E80B95",
+  "source_sha256": "5b3101bd5b9edfc09d115057f560b04cdecf886822f20ed4cbac3d322be41ef0",
+  "status": "STOPPED",
+  "synthesis_evidence": []
+}

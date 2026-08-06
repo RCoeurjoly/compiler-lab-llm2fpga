@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -u
+
+sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv
+python3 -c "import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-E9C1300B04E80B95'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_state','licence_spdx_id','licence_evidence','source_closure_state','vendor_ip_indicators_json','failure_code')},sort_keys=True))"
+python3 -c "import csv,json; r=next(x for x in csv.DictReader(open('survey/build/deep_review.csv')) if x['project_family_id']=='PF-E9C1300B04E80B95'); print(json.dumps({k:r[k] for k in ('title','rq1_input_frontend','rq2_model_family','rq2_prefill','rq2_decode','rq2_token_loop','rq2_kv_cache','rq2_completeness','rq4_required_closed_tools_or_ip')},sort_keys=True))"

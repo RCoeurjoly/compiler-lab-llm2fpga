@@ -1,0 +1,57 @@
+{
+  "M0-operators": {
+    "acceptance": {
+      "fixed_point_lsb": 1,
+      "floating_absolute": 1e-05,
+      "floating_relative": 0.0001,
+      "integer": "identical"
+    },
+    "batch_size": 1,
+    "operators": [
+      "int8_matmul",
+      "normalization",
+      "activation",
+      "rope",
+      "causal_softmax",
+      "kv_read_write"
+    ],
+    "static_shapes": true
+  },
+  "M1-block": {
+    "acceptance": {
+      "fixed_point_lsb": 1,
+      "floating_absolute": 1e-05,
+      "floating_relative": 0.0001,
+      "integer": "identical"
+    },
+    "batch_size": 1,
+    "blocks": 1,
+    "d_ff": 128,
+    "d_model": 64,
+    "heads": 4,
+    "sequence": 16
+  },
+  "M2-tiny-lm": {
+    "acceptance": {
+      "token_ids": "identical"
+    },
+    "batch_size": 1,
+    "blocks": 2,
+    "d_ff": 256,
+    "d_model": 128,
+    "decode_mode": "greedy",
+    "decode_tokens": 4,
+    "heads": 4,
+    "kv_state": "persistent_across_decode_steps",
+    "max_sequence": 32,
+    "vocabulary": 256
+  },
+  "M3-repository-fixture": {
+    "acceptance": {
+      "integer": "identical",
+      "reference": "frozen PT2E W8A8 evaluator"
+    },
+    "batch_size": 1,
+    "fixture": "compiler-lab TinyStories frozen repository fixture"
+  }
+}

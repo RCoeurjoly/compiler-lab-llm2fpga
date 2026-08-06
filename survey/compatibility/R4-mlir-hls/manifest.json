@@ -1,0 +1,65 @@
+{
+  "actual_stage": "SOURCE_CLOSURE",
+  "artifact_commit": "",
+  "artifact_sha256": "",
+  "budget_hours": 16,
+  "command_results": [
+    {
+      "command": "sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv",
+      "exit_code": 0,
+      "index": 1
+    },
+    {
+      "command": "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-86FE8DBFB50CB04C'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_state','licence_spdx_id','source_closure_state','generated_or_omitted_rtl','tool_indicators_json','failure_code')},sort_keys=True))\"",
+      "exit_code": 0,
+      "index": 2
+    },
+    {
+      "command": "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/artifact_inventory.csv')) if x['project_family_id']=='PF-86FE8DBFB50CB04C'); print(json.dumps({k:r[k] for k in ('artifact_claim_state','artifact_relation','limitations')},sort_keys=True))\"",
+      "exit_code": 0,
+      "index": 3
+    }
+  ],
+  "commands_sha256": "4ab90d191390be155cfdc8d65dd98fe2e92f34d177942f77f137d4d17961df74",
+  "complete_elaboratable_rtl": false,
+  "decision": "INELIGIBLE",
+  "environment_manifest": {
+    "artifact_inventory_sha256": "4e06aed7708955484b2eb609034c822aec62acc47f3594fec901ae95d503b301",
+    "cwd_policy": "repository-relative commands",
+    "deep_review_sha256": "239c996d4f79364b3c261bf601a7a211104b2b60396ad8b4e00e00d7d7d472f5",
+    "platform": "Linux-7.0.0-28-generic-x86_64-with-glibc2.40",
+    "protocol_sha256": "7ec619fa52e3b83a24a4f4b25bc656de8bd9895b2c9d70b3688e98fc7e656a62",
+    "python": "3.11.14",
+    "repository_audit_sha256": "be15ec353621597b379bd60bc859e8b95298cbf041b0a27ed49ae611a9b5c2e6"
+  },
+  "evidence_files": [],
+  "executed_commands": [
+    "sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv",
+    "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-86FE8DBFB50CB04C'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_state','licence_spdx_id','source_closure_state','generated_or_omitted_rtl','tool_indicators_json','failure_code')},sort_keys=True))\"",
+    "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/artifact_inventory.csv')) if x['project_family_id']=='PF-86FE8DBFB50CB04C'); print(json.dumps({k:r[k] for k in ('artifact_claim_state','artifact_relation','limitations')},sort_keys=True))\""
+  ],
+  "expected_stage": "M1_RTL",
+  "failure_code": "F_SOURCE_MISSING",
+  "failure_detail": "The audit observes the general Allo tree but the paper marks the LLM artifact as a future release; no complete LLM RTL artifact is pinned.",
+  "fixture": "M0-operators",
+  "frozen_tolerance": {
+    "fixed_point_lsb": 1,
+    "floating_absolute": 1e-05,
+    "floating_relative": 0.0001,
+    "integer": "identical"
+  },
+  "generated_rtl_paths": [],
+  "lint_evidence": [],
+  "m2_evidence": {},
+  "next_bounded_action": "Obtain and audit the paper-specific LLM release before attempting Allo M0/M1 generation.",
+  "receipt_schema_version": 1,
+  "route_family": "HLS",
+  "route_id": "R4",
+  "route_title": "Allo MLIR/HLS route",
+  "simulation_evidence": [],
+  "source_commit": "74b0373ecbc4cfded24f5660c12eee4253c31be5",
+  "source_evidence": "survey/build/repository_audit.csv#repository_audit_id=REPO-PF-86FE8DBFB50CB04C",
+  "source_sha256": "f9f59fd6e68f950b1333719c872682a188295b5f89a016383509c00b43366608",
+  "status": "STOPPED",
+  "synthesis_evidence": []
+}
