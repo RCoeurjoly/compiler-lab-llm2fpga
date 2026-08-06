@@ -27,6 +27,7 @@ from survey.scripts.audit_repositories import (
     zenodo_artifact_observation,
 )
 from survey.scripts.enrich_metadata import (
+    CacheEntry,
     cached_request,
     licence_state,
     retrieval_failure_code,
@@ -79,6 +80,32 @@ def _write_cache_entry(
         encoding="utf-8",
     )
     return entry
+
+
+def _audit_with_tree_body(body: bytes) -> dict[str, object]:
+    slug = "owner/repo"
+    api = "https://api.github.com/repos/Owner/Repo"
+    commit = "1" * 40
+    fixtures = (
+        (f"{slug}:repository", api, b'{"default_branch":"main","archived":false}'),
+        (f"{slug}:commit:main", f"{api}/commits/main", json.dumps({"sha": commit}).encode()),
+        (f"{slug}:tree:{commit}", f"{api}/git/trees/{commit}?recursive=1", body),
+        (f"{slug}:releases", f"{api}/releases?per_page=100", b"[]"),
+        (f"{slug}:licence:{commit}", f"{api}/license?ref={commit}", b'{"license":{"spdx_id":"MIT"}}'),
+        (f"{slug}:readme:{commit}", f"{api}/readme?ref={commit}", b'{"encoding":"base64","content":""}'),
+    )
+    with TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        for identifier, url, response_body in fixtures:
+            _write_cache_entry(
+                root,
+                service="github",
+                identifier=identifier,
+                url=url,
+                body=response_body,
+            )
+        with patch.dict(os.environ, {"SURVEY_API_CACHE_ROOT": str(root)}):
+            return audit_repository("https://github.com/Owner/Repo", None)
 
 
 class CacheAndNormalizationTests(unittest.TestCase):
@@ -256,11 +283,11 @@ class ArtifactInventoryTests(unittest.TestCase):
     def test_tree_evidence_keeps_manifests_gitlinks_vendor_headers_and_encryption_separate(self) -> None:
         observations = _tree_observations(
             [
-                {"path": "deps/requirements.txt", "mode": "100644", "sha": "1" * 40},
-                {"path": "flake.nix", "mode": "100644", "sha": "2" * 40},
-                {"path": "vendor/core.hpp", "mode": "100644", "sha": "3" * 40},
-                {"path": "encrypted/core.dcp", "mode": "100644", "sha": "4" * 40},
-                {"path": "upstream", "mode": "160000", "sha": "5" * 40},
+                {"path": "deps/requirements.txt", "mode": "100644", "type": "blob", "sha": "1" * 40},
+                {"path": "flake.nix", "mode": "100644", "type": "blob", "sha": "2" * 40},
+                {"path": "vendor/core.hpp", "mode": "100644", "type": "blob", "sha": "3" * 40},
+                {"path": "encrypted/core.dcp", "mode": "100644", "type": "blob", "sha": "4" * 40},
+                {"path": "upstream", "mode": "160000", "type": "commit", "sha": "5" * 40},
             ],
             "",
         )
@@ -282,12 +309,29 @@ class ArtifactInventoryTests(unittest.TestCase):
                     ],
                     "path": "encrypted/core.dcp",
                 },
-                {
-                    "evidence_codes": ["VENDOR_IP_PATH_MARKER"],
-                    "path": "vendor/core.hpp",
-                },
             ],
         )
+        self.assertNotIn("vendor/core.hpp", observations["vendor_ip"])
+
+    def test_malformed_gitlink_is_a_tree_failure_not_observed_closure(self) -> None:
+        tree = json.dumps(
+            {
+                "tree": [
+                    {
+                        "path": "upstream",
+                        "mode": "160000",
+                        "type": "commit",
+                        "sha": "not-a-commit",
+                    }
+                ],
+                "truncated": False,
+            }
+        ).encode()
+        row = _audit_with_tree_body(tree)
+        self.assertEqual(row["source_closure_state"], "incomplete_indicators_observed")
+        self.assertEqual(json.loads(row["submodule_gitlinks_json"]), [])
+        self.assertIn("MALFORMED_GITLINK", row["failure_code"])
+        self.assertNotEqual(row["observed_status"], "observed")
 
     def test_malformed_zenodo_success_is_negative_with_raw_receipt(self) -> None:
         with TemporaryDirectory() as temporary:
@@ -312,6 +356,37 @@ class ArtifactInventoryTests(unittest.TestCase):
         receipt = json.loads(observation["endpoint_evidence_json"])["record"]
         self.assertEqual(receipt["http_status"], 200)
         self.assertEqual(receipt["response_sha256"], hashlib.sha256(b"not-json").hexdigest())
+
+    def test_zenodo_rejects_malformed_metadata_and_licence_types(self) -> None:
+        malformed_payloads = (
+            {},
+            {"metadata": []},
+            {"metadata": {"license": 7}},
+            {"metadata": {"license": []}},
+            {"metadata": {"license": {"id": 7}}},
+            {"metadata": {"license": {"id": []}}},
+        )
+        for payload in malformed_payloads:
+            with self.subTest(payload=payload):
+                body = json.dumps(payload).encode()
+                entry = CacheEntry(
+                    service="zenodo",
+                    identifier="10.5281/zenodo.10422477",
+                    request_url="https://zenodo.org/api/records/10422477",
+                    raw_response_path="responses/zenodo/fixture.body",
+                    http_status=200,
+                    retrieved_at_utc="2026-08-06T10:00:00+00:00",
+                    response_sha256=hashlib.sha256(body).hexdigest(),
+                    error_body_sha256="",
+                    body=body,
+                    from_cache=True,
+                )
+                observation = zenodo_artifact_observation(entry)
+                self.assertEqual(observation["observed_status"], "unavailable")
+                self.assertEqual(observation["licence_state"], "unavailable")
+                self.assertEqual(
+                    observation["failure_code"], "MALFORMED_RESPONSE_ZENODO"
+                )
 
     def test_truncated_api_tree_is_incomplete_source_closure(self) -> None:
         state, failures = repository_source_closure(
@@ -523,6 +598,42 @@ class ArtifactInventoryTests(unittest.TestCase):
                 )
                 self.assertNotEqual(row["observed_status"], "observed")
 
+    def test_tree_requires_explicit_boolean_truncation_and_complete_entry_shapes(self) -> None:
+        malformed_trees = (
+            {},
+            {"tree": []},
+            {"tree": [], "truncated": "false"},
+            {"tree": [{}], "truncated": False},
+            {
+                "tree": [
+                    {
+                        "path": "../escape",
+                        "mode": "100644",
+                        "type": "blob",
+                        "sha": "1" * 40,
+                    }
+                ],
+                "truncated": False,
+            },
+            {
+                "tree": [
+                    {
+                        "path": "mislabeled-directory",
+                        "mode": "040000",
+                        "type": "blob",
+                        "sha": "1" * 40,
+                    }
+                ],
+                "truncated": False,
+            },
+        )
+        for payload in malformed_trees:
+            with self.subTest(payload=payload):
+                row = _audit_with_tree_body(json.dumps(payload).encode())
+                self.assertEqual(row["source_closure_state"], "unavailable")
+                self.assertIn("MALFORMED_RESPONSE_TREE", row["failure_code"])
+                self.assertNotEqual(row["observed_status"], "observed")
+
     def test_fresh_csv_bundle_is_absent_when_staging_fails(self) -> None:
         with TemporaryDirectory() as temporary:
             out = Path(temporary) / "fresh-output"
@@ -540,8 +651,67 @@ class ArtifactInventoryTests(unittest.TestCase):
                 )
             self.assertFalse(out.exists())
 
+    def test_existing_csv_bundle_rolls_back_every_file_after_publish_failure(self) -> None:
+        with TemporaryDirectory() as temporary:
+            out = Path(temporary) / "existing-output"
+            out.mkdir()
+            original = {
+                "one.csv": b"old-one\n",
+                "two.csv": b"old-two\n",
+                "three.csv": b"old-three\n",
+            }
+            for filename, body in original.items():
+                (out / filename).write_bytes(body)
+
+            real_replace = Path.replace
+            publish_count = 0
+
+            def fail_second_publish(source: Path, target: Path) -> Path:
+                nonlocal publish_count
+                if target.parent == out:
+                    publish_count += 1
+                    if publish_count == 2:
+                        raise OSError("simulated second publish failure")
+                return real_replace(source, target)
+
+            with patch.object(Path, "replace", autospec=True, side_effect=fail_second_publish):
+                with self.assertRaisesRegex(OSError, "simulated"):
+                    _write_csv_bundle_atomic(
+                        out,
+                        (
+                            ("one.csv", ["value"], [{"value": "new-one"}]),
+                            ("two.csv", ["value"], [{"value": "new-two"}]),
+                            ("three.csv", ["value"], [{"value": "new-three"}]),
+                        ),
+                    )
+
+            self.assertEqual(
+                {filename: (out / filename).read_bytes() for filename in original},
+                original,
+            )
+
 
 class CommittedArtifactEvidenceTests(unittest.TestCase):
+    def test_repository_validation_rejects_malformed_gitlink_objects(self) -> None:
+        with (ROOT / "survey/build/repository_audit.csv").open(
+            encoding="utf-8", newline=""
+        ) as handle:
+            row = next(csv.DictReader(handle))
+        malformed = (
+            [{"path": "", "sha": "1" * 40}],
+            [{"path": "../escape", "sha": "1" * 40}],
+            [{"path": "/absolute", "sha": "1" * 40}],
+            [{"path": "upstream", "sha": "short"}],
+            [{"path": "upstream", "sha": "g" * 40}],
+            [{"path": "upstream", "sha": "1" * 40, "extra": "x"}],
+        )
+        for value in malformed:
+            with self.subTest(value=value):
+                broken = dict(row)
+                broken["submodule_gitlinks_json"] = json.dumps(value)
+                with self.assertRaisesRegex(ValueError, "submodule_gitlinks_json"):
+                    validate_repository_audit([broken])
+
     def test_repository_validation_rejects_observed_rows_without_ref_or_receipts(self) -> None:
         with (ROOT / "survey/build/repository_audit.csv").open(
             encoding="utf-8", newline=""

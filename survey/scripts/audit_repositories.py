@@ -11,7 +11,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import quote, urlsplit
 
 try:
@@ -292,7 +292,7 @@ def zenodo_artifact_observation(entry: object) -> dict[str, str]:
             "endpoint_evidence_json": _json({"record": receipt}),
         }
     assert isinstance(payload, dict)
-    metadata = payload.get("metadata", {})
+    metadata = payload.get("metadata")
     if not isinstance(metadata, dict):
         receipt["failure_code"] = "MALFORMED_RESPONSE_ZENODO"
         return {
@@ -302,12 +302,30 @@ def zenodo_artifact_observation(entry: object) -> dict[str, str]:
             "failure_code": "MALFORMED_RESPONSE_ZENODO",
             "endpoint_evidence_json": _json({"record": receipt}),
         }
-    licence = metadata.get("license", {})
-    licence_id = (
-        str(licence.get("id") or "")
-        if isinstance(licence, dict)
-        else str(licence or "")
-    )
+    licence = metadata.get("license")
+    if licence is not None and not isinstance(licence, (dict, str)):
+        receipt["failure_code"] = "MALFORMED_RESPONSE_ZENODO"
+        return {
+            "observed_status": "unavailable",
+            "licence_state": "unavailable",
+            "licence_evidence": "Zenodo metadata.license has an invalid type",
+            "failure_code": "MALFORMED_RESPONSE_ZENODO",
+            "endpoint_evidence_json": _json({"record": receipt}),
+        }
+    if isinstance(licence, dict):
+        licence_id_value = licence.get("id")
+        if licence_id_value is not None and not isinstance(licence_id_value, str):
+            receipt["failure_code"] = "MALFORMED_RESPONSE_ZENODO"
+            return {
+                "observed_status": "unavailable",
+                "licence_state": "unavailable",
+                "licence_evidence": "Zenodo metadata.license.id has an invalid type",
+                "failure_code": "MALFORMED_RESPONSE_ZENODO",
+                "endpoint_evidence_json": _json({"record": receipt}),
+            }
+        licence_id = licence_id_value or ""
+    else:
+        licence_id = licence or ""
     return {
         "observed_status": "observed",
         "licence_state": "detected" if licence_id else "none_detected",
@@ -327,7 +345,58 @@ def _paths_matching(paths: list[str], patterns: tuple[str, ...]) -> list[str]:
     )
 
 
+def _safe_relative_tree_path(value: object) -> bool:
+    if not isinstance(value, str) or not value or value.startswith("/"):
+        return False
+    path = PurePosixPath(value)
+    return all(part not in {"", ".", ".."} for part in path.parts)
+
+
+def _tree_item_failure(item: object) -> str:
+    if not isinstance(item, dict):
+        return "MALFORMED_RESPONSE_TREE"
+    path = item.get("path")
+    mode = item.get("mode")
+    object_type = item.get("type")
+    sha = item.get("sha")
+    is_gitlink = mode == "160000" or object_type == "commit"
+    if is_gitlink:
+        if (
+            mode != "160000"
+            or object_type != "commit"
+            or not _safe_relative_tree_path(path)
+            or not isinstance(sha, str)
+            or not re.fullmatch(r"[0-9a-fA-F]{40}", sha)
+        ):
+            return "MALFORMED_GITLINK"
+        return ""
+    allowed_modes = {
+        "blob": {"100644", "100755", "120000"},
+        "tree": {"040000"},
+    }
+    if (
+        not _safe_relative_tree_path(path)
+        or not isinstance(object_type, str)
+        or object_type not in allowed_modes
+        or not isinstance(mode, str)
+        or mode not in allowed_modes[object_type]
+        or not isinstance(sha, str)
+        or not re.fullmatch(r"[0-9a-fA-F]{40}", sha)
+    ):
+        return "MALFORMED_RESPONSE_TREE"
+    return ""
+
+
 def _tree_observations(tree_items: list[object], readme: str) -> dict[str, object]:
+    valid_items = []
+    tree_failure_codes = []
+    for item in tree_items:
+        failure = _tree_item_failure(item)
+        if failure:
+            tree_failure_codes.append(failure)
+        else:
+            valid_items.append(item)
+    tree_items = valid_items
     paths = sorted(
         str(item.get("path"))
         for item in tree_items
@@ -370,14 +439,14 @@ def _tree_observations(tree_items: list[object], readme: str) -> dict[str, objec
     encrypted_ip = _paths_matching(paths, (r"(^|/)(encrypted|encryption)(/|$)",))
     vendor_paths = _paths_matching(
         paths,
-        (r"\.(xci|dcp|edf|edn|ngc|qip)$", r"(^|/)(ip|ipcore|vendor)(/|$)"),
+        (r"\.(xci|dcp|edf|edn|ngc|qip)$", r"(^|/)(ip|ipcore)(/|$)"),
     )
     vendor_ip_evidence = []
     for path in sorted(set(vendor_paths + encrypted_ip)):
         codes = []
         if re.search(r"\.(xci|dcp|edf|edn|ngc|qip)$", path, re.I):
             codes.append("VENDOR_IP_FILE_EXTENSION")
-        if re.search(r"(^|/)(ip|ipcore|vendor)(/|$)", path, re.I):
+        if re.search(r"(^|/)(ip|ipcore)(/|$)", path, re.I):
             codes.append("VENDOR_IP_PATH_MARKER")
         if re.search(r"(^|/)(encrypted|encryption)(/|$)", path, re.I):
             codes.append("ENCRYPTED_PATH_MARKER")
@@ -411,7 +480,7 @@ def _tree_observations(tree_items: list[object], readme: str) -> dict[str, objec
                 re.I,
             )
         },
-        key=str.lower,
+        key=lambda value: (value.lower(), value),
     )
     generated_markers = sorted(
         set(
@@ -450,6 +519,7 @@ def _tree_observations(tree_items: list[object], readme: str) -> dict[str, objec
         ),
         "generated_markers": generated_markers,
         "omitted_markers": omitted_markers,
+        "tree_failure_codes": list(dict.fromkeys(tree_failure_codes)),
     }
 
 
@@ -821,22 +891,20 @@ def audit_repository(
     tree_payload, tree_failure = _endpoint_json(entries["tree"], "tree", dict)
     if tree_failure:
         failures.append(tree_failure)
-    tree_items = tree_payload.get("tree", []) if isinstance(tree_payload, dict) else []
+    tree_items = tree_payload.get("tree") if isinstance(tree_payload, dict) else None
     if isinstance(tree_payload, dict) and (
         not isinstance(tree_items, list)
-        or any(
-            not isinstance(item, dict)
-            or not isinstance(item.get("path"), str)
-            or not isinstance(item.get("mode"), str)
-            or not isinstance(item.get("sha"), str)
-            for item in tree_items
-        )
+        or not isinstance(tree_payload.get("truncated"), bool)
     ):
         tree_items = []
         failures.append("MALFORMED_RESPONSE_TREE")
         tree_failure = "MALFORMED_RESPONSE_TREE"
+    if tree_items is None:
+        tree_items = []
     tree_truncated = bool(
-        tree_payload.get("truncated") if isinstance(tree_payload, dict) else False
+        tree_payload["truncated"]
+        if isinstance(tree_payload, dict) and not tree_failure
+        else False
     )
     paths = sorted(
         str(item.get("path"))
@@ -901,6 +969,12 @@ def audit_repository(
             readme_failure = "MALFORMED_RESPONSE_README"
             failures.append(readme_failure)
     observations = _tree_observations(tree_items, readme)
+    tree_item_failures = observations["tree_failure_codes"]
+    failures.extend(tree_item_failures)
+    if "MALFORMED_RESPONSE_TREE" in tree_item_failures:
+        tree_failure = "MALFORMED_RESPONSE_TREE"
+    elif "MALFORMED_GITLINK" in tree_item_failures:
+        tree_failure = "MALFORMED_GITLINK"
     submodules = observations["submodules"]
     submodule_gitlinks = observations["submodule_gitlinks"]
     build_files = observations["build_files"]
@@ -919,13 +993,19 @@ def audit_repository(
     generated_markers = observations["generated_markers"]
     omitted_markers = observations["omitted_markers"]
     closure, closure_failures = repository_source_closure(
-        tree_status=(0 if tree_failure else entries["tree"].http_status),
+        tree_status=(
+            0
+            if tree_failure and tree_failure != "MALFORMED_GITLINK"
+            else entries["tree"].http_status
+        ),
         tree_truncated=tree_truncated,
         submodules=submodules,
         vendor_ip=vendor_ip,
         binaries=binaries,
         omitted_markers=omitted_markers,
     )
+    if tree_failure == "MALFORMED_GITLINK":
+        closure = "incomplete_indicators_observed"
     failures.extend(closure_failures)
     failures = list(dict.fromkeys(failures))
     if state == "none_detected":
@@ -1200,6 +1280,18 @@ def validate_repository_audit(rows: list[dict[str, object]]) -> None:
         ):
             if not isinstance(json.loads(str(row[field])), list):
                 raise ValueError(f"repository audit {field} is not a JSON list")
+        gitlinks = json.loads(str(row["submodule_gitlinks_json"]))
+        if any(
+            not isinstance(item, dict)
+            or set(item) != {"path", "sha"}
+            or not _safe_relative_tree_path(item.get("path"))
+            or not isinstance(item.get("sha"), str)
+            or not re.fullmatch(r"[0-9a-fA-F]{40}", item["sha"])
+            for item in gitlinks
+        ):
+            raise ValueError(
+                "repository audit submodule_gitlinks_json contains a malformed gitlink"
+            )
         if not isinstance(json.loads(str(row["endpoint_evidence_json"])), dict):
             raise ValueError("repository audit endpoint_evidence_json is not a JSON object")
 
@@ -1216,7 +1308,7 @@ def _write_csv_bundle_atomic(
     out: Path,
     specs: tuple[tuple[str, list[str], list[dict[str, object]]], ...],
 ) -> None:
-    """Stage all CSVs before publishing; a new output directory appears whole."""
+    """Stage all CSVs and roll back an existing bundle on publish exceptions."""
 
     out.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{out.name}-staging-", dir=out.parent))
@@ -1229,8 +1321,36 @@ def _write_csv_bundle_atomic(
             published_as_directory = True
             return
         out.mkdir(parents=True, exist_ok=True)
+        backups = staging / ".backups"
+        backups.mkdir()
+        absent_before = set()
         for filename, _, _ in specs:
-            (staging / filename).replace(out / filename)
+            target = out / filename
+            if target.exists():
+                shutil.copy2(target, backups / filename)
+            else:
+                absent_before.add(filename)
+        try:
+            for filename, _, _ in specs:
+                (staging / filename).replace(out / filename)
+        except BaseException:
+            rollback_errors = []
+            for filename, _, _ in specs:
+                target = out / filename
+                backup = backups / filename
+                try:
+                    if backup.exists():
+                        backup.replace(target)
+                    elif filename in absent_before and target.exists():
+                        target.unlink()
+                except OSError as error:
+                    rollback_errors.append(f"{filename}: {error}")
+            if rollback_errors:
+                raise RuntimeError(
+                    "CSV bundle publish failed and rollback was incomplete: "
+                    + "; ".join(rollback_errors)
+                )
+            raise
     finally:
         if not published_as_directory:
             shutil.rmtree(staging, ignore_errors=True)
