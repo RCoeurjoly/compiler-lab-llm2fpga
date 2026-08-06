@@ -196,8 +196,6 @@ def validate_reviews(reviews: pd.DataFrame) -> pd.DataFrame:
             value = _text(row[field])
             if not value:
                 continue
-            if field in SCORE_LIMITS and _integer(value, field) == 0:
-                continue
             if field not in evidence:
                 raise ValueError(
                     f"{family_id}: non-empty decision-critical {field} lacks evidence"
@@ -280,7 +278,12 @@ def _select_for_size(
         if family_id in mandatory_ids:
             continue
         route = _text(row["route_family"])
-        if route not in exception_routes and counts.get(route, 0) >= cap:
+        route_limit = (
+            max(cap, counts.get(route, 0))
+            if route in exception_routes
+            else cap
+        )
+        if counts.get(route, 0) >= route_limit:
             continue
         chosen = pd.concat([chosen, row.to_frame().T], ignore_index=True)
         counts[route] = counts.get(route, 0) + 1
@@ -295,6 +298,8 @@ def select_families(families: pd.DataFrame, reviews: pd.DataFrame) -> pd.DataFra
     reviews = validate_reviews(reviews)
     primary = _primary_families(families)
     controls = reviews[reviews["project_family_id"].str.startswith("CONTROL-")]
+    if list(controls["project_family_id"]) != ["CONTROL-COMPILER-LAB"]:
+        raise ValueError("controlled extraction requires one compiler-lab control")
     corpus_reviews = reviews[~reviews.index.isin(controls.index)]
     unknown = set(corpus_reviews["project_family_id"]) - set(primary["project_family_id"])
     if unknown:
@@ -310,8 +315,6 @@ def select_families(families: pd.DataFrame, reviews: pd.DataFrame) -> pd.DataFra
                 )
 
     if not controls.empty:
-        if list(controls["project_family_id"]) != ["CONTROL-COMPILER-LAB"]:
-            raise ValueError("controlled extraction requires one compiler-lab control")
         all_a = set(primary.loc[primary["level_final"].eq("A"), "project_family_id"])
         supported_a = set(
             reviews.loc[

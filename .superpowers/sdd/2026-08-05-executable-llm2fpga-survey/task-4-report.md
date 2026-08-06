@@ -3,9 +3,14 @@
 ## Status and commit
 
 Task 4 is complete in the isolated `codex/executable-llm2fpga-survey`
-worktree. The implementation and frozen extraction are committed as:
+worktree. The initial implementation and extraction were committed as:
 
 - `52ceb27` — `survey: extract deep-review route evidence`
+
+The extraction was subsequently remediated after review: every selected PDF
+was audited at page/section granularity, zero-valued score decisions were made
+evidence-bearing, and the control/cap policies were tightened. The current
+report describes that remediated state.
 
 No Task 1/2 receipts, Task 3 decisions, screening classifications, family
 relations, or prior generated artifacts were changed.
@@ -38,9 +43,13 @@ The `DATAFLOW` count is a documented protocol exception to the 30% cap: the 14
 mandatory supported Level A dataflow families alone already exceed 30% of the
 36-row sample. The selector enforces the cap for every other route and permits
 an exception only when the mandatory supported-Level-A count itself forces it.
+The exception limit is exactly the greater of the ordinary cap and the forced
+mandatory count, so optional same-route candidates cannot ride the exception.
 
-The sample also contains four rows selected as paper-reported open-artifact or
-compiler-lab controls. Each C representative is explicitly marked as both a
+The remediated scoring records ten rows with paper-reported artifact evidence
+or the compiler-lab artifact control. Future-release promises remain score 0;
+paper-linked source receives 1; the pinned compiler-lab and archival/licensed
+artifacts receive 2. Each C representative is explicitly marked as both a
 distinct executable route and a conservative route-boundary/incompatibility
 case. Those rows do **not** claim an observed build failure: their notes label
 the conclusion as inferred from the cited absence of an end-to-end causal token
@@ -107,21 +116,29 @@ The final fields are `evidence_locations` and `notes`. Strict validation rejects
 extra aliases, missing columns, out-of-range or inconsistent scores, duplicate
 families, disagreement with frozen family metadata, nonportable evidence, and
 any populated decision-critical RQ cell without a matching per-field evidence
-entry.
+entry. Evidence is required for every score value, including zero: a zero is a
+selection decision rather than missing data. The compiler-lab control is
+unconditionally required, including in small or synthetic selector inputs.
 
 ## Evidence method
 
 The extraction uses only sources already available in the frozen corpus and
 the pinned compiler-lab repository; no unrecorded online lookup was needed.
 
-- Paper claims use a portable versioned arXiv URL with the exact `#abstract`
-  locator. They are limited to information documented in the frozen abstract.
+- All 35 paper PDFs were checked from the frozen local cache. Paper claims use
+  a portable versioned arXiv PDF URL carrying cache filename, SHA-256, exact
+  page, section/table, and a short search phrase. No paper claim uses an arXiv
+  abstract-page locator.
 - The compiler-lab control uses GitHub URLs pinned to commit
   `433592c448f8b19a30dd046a1ec726b09a86d892`, exact repository paths, and line
   anchors in `README.md` and the observable-equivalence ADR.
 - `evidence_locations` is a JSON object mapping each populated decision-critical
-  field to its own locator. All 36 rows have evidence objects; all 201 populated
+  field to its own locator. All 36 rows have evidence objects; all 396 populated
   RQ cells have a corresponding locator.
+- Zero artifact, open-migration, causal-relevance, and quantitative decisions
+  carry a cache-identified `pages-1-N` controlled-full-document audit locator.
+  Three stale quantitative zeroes were corrected because their PDFs do report
+  project FPGA measurements: the KV260 decode design, TeLLMe v2, and LlamaF.
 - `notes` distinguishes `documented`, `observed`, and `inferred` evidence. The
   six C boundary controls explicitly say that absent token-loop evidence is an
   inference, not an observed incompatibility.
@@ -129,8 +146,15 @@ the pinned compiler-lab repository; no unrecorded online lookup was needed.
   `not reported`.
 
 Paper-reported source availability is recorded only as a qualified report from
-the cited abstract. It does not establish repository contents, license status,
+the cited PDF. It does not establish repository contents, license status,
 dependency closure, buildability, or reproduction. Those audits remain Task 5.
+
+The review-specific semantic corrections are explicit: FastMamba has no
+Transformer-attention claim and records W8A8 linear quantization; TATAA records
+INT8 linear/bfloat16 nonlinear execution and the paper's 2935.2 GOPS / 189.5
+GFLOPS values; MEADOW does not turn a prior quantization method into a claimed
+MEADOW contribution and records the reported TTFT/TBT improvements and
+less-than-10-W platform claim.
 
 ## TDD RED/green evidence
 
@@ -159,18 +183,33 @@ one executable C route did not raise. The selector was then tightened to require
 all six C route families, all supported A families, the compiler-lab control,
 an open-artifact row, and one route-boundary case per route.
 
+Review remediation added three policy regressions and one committed-artifact
+regression. Before production changes, they demonstrated that zero scores could
+omit evidence, a selection could omit the compiler-lab control, a forced route
+exception admitted optional same-route rows, and all committed paper claims
+still pointed to abstract pages. The observed failures included:
+
+```text
+ValueError not raised (artifact_availability_score)
+ValueError not raised (compiler-lab control)
+DATAFLOW count 34 != 15
+188 PDF-locator/known-row assertion failures
+```
+
 Final focused result:
 
 ```text
 nix develop -c python -m unittest tests.test_survey_selection -v
-Ran 10 tests in 0.560s
+Ran 14 tests
 OK
 ```
 
 The focused suite covers score bounds and summation, mandatory A/C/control
 inclusion, exact controlled composition, stable lexical ties, the 25–40 range,
-the 30% cap and forced Level A exception, the all-mandatory target edge case,
-exact schema/evidence validation, and byte-identical regeneration.
+the 30% cap and forced-only Level A exception, the all-mandatory target edge
+case, zero-score evidence, unconditional control inclusion, PDF page locators,
+known-row semantic corrections, exact schema validation, and byte-identical
+regeneration.
 
 Fresh combined survey verification before the implementation commit:
 
@@ -178,7 +217,7 @@ Fresh combined survey verification before the implementation commit:
 nix develop -c python -m unittest \
   tests.test_survey_selection tests.test_survey_screening \
   tests.test_survey_phase1 tests.test_survey_scope -v
-Ran 84 tests in 18.226s
+Ran 88 tests in 18.111s
 OK
 ```
 
@@ -213,7 +252,7 @@ outputs.
 
 There is no blocking Task 4 concern. The following limitations are explicit:
 
-- This extraction deliberately stops at paper/abstract and pinned local-control
+- This extraction deliberately stops at frozen-paper and pinned local-control
   evidence where precise repository audit evidence is unavailable. Task 5 must
   inspect repositories, commits, licenses, submodules, generated files,
   dependencies, tests, vendor IP, and buildability before any reproducibility
@@ -225,5 +264,5 @@ There is no blocking Task 4 concern. The following limitations are explicit:
 - The inherited Task 3 single-reviewer limitation remains: the frozen repeat
   sample exists, but no second-reviewer or delayed-repeat agreement statistic
   is invented here.
-- Board/part feasibility remains unknown where the paper abstract does not
-  report it; blank values are not positive evidence.
+- Board/part feasibility remains unknown where the audited PDF does not report
+  it; blank values are not positive evidence.
