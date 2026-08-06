@@ -38,6 +38,7 @@
     "curl -fsSL https://zenodo.org/api/records/10462167/files/README.md/content",
     "python3 -c \"import json; d=json.load(open('survey/build/api-cache/responses/zenodo/19f09e16466d9bcc9442e69b70f082e079eb5a6a349e4c225943c8366ac8a331.body')); print([(f['key'],f['size'],f['checksum']) for f in d['files']])\""
   ],
+  "execution_provenance": {},
   "expected_stage": "M2_STATEFUL_DECODE",
   "failure_code": "F_VENDOR_IP",
   "failure_detail": "The licensed deposit README says the RTL is proprietary Infinigence-AI IP and supplies only a pre-generated U280 bitstream, precompiled cases, and a host file. Independent RTL lint and generic synthesis are impossible.",
@@ -52,7 +53,7 @@
   "lint_evidence": [],
   "m2_evidence": {},
   "next_bounded_action": "Obtain redistributable source RTL from the IP owner; a closed bitstream cannot satisfy independent lint or synthesis gates.",
-  "receipt_schema_version": 1,
+  "receipt_schema_version": 2,
   "route_family": "PARAMETERIZED_RTL",
   "route_id": "R2",
   "route_title": "FlightLLM parameterized RTL artifact",

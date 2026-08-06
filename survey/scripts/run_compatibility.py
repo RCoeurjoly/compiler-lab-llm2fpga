@@ -55,6 +55,43 @@ FIXTURES: dict[str, dict[str, Any]] = {
             "causal_softmax",
             "kv_read_write",
         ],
+        "operator_shapes": {
+            "int8_matmul": {
+                "lhs": [1, 16, 64],
+                "rhs": [64, 64],
+                "output": [1, 16, 64],
+            },
+            "normalization": {
+                "input": [1, 16, 64],
+                "scale": [64],
+                "bias": [64],
+                "output": [1, 16, 64],
+            },
+            "activation": {
+                "input": [1, 16, 64],
+                "output": [1, 16, 64],
+            },
+            "rope": {
+                "query": [1, 4, 16, 16],
+                "key": [1, 4, 16, 16],
+                "position": [1, 16],
+                "query_output": [1, 4, 16, 16],
+                "key_output": [1, 4, 16, 16],
+            },
+            "causal_softmax": {
+                "logits": [1, 4, 16, 16],
+                "causal_mask": [1, 1, 16, 16],
+                "output": [1, 4, 16, 16],
+            },
+            "kv_read_write": {
+                "key_write": [1, 4, 1, 16],
+                "value_write": [1, 4, 1, 16],
+                "key_cache": [1, 4, 16, 16],
+                "value_cache": [1, 4, 16, 16],
+                "key_read": [1, 4, 16, 16],
+                "value_read": [1, 4, 16, 16],
+            },
+        },
         "acceptance": {
             "integer": "identical",
             "fixed_point_lsb": 1,
@@ -132,13 +169,9 @@ ROUTES: dict[str, RouteSpec] = {
         source_sha256="e1848d79218fad62e2fb8873067ee90bcf370a23e9752cf6c9545aa78d96a872",
         artifact_commit="nix-store-b8pwl1r7jq05hn5pphj4zxyg67c3zxjs",
         artifact_sha256="f0e0f500a44ef2daabecd780d743fee2585a46593c2e3d67a7e6b189fd28f983",
-        first_gate="SMOKE_TESTS",
-        first_failure_code="F_ENV",
-        first_failure_detail=(
-            "Capture and Linalg lowering complete, but the focused smoke suite has "
-            "a stale patches-directory assertion. Pinned pytest also reaches the "
-            "preserved Python 3.11 f-string collection failure."
-        ),
+        first_gate="OBSERVATION_REQUIRED",
+        first_failure_code="NONE",
+        first_failure_detail="R1 must be classified from the recorded command evidence.",
         fixture="M3-repository-fixture",
     ),
     "R2": RouteSpec(
@@ -226,13 +259,9 @@ ROUTES: dict[str, RouteSpec] = {
         "survey/build/artifact_inventory.csv#project_family_id=PF-4EBDD47F47E94583",
         source_commit="3b3e98fabbca7987809c681244076a646af519b9",
         source_sha256="09db867d6000c8f0d8ee8868696d7981e66ca0665762ed86c27df34bd7fe796b",
-        complete_elaboratable_rtl=True,
-        first_gate="CAUSAL_LM_COVERAGE",
-        first_failure_code="F_INTERFACE",
-        first_failure_detail=(
-            "The audited MIT source is a time-series transformer and does not provide "
-            "a causal-LM prefill/decode, KV-cache, or token-generation interface."
-        ),
+        first_gate="OBSERVATION_REQUIRED",
+        first_failure_code="NONE",
+        first_failure_detail="R7 must be classified from the exact checkout evidence.",
     ),
     "R8": RouteSpec(
         "R8",
@@ -243,13 +272,9 @@ ROUTES: dict[str, RouteSpec] = {
         "survey/build/repository_audit.csv#repository_audit_id=REPO-PF-E9C1300B04E80B95",
         source_commit="e21dafa4d877c1dc7846f9e0b60c05a995d033eb",
         source_sha256="5b3101bd5b9edfc09d115057f560b04cdecf886822f20ed4cbac3d322be41ef0",
-        first_gate="CAUSAL_LM_COVERAGE",
-        first_failure_code="F_INTERFACE",
-        first_failure_detail=(
-            "The frozen source has a BSD-2 licence despite GitHub's NOASSERTION SPDX "
-            "classification, but the audited Cascade artifact is a Verilog virtualization "
-            "control and contains no causal-LM prefill/decode or token-loop implementation."
-        ),
+        first_gate="OBSERVATION_REQUIRED",
+        first_failure_code="NONE",
+        first_failure_detail="R8 must be classified from the exact checkout evidence.",
     ),
 }
 
@@ -270,12 +295,26 @@ _R1_RTL = (
     "xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-"
     "calyx-native-sv/sv/main.sv"
 )
+_R1_FROZEN_CONTROL = "433592c448f8b19a30dd046a1ec726b09a86d892"
+_R7_SOURCE_URL = "https://github.com/Edwina1030/TinyTransformer4TS.git"
+_R7_SOURCE_COMMIT = "3b3e98fabbca7987809c681244076a646af519b9"
+_R7_SOURCE_DIR = "/tmp/llm2fpga-task6-r7-receipt-source"
+_R8_SOURCE_URL = "https://github.com/JoshuaLandgraf/cascade.git"
+_R8_SOURCE_COMMIT = "e21dafa4d877c1dc7846f9e0b60c05a995d033eb"
+_R8_SOURCE_DIR = "/tmp/llm2fpga-task6-r8-receipt-source"
+_R8_BUILD_DIR = "/tmp/llm2fpga-task6-r8-receipt-build"
 
 ROUTE_COMMANDS: dict[str, tuple[str, ...]] = {
     "R1": (
         "git rev-parse HEAD && nix --version && nix develop -c bash -c "
         "'python --version; circt-opt --version; mlir-opt --version; "
         "verilator --version; yosys -V'",
+        "git diff --quiet 433592c448f8b19a30dd046a1ec726b09a86d892..HEAD -- "
+        ". ':(exclude)survey/**' ':(exclude).superpowers/**' "
+        "':(exclude)tests/test_survey_*' && git diff --quiet -- . "
+        "':(exclude)survey/**' ':(exclude).superpowers/**' "
+        "':(exclude)tests/test_survey_*' && "
+        "printf 'compiler_scope_equivalent=true\\n'",
         "nix build .#tinystories-representative-core-w4a8-pytorch-exported "
         "--no-link --print-out-paths -L",
         "nix build .#tinystories-representative-core-w4a8-linalg "
@@ -319,13 +358,21 @@ ROUTE_COMMANDS: dict[str, tuple[str, ...]] = {
     ),
     "R7": (
         _COMMON_AUDIT_COMMAND,
-        "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-4EBDD47F47E94583'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_spdx_id','source_closure_state','generated_or_omitted_rtl','tests_json','failure_code')},sort_keys=True))\"",
-        "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/deep_review.csv')) if x['project_family_id']=='PF-4EBDD47F47E94583'); print(json.dumps({k:r[k] for k in ('title','rq2_model_family','rq2_prefill','rq2_decode','rq2_token_loop','rq2_kv_cache','rq2_completeness')},sort_keys=True))\"",
+        f"if test -d {_R7_SOURCE_DIR}/.git; then git -C {_R7_SOURCE_DIR} fetch --quiet origin {_R7_SOURCE_COMMIT}; else git clone --filter=blob:none --no-checkout {_R7_SOURCE_URL} {_R7_SOURCE_DIR}; fi && git -C {_R7_SOURCE_DIR} checkout --detach {_R7_SOURCE_COMMIT} && git -C {_R7_SOURCE_DIR} rev-parse HEAD && git -C {_R7_SOURCE_DIR} status --short",
+        f"python3 -c \"from pathlib import Path; r=Path('{_R7_SOURCE_DIR}'); req=(r/'requirements.txt').read_text(); dep=next(x for x in req.splitlines() if x.startswith('git+ssh://')); ref=dep.rsplit('@',1)[-1]; immutable=len(ref)==40 and all(c in '0123456789abcdef' for c in ref.lower()); marker=chr(36)+'{{'; templates=list((r/'models/quant').glob('*.tpl.vhd')); print('r7_external_dependency='+dep); print('r7_external_dependency_immutable='+str(immutable).lower()); print('r7_templates_fully_rendered='+str(not any(marker in p.read_text() for p in templates)).lower())\"",
+        "GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10' git ls-remote git@github.com:es-ude/elastic-ai.creator.git add-linear-quantization",
+        f"python3 -m py_compile {_R7_SOURCE_DIR}/models/quant/design.py {_R7_SOURCE_DIR}/hw_converter/convert2hw.py",
+        f"cd {_R7_SOURCE_DIR} && python3 -c 'import hw_converter.convert2hw'",
+        f"nix develop -c bash -c 'command -v ghdl; ghdl -a {_R7_SOURCE_DIR}/models/quant/transformer.tpl.vhd'",
+        f"python3 -c \"from pathlib import Path; t=(Path('{_R7_SOURCE_DIR}')/'README.md').read_text(); print('r7_causal_lm_interface='+str('causal' in t.lower() and 'decode' in t.lower()).lower()); print('r7_declared_workload=time_series')\"",
     ),
     "R8": (
         _COMMON_AUDIT_COMMAND,
-        "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-E9C1300B04E80B95'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_state','licence_spdx_id','licence_evidence','source_closure_state','vendor_ip_indicators_json','failure_code')},sort_keys=True))\"",
-        "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/deep_review.csv')) if x['project_family_id']=='PF-E9C1300B04E80B95'); print(json.dumps({k:r[k] for k in ('title','rq1_input_frontend','rq2_model_family','rq2_prefill','rq2_decode','rq2_token_loop','rq2_kv_cache','rq2_completeness','rq4_required_closed_tools_or_ip')},sort_keys=True))\"",
+        f"if test -d {_R8_SOURCE_DIR}/.git; then git -C {_R8_SOURCE_DIR} fetch --quiet origin {_R8_SOURCE_COMMIT}; else git clone --filter=blob:none --no-checkout {_R8_SOURCE_URL} {_R8_SOURCE_DIR}; fi && git -C {_R8_SOURCE_DIR} checkout --detach {_R8_SOURCE_COMMIT} && git -C {_R8_SOURCE_DIR} rev-parse HEAD && git -C {_R8_SOURCE_DIR} status --short",
+        f"python3 -c \"from pathlib import Path; d=Path('{_R8_SOURCE_DIR}')/'share/cascade/de10'; qsf=(d/'DE10_NANO_SoC_GHRD.qsf').read_text(); needed=['soc_system/synthesis/soc_system.qip']; referenced=[p for p in needed if p in qsf]; missing=[p for p in referenced if not (d/p).is_file()]; print('r8_qsf_references='+','.join(referenced)); print('r8_qsys_source_present='+str((d/'soc_system.qsys').is_file()).lower()); print('r8_missing_required_files='+','.join(missing)); print('r8_source_closure_complete='+str(not missing).lower())\"",
+        f"cmake -S {_R8_SOURCE_DIR} -B {_R8_BUILD_DIR} -DCMAKE_BUILD_TYPE=Release && cmake --build {_R8_BUILD_DIR} -j2",
+        f"nix develop -c yosys -p 'read_verilog -I {_R8_SOURCE_DIR} {_R8_SOURCE_DIR}/share/cascade/test/benchmark/adpcm/adpcm.v; hierarchy -check -top test; proc; check'",
+        f"python3 -c \"from pathlib import Path; t=(Path('{_R8_SOURCE_DIR}')/'experiments/README.md').read_text().lower(); print('r8_causal_lm_interface='+str('causal' in t and 'decode' in t).lower()); print('r8_declared_workload=fpga_virtualization')\"",
     ),
 }
 
@@ -340,6 +387,7 @@ RECEIPT_REQUIRED_FIELDS = (
     "artifact_commit",
     "artifact_sha256",
     "environment_manifest",
+    "execution_provenance",
     "executed_commands",
     "command_results",
     "expected_stage",
@@ -442,6 +490,7 @@ class RouteReceipt:
     simulation_evidence: tuple[str, ...] = ()
     synthesis_evidence: tuple[str, ...] = ()
     m2_evidence: Mapping[str, Any] = field(default_factory=dict)
+    execution_provenance: Mapping[str, Any] = field(default_factory=dict)
     evidence_files: tuple[str, ...] = ()
     next_bounded_action: str = ""
     budget_hours: int = 16
@@ -450,7 +499,7 @@ class RouteReceipt:
     stderr: str = ""
     command_results: tuple[Mapping[str, Any], ...] = ()
     commands_sha256: str = ""
-    receipt_schema_version: int = 1
+    receipt_schema_version: int = 2
 
     @classmethod
     def controlled_failure(
@@ -498,6 +547,10 @@ class RouteReceipt:
 def run_route(route: RouteSpec, budget_hours: int) -> RouteReceipt:
     if budget_hours not in (16, 40):
         raise ValueError("budget_hours must be the frozen 16 or 40 hour cap")
+    if route.route_id in {"R1", "R7", "R8"}:
+        raise ValueError(
+            f"{route.route_id} must be classified from its executed command evidence"
+        )
     if route.first_failure_code not in ALLOWED_FAILURE_CODES:
         raise ValueError(f"failure_code: {route.first_failure_code}")
     if (
@@ -519,6 +572,179 @@ def run_route(route: RouteSpec, budget_hours: int) -> RouteReceipt:
         next_bounded_action=route.bounded_corrective_action or _bounded_next_action(route),
         budget_hours=budget_hours,
     )
+
+
+def _result_containing(
+    results: Sequence[Mapping[str, Any]], fragment: str
+) -> Mapping[str, Any]:
+    for result in results:
+        if fragment in str(result["command"]):
+            return result
+    raise ValueError(f"missing executed command containing: {fragment}")
+
+
+def _command_stdout(
+    stdout: str, commands: Sequence[str], command_index: int
+) -> str:
+    header = f"===== command {command_index}: {commands[command_index - 1]} =====\n"
+    if header not in stdout:
+        raise ValueError(f"missing stdout section for command {command_index}")
+    section = stdout.split(header, 1)[1]
+    next_header = f"===== command {command_index + 1}:"
+    return section.split(next_header, 1)[0]
+
+
+def _derived_observed_failure(
+    route: RouteSpec,
+    commands: Sequence[str],
+    stdout: str,
+    stderr: str,
+    results: Sequence[Mapping[str, Any]],
+    budget_hours: int,
+) -> RouteReceipt:
+    """Classify R1/R7/R8 only from the persisted command observations."""
+
+    if route.route_id == "R1":
+        environment = results[0]
+        if environment["exit_code"] != 0:
+            return RouteReceipt.controlled_failure(
+                route=route,
+                actual_stage="ENVIRONMENT_REPRODUCTION",
+                failure_code="F_ENV",
+                failure_detail=(
+                    "The recorded environment reproduction command failed; no later "
+                    "compatibility conclusion is inferred."
+                ),
+                next_bounded_action="Repair the pinned execution environment and rerun R1.",
+                executed_commands=commands,
+                budget_hours=budget_hours,
+            )
+        native_sv = _result_containing(results, "calyx-native-sv")
+        if (
+            native_sv["exit_code"] != 0
+            and "verify_calyx_f32_constant_bits.py" in stderr
+            and "can't open file" in stderr
+        ):
+            executed_commit = _command_stdout(stdout, commands, 1).splitlines()[0]
+            if len(executed_commit) != 40:
+                raise ValueError("R1 did not record a full execution commit")
+            scope_check = _result_containing(results, "compiler_scope_equivalent=true")
+            scope_equivalent = (
+                scope_check["exit_code"] == 0
+                and "compiler_scope_equivalent=true" in stdout
+            )
+            if not scope_equivalent:
+                raise ValueError("R1 execution scope differs from frozen control")
+            return replace(
+                RouteReceipt.controlled_failure(
+                    route=route,
+                    actual_stage="RTL_GENERATION",
+                    failure_code="F_SOURCE_MISSING",
+                    failure_detail=(
+                        "The environment and capture/Linalg commands completed. The "
+                        "earlier smoke-suite stale assertion and pytest collection errors "
+                        "are preserved baseline diagnostics, not F_ENV. The first protocol "
+                        "taxonomy match is RTL generation: the native-SV derivation's "
+                        "store-copied export script references the missing "
+                        "verify_calyx_f32_constant_bits.py helper."
+                    ),
+                    next_bounded_action=(
+                        "In a separate compiler-lab change, supply the committed "
+                        "CALYX_VERIFY_F32_CONSTANT_BITS derivation input, regenerate RTL, "
+                        "then rerun lint and synthesis."
+                    ),
+                    executed_commands=commands,
+                    budget_hours=budget_hours,
+                ),
+                execution_provenance={
+                    "executed_commit": executed_commit,
+                    "frozen_control_commit": route.source_commit,
+                    "compiler_scope_check_command": scope_check["command"],
+                    "compiler_scope_equivalent": True,
+                    "scope": (
+                        "tracked compiler-lab files excluding survey/, .superpowers/, "
+                        "and tests/test_survey_*"
+                    ),
+                },
+            )
+        raise ValueError(
+            "R1 did not reproduce the observed missing native-SV helper blocker"
+        )
+
+    if route.route_id == "R7":
+        checkout = _result_containing(results, "TinyTransformer4TS.git")
+        if checkout["exit_code"] != 0:
+            return RouteReceipt.controlled_failure(
+                route=route,
+                actual_stage="SOURCE_RETRIEVAL",
+                failure_code="F_SOURCE_MISSING",
+                failure_detail="The exact TinyTransformer4TS commit could not be checked out.",
+                next_bounded_action="Recover the exact paper-reported source commit.",
+                executed_commands=commands,
+                budget_hours=budget_hours,
+            )
+        if (
+            "r7_external_dependency_immutable=false" in stdout
+            and "r7_templates_fully_rendered=false" in stdout
+        ):
+            return RouteReceipt.controlled_failure(
+                route=route,
+                actual_stage="SOURCE_CLOSURE",
+                failure_code="F_SOURCE_MISSING",
+                failure_detail=(
+                    "The exact MIT checkout is accessible, but its hardware-generation "
+                    "templates depend on elastic-ai.creator through a mutable git branch "
+                    "rather than a source-pinned release; the checked-in VHDL templates "
+                    "remain unrendered. The later import and GHDL checks are retained as "
+                    "diagnostics, while source closure is the first failed gate."
+                ),
+                next_bounded_action=(
+                    "Pin and include the exact ElasticAI.Creator source/template revision "
+                    "needed to render complete VHDL before attempting operator triage."
+                ),
+                executed_commands=commands,
+                budget_hours=budget_hours,
+            )
+        raise ValueError("R7 did not record the expected source-closure evidence")
+
+    if route.route_id == "R8":
+        checkout = _result_containing(results, "cascade.git")
+        if checkout["exit_code"] != 0:
+            return RouteReceipt.controlled_failure(
+                route=route,
+                actual_stage="SOURCE_RETRIEVAL",
+                failure_code="F_SOURCE_MISSING",
+                failure_detail="The exact Cascade artifact commit could not be checked out.",
+                next_bounded_action="Recover the exact artifact commit and its dependencies.",
+                executed_commands=commands,
+                budget_hours=budget_hours,
+            )
+        if (
+            "r8_source_closure_complete=false" in stdout
+            and "soc_system/synthesis/soc_system.qip" in stdout
+        ):
+            return RouteReceipt.controlled_failure(
+                route=route,
+                actual_stage="SOURCE_CLOSURE",
+                failure_code="F_SOURCE_MISSING",
+                failure_detail=(
+                    "The exact Cascade checkout is accessible and includes "
+                    "soc_system.qsys, but its DE10 Quartus project references the absent "
+                    "generated soc_system/synthesis/soc_system.qip hierarchy. The source "
+                    "requires vendor Qsys generation to produce that input. The later "
+                    "CMake and Yosys checks are retained as "
+                    "diagnostics; causal-LM coverage is not reached."
+                ),
+                next_bounded_action=(
+                    "Provide the generated DE10 QIP hierarchy or a reproducible, "
+                    "replaceable generation path before attempting fallback-route evaluation."
+                ),
+                executed_commands=commands,
+                budget_hours=budget_hours,
+            )
+        raise ValueError("R8 did not record the expected source-closure evidence")
+
+    raise ValueError(f"no observed failure derivation for {route.route_id}")
 
 
 def _bounded_next_action(route: RouteSpec) -> str:
@@ -544,6 +770,118 @@ def _commands_text(commands: Sequence[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _m2_dimensions() -> dict[str, Any]:
+    fixture = FIXTURES["M2-tiny-lm"]
+    return {
+        field: fixture[field]
+        for field in (
+            "blocks",
+            "d_model",
+            "heads",
+            "d_ff",
+            "vocabulary",
+            "max_sequence",
+            "batch_size",
+            "decode_tokens",
+            "decode_mode",
+            "kv_state",
+        )
+    }
+
+
+def _route_file(route_dir: Path, value: str, field: str) -> Path:
+    candidate = Path(value)
+    if candidate.is_absolute():
+        return candidate
+    if ".." in candidate.parts:
+        raise ValueError(f"{field}: path traversal is not an evidence anchor")
+    return route_dir / candidate
+
+
+def _validate_evidence_anchor(
+    anchor: Any,
+    *,
+    field: str,
+    route_dir: Path,
+    commands: Sequence[str],
+) -> None:
+    if not isinstance(anchor, str) or not anchor:
+        raise ValueError(f"{field}: evidence anchor must be a nonempty string")
+    if "#command-" in anchor:
+        log_name, separator, command_number = anchor.partition("#command-")
+        if separator != "#command-" or log_name not in {"stdout.log", "stderr.log"}:
+            raise ValueError(f"{field}: invalid log command anchor: {anchor}")
+        try:
+            index = int(command_number)
+        except ValueError as error:
+            raise ValueError(f"{field}: invalid command anchor: {anchor}") from error
+        if index < 1 or index > len(commands):
+            raise ValueError(f"{field}: command anchor is out of range: {anchor}")
+        log_path = route_dir / log_name
+        expected_header = f"===== command {index}: {commands[index - 1]} =====\n"
+        if not log_path.is_file() or expected_header not in log_path.read_text(encoding="utf-8"):
+            raise ValueError(f"{field}: unresolved log command anchor: {anchor}")
+        return
+    path = _route_file(route_dir, anchor, field)
+    if not path.is_file():
+        raise ValueError(f"{field}: missing evidence file: {anchor}")
+
+
+def _validate_m2_pass(
+    receipt: Mapping[str, Any],
+    *,
+    route_dir: Path,
+    commands: Sequence[str],
+    results: Sequence[Mapping[str, Any]],
+) -> None:
+    if receipt["fixture"] != "M2-tiny-lm":
+        raise ValueError("M2 pass requires the frozen M2-tiny-lm fixture")
+    m2 = receipt["m2_evidence"]
+    if not isinstance(m2, Mapping):
+        raise ValueError("M2 pass requires a structured m2_evidence mapping")
+    evidence_name = m2.get("evidence_file")
+    command_index = m2.get("command_index")
+    if not isinstance(evidence_name, str) or not evidence_name:
+        raise ValueError("M2 pass requires an existing parsed evidence_file")
+    if not isinstance(command_index, int) or not 1 <= command_index <= len(commands):
+        raise ValueError("M2 pass requires an executed command_index")
+    if results[command_index - 1]["exit_code"] != 0:
+        raise ValueError("M2 pass evidence command did not succeed")
+    if evidence_name not in commands[command_index - 1]:
+        raise ValueError("M2 pass evidence is not tied to its executed command")
+    if evidence_name not in receipt["simulation_evidence"]:
+        raise ValueError("M2 pass requires simulation_evidence for its parsed result")
+    evidence_path = _route_file(route_dir, evidence_name, "m2_evidence")
+    if not evidence_path.is_file():
+        raise ValueError("M2 pass requires an existing parsed evidence file")
+    try:
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("M2 pass evidence file is not valid JSON") from error
+    if not isinstance(evidence, Mapping):
+        raise ValueError("M2 pass evidence JSON must be an object")
+    if evidence.get("fixture") != "M2-tiny-lm":
+        raise ValueError("M2 pass evidence fixture does not match M2-tiny-lm")
+    if evidence.get("dimensions") != _m2_dimensions():
+        raise ValueError("M2 pass evidence dimensions do not match the frozen fixture")
+    if evidence.get("token_loop_control") != "hardware":
+        raise ValueError("M2 pass requires a hardware token loop")
+    if evidence.get("kv_state_persistent") is not True:
+        raise ValueError("M2 pass requires persistent KV state")
+    reference_tokens = evidence.get("reference_token_ids")
+    observed_tokens = evidence.get("observed_token_ids")
+    token_count = FIXTURES["M2-tiny-lm"]["decode_tokens"]
+    if (
+        not isinstance(reference_tokens, list)
+        or not isinstance(observed_tokens, list)
+        or len(reference_tokens) != token_count
+        or len(observed_tokens) != token_count
+        or not all(isinstance(token, int) for token in reference_tokens + observed_tokens)
+        or reference_tokens != observed_tokens
+    ):
+        raise ValueError("M2 pass requires token-identical greedy decode outputs")
+
+
 def validate_receipt(
     receipt: Mapping[str, Any], route_dir: Path | None = None
 ) -> None:
@@ -554,6 +892,23 @@ def validate_receipt(
         raise ValueError(f"failure_code: {receipt['failure_code']}")
     if receipt["failure_code"] != "NONE" and receipt["decision"] == "PRIMARY":
         raise ValueError("a failed hard gate cannot have decision=PRIMARY")
+    if receipt["route_id"] == "R1":
+        provenance = receipt["execution_provenance"]
+        if (
+            not isinstance(provenance, Mapping)
+            or not isinstance(provenance.get("executed_commit"), str)
+            or len(provenance["executed_commit"]) != 40
+            or provenance["executed_commit"] == receipt["source_commit"]
+            or provenance.get("frozen_control_commit") != receipt["source_commit"]
+            or provenance.get("compiler_scope_equivalent") is not True
+        ):
+            raise ValueError(
+                "execution_provenance must distinguish R1 execution from the frozen control"
+            )
+    is_m2_pass = (
+        receipt["status"] == "PASSED"
+        and receipt["actual_stage"] == "M2_STATEFUL_DECODE"
+    )
     if receipt["status"] == "PASSED":
         if receipt["failure_code"] != "NONE":
             raise ValueError("PASSED receipt must use failure_code=NONE")
@@ -562,19 +917,6 @@ def validate_receipt(
             for field in ("lint_evidence", "simulation_evidence", "synthesis_evidence")
         ):
             raise ValueError("PASSED receipt has no executable evidence")
-        if receipt["actual_stage"] == "M2_STATEFUL_DECODE":
-            m2 = receipt["m2_evidence"]
-            required_m2 = (
-                m2.get("implemented") is True
-                and m2.get("kv_state_persistent") is True
-                and m2.get("token_ids_identical") is True
-                and m2.get("token_loop_control") == "hardware"
-            )
-            if receipt["fixture"] != "M2-tiny-lm" or not required_m2:
-                raise ValueError(
-                    "M2 pass requires implemented hardware-controlled decode, "
-                    "persistent KV state, and token-identical evidence"
-                )
     if receipt["fixture"] not in FIXTURES:
         raise ValueError(f"unknown fixture: {receipt['fixture']}")
     if int(receipt["budget_hours"]) not in (16, 40):
@@ -594,6 +936,8 @@ def validate_receipt(
                 "command_results must preserve each command, index, and exit code"
             )
     if route_dir is None:
+        if is_m2_pass:
+            raise ValueError("M2 pass requires a route directory with parsed evidence")
         return
     commands_path = route_dir / "commands.sh"
     if not commands_path.is_file():
@@ -606,10 +950,23 @@ def validate_receipt(
     for name in ("README.md", "stdout.log", "stderr.log"):
         if not (route_dir / name).is_file():
             raise ValueError(f"missing receipt file: {name}")
-    for evidence in receipt["evidence_files"]:
-        path = route_dir / str(evidence)
+    if is_m2_pass:
+        _validate_m2_pass(
+            receipt, route_dir=route_dir, commands=commands, results=results
+        )
+    for field in ("lint_evidence", "simulation_evidence", "synthesis_evidence"):
+        for anchor in receipt[field]:
+            _validate_evidence_anchor(
+                anchor, field=field, route_dir=route_dir, commands=commands
+            )
+    for rtl_path in receipt["generated_rtl_paths"]:
+        path = _route_file(route_dir, str(rtl_path), "generated_rtl_paths")
         if not path.is_file():
-            raise ValueError(f"missing evidence file: {evidence}")
+            raise ValueError(f"generated_rtl_paths: missing RTL file: {rtl_path}")
+    for evidence in receipt["evidence_files"]:
+        _validate_evidence_anchor(
+            evidence, field="evidence_files", route_dir=route_dir, commands=commands
+        )
 
 
 def write_route_receipt(receipt: RouteReceipt, route_dir: Path) -> Path:
@@ -683,7 +1040,12 @@ def record_route(
 
     commands = ROUTE_COMMANDS[route.route_id]
     stdout, stderr, results = execute_commands(commands, cwd=ROOT)
-    receipt = run_route(route, budget_hours)
+    if route.route_id in {"R1", "R7", "R8"}:
+        receipt = _derived_observed_failure(
+            route, commands, stdout, stderr, results, budget_hours
+        )
+    else:
+        receipt = run_route(route, budget_hours)
     receipt = replace(
         receipt,
         executed_commands=commands,
@@ -695,24 +1057,28 @@ def record_route(
         receipt = replace(
             receipt,
             failure_detail=(
-                "Capture and Linalg lowering completed, but the focused smoke suite "
-                "failed 18/19 at a stale patches-directory assertion. Pinned pytest "
-                "collection also reported the preserved Python 3.11 f-string SyntaxError "
-                "and submodule import errors. The representative-core SV derivation "
-                "failed because the store-copied export script resolved an unexported "
-                "verification helper to a nonexistent /nix/store path. Independent lint "
-                "and generic synthesis of the hash-pinned existing RC RTL then failed in "
-                "Verilator and Yosys; no RTL gate passed."
+                "The environment and capture/Linalg commands completed. The focused "
+                "smoke suite's stale patches-directory assertion and the pinned pytest "
+                "collection errors are preserved baseline diagnostics, not F_ENV. The "
+                "first protocol-taxonomy blocker is RTL generation: the native-SV "
+                "derivation's store-copied export script references the missing "
+                "verify_calyx_f32_constant_bits.py helper. Independent lint and generic "
+                "synthesis of a hash-pinned existing RC RTL then also failed; no RTL "
+                "gate passed."
             ),
             next_bounded_action=(
-                "In a separate compiler-lab change, repair the baseline test collection "
-                "and missing CALYX_VERIFY_F32_CONSTANT_BITS derivation input, then "
-                "regenerate RTL before rerunning lint and synthesis."
+                "In a separate compiler-lab change, supply the committed "
+                "CALYX_VERIFY_F32_CONSTANT_BITS derivation input, then regenerate RTL "
+                "before rerunning lint and synthesis."
             ),
             generated_rtl_paths=(_R1_RTL,),
-            lint_evidence=("stderr.log#command-10",),
-            synthesis_evidence=("stdout.log#command-11",),
+            lint_evidence=("stderr.log#command-11",),
+            synthesis_evidence=("stderr.log#command-12",),
         )
+    if route.route_id == "R7":
+        receipt = replace(receipt, lint_evidence=("stderr.log#command-7",))
+    if route.route_id == "R8":
+        receipt = replace(receipt, lint_evidence=("stderr.log#command-5",))
     write_route_receipt(receipt, route_dir)
     return receipt
 

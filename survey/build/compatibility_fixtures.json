@@ -7,6 +7,142 @@
       "integer": "identical"
     },
     "batch_size": 1,
+    "operator_shapes": {
+      "activation": {
+        "input": [
+          1,
+          16,
+          64
+        ],
+        "output": [
+          1,
+          16,
+          64
+        ]
+      },
+      "causal_softmax": {
+        "causal_mask": [
+          1,
+          1,
+          16,
+          16
+        ],
+        "logits": [
+          1,
+          4,
+          16,
+          16
+        ],
+        "output": [
+          1,
+          4,
+          16,
+          16
+        ]
+      },
+      "int8_matmul": {
+        "lhs": [
+          1,
+          16,
+          64
+        ],
+        "output": [
+          1,
+          16,
+          64
+        ],
+        "rhs": [
+          64,
+          64
+        ]
+      },
+      "kv_read_write": {
+        "key_cache": [
+          1,
+          4,
+          16,
+          16
+        ],
+        "key_read": [
+          1,
+          4,
+          16,
+          16
+        ],
+        "key_write": [
+          1,
+          4,
+          1,
+          16
+        ],
+        "value_cache": [
+          1,
+          4,
+          16,
+          16
+        ],
+        "value_read": [
+          1,
+          4,
+          16,
+          16
+        ],
+        "value_write": [
+          1,
+          4,
+          1,
+          16
+        ]
+      },
+      "normalization": {
+        "bias": [
+          64
+        ],
+        "input": [
+          1,
+          16,
+          64
+        ],
+        "output": [
+          1,
+          16,
+          64
+        ],
+        "scale": [
+          64
+        ]
+      },
+      "rope": {
+        "key": [
+          1,
+          4,
+          16,
+          16
+        ],
+        "key_output": [
+          1,
+          4,
+          16,
+          16
+        ],
+        "position": [
+          1,
+          16
+        ],
+        "query": [
+          1,
+          4,
+          16,
+          16
+        ],
+        "query_output": [
+          1,
+          4,
+          16,
+          16
+        ]
+      }
+    },
     "operators": [
       "int8_matmul",
       "normalization",

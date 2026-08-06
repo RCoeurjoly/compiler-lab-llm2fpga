@@ -38,6 +38,7 @@
     "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-86FE8DBFB50CB04C'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_state','licence_spdx_id','source_closure_state','generated_or_omitted_rtl','tool_indicators_json','failure_code')},sort_keys=True))\"",
     "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/artifact_inventory.csv')) if x['project_family_id']=='PF-86FE8DBFB50CB04C'); print(json.dumps({k:r[k] for k in ('artifact_claim_state','artifact_relation','limitations')},sort_keys=True))\""
   ],
+  "execution_provenance": {},
   "expected_stage": "M1_RTL",
   "failure_code": "F_SOURCE_MISSING",
   "failure_detail": "The audit observes the general Allo tree but the paper marks the LLM artifact as a future release; no complete LLM RTL artifact is pinned.",
@@ -52,7 +53,7 @@
   "lint_evidence": [],
   "m2_evidence": {},
   "next_bounded_action": "Obtain and audit the paper-specific LLM release before attempting Allo M0/M1 generation.",
-  "receipt_schema_version": 1,
+  "receipt_schema_version": 2,
   "route_family": "HLS",
   "route_id": "R4",
   "route_title": "Allo MLIR/HLS route",

@@ -32,6 +32,7 @@
     "sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv",
     "python3 -c \"import csv; r=list(csv.DictReader(open('survey/build/artifact_inventory.csv'))); m=[x for x in r if 'finn' in (x['title']+' '+x['normalized_artifact_url']).lower()]; print('matching_artifact_rows='+str(len(m)))\""
   ],
+  "execution_provenance": {},
   "expected_stage": "M1_RTL",
   "failure_code": "F_SOURCE_MISSING",
   "failure_detail": "The frozen deep-review work has no attributed and audited FINN source artifact.",
@@ -46,7 +47,7 @@
   "lint_evidence": [],
   "m2_evidence": {},
   "next_bounded_action": "Attribute and audit the exact FINN transformer extension release; do not substitute generic FINN.",
-  "receipt_schema_version": 1,
+  "receipt_schema_version": 2,
   "route_family": "DATAFLOW",
   "route_id": "R5",
   "route_title": "FINN transformer-adjacent route",

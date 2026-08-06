@@ -3,7 +3,17 @@
 239c996d4f79364b3c261bf601a7a211104b2b60396ad8b4e00e00d7d7d472f5  survey/build/deep_review.csv
 4e06aed7708955484b2eb609034c822aec62acc47f3594fec901ae95d503b301  survey/build/artifact_inventory.csv
 be15ec353621597b379bd60bc859e8b95298cbf041b0a27ed49ae611a9b5c2e6  survey/build/repository_audit.csv
-===== command 2: python3 -c "import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-4EBDD47F47E94583'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_spdx_id','source_closure_state','generated_or_omitted_rtl','tests_json','failure_code')},sort_keys=True))" =====
-{"failure_code": "", "generated_or_omitted_rtl": "rtl_files=17;generated_markers=[];omitted_markers=[]", "licence_spdx_id": "MIT", "observed_commit": "3b3e98fabbca7987809c681244076a646af519b9", "source_closure_state": "api_tree_observed", "tests_json": "[\"hw_converter/firmware/env5se_top_reconfig_tb.vhd\",\"test.py\"]"}
-===== command 3: python3 -c "import csv,json; r=next(x for x in csv.DictReader(open('survey/build/deep_review.csv')) if x['project_family_id']=='PF-4EBDD47F47E94583'); print(json.dumps({k:r[k] for k in ('title','rq2_model_family','rq2_prefill','rq2_decode','rq2_token_loop','rq2_kv_cache','rq2_completeness')},sort_keys=True))" =====
-{"rq2_completeness": "route-boundary control: no prefill, autoregressive decode, KV cache, or sampling", "rq2_decode": "", "rq2_kv_cache": "", "rq2_model_family": "non-causal time-series forecasting, classification, and anomaly-detection encoder", "rq2_prefill": "", "rq2_token_loop": "", "title": "Automating Versatile Time-Series Analysis with Tiny Transformers on Embedded FPGAs"}
+===== command 2: if test -d /tmp/llm2fpga-task6-r7-receipt-source/.git; then git -C /tmp/llm2fpga-task6-r7-receipt-source fetch --quiet origin 3b3e98fabbca7987809c681244076a646af519b9; else git clone --filter=blob:none --no-checkout https://github.com/Edwina1030/TinyTransformer4TS.git /tmp/llm2fpga-task6-r7-receipt-source; fi && git -C /tmp/llm2fpga-task6-r7-receipt-source checkout --detach 3b3e98fabbca7987809c681244076a646af519b9 && git -C /tmp/llm2fpga-task6-r7-receipt-source rev-parse HEAD && git -C /tmp/llm2fpga-task6-r7-receipt-source status --short =====
+3b3e98fabbca7987809c681244076a646af519b9
+===== command 3: python3 -c "from pathlib import Path; r=Path('/tmp/llm2fpga-task6-r7-receipt-source'); req=(r/'requirements.txt').read_text(); dep=next(x for x in req.splitlines() if x.startswith('git+ssh://')); ref=dep.rsplit('@',1)[-1]; immutable=len(ref)==40 and all(c in '0123456789abcdef' for c in ref.lower()); marker=chr(36)+'{'; templates=list((r/'models/quant').glob('*.tpl.vhd')); print('r7_external_dependency='+dep); print('r7_external_dependency_immutable='+str(immutable).lower()); print('r7_templates_fully_rendered='+str(not any(marker in p.read_text() for p in templates)).lower())" =====
+r7_external_dependency=git+ssh://git@github.com/es-ude/elastic-ai.creator.git@add-linear-quantization
+r7_external_dependency_immutable=false
+r7_templates_fully_rendered=false
+===== command 4: GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10' git ls-remote git@github.com:es-ude/elastic-ai.creator.git add-linear-quantization =====
+62cc5852973941b7f5f15299304a966b716c3ce8	refs/heads/add-linear-quantization
+===== command 5: python3 -m py_compile /tmp/llm2fpga-task6-r7-receipt-source/models/quant/design.py /tmp/llm2fpga-task6-r7-receipt-source/hw_converter/convert2hw.py =====
+===== command 6: cd /tmp/llm2fpga-task6-r7-receipt-source && python3 -c 'import hw_converter.convert2hw' =====
+===== command 7: nix develop -c bash -c 'command -v ghdl; ghdl -a /tmp/llm2fpga-task6-r7-receipt-source/models/quant/transformer.tpl.vhd' =====
+===== command 8: python3 -c "from pathlib import Path; t=(Path('/tmp/llm2fpga-task6-r7-receipt-source')/'README.md').read_text(); print('r7_causal_lm_interface='+str('causal' in t.lower() and 'decode' in t.lower()).lower()); print('r7_declared_workload=time_series')" =====
+r7_causal_lm_interface=false
+r7_declared_workload=time_series

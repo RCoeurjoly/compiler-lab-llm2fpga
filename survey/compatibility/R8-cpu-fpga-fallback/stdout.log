@@ -3,7 +3,28 @@
 239c996d4f79364b3c261bf601a7a211104b2b60396ad8b4e00e00d7d7d472f5  survey/build/deep_review.csv
 4e06aed7708955484b2eb609034c822aec62acc47f3594fec901ae95d503b301  survey/build/artifact_inventory.csv
 be15ec353621597b379bd60bc859e8b95298cbf041b0a27ed49ae611a9b5c2e6  survey/build/repository_audit.csv
-===== command 2: python3 -c "import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-E9C1300B04E80B95'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_state','licence_spdx_id','licence_evidence','source_closure_state','vendor_ip_indicators_json','failure_code')},sort_keys=True))" =====
-{"failure_code": "", "licence_evidence": "GitHub licence API at e21dafa4d877c1dc7846f9e0b60c05a995d033eb: Other", "licence_spdx_id": "NOASSERTION", "licence_state": "detected", "observed_commit": "e21dafa4d877c1dc7846f9e0b60c05a995d033eb", "source_closure_state": "incomplete_indicators_observed", "vendor_ip_indicators_json": "[\"share/cascade/de10/ip\",\"share/cascade/de10/ip/altsource_probe\",\"share/cascade/de10/ip/altsource_probe/hps_reset.qip\",\"share/cascade/de10/ip/altsource_probe/hps_reset.v\",\"share/cascade/de10/ip/altsource_probe/hps_reset_bb.v\",\"share/cascade/de10/ip/program_logic.v\"]"}
-===== command 3: python3 -c "import csv,json; r=next(x for x in csv.DictReader(open('survey/build/deep_review.csv')) if x['project_family_id']=='PF-E9C1300B04E80B95'); print(json.dumps({k:r[k] for k in ('title','rq1_input_frontend','rq2_model_family','rq2_prefill','rq2_decode','rq2_token_loop','rq2_kv_cache','rq2_completeness','rq4_required_closed_tools_or_ip')},sort_keys=True))" =====
-{"rq1_input_frontend": "Verilog hardware design", "rq2_completeness": "route-boundary control, not an LLM token-loop implementation", "rq2_decode": "", "rq2_kv_cache": "", "rq2_model_family": "general FPGA workloads; no causal-LM evaluation", "rq2_prefill": "", "rq2_token_loop": "", "rq4_required_closed_tools_or_ip": "Vivado and Quartus binary toolchains", "title": "Compiler-Driven FPGA Virtualization with SYNERGY"}
+===== command 2: if test -d /tmp/llm2fpga-task6-r8-receipt-source/.git; then git -C /tmp/llm2fpga-task6-r8-receipt-source fetch --quiet origin e21dafa4d877c1dc7846f9e0b60c05a995d033eb; else git clone --filter=blob:none --no-checkout https://github.com/JoshuaLandgraf/cascade.git /tmp/llm2fpga-task6-r8-receipt-source; fi && git -C /tmp/llm2fpga-task6-r8-receipt-source checkout --detach e21dafa4d877c1dc7846f9e0b60c05a995d033eb && git -C /tmp/llm2fpga-task6-r8-receipt-source rev-parse HEAD && git -C /tmp/llm2fpga-task6-r8-receipt-source status --short =====
+e21dafa4d877c1dc7846f9e0b60c05a995d033eb
+===== command 3: python3 -c "from pathlib import Path; d=Path('/tmp/llm2fpga-task6-r8-receipt-source')/'share/cascade/de10'; qsf=(d/'DE10_NANO_SoC_GHRD.qsf').read_text(); needed=['soc_system/synthesis/soc_system.qip']; referenced=[p for p in needed if p in qsf]; missing=[p for p in referenced if not (d/p).is_file()]; print('r8_qsf_references='+','.join(referenced)); print('r8_qsys_source_present='+str((d/'soc_system.qsys').is_file()).lower()); print('r8_missing_required_files='+','.join(missing)); print('r8_source_closure_complete='+str(not missing).lower())" =====
+r8_qsf_references=soc_system/synthesis/soc_system.qip
+r8_qsys_source_present=true
+r8_missing_required_files=soc_system/synthesis/soc_system.qip
+r8_source_closure_complete=false
+===== command 4: cmake -S /tmp/llm2fpga-task6-r8-receipt-source -B /tmp/llm2fpga-task6-r8-receipt-build -DCMAKE_BUILD_TYPE=Release && cmake --build /tmp/llm2fpga-task6-r8-receipt-build -j2 =====
+-- Configuring incomplete, errors occurred!
+===== command 5: nix develop -c yosys -p 'read_verilog -I /tmp/llm2fpga-task6-r8-receipt-source /tmp/llm2fpga-task6-r8-receipt-source/share/cascade/test/benchmark/adpcm/adpcm.v; hierarchy -check -top test; proc; check' =====
+
+ /----------------------------------------------------------------------------\
+ |  yosys -- Yosys Open SYnthesis Suite                                       |
+ |  Copyright (C) 2012 - 2026  Claire Xenia Wolf <claire@yosyshq.com>         |
+ |  Distributed under an ISC-like license, type "license" to see terms        |
+ \----------------------------------------------------------------------------/
+ Yosys 0.66 (git sha1 7f8fdfd8d7bc08c749a2a969388d3425d4f369d5, clang++ 18.1.8 -fPIC -O3)
+
+-- Running command `read_verilog -I /tmp/llm2fpga-task6-r8-receipt-source /tmp/llm2fpga-task6-r8-receipt-source/share/cascade/test/benchmark/adpcm/adpcm.v; hierarchy -check -top test; proc; check' --
+
+1. Executing Verilog-2005 frontend: /tmp/llm2fpga-task6-r8-receipt-source/share/cascade/test/benchmark/adpcm/adpcm.v
+Parsing Verilog input from `/tmp/llm2fpga-task6-r8-receipt-source/share/cascade/test/benchmark/adpcm/adpcm.v' to AST representation.
+===== command 6: python3 -c "from pathlib import Path; t=(Path('/tmp/llm2fpga-task6-r8-receipt-source')/'experiments/README.md').read_text().lower(); print('r8_causal_lm_interface='+str('causal' in t and 'decode' in t).lower()); print('r8_declared_workload=fpga_virtualization')" =====
+r8_causal_lm_interface=false
+r8_declared_workload=fpga_virtualization

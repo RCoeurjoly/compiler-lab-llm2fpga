@@ -32,6 +32,7 @@
     "sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv",
     "python3 -c \"import csv; r=list(csv.DictReader(open('survey/build/artifact_inventory.csv'))); m=[x for x in r if 'mase' in (x['title']+' '+x['normalized_artifact_url']).lower()]; print('matching_artifact_rows='+str(len(m)))\""
   ],
+  "execution_provenance": {},
   "expected_stage": "M1_RTL",
   "failure_code": "F_SOURCE_MISSING",
   "failure_detail": "Task 5 contains no paper-attributed, commit-pinned Mase source artifact.",
@@ -46,7 +47,7 @@
   "lint_evidence": [],
   "m2_evidence": {},
   "next_bounded_action": "Attribute a Mase release to a frozen survey work and audit its licence and immutable source commit.",
-  "receipt_schema_version": 1,
+  "receipt_schema_version": 2,
   "route_family": "DATAFLOW",
   "route_id": "R3",
   "route_title": "Mase compiler route",

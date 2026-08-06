@@ -1,5 +1,5 @@
 {
-  "actual_stage": "SMOKE_TESTS",
+  "actual_stage": "RTL_GENERATION",
   "artifact_commit": "nix-store-b8pwl1r7jq05hn5pphj4zxyg67c3zxjs",
   "artifact_sha256": "f0e0f500a44ef2daabecd780d743fee2585a46593c2e3d67a7e6b189fd28f983",
   "budget_hours": 16,
@@ -10,57 +10,62 @@
       "index": 1
     },
     {
-      "command": "nix build .#tinystories-representative-core-w4a8-pytorch-exported --no-link --print-out-paths -L",
+      "command": "git diff --quiet 433592c448f8b19a30dd046a1ec726b09a86d892..HEAD -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && git diff --quiet -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && printf 'compiler_scope_equivalent=true\\n'",
       "exit_code": 0,
       "index": 2
     },
     {
-      "command": "nix build .#tinystories-representative-core-w4a8-linalg --no-link --print-out-paths -L",
+      "command": "nix build .#tinystories-representative-core-w4a8-pytorch-exported --no-link --print-out-paths -L",
       "exit_code": 0,
       "index": 3
     },
     {
+      "command": "nix build .#tinystories-representative-core-w4a8-linalg --no-link --print-out-paths -L",
+      "exit_code": 0,
+      "index": 4
+    },
+    {
       "command": "nix develop -c python -m unittest tests.test_torch_mlir_fingerprint tests.test_pipeline_clarity -v",
       "exit_code": 1,
-      "index": 4
+      "index": 5
     },
     {
       "command": "nix build github:NixOS/nixpkgs/b134951a4c9f3c995fd7be05f3243f8ecd65d798#python311Packages.pytest --no-link",
       "exit_code": 0,
-      "index": 5
+      "index": 6
     },
     {
       "command": "PYTHONPATH=/nix/store/wiivwk558q3nj8xnzyc901dsc5c8fqf4-python3.11-pytest-8.1.1/lib/python3.11/site-packages:/nix/store/g48903rpbx6czj8fdmjckxsn7ns4xi3b-python3.11-pluggy-1.4.0/lib/python3.11/site-packages:/nix/store/x86vbwafzpwk6nhcpgvfbyyma9ajp1b8-python3.11-iniconfig-2.0.0/lib/python3.11/site-packages:/nix/store/dkphwn70lhdmazrl4zdnj63gy0yw4qfj-python3.11-packaging-24.0/lib/python3.11/site-packages nix develop -c python -m pytest -q",
       "exit_code": 2,
-      "index": 6
+      "index": 7
     },
     {
       "command": "nix develop -c python -m py_compile tests/test_rc_observable_driver.py",
       "exit_code": 1,
-      "index": 7
+      "index": 8
     },
     {
       "command": "nix build .#tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-calyx-native-sv --no-link --print-out-paths -L",
       "exit_code": 1,
-      "index": 8
+      "index": 9
     },
     {
       "command": "sha256sum /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv && wc -c /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv",
       "exit_code": 0,
-      "index": 9
+      "index": 10
     },
     {
       "command": "nix develop -c verilator --lint-only --timing --Wno-fatal --top-module main /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv",
       "exit_code": 1,
-      "index": 10
+      "index": 11
     },
     {
       "command": "nix develop -c yosys -p 'read_verilog -sv /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv; hierarchy -check -top main; synth -top main; stat'",
       "exit_code": 1,
-      "index": 11
+      "index": 12
     }
   ],
-  "commands_sha256": "4be840475a00e1ff70b0d1674112d8bebcefb96d6de49dd94141fcb57d04e9f0",
+  "commands_sha256": "12cb95ce1cc4b2e72315a64cb12f94df97bb65830816e9a52adf0be637832c98",
   "complete_elaboratable_rtl": false,
   "decision": "INELIGIBLE",
   "environment_manifest": {
@@ -75,6 +80,7 @@
   "evidence_files": [],
   "executed_commands": [
     "git rev-parse HEAD && nix --version && nix develop -c bash -c 'python --version; circt-opt --version; mlir-opt --version; verilator --version; yosys -V'",
+    "git diff --quiet 433592c448f8b19a30dd046a1ec726b09a86d892..HEAD -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && git diff --quiet -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && printf 'compiler_scope_equivalent=true\\n'",
     "nix build .#tinystories-representative-core-w4a8-pytorch-exported --no-link --print-out-paths -L",
     "nix build .#tinystories-representative-core-w4a8-linalg --no-link --print-out-paths -L",
     "nix develop -c python -m unittest tests.test_torch_mlir_fingerprint tests.test_pipeline_clarity -v",
@@ -86,9 +92,16 @@
     "nix develop -c verilator --lint-only --timing --Wno-fatal --top-module main /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv",
     "nix develop -c yosys -p 'read_verilog -sv /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv; hierarchy -check -top main; synth -top main; stat'"
   ],
+  "execution_provenance": {
+    "compiler_scope_check_command": "git diff --quiet 433592c448f8b19a30dd046a1ec726b09a86d892..HEAD -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && git diff --quiet -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && printf 'compiler_scope_equivalent=true\\n'",
+    "compiler_scope_equivalent": true,
+    "executed_commit": "83aac269f3b16ee0c261ab2c7075e4654cfee74d",
+    "frozen_control_commit": "433592c448f8b19a30dd046a1ec726b09a86d892",
+    "scope": "tracked compiler-lab files excluding survey/, .superpowers/, and tests/test_survey_*"
+  },
   "expected_stage": "M3_GENERIC_SYNTHESIS",
-  "failure_code": "F_ENV",
-  "failure_detail": "Capture and Linalg lowering completed, but the focused smoke suite failed 18/19 at a stale patches-directory assertion. Pinned pytest collection also reported the preserved Python 3.11 f-string SyntaxError and submodule import errors. The representative-core SV derivation failed because the store-copied export script resolved an unexported verification helper to a nonexistent /nix/store path. Independent lint and generic synthesis of the hash-pinned existing RC RTL then failed in Verilator and Yosys; no RTL gate passed.",
+  "failure_code": "F_SOURCE_MISSING",
+  "failure_detail": "The environment and capture/Linalg commands completed. The focused smoke suite's stale patches-directory assertion and the pinned pytest collection errors are preserved baseline diagnostics, not F_ENV. The first protocol-taxonomy blocker is RTL generation: the native-SV derivation's store-copied export script references the missing verify_calyx_f32_constant_bits.py helper. Independent lint and generic synthesis of a hash-pinned existing RC RTL then also failed; no RTL gate passed.",
   "fixture": "M3-repository-fixture",
   "frozen_tolerance": {
     "integer": "identical",
@@ -98,11 +111,11 @@
     "/nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv"
   ],
   "lint_evidence": [
-    "stderr.log#command-10"
+    "stderr.log#command-11"
   ],
   "m2_evidence": {},
-  "next_bounded_action": "In a separate compiler-lab change, repair the baseline test collection and missing CALYX_VERIFY_F32_CONSTANT_BITS derivation input, then regenerate RTL before rerunning lint and synthesis.",
-  "receipt_schema_version": 1,
+  "next_bounded_action": "In a separate compiler-lab change, supply the committed CALYX_VERIFY_F32_CONSTANT_BITS derivation input, then regenerate RTL before rerunning lint and synthesis.",
+  "receipt_schema_version": 2,
   "route_family": "MLIR_CIRCT",
   "route_id": "R1",
   "route_title": "compiler-lab MLIR/CIRCT control",
@@ -112,6 +125,6 @@
   "source_sha256": "e1848d79218fad62e2fb8873067ee90bcf370a23e9752cf6c9545aa78d96a872",
   "status": "STOPPED",
   "synthesis_evidence": [
-    "stdout.log#command-11"
+    "stderr.log#command-12"
   ]
 }

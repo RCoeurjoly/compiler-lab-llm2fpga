@@ -80,6 +80,110 @@ class CompatibilityContractTests(unittest.TestCase):
         )
         self.assertEqual(set(FIXTURES), {"M0-operators", "M1-block", "M2-tiny-lm", "M3-repository-fixture"})
 
+    def test_m0_fixture_freezes_operator_operands_outputs_and_kv_state_shape(self) -> None:
+        self.assertEqual(
+            FIXTURES["M0-operators"]["operator_shapes"],
+            {
+                "int8_matmul": {
+                    "lhs": [1, 16, 64],
+                    "rhs": [64, 64],
+                    "output": [1, 16, 64],
+                },
+                "normalization": {
+                    "input": [1, 16, 64],
+                    "scale": [64],
+                    "bias": [64],
+                    "output": [1, 16, 64],
+                },
+                "activation": {
+                    "input": [1, 16, 64],
+                    "output": [1, 16, 64],
+                },
+                "rope": {
+                    "query": [1, 4, 16, 16],
+                    "key": [1, 4, 16, 16],
+                    "position": [1, 16],
+                    "query_output": [1, 4, 16, 16],
+                    "key_output": [1, 4, 16, 16],
+                },
+                "causal_softmax": {
+                    "logits": [1, 4, 16, 16],
+                    "causal_mask": [1, 1, 16, 16],
+                    "output": [1, 4, 16, 16],
+                },
+                "kv_read_write": {
+                    "key_write": [1, 4, 1, 16],
+                    "value_write": [1, 4, 1, 16],
+                    "key_cache": [1, 4, 16, 16],
+                    "value_cache": [1, 4, 16, 16],
+                    "key_read": [1, 4, 16, 16],
+                    "value_read": [1, 4, 16, 16],
+                },
+            },
+        )
+
+    def test_m2_pass_requires_existing_parsed_command_tied_evidence(self) -> None:
+        receipt = RouteReceipt.controlled_failure(
+            route=ROUTES["R2"],
+            actual_stage="M2_STATEFUL_DECODE",
+            failure_code="F_STATE",
+            next_bounded_action="Implement the stateful decode loop in hardware.",
+            executed_commands=("python3 emit_m2.py > m2-simulation.json",),
+        )
+        receipt = replace(
+            receipt,
+            command_results=(
+                {
+                    "index": 1,
+                    "command": "python3 emit_m2.py > m2-simulation.json",
+                    "exit_code": 0,
+                },
+            ),
+        )
+        with TemporaryDirectory() as temporary:
+            route_dir = Path(temporary) / ROUTES["R2"].slug
+            write_route_receipt(receipt, route_dir)
+            claimed_pass = {
+                **json.loads((route_dir / "manifest.json").read_text()),
+                "status": "PASSED",
+                "decision": "CANDIDATE",
+                "failure_code": "NONE",
+                "fixture": "M2-tiny-lm",
+                "simulation_evidence": ["m2-simulation.json"],
+                "m2_evidence": {
+                    "evidence_file": "m2-simulation.json",
+                    "command_index": 1,
+                },
+            }
+            with self.assertRaisesRegex(ValueError, "M2"):
+                validate_receipt(claimed_pass, route_dir)
+
+            (route_dir / "m2-simulation.json").write_text(
+                json.dumps(
+                    {
+                        "fixture": "M2-tiny-lm",
+                        "dimensions": {
+                            "blocks": 2,
+                            "d_model": 128,
+                            "heads": 4,
+                            "d_ff": 256,
+                            "vocabulary": 256,
+                            "max_sequence": 32,
+                            "batch_size": 1,
+                            "decode_tokens": 4,
+                            "decode_mode": "greedy",
+                            "kv_state": "persistent_across_decode_steps",
+                        },
+                        "token_loop_control": "hardware",
+                        "kv_state_persistent": True,
+                        "reference_token_ids": [1, 2, 3, 4],
+                        "observed_token_ids": [1, 2, 3, 4],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            validate_receipt(claimed_pass, route_dir)
+
     def test_m2_pass_rejects_host_control_or_unverified_kv_state(self) -> None:
         receipt = RouteReceipt.controlled_failure(
             route=ROUTES["R2"],
@@ -104,9 +208,6 @@ class CompatibilityContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "M2"):
             validate_receipt(claimed_pass)
 
-        claimed_pass["m2_evidence"]["token_loop_control"] = "hardware"
-        validate_receipt(claimed_pass)
-
     def test_failed_hard_gate_cannot_be_primary(self) -> None:
         receipt = RouteReceipt.controlled_failure(
             route=ROUTES["R3"],
@@ -118,6 +219,16 @@ class CompatibilityContractTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "PRIMARY"):
             validate_receipt({**receipt.to_dict(), "decision": "PRIMARY"})
+
+    def test_r1_requires_distinct_execution_and_frozen_control_provenance(self) -> None:
+        receipt = RouteReceipt.controlled_failure(
+            route=ROUTES["R1"],
+            actual_stage="RTL_GENERATION",
+            failure_code="F_SOURCE_MISSING",
+            next_bounded_action="Supply the missing helper.",
+        ).to_dict()
+        with self.assertRaisesRegex(ValueError, "execution_provenance"):
+            validate_receipt(receipt)
 
     def test_receipt_schema_rejects_unknown_failures_and_missing_fields(self) -> None:
         receipt = RouteReceipt.controlled_failure(
@@ -181,6 +292,35 @@ class CompatibilityContractTests(unittest.TestCase):
         ]
         with self.assertRaisesRegex(ValueError, "command_results"):
             validate_receipt(receipt)
+
+    def test_all_evidence_fields_reject_broken_log_and_file_anchors(self) -> None:
+        receipt = RouteReceipt.controlled_failure(
+            route=ROUTES["R6"],
+            actual_stage="ARTIFACT_ATTRIBUTION",
+            failure_code="F_SOURCE_MISSING",
+            next_bounded_action="Attribute the source release.",
+            executed_commands=("printf 'route check\\n'",),
+        )
+        receipt = replace(
+            receipt,
+            command_results=(
+                {"index": 1, "command": "printf 'route check\\n'", "exit_code": 0},
+            ),
+        )
+        with TemporaryDirectory() as temporary:
+            route_dir = Path(temporary) / ROUTES["R6"].slug
+            write_route_receipt(receipt, route_dir)
+            manifest = json.loads((route_dir / "manifest.json").read_text())
+            for field, bad_anchor in (
+                ("lint_evidence", "stderr.log#command-2"),
+                ("simulation_evidence", "stdout.log#command-2"),
+                ("synthesis_evidence", "stderr.log#command-2"),
+                ("generated_rtl_paths", "missing.sv"),
+            ):
+                with self.subTest(field=field):
+                    invalid = {**manifest, field: [bad_anchor]}
+                    with self.assertRaisesRegex(ValueError, field):
+                        validate_receipt(invalid, route_dir)
 
     def test_sixteen_hour_cap_stops_an_unbounded_route_without_rtl(self) -> None:
         route = RouteSpec(
@@ -247,6 +387,50 @@ class RecordedReceiptTests(unittest.TestCase):
                 self.assertNotEqual(manifest["failure_code"], "NONE")
                 self.assertEqual(manifest["simulation_evidence"], [])
                 self.assertEqual(manifest["m2_evidence"], {})
+
+    def test_recorded_r1_provenance_and_blocker_are_evidence_derived(self) -> None:
+        manifest = json.loads(
+            (COMPATIBILITY / "R1-mlir-circt" / "manifest.json").read_text()
+        )
+        self.assertEqual(manifest["actual_stage"], "RTL_GENERATION")
+        self.assertEqual(manifest["failure_code"], "F_SOURCE_MISSING")
+        self.assertNotEqual(
+            manifest["execution_provenance"]["executed_commit"],
+            manifest["source_commit"],
+        )
+        self.assertTrue(manifest["execution_provenance"]["compiler_scope_equivalent"])
+        self.assertEqual(manifest["synthesis_evidence"], ["stderr.log#command-12"])
+
+    def test_recorded_r7_and_r8_source_triage_precedes_model_coverage(self) -> None:
+        for route_id, slug in (
+            ("R7", "R7-open-accelerator"),
+            ("R8", "R8-cpu-fpga-fallback"),
+        ):
+            with self.subTest(route=route_id):
+                manifest = json.loads((COMPATIBILITY / slug / "manifest.json").read_text())
+                self.assertEqual(manifest["actual_stage"], "SOURCE_CLOSURE")
+                self.assertEqual(manifest["failure_code"], "F_SOURCE_MISSING")
+                self.assertTrue(
+                    any("git clone" in command for command in manifest["executed_commands"])
+                )
+                if route_id == "R7":
+                    self.assertIn(
+                        "r7_external_dependency_immutable=false",
+                        (COMPATIBILITY / slug / "stdout.log").read_text(),
+                    )
+                    self.assertIn(
+                        "git ls-remote",
+                        "\n".join(manifest["executed_commands"]),
+                    )
+                else:
+                    self.assertIn(
+                        "r8_qsf_references=soc_system/synthesis/soc_system.qip",
+                        (COMPATIBILITY / slug / "stdout.log").read_text(),
+                    )
+                    self.assertIn(
+                        "r8_qsys_source_present=true",
+                        (COMPATIBILITY / slug / "stdout.log").read_text(),
+                    )
 
 
 if __name__ == "__main__":

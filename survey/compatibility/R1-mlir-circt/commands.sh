@@ -2,6 +2,7 @@
 set -u
 
 git rev-parse HEAD && nix --version && nix develop -c bash -c 'python --version; circt-opt --version; mlir-opt --version; verilator --version; yosys -V'
+git diff --quiet 433592c448f8b19a30dd046a1ec726b09a86d892..HEAD -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && git diff --quiet -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && printf 'compiler_scope_equivalent=true\n'
 nix build .#tinystories-representative-core-w4a8-pytorch-exported --no-link --print-out-paths -L
 nix build .#tinystories-representative-core-w4a8-linalg --no-link --print-out-paths -L
 nix develop -c python -m unittest tests.test_torch_mlir_fingerprint tests.test_pipeline_clarity -v

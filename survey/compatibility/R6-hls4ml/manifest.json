@@ -32,6 +32,7 @@
     "sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv",
     "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/artifact_inventory.csv')) if x['project_family_id']=='PF-3DBBE522B68ECE13'); print(json.dumps({k:r[k] for k in ('artifact_claim_state','artifact_kind','observed_status','licence_state','failure_code','limitations')},sort_keys=True))\""
   ],
+  "execution_provenance": {},
   "expected_stage": "M1_RTL",
   "failure_code": "F_SOURCE_MISSING",
   "failure_detail": "The paper audit found no attributed public project artifact for the transformer extension, so a generic upstream checkout cannot substitute.",
@@ -46,7 +47,7 @@
   "lint_evidence": [],
   "m2_evidence": {},
   "next_bounded_action": "Attribute and audit the exact hls4ml transformer extension release; do not substitute generic hls4ml.",
-  "receipt_schema_version": 1,
+  "receipt_schema_version": 2,
   "route_family": "HLS",
   "route_id": "R6",
   "route_title": "hls4ml transformer route",

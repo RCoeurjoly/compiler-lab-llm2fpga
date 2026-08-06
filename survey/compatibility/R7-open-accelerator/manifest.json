@@ -1,5 +1,5 @@
 {
-  "actual_stage": "CAUSAL_LM_COVERAGE",
+  "actual_stage": "SOURCE_CLOSURE",
   "artifact_commit": "",
   "artifact_sha256": "",
   "budget_hours": 16,
@@ -10,18 +10,43 @@
       "index": 1
     },
     {
-      "command": "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-4EBDD47F47E94583'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_spdx_id','source_closure_state','generated_or_omitted_rtl','tests_json','failure_code')},sort_keys=True))\"",
+      "command": "if test -d /tmp/llm2fpga-task6-r7-receipt-source/.git; then git -C /tmp/llm2fpga-task6-r7-receipt-source fetch --quiet origin 3b3e98fabbca7987809c681244076a646af519b9; else git clone --filter=blob:none --no-checkout https://github.com/Edwina1030/TinyTransformer4TS.git /tmp/llm2fpga-task6-r7-receipt-source; fi && git -C /tmp/llm2fpga-task6-r7-receipt-source checkout --detach 3b3e98fabbca7987809c681244076a646af519b9 && git -C /tmp/llm2fpga-task6-r7-receipt-source rev-parse HEAD && git -C /tmp/llm2fpga-task6-r7-receipt-source status --short",
       "exit_code": 0,
       "index": 2
     },
     {
-      "command": "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/deep_review.csv')) if x['project_family_id']=='PF-4EBDD47F47E94583'); print(json.dumps({k:r[k] for k in ('title','rq2_model_family','rq2_prefill','rq2_decode','rq2_token_loop','rq2_kv_cache','rq2_completeness')},sort_keys=True))\"",
+      "command": "python3 -c \"from pathlib import Path; r=Path('/tmp/llm2fpga-task6-r7-receipt-source'); req=(r/'requirements.txt').read_text(); dep=next(x for x in req.splitlines() if x.startswith('git+ssh://')); ref=dep.rsplit('@',1)[-1]; immutable=len(ref)==40 and all(c in '0123456789abcdef' for c in ref.lower()); marker=chr(36)+'{'; templates=list((r/'models/quant').glob('*.tpl.vhd')); print('r7_external_dependency='+dep); print('r7_external_dependency_immutable='+str(immutable).lower()); print('r7_templates_fully_rendered='+str(not any(marker in p.read_text() for p in templates)).lower())\"",
       "exit_code": 0,
       "index": 3
+    },
+    {
+      "command": "GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10' git ls-remote git@github.com:es-ude/elastic-ai.creator.git add-linear-quantization",
+      "exit_code": 0,
+      "index": 4
+    },
+    {
+      "command": "python3 -m py_compile /tmp/llm2fpga-task6-r7-receipt-source/models/quant/design.py /tmp/llm2fpga-task6-r7-receipt-source/hw_converter/convert2hw.py",
+      "exit_code": 0,
+      "index": 5
+    },
+    {
+      "command": "cd /tmp/llm2fpga-task6-r7-receipt-source && python3 -c 'import hw_converter.convert2hw'",
+      "exit_code": 1,
+      "index": 6
+    },
+    {
+      "command": "nix develop -c bash -c 'command -v ghdl; ghdl -a /tmp/llm2fpga-task6-r7-receipt-source/models/quant/transformer.tpl.vhd'",
+      "exit_code": 127,
+      "index": 7
+    },
+    {
+      "command": "python3 -c \"from pathlib import Path; t=(Path('/tmp/llm2fpga-task6-r7-receipt-source')/'README.md').read_text(); print('r7_causal_lm_interface='+str('causal' in t.lower() and 'decode' in t.lower()).lower()); print('r7_declared_workload=time_series')\"",
+      "exit_code": 0,
+      "index": 8
     }
   ],
-  "commands_sha256": "3a6b12ca8ac85c6dda6101bd768bb2ef058e20cafd19990decce137dc12e5ffc",
-  "complete_elaboratable_rtl": true,
+  "commands_sha256": "7b92f3ae16fe104145f08cf91f95ef52e9163cc7e27bdf6126420992d6073fb8",
+  "complete_elaboratable_rtl": false,
   "decision": "INELIGIBLE",
   "environment_manifest": {
     "artifact_inventory_sha256": "4e06aed7708955484b2eb609034c822aec62acc47f3594fec901ae95d503b301",
@@ -35,12 +60,18 @@
   "evidence_files": [],
   "executed_commands": [
     "sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv",
-    "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/repository_audit.csv')) if x['project_family_id']=='PF-4EBDD47F47E94583'); print(json.dumps({k:r[k] for k in ('observed_commit','licence_spdx_id','source_closure_state','generated_or_omitted_rtl','tests_json','failure_code')},sort_keys=True))\"",
-    "python3 -c \"import csv,json; r=next(x for x in csv.DictReader(open('survey/build/deep_review.csv')) if x['project_family_id']=='PF-4EBDD47F47E94583'); print(json.dumps({k:r[k] for k in ('title','rq2_model_family','rq2_prefill','rq2_decode','rq2_token_loop','rq2_kv_cache','rq2_completeness')},sort_keys=True))\""
+    "if test -d /tmp/llm2fpga-task6-r7-receipt-source/.git; then git -C /tmp/llm2fpga-task6-r7-receipt-source fetch --quiet origin 3b3e98fabbca7987809c681244076a646af519b9; else git clone --filter=blob:none --no-checkout https://github.com/Edwina1030/TinyTransformer4TS.git /tmp/llm2fpga-task6-r7-receipt-source; fi && git -C /tmp/llm2fpga-task6-r7-receipt-source checkout --detach 3b3e98fabbca7987809c681244076a646af519b9 && git -C /tmp/llm2fpga-task6-r7-receipt-source rev-parse HEAD && git -C /tmp/llm2fpga-task6-r7-receipt-source status --short",
+    "python3 -c \"from pathlib import Path; r=Path('/tmp/llm2fpga-task6-r7-receipt-source'); req=(r/'requirements.txt').read_text(); dep=next(x for x in req.splitlines() if x.startswith('git+ssh://')); ref=dep.rsplit('@',1)[-1]; immutable=len(ref)==40 and all(c in '0123456789abcdef' for c in ref.lower()); marker=chr(36)+'{'; templates=list((r/'models/quant').glob('*.tpl.vhd')); print('r7_external_dependency='+dep); print('r7_external_dependency_immutable='+str(immutable).lower()); print('r7_templates_fully_rendered='+str(not any(marker in p.read_text() for p in templates)).lower())\"",
+    "GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10' git ls-remote git@github.com:es-ude/elastic-ai.creator.git add-linear-quantization",
+    "python3 -m py_compile /tmp/llm2fpga-task6-r7-receipt-source/models/quant/design.py /tmp/llm2fpga-task6-r7-receipt-source/hw_converter/convert2hw.py",
+    "cd /tmp/llm2fpga-task6-r7-receipt-source && python3 -c 'import hw_converter.convert2hw'",
+    "nix develop -c bash -c 'command -v ghdl; ghdl -a /tmp/llm2fpga-task6-r7-receipt-source/models/quant/transformer.tpl.vhd'",
+    "python3 -c \"from pathlib import Path; t=(Path('/tmp/llm2fpga-task6-r7-receipt-source')/'README.md').read_text(); print('r7_causal_lm_interface='+str('causal' in t.lower() and 'decode' in t.lower()).lower()); print('r7_declared_workload=time_series')\""
   ],
+  "execution_provenance": {},
   "expected_stage": "M2_STATEFUL_DECODE",
-  "failure_code": "F_INTERFACE",
-  "failure_detail": "The audited MIT source is a time-series transformer and does not provide a causal-LM prefill/decode, KV-cache, or token-generation interface.",
+  "failure_code": "F_SOURCE_MISSING",
+  "failure_detail": "The exact MIT checkout is accessible, but its hardware-generation templates depend on elastic-ai.creator through a mutable git branch rather than a source-pinned release; the checked-in VHDL templates remain unrendered. The later import and GHDL checks are retained as diagnostics, while source closure is the first failed gate.",
   "fixture": "M0-operators",
   "frozen_tolerance": {
     "fixed_point_lsb": 1,
@@ -49,10 +80,12 @@
     "integer": "identical"
   },
   "generated_rtl_paths": [],
-  "lint_evidence": [],
+  "lint_evidence": [
+    "stderr.log#command-7"
+  ],
   "m2_evidence": {},
-  "next_bounded_action": "Select a licensed causal-LM accelerator with a prefill/decode and persistent-KV interface.",
-  "receipt_schema_version": 1,
+  "next_bounded_action": "Pin and include the exact ElasticAI.Creator source/template revision needed to render complete VHDL before attempting operator triage.",
+  "receipt_schema_version": 2,
   "route_family": "PARAMETERIZED_RTL",
   "route_id": "R7",
   "route_title": "open reusable accelerator control",

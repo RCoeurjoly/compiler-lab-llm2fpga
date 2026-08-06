@@ -1,5 +1,5 @@
 ===== command 1: git rev-parse HEAD && nix --version && nix develop -c bash -c 'python --version; circt-opt --version; mlir-opt --version; verilator --version; yosys -V' =====
-c678ac19a3c90fed27c5329b2ebb624436693385
+83aac269f3b16ee0c261ab2c7075e4654cfee74d
 nix (Nix) 2.33.3
 Python 3.11.14
 LLVM (http://llvm.org/):
@@ -11,13 +11,15 @@ LLVM (http://llvm.org/):
   Optimized build.
 Verilator 5.022 2024-02-24 rev UNKNOWN.REV
 Yosys 0.66 (git sha1 7f8fdfd8d7bc08c749a2a969388d3425d4f369d5, clang++ 18.1.8 -fPIC -O3)
-===== command 2: nix build .#tinystories-representative-core-w4a8-pytorch-exported --no-link --print-out-paths -L =====
+===== command 2: git diff --quiet 433592c448f8b19a30dd046a1ec726b09a86d892..HEAD -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && git diff --quiet -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && printf 'compiler_scope_equivalent=true\n' =====
+compiler_scope_equivalent=true
+===== command 3: nix build .#tinystories-representative-core-w4a8-pytorch-exported --no-link --print-out-paths -L =====
 /nix/store/nld3cp8rwi83l2v5jpjc0562isryki1d-tinystories-representative-core-w4a8-pytorch-exported
-===== command 3: nix build .#tinystories-representative-core-w4a8-linalg --no-link --print-out-paths -L =====
+===== command 4: nix build .#tinystories-representative-core-w4a8-linalg --no-link --print-out-paths -L =====
 /nix/store/bq6m7x99m9nwwik55gbvi5fn89iicdan-tinystories-representative-core-w4a8-linalg.mlir
-===== command 4: nix develop -c python -m unittest tests.test_torch_mlir_fingerprint tests.test_pipeline_clarity -v =====
-===== command 5: nix build github:NixOS/nixpkgs/b134951a4c9f3c995fd7be05f3243f8ecd65d798#python311Packages.pytest --no-link =====
-===== command 6: PYTHONPATH=/nix/store/wiivwk558q3nj8xnzyc901dsc5c8fqf4-python3.11-pytest-8.1.1/lib/python3.11/site-packages:/nix/store/g48903rpbx6czj8fdmjckxsn7ns4xi3b-python3.11-pluggy-1.4.0/lib/python3.11/site-packages:/nix/store/x86vbwafzpwk6nhcpgvfbyyma9ajp1b8-python3.11-iniconfig-2.0.0/lib/python3.11/site-packages:/nix/store/dkphwn70lhdmazrl4zdnj63gy0yw4qfj-python3.11-packaging-24.0/lib/python3.11/site-packages nix develop -c python -m pytest -q =====
+===== command 5: nix develop -c python -m unittest tests.test_torch_mlir_fingerprint tests.test_pipeline_clarity -v =====
+===== command 6: nix build github:NixOS/nixpkgs/b134951a4c9f3c995fd7be05f3243f8ecd65d798#python311Packages.pytest --no-link =====
+===== command 7: PYTHONPATH=/nix/store/wiivwk558q3nj8xnzyc901dsc5c8fqf4-python3.11-pytest-8.1.1/lib/python3.11/site-packages:/nix/store/g48903rpbx6czj8fdmjckxsn7ns4xi3b-python3.11-pluggy-1.4.0/lib/python3.11/site-packages:/nix/store/x86vbwafzpwk6nhcpgvfbyyma9ajp1b8-python3.11-iniconfig-2.0.0/lib/python3.11/site-packages:/nix/store/dkphwn70lhdmazrl4zdnj63gy0yw4qfj-python3.11-packaging-24.0/lib/python3.11/site-packages nix develop -c python -m pytest -q =====
 
 ==================================== ERRORS ====================================
 ______ ERROR collecting LLM-inference-on-FPGA-papers/tests/test_arxiv.py _______
@@ -118,14 +120,14 @@ ERROR LLM-inference-on-FPGA-papers/tests/test_render.py
 ERROR LLM-inference-on-FPGA-papers/tests/test_storage.py
 ERROR tests/test_rc_observable_driver.py
 !!!!!!!!!!!!!!!!!!! Interrupted: 8 errors during collection !!!!!!!!!!!!!!!!!!!!
-8 errors in 3.23s
-===== command 7: nix develop -c python -m py_compile tests/test_rc_observable_driver.py =====
-===== command 8: nix build .#tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-calyx-native-sv --no-link --print-out-paths -L =====
-===== command 9: sha256sum /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv && wc -c /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv =====
+8 errors in 3.07s
+===== command 8: nix develop -c python -m py_compile tests/test_rc_observable_driver.py =====
+===== command 9: nix build .#tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-calyx-native-sv --no-link --print-out-paths -L =====
+===== command 10: sha256sum /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv && wc -c /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv =====
 f0e0f500a44ef2daabecd780d743fee2585a46593c2e3d67a7e6b189fd28f983  /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv
 9955404 /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv
-===== command 10: nix develop -c verilator --lint-only --timing --Wno-fatal --top-module main /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv =====
-===== command 11: nix develop -c yosys -p 'read_verilog -sv /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv; hierarchy -check -top main; synth -top main; stat' =====
+===== command 11: nix develop -c verilator --lint-only --timing --Wno-fatal --top-module main /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv =====
+===== command 12: nix develop -c yosys -p 'read_verilog -sv /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv; hierarchy -check -top main; synth -top main; stat' =====
 
  /----------------------------------------------------------------------------\
  |  yosys -- Yosys Open SYnthesis Suite                                       |
