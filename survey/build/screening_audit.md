@@ -6,8 +6,8 @@ This audit is generated from the frozen Phase-1 mapping and the controlled revie
 
 - Source manifestations: 461
 - Bibliographic work IDs: 456
-- Included A-D manifestations: 231
-- Excluded X manifestations: 230
+- Included A-D manifestations: 230
+- Excluded X manifestations: 231
 - Included project families: 226
 
 ## Final counts
@@ -17,8 +17,8 @@ This audit is generated from the frozen Phase-1 mapping and the controlled revie
 | A | 30 |
 | B | 57 |
 | C | 75 |
-| D | 69 |
-| X | 230 |
+| D | 68 |
+| X | 231 |
 
 ## Controlled exclusion counts
 
@@ -33,7 +33,7 @@ This audit is generated from the frozen Phase-1 mapping and the controlled revie
 | X_PERFORMANCE_MODEL_ONLY | 2 |
 | X_RETRACTED | 0 |
 | X_SECONDARY | 19 |
-| X_TRAINING_ONLY | 5 |
+| X_TRAINING_ONLY | 6 |
 | X_VIT_NO_TRANSFER | 0 |
 
 ## Duplicate/version decisions
@@ -55,17 +55,16 @@ Every source manifestation remains in `screening_decisions.csv`. Non-preferred d
 
 ## Project-family consolidation
 
-Project-family IDs are distinct from bibliographic `work_id` values. For conservative single-work families, the stable identifier is `PF-` followed by the first 16 uppercase hexadecimal characters of SHA-256(`project-family:` + `work_id`). Named multi-work families use the same derivation with a canonical `named-system:<slug>` key. The default is a conservative single-work family, explicitly marked `single_work_family`; multiple works share a family only when paper text identifies a named extension or release relationship. Repository URL equality is never used as family evidence.
+Project-family IDs are distinct from bibliographic `work_id` values. For conservative single-work families, the stable identifier is `PF-` followed by the first 16 uppercase hexadecimal characters of SHA-256(`project-family:` + `work_id`). Named multi-work families use the same derivation with a canonical `named-system:<slug>` key recorded in `project_family_key`; callers cannot choose IDs. The default is a conservative single-work family, explicitly marked `single_work_family`; multiple works share a family only when paper text identifies a named extension or release relationship. Repository URL equality is never used as family evidence.
 
-Named multi-work families: 5. Every linked bibliographic work remains a separate row in `project_families.csv`.
+Named multi-work families: 4. Every linked bibliographic work remains a separate row in `project_families.csv`.
 
-| Project family | Primary work | Linked works | Grouping basis |
-|---|---|---|---|
-| PF-1E29B67248E46AA2 | WORK-9EB01DDF67D140A4 | WORK-688ADEA2C66217F1;WORK-9EB01DDF67D140A4 | named_system_retargeting_lower_confidence; exact HPCNeuroNet name, three shared authors, and the same Transformer-to-spiking-attention chain support one system family, while VU37P/VHDL audio and PYNQ-Z1/HLS4ML particle implementations remain distinct work rows |
-| PF-25C132E08D276681 | WORK-D98F092B3E212C22 | WORK-D98F092B3E212C22;WORK-EDCEC112A1B67954 | named_system_extension; TeLLMe v2 cites the original TeLLMe arXiv:2504.16266, retains all five authors, and extends the same ternary prefill/decode accelerator |
-| PF-31AE21CFCF31BECE | WORK-76ACBFCD99E4F225 | WORK-76ACBFCD99E4F225;WORK-ABC385BEAF195807 | named_system_extension; MetaML-Pro section Relationship to Prior Publications states that it expands the prior MetaML framework |
-| PF-443A595D662099E7 | WORK-2D44FCCE8D9826E3 | WORK-2D44FCCE8D9826E3;WORK-5B6F84F0C6192010 | named_system_extension; Edge-MoE explicitly names M3ViT as its source model and solves its FPGA-deployment challenges with five shared authors |
-| PF-4814F9379C7A45A0 | WORK-674CDDB57508D5CE | WORK-674CDDB57508D5CE;WORK-769AF53322C4EFB1 | named_system_extension; both papers introduce the same HADDOC2 open-source CNN-to-VHDL tool with five core authors, and the later peer-reviewed work extends its direct-mapping tactics |
+| Project family | Family key | Primary work | Linked works | Grouping basis |
+|---|---|---|---|---|
+| PF-25C132E08D276681 | named-system:tellme | WORK-D98F092B3E212C22 | WORK-D98F092B3E212C22;WORK-EDCEC112A1B67954 | named_system_extension; TeLLMe v2 cites the original TeLLMe arXiv:2504.16266, retains all five authors, and extends the same ternary prefill/decode accelerator |
+| PF-31AE21CFCF31BECE | named-system:metaml | WORK-76ACBFCD99E4F225 | WORK-76ACBFCD99E4F225;WORK-ABC385BEAF195807 | named_system_extension; MetaML-Pro section Relationship to Prior Publications states that it expands the prior MetaML framework |
+| PF-443A595D662099E7 | named-system:m3vit_edge_moe | WORK-2D44FCCE8D9826E3 | WORK-2D44FCCE8D9826E3;WORK-5B6F84F0C6192010 | named_system_extension; Edge-MoE explicitly names M3ViT as its source model and solves its FPGA-deployment challenges with five shared authors |
+| PF-4814F9379C7A45A0 | named-system:haddoc2 | WORK-674CDDB57508D5CE | WORK-674CDDB57508D5CE;WORK-769AF53322C4EFB1 | named_system_extension; both papers introduce the same HADDOC2 open-source CNN-to-VHDL tool with five core authors, and the later peer-reviewed work extends its direct-mapping tactics |
 
 ## Explicit conservative non-merges
 
@@ -73,6 +72,7 @@ Similar titles, authors, domains, or framework dependencies do not establish a s
 
 | Candidate records | Assigned families | Non-merge rationale |
 |---|---|---|
+| REC-8079DF7689E5D2AD; REC-361ADBB8874502B6 | PF-EC7A371C4608D83D; PF-3123E25E353ECBC2 | The later particle-physics paper neither cites the earlier audio paper nor identifies it as a predecessor; shared naming and authors are insufficient with no direct release, version, or extension evidence. |
 | REC-1D91E09883329FFA; REC-A53433EACA5A3E39 | PF-5F8C88F4E63C8F53; PF-91EE3D151F49EC76 | The later paper cites a conference predecessor, but the cited conference predecessor is a different 2021 work; neither paper identifies the other as a release or extension. |
 | REC-F95950AEA19221D0; REC-6099EE66504F6EF2 | PF-A254A36430409187; PF-3DBBE522B68ECE13 | Both works use hls4ml in particle-physics transformer implementations, but shared use of hls4ml is insufficient without an explicit cross-citation or stated release/extension relationship. |
 
@@ -88,8 +88,8 @@ The exact selected IDs are committed in `repeat_review_sample.csv` and enumerate
 | A | 30 | 30 |
 | B | 57 | 12 |
 | C | 75 | 75 |
-| D | 69 | 14 |
-| X | 230 | 46 |
+| D | 68 | 14 |
+| X | 231 | 47 |
 
 A second independent or one-week-delayed blind pass has not been represented as completed; downstream reporting must preserve this single-reviewer limitation until that pass is performed.
 
@@ -272,6 +272,7 @@ A second independent or one-week-delayed blind pass has not been represented as 
 | REC-BA4F44A6E9632049 | X | lowest stable hashes; ceil(20%) | 264d264cabcbd74177a33e3a5fd41f22542b4f8da406f5c2b5229b3d79c62834 |
 | REC-2E8C2D5C8564F14C | X | lowest stable hashes; ceil(20%) | 28a5f262f9d93710247c793d5f7ea8feea93e73f144f7982a8352d5626f1e756 |
 | REC-EAAAF4FE370E17FC | X | lowest stable hashes; ceil(20%) | 29bb177bbffa63f4681234031eca43bf40e70a4d8d667d3194405d7d95a7b794 |
+| REC-366753D8F671C3E6 | X | lowest stable hashes; ceil(20%) | 2a491aa8902918517dd869199711e1e4757aec4dbedcf5d414d1fbb32fed26ff |
 
 ## Unresolved but non-blocking uncertainty
 
@@ -468,7 +469,7 @@ Every final disposition and reviewer basis is listed below; these paths are also
 | REC-5379D6B857EA5D12 | B | codex-title-abstract-screen | title_abstract | survey/build/phase1_mapping.csv#record_id=REC-5379D6B857EA5D12:title+abstract |
 | REC-A4176B89BC21CA65 | C | codex-title-abstract-screen | title_abstract+local_full_text | survey/build/phase1_mapping.csv#record_id=REC-A4176B89BC21CA65:title+abstract;source_url=https://arxiv.org/pdf/2309.12917v1;cache_filename=2309.12917v1.pdf;cache_sha256=4c630272c06cb0f9264badec40c0d4543d0b1bfd7981cd3b146ab30d1162b0c0;locator=section=Olympus_flow&search=implemented_as_an_FPGA_bitstream |
 | REC-03737A3859757540 | C | codex-title-abstract-screen | title_abstract | survey/build/phase1_mapping.csv#record_id=REC-03737A3859757540:title+abstract |
-| REC-BCED24E48DF96CCD | D | codex-title-abstract-screen | title_abstract | survey/build/phase1_mapping.csv#record_id=REC-BCED24E48DF96CCD:title+abstract |
+| REC-BCED24E48DF96CCD | X | codex-title-abstract-screen | title_abstract+local_full_text | survey/build/phase1_mapping.csv#record_id=REC-BCED24E48DF96CCD:title+abstract;source_url=https://arxiv.org/pdf/2310.02654v1;cache_filename=2310.02654v1.pdf;cache_sha256=dec7727f4408387abe36faf8c4db15d31d3e1df087f1f6701b9d5699dff07d8c;locator=page=10,section=6.3.Extension_to_Mixed-precision_Quantisation,search=deployment_possibilities_on_embedded_FPGAs |
 | REC-366753D8F671C3E6 | X | codex-title-abstract-screen | title_abstract | survey/build/phase1_mapping.csv#record_id=REC-366753D8F671C3E6:title+abstract |
 | REC-3F04DF5486FF18BF | D | codex-title-abstract-screen | title_abstract | survey/build/phase1_mapping.csv#record_id=REC-3F04DF5486FF18BF:title+abstract |
 | REC-951785FA7828CC56 | X | codex-title-abstract-screen | title_abstract | survey/build/phase1_mapping.csv#record_id=REC-951785FA7828CC56:title+abstract |

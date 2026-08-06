@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -51,13 +52,24 @@ DECISION_REQUIRED_COLUMNS = frozenset(
         "evidence_location",
         "decision_notes",
         "project_family_id",
+        "project_family_key",
         "family_is_primary_work",
         "family_grouping_basis",
         "route_family_final",
     }
 )
 
+NAMED_SYSTEM_KEY_PATTERN = re.compile(
+    r"named-system:[a-z0-9][a-z0-9_-]*\Z"
+)
+
 EXPLICIT_NON_MERGES = (
+    (
+        ("REC-8079DF7689E5D2AD", "REC-361ADBB8874502B6"),
+        "The later particle-physics paper neither cites the earlier audio paper "
+        "nor identifies it as a predecessor; shared naming and authors are "
+        "insufficient with no direct release, version, or extension evidence.",
+    ),
     (
         ("REC-1D91E09883329FFA", "REC-A53433EACA5A3E39"),
         "The later paper cites a conference predecessor, but the cited "
@@ -96,11 +108,95 @@ def _nonblank(frame: pd.DataFrame, column: str) -> pd.Series:
     return frame[column].fillna("").astype(str).str.strip().ne("")
 
 
+def project_family_id_for_key(project_family_key: str) -> str:
+    """Return the stable public identifier derived from a canonical family key."""
+
+    digest = hashlib.sha256(
+        f"project-family:{project_family_key}".encode("utf-8")
+    ).hexdigest()
+    return f"PF-{digest[:16].upper()}"
+
+
+def _validate_project_family_assignments(rows: pd.DataFrame) -> pd.DataFrame:
+    """Normalize and validate keys before deriving stable project-family IDs."""
+
+    _require_columns(
+        rows,
+        {"record_id", "work_id", "project_family_id", "project_family_key"},
+        "project-family assignments",
+    )
+    normalized = rows.copy()
+    for column in ("project_family_id", "project_family_key"):
+        normalized[column] = (
+            normalized[column].fillna("").astype(str).str.strip()
+        )
+
+    has_id = normalized["project_family_id"].ne("")
+    has_key = normalized["project_family_key"].ne("")
+    if not has_id.equals(has_key):
+        raise ValueError(
+            "project_family_id and project_family_key must either both be "
+            "present or both be blank"
+        )
+
+    linked = normalized.loc[has_key].copy()
+    if linked.empty:
+        return normalized
+
+    keys_per_id = linked.groupby("project_family_id")[
+        "project_family_key"
+    ].nunique()
+    ambiguous_ids = sorted(keys_per_id.loc[keys_per_id.ne(1)].index)
+    if ambiguous_ids:
+        raise ValueError(
+            "every project_family_id must have exactly one project_family_key: "
+            + ", ".join(ambiguous_ids)
+        )
+
+    keys_per_work = linked.groupby("work_id")["project_family_key"].nunique()
+    split_works = sorted(keys_per_work.loc[keys_per_work.ne(1)].index)
+    if split_works:
+        raise ValueError(
+            "every linked work must belong to exactly one project family key: "
+            + ", ".join(str(work_id) for work_id in split_works)
+        )
+
+    for project_family_key, group in linked.groupby(
+        "project_family_key", sort=True
+    ):
+        work_ids = sorted(set(group["work_id"].astype(str)))
+        if project_family_key.startswith("named-system:"):
+            if not NAMED_SYSTEM_KEY_PATTERN.fullmatch(project_family_key):
+                raise ValueError(
+                    "project_family_key must be canonical named-system:<slug>: "
+                    + project_family_key
+                )
+            if len(work_ids) < 2:
+                raise ValueError(
+                    "named-system project_family_key must link multiple works: "
+                    + project_family_key
+                )
+            continue
+        if len(work_ids) != 1 or project_family_key != work_ids[0]:
+            raise ValueError(
+                "single-work project_family_key must equal work_id: "
+                + project_family_key
+            )
+
+    expected_ids = linked["project_family_key"].map(project_family_id_for_key)
+    if not linked["project_family_id"].equals(expected_ids):
+        raise ValueError(
+            "project_family_id must be derived from project_family_key"
+        )
+
+    return normalized
+
+
 def _contains_local_path_reference(evidence: str) -> bool:
     for segment in evidence.split(";"):
         token = segment.strip()
         lowered = token.lower()
-        if lowered.startswith("source_url=https://"):
+        if lowered.startswith(("source_url=https://", "source_url=http://")):
             continue
         key, separator, raw_value = token.partition("=")
         value = raw_value.strip() if separator else token
@@ -124,6 +220,29 @@ def _contains_local_path_reference(evidence: str) -> bool:
         if lowered_value.endswith(".pdf") and ("/" in value or "\\" in value):
             return True
     return False
+
+
+def _validate_title_abstract_evidence(record_id: str, evidence: str) -> None:
+    expected = (
+        "survey/build/phase1_mapping.csv#record_id="
+        f"{record_id}:title+abstract"
+    )
+    mapping_reference = evidence.split(";", 1)[0].strip()
+    if _contains_local_path_reference(evidence):
+        raise ValueError(
+            "title/abstract evidence cannot contain a local path for "
+            f"{record_id}"
+        )
+    if not mapping_reference.startswith("survey/build/phase1_mapping.csv#"):
+        raise ValueError(
+            "portable title/abstract evidence must use a frozen mapping path "
+            f"for {record_id}"
+        )
+    if mapping_reference != expected:
+        raise ValueError(
+            "title/abstract evidence must point to its own frozen mapping record "
+            f"for {record_id}"
+        )
 
 
 def validate_decisions(
@@ -242,20 +361,15 @@ def validate_decisions(
     if (requires_route & ordered["route_family_final"].eq("")).any():
         raise ValueError("A-C records require a controlled final route family")
 
-    ordered["project_family_id"] = (
-        ordered["project_family_id"].fillna("").astype(str).str.strip()
-    )
     ordered["family_grouping_basis"] = (
         ordered["family_grouping_basis"].fillna("").astype(str).str.strip()
     )
-    has_family = ordered["project_family_id"].ne("")
+    ordered = _validate_project_family_assignments(ordered)
+    has_family = ordered["project_family_key"].ne("")
     if ((~is_x) & ~has_family).any():
         raise ValueError("every included record requires a project family")
     if (has_family & ordered["family_grouping_basis"].eq("")).any():
         raise ValueError("every project family link requires a grouping basis")
-    work_ids = set(mapping["work_id"].fillna("").astype(str))
-    if ordered.loc[has_family, "project_family_id"].isin(work_ids).any():
-        raise ValueError("project_family_id must be distinct from work_id")
     invalid_excluded_family = is_x & has_family & ordered["exclusion_code"].ne(
         "X_DUPLICATE"
     )
@@ -315,6 +429,11 @@ def validate_decisions(
                     "retain a project family"
                 )
             continue
+        if duplicate.project_family_key != preferred["project_family_key"]:
+            raise ValueError(
+                "a duplicate and its included preferred manifestation must share "
+                "the same project family key"
+            )
         if duplicate.project_family_id != preferred["project_family_id"]:
             raise ValueError(
                 "a duplicate and its included preferred manifestation must share "
@@ -339,6 +458,10 @@ def validate_decisions(
     }
     if not ordered["review_basis"].isin(controlled_review_bases).all():
         raise ValueError("review_basis must use the controlled screening vocabulary")
+    for decision in ordered.itertuples(index=False):
+        _validate_title_abstract_evidence(
+            str(decision.record_id), str(decision.evidence_location)
+        )
     source_by_record = mapping.set_index("record_id")
     full_text_rows = ordered.loc[
         ordered["review_basis"].eq("title_abstract+local_full_text")
@@ -431,6 +554,7 @@ def make_project_families(screened: pd.DataFrame) -> pd.DataFrame:
         "final_level",
         "include_final",
         "project_family_id",
+        "project_family_key",
         "family_is_primary_work",
         "family_grouping_basis",
         "evidence_location",
@@ -438,15 +562,13 @@ def make_project_families(screened: pd.DataFrame) -> pd.DataFrame:
     }
     _require_columns(screened, required, "screened decisions")
 
-    rows = screened.copy()
-    rows["project_family_id"] = (
-        rows["project_family_id"].fillna("").astype(str).str.strip()
-    )
-    rows = rows.loc[rows["project_family_id"].ne("")].copy()
+    rows = _validate_project_family_assignments(screened)
+    rows = rows.loc[rows["project_family_key"].ne("")].copy()
     if rows.empty:
         return pd.DataFrame(
             columns=[
                 "project_family_id",
+                "project_family_key",
                 "primary_work_id",
                 "work_id",
                 "is_primary_work",
@@ -460,7 +582,7 @@ def make_project_families(screened: pd.DataFrame) -> pd.DataFrame:
             ]
         )
 
-    families_per_work = rows.groupby("work_id")["project_family_id"].nunique()
+    families_per_work = rows.groupby("work_id")["project_family_key"].nunique()
     split_works = sorted(families_per_work.loc[families_per_work.ne(1)].index)
     if split_works:
         raise ValueError(
@@ -480,9 +602,10 @@ def make_project_families(screened: pd.DataFrame) -> pd.DataFrame:
     ]
 
     relations: list[dict[str, object]] = []
-    for (family_id, work_id), group in rows.groupby(
-        ["project_family_id", "work_id"], sort=True
+    for (project_family_key, work_id), group in rows.groupby(
+        ["project_family_key", "work_id"], sort=True
     ):
+        family_id = project_family_id_for_key(str(project_family_key))
         primary_values = set(group["family_is_primary_work"].tolist())
         if len(primary_values) != 1:
             raise ValueError(
@@ -521,6 +644,7 @@ def make_project_families(screened: pd.DataFrame) -> pd.DataFrame:
         relations.append(
             {
                 "project_family_id": str(family_id),
+                "project_family_key": str(project_family_key),
                 "work_id": str(work_id),
                 "is_primary_work": primary_values.pop(),
                 "preferred_record_id": preferred_id,
@@ -713,9 +837,9 @@ def _make_screening_audit(
             "Project-family IDs are distinct from bibliographic `work_id` values. "
             "For conservative single-work families, the stable identifier is "
             "`PF-` followed by the first 16 uppercase hexadecimal characters of "
-            "SHA-256(`project-family:` + `work_id`). "
-            "Named multi-work families use the same derivation with a canonical "
-            "`named-system:<slug>` key. "
+            "SHA-256(`project-family:` + `work_id`). Named multi-work families "
+            "use the same derivation with a canonical `named-system:<slug>` key "
+            "recorded in `project_family_key`; callers cannot choose IDs. "
             "The default is a conservative single-work family, explicitly marked "
             "`single_work_family`; multiple works share a family only when paper "
             "text identifies a named extension or release relationship. Repository "
@@ -724,14 +848,15 @@ def _make_screening_audit(
             f"Named multi-work families: {len(multi_work_families)}. Every linked "
             "bibliographic work remains a separate row in `project_families.csv`.",
             "",
-            "| Project family | Primary work | Linked works | Grouping basis |",
-            "|---|---|---|---|",
+            "| Project family | Family key | Primary work | Linked works | Grouping basis |",
+            "|---|---|---|---|---|",
             *[
                 "| "
                 + " | ".join(
                     _markdown_cell(value)
                     for value in (
                         group.iloc[0]["project_family_id"],
+                        group.iloc[0]["project_family_key"],
                         group.iloc[0]["primary_work_id"],
                         ";".join(group["work_id"].astype(str)),
                         group.iloc[0]["family_grouping_basis"],
@@ -841,7 +966,11 @@ def _make_screening_audit(
 
 
 def _write_final_flow_counts(
-    screened: pd.DataFrame, families: pd.DataFrame, out_dir: Path
+    screened: pd.DataFrame,
+    families: pd.DataFrame,
+    out_dir: Path,
+    *,
+    mapping_path: Path,
 ) -> None:
     source_counts_path = out_dir / "flow_counts.json"
     source_run_path = out_dir / "phase1_run.json"
@@ -853,6 +982,9 @@ def _write_final_flow_counts(
 
     source_counts_bytes = source_counts_path.read_bytes()
     source_run_bytes = source_run_path.read_bytes()
+    if not mapping_path.is_file():
+        raise ValueError("final flow counts require the supplied phase1 mapping file")
+    mapping_bytes = mapping_path.read_bytes()
     source_counts = json.loads(source_counts_bytes)
     source_run = json.loads(source_run_bytes)
     if not isinstance(source_counts, dict) or not isinstance(source_run, dict):
@@ -874,6 +1006,12 @@ def _write_final_flow_counts(
     if expected_flow_hash != actual_flow_hash:
         raise ValueError(
             "flow_counts.json no longer matches immutable phase1_run.json"
+        )
+    expected_mapping_hash = output_hashes.get("phase1_mapping.csv", "")
+    actual_mapping_hash = hashlib.sha256(mapping_bytes).hexdigest()
+    if expected_mapping_hash != actual_mapping_hash:
+        raise ValueError(
+            "phase1_mapping.csv no longer matches immutable phase1_run.json"
         )
 
     final_levels = screened["final_level"].value_counts()
@@ -905,9 +1043,7 @@ def _write_final_flow_counts(
                 for level in ("A", "B", "C", "D", "X")
             },
             "source_phase1_flow_counts_sha256": actual_flow_hash,
-            "source_phase1_mapping_sha256": output_hashes.get(
-                "phase1_mapping.csv", ""
-            ),
+            "source_phase1_mapping_sha256": actual_mapping_hash,
             "source_phase1_run": "survey/build/phase1_run.json",
             "source_phase1_run_sha256": hashlib.sha256(source_run_bytes).hexdigest(),
         }
@@ -918,7 +1054,9 @@ def _write_final_flow_counts(
     )
 
 
-def write_screening_outputs(screened: pd.DataFrame, out_dir: Path) -> None:
+def write_screening_outputs(
+    screened: pd.DataFrame, out_dir: Path, *, mapping_path: Path
+) -> None:
     """Write deterministic products beside the immutable Phase-1 receipt."""
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -970,7 +1108,9 @@ def write_screening_outputs(screened: pd.DataFrame, out_dir: Path) -> None:
     ).to_csv(
         out_dir / "repeat_review_sample.csv", index=False, lineterminator="\n"
     )
-    _write_final_flow_counts(screened, families, out_dir)
+    _write_final_flow_counts(
+        screened, families, out_dir, mapping_path=mapping_path
+    )
     (out_dir / "screening_audit.md").write_text(
         _make_screening_audit(screened, families), encoding="utf-8"
     )
@@ -993,7 +1133,7 @@ def main() -> None:
             f"Expected {args.expected_records} frozen records; found {len(mapping)}"
         )
     screened = validate_decisions(mapping, decisions)
-    write_screening_outputs(screened, args.out)
+    write_screening_outputs(screened, args.out, mapping_path=args.mapping)
     counts = screened["final_level"].value_counts().sort_index().to_dict()
     print(json.dumps({"records": len(screened), "final_levels": counts}, indent=2))
 

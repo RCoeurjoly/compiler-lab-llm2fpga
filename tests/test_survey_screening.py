@@ -64,9 +64,13 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
                     "exclusion_code": "",
                     "reviewer": "codex-title-abstract-screen",
                     "review_basis": "title_abstract",
-                    "evidence_location": "phase1_mapping.csv#REC-1:title+abstract",
+                    "evidence_location": (
+                        "survey/build/phase1_mapping.csv#record_id=REC-1:"
+                        "title+abstract"
+                    ),
                     "decision_notes": "Block-level FPGA transformer evidence.",
-                    "project_family_id": "PF-1",
+                    "project_family_id": "PF-4C2FEC15D9875CAC",
+                    "project_family_key": "WORK-1",
                     "family_is_primary_work": True,
                     "family_grouping_basis": "single_work_family",
                     "route_family_final": "DATAFLOW",
@@ -79,9 +83,13 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
                     "exclusion_code": "X_SECONDARY",
                     "reviewer": "codex-title-abstract-screen",
                     "review_basis": "title_abstract",
-                    "evidence_location": "phase1_mapping.csv#REC-2:title+abstract",
+                    "evidence_location": (
+                        "survey/build/phase1_mapping.csv#record_id=REC-2:"
+                        "title+abstract"
+                    ),
                     "decision_notes": "Secondary survey.",
                     "project_family_id": "",
+                    "project_family_key": "",
                     "family_is_primary_work": False,
                     "family_grouping_basis": "",
                     "route_family_final": "",
@@ -141,12 +149,25 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
         self.assert_invalid(
             "project family",
             project_family_id="",
+            project_family_key="",
             family_is_primary_work=False,
             family_grouping_basis="",
         )
 
-    def test_rejects_project_family_id_that_reuses_work_id(self) -> None:
-        self.assert_invalid("distinct from work_id", project_family_id="WORK-1")
+    def test_rejects_noncanonical_project_family_id(self) -> None:
+        self.assert_invalid(
+            "derived from project_family_key", project_family_id="PF-ARBITRARY"
+        )
+
+    def test_rejects_malformed_or_wrong_single_work_family_key(self) -> None:
+        self.assert_invalid(
+            "project_family_key must be canonical",
+            project_family_key="named-system:Invalid Slug",
+        )
+        self.assert_invalid(
+            "single-work project_family_key",
+            project_family_key="WORK-2",
+        )
 
     def test_rejects_unknown_route_family(self) -> None:
         self.assert_invalid("controlled route family", route_family_final="OTHER")
@@ -154,15 +175,29 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
     def test_requires_route_family_for_levels_a_through_c(self) -> None:
         self.assert_invalid("A-C records require", route_family_final="")
 
+    def test_title_abstract_evidence_binds_the_current_record_and_path(self) -> None:
+        decisions = self.decisions.copy()
+        decisions.loc[0, "evidence_location"] = (
+            "survey/build/phase1_mapping.csv#record_id=REC-2:title+abstract"
+        )
+        with self.assertRaisesRegex(ValueError, "own frozen mapping record"):
+            validate_decisions(self.mapping, decisions)
+
+        decisions.loc[0, "evidence_location"] = "/tmp/REC-1:title+abstract"
+        with self.assertRaisesRegex(ValueError, "local path"):
+            validate_decisions(self.mapping, decisions)
+
     def test_full_text_basis_requires_portable_source_and_cache_identity(self) -> None:
         decisions = self.decisions.copy()
         decisions.loc[0, "review_basis"] = "title_abstract+local_full_text"
-        decisions.loc[0, "evidence_location"] = "/tmp/1234.00001v1.pdf#page=1"
+        decisions.loc[0, "evidence_location"] = (
+            "survey/build/phase1_mapping.csv#record_id=REC-1:title+abstract"
+        )
         with self.assertRaisesRegex(ValueError, "portable full-text evidence"):
             validate_decisions(self.mapping, decisions)
 
         valid_evidence = (
-            "phase1_mapping.csv#REC-1:title+abstract;"
+            "survey/build/phase1_mapping.csv#record_id=REC-1:title+abstract;"
             "source_url=https://arxiv.org/pdf/1234.00001v1;"
             "cache_filename=1234.00001v1.pdf;"
             f"cache_sha256={'1' * 64};locator=page 1"
@@ -223,7 +258,8 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
                     record_id="REC-1-OLD",
                     work_id="WORK-1",
                     exclusion_code="X_DUPLICATE",
-                    project_family_id="PF-1",
+                    project_family_id="PF-4C2FEC15D9875CAC",
+                    project_family_key="WORK-1",
                     family_is_primary_work=True,
                     family_grouping_basis="single_work_family",
                 ),
@@ -254,8 +290,9 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
             validate_decisions(self.mapping, preferred_duplicate)
 
         split_family = decisions.copy()
-        split_family.loc[1, "project_family_id"] = "PF-OTHER"
-        with self.assertRaisesRegex(ValueError, "same project family"):
+        split_family.loc[1, "project_family_key"] = "named-system:other"
+        split_family.loc[1, "project_family_id"] = "PF-28B67C9C652831BA"
+        with self.assertRaisesRegex(ValueError, "project family key"):
             validate_decisions(mapping, split_family)
 
         no_preferred = mapping.copy()
@@ -284,32 +321,43 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
         )
         self.assertEqual(["", ""], screened["include_final_source"].tolist())
 
+    def _write_frozen_phase1_inputs(
+        self, output: Path
+    ) -> tuple[Path, dict[str, object], bytes]:
+        mapping_path = output / "phase1_mapping.csv"
+        self.mapping.to_csv(mapping_path, index=False, lineterminator="\n")
+        mapping_bytes = mapping_path.read_bytes()
+        source_counts: dict[str, object] = {
+            "auto_levels": {"A": 0, "B": 1, "C": 0, "D": 0, "X": 1},
+            "candidate_unique_works": 2,
+            "duplicate_manifestations": 0,
+            "duplicate_work_groups": 0,
+            "input_records": 2,
+            "manual_review_queue": 2,
+        }
+        flow_bytes = (
+            json.dumps(source_counts, indent=2, sort_keys=True) + "\n"
+        ).encode()
+        (output / "flow_counts.json").write_bytes(flow_bytes)
+        phase1_run = {
+            "output_sha256": {
+                "flow_counts.json": hashlib.sha256(flow_bytes).hexdigest(),
+                "phase1_mapping.csv": hashlib.sha256(mapping_bytes).hexdigest(),
+            }
+        }
+        (output / "phase1_run.json").write_text(
+            json.dumps(phase1_run, indent=2, sort_keys=True) + "\n"
+        )
+        return mapping_path, source_counts, flow_bytes
+
     def test_writes_exclusion_family_and_traceable_audit_outputs(self) -> None:
         screened = validate_decisions(self.mapping, self.decisions)
         with TemporaryDirectory() as temporary:
             output = Path(temporary)
-            source_counts = {
-                "auto_levels": {"A": 0, "B": 1, "C": 0, "D": 0, "X": 1},
-                "candidate_unique_works": 2,
-                "duplicate_manifestations": 0,
-                "duplicate_work_groups": 0,
-                "input_records": 2,
-                "manual_review_queue": 2,
-            }
-            flow_bytes = (
-                json.dumps(source_counts, indent=2, sort_keys=True) + "\n"
-            ).encode()
-            (output / "flow_counts.json").write_bytes(flow_bytes)
-            phase1_run = {
-                "output_sha256": {
-                    "flow_counts.json": hashlib.sha256(flow_bytes).hexdigest(),
-                    "phase1_mapping.csv": "fixture-mapping-sha256",
-                }
-            }
-            (output / "phase1_run.json").write_text(
-                json.dumps(phase1_run, indent=2, sort_keys=True) + "\n"
+            mapping_path, source_counts, flow_bytes = self._write_frozen_phase1_inputs(
+                output
             )
-            write_screening_outputs(screened, output)
+            write_screening_outputs(screened, output, mapping_path=mapping_path)
 
             exclusions = pd.read_csv(
                 output / "phase1_exclusions.csv", keep_default_na=False
@@ -325,7 +373,9 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
 
         self.assertEqual(["REC-2"], exclusions["record_id"].tolist())
         self.assertEqual(["X_SECONDARY"], exclusions["exclusion_code"].tolist())
-        self.assertEqual(["PF-1"], families["project_family_id"].tolist())
+        self.assertEqual(
+            ["PF-4C2FEC15D9875CAC"], families["project_family_id"].tolist()
+        )
         self.assertIn("| B | 1 |", audit)
         self.assertIn("| X | 1 |", audit)
         self.assertIn("Duplicate/version decisions", audit)
@@ -336,11 +386,11 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
         self.assertIn("Unresolved but non-blocking uncertainty", audit)
         self.assertIn("SHA-256(`project-family:` + `work_id`)", audit)
         self.assertIn(
-            "phase1_mapping.csv#REC-1:title+abstract",
+            "survey/build/phase1_mapping.csv#record_id=REC-1:title+abstract",
             audit,
         )
         self.assertIn(
-            "phase1_mapping.csv#REC-2:title+abstract",
+            "survey/build/phase1_mapping.csv#record_id=REC-2:title+abstract",
             audit,
         )
         self.assertEqual(source_counts["auto_levels"], final_counts["auto_levels"])
@@ -355,11 +405,27 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
             hashlib.sha256(flow_bytes).hexdigest(),
             final_counts["source_phase1_flow_counts_sha256"],
         )
+        self.assertEqual(
+            hashlib.sha256(
+                self.mapping.to_csv(index=False, lineterminator="\n").encode()
+            ).hexdigest(),
+            final_counts["source_phase1_mapping_sha256"],
+        )
         self.assertEqual({"REC-1", "REC-2"}, set(repeat_sample["record_id"]))
         self.assertEqual(
             {"lowest stable hashes; ceil(20%)"},
             set(repeat_sample["selection_rule"]),
         )
+
+    def test_rejects_mapping_bytes_that_do_not_match_phase1_receipt(self) -> None:
+        screened = validate_decisions(self.mapping, self.decisions)
+        with TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            mapping_path, _, _ = self._write_frozen_phase1_inputs(output)
+            mapping_path.write_bytes(mapping_path.read_bytes() + b"\n")
+
+            with self.assertRaisesRegex(ValueError, "phase1_mapping.csv no longer"):
+                write_screening_outputs(screened, output, mapping_path=mapping_path)
 
 
 class ProjectFamilyTests(unittest.TestCase):
@@ -373,7 +439,8 @@ class ProjectFamilyTests(unittest.TestCase):
                     "title": "System foundation",
                     "final_level": "C",
                     "include_final": True,
-                    "project_family_id": "PF-SYSTEM",
+                    "project_family_id": "PF-EE98D34497449122",
+                    "project_family_key": "named-system:system",
                     "family_is_primary_work": True,
                     "family_grouping_basis": "named_system_extension",
                     "evidence_location": "phase1_mapping.csv#REC-1:title+abstract",
@@ -386,7 +453,8 @@ class ProjectFamilyTests(unittest.TestCase):
                     "title": "System extension",
                     "final_level": "A",
                     "include_final": True,
-                    "project_family_id": "PF-SYSTEM",
+                    "project_family_id": "PF-EE98D34497449122",
+                    "project_family_key": "named-system:system",
                     "family_is_primary_work": False,
                     "family_grouping_basis": "named_system_extension",
                     "evidence_location": "phase1_mapping.csv#REC-2:title+abstract",
@@ -411,6 +479,14 @@ class ProjectFamilyTests(unittest.TestCase):
         self.assertEqual(["WORK-1", "WORK-2"], families["work_id"].tolist())
         self.assertEqual(["WORK-1", "WORK-1"], families["primary_work_id"].tolist())
         self.assertEqual(
+            ["PF-EE98D34497449122", "PF-EE98D34497449122"],
+            families["project_family_id"].tolist(),
+        )
+        self.assertEqual(
+            ["named-system:system", "named-system:system"],
+            families["project_family_key"].tolist(),
+        )
+        self.assertEqual(
             [
                 '["phase1_mapping.csv#REC-1:title+abstract"]',
                 '["phase1_mapping.csv#REC-2:title+abstract"]',
@@ -422,7 +498,8 @@ class ProjectFamilyTests(unittest.TestCase):
         screened = self.family_rows()
         screened["work_id"] = "WORK-1"
         screened["preferred_record_id"] = "REC-1"
-        screened.loc[1, "project_family_id"] = "PF-OTHER"
+        screened.loc[1, "project_family_key"] = "named-system:other"
+        screened.loc[1, "project_family_id"] = "PF-28B67C9C652831BA"
         screened["family_is_primary_work"] = True
 
         with self.assertRaisesRegex(ValueError, "exactly one project family"):
@@ -433,6 +510,21 @@ class ProjectFamilyTests(unittest.TestCase):
         screened.loc[0, "record_id"] = "REC-1-OLD"
 
         with self.assertRaisesRegex(ValueError, "included preferred manifestation"):
+            make_project_families(screened)
+
+    def test_rejects_arbitrary_project_family_id_before_family_output(self) -> None:
+        screened = self.family_rows()
+        screened.loc[0, "project_family_id"] = "PF-ARBITRARY"
+
+        with self.assertRaisesRegex(ValueError, "derived from project_family_key"):
+            make_project_families(screened)
+
+    def test_rejects_named_system_key_for_a_single_work(self) -> None:
+        screened = self.family_rows().iloc[[0]].copy()
+
+        with self.assertRaisesRegex(
+            ValueError, "named-system project_family_key must link multiple works"
+        ):
             make_project_families(screened)
 
 
@@ -465,6 +557,17 @@ class FrozenScreeningArtifactTests(unittest.TestCase):
         self.assertTrue(
             set(families["project_family_id"]).isdisjoint(set(mapping["work_id"]))
         )
+        linked = screened.loc[screened["project_family_key"].ne("")]
+        self.assertTrue(
+            linked.apply(
+                lambda row: row["project_family_id"]
+                == "PF-"
+                + hashlib.sha256(
+                    f"project-family:{row['project_family_key']}".encode()
+                ).hexdigest()[:16].upper(),
+                axis=1,
+            ).all()
+        )
 
         nonpreferred = screened.loc[~screened["is_preferred_manifestation"]]
         self.assertEqual(5, len(nonpreferred))
@@ -475,7 +578,7 @@ class FrozenScreeningArtifactTests(unittest.TestCase):
             screened["review_basis"].eq("title_abstract+local_full_text"),
             "evidence_location",
         ]
-        self.assertEqual(50, len(full_text))
+        self.assertEqual(51, len(full_text))
         self.assertTrue(full_text.str.contains(";source_url=https://").all())
         self.assertTrue(full_text.str.contains(";cache_filename=").all())
         self.assertTrue(full_text.str.contains(";cache_sha256=").all())
@@ -500,11 +603,6 @@ class FrozenScreeningArtifactTests(unittest.TestCase):
                 "REC-22B8F133078A7448",
                 "REC-0E5CD4ABE22322D8",
                 "WORK-674CDDB57508D5CE",
-            ),
-            (
-                "REC-8079DF7689E5D2AD",
-                "REC-361ADBB8874502B6",
-                "WORK-9EB01DDF67D140A4",
             ),
             (
                 "REC-4C2E95DDB8B7F21F",
@@ -533,11 +631,20 @@ class FrozenScreeningArtifactTests(unittest.TestCase):
             self.assertEqual(2, len(relation))
             self.assertEqual({primary_work_id}, set(relation["primary_work_id"]))
 
+        self.assertEqual(230, len(families))
         self.assertEqual(226, families["project_family_id"].nunique())
+        self.assertEqual(
+            4,
+            sum(
+                len(group) > 1
+                for _, group in families.groupby("project_family_id", sort=True)
+            ),
+        )
 
         unrelated_pairs = [
             ("REC-1D91E09883329FFA", "REC-A53433EACA5A3E39"),
             ("REC-F95950AEA19221D0", "REC-6099EE66504F6EF2"),
+            ("REC-8079DF7689E5D2AD", "REC-361ADBB8874502B6"),
         ]
         for left_id, right_id in unrelated_pairs:
             unrelated = screened.loc[
@@ -548,33 +655,50 @@ class FrozenScreeningArtifactTests(unittest.TestCase):
         self.assertEqual(461, final_counts["input_records"])
         self.assertEqual(456, final_counts["candidate_unique_works"])
         self.assertEqual(
-            {"A": 30, "B": 57, "C": 75, "D": 69, "X": 230},
+            {"A": 30, "B": 57, "C": 75, "D": 68, "X": 231},
             final_counts["final_levels"],
         )
         self.assertEqual(226, final_counts["project_family_count"])
+        qat = screened.loc[
+            screened["record_id"].eq("REC-BCED24E48DF96CCD")
+        ].iloc[0]
+        self.assertEqual("X", qat["final_level"])
+        self.assertEqual("X_TRAINING_ONLY", qat["exclusion_code"])
+        self.assertEqual("title_abstract+local_full_text", qat["review_basis"])
+        self.assertIn("section=6.3.Extension_to_Mixed-precision_Quantisation", qat["evidence_location"])
         audit = (repository / "survey/build/screening_audit.md").read_text()
         for expected in (
             "| A | 30 | 30 |",
             "| B | 57 | 12 |",
             "| C | 75 | 75 |",
-            "| D | 69 | 14 |",
-            "| X | 230 | 46 |",
+            "| D | 68 | 14 |",
+            "| X | 231 | 47 |",
             "## Explicit conservative non-merges",
             "REC-1D91E09883329FFA; REC-A53433EACA5A3E39",
             "the cited conference predecessor is a different 2021 work",
             "REC-F95950AEA19221D0; REC-6099EE66504F6EF2",
             "shared use of hls4ml is insufficient without an explicit cross-citation",
+            "REC-8079DF7689E5D2AD; REC-361ADBB8874502B6",
+            "no direct release, version, or extension evidence",
         ):
             self.assertIn(expected, audit)
 
         with TemporaryDirectory() as temporary:
             regenerated = Path(temporary)
-            for source_name in ("flow_counts.json", "phase1_run.json"):
+            for source_name in (
+                "flow_counts.json",
+                "phase1_run.json",
+                "phase1_mapping.csv",
+            ):
                 shutil.copyfile(
                     repository / "survey/build" / source_name,
                     regenerated / source_name,
                 )
-            write_screening_outputs(screened, regenerated)
+            write_screening_outputs(
+                screened,
+                regenerated,
+                mapping_path=regenerated / "phase1_mapping.csv",
+            )
             for artifact_name in (
                 "phase1_exclusions.csv",
                 "project_families.csv",
