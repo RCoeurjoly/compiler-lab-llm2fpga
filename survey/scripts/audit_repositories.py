@@ -436,13 +436,24 @@ def _tree_observations(tree_items: list[object], readme: str) -> dict[str, objec
             r"(^|/)[^/]*(test|tb)\.(v|sv|vhd|py|cpp)$",
         ),
     )
-    encrypted_ip = _paths_matching(paths, (r"(^|/)(encrypted|encryption)(/|$)",))
+    vendor_headers = _paths_matching(
+        paths,
+        (
+            r"(^|/)(vendor|third_party|external|deps|ip|ipcore|encrypted|encryption)/.*\.(h|hh|hpp|hxx|vh|svh|vhi)$",
+        ),
+    )
+    vendor_header_set = set(vendor_headers)
+    encrypted_ip = [
+        path
+        for path in _paths_matching(paths, (r"(^|/)(encrypted|encryption)(/|$)",))
+        if path not in vendor_header_set
+    ]
     vendor_paths = _paths_matching(
         paths,
         (r"\.(xci|dcp|edf|edn|ngc|qip)$", r"(^|/)(ip|ipcore)(/|$)"),
     )
     vendor_ip_evidence = []
-    for path in sorted(set(vendor_paths + encrypted_ip)):
+    for path in sorted(set(vendor_paths + encrypted_ip) - vendor_header_set):
         codes = []
         if re.search(r"\.(xci|dcp|edf|edn|ngc|qip)$", path, re.I):
             codes.append("VENDOR_IP_FILE_EXTENSION")
@@ -451,12 +462,7 @@ def _tree_observations(tree_items: list[object], readme: str) -> dict[str, objec
         if re.search(r"(^|/)(encrypted|encryption)(/|$)", path, re.I):
             codes.append("ENCRYPTED_PATH_MARKER")
         vendor_ip_evidence.append({"evidence_codes": codes, "path": path})
-    vendor_headers = _paths_matching(
-        paths,
-        (
-            r"(^|/)(vendor|third_party|external|deps|ip|ipcore)/.*\.(h|hh|hpp|hxx|vh|svh|vhi)$",
-        ),
-    )
+    vendor_paths = [path for path in vendor_paths if path not in vendor_header_set]
     binaries = _paths_matching(
         paths, (r"\.(bin|bit|sof|a|so|dll|exe|jar|pt|pth|onnx|npz|npy)$",)
     )
@@ -947,6 +953,31 @@ def audit_repository(
     ):
         licence_payload = None
         licence_failure = "MALFORMED_RESPONSE_LICENCE"
+    if not licence_failure and isinstance(licence_payload, dict):
+        licence_object = licence_payload["license"]
+        metadata_values = {
+            "spdx_id": licence_object.get("spdx_id"),
+            "name": licence_object.get("name"),
+        }
+        malformed_metadata = any(
+            value is not None
+            and (
+                not isinstance(value, str)
+                or not value
+                or value != value.strip()
+                or any(ord(character) < 32 or ord(character) == 127 for character in value)
+            )
+            for value in metadata_values.values()
+        )
+        spdx_value = metadata_values["spdx_id"]
+        if (
+            isinstance(spdx_value, str)
+            and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+-]*", spdx_value)
+        ):
+            malformed_metadata = True
+        if malformed_metadata:
+            licence_payload = None
+            licence_failure = "MALFORMED_RESPONSE_LICENCE"
     if licence_failure and entries["licence"].http_status != 404:
         failures.append(licence_failure)
     licence_object = (

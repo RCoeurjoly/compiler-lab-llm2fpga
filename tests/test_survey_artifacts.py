@@ -82,21 +82,47 @@ def _write_cache_entry(
     return entry
 
 
-def _audit_with_tree_body(body: bytes) -> dict[str, object]:
+def _audit_with_endpoint_body(endpoint_name: str, body: bytes) -> dict[str, object]:
     slug = "owner/repo"
     api = "https://api.github.com/repos/Owner/Repo"
     commit = "1" * 40
-    fixtures = (
-        (f"{slug}:repository", api, b'{"default_branch":"main","archived":false}'),
-        (f"{slug}:commit:main", f"{api}/commits/main", json.dumps({"sha": commit}).encode()),
-        (f"{slug}:tree:{commit}", f"{api}/git/trees/{commit}?recursive=1", body),
-        (f"{slug}:releases", f"{api}/releases?per_page=100", b"[]"),
-        (f"{slug}:licence:{commit}", f"{api}/license?ref={commit}", b'{"license":{"spdx_id":"MIT"}}'),
-        (f"{slug}:readme:{commit}", f"{api}/readme?ref={commit}", b'{"encoding":"base64","content":""}'),
-    )
+    fixtures = {
+        "repository": (
+            f"{slug}:repository",
+            api,
+            b'{"default_branch":"main","archived":false}',
+        ),
+        "commit": (
+            f"{slug}:commit:main",
+            f"{api}/commits/main",
+            json.dumps({"sha": commit}).encode(),
+        ),
+        "tree": (
+            f"{slug}:tree:{commit}",
+            f"{api}/git/trees/{commit}?recursive=1",
+            b'{"tree":[],"truncated":false}',
+        ),
+        "releases": (
+            f"{slug}:releases",
+            f"{api}/releases?per_page=100",
+            b"[]",
+        ),
+        "licence": (
+            f"{slug}:licence:{commit}",
+            f"{api}/license?ref={commit}",
+            b'{"license":{"spdx_id":"MIT"}}',
+        ),
+        "readme": (
+            f"{slug}:readme:{commit}",
+            f"{api}/readme?ref={commit}",
+            b'{"encoding":"base64","content":""}',
+        ),
+    }
+    identifier, url, _ = fixtures[endpoint_name]
+    fixtures[endpoint_name] = (identifier, url, body)
     with TemporaryDirectory() as temporary:
         root = Path(temporary)
-        for identifier, url, response_body in fixtures:
+        for identifier, url, response_body in fixtures.values():
             _write_cache_entry(
                 root,
                 service="github",
@@ -106,6 +132,10 @@ def _audit_with_tree_body(body: bytes) -> dict[str, object]:
             )
         with patch.dict(os.environ, {"SURVEY_API_CACHE_ROOT": str(root)}):
             return audit_repository("https://github.com/Owner/Repo", None)
+
+
+def _audit_with_tree_body(body: bytes) -> dict[str, object]:
+    return _audit_with_endpoint_body("tree", body)
 
 
 class CacheAndNormalizationTests(unittest.TestCase):
@@ -281,19 +311,33 @@ class CacheAndNormalizationTests(unittest.TestCase):
 
 class ArtifactInventoryTests(unittest.TestCase):
     def test_tree_evidence_keeps_manifests_gitlinks_vendor_headers_and_encryption_separate(self) -> None:
+        header_paths = [
+            "vendor/core.hpp",
+            "third_party/core.hh",
+            "external/core.hxx",
+            "deps/core.h",
+            "ip/core.svh",
+            "ipcore/core.vhi",
+            "encrypted/core.vh",
+            "encryption/core.hpp",
+        ]
         observations = _tree_observations(
             [
                 {"path": "deps/requirements.txt", "mode": "100644", "type": "blob", "sha": "1" * 40},
                 {"path": "flake.nix", "mode": "100644", "type": "blob", "sha": "2" * 40},
-                {"path": "vendor/core.hpp", "mode": "100644", "type": "blob", "sha": "3" * 40},
-                {"path": "encrypted/core.dcp", "mode": "100644", "type": "blob", "sha": "4" * 40},
+                *[
+                    {"path": path, "mode": "100644", "type": "blob", "sha": f"{index:x}" * 40}
+                    for index, path in enumerate(header_paths, start=3)
+                ],
+                {"path": "encrypted/core.dcp", "mode": "100644", "type": "blob", "sha": "d" * 40},
+                {"path": "ip/register-map.txt", "mode": "100644", "type": "blob", "sha": "e" * 40},
                 {"path": "upstream", "mode": "160000", "type": "commit", "sha": "5" * 40},
             ],
             "",
         )
         self.assertEqual(observations["dependency_manifests"], ["deps/requirements.txt"])
         self.assertEqual(observations["tool_manifests"], ["flake.nix"])
-        self.assertEqual(observations["vendor_headers"], ["vendor/core.hpp"])
+        self.assertEqual(observations["vendor_headers"], sorted(header_paths))
         self.assertEqual(observations["encrypted_ip"], ["encrypted/core.dcp"])
         self.assertEqual(
             observations["submodule_gitlinks"],
@@ -309,9 +353,44 @@ class ArtifactInventoryTests(unittest.TestCase):
                     ],
                     "path": "encrypted/core.dcp",
                 },
+                {
+                    "evidence_codes": ["VENDOR_IP_PATH_MARKER"],
+                    "path": "ip/register-map.txt",
+                },
             ],
         )
-        self.assertNotIn("vendor/core.hpp", observations["vendor_ip"])
+        for path in header_paths:
+            with self.subTest(path=path):
+                self.assertNotIn(path, observations["vendor_ip"])
+                self.assertNotIn(path, observations["encrypted_ip"])
+                self.assertNotIn(
+                    path,
+                    [item["path"] for item in observations["vendor_ip_evidence"]],
+                )
+
+    def test_licence_metadata_rejects_non_strings_and_invalid_strings(self) -> None:
+        malformed_licences = (
+            {"spdx_id": 7, "name": "MIT License"},
+            {"spdx_id": [], "name": "MIT License"},
+            {"spdx_id": {}, "name": "MIT License"},
+            {"spdx_id": " MIT ", "name": "MIT License"},
+            {"spdx_id": "MIT\nInjected", "name": "MIT License"},
+            {"spdx_id": "MIT", "name": 7},
+            {"spdx_id": "MIT", "name": []},
+            {"spdx_id": "MIT", "name": {}},
+            {"spdx_id": "MIT", "name": "  "},
+            {"spdx_id": "MIT", "name": "MIT\u0000License"},
+        )
+        for licence in malformed_licences:
+            with self.subTest(licence=licence):
+                row = _audit_with_endpoint_body(
+                    "licence", json.dumps({"license": licence}).encode()
+                )
+                self.assertEqual(row["licence_state"], "unavailable")
+                self.assertEqual(row["licence_spdx_id"], "")
+                self.assertIn("MALFORMED_RESPONSE_LICENCE", row["failure_code"])
+                receipt = json.loads(row["endpoint_evidence_json"])["licence"]
+                self.assertEqual(receipt["failure_code"], "MALFORMED_RESPONSE_LICENCE")
 
     def test_malformed_gitlink_is_a_tree_failure_not_observed_closure(self) -> None:
         tree = json.dumps(
@@ -689,6 +768,43 @@ class ArtifactInventoryTests(unittest.TestCase):
                 {filename: (out / filename).read_bytes() for filename in original},
                 original,
             )
+
+    def test_existing_csv_bundle_removes_new_files_during_publish_rollback(self) -> None:
+        with TemporaryDirectory() as temporary:
+            out = Path(temporary) / "partially-populated-output"
+            out.mkdir()
+            original = {
+                "one.csv": b"old-one\n",
+                "three.csv": b"old-three\n",
+            }
+            for filename, body in original.items():
+                (out / filename).write_bytes(body)
+
+            real_replace = Path.replace
+            publish_count = 0
+
+            def fail_third_publish(source: Path, target: Path) -> Path:
+                nonlocal publish_count
+                if target.parent == out:
+                    publish_count += 1
+                    if publish_count == 3:
+                        raise OSError("simulated third publish failure")
+                return real_replace(source, target)
+
+            with patch.object(Path, "replace", autospec=True, side_effect=fail_third_publish):
+                with self.assertRaisesRegex(OSError, "simulated"):
+                    _write_csv_bundle_atomic(
+                        out,
+                        (
+                            ("one.csv", ["value"], [{"value": "new-one"}]),
+                            ("two.csv", ["value"], [{"value": "new-two"}]),
+                            ("three.csv", ["value"], [{"value": "new-three"}]),
+                        ),
+                    )
+
+            self.assertEqual((out / "one.csv").read_bytes(), original["one.csv"])
+            self.assertFalse((out / "two.csv").exists())
+            self.assertEqual((out / "three.csv").read_bytes(), original["three.csv"])
 
 
 class CommittedArtifactEvidenceTests(unittest.TestCase):
