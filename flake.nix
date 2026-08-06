@@ -129,6 +129,10 @@
             tabulate
           ];
         surveyPython = python.withPackages surveyPythonPackages;
+        # D16 renders a portable PDF from the survey evidence package. Keep
+        # pdflatex in the pinned Nix development environment rather than
+        # accepting a host-profile TeX installation.
+        surveyTex = pkgs.texlive.combined.scheme-small;
         surveyPhase1 = pkgs.writeShellApplication {
           name = "survey-phase1";
           runtimeInputs = [ surveyPython ];
@@ -2589,12 +2593,13 @@ PY
             yosysSlang
             pythonWithTinyStories
             surveyPhase1
+            surveyTex
             pkgs.verilator
           ];
         };
 
         devShells.survey = pkgs.mkShell {
-          packages = [ surveyPython surveyPhase1 pkgs.git pkgs.nix ];
+          packages = [ surveyPython surveyPhase1 surveyTex pkgs.git pkgs.nix ];
         };
 
         formatter = pkgs.nixfmt-classic;
