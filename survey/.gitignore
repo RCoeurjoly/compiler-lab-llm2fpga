@@ -1,1 +1,2 @@
-/build/api-cache/
+/build/api-cache/*
+!/build/api-cache/index.json
