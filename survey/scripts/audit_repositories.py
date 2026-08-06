@@ -960,10 +960,9 @@ def audit_repository(
             "name": licence_object.get("name"),
         }
         malformed_metadata = any(
-            value is not None
-            and (
-                not isinstance(value, str)
-                or not value
+            not isinstance(value, str)
+            or (
+                not value
                 or value != value.strip()
                 or any(ord(character) < 32 or ord(character) == 127 for character in value)
             )

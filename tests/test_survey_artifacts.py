@@ -110,7 +110,7 @@ def _audit_with_endpoint_body(endpoint_name: str, body: bytes) -> dict[str, obje
         "licence": (
             f"{slug}:licence:{commit}",
             f"{api}/license?ref={commit}",
-            b'{"license":{"spdx_id":"MIT"}}',
+            b'{"license":{"name":"MIT License","spdx_id":"MIT"}}',
         ),
         "readme": (
             f"{slug}:readme:{commit}",
@@ -370,6 +370,14 @@ class ArtifactInventoryTests(unittest.TestCase):
 
     def test_licence_metadata_rejects_non_strings_and_invalid_strings(self) -> None:
         malformed_licences = (
+            {},
+            {"spdx_id": "MIT"},
+            {"name": "MIT License"},
+            {"spdx_id": None, "name": "MIT License"},
+            {"spdx_id": "MIT", "name": None},
+            {"spdx_id": None, "name": None},
+            {"spdx_id": "", "name": "MIT License"},
+            {"spdx_id": "MIT", "name": ""},
             {"spdx_id": 7, "name": "MIT License"},
             {"spdx_id": [], "name": "MIT License"},
             {"spdx_id": {}, "name": "MIT License"},
@@ -573,7 +581,7 @@ class ArtifactInventoryTests(unittest.TestCase):
             "licence": (
                 f"{slug}:licence:{commit}",
                 f"{api}/license?ref={commit}",
-                b'{"license":{"spdx_id":"MIT"}}',
+                b'{"license":{"name":"MIT License","spdx_id":"MIT"}}',
             ),
             "readme": (
                 f"{slug}:readme:{commit}",
@@ -632,7 +640,7 @@ class ArtifactInventoryTests(unittest.TestCase):
             "commit": json.dumps({"sha": commit}).encode(),
             "tree": b'{"tree":[],"truncated":false}',
             "releases": b"[]",
-            "licence": b'{"license":{"spdx_id":"MIT"}}',
+            "licence": b'{"license":{"name":"MIT License","spdx_id":"MIT"}}',
             "readme": b'{"encoding":"base64","content":""}',
         }
         invalid = {
