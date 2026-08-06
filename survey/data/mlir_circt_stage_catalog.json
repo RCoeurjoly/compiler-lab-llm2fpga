@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "source_provenance": {
+    "source_kind": "user_supplied_protocol",
+    "source_filename": "survey_protocol_llm2fpga.md",
+    "source_sha256": "5112ba94144043a5d3cefa01b29d89dd3eb8643633a9a6fb26c9e20ca372fb2e",
+    "source_line_range": "1170-1203",
+    "source_path_provenance": "The source was supplied outside this repository; its original absolute workstation path is intentionally omitted so this catalog remains portable."
+  },
+  "correction": {
+    "frozen_protocol_path": "survey/protocol.md",
+    "frozen_protocol_modified": false,
+    "omitted_stage": "Weight-loading interface",
+    "reason": "The frozen protocol prose omits this canonical stage; this tracked catalog transcribes the supplied source table without modifying the frozen file."
+  },
+  "stages": [
+    {"ordinal": 1, "name": "PyTorch model capture"},
+    {"ordinal": 2, "name": "Dynamic-to-static shape specialization"},
+    {"ordinal": 3, "name": "Tensor-to-buffer conversion"},
+    {"ordinal": 4, "name": "Quantized/fixed-point type legalization"},
+    {"ordinal": 5, "name": "MatMul tiling and data reuse"},
+    {"ordinal": 6, "name": "Attention/QKV fusion"},
+    {"ordinal": 7, "name": "Causal masking"},
+    {"ordinal": 8, "name": "Softmax approximation"},
+    {"ordinal": 9, "name": "LayerNorm/RMSNorm lowering"},
+    {"ordinal": 10, "name": "GELU/SiLU approximation"},
+    {"ordinal": 11, "name": "RoPE lowering"},
+    {"ordinal": 12, "name": "KV-cache state and addressing"},
+    {"ordinal": 13, "name": "Buffer banking and memory-port assignment"},
+    {"ordinal": 14, "name": "Resource sharing and scheduling"},
+    {"ordinal": 15, "name": "Backpressure and deadlock handling"},
+    {"ordinal": 16, "name": "Weight-loading interface"},
+    {"ordinal": 17, "name": "AXI/stream/memory interface generation"},
+    {"ordinal": 18, "name": "Synthesizable memory inference"},
+    {"ordinal": 19, "name": "Clock/reset generation"},
+    {"ordinal": 20, "name": "FPGA-family technology mapping"}
+  ]
+}
