@@ -2596,10 +2596,16 @@ PY
             surveyTex
             pkgs.verilator
           ];
+          shellHook = ''
+            export SURVEY_DECLARED_TEXLIVE="${surveyTex}"
+          '';
         };
 
         devShells.survey = pkgs.mkShell {
           packages = [ surveyPython surveyPhase1 surveyTex pkgs.git pkgs.nix ];
+          shellHook = ''
+            export SURVEY_DECLARED_TEXLIVE="${surveyTex}"
+          '';
         };
 
         formatter = pkgs.nixfmt-classic;
