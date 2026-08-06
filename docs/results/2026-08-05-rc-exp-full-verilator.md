@@ -27,3 +27,16 @@ executable. The strict simulation emitted the ABI receipt but produced neither
 124). Therefore functional equivalence is **not yet established**. The result
 is a reproducible simulation-performance blocker, not an equivalence claim.
 
+## Follow-up heartbeat run
+
+A rebuilt testbench with 1,000-cycle heartbeats completed the first context at
+cycle 514,871 and found a concrete mismatch:
+
+```text
+CASE_FAIL index=0 reason=RAW_CODE cycles=514871
+expected_codes=18,-93,-34,7,20,1 observed_codes=-70,26,22,-112,-39,10
+expected_token=4 observed_token=0 write_mask=111111
+```
+
+The process exited with status 134 after the testbench assertion. This is now a
+functional counterexample, not a simulation-timeout blocker.
