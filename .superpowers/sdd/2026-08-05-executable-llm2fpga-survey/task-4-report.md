@@ -156,6 +156,15 @@ GFLOPS values; MEADOW does not turn a prior quantization method into a claimed
 MEADOW contribution and records the reported TTFT/TBT improvements and
 less-than-10-W platform claim.
 
+FastMamba has one frozen-source provenance conflict. The frozen catalogue
+abstract for `2505.18975v4` says 6× decode energy efficiency, while the
+cache-verified PDF with SHA-256
+`28c2fd79f07e99d0b283b22ba825fc73ec1f1d47215f236c770cecc353cbc85a`
+says 1.65× in its page-1 abstract and Table III (0.61 versus 0.37
+token/(s·W)). RQ5 is a page-cited claim, so it uses the PDF-primary value:
+**1.65× higher decode energy efficiency than RTX 3090**. The row notes record
+this adjudication rather than silently choosing the catalogue value.
+
 ## TDD RED/green evidence
 
 The initial focused RED run occurred before production code existed:
@@ -196,11 +205,16 @@ DATAFLOW count 34 != 15
 188 PDF-locator/known-row assertion failures
 ```
 
+A later source-precedence regression first failed because FastMamba's row used
+an imprecise `1.65x` string and did not disclose the frozen-catalogue 6× versus
+cache-PDF 1.65× conflict. The regression requires the PDF-primary value, its
+page-1 `1.65` locator, and the row-level disclosure.
+
 Final focused result:
 
 ```text
 nix develop -c python -m unittest tests.test_survey_selection -v
-Ran 14 tests
+Ran 15 tests
 OK
 ```
 
@@ -208,7 +222,7 @@ The focused suite covers score bounds and summation, mandatory A/C/control
 inclusion, exact controlled composition, stable lexical ties, the 25–40 range,
 the 30% cap and forced-only Level A exception, the all-mandatory target edge
 case, zero-score evidence, unconditional control inclusion, PDF page locators,
-known-row semantic corrections, exact schema validation, and byte-identical
+known-row semantic corrections (including FastMamba source precedence), exact schema validation, and byte-identical
 regeneration.
 
 Fresh combined survey verification before the implementation commit:
@@ -217,7 +231,7 @@ Fresh combined survey verification before the implementation commit:
 nix develop -c python -m unittest \
   tests.test_survey_selection tests.test_survey_screening \
   tests.test_survey_phase1 tests.test_survey_scope -v
-Ran 88 tests in 18.111s
+Ran 89 tests in 18.226s
 OK
 ```
 

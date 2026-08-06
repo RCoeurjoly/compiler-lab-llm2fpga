@@ -493,6 +493,26 @@ class DeepReviewSelectionTests(unittest.TestCase):
         self.assertTrue(meadow["rq5_latency"])
         self.assertTrue(meadow["rq5_power"])
 
+    def test_fastmamba_pdf_primary_energy_evidence_discloses_catalog_conflict(self) -> None:
+        reviews = pd.read_csv(
+            ROOT / "survey/data/deep_review_manual.csv",
+            dtype=str,
+            keep_default_na=False,
+        ).set_index("project_family_id")
+        fastmamba = reviews.loc["PF-5345A35EEB976D35"]
+        evidence = json.loads(fastmamba["evidence_locations"])
+
+        self.assertEqual(
+            fastmamba["rq5_power"],
+            "1.65× higher decode energy efficiency than RTX 3090",
+        )
+        self.assertIn(
+            "locator=page-1_section-Abstract_phrase-1.65",
+            evidence["rq5_power"],
+        )
+        self.assertIn("catalog abstract says 6×", fastmamba["notes"])
+        self.assertIn("PDF-primary", fastmamba["notes"])
+
     def test_committed_extraction_regenerates_byte_identically(self) -> None:
         with TemporaryDirectory() as temporary_directory:
             out = Path(temporary_directory)
