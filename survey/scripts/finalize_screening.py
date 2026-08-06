@@ -965,13 +965,11 @@ def _make_screening_audit(
     return "\n".join(lines) + "\n"
 
 
-def _write_final_flow_counts(
-    screened: pd.DataFrame,
-    families: pd.DataFrame,
-    out_dir: Path,
-    *,
-    mapping_path: Path,
-) -> None:
+def _load_verified_phase1_receipt(
+    out_dir: Path, mapping_path: Path
+) -> tuple[dict[str, object], str, str, str]:
+    """Return immutable Phase-1 receipt data after checking supplied mapping bytes."""
+
     source_counts_path = out_dir / "flow_counts.json"
     source_run_path = out_dir / "phase1_run.json"
     if not source_counts_path.is_file() or not source_run_path.is_file():
@@ -1013,6 +1011,25 @@ def _write_final_flow_counts(
         raise ValueError(
             "phase1_mapping.csv no longer matches immutable phase1_run.json"
         )
+    return (
+        source_counts,
+        actual_flow_hash,
+        actual_mapping_hash,
+        hashlib.sha256(source_run_bytes).hexdigest(),
+    )
+
+
+def _write_final_flow_counts(
+    screened: pd.DataFrame,
+    families: pd.DataFrame,
+    out_dir: Path,
+    *,
+    source_counts: dict[str, object],
+    source_flow_counts_sha256: str,
+    source_mapping_sha256: str,
+    source_run_sha256: str,
+) -> None:
+    """Write final counts using receipt data already verified before output writes."""
 
     final_levels = screened["final_level"].value_counts()
     exclusions = screened.loc[
@@ -1042,10 +1059,10 @@ def _write_final_flow_counts(
                 level: int(repeat_counts.get(level, 0))
                 for level in ("A", "B", "C", "D", "X")
             },
-            "source_phase1_flow_counts_sha256": actual_flow_hash,
-            "source_phase1_mapping_sha256": actual_mapping_hash,
+            "source_phase1_flow_counts_sha256": source_flow_counts_sha256,
+            "source_phase1_mapping_sha256": source_mapping_sha256,
             "source_phase1_run": "survey/build/phase1_run.json",
-            "source_phase1_run_sha256": hashlib.sha256(source_run_bytes).hexdigest(),
+            "source_phase1_run_sha256": source_run_sha256,
         }
     )
     (out_dir / "final_flow_counts.json").write_text(
@@ -1059,6 +1076,12 @@ def write_screening_outputs(
 ) -> None:
     """Write deterministic products beside the immutable Phase-1 receipt."""
 
+    (
+        source_counts,
+        source_flow_counts_sha256,
+        source_mapping_sha256,
+        source_run_sha256,
+    ) = _load_verified_phase1_receipt(out_dir, mapping_path)
     out_dir.mkdir(parents=True, exist_ok=True)
     exclusion_columns = [
         "record_index",
@@ -1109,7 +1132,13 @@ def write_screening_outputs(
         out_dir / "repeat_review_sample.csv", index=False, lineterminator="\n"
     )
     _write_final_flow_counts(
-        screened, families, out_dir, mapping_path=mapping_path
+        screened,
+        families,
+        out_dir,
+        source_counts=source_counts,
+        source_flow_counts_sha256=source_flow_counts_sha256,
+        source_mapping_sha256=source_mapping_sha256,
+        source_run_sha256=source_run_sha256,
     )
     (out_dir / "screening_audit.md").write_text(
         _make_screening_audit(screened, families), encoding="utf-8"

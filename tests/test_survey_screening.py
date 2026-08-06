@@ -427,6 +427,34 @@ class ScreeningDecisionValidationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "phase1_mapping.csv no longer"):
                 write_screening_outputs(screened, output, mapping_path=mapping_path)
 
+    def test_mapping_receipt_mismatch_preserves_all_final_artifacts(self) -> None:
+        """Receipt validation must precede every final-artifact write."""
+
+        screened = validate_decisions(self.mapping, self.decisions)
+        final_artifacts = (
+            "phase1_exclusions.csv",
+            "project_families.csv",
+            "repeat_review_sample.csv",
+            "final_flow_counts.json",
+            "screening_audit.md",
+        )
+        with TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            mapping_path, _, _ = self._write_frozen_phase1_inputs(output)
+            sentinels = {
+                artifact: f"unchanged sentinel for {artifact}\n".encode()
+                for artifact in final_artifacts
+            }
+            for artifact, sentinel in sentinels.items():
+                (output / artifact).write_bytes(sentinel)
+            mapping_path.write_bytes(mapping_path.read_bytes() + b"\n")
+
+            with self.assertRaisesRegex(ValueError, "phase1_mapping.csv no longer"):
+                write_screening_outputs(screened, output, mapping_path=mapping_path)
+
+            for artifact, sentinel in sentinels.items():
+                self.assertEqual(sentinel, (output / artifact).read_bytes())
+
 
 class ProjectFamilyTests(unittest.TestCase):
     def family_rows(self) -> pd.DataFrame:
