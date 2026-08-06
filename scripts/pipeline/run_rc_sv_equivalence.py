@@ -1276,7 +1276,7 @@ def _strict_fixture(
         + "\n".join(declarations)
         + "\n"
     )
-    text += f"integer cycle_bound = {cycle_bound}; integer heartbeat_cycles = 0;\n"
+    text += f"integer cycle_bound = {cycle_bound}; integer heartbeat_cycles = 0; integer dump_scratch = 0;\n"
     text += (
         "logic clk=0, reset=0, go=0; wire done; integer request_count=0, completion_count=0; "
         f"wire any_mem_en = {memory_enable_terms}; always #5 clk=~clk;\n"
@@ -1290,6 +1290,12 @@ def _strict_fixture(
     )
     text += '    $write("OUTPUT_TENSOR context=%0d codes=", context_index);\n'
     text += '    for (lane = 0; lane < 48; lane = lane + 1) $write("%0d%s", $signed(mem26[lane]), lane == 47 ? "\\n" : ",");\n'
+    text += "    if (dump_scratch != 0) begin\n"
+    for number in sorted(SCRATCH_PORTS):
+        depth = ports[number][1]
+        text += f'      $write("SCRATCH port={number} values=");\n'
+        text += f'      for (lane = 0; lane < {depth}; lane = lane + 1) $write("%0h%s", mem{number}[lane], lane == {depth - 1} ? "\\n" : ",");\n'
+    text += "    end\n"
     text += '    $fatal(1, "observable shard case failed: %s", reason);\n'
     text += "  end\nendtask\n"
     text += "always_ff @(posedge clk) begin clock_cycle <= clock_cycle + 1; end\n"
@@ -1347,6 +1353,7 @@ def _strict_fixture(
     text += "  end\n"
     text += "  if (!$value$plusargs(\"cycle_bound=%d\", cycle_bound) || cycle_bound <= 0) begin context_index = shard_start; case_cycles = 0; case_fail(\"INVALID_CYCLE_BOUND\"); end\n"
     text += "  void'($value$plusargs(\"heartbeat_cycles=%d\", heartbeat_cycles));\n"
+    text += "  void'($value$plusargs(\"dump_scratch=%d\", dump_scratch));\n"
     text += '  oracle_fd = $fopen(oracle_path, "r");\n'
     text += "  if (oracle_fd == 0) begin context_index = shard_start; case_cycles = 0; case_fail(\"ORACLE_OPEN_FAILED\"); end\n"
     text += "  completed_cases = 0; min_cycles = 0; max_cycles = 0;\n"

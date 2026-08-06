@@ -372,6 +372,14 @@ class RcObservableDriverTest(unittest.TestCase):
         self.assertIn("OUTPUT_TENSOR context=%0d", tb)
         self.assertIn("for (lane = 0; lane < 48; lane = lane + 1)", tb)
 
+    def test_strict_failure_can_dump_all_scratch_boundaries(self):
+        """Catches losing the intermediate memories needed for first-divergence analysis."""
+
+        tb = self._strict_fixture_text()
+        self.assertIn('$value$plusargs("dump_scratch=%d", dump_scratch)', tb)
+        self.assertIn('SCRATCH port=46 values=', tb)
+        self.assertIn('SCRATCH port=145 values=', tb)
+
     def test_strict_fixture_lints_with_project_verilator_5022(self):
         """Catches malformed generated control flow before a real build."""
 
