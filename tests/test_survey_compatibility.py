@@ -343,6 +343,33 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertEqual(receipt.failure_code, "F_RTL")
         self.assertNotEqual(receipt.decision, "PRIMARY")
 
+    def test_run_route_returns_a_controlled_receipt_for_every_frozen_route(self) -> None:
+        observed_route_ids = {"R1", "R7", "R8"}
+        for route in ROUTES.values():
+            with self.subTest(route=route.route_id):
+                receipt = run_route(route, budget_hours=16)
+                self.assertIsInstance(receipt, RouteReceipt)
+                self.assertEqual(receipt.route_id, route.route_id)
+                self.assertEqual(receipt.status, "STOPPED")
+                self.assertEqual(receipt.decision, "INELIGIBLE")
+                self.assertIn(receipt.failure_code, ALLOWED_FAILURE_CODES)
+                if route.route_id in observed_route_ids:
+                    manifest = json.loads(
+                        (
+                            COMPATIBILITY / route.slug / "manifest.json"
+                        ).read_text()
+                    )
+                    self.assertEqual(receipt.actual_stage, manifest["actual_stage"])
+                    self.assertEqual(receipt.failure_code, manifest["failure_code"])
+                    self.assertEqual(
+                        receipt.executed_commands,
+                        tuple(manifest["executed_commands"]),
+                    )
+                    self.assertEqual(
+                        receipt.execution_provenance,
+                        manifest["execution_provenance"],
+                    )
+
     def test_record_route_executes_the_frozen_gate_checks_and_writes_receipt(self) -> None:
         with TemporaryDirectory() as temporary:
             route_dir = Path(temporary) / ROUTES["R3"].slug

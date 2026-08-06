@@ -21,6 +21,11 @@ The remediation changes three classifications from the previous report:
 R2–R6 retain their prior evidence-derived outcomes. The final summary is
 generated from the validated manifests.
 
+`run_route(route, budget_hours)` returns a controlled receipt for every frozen
+route. For R1, R7, and R8 it loads and validates the persisted observed receipt
+instead of re-executing the route commands; `record_route` remains the command
+execution entry point.
+
 ## Frozen fixture and pass contract
 
 M0 fixes batch size 1 and these exact dimensions:
@@ -78,7 +83,7 @@ The checkout printed the required commit. The source-closure check (command 3,
 exit 0) derives that `elastic-ai.creator` is pinned only to the mutable
 `add-linear-quantization` branch and that the checked-in VHDL templates remain
 unrendered. The remote branch lookup exited 0, Python syntax check exited 0,
-import exited 1 for missing `torch`, and the available-tool GHDL attempt exited
+import exited 1 for missing `sklearn`, and the available-tool GHDL attempt exited
 127. These are retained diagnostics; source closure is the first failed gate.
 
 ## R8: Cascade fallback control
@@ -101,8 +106,8 @@ as later diagnostics; causal-LM coverage is not reached.
 
 - `python3 survey/scripts/run_compatibility.py --route all --validate` — exit 0.
 - `nix develop -c python -m unittest tests.test_survey_compatibility -v` —
-  18 passed.
-- Combined Task 1–6 suite — 133 passed in 18.570 s.
+  19 passed.
+- Combined Task 1–6 suite — 134 passed in 18.511 s.
 - `python3 -m py_compile survey/scripts/run_compatibility.py tests/test_survey_compatibility.py` — exit 0.
 - `git diff --check` — exit 0.
 - The scoped secret-pattern scan returned no matches.

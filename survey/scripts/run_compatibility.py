@@ -544,13 +544,48 @@ class RouteReceipt:
         return value
 
 
+_OBSERVATION_DRIVEN_ROUTE_IDS = frozenset({"R1", "R7", "R8"})
+
+
+def _load_recorded_receipt(route: RouteSpec, budget_hours: int) -> RouteReceipt:
+    """Return validated persisted evidence for a route whose gate is observed."""
+
+    route_dir = ROOT / "survey/compatibility" / route.slug
+    manifest_path = route_dir / "manifest.json"
+    if not manifest_path.is_file():
+        raise ValueError(
+            f"{route.route_id} requires an observed receipt at {manifest_path}"
+        )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    validate_receipt(manifest, route_dir)
+    if (
+        manifest["route_id"] != route.route_id
+        or manifest["source_commit"] != route.source_commit
+    ):
+        raise ValueError(
+            f"{route.route_id} recorded receipt does not match the requested route"
+        )
+    receipt_data = dict(manifest)
+    for field_name in (
+        "executed_commands",
+        "generated_rtl_paths",
+        "lint_evidence",
+        "simulation_evidence",
+        "synthesis_evidence",
+        "evidence_files",
+        "command_results",
+    ):
+        receipt_data[field_name] = tuple(receipt_data[field_name])
+    receipt_data["stdout"] = (route_dir / "stdout.log").read_text(encoding="utf-8")
+    receipt_data["stderr"] = (route_dir / "stderr.log").read_text(encoding="utf-8")
+    return replace(RouteReceipt(**receipt_data), budget_hours=budget_hours)
+
+
 def run_route(route: RouteSpec, budget_hours: int) -> RouteReceipt:
     if budget_hours not in (16, 40):
         raise ValueError("budget_hours must be the frozen 16 or 40 hour cap")
-    if route.route_id in {"R1", "R7", "R8"}:
-        raise ValueError(
-            f"{route.route_id} must be classified from its executed command evidence"
-        )
+    if route.route_id in _OBSERVATION_DRIVEN_ROUTE_IDS:
+        return _load_recorded_receipt(route, budget_hours)
     if route.first_failure_code not in ALLOWED_FAILURE_CODES:
         raise ValueError(f"failure_code: {route.first_failure_code}")
     if (
