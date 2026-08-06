@@ -62,6 +62,39 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _build_tree_sha256(root: Path) -> dict[str, str]:
+    """Hash every file in a build tree by its relative portable path."""
+
+    return {
+        path.relative_to(root).as_posix(): _sha256(path)
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def _assert_exact_build_tree_identity(
+    testcase: unittest.TestCase,
+    expected: dict[str, str],
+    actual: dict[str, str],
+    *,
+    expected_label: str,
+    actual_label: str,
+) -> None:
+    """Require no missing/extra files and equal bytes for every build file."""
+
+    testcase.assertEqual(
+        set(expected),
+        set(actual),
+        f"{expected_label} and {actual_label} must have the same relative file paths",
+    )
+    for relative_path in sorted(expected):
+        testcase.assertEqual(
+            expected[relative_path],
+            actual[relative_path],
+            f"{expected_label} / {actual_label} byte SHA-256 differs: {relative_path}",
+        )
+
+
 def _refresh_report_metadata(out: Path, filenames: tuple[str, ...]) -> None:
     """Rehash deliberately modified temporary report evidence."""
 
@@ -257,10 +290,7 @@ class SurveyReportTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls._output_directory = TemporaryDirectory()
         cls.out = Path(cls._output_directory.name) / "report-output"
-        cls.primary_artifact_hashes = {
-            filename: _sha256(ROOT / "survey/build" / filename)
-            for filename in (*TEXTUAL_REPORT_ARTIFACTS, "final_report.pdf")
-        }
+        cls.canonical_build_tree_hashes = _build_tree_sha256(ROOT / "survey/build")
         cls.pdf = build_report(ROOT, cls.out)
 
     @classmethod
@@ -395,9 +425,45 @@ class SurveyReportTests(unittest.TestCase):
 
     def test_report_rendering_does_not_rewrite_tracked_build_artifacts(self) -> None:
         self.assertNotEqual(self.out, ROOT / "survey/build")
-        for filename, expected_hash in self.primary_artifact_hashes.items():
-            with self.subTest(filename=filename):
-                self.assertEqual(_sha256(ROOT / "survey/build" / filename), expected_hash)
+        _assert_exact_build_tree_identity(
+            self,
+            self.canonical_build_tree_hashes,
+            _build_tree_sha256(ROOT / "survey/build"),
+            expected_label="pre-render canonical build",
+            actual_label="post-render canonical build",
+        )
+
+    def test_full_build_tree_comparison_detects_non_report_build_drift(
+        self,
+    ) -> None:
+        """A full tree comparator must catch drift outside D13--D16 outputs."""
+
+        with TemporaryDirectory() as directory:
+            canonical = Path(directory) / "canonical-build"
+            replay = Path(directory) / "replay-build"
+            shutil.copytree(ROOT / "survey/build", canonical)
+            shutil.copytree(canonical, replay)
+            drifted = replay / "flow_counts.json"
+            drifted.write_bytes(drifted.read_bytes() + b"\n# temporary drift\n")
+
+            report_only_canonical = {
+                filename: _sha256(canonical / filename)
+                for filename in (*TEXTUAL_REPORT_ARTIFACTS, "final_report.pdf")
+            }
+            report_only_replay = {
+                filename: _sha256(replay / filename)
+                for filename in (*TEXTUAL_REPORT_ARTIFACTS, "final_report.pdf")
+            }
+            self.assertEqual(report_only_canonical, report_only_replay)
+
+            with self.assertRaisesRegex(AssertionError, r"flow_counts\.json"):
+                _assert_exact_build_tree_identity(
+                    self,
+                    _build_tree_sha256(canonical),
+                    _build_tree_sha256(replay),
+                    expected_label="temporary canonical build",
+                    actual_label="temporary drifted build",
+                )
 
     def test_report_rendering_is_byte_deterministic_across_isolated_outputs(self) -> None:
         replay_out = self.out.parent / "report-output-replay"
@@ -439,6 +505,8 @@ class SurveyReportTests(unittest.TestCase):
         if shutil.which("nix") is None:
             self.skipTest("nix is unavailable; the declared Nix shell exercises this replay")
         with TemporaryDirectory() as directory:
+            canonical_build = ROOT / "survey/build"
+            canonical_before = _build_tree_sha256(canonical_build)
             replay_root = Path(directory) / "replay"
             shutil.copytree(
                 ROOT,
@@ -468,15 +536,24 @@ class SurveyReportTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             replay_out = replay_root / "survey/build"
+            _assert_exact_build_tree_identity(
+                self,
+                canonical_before,
+                _build_tree_sha256(canonical_build),
+                expected_label="pre-replay canonical build",
+                actual_label="post-replay canonical build",
+            )
             self.assertEqual(
                 validate_deliverables(replay_root),
                 [f"D{number}" for number in range(1, 17)],
             )
-            for filename in (*TEXTUAL_REPORT_ARTIFACTS, "final_report.pdf"):
-                with self.subTest(filename=filename):
-                    self.assertEqual(
-                        _sha256(self.out / filename), _sha256(replay_out / filename)
-                    )
+            _assert_exact_build_tree_identity(
+                self,
+                canonical_before,
+                _build_tree_sha256(replay_out),
+                expected_label="canonical build",
+                actual_label="clean Git-free replay build",
+            )
             transcript = (replay_out / "final_report_pdflatex.txt").read_text(
                 encoding="utf-8"
             )
