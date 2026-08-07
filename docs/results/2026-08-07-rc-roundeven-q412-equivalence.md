@@ -90,3 +90,9 @@ maps the proven `INT32_MIN + (-1)` exceptional case back to `INT32_MIN` (and
 the commuted form). The RC Calyx-to-SV target enables this transform, while
 the MLIR guard remains the default semantic legalization for other targets.
 The diagnostic strict pass above was produced by this exact transform.
+
+The RC target also sets `LLM2FPGA_DISABLE_Q412_ROUNDEVEN_GUARD=1` while
+building its Calyx handoff. This avoids materializing one floating compare and
+select tree per Q4.12 lane; the post-SV transform supplies the same proven
+exceptional-value behavior at the shared RTL primitive. The opt-out is
+target-scoped, and the semantic MLIR guard remains enabled by default.
