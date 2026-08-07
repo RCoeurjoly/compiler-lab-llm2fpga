@@ -152,3 +152,17 @@ this wrapper form rather than a numerical mismatch.
 Bounded nested-emission experiments with `inline`, `cell-share`, and
 `infer-data-path` disabled did not produce SV within five minutes. They were
 stopped before memory exhaustion; none is accepted as a semantic workaround.
+
+A focused flat-wrapper probe at the first diagnostic timeout recorded:
+
+```text
+HEARTBEAT ascending cycles=100000 state=1828 inner_state=1
+  go_int=1 signal_reg=0 awaited_done=0 mem_en=0 done=0
+  requests=7065 mem_completions=7065 output_writes=0 last_port=94
+WRAP_DEBUG cycle=0 invoke_go=1 invoke_done=0 out_en=0 out_we=0
+```
+
+The wrapper's invoke signal remains asserted, so the failure is not caused by
+the wrapper dropping `go`; the inner invocation never returns `done` after
+the memory traffic completes. This narrows the repair target to the flat
+invocation/static-control lowering rather than output-memory wiring.
