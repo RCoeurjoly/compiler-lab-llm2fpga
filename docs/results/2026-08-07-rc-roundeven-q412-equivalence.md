@@ -140,3 +140,15 @@ liveness/handshake or scheduling incompatibility with the strict testbench;
 it is not an equivalence pass and increasing the timeout alone is not a
 justified fix. The next debug step is a flat-versus-nested signal comparison
 at the first state where output production diverges.
+
+The generated flat RTL explains the structural difference: it contains an
+integrated `main` component plus an external-memory `main_1` invocation
+wrapper. The wrapper gates its memory request/read-data/done connections on
+`invoke0_go_out`; the nested emitter instead emits one integrated `main`.
+The flat run's `main_1` FSM advances and completes memory transactions, but
+never asserts the output memory write, consistent with a liveness failure in
+this wrapper form rather than a numerical mismatch.
+
+Bounded nested-emission experiments with `inline`, `cell-share`, and
+`infer-data-path` disabled did not produce SV within five minutes. They were
+stopped before memory exhaustion; none is accepted as a semantic workaround.
