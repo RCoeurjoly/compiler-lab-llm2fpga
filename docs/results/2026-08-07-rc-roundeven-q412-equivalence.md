@@ -188,3 +188,22 @@ liveness defect is intrinsic to the flat lowering/control schedule (or to a
 shared generated primitive), not merely to top-level invocation wiring. The
 promotion pass is not part of the active pipeline and must not be treated as
 a fix.
+
+The first direct control divergence is visible at FSM state 1828. In the
+retained nested closure, the transition guard is:
+
+```text
+fsm0 == 1828 && invoke907_done_out && tdcc_go_out
+```
+
+and `invoke907_done_in` is driven by `mulf_87_reg_done`. In the fresh flat
+closure, the corresponding guard is:
+
+```text
+fsm0 == 1828 && wrapper_early_reset_static_seq136_done_out && tdcc_go_out
+```
+
+but `wrapper_early_reset_static_seq136_done_in` is driven by `signal_reg_out`.
+The heartbeat shows `signal_reg_out=0` indefinitely. This is the concrete
+flat-lowering liveness defect to repair; it is not an oracle mismatch or a
+timeout-selection problem.
