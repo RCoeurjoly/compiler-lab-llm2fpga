@@ -290,3 +290,17 @@ at TDCC because static control must already be compiled away; disabling
 `static-inline` or `static-promotion` is not a valid workaround (panic or stack
 overflow). The next fix must preserve the normal static-inline/compile-static/
 TDCC pipeline and address the repeated wrapper/inner-FSM protocol itself.
+
+## Fresh-artifact check
+
+The previously simulated `/tmp/rc-flat-vlt/main.sv` was timestamped before the
+current `/tmp/rc-current-futil/fixed.futil` artifact and therefore was not a
+fresh closure for the current Futil. A fresh native Calyx-to-Verilog attempt
+with the current Futil, using an unlimited stack, did not emit `main.sv` before
+the host terminated the process after the data-path-inference warnings. This
+means the state-1828 runtime result is valid for the retained closure, but a
+new strict equivalence result cannot be claimed until the current Futil has
+been emitted and compiled. The next implementation step is consequently to
+make the fresh closure reproducible within the host resource envelope (or
+reduce the graph before emission), then rerun the state probe on that exact
+artifact.
