@@ -249,3 +249,7 @@ current RC Calyx artifact. Its preflight rejects the graph before lowering:
 structuralized. It therefore cannot currently serve as a drop-in alternative
 for this closure; using it would require a separate memory/invocation lowering
 design rather than a local liveness repair.
+
+A controlled `tdcc.one-hot-cutoff=32` flat-emission run also produced the same
+state-1828 guard and wrapper completion wiring. The deadlock is therefore not
+caused by binary-versus-one-hot FSM encoding.
