@@ -155,19 +155,19 @@ if [[ "$rc" -ne 0 || ! -s "$output_dir/sv/main.sv" ]]; then
   exit 1
 fi
 
+if [[ -n "$fix_sv_roundeven_overflow" ]]; then
+  python3 "$fix_sv_roundeven_overflow" \
+    "$output_dir/sv/main.sv" "$output_dir/sv/main.roundeven.sv" \
+    "$output_dir/roundeven-overflow-receipt.json"
+  mv "$output_dir/sv/main.roundeven.sv" "$output_dir/sv/main.sv"
+fi
+
 if [[ "${CALYX_SKIP_RESOURCE_REPORT:-0}" == "1" ]]; then
   printf '%s\n' "$output_dir/sv/main.sv" >"$output_dir/sources.f"
   cat >"$output_dir/manifest.json" <<'JSON'
 {"backend":"native-calyx","stage":"calyx-sv","status":"ok","sources":"sources.f"}
 JSON
   exit 0
-fi
-
-if [[ -n "$fix_sv_roundeven_overflow" ]]; then
-  python3 "$fix_sv_roundeven_overflow" \
-    "$output_dir/sv/main.sv" "$output_dir/sv/main.roundeven.sv" \
-    "$output_dir/roundeven-overflow-receipt.json"
-  mv "$output_dir/sv/main.roundeven.sv" "$output_dir/sv/main.sv"
 fi
 
 set +e

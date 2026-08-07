@@ -207,3 +207,23 @@ but `wrapper_early_reset_static_seq136_done_in` is driven by `signal_reg_out`.
 The heartbeat shows `signal_reg_out=0` indefinitely. This is the concrete
 flat-lowering liveness defect to repair; it is not an oracle mismatch or a
 timeout-selection problem.
+
+### Single-wire repair rejected
+
+As a falsification test, a temporary closure transform rewired the flat
+state-1828 guard from `signal_reg_out` to `mulf_87_reg_done`, matching the
+nested `invoke907_done_in` source. The repaired RTL compiled successfully, but
+a fresh 100,000-cycle strict run still reported:
+
+```text
+HEARTBEAT ascending cycles=100000 state=1828 inner_state=1
+  go_int=1 signal_reg=0 awaited_done=0 mem_en=0 done=0
+  requests=7041 mem_completions=7041 output_writes=0
+TIMEOUT ascending 100000
+```
+
+The one-wire substitution is therefore not a fix and has been removed from
+the active pipeline. The evidence still identifies state 1828 as the first
+observable divergence, but the correct repair must address the flat control
+schedule or its generated static-control component rather than substituting
+one completion signal.
