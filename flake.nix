@@ -808,6 +808,7 @@
             nativeBuildInputs = [ mlir circt python pkgs.bash ];
           } ''
             set -euo pipefail
+            export LLM2FPGA_DISABLE_Q412_ROUNDEVEN_GUARD=1
             mkdir -p "$out"
             input=${pipelineStagePackagesNoHandshake."tinystories-w8a8-rc-study-mask9-vocab6-width2-flat-scf"}/flat.scf.mlir
             pre="$out/pre-calyx.mlir"

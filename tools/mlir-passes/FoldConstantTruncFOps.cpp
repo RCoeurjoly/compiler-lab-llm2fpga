@@ -15,6 +15,8 @@
 #include "llvm/ADT/APFloat.h"
 
 #include <optional>
+#include <cstdlib>
+#include <cstring>
 
 using namespace mlir;
 
@@ -552,7 +554,12 @@ private:
                        : arith::ConstantOp();
     auto divisorAttr = divisor ? dyn_cast<FloatAttr>(divisor.getValue())
                                : FloatAttr();
-    if (divisorAttr && divisorAttr.getValueAsDouble() == 0.000244140625) {
+    const char *disableQ412Guard =
+        std::getenv("LLM2FPGA_DISABLE_Q412_ROUNDEVEN_GUARD");
+    const bool q412GuardDisabled =
+        disableQ412Guard && std::strcmp(disableQ412Guard, "1") == 0;
+    if (!q412GuardDisabled && divisorAttr &&
+        divisorAttr.getValueAsDouble() == 0.000244140625) {
       // The RC softmax path requantizes a finite negative mask through an
       // exact Q4.12 scale (2^-12). The division can overflow to -inf before
       // roundeven. Values with |x| >= 2^31 have no fractional f32 bits; this
