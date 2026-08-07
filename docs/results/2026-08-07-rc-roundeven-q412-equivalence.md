@@ -73,3 +73,10 @@ as the final generated closure. The remaining gate is to regenerate the
 synthesized SV from Futil hash
 `72ee28625ea23e1457ec58987f01598069694f0032e17a39e1659220f1584276` and rerun
 the strict test without the probe.
+
+The attempted regeneration used `ulimit -s unlimited` (the normal export
+script already does this). On this host, Calyx's `--synthesis --nested` phase
+reached roughly 26 GiB RSS after 17 minutes without emitting `sv/main.sv`; it
+was stopped before exhausting the machine. This is a compilation-resource
+blocker, distinct from the confirmed arithmetic counterexample. No generated
+artifact from that incomplete attempt is treated as final evidence.
