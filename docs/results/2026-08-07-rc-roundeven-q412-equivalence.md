@@ -242,3 +242,10 @@ collision/merge defect: the flat scheduler is selecting a wrapper static
 sequence where the nested schedule has an invocation. Renaming a completion
 wire cannot repair that schedule, so the next backend experiment must preserve
 the invocation boundary or prevent this control merge.
+
+The repository's CIRCT Calyx-to-HW/SV backend was also tested against the
+current RC Calyx artifact. Its preflight rejects the graph before lowering:
+`calyx.seq_mem`, `calyx.instance`, and `calyx.invoke` must first be lowered or
+structuralized. It therefore cannot currently serve as a drop-in alternative
+for this closure; using it would require a separate memory/invocation lowering
+design rather than a local liveness repair.
