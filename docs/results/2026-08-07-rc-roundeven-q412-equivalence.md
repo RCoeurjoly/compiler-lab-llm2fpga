@@ -2,10 +2,19 @@
 
 ## Status
 
-The strict context-0 equivalence gate is not yet green. Compilation of the
-diagnostic closure succeeds, but the host supervisor terminates the long
-Verilator execution before the model reaches its normal completion near
-cycle 514,919. No oracle criterion was weakened.
+The strict context-0 equivalence gate is not yet green. The diagnostic closure
+compiled and completed at cycle 514,871, but failed the independent 48-code
+check:
+
+```text
+CASE_FAIL index=0 reason=FULL_RAW_CODE
+observed_codes=-70,26,22,-112,-39,10 observed_token=4
+```
+
+The frozen six-code oracle therefore also did not pass. No oracle criterion
+was weakened. The generated closure used for this diagnostic run included a
+temporary RTL-only probe; it is evidence about the failing boundary, not a
+replacement for regenerating SV from the checked-in MLIR fix.
 
 ## Earliest divergence
 
@@ -42,4 +51,3 @@ path. The checked-in reproducer is
 The pass and real-plugin regression tests pass. A complete strict context-0
 run using the regenerated closure remains required before this goal can be
 marked complete.
-
