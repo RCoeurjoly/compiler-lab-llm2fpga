@@ -96,3 +96,14 @@ building its Calyx handoff. This avoids materializing one floating compare and
 select tree per Q4.12 lane; the post-SV transform supplies the same proven
 exceptional-value behavior at the shared RTL primitive. The opt-out is
 target-scoped, and the semantic MLIR guard remains enabled by default.
+
+The strict diagnostic closure used the exact script output hashes:
+
+```text
+input main.sv   sha256=3ef261f87a4488b2347561c49d03462b23519ea5900d2c5b3f5dcc1f942266e6
+output main.sv  sha256=1d87bfed9a5ef283b53e74ab48de1b6fffec8d23d5827799cbb15969d91abc67
+```
+
+The frozen oracle and testbench were unchanged; the result was the
+`CASE_PASS`/`SHARD_PASS` shown above. A regenerated closure from the current
+target is still required to replace this retained diagnostic artifact.
