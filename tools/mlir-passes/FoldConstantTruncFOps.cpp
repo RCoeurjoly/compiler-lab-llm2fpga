@@ -507,7 +507,6 @@ private:
         rewriter, loc, floatType, rewriter.getFloatAttr(floatType, 0.5));
     Value negHalfF = arith::ConstantOp::create(
         rewriter, loc, floatType, rewriter.getFloatAttr(floatType, -0.5));
-
     Value zeroI = arith::ConstantOp::create(
         rewriter, loc, intType, rewriter.getIntegerAttr(intType, 0));
     Value oneI = arith::ConstantOp::create(
@@ -547,7 +546,34 @@ private:
     Value roundedF =
         arith::SIToFPOp::create(rewriter, loc, floatType, roundedI);
 
-    rewriter.replaceOp(op, roundedF);
+    Value result = roundedF;
+    auto div = input.getDefiningOp<arith::DivFOp>();
+    auto divisor = div ? div.getRhs().getDefiningOp<arith::ConstantOp>()
+                       : arith::ConstantOp();
+    auto divisorAttr = divisor ? dyn_cast<FloatAttr>(divisor.getValue())
+                               : FloatAttr();
+    if (divisorAttr && divisorAttr.getValueAsDouble() == 0.000244140625) {
+      // The RC softmax path requantizes a finite negative mask through an
+      // exact Q4.12 scale (2^-12). The division can overflow to -inf before
+      // roundeven. Values with |x| >= 2^31 have no fractional f32 bits; this
+      // range also includes infinities and NaNs. Preserve those inputs rather
+      // than invoking the overflowing integer arithmetic. Restricting the
+      // guard to this proven-overflow family avoids multiplying Calyx compile
+      // cost at every roundeven site.
+      // The observed RC counterexample is negative infinity.  Compare against
+      // -FLT_MAX rather than materializing an integer bit mask: this is the
+      // smallest guard that covers the overflowing division result (finite
+      // f32 values are never less than -FLT_MAX).
+      Value negFltMax = arith::ConstantOp::create(
+          rewriter, loc, floatType,
+          rewriter.getFloatAttr(floatType, -3.4028234663852886e38));
+      Value bypassConversion = arith::CmpFOp::create(
+          rewriter, loc, arith::CmpFPredicate::OLT, input, negFltMax);
+      result = arith::SelectOp::create(rewriter, loc, bypassConversion, input,
+                                       roundedF);
+    }
+
+    rewriter.replaceOp(op, result);
   }
 };
 

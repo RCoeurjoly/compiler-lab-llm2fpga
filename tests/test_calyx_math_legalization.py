@@ -1,4 +1,6 @@
 import unittest
+import os
+import subprocess
 from pathlib import Path
 
 
@@ -6,6 +8,27 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CalyxMathLegalizationTest(unittest.TestCase):
+    def test_roundeven_lowering_preserves_negative_infinity(self) -> None:
+        circt_opt = os.environ.get("CIRCT_OPT")
+        pass_plugin = os.environ.get("LLM2FPGA_MLIR_PASS_PLUGIN")
+        if not circt_opt or not pass_plugin:
+            self.skipTest("set CIRCT_OPT and LLM2FPGA_MLIR_PASS_PLUGIN")
+
+        fixture = ROOT / "reproducers" / "calyx-math-roundeven" / "nonfinite.mlir"
+        completed = subprocess.run(
+            [
+                circt_opt,
+                f"--load-pass-plugin={pass_plugin}",
+                "--pass-pipeline=builtin.module(llm2fpga-lower-roundeven-for-calyx,canonicalize)",
+                str(fixture),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertIn("0xFF800000 : f32", completed.stdout)
+        self.assertNotIn("arith.fptosi", completed.stdout)
+
     def test_pre_calyx_pipeline_legalizes_exact_supported_math(self) -> None:
         pipeline = (ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
         source = (

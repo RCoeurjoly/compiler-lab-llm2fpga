@@ -387,11 +387,15 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
     def test_calyx_math_roundeven_regression_case_is_tracked(self) -> None:
         reproducer_dir = REPO_ROOT / "reproducers" / "calyx-math-roundeven"
         failing = (reproducer_dir / "input.mlir").read_text(encoding="utf-8")
+        nonfinite = (reproducer_dir / "nonfinite.mlir").read_text(encoding="utf-8")
         readme = (reproducer_dir / "README.md").read_text(encoding="utf-8")
 
         self.assertIn("math.roundeven", failing)
+        self.assertIn("-3.40282347E+38", nonfinite)
+        self.assertIn("2.44140625E-4", nonfinite)
         self.assertIn("llm2fpga-lower-roundeven-for-calyx", readme)
-        self.assertIn("finite values in the `i32` range", readme)
+        self.assertIn("below `-FLT_MAX`", readme)
+        self.assertIn("bypass", readme)
         self.assertIn("Textual MLIR substitution is not an acceptable fix", readme)
 
     def test_current_calyx_math_rsqrt_blocker_is_minimized(self) -> None:
