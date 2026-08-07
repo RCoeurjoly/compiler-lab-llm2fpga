@@ -227,3 +227,9 @@ the active pipeline. The evidence still identifies state 1828 as the first
 observable divergence, but the correct repair must address the flat control
 schedule or its generated static-control component rather than substituting
 one completion signal.
+
+Disabling Calyx's `inline` pass for flat Verilog emission also left the same
+state-1828 guard (`wrapper_early_reset_static_seq136_done_out`) in the output;
+the flat scheduler therefore introduces this control shape before the
+individual component inlining choice. No-inlining was not accepted as a
+workaround.
