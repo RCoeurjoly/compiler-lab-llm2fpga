@@ -233,3 +233,12 @@ state-1828 guard (`wrapper_early_reset_static_seq136_done_out`) in the output;
 the flat scheduler therefore introduces this control shape before the
 individual component inlining choice. No-inlining was not accepted as a
 workaround.
+
+The nested RTL contains both `early_reset_static_seq136` and
+`wrapper_early_reset_static_seq136`; its state-1828 transition remains an
+explicit `invoke907_done_out`. Flat RTL has only the wrapper-namespaced
+sequence at that transition. This supports a control-component flattening
+collision/merge defect: the flat scheduler is selecting a wrapper static
+sequence where the nested schedule has an invocation. Renaming a completion
+wire cannot repair that schedule, so the next backend experiment must preserve
+the invocation boundary or prevent this control merge.
