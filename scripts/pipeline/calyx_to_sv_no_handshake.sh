@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 normalize_for_export="${CALYX_NORMALIZE_FOR_EXPORT:-$SCRIPT_DIR/normalize_calyx_for_export.py}"
 normalize_futil_constants="${CALYX_NORMALIZE_FUTIL_CONSTANTS:-$SCRIPT_DIR/normalize_futil_float_constants.py}"
 fix_futil_fptosi_handshake="${CALYX_FIX_FUTIL_FPTOSI_HANDSHAKE:-$SCRIPT_DIR/fix_futil_fptosi_handshake.py}"
+fix_sv_roundeven_overflow="${CALYX_FIX_SV_ROUNDEVEN_OVERFLOW:-}"
 verify_futil_bits="${CALYX_VERIFY_F32_CONSTANT_BITS:-$SCRIPT_DIR/verify_calyx_f32_constant_bits.py}"
 
 circt_translate="${1:?usage: calyx_to_sv <circt-translate> <calyx-bin> <calyx-lib-dir> <calyx-dir> <output-dir>}"
@@ -152,6 +153,13 @@ if [[ "$rc" -ne 0 || ! -s "$output_dir/sv/main.sv" ]]; then
   sed -n '1,160p' "$tmp_calyx_log" >&2
   rm -f "$output_dir/sv/main.sv"
   exit 1
+fi
+
+if [[ -n "$fix_sv_roundeven_overflow" ]]; then
+  python3 "$fix_sv_roundeven_overflow" \
+    "$output_dir/sv/main.sv" "$output_dir/sv/main.roundeven.sv" \
+    "$output_dir/roundeven-overflow-receipt.json"
+  mv "$output_dir/sv/main.roundeven.sv" "$output_dir/sv/main.sv"
 fi
 
 set +e
