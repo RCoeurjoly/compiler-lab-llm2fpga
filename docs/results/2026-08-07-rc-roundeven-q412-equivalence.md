@@ -51,3 +51,25 @@ path. The checked-in reproducer is
 The pass and real-plugin regression tests pass. A complete strict context-0
 run using the regenerated closure remains required before this goal can be
 marked complete.
+
+## Diagnostic confirmation
+
+To separate the arithmetic fault from closure regeneration, the prior
+pre-fix synthesized closure was run with a deterministic RTL probe that
+saturates the one exceptional signed-add case (`0x80000000 + 0xffffffff`),
+without changing the oracle or testbench criteria. The run completed the same
+context in 505,273 cycles and passed all 48 codes and the token:
+
+```text
+CASE_PASS index=0 cycles=505273
+expected_codes=18,-93,-34,7,20,1
+observed_codes=18,-93,-34,7,20,1 expected_token=4 observed_token=4
+SHARD_PASS start=0 count=1 completed=1
+```
+
+This confirms the wraparound identified above is sufficient to explain the
+counterexample. The probe is diagnostic evidence only; it is not being used
+as the final generated closure. The remaining gate is to regenerate the
+synthesized SV from Futil hash
+`72ee28625ea23e1457ec58987f01598069694f0032e17a39e1659220f1584276` and rerun
+the strict test without the probe.
