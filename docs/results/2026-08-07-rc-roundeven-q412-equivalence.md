@@ -265,3 +265,28 @@ Repeating the synthesis+nested experiment on the normalized Futil before the
 FPTOSI handshake legalization did not materially change the result: after a
 bounded several-minute run it had still emitted no `main.sv`. Thus the nested
 emission blow-up is not attributable to that legalization alone.
+
+## 2026-08-07 TDCC/static-pass state mapping
+
+The current fixed Futil was run through the pinned Calyx compiler with the
+TDCC FSM JSON dump enabled using `-x tdcc:dump-fsm-json=/tmp/rc-fsm/tdcc.json`.
+The JSON identifies the liveness state unambiguously as state 1828,
+`wrapper_early_reset_static_seq136`.
+
+In the post-pass Futil, this wrapper is launched only at outer `fsm0` state
+1828 and its completion is `signal_reg.out`. The corresponding inner FSM
+equation advances on `early_reset_static_seq136_go`, which is wired directly
+from `wrapper_early_reset_static_seq136_go`.
+
+This narrows the blocker from unknown arithmetic or memory behavior to a
+repeat-invocation/static-compile handshake: the live closure reaches outer
+state 1828 with the inner FSM at state 1 and `signal_reg=0`, but does not
+observe the expected early-reset go transition. The old single-wire repair
+(making wrapper done depend on `mulf_87_reg_done`) was rejected because it did
+not change this behavior.
+
+Pass-boundary experiments are also recorded. Disabling `compile-static` fails
+at TDCC because static control must already be compiled away; disabling
+`static-inline` or `static-promotion` is not a valid workaround (panic or stack
+overflow). The next fix must preserve the normal static-inline/compile-static/
+TDCC pipeline and address the repeated wrapper/inner-FSM protocol itself.
