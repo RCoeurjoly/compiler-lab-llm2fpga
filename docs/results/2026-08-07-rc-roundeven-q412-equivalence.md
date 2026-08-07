@@ -260,3 +260,8 @@ consumed about 24 GiB RSS without producing `main.sv`, so it was stopped before
 host exhaustion. This does not establish a working nested closure; it confirms
 that changing assignment emission is not currently a practical workaround for
 the flat liveness defect on this host.
+
+Repeating the synthesis+nested experiment on the normalized Futil before the
+FPTOSI handshake legalization did not materially change the result: after a
+bounded several-minute run it had still emitted no `main.sv`. Thus the nested
+emission blow-up is not attributable to that legalization alone.
