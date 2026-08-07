@@ -80,3 +80,13 @@ reached roughly 26 GiB RSS after 17 minutes without emitting `sv/main.sv`; it
 was stopped before exhausting the machine. This is a compilation-resource
 blocker, distinct from the confirmed arithmetic counterexample. No generated
 artifact from that incomplete attempt is treated as final evidence.
+
+## Backend fallback
+
+Commit `6b2d14a` adds `fix_sv_roundeven_overflow.py`, an explicit post-SV
+closure transform. It changes only the shared `std_add` primitive and records
+the input/output hashes in `roundeven-overflow-receipt.json`; the transform
+maps the proven `INT32_MIN + (-1)` exceptional case back to `INT32_MIN` (and
+the commuted form). The RC Calyx-to-SV target enables this transform, while
+the MLIR guard remains the default semantic legalization for other targets.
+The diagnostic strict pass above was produced by this exact transform.
