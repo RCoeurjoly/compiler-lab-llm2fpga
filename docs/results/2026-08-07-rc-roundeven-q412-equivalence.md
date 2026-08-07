@@ -107,3 +107,24 @@ output main.sv  sha256=1d87bfed9a5ef283b53e74ab48de1b6fffec8d23d5827799cbb15969d
 The frozen oracle and testbench were unchanged; the result was the
 `CASE_PASS`/`SHARD_PASS` shown above. A regenerated closure from the current
 target is still required to replace this retained diagnostic artifact.
+
+## Flat-emission unblock
+
+The nested Calyx emitter was not the only expensive phase: the equivalence
+only target also invokes a second synthesized resource-report pass unless it
+is explicitly disabled. Commit `a5673b6` adds `CALYX_SKIP_RESOURCE_REPORT=1`
+for equivalence-only builds and selects flat (`CALYX_EMIT_NESTED=0`) emission.
+
+The resulting current-pipeline closure was generated successfully:
+
+```text
+SV: /nix/store/yk48hnxvmb9l3b5pv90cf2fzqsk52mpy-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv-no-synthesis/sv/main.sv
+SV bytes: 18,912,173
+Verilator generated C++: 134,185,438 bytes in 199.229 s
+Verilator compile: 496.348 s
+```
+
+The strict context-0 run on this fresh flat closure is still running under
+the 600,000-cycle bound. Its completion result will determine whether the
+functional-equivalence gate is green; the closure-generation and compilation
+parts are no longer blocked by Calyx memory use.
