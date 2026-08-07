@@ -5,7 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 normalize_for_export="${CALYX_NORMALIZE_FOR_EXPORT:-$SCRIPT_DIR/normalize_calyx_for_export.py}"
 normalize_futil_constants="${CALYX_NORMALIZE_FUTIL_CONSTANTS:-$SCRIPT_DIR/normalize_futil_float_constants.py}"
 fix_futil_fptosi_handshake="${CALYX_FIX_FUTIL_FPTOSI_HANDSHAKE:-$SCRIPT_DIR/fix_futil_fptosi_handshake.py}"
-promote_invoked_toplevel="${CALYX_PROMOTE_INVOKED_TOPLEVEL:-}"
 fix_sv_roundeven_overflow="${CALYX_FIX_SV_ROUNDEVEN_OVERFLOW:-}"
 verify_futil_bits="${CALYX_VERIFY_F32_CONSTANT_BITS:-$SCRIPT_DIR/verify_calyx_f32_constant_bits.py}"
 
@@ -106,13 +105,6 @@ python3 "$normalize_futil_constants" "$tmp_exported_futil" "$tmp_normalized_futi
 
 python3 "$fix_futil_fptosi_handshake" "$tmp_normalized_futil" "$output_dir/model.futil" \
   >"$output_dir/logs/fix-futil-fptosi-handshake.log" 2>&1
-
-if [[ -n "$promote_invoked_toplevel" ]]; then
-  python3 "$promote_invoked_toplevel" \
-    "$output_dir/model.futil" "$output_dir/model.promoted.futil" \
-    >"$output_dir/logs/promote-calyx-invoked-toplevel.log" 2>&1
-  mv "$output_dir/model.promoted.futil" "$output_dir/model.futil"
-fi
 
 missing_imports=()
 while IFS= read -r import_path; do
