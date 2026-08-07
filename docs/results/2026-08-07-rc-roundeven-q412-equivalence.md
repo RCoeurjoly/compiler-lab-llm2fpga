@@ -124,7 +124,19 @@ Verilator generated C++: 134,185,438 bytes in 199.229 s
 Verilator compile: 496.348 s
 ```
 
-The strict context-0 run on this fresh flat closure is still running under
-the 600,000-cycle bound. Its completion result will determine whether the
-functional-equivalence gate is green; the closure-generation and compilation
-parts are no longer blocked by Calyx memory use.
+The strict run on this fresh flat closure completed the 600,000-cycle bound,
+but did not produce an output for any of the four diagnostic inputs:
+
+```text
+RESULT ascending   -1 -1 -1 -1 -1 -1
+RESULT descending  -1 -1 -1 -1 -1 -1
+RESULT zeros       -1 -1 -1 -1 -1 -1
+RESULT alternating -1 -1 -1 -1 -1 -1
+```
+
+At the bound the model had made and completed memory requests, but remained
+`done=0` with `output_writes=0`. The flat closure therefore exposes a
+liveness/handshake or scheduling incompatibility with the strict testbench;
+it is not an equivalence pass and increasing the timeout alone is not a
+justified fix. The next debug step is a flat-versus-nested signal comparison
+at the first state where output production diverges.
