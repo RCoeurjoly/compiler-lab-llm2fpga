@@ -253,3 +253,10 @@ design rather than a local liveness repair.
 A controlled `tdcc.one-hot-cutoff=32` flat-emission run also produced the same
 state-1828 guard and wrapper completion wiring. The deadlock is therefore not
 caused by binary-versus-one-hot FSM encoding.
+
+The semantically faithful native-Calyx fallback (`--synthesis --nested`) was
+also attempted on the exact current Futil. After roughly ten minutes it had
+consumed about 24 GiB RSS without producing `main.sv`, so it was stopped before
+host exhaustion. This does not establish a working nested closure; it confirms
+that changing assignment emission is not currently a practical workaround for
+the flat liveness defect on this host.
