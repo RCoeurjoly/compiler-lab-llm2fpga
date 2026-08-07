@@ -1399,7 +1399,8 @@ def _strict_fixture(
     text += "    if (completed_cases == 1 || case_cycles > max_cycles) max_cycles = case_cycles;\n"
     text += "  end\n"
     text += '  oracle_scan_status = $fscanf(oracle_fd, "%h", trailing_record);\n'
-    text += "  if (oracle_scan_status != -1) begin context_index = sequence_mode ? 0 : shard_start + shard_count; case_cycles = 0; case_fail(\"TRAILING_ORACLE_RECORD\"); end\n"
+    text += "  if (oracle_scan_status == 1) begin context_index = sequence_mode ? 0 : shard_start + shard_count; case_cycles = 0; case_fail(\"TRAILING_ORACLE_RECORD\"); end\n"
+    text += "  if (oracle_scan_status == 0 && !$feof(oracle_fd)) begin context_index = sequence_mode ? 0 : shard_start + shard_count; case_cycles = 0; case_fail(\"TRAILING_ORACLE_MALFORMED\"); end\n"
     text += "  $fclose(oracle_fd);\n"
     text += "  if (sequence_mode) begin context_index_scan_status = $fscanf(context_index_fd, \"%d\", context_index); if (context_index_scan_status != -1) begin case_cycles = 0; case_fail(\"TRAILING_CONTEXT_INDEX\"); end $fclose(context_index_fd); end\n"
     text += '  if (sequence_mode) $display("SEQUENCE_PASS count=%0d completed=%0d resets=%0d min_cycles=%0d max_cycles=%0d", sequence_count, completed_cases, completed_cases, min_cycles, max_cycles);\n'

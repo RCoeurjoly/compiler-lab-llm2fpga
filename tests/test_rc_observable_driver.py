@@ -365,6 +365,18 @@ class RcObservableDriverTest(unittest.TestCase):
         self.assertNotIn("ascending", tb)
         self.assertNotIn("token_ids", tb)
 
+    def test_fixture_accepts_eof_after_oracle_whitespace_but_rejects_trailing_data(self):
+        """Catches treating Verilator's zero-at-whitespace-EOF as another record."""
+
+        tb = self._strict_fixture_text()
+        self.assertIn("if (oracle_scan_status == 1)", tb)
+        self.assertIn(
+            "if (oracle_scan_status == 0 && !$feof(oracle_fd))",
+            tb,
+        )
+        self.assertIn("TRAILING_ORACLE_RECORD", tb)
+        self.assertIn("TRAILING_ORACLE_MALFORMED", tb)
+
     def test_strict_failure_dumps_complete_output_tensor(self):
         """Catches losing the terminal tensor needed to localize a raw-code mismatch."""
 
