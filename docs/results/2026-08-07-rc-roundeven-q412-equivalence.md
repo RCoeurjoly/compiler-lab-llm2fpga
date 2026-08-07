@@ -166,3 +166,25 @@ The wrapper's invoke signal remains asserted, so the failure is not caused by
 the wrapper dropping `go`; the inner invocation never returns `done` after
 the memory traffic completes. This narrows the repair target to the flat
 invocation/static-control lowering rather than output-memory wiring.
+
+## Top-level promotion hypothesis (falsified)
+
+To distinguish wrapper wiring from the generated component's own control, an
+experimental pass promoted the invoked `main_1` component to the Calyx
+top-level and emitted a single flat RTL module. This closure also compiled
+successfully (normalized SV SHA-256
+`4dd89e9f485dfdd2344ba9e6bdc918f7761184c3ec9bbd2b3281b63fe6d9cdc9`), but the
+strict `zeros` diagnostic reproduced the same stall:
+
+```text
+RESULT zeros -1 -1 -1 -1 -1 -1
+HEARTBEAT zeros cycles=100000 state=1828 inner_state=1
+  go_int=1 signal_reg=0 awaited_done=0 mem_en=0 done=0
+  requests=7065 mem_completions=7065 output_writes=0 last_port=94
+```
+
+Therefore removing the `main`/`main_1` wrapper is not sufficient. The
+liveness defect is intrinsic to the flat lowering/control schedule (or to a
+shared generated primitive), not merely to top-level invocation wiring. The
+promotion pass is not part of the active pipeline and must not be treated as
+a fix.
