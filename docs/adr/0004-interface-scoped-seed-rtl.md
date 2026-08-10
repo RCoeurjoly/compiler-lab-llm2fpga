@@ -10,6 +10,8 @@ The first proof is cycle-accurate at the architectural interface: candidate valu
 
 The seed is scoped to one RC model/configuration for the initial workflow. Later models may reuse the ABI and memory contracts, but each requires independent PyTorch qualification before supporting a generality claim.
 
+Within that configuration, EQY must quantify over every legal architectural input, reset, handshake, and abstract-memory trace. The finite PyTorch context suite establishes the seed's semantics; it is not a substitute for universal RTL-to-RTL equivalence.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
