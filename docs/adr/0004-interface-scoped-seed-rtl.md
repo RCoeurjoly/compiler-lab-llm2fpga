@@ -8,6 +8,8 @@ The first EQY milestone uses deterministic abstract synchronous memories and ver
 
 The first proof is cycle-accurate at the architectural interface: candidate values, handshakes, memory requests, and completion timing must match the seed on every cycle. Latency-insensitive or retimed equivalence is deferred to a separate phase so protocol redesign is not conflated with datapath optimization.
 
+The seed is scoped to one RC model/configuration for the initial workflow. Later models may reuse the ABI and memory contracts, but each requires independent PyTorch qualification before supporting a generality claim.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.

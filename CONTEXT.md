@@ -186,6 +186,10 @@ _Avoid_: DDR3 model, vendor memory, unconstrained memory black box
 The first EQY milestone requires candidate RTL to preserve the seed's architectural-interface values and handshake timing cycle-for-cycle, including memory-request and completion timing; latency-insensitive or retimed equivalence is a later proof phase.
 _Avoid_: latency-insensitive first proof, retiming plus datapath change, protocol redesign
 
+**Configuration-scoped seed**:
+The initial behavioral seed and EQY proof target one RC model/configuration; shared input/output and memory ABI contracts may be reused, but another model or parameterization requires its own PyTorch qualification before making a generality claim.
+_Avoid_: universal seed claim, cross-model proof by analogy, unqualified parameter sweep
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
