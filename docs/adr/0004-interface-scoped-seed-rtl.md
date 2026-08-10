@@ -48,6 +48,8 @@ The immediate engineering priority is therefore baseline RC functional qualifica
 
 The first diagnostic is one deterministic input with internal semantic-checkpoint and scratch-boundary traces, alongside final outputs, so the earliest divergence can be localized before running a broad context campaign.
 
+Baseline acceptance requires exact agreement with the frozen PyTorch oracle for all six observable logits and the selected token under the completion contract. Tolerances, altered oracles, and approximate acceptance do not qualify the baseline.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
