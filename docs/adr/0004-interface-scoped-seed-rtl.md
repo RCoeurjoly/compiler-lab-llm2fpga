@@ -30,6 +30,8 @@ Instrumentation has two required planes: static FPGA reports for area, timing, a
 
 The largest model that fits the target is measured through a staged size sweep using the generated RTL, synthesis/resource reports, and DDR3-capacity accounting, followed by search to narrow the feasible boundary. Extrapolation is a fallback only after a recorded tool or resource limit prevents direct probing.
 
+Board validation is gated: a candidate must first pass PyTorch-backed RTL simulation, Yosys, nextpnr-xilinx, and target resource-fit checks. Only then is it executed on hardware to measure physical timing, throughput, and DDR3 behavior.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
