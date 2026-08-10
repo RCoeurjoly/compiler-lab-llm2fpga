@@ -32,6 +32,8 @@ The largest model that fits the target is measured through a staged size sweep u
 
 Board validation is gated: a candidate must first pass PyTorch-backed RTL simulation, Yosys, nextpnr-xilinx, and target resource-fit checks. Only then is it executed on hardware to measure physical timing, throughput, and DDR3 behavior.
 
+The workflow distinguishes `RTL-qualified` (host simulation, EQY where applicable, synthesis, place-and-route, and fit) from `hardware-qualified` (all of those plus successful target-board execution and recorded physical DDR3/timing/throughput measurements).
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.

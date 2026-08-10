@@ -234,6 +234,14 @@ _Avoid_: area-per-parameter extrapolation first, compute-only fit claim, unrecor
 A candidate reaches board validation only after it passes PyTorch-backed RTL simulation, Yosys processing, nextpnr-xilinx processing, and target FPGA/DDR3 resource-fit checks; board execution then measures physical timing, throughput, and DDR3 behavior.
 _Avoid_: board-first debugging, simulation-only fit claim, hardware test of an unprocessed RTL candidate
 
+**RTL-qualified candidate**:
+A candidate that passes PyTorch-backed simulation, EQY (when applicable), Yosys, nextpnr-xilinx, and target resource-fit checks but has not yet been validated on physical hardware.
+_Avoid_: hardware-qualified, board-proven performance
+
+**Hardware-qualified candidate**:
+An RTL-qualified candidate that also executes successfully on the target board and has measured physical timing, throughput, and DDR3 behavior recorded in its receipt.
+_Avoid_: simulation-only qualification, unmeasured board claim
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
