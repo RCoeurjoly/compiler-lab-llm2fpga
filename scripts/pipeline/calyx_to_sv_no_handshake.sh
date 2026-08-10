@@ -6,6 +6,7 @@ normalize_for_export="${CALYX_NORMALIZE_FOR_EXPORT:-$SCRIPT_DIR/normalize_calyx_
 normalize_futil_constants="${CALYX_NORMALIZE_FUTIL_CONSTANTS:-$SCRIPT_DIR/normalize_futil_float_constants.py}"
 fix_futil_fptosi_handshake="${CALYX_FIX_FUTIL_FPTOSI_HANDSHAKE:-$SCRIPT_DIR/fix_futil_fptosi_handshake.py}"
 fix_sv_roundeven_overflow="${CALYX_FIX_SV_ROUNDEVEN_OVERFLOW:-}"
+fix_sv_divsqrt_handshake="${CALYX_FIX_SV_DIVSQRT_HANDSHAKE:-}"
 verify_futil_bits="${CALYX_VERIFY_F32_CONSTANT_BITS:-$SCRIPT_DIR/verify_calyx_f32_constant_bits.py}"
 
 circt_translate="${1:?usage: calyx_to_sv <circt-translate> <calyx-bin> <calyx-lib-dir> <calyx-dir> <output-dir>}"
@@ -166,6 +167,15 @@ if [[ -n "$fix_sv_roundeven_overflow" ]]; then
   # while still emitting the wrapping std_add implementation.
   grep -q "left == 32'h80000000" "$output_dir/sv/main.sv"
   test -s "$output_dir/roundeven-overflow-receipt.json"
+fi
+
+if [[ -n "$fix_sv_divsqrt_handshake" ]]; then
+  python3 "$fix_sv_divsqrt_handshake" \
+    "$output_dir/sv/main.sv" "$output_dir/sv/main.divsqrt.sv" \
+    "$output_dir/divsqrt-handshake-receipt.json"
+  mv "$output_dir/sv/main.divsqrt.sv" "$output_dir/sv/main.sv"
+  grep -q "LLM2FPGA_COMPLETE" "$output_dir/sv/main.sv"
+  test -s "$output_dir/divsqrt-handshake-receipt.json"
 fi
 
 if [[ "${CALYX_SKIP_RESOURCE_REPORT:-0}" == "1" ]]; then
