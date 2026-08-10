@@ -266,6 +266,10 @@ _Avoid_: optimizing a failing baseline, performance-only qualification, EQY befo
 Until the baseline RC artifact is RTL-qualified, active engineering is limited to reproducing and fixing its functional inference path; EQY implementation, recursive optimization, and performance instrumentation are deferred follow-on phases.
 _Avoid_: parallel optimization of a failing design, premature speed claims, infrastructure before correctness
 
+**Baseline divergence diagnostic**:
+The first RC debugging run uses one deterministic input and records internal semantic checkpoints plus scratch-boundary values, in addition to final outputs, to identify the earliest PyTorch-versus-SV divergence before broadening the test set.
+_Avoid_: final-logit-only debugging, random first input, broad campaign before localization
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite

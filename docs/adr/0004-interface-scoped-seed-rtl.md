@@ -46,6 +46,8 @@ This optimization workflow is blocked until a baseline RC artifact completes end
 
 The immediate engineering priority is therefore baseline RC functional qualification: reproduce and fix the inference path first, then implement EQY and the measurement-driven optimization loop.
 
+The first diagnostic is one deterministic input with internal semantic-checkpoint and scratch-boundary traces, alongside final outputs, so the earliest divergence can be localized before running a broad context campaign.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
