@@ -12,6 +12,8 @@ The seed is scoped to one RC model/configuration for the initial workflow. Later
 
 Within that configuration, EQY must quantify over every legal architectural input, reset, handshake, and abstract-memory trace. The finite PyTorch context suite establishes the seed's semantics; it is not a substitute for universal RTL-to-RTL equivalence.
 
+The qualified seed is materialized by a reproducible Nix derivation containing the RTL source closure, tool inputs, contract, and qualification evidence. Its identity is content-addressed; changing any of those inputs creates a new seed that must pass qualification again.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
