@@ -168,6 +168,14 @@ _Avoid_: approximate logits, formatted output
 A lowering, RTL, and simulation route eligible to support an exact equivalence claim because it is checked against the frozen reference by the equivalence gate.
 _Avoid_: default pipeline, trusted backend
 
+**Behavioral seed RTL**:
+The first RTL implementation that has passed the agreed PyTorch equivalence gate and is retained as the behavioral reference for RTL-to-RTL optimization.
+_Avoid_: golden source, permanently correct RTL, implementation template
+
+**Architectural contract**:
+The externally observable clock/reset, input, output, and memory-transaction behavior that an optimized RTL implementation must preserve; it excludes internal hierarchy, state encoding, pipeline structure, and scratch layout.
+_Avoid_: internal RTL shape, source-level structure, synthesis-preserved hierarchy
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
