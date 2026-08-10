@@ -254,6 +254,10 @@ _Avoid_: inferred hardware throughput, post-route-as-measured, simulation-only D
 Hardware receipts report repeated runs on fixed workloads, clock/reset settings, and initialization conditions, with run-to-run variance and relevant board conditions recorded before comparing candidates.
 _Avoid_: single-run speedup, changing workload between candidates, hidden initialization state
 
+**RC-first optimization campaign**:
+RC is the fast iterative search target for compiler/RTL transformations and bottleneck instrumentation; TinyStories-1M is the transfer and scale probe used to measure the largest practical model and board/resource boundary rather than to gate every RC iteration.
+_Avoid_: TinyStories-only search loop, RC-only scaling claim, full-model rebuild for every candidate
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite

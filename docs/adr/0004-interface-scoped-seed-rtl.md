@@ -40,6 +40,8 @@ Claims about achieved board clock, DDR3 bandwidth, or end-to-end throughput requ
 
 Hardware receipts must report repeated runs under fixed workloads, clock/reset settings, and initialization conditions, including run-to-run variance and relevant board conditions.
 
+The first campaign optimizes RC as the fast search target, using TinyStories-1M as a transfer and scale probe for the largest practical model and board/resource boundary. TinyStories-1M need not gate every RC iteration.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
