@@ -50,6 +50,8 @@ The first diagnostic is one deterministic input with internal semantic-checkpoin
 
 Baseline acceptance requires exact agreement with the frozen PyTorch oracle for all six observable logits and the selected token under the completion contract. Tolerances, altered oracles, and approximate acceptance do not qualify the baseline.
 
+Qualification declares a deterministic RTL cycle deadline separately from host wall-time, memory, and process limits. Exceeding the cycle deadline is a functional liveness failure; host exhaustion is reported as a tooling/resource result.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
