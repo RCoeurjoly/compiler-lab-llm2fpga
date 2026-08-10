@@ -20,6 +20,8 @@ Promotion has a three-candidate calibration phase: each of the first three candi
 
 The recursive optimization loop is measurement-driven. Every candidate must produce reproducible area, timing/critical-path, cycle-latency, throughput, memory-traffic/utilization, and DDR3-capacity evidence. These measurements classify the bottleneck as compute-bound or memory-bound and support scaling estimates for RC and the largest model that fits the target FPGA plus DDR3.
 
+Every candidate must also emit a machine-readable optimization receipt containing derivation identities, transformation and tool provenance, measurements, memory evidence, bottleneck classification, and EQY/PyTorch status. An incomplete receipt makes the candidate ineligible for promotion.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.

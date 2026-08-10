@@ -210,6 +210,10 @@ _Avoid_: PyTorch gate forever, EQY-only from the first candidate, silent contrac
 Each candidate is evaluated with reproducible instrumentation for FPGA area, timing and critical paths, cycle latency, throughput, memory traffic/utilization, and DDR3 capacity; the records classify the candidate as compute-bound or memory-bound and support scaling estimates for RC and the largest board-fit model.
 _Avoid_: optimizing one metric in isolation, unexplained bottleneck claims, RC-only scaling claim
 
+**Optimization receipt**:
+A required machine-readable record for every candidate containing the candidate and seed derivation identities, transformation/provenance, tool versions, resource and performance measurements, memory/DDR3 evidence, bottleneck classification, and EQY/PyTorch status; missing or incomplete receipts make a candidate ineligible for promotion.
+_Avoid_: prose-only benchmark, missing provenance, promotion without bottleneck evidence
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
