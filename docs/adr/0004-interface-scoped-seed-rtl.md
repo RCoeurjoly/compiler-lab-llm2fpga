@@ -14,6 +14,8 @@ Within that configuration, EQY must quantify over every legal architectural inpu
 
 The qualified seed is materialized by a reproducible Nix derivation containing the RTL source closure, tool inputs, contract, and qualification evidence. Its identity is content-addressed; changing any of those inputs creates a new seed that must pass qualification again.
 
+EQY runs use a staged budget: bounded sanity proofs provide early structural feedback, followed by a full universal proof under declared wall-time and memory limits. A timeout, OOM, or other inconclusive solver result is reported as inconclusive and cannot be promoted to a pass.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
