@@ -160,6 +160,12 @@ if [[ -n "$fix_sv_roundeven_overflow" ]]; then
     "$output_dir/sv/main.sv" "$output_dir/sv/main.roundeven.sv" \
     "$output_dir/roundeven-overflow-receipt.json"
   mv "$output_dir/sv/main.roundeven.sv" "$output_dir/sv/main.sv"
+  # Keep the repair auditable: a successful helper invocation must leave the
+  # exceptional INT32_MIN + (-1) guard in the actual closure.  Without this
+  # check, an old/stale generated artifact can look like a repaired build
+  # while still emitting the wrapping std_add implementation.
+  grep -q "left == 32'h80000000" "$output_dir/sv/main.sv"
+  test -s "$output_dir/roundeven-overflow-receipt.json"
 fi
 
 if [[ "${CALYX_SKIP_RESOURCE_REPORT:-0}" == "1" ]]; then
