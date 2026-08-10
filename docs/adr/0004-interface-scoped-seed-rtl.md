@@ -24,6 +24,8 @@ Every candidate must also emit a machine-readable optimization receipt containin
 
 Bottleneck classification must be quantitative: derive it from operation counts, achieved compute rate, bytes transferred, achieved bandwidth, and applicable FPGA/DDR3 ceilings in a roofline-style comparison, recording counter sources and assumptions in the receipt.
 
+Candidate selection maintains a Pareto frontier over area, timing, latency, throughput, and DDR3 capacity. Target-board feasibility, correctness, and declared tool-resource limits are hard constraints; workload goals choose among non-dominated candidates rather than an opaque weighted score.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.

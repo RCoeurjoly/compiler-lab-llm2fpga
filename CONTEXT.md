@@ -218,6 +218,10 @@ _Avoid_: prose-only benchmark, missing provenance, promotion without bottleneck 
 The quantitative compute-/memory-bound label derived from measured operation counts, achieved compute rate, bytes transferred, achieved bandwidth, and the applicable FPGA/DDR3 compute and bandwidth ceilings; the assumptions and counter sources are recorded in the optimization receipt.
 _Avoid_: subjective bottleneck label, peak-only estimate, unmeasured bandwidth claim
 
+**Candidate Pareto frontier**:
+The non-dominated set of qualified candidates across area, timing, latency, throughput, and DDR3 capacity, subject to hard target-board, correctness, and tool-resource constraints; selection among frontier points is workload-dependent.
+_Avoid_: single opaque weighted score, trading away correctness, ignoring board feasibility
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
