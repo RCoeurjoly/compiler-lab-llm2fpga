@@ -258,6 +258,10 @@ _Avoid_: single-run speedup, changing workload between candidates, hidden initia
 RC is the fast iterative search target for compiler/RTL transformations and bottleneck instrumentation; TinyStories-1M is the transfer and scale probe used to measure the largest practical model and board/resource boundary rather than to gate every RC iteration.
 _Avoid_: TinyStories-only search loop, RC-only scaling claim, full-model rebuild for every candidate
 
+**Functional-baseline prerequisite**:
+The EQY optimization and measurement campaign begins only after a baseline RC artifact completes end-to-end inference and is RTL-qualified; optimization is applied only to a design whose functional contract has already been established.
+_Avoid_: optimizing a failing baseline, performance-only qualification, EQY before PyTorch agreement
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
