@@ -172,6 +172,8 @@ _Avoid_: default pipeline, trusted backend
 The first RTL implementation that has passed the agreed PyTorch equivalence gate and is retained as the behavioral reference for RTL-to-RTL optimization.
 _Avoid_: golden source, permanently correct RTL, implementation template
 
+The minimum qualification bar is the one-input smoke gate plus the frozen-four gate, reset-isolation evidence, and semantic-checkpoint agreement. The 24-context bug screen and 64-context high-confidence tier strengthen the seed's trust claim but are not prerequisites for building the initial EQY flow.
+
 **Architectural contract**:
 The externally observable clock/reset, input, output, and memory-transaction behavior that an optimized RTL implementation must preserve; it excludes internal hierarchy, state encoding, pipeline structure, and scratch layout.
 _Avoid_: internal RTL shape, source-level structure, synthesis-preserved hierarchy
