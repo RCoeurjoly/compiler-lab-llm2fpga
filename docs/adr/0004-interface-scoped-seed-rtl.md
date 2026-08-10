@@ -22,6 +22,8 @@ The recursive optimization loop is measurement-driven. Every candidate must prod
 
 Every candidate must also emit a machine-readable optimization receipt containing derivation identities, transformation and tool provenance, measurements, memory evidence, bottleneck classification, and EQY/PyTorch status. An incomplete receipt makes the candidate ineligible for promotion.
 
+Bottleneck classification must be quantitative: derive it from operation counts, achieved compute rate, bytes transferred, achieved bandwidth, and applicable FPGA/DDR3 ceilings in a roofline-style comparison, recording counter sources and assumptions in the receipt.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
