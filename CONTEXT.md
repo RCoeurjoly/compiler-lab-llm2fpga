@@ -182,6 +182,10 @@ _Avoid_: internal RTL shape, source-level structure, synthesis-preserved hierarc
 A deterministic synchronous memory model used for the first EQY compute comparison, with explicit assumptions for legal contents, request, response, and completion behavior but no implementation commitment to on-chip RAM, DDR3, or a vendor model.
 _Avoid_: DDR3 model, vendor memory, unconstrained memory black box
 
+**Cycle-accurate EQY contract**:
+The first EQY milestone requires candidate RTL to preserve the seed's architectural-interface values and handshake timing cycle-for-cycle, including memory-request and completion timing; latency-insensitive or retimed equivalence is a later proof phase.
+_Avoid_: latency-insensitive first proof, retiming plus datapath change, protocol redesign
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite

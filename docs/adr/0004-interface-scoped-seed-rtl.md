@@ -6,6 +6,8 @@ The seed qualification bar is the one-input smoke gate plus the frozen-four gate
 
 The first EQY milestone uses deterministic abstract synchronous memories and verifies UberDDR3/vendor-memory transport separately against the same memory contract. This keeps compute optimization independent of the DDR3 controller's formal state space.
 
+The first proof is cycle-accurate at the architectural interface: candidate values, handshakes, memory requests, and completion timing must match the seed on every cycle. Latency-insensitive or retimed equivalence is deferred to a separate phase so protocol redesign is not conflated with datapath optimization.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
