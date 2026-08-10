@@ -31,3 +31,21 @@ being accepted as repaired.  Unit tests and shell syntax checks pass.
 The canonical Nix rebuild was attempted but did not complete within the
 available interactive build session, so exact post-fix Verilator equivalence
 and frozen-four verification remain outstanding.  This goal is not complete.
+
+## Regenerated-closure follow-up
+
+The rebuild was subsequently completed at
+`/nix/store/ii2d6l6n8b2mqzgxq4amw2his3jnjri2-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv-no-synthesis`.
+Its generated SV has the guarded `std_add` and output SHA-256
+`9599bd8694d5baf0074306a178e80d9898430091ce13d00455f706916892bff6`.
+Verilator compilation completed with 443 C++ files; code generation took
+94.48 s and C++ compilation 1,215.20 s.
+
+The repaired closure still failed context 0 at cycle 523,575 with the same
+six codes and token.  The repair is observable: scratch port 94 changes from
+the old `0x7f` values to `0x80`.  However, scratch port 85 is already
+different, so the overflow repair is not the earliest divergence in this
+fresh closure.  The Futil SHA is identical to the retained closure
+(`fe663546…`), while the regenerated SV contains a materially different
+HardFloat primitive-definition closure.  This makes primitive/tool closure
+provenance the next investigation target; no equivalence claim is made.
