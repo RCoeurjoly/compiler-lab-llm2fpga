@@ -28,6 +28,8 @@ Candidate selection maintains a Pareto frontier over area, timing, latency, thro
 
 Instrumentation has two required planes: static FPGA reports for area, timing, and critical paths, plus dynamic simulation/trace counters for cycles, operations, stalls, memory traffic, and bandwidth on the same candidate and workload.
 
+The largest model that fits the target is measured through a staged size sweep using the generated RTL, synthesis/resource reports, and DDR3-capacity accounting, followed by search to narrow the feasible boundary. Extrapolation is a fallback only after a recorded tool or resource limit prevents direct probing.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.

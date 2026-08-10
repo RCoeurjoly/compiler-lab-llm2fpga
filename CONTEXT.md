@@ -226,6 +226,10 @@ _Avoid_: single opaque weighted score, trading away correctness, ignoring board 
 The optimization evidence combines static FPGA implementation reports (area, timing, and critical paths) with dynamic simulation or trace counters (cycles, operations, stalls, memory traffic, and bandwidth) for the same candidate and workload.
 _Avoid_: static-only bottleneck, simulation-only area claim, mismatched workload receipts
 
+**Measured model-fit boundary**:
+The largest-board-fit estimate is obtained by a staged model-size sweep with generated RTL, synthesis/resource reports, and DDR3-capacity accounting, narrowing the feasible/infeasible boundary by search; extrapolation is permitted only after a recorded tool or resource limit blocks direct measurement.
+_Avoid_: area-per-parameter extrapolation first, compute-only fit claim, unrecorded synthesis failure
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
