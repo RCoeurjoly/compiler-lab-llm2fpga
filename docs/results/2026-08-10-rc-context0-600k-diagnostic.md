@@ -77,3 +77,34 @@ explains why a one-minute host timeout is not a meaningful equivalence budget.
 The repository frozen-four derivation is still running against this same
 closure; no multi-context equivalence claim is made until its durable summary
 passes.
+
+## Frozen-four and ordered-reset gate
+
+The repaired Verilator binary was run directly from the compile cache
+`/tmp/rc-divsqrt-strict/obj_dir/Vtb`, with ABI receipt
+`1cd84e6cbfef8400c5b2a9ddf68ba4ad3f734f9f8542eefe252aa56a2c91988b`, the
+same generated SV closure, frozen image/manifest, and 600,000-cycle bound.
+The four independent frozen oracle shards all passed:
+
+```text
+ascending  index=67141   cycles=505036  codes=-28,127,45,-12,-30,-3  token=1
+alternating index=239945 cycles=505237  codes=-22,98,34,-10,-23,-3    token=1
+zeros      index=0       cycles=505273  codes=18,-93,-34,7,20,1       token=4
+descending index=1612474 cycles=504497  codes=19,-97,-35,7,21,1      token=4
+```
+
+Each line emitted `CASE_PASS`, `done=1`, `completion_count=1`,
+`within_bound=1`, `reset_complete=1`, and `write_mask=111111`. The ordered
+single-process sequence used those same four records in the repository order
+ascending, descending, zeros, alternating and emitted:
+
+```text
+SEQUENCE_PASS count=4 completed=4 resets=4 min_cycles=504497 max_cycles=505273
+```
+
+The sequence run took 2,883.794 s wall time (23,068.139 s CPU on eight
+threads). The Nix convenience wrapper was stopped after its daemon stalled;
+the direct run used the already compiled cache and identical RTL, ABI, image,
+oracle records, cycle bound, and exact comparison fixture. This is therefore
+the durable functional gate evidence; it does not claim exhaustive
+equivalence over the full 1,679,616-context domain.
