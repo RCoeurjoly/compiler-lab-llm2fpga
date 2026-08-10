@@ -16,6 +16,8 @@ The qualified seed is materialized by a reproducible Nix derivation containing t
 
 EQY runs use a staged budget: bounded sanity proofs provide early structural feedback, followed by a full universal proof under declared wall-time and memory limits. A timeout, OOM, or other inconclusive solver result is reported as inconclusive and cannot be promoted to a pass.
 
+Promotion has a three-candidate calibration phase: each of the first three candidates must pass EQY and the full PyTorch gates. Thereafter, EQY-only promotion is allowed only while the seed derivation and architectural/memory/toolchain contracts remain unchanged; any such change restarts PyTorch qualification.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.

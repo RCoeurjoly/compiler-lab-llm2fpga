@@ -202,6 +202,10 @@ _Avoid_: mutable reference RTL, floating checkout, unrecorded seed patch
 An EQY campaign starts with bounded sanity proofs for quick structural feedback, then attempts the full universal proof under a declared wall-time and memory budget; timeout, resource exhaustion, or inconclusive solver status is recorded as inconclusive, never as equivalence.
 _Avoid_: timeout-as-pass, unbounded first attempt, hidden solver limits
 
+**EQY promotion phases**:
+The first three promoted candidates are in a calibration phase and require both EQY and the full PyTorch gates. After that, candidates preserving the frozen seed derivation and contracts may use EQY-only promotion, while any seed, interface, memory-contract, or toolchain change restarts PyTorch requalification.
+_Avoid_: PyTorch gate forever, EQY-only from the first candidate, silent contract drift
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
