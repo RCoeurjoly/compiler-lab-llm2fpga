@@ -26,6 +26,8 @@ Bottleneck classification must be quantitative: derive it from operation counts,
 
 Candidate selection maintains a Pareto frontier over area, timing, latency, throughput, and DDR3 capacity. Target-board feasibility, correctness, and declared tool-resource limits are hard constraints; workload goals choose among non-dominated candidates rather than an opaque weighted score.
 
+Instrumentation has two required planes: static FPGA reports for area, timing, and critical paths, plus dynamic simulation/trace counters for cycles, operations, stalls, memory traffic, and bandwidth on the same candidate and workload.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.

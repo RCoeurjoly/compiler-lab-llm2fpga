@@ -222,6 +222,10 @@ _Avoid_: subjective bottleneck label, peak-only estimate, unmeasured bandwidth c
 The non-dominated set of qualified candidates across area, timing, latency, throughput, and DDR3 capacity, subject to hard target-board, correctness, and tool-resource constraints; selection among frontier points is workload-dependent.
 _Avoid_: single opaque weighted score, trading away correctness, ignoring board feasibility
 
+**Dual-plane instrumentation**:
+The optimization evidence combines static FPGA implementation reports (area, timing, and critical paths) with dynamic simulation or trace counters (cycles, operations, stalls, memory traffic, and bandwidth) for the same candidate and workload.
+_Avoid_: static-only bottleneck, simulation-only area claim, mismatched workload receipts
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
