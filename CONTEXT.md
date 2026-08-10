@@ -206,6 +206,10 @@ _Avoid_: timeout-as-pass, unbounded first attempt, hidden solver limits
 The first three promoted candidates are in a calibration phase and require both EQY and the full PyTorch gates. After that, candidates preserving the frozen seed derivation and contracts may use EQY-only promotion, while any seed, interface, memory-contract, or toolchain change restarts PyTorch requalification.
 _Avoid_: PyTorch gate forever, EQY-only from the first candidate, silent contract drift
 
+**Measurement-driven optimization loop**:
+Each candidate is evaluated with reproducible instrumentation for FPGA area, timing and critical paths, cycle latency, throughput, memory traffic/utilization, and DDR3 capacity; the records classify the candidate as compute-bound or memory-bound and support scaling estimates for RC and the largest board-fit model.
+_Avoid_: optimizing one metric in isolation, unexplained bottleneck claims, RC-only scaling claim
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
