@@ -178,6 +178,10 @@ The minimum qualification bar is the one-input smoke gate plus the frozen-four g
 The externally observable clock/reset, input, output, and memory-transaction behavior that an optimized RTL implementation must preserve; it excludes internal hierarchy, state encoding, pipeline structure, and scratch layout.
 _Avoid_: internal RTL shape, source-level structure, synthesis-preserved hierarchy
 
+**Abstract memory model**:
+A deterministic synchronous memory model used for the first EQY compute comparison, with explicit assumptions for legal contents, request, response, and completion behavior but no implementation commitment to on-chip RAM, DDR3, or a vendor model.
+_Avoid_: DDR3 model, vendor memory, unconstrained memory black box
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
