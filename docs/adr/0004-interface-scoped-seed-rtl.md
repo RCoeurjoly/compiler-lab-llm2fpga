@@ -38,6 +38,8 @@ Hardware validation must flash and exercise the exact content-addressed RTL-qual
 
 Claims about achieved board clock, DDR3 bandwidth, or end-to-end throughput require measurements from that exact hardware-qualified artifact. Host simulation, Yosys, and nextpnr estimates are screening evidence only.
 
+Hardware receipts must report repeated runs under fixed workloads, clock/reset settings, and initialization conditions, including run-to-run variance and relevant board conditions.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
