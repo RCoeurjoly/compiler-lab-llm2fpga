@@ -44,6 +44,8 @@ The first campaign optimizes RC as the fast search target, using TinyStories-1M 
 
 This optimization workflow is blocked until a baseline RC artifact completes end-to-end inference and passes the RTL-qualified gate. EQY and performance instrumentation apply only after the functional contract has been established.
 
+The immediate engineering priority is therefore baseline RC functional qualification: reproduce and fix the inference path first, then implement EQY and the measurement-driven optimization loop.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
