@@ -36,6 +36,8 @@ The workflow distinguishes `RTL-qualified` (host simulation, EQY where applicabl
 
 Hardware validation must flash and exercise the exact content-addressed RTL-qualified derivation, recording the Nix/store identity plus bitstream and source-closure hashes; manual rebuilds or edited bitstreams are not valid evidence.
 
+Claims about achieved board clock, DDR3 bandwidth, or end-to-end throughput require measurements from that exact hardware-qualified artifact. Host simulation, Yosys, and nextpnr estimates are screening evidence only.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.
