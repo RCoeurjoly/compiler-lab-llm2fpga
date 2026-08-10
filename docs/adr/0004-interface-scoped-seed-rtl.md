@@ -34,6 +34,8 @@ Board validation is gated: a candidate must first pass PyTorch-backed RTL simula
 
 The workflow distinguishes `RTL-qualified` (host simulation, EQY where applicable, synthesis, place-and-route, and fit) from `hardware-qualified` (all of those plus successful target-board execution and recorded physical DDR3/timing/throughput measurements).
 
+Hardware validation must flash and exercise the exact content-addressed RTL-qualified derivation, recording the Nix/store identity plus bitstream and source-closure hashes; manual rebuilds or edited bitstreams are not valid evidence.
+
 ## Considered options
 
 - Treat the complete seed RTL structure as the EQY contract. Rejected because it would unnecessarily lock optimization to compiler artifacts.

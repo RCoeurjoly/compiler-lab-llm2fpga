@@ -242,6 +242,10 @@ _Avoid_: hardware-qualified, board-proven performance
 An RTL-qualified candidate that also executes successfully on the target board and has measured physical timing, throughput, and DDR3 behavior recorded in its receipt.
 _Avoid_: simulation-only qualification, unmeasured board claim
 
+**Hardware artifact identity**:
+Board validation must flash and exercise the exact content-addressed RTL-qualified derivation, preserving its Nix/store identity and recording the bitstream and source-closure hashes in the hardware receipt.
+_Avoid_: manual rebuild, edited bitstream, hashless board result
+
 **Staged validation roadmap**:
 The ordered program starts direct raw-SV closure and host-only DDR3 integration in parallel, reaches one exact DDR3-backed RC input, then its selected-input campaign, a bounded TinyStories-1M run through the same lowering, SV, Yosys, and nextpnr-xilinx path, and finally a deliberate choice between scaling and further RC optimization. A scale estimate is the fallback only when that direct probe reaches a recorded resource limit.
 _Avoid_: scale-first rewrite, exhaustive-simulation prerequisite
