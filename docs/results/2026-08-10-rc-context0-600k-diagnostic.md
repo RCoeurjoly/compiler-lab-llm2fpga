@@ -49,3 +49,31 @@ fresh closure.  The Futil SHA is identical to the retained closure
 (`fe663546…`), while the regenerated SV contains a materially different
 HardFloat primitive-definition closure.  This makes primitive/tool closure
 provenance the next investigation target; no equivalence claim is made.
+
+## Divsqrt-handshake repair
+
+The retained passing diagnostic closure showed that `std_divSqrtFN` must issue
+one HardFloat request per Calyx transaction and complete on `outValid`. The
+fresh Nix closure therefore applies `fix_sv_divsqrt_handshake.py` after the
+round-even repair. Receipt:
+
+```text
+closure=/nix/store/5qm739maxpd9cvg5jwkdm316s8kr7g35-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv-no-synthesis
+sv_sha256=2262298433271af636683517bba9c7641d02097de314b3dac4f4e3c0843e83f7
+divsqrt_repair_count=1
+```
+
+The strict Verilator context-0 run used the frozen image, manifest, memory
+ABI, f32 constant proof, and exact one-record PyTorch oracle. It completed at
+cycle 505,273 and passed all six raw logits and the final token:
+
+```text
+CASE_PASS index=0 cycles=505273 expected_codes=18,-93,-34,7,20,1 observed_codes=18,-93,-34,7,20,1 expected_token=4 observed_token=4 done=1 completion_count=1 within_bound=1 reset_complete=1 reset_cycles=3 reset_ordinal=1 write_mask=111111
+SHARD_PASS start=0 count=1 completed=1 min_cycles=505273 max_cycles=505273
+```
+
+Verilator reported 990.425 s wall time (8-thread CPU time 7919.322 s), which
+explains why a one-minute host timeout is not a meaningful equivalence budget.
+The repository frozen-four derivation is still running against this same
+closure; no multi-context equivalence claim is made until its durable summary
+passes.
