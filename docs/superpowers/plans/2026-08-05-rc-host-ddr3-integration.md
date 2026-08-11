@@ -1,5 +1,9 @@
 # Host-only DDR3-backed RC integration plan
 
+> **Status:** Deferred by ADR-0005. Execute this scaling plan only after the
+> fully on-chip inference checkpoint and its XC7K480T fit or failure boundary
+> have been recorded.
+
 > Implementation plan; execute only after selecting an execution mode.
 
 ## Goal

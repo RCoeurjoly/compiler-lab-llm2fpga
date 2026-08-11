@@ -68,6 +68,15 @@
 - **Baseline RC memory stage** — The initial complete V=6 RC implementation
   using its frozen baseline memory realization. It must be lowered, verified,
   and tested on FPGA before DDR3 externalization becomes an experiment.
+- **Fully on-chip inference checkpoint** — Complete multi-token RC inference
+  with frozen weights and all token-loop state resident in FPGA logic or on-chip
+  memory, with no DDR3 controller or DDR3 traffic in the token loop. Simulation
+  establishes behavior; mapped synthesis and constrained XC7K480T P&R establish
+  the device-specific fit or failure boundary.
+- **DDR3 scaling stage** — The post-checkpoint architecture that externalizes
+  weights and, when necessary, context or KV state to increase model capacity.
+  It repeats the applicable equivalence, synthesis, P&R, and performance gates
+  and never substitutes for the fully on-chip inference checkpoint.
 - **RC FPGA checkpoint** — A reproducible XC7K480T bitstream plus a board-captured
   vertical-slice result containing the six raw codes, token ID, and latency
   compared with frozen PT2E. Build success or `done` alone does not qualify.
