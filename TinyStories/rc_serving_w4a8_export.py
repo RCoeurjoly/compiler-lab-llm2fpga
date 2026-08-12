@@ -32,6 +32,10 @@ from .rc_serving_w4a8_contract import (
     WEIGHT_MIN,
     validate_manifest,
 )
+from .rc_serving_contract import load_trace
+from .rc_serving_w4a8_cache_abi import TensorCachePhaseWrapper, flatten_dynamic_cache
+from .rc_serving_evidence import enable_hf_dynamic_cache_export_support, tensor_record
+from .rc_serving_w4a8_source import build_w4a8_source_model, fresh_w4a8_phase_invocation
 
 
 @dataclass(frozen=True)
@@ -63,9 +67,12 @@ class FrozenTensorRecord:
 
 
 def convert_w4a8_program(
-    model: torch.nn.Module, example_inputs: tuple[object, ...]
+    model: torch.nn.Module,
+    example_inputs: tuple[object, ...],
+    example_kwargs: Mapping[str, object] | None = None,
 ) -> torch.export.ExportedProgram:
-    exported = torch.export.export(model, example_inputs, strict=False)
+    kwargs = dict(example_kwargs or {})
+    exported = torch.export.export(model, example_inputs, kwargs=kwargs, strict=False)
     quantizer = XNNPACKQuantizer().set_global(
         get_symmetric_quantization_config(
             is_dynamic=False,
@@ -77,14 +84,33 @@ def convert_w4a8_program(
     )
     prepared = prepare_pt2e(exported.module(), quantizer)
     with torch.no_grad():
-        prepared(*example_inputs)
+        prepared(*example_inputs, **kwargs)
     converted = convert_pt2e(prepared)
     move_exported_model_to_eval(converted)
-    return torch.export.export(converted, example_inputs, strict=False)
+    return torch.export.export(converted, example_inputs, kwargs=kwargs, strict=False)
 
 
 def integer_weight_tensors(exported: object) -> dict[str, torch.Tensor]:
     return dict(_named_integer_weights(exported))
+
+
+def phase_bundle_manifest(phase_digests: Mapping[str, str]) -> dict[str, object]:
+    if tuple(phase_digests) != PHASE_NAMES:
+        raise ValueError("converted phases are not in canonical order")
+    return {
+        "schema_version": 1,
+        "artifact_kind": "w4a8-serving-phase-bundle",
+        "model_key": W4A8_MODEL_KEY,
+        "numeric_format": "pt2e-static-w4a8",
+        "converted_phases": [
+            {
+                "name": name,
+                "path": name,
+                "exported_program_sha256": phase_digests[name],
+            }
+            for name in PHASE_NAMES
+        ],
+    }
 
 
 def pack_signed_nibbles(values: torch.Tensor) -> bytes:
@@ -202,3 +228,57 @@ def write_frozen_tensor_bundle(
     (out_dir / "manifest.json").write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+
+
+def _write_json(path: Path, payload: object) -> None:
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def materialize_w4a8_bundle(model_path: Path, trace_path: Path, out_dir: Path) -> None:
+    trace = load_trace(trace_path)
+    out_dir.mkdir(parents=True, exist_ok=False)
+    converted_phases: dict[str, torch.export.ExportedProgram] = {}
+    phase_digests: dict[str, str] = {}
+    enable_hf_dynamic_cache_export_support()
+    for phase_name in PHASE_NAMES:
+        torch._dynamo.reset()
+        model = build_w4a8_source_model(model_path)
+        invocation = fresh_w4a8_phase_invocation(model, trace, phase_name)
+        cache_inputs = (
+            ()
+            if invocation.past_key_values is None
+            else flatten_dynamic_cache(invocation.past_key_values, expected_layers=2)
+        )
+        wrapper = TensorCachePhaseWrapper(model, invocation.phase, expected_layers=2)
+        example_inputs = (invocation.input_ids,) + cache_inputs
+        converted = convert_w4a8_program(wrapper, example_inputs)
+        phase_dir = out_dir / phase_name
+        phase_dir.mkdir()
+        exported_path = phase_dir / "exported.pt2"
+        torch.export.save(converted, exported_path)
+        (phase_dir / "graph.txt").write_text(str(converted.graph) + "\n", encoding="utf-8")
+        (phase_dir / "graph-module.py").write_text(converted.graph_module.code + "\n", encoding="utf-8")
+        (phase_dir / "graph-signature.txt").write_text(str(converted.graph_signature) + "\n", encoding="utf-8")
+        with torch.no_grad():
+            output = converted.module()(*example_inputs)
+        if not isinstance(output, tuple) or len(output) != 5 or not isinstance(output[0], torch.Tensor):
+            raise RuntimeError(f"{phase_name} converted program did not return logits and cache")
+        _write_json(
+            phase_dir / "reference.json",
+            {
+                "name": phase_name,
+                "input_token_ids": [int(value) for value in invocation.input_ids[0].tolist()],
+                "last_logits": tensor_record(output[0][0, -1, :]),
+                "cache_leaves": [tensor_record(tensor) for tensor in output[1:]],
+            },
+        )
+        digest = hashlib.sha256(exported_path.read_bytes()).hexdigest()
+        phase_digests[phase_name] = digest
+        converted_phases[phase_name] = converted
+
+    frozen_dir = out_dir / "frozen"
+    write_frozen_tensor_bundle(converted_phases, frozen_dir)
+    bundle = phase_bundle_manifest(phase_digests)
+    bundle["frozen_manifest"] = "frozen/manifest.json"
+    bundle["weights"] = "frozen/weights.bin"
+    _write_json(out_dir / "manifest.json", bundle)

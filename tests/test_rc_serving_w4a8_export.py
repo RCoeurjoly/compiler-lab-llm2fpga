@@ -33,6 +33,36 @@ class RcServingW4A8ExportTest(unittest.TestCase):
         self.assertTrue(all(int(tensor.min()) >= -8 for tensor in weights.values()))
         self.assertTrue(all(int(tensor.max()) <= 7 for tensor in weights.values()))
 
+    def test_phase_bundle_manifest_names_converted_programs(self) -> None:
+        manifest = export.phase_bundle_manifest(
+            {
+                "prefill-8": "a" * 64,
+                "decode-8": "b" * 64,
+                "decode-9": "c" * 64,
+            }
+        )
+        self.assertEqual(manifest["model_key"], export.W4A8_MODEL_KEY)
+        self.assertEqual(manifest["numeric_format"], "pt2e-static-w4a8")
+        self.assertEqual(
+            [phase["name"] for phase in manifest["converted_phases"]],
+            ["prefill-8", "decode-8", "decode-9"],
+        )
+
+    def test_phase_bundle_manifest_rejects_noncanonical_order(self) -> None:
+        with self.assertRaisesRegex(ValueError, "canonical order"):
+            export.phase_bundle_manifest(
+                {"decode-8": "b" * 64, "prefill-8": "a" * 64, "decode-9": "c" * 64}
+            )
+
+    def test_materializer_cli_is_dedicated_to_w4a8_bundle(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "scripts/pipeline/materialize_rc_serving_w4a8.py").read_text()
+        self.assertIn("materialize_w4a8_bundle", source)
+        self.assertIn("--model-path", source)
+        self.assertIn("--trace", source)
+        self.assertIn("--out-dir", source)
+        self.assertNotIn("materialize_rc_serving_direct_exports", source)
+
     def test_pack_signed_nibbles_uses_low_even_high_odd_order(self) -> None:
         values = torch.tensor([-8, -1, 0, 7, 3], dtype=torch.int8)
         self.assertEqual(export.pack_signed_nibbles(values), bytes([0xF8, 0x70, 0x03]))

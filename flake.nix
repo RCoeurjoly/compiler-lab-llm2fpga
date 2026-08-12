@@ -435,6 +435,10 @@
           inherit pkgs pythonWithTinyStoriesTorchAO tinyStories1m;
           sourceRoot = ./.;
         };
+        rcServingW4A8System = import ./nix/rc-serving-w4a8-system.nix {
+          inherit pkgs pythonWithTinyStoriesTorchAO tinyStories1m;
+          sourceRoot = ./.;
+        };
         modelRegistryNoHandshake = import ./nix/models.nix {
           registerModel = pipelineLib.registerNoHandshakeModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
@@ -2516,6 +2520,14 @@ PY
             rcServingSystem.decode8PytorchExported;
           "tinystories-w8a8-rc-serving-mask10-vocab6-width2-decode-9-pytorch-exported" =
             rcServingSystem.decode9PytorchExported;
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-frozen-bundle" =
+            rcServingW4A8System.frozenBundle;
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-pytorch-exported" =
+            rcServingW4A8System.prefill8PytorchExported;
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-pytorch-exported" =
+            rcServingW4A8System.decode8PytorchExported;
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-pytorch-exported" =
+            rcServingW4A8System.decode9PytorchExported;
           "tinystories-w8a8-rc-nonlinear-slices" = quantizedRcNonlinearSlices;
           "tinystories-w8a8-rc-nonlinear-lowering-frontier" =
             quantizedRcNonlinearFrontier;
