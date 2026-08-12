@@ -959,6 +959,19 @@ PY
               ${circt}/bin/circt-translate ${calyx}/bin/calyx \
               ${calyx}/share/calyx ${rcPolynomialExpCalyx}/calyx "$out"
           '';
+        rcSynthesisBaseline = import ./nix/rc-synthesis-baseline.nix {
+          inherit pkgs python;
+          yosys = yosysPkg;
+          inherit yosysSlang;
+          nextpnr = task3MainLib.task3Toolchain.nextpnr;
+          chipdb = task3MainLib.task3Toolchain.chipdb;
+          # Content-addressed snapshot of the immutable, functionally
+          # validated closure. Do not silently replace it with a regeneration
+          # from a dirty worktree.
+          sourceSvGz = ./artifacts/rc-validated-main.sv.gz;
+          normalizer = ./scripts/pipeline/fix_sv_synthesis_frontend.py;
+          evidenceWriter = ./scripts/pipeline/write_rc_pnr_evidence.py;
+        };
         rcPolynomialExpHwSv = pkgs.runCommand
           "tinystories-w8a8-rc-polynomial-exp-calyx-hw-sv" {
             nativeBuildInputs = [ circt python pkgs.bash ];
@@ -2477,6 +2490,14 @@ PY
           "tinystories-w8a8-rc-verilator-config-matrix" = rcVerilatorConfigMatrix;
           "tinystories-w8a8-rc-polynomial-exp-sv-flat" = rcPolynomialExpSvFlat;
           "tinystories-w8a8-rc-polynomial-exp-sv-no-synthesis" = rcPolynomialExpSvNoSynthesis;
+          "tinystories-w8a8-rc-xc7k480t-normalized-sv" =
+            rcSynthesisBaseline.normalized;
+          "tinystories-w8a8-rc-xc7k480t-mapped" =
+            rcSynthesisBaseline.mapped;
+          "tinystories-w8a8-rc-xc7k480t-dram-compatible" =
+            rcSynthesisBaseline.dramCompatible;
+          "tinystories-w8a8-rc-xc7k480t-nextpnr-evidence" =
+            rcSynthesisBaseline.pnrEvidence;
           "tinystories-w8a8-rc-polynomial-exp-calyx-hw-sv" = rcPolynomialExpHwSv;
           "tinystories-w8a8-pt2e-graph-shape-audit" =
             tinystoriesW8A8Pt2eGraphShapeAudit;

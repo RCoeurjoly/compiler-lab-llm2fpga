@@ -615,6 +615,9 @@
             });
           yosys = yosysPkg;
           yosysSlang = yosysSlang;
+          nextpnr = openXC7Nextpnr;
+          chipdb = fpgaChipdb;
+          part = "xc7k480tffg1156-1";
         };
 
         mkTask3XilinxUtilization = { name, modelIl, topName, capacities
