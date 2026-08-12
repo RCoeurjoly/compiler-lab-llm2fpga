@@ -103,6 +103,16 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         self.assertEqual(dtype, "torch.bool")
         self.assertEqual(shape, (3,))
 
+    def test_fixture_preloads_inputs_and_dumps_all_phase_outputs(self) -> None:
+        rtl = tuple(module.SvMemoryPort(i, 32, 2) for i in range(4))
+        roles = module.PhaseRoles((0, 1), (2, 3), 2, (3,))
+        fixture = module.render_fixture(rtl, roles, timeout_cycles=123)
+        self.assertIn('$readmemh("mem0.hex", mem0);', fixture)
+        self.assertNotIn('$readmemh("mem2.hex", mem2);', fixture)
+        self.assertIn('$writememh("out2.hex", mem2);', fixture)
+        self.assertIn('$writememh("out3.hex", mem3);', fixture)
+        self.assertIn("timeout_counter < 123", fixture)
+
 
 if __name__ == "__main__":
     unittest.main()
