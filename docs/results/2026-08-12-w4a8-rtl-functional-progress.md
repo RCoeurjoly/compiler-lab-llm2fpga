@@ -101,3 +101,36 @@ port 95. The next diagnostic must trace the floating projection value entering
 the FP-to-int quantization that produces those `0xdd` words; neither the memory
 fixture nor `std_intToFp` should be changed based on the end-of-run scratch
 dump.
+
+## First key-projection MAC localization
+
+Two further cycle-local traces followed the first layer-0 key value backward
+through its repeated QDQ and initial quantization. The Calyx allocation numbers
+below are aggressively reused scratch memories, so these observations are tied
+to the named FSM intervals rather than final memory contents.
+
+- FSM states 908 through 923 read `arg_mem_93[0:1]` as
+  `0x00000000, 0x00000000`, divide by the layer-0 key scale, and write
+  `arg_mem_95[0:1]` as `0xdd, 0xdd` (-35 in signed i8). Thus the first key
+  quantizer receives exact float zero; the later QDQ path is not losing a
+  nonzero value.
+- FSM states 696 through 707 read the initial key-quantized buffer
+  `arg_mem_72[0:1]` as `0xdd, 0xdd`, correctly subtract -35, and write
+  `arg_mem_93[0:1]` as float zero. This proves the zero already exists at the
+  initial key projection quantizer.
+- FSM states 630 through 684 cover that projection's 2-by-2 signed-int8 MAC,
+  i32-to-f32 conversion, scaling, and first quantizer. `arg_mem_92[0:1]`, the
+  two i32 accumulators, is initialized to zero and every one of its four MAC
+  writes stores zero. `arg_mem_71[0:1]` consequently receives float zero and
+  the first quantizer writes `arg_mem_72[0:1] = 0xdd, 0xdd`.
+
+The earliest demonstrated bad boundary is now the layer-0 key projection's
+i8-by-i8 MAC, before all floating-point conversion and quantization. The next
+diagnostic is to capture both signed operands and the multiply/add result for
+the four accumulator writes. That will distinguish zero/corrupt activation or
+weight inputs from integer multiply/add lowering or scheduling failure.
+
+Disposable trace logs from this investigation are
+`/tmp/w4a8-tracekey-run.log` and `/tmp/w4a8-tracekeydot-run.log`; the generated
+SV remains the immutable Nix closure recorded above. The temporary paths are
+diagnostic breadcrumbs, not required durable inputs.
