@@ -2567,6 +2567,18 @@ PY
             rcServingW4A8System.decode8PytorchExported;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-pytorch-exported" =
             rcServingW4A8System.decode9PytorchExported;
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-flat-scf" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-flat-scf";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-flat-scf" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-flat-scf";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-flat-scf" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-flat-scf";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx";
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv" =
             rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv";
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv" =

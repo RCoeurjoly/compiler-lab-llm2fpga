@@ -36,6 +36,13 @@ class RcServingW4A8NixTest(unittest.TestCase):
             self.assertIn(model, flake)
             self.assertIn(f'"{model}-calyx-native-sv"', flake)
 
+    def test_each_phase_exports_semantic_handoffs_for_rtl_fixture_generation(self) -> None:
+        flake = (ROOT / "flake.nix").read_text()
+        for phase in ("prefill-8", "decode-8", "decode-9"):
+            model = f"{KEY}-{phase}"
+            self.assertIn(f'"{model}-flat-scf"', flake)
+            self.assertIn(f'"{model}-calyx"', flake)
+
     def test_each_phase_explicitly_opts_into_resource_scout_math(self) -> None:
         flake = (ROOT / "flake.nix").read_text()
         pipeline = (ROOT / "nix/pipeline.nix").read_text()
