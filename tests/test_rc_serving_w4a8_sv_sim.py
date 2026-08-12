@@ -113,6 +113,14 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         self.assertIn('$writememh("out3.hex", mem3);', fixture)
         self.assertIn("timeout_counter < 123", fixture)
 
+    def test_fixture_can_dump_selected_scratch_ports(self) -> None:
+        rtl = tuple(module.SvMemoryPort(i, 32, 2) for i in range(4))
+        roles = module.PhaseRoles((0, 1), (2, 3), 2, (3,))
+        fixture = module.render_fixture(
+            rtl, roles, timeout_cycles=123, debug_ports=(1,)
+        )
+        self.assertIn('$writememh("debug1.hex", mem1);', fixture)
+
     def test_hex_output_words_decode_little_endian_float_payload(self) -> None:
         text = "// 0x00000000\n3f800000\nc0200000\n"
         payload = module.decode_hex_words(text, width=32, count=2)

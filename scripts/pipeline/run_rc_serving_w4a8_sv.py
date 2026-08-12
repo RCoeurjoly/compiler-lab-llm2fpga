@@ -220,7 +220,8 @@ def _flatten(value: object) -> list[object]:
 
 
 def render_fixture(
-    rtl: tuple[SvMemoryPort, ...], roles: PhaseRoles, *, timeout_cycles: int
+    rtl: tuple[SvMemoryPort, ...], roles: PhaseRoles, *, timeout_cycles: int,
+    debug_ports: tuple[int, ...] = (),
 ) -> str:
     if timeout_cycles <= 0:
         raise ValueError("timeout_cycles must be positive")
@@ -267,6 +268,10 @@ def render_fixture(
         if number in roles.inputs:
             initialization.append(f'  $readmemh("mem{number}.hex", mem{number});')
     dumps = [f'  $writememh("out{number}.hex", mem{number});' for number in roles.outputs]
+    dumps.extend(
+        f'  $writememh("debug{number}.hex", mem{number});'
+        for number in debug_ports
+    )
     return "\n".join(
         [
             "`timescale 1ns/1ps",
@@ -389,7 +394,12 @@ def _run(args: argparse.Namespace) -> int:
         inputs.append(
             {"port": number, "shape": list(shape), "dtype": dtype, "sha256": _sha256(payload)}
         )
-    fixture = render_fixture(rtl, roles, timeout_cycles=args.timeout_cycles)
+    debug_ports = tuple(args.debug_port or ())
+    if any(number < 0 or number >= len(rtl) for number in debug_ports):
+        raise ValueError("debug port is outside the generated RTL memory ABI")
+    fixture = render_fixture(
+        rtl, roles, timeout_cycles=args.timeout_cycles, debug_ports=debug_ports
+    )
     fixture_path = args.work_dir / "tb.sv"
     fixture_path.write_text(fixture, encoding="utf-8")
     normalized_sv_path = args.work_dir / "main.normalized.sv"
@@ -473,6 +483,7 @@ def main() -> None:
     parser.add_argument("--jobs", type=int, default=1)
     parser.add_argument("--timeout-cycles", type=int, default=100_000_000)
     parser.add_argument("--atol", type=float, default=1e-4)
+    parser.add_argument("--debug-port", action="append", type=int)
     args = parser.parse_args()
     if args.jobs <= 0:
         parser.error("--jobs must be positive")
