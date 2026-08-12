@@ -147,3 +147,37 @@ def validate_abi(
                 f"arg_mem_{memory.number} depth {port.depth} is smaller than "
                 f"semantic depth {required_depth}"
             )
+
+
+def runtime_values(exported: object) -> tuple[object, ...]:
+    positional, keyword = exported.example_inputs
+    if keyword:
+        raise ValueError("W4A8 phase fixture requires positional example inputs")
+    user_inputs = iter(positional)
+    values: list[object] = []
+    for spec in exported.graph_signature.input_specs:
+        kind = spec.kind.name
+        if kind == "PARAMETER":
+            continue
+        if kind == "USER_INPUT":
+            try:
+                values.append(next(user_inputs))
+            except StopIteration as error:
+                raise ValueError("graph signature has more user inputs than examples") from error
+            continue
+        if kind == "BUFFER":
+            value = exported.state_dict.get(spec.target)
+            if value is None:
+                value = exported.constants.get(spec.target)
+            if value is None:
+                raise ValueError(f"missing persistent buffer {spec.target}")
+            values.append(value)
+            continue
+        raise ValueError(f"unsupported ExportedProgram input kind: {kind}")
+    try:
+        next(user_inputs)
+    except StopIteration:
+        pass
+    else:
+        raise ValueError("example inputs remain after graph signature traversal")
+    return tuple(values)

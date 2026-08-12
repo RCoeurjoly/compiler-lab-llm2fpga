@@ -3,6 +3,7 @@ import struct
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -73,6 +74,20 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
             module.validate_abi(semantic, (module.SvMemoryPort(0, 8, 2),))
         with self.assertRaisesRegex(ValueError, "width"):
             module.validate_abi(semantic, (module.SvMemoryPort(0, 32, 4),))
+
+    def test_runtime_values_follow_buffer_then_user_input_signature_order(self) -> None:
+        specs = [
+            SimpleNamespace(kind=SimpleNamespace(name="PARAMETER"), target="weight"),
+            SimpleNamespace(kind=SimpleNamespace(name="BUFFER"), target="buffer"),
+            SimpleNamespace(kind=SimpleNamespace(name="USER_INPUT"), target=None),
+        ]
+        exported = SimpleNamespace(
+            graph_signature=SimpleNamespace(input_specs=specs),
+            state_dict={"weight": "w", "buffer": "b"},
+            constants={},
+            example_inputs=(("token",), {}),
+        )
+        self.assertEqual(module.runtime_values(exported), ("b", "token"))
 
 
 if __name__ == "__main__":
