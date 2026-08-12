@@ -134,15 +134,19 @@ let
       test -f "$out/blockers.json"
     '';
 
-  mkScfToCalyxDerivation = { name, flatScf, enableScoutMath ? false }:
+  mkScfToCalyxDerivation = { name, flatScf, calyxMathProfile ? "none" }:
     let
-      scoutMathPass = pkgs.lib.optionalString enableScoutMath
-        ",llm2fpga-lower-scout-math-for-calyx,llm2fpga-lower-constant-fpowi-for-calyx";
+      mathPasses = if calyxMathProfile == "none" then ""
+        else if calyxMathProfile == "scout" then
+          ",llm2fpga-lower-scout-math-for-calyx,llm2fpga-lower-constant-fpowi-for-calyx"
+        else if calyxMathProfile == "equivalence-candidate" then
+          ",llm2fpga-lower-polynomial-exp-for-calyx,llm2fpga-lower-constant-fpowi-for-calyx,llm2fpga-lower-rational-tanh-for-calyx"
+        else throw "unsupported Calyx math profile: ${calyxMathProfile}";
     in pkgs.runCommand "${name}-calyx" { buildInputs = [ mlir circt python ]; } ''
       tmp_pre_calyx="$(mktemp /tmp/no_handshake_pre_calyx_XXXXXX.mlir)"
       ${mlir}/bin/mlir-opt ${flatScf}/flat.scf.mlir \
         --load-pass-plugin=${mlirPasses}/lib/LLM2FPGAMLIRPasses.so \
-        --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx${scoutMathPass},llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
+        --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx${mathPasses},llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
         -o "$tmp_pre_calyx"
       export CALYX_PREFLIGHT_REPORT=${pipelineScripts}/calyx_preflight_report.py
       ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
@@ -423,7 +427,7 @@ let
     , tosaFromTorch ? null, linalgFromStages ?
       ({ name, torch, ... }: mkLinalgDerivation { inherit name torch; })
     , allowHwExterns ? false, fpPrimsSv ? null
-    , slangPerFileExternModules ? false, enableScoutMath ? false }:
+    , slangPerFileExternModules ? false, calyxMathProfile ? "none" }:
     let
       unavailable = stage: reason:
         mkUnavailableStage { inherit name stage reason; };
@@ -458,7 +462,7 @@ let
           inherit (self) scf;
         };
         calyx = mkScfToCalyxDerivation {
-          inherit name enableScoutMath;
+          inherit name calyxMathProfile;
           flatScf = self."flat-scf";
         };
         "calyx-native-sv" = mkCalyxNativeSvDerivation {
@@ -532,7 +536,7 @@ let
     , source ? { type = "local"; }, hfSnapshot ? null, pytorchToolchain ? [ ]
     , pytorchExportedCommand, pytorchExportedBuildInputs ? pytorchToolchain
     , allowHwExterns ? false, fpPrimsSv ? null
-    , slangPerFileExternModules ? false, enableScoutMath ? false }:
+    , slangPerFileExternModules ? false, calyxMathProfile ? "none" }:
     let
       resolvedHfSnapshot = mkHfSnapshotDerivation { inherit name hfSnapshot; };
       resolvedPyTorchExported = mkPyTorchExportedDerivation {
@@ -553,7 +557,7 @@ let
         pytorchExported = resolvedPyTorchExported;
         torchStage = resolvedTorchStage;
         inherit allowHwExterns fpPrimsSv slangPerFileExternModules
-          enableScoutMath;
+          calyxMathProfile;
       };
       model = {
         inherit key name description;

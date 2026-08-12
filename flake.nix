@@ -457,10 +457,10 @@
               };
               allowHwExterns = true;
               slangPerFileExternModules = true;
-              # Explicitly provisional: this legalizes nonlinear ops for the
-              # synthesis resource scout. Simulation decides whether it can
-              # serve as an equivalence candidate.
-              enableScoutMath = true;
+              # Use the nonlinear route already validated by the W8A8 RC
+              # equivalence campaign; this W4A8 phase fixture independently
+              # checks its logits and cache leaves.
+              calyxMathProfile = "equivalence-candidate";
               inherit fpPrimsSv;
               hfSnapshot = tinyStories1m.snapshot;
               pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];

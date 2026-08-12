@@ -43,12 +43,13 @@ class RcServingW4A8NixTest(unittest.TestCase):
             self.assertIn(f'"{model}-flat-scf"', flake)
             self.assertIn(f'"{model}-calyx"', flake)
 
-    def test_each_phase_explicitly_opts_into_resource_scout_math(self) -> None:
+    def test_each_phase_explicitly_opts_into_equivalence_candidate_math(self) -> None:
         flake = (ROOT / "flake.nix").read_text()
         pipeline = (ROOT / "nix/pipeline.nix").read_text()
-        self.assertIn("enableScoutMath = true", flake)
-        self.assertIn("enableScoutMath ? false", pipeline)
-        self.assertIn("optionalString enableScoutMath", pipeline)
+        self.assertIn('calyxMathProfile = "equivalence-candidate"', flake)
+        self.assertIn('calyxMathProfile ? "none"', pipeline)
+        self.assertIn("llm2fpga-lower-polynomial-exp-for-calyx", pipeline)
+        self.assertIn("llm2fpga-lower-rational-tanh-for-calyx", pipeline)
         self.assertIn("llm2fpga-lower-constant-fpowi-for-calyx", pipeline)
 
 
