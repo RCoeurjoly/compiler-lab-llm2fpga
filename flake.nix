@@ -439,6 +439,45 @@
           inherit pkgs pythonWithTinyStoriesTorchAO tinyStories1m;
           sourceRoot = ./.;
         };
+        rcServingW4A8Registry = builtins.listToAttrs (map (phase:
+          let
+            name = "${rcServingW4A8System.modelKey}-${phase.name}";
+          in {
+            inherit name;
+            value = pipelineLib.registerNoHandshakeModel {
+              key = name;
+              inherit name;
+              description =
+                "Tensor-cache ${phase.name} W4A8 serving phase compiler oracle.";
+              source = {
+                type = "derived";
+                profile = "stateful-serving-w4a8-tensor-cache-phase";
+                inherit (phase) name;
+                quantization = "pt2e-static-w4a8";
+              };
+              allowHwExterns = true;
+              slangPerFileExternModules = true;
+              # Explicitly provisional: this legalizes nonlinear ops for the
+              # synthesis resource scout. Simulation decides whether it can
+              # serve as an equivalence candidate.
+              enableScoutMath = true;
+              inherit fpPrimsSv;
+              hfSnapshot = tinyStories1m.snapshot;
+              pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
+              pytorchExportedCommand = ''
+                ln -s ${phase.exported}/exported.pt2 "$out/exported.pt2"
+                ln -s ${phase.exported}/reference.json "$out/reference.json"
+                ln -s ${phase.exported}/w4a8-manifest.json "$out/w4a8-manifest.json"
+                ln -s ${phase.exported}/weights.bin "$out/weights.bin"
+              '';
+            };
+          }) [
+            { name = "prefill-8"; exported = rcServingW4A8System.prefill8PytorchExported; }
+            { name = "decode-8"; exported = rcServingW4A8System.decode8PytorchExported; }
+            { name = "decode-9"; exported = rcServingW4A8System.decode9PytorchExported; }
+          ]);
+        rcServingW4A8PipelinePackages =
+          pipelineLib.pipelineStagePackagesFromRegistry rcServingW4A8Registry;
         modelRegistryNoHandshake = import ./nix/models.nix {
           registerModel = pipelineLib.registerNoHandshakeModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
@@ -2528,6 +2567,12 @@ PY
             rcServingW4A8System.decode8PytorchExported;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-pytorch-exported" =
             rcServingW4A8System.decode9PytorchExported;
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv";
           "tinystories-w8a8-rc-nonlinear-slices" = quantizedRcNonlinearSlices;
           "tinystories-w8a8-rc-nonlinear-lowering-frontier" =
             quantizedRcNonlinearFrontier;

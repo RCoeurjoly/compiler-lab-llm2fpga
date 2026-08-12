@@ -27,6 +27,23 @@ class RcServingW4A8NixTest(unittest.TestCase):
         self.assertIn('cmp "$out/manifest.json" repeat/manifest.json', system)
         self.assertIn('cmp "$out/frozen/weights.bin" repeat/frozen/weights.bin', system)
 
+    def test_each_phase_enters_the_existing_no_handshake_pipeline(self) -> None:
+        flake = (ROOT / "flake.nix").read_text()
+        self.assertIn("rcServingW4A8Registry", flake)
+        self.assertIn("registerNoHandshakeModel", flake)
+        for phase in ("prefill-8", "decode-8", "decode-9"):
+            model = f"{KEY}-{phase}"
+            self.assertIn(model, flake)
+            self.assertIn(f'"{model}-calyx-native-sv"', flake)
+
+    def test_each_phase_explicitly_opts_into_resource_scout_math(self) -> None:
+        flake = (ROOT / "flake.nix").read_text()
+        pipeline = (ROOT / "nix/pipeline.nix").read_text()
+        self.assertIn("enableScoutMath = true", flake)
+        self.assertIn("enableScoutMath ? false", pipeline)
+        self.assertIn("optionalString enableScoutMath", pipeline)
+        self.assertIn("llm2fpga-lower-constant-fpowi-for-calyx", pipeline)
+
 
 if __name__ == "__main__":
     unittest.main()

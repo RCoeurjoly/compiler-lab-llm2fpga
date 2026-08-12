@@ -49,7 +49,7 @@ class CalyxMathLegalizationTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("llm2fpga-lower-scout-math-for-calyx", pipeline)
-        self.assertIn('name == "tinystories-w8a8"', pipeline)
+        self.assertIn("optionalString enableScoutMath", pipeline)
         self.assertIn("PassRegistration<LowerScoutMathForCalyxPass>", source)
         self.assertIn("math::ExpOp", source)
         self.assertIn("math::PowFOp", source)

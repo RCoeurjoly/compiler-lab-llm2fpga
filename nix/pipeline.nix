@@ -134,10 +134,10 @@ let
       test -f "$out/blockers.json"
     '';
 
-  mkScfToCalyxDerivation = { name, flatScf }:
+  mkScfToCalyxDerivation = { name, flatScf, enableScoutMath ? false }:
     let
-      scoutMathPass = pkgs.lib.optionalString (name == "tinystories-w8a8")
-        ",llm2fpga-lower-scout-math-for-calyx";
+      scoutMathPass = pkgs.lib.optionalString enableScoutMath
+        ",llm2fpga-lower-scout-math-for-calyx,llm2fpga-lower-constant-fpowi-for-calyx";
     in pkgs.runCommand "${name}-calyx" { buildInputs = [ mlir circt python ]; } ''
       tmp_pre_calyx="$(mktemp /tmp/no_handshake_pre_calyx_XXXXXX.mlir)"
       ${mlir}/bin/mlir-opt ${flatScf}/flat.scf.mlir \
@@ -171,6 +171,7 @@ let
       export CALYX_NORMALIZE_FOR_EXPORT=${pipelineScripts}/normalize_calyx_for_export.py
       export CALYX_NORMALIZE_FUTIL_CONSTANTS=${pipelineScripts}/normalize_futil_float_constants.py
       export CALYX_FIX_FUTIL_FPTOSI_HANDSHAKE=${pipelineScripts}/fix_futil_fptosi_handshake.py
+      export CALYX_VERIFY_F32_CONSTANT_BITS=${pipelineScripts}/verify_calyx_f32_constant_bits.py
       ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
         ${circt}/bin/circt-translate \
         ${calyxTool}/bin/calyx \
@@ -422,7 +423,7 @@ let
     , tosaFromTorch ? null, linalgFromStages ?
       ({ name, torch, ... }: mkLinalgDerivation { inherit name torch; })
     , allowHwExterns ? false, fpPrimsSv ? null
-    , slangPerFileExternModules ? false }:
+    , slangPerFileExternModules ? false, enableScoutMath ? false }:
     let
       unavailable = stage: reason:
         mkUnavailableStage { inherit name stage reason; };
@@ -457,7 +458,7 @@ let
           inherit (self) scf;
         };
         calyx = mkScfToCalyxDerivation {
-          inherit name;
+          inherit name enableScoutMath;
           flatScf = self."flat-scf";
         };
         "calyx-native-sv" = mkCalyxNativeSvDerivation {
@@ -531,7 +532,7 @@ let
     , source ? { type = "local"; }, hfSnapshot ? null, pytorchToolchain ? [ ]
     , pytorchExportedCommand, pytorchExportedBuildInputs ? pytorchToolchain
     , allowHwExterns ? false, fpPrimsSv ? null
-    , slangPerFileExternModules ? false }:
+    , slangPerFileExternModules ? false, enableScoutMath ? false }:
     let
       resolvedHfSnapshot = mkHfSnapshotDerivation { inherit name hfSnapshot; };
       resolvedPyTorchExported = mkPyTorchExportedDerivation {
@@ -551,7 +552,8 @@ let
         hfSnapshot = resolvedHfSnapshot;
         pytorchExported = resolvedPyTorchExported;
         torchStage = resolvedTorchStage;
-        inherit allowHwExterns fpPrimsSv slangPerFileExternModules;
+        inherit allowHwExterns fpPrimsSv slangPerFileExternModules
+          enableScoutMath;
       };
       model = {
         inherit key name description;
