@@ -113,6 +113,11 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         self.assertIn('$writememh("out3.hex", mem3);', fixture)
         self.assertIn("timeout_counter < 123", fixture)
 
+    def test_hex_output_words_decode_little_endian_float_payload(self) -> None:
+        text = "// 0x00000000\n3f800000\nc0200000\n"
+        payload = module.decode_hex_words(text, width=32, count=2)
+        self.assertEqual(payload, struct.pack("<ff", 1.0, -2.5))
+
 
 if __name__ == "__main__":
     unittest.main()

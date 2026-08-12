@@ -3,10 +3,16 @@
 
 from __future__ import annotations
 
+import argparse
 import dataclasses
+import hashlib
+import json
 import math
 import re
 import struct
+import subprocess
+import time
+from pathlib import Path
 
 
 @dataclasses.dataclass(frozen=True)
@@ -290,3 +296,176 @@ def render_fixture(
             "",
         ]
     )
+
+
+def decode_hex_words(source: str, *, width: int, count: int) -> bytes:
+    if width == 1:
+        byte_width = 1
+    elif width % 8 == 0:
+        byte_width = width // 8
+    else:
+        raise ValueError(f"unsupported output memory width: {width}")
+    words = [
+        token
+        for line in source.splitlines()
+        if line.strip() and not line.lstrip().startswith("//")
+        for token in line.split()
+    ]
+    if len(words) < count:
+        raise ValueError(f"output memory has {len(words)} words, expected at least {count}")
+    payload = bytearray()
+    for word in words[:count]:
+        if "x" in word.lower() or "z" in word.lower():
+            raise ValueError(f"output memory contains unknown word: {word}")
+        value = int(word, 16)
+        payload.extend(value.to_bytes(byte_width, "little"))
+    return bytes(payload)
+
+
+def _sha256(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _float_metrics(actual: bytes, expected: bytes) -> dict[str, object]:
+    if len(actual) != len(expected) or len(actual) % 4:
+        raise ValueError("float comparison payload sizes disagree")
+    count = len(actual) // 4
+    lhs = struct.unpack(f"<{count}f", actual)
+    rhs = struct.unpack(f"<{count}f", expected)
+    differences = [abs(a - b) for a, b in zip(lhs, rhs)]
+    return {
+        "element_count": count,
+        "max_abs_error": max(differences, default=0.0),
+        "mean_abs_error": sum(differences) / count if count else 0.0,
+        "actual_sha256": _sha256(actual),
+        "expected_sha256": _sha256(expected),
+        "bit_exact": actual == expected,
+    }
+
+
+def _run(args: argparse.Namespace) -> int:
+    # Importing PT2E registration is required before torch.export.load can
+    # resolve quantized_decomposed operators from the frozen archive.
+    import torch
+    from torch.ao.quantization.quantize_pt2e import convert_pt2e  # noqa: F401
+
+    args.work_dir.mkdir(parents=True, exist_ok=True)
+    sv_source = args.sv.read_text(encoding="utf-8")
+    semantic = parse_flat_scf_abi(args.flat_scf.read_text(encoding="utf-8"))
+    rtl = parse_sv_memory_ports(sv_source)
+    validate_abi(semantic, rtl)
+    roles = phase_roles(args.phase, semantic_port_count=len(semantic))
+    exported = torch.export.load(args.exported)
+    values = runtime_values(exported)
+    if len(values) != len(roles.inputs):
+        raise ValueError(
+            f"archive has {len(values)} runtime values, ABI requires {len(roles.inputs)}"
+        )
+    inputs = []
+    for number, tensor in zip(roles.inputs, values):
+        payload, dtype, shape = tensor_payload(tensor)
+        memory = semantic[number]
+        if shape != memory.shape:
+            # Rank-zero tensors are represented by one-element Calyx memories.
+            if not (shape == () and memory.shape == (1,)):
+                raise ValueError(
+                    f"arg_mem_{number} tensor shape {shape} != semantic {memory.shape}"
+                )
+        words = memory_words(payload, width=memory.width)
+        (args.work_dir / f"mem{number}.hex").write_text(
+            "\n".join(words) + "\n", encoding="ascii"
+        )
+        inputs.append(
+            {"port": number, "shape": list(shape), "dtype": dtype, "sha256": _sha256(payload)}
+        )
+    fixture = render_fixture(rtl, roles, timeout_cycles=args.timeout_cycles)
+    fixture_path = args.work_dir / "tb.sv"
+    fixture_path.write_text(fixture, encoding="utf-8")
+    compile_log = args.work_dir / "verilator-build.log"
+    compile_command = [
+        args.verilator,
+        "--binary",
+        "--top-module", "tb",
+        "--Mdir", str(args.work_dir / "obj_dir"),
+        "-Wno-fatal",
+        "-Wno-WIDTHEXPAND",
+        "-Wno-WIDTHTRUNC",
+        "-j", str(args.jobs),
+        str(args.sv),
+        str(fixture_path),
+    ]
+    started = time.monotonic()
+    with compile_log.open("w", encoding="utf-8") as log:
+        compiled = subprocess.run(compile_command, stdout=log, stderr=subprocess.STDOUT)
+    compile_seconds = time.monotonic() - started
+    if compiled.returncode:
+        raise RuntimeError(f"Verilator compilation failed; see {compile_log}")
+    simulation_log = args.work_dir / "simulation.log"
+    started = time.monotonic()
+    with simulation_log.open("w", encoding="utf-8") as log:
+        simulated = subprocess.run(
+            [str(args.work_dir / "obj_dir/Vtb")],
+            cwd=args.work_dir,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+        )
+    simulation_seconds = time.monotonic() - started
+    if simulated.returncode:
+        raise RuntimeError(f"RTL simulation failed; see {simulation_log}")
+    reference = json.loads(args.reference.read_text(encoding="utf-8"))
+    expected_records = [reference["last_logits"], *reference["cache_leaves"]]
+    comparisons = []
+    for number, memory, record in zip(roles.outputs, semantic[len(roles.inputs):], expected_records):
+        expected = bytes.fromhex(record["little_endian_hex"])
+        actual = decode_hex_words(
+            (args.work_dir / f"out{number}.hex").read_text(encoding="ascii"),
+            width=memory.width,
+            count=math.prod(memory.shape),
+        )
+        metrics = _float_metrics(actual, expected)
+        metrics.update({"port": number, "shape": list(memory.shape), "dtype": record["dtype"]})
+        comparisons.append(metrics)
+    passed = all(item["max_abs_error"] <= args.atol for item in comparisons)
+    report = {
+        "schema": "rc-serving-w4a8-sv-equivalence-v1",
+        "phase": args.phase,
+        "status": "pass" if passed else "mismatch",
+        "atol": args.atol,
+        "semantic_port_count": len(semantic),
+        "rtl_port_count": len(rtl),
+        "inputs": inputs,
+        "comparisons": comparisons,
+        "compile_seconds": compile_seconds,
+        "simulation_seconds": simulation_seconds,
+        "artifacts": {
+            "sv": str(args.sv), "flat_scf": str(args.flat_scf),
+            "exported": str(args.exported), "reference": str(args.reference),
+        },
+    }
+    args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps(report, sort_keys=True))
+    return 0 if passed else 1
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--phase", required=True, choices=("prefill-8", "decode-8", "decode-9"))
+    parser.add_argument("--sv", required=True, type=Path)
+    parser.add_argument("--flat-scf", required=True, type=Path)
+    parser.add_argument("--exported", required=True, type=Path)
+    parser.add_argument("--reference", required=True, type=Path)
+    parser.add_argument("--work-dir", required=True, type=Path)
+    parser.add_argument("--report", required=True, type=Path)
+    parser.add_argument("--verilator", default="verilator")
+    parser.add_argument("--jobs", type=int, default=1)
+    parser.add_argument("--timeout-cycles", type=int, default=100_000_000)
+    parser.add_argument("--atol", type=float, default=1e-4)
+    args = parser.parse_args()
+    if args.jobs <= 0:
+        parser.error("--jobs must be positive")
+    args.report.parent.mkdir(parents=True, exist_ok=True)
+    raise SystemExit(_run(args))
+
+
+if __name__ == "__main__":
+    main()
