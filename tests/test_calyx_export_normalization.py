@@ -119,6 +119,39 @@ class CalyxExportNormalizationTest(unittest.TestCase):
         )
         self.assertIn("ordinary_reg.write_en = 1'b1;", fixed)
 
+    def test_sitofp_result_register_waits_for_converter_done(self) -> None:
+        source = """component main() -> () {
+  wires {
+    group convert {
+      std_intToFpFN_37.in = value.out;
+      std_intToFpFN_37.signedIn = 1'b1;
+      sitofp_37_reg.in = std_intToFpFN_37.out;
+      sitofp_37_reg.write_en = 1'b1;
+      std_intToFpFN_37.go = !std_intToFpFN_37.done ? 1'b1;
+      convert[done] = sitofp_37_reg.done;
+    }
+  }
+}
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            input_path = Path(tmp) / "input.futil"
+            output_path = Path(tmp) / "output.futil"
+            input_path.write_text(source, encoding="utf-8")
+            subprocess.run(
+                [
+                    "python3",
+                    str(FPTOSI_HANDSHAKE_SCRIPT),
+                    str(input_path),
+                    str(output_path),
+                ],
+                check=True,
+            )
+            fixed = output_path.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "sitofp_37_reg.write_en = std_intToFpFN_37.done;", fixed
+        )
+
     def test_native_export_fixes_fptosi_after_constant_normalization(self) -> None:
         script = (
             ROOT / "scripts" / "pipeline" / "calyx_to_sv_no_handshake.sh"
