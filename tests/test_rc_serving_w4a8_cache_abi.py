@@ -77,6 +77,18 @@ class RcServingW4A8CacheAbiTest(unittest.TestCase):
             [tensor.numpy().tobytes() for tensor in flat],
         )
 
+    def test_reconstruction_does_not_insert_rank_one_empty_concat(self) -> None:
+        class CacheRoundTrip(torch.nn.Module):
+            def forward(self, *leaves):
+                cache = reconstruct_dynamic_cache(leaves, expected_layers=2)
+                return flatten_dynamic_cache(cache, expected_layers=2)
+
+        flat = flatten_dynamic_cache(sample_cache(), expected_layers=2)
+        exported = torch.export.export(CacheRoundTrip(), flat, strict=False)
+        graph = str(exported.graph)
+        self.assertNotIn("aten.cat", graph)
+        self.assertNotIn("lift_fresh_copy", graph)
+
     def test_snapshot_cache_isolated_from_later_mutation(self) -> None:
         original = sample_cache()
         copied = snapshot_cache(original, expected_layers=2)

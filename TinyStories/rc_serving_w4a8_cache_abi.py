@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 import torch
 from transformers import DynamicCache
+from transformers.cache_utils import DynamicLayer
 
 from .rc_serving_contract import ServingPhase
 
@@ -43,14 +44,16 @@ def reconstruct_dynamic_cache(
     if len(leaves) != expected_leaves:
         word = "four" if expected_leaves == 4 else str(expected_leaves)
         raise ValueError(f"cache boundary requires exactly {word} K/V tensors")
-    pairs = tuple(
-        (
-            _validate_tensor(leaves[2 * layer], 2 * layer),
-            _validate_tensor(leaves[2 * layer + 1], 2 * layer + 1),
-        )
-        for layer in range(expected_layers)
-    )
-    return DynamicCache.from_legacy_cache(pairs)
+    cache = DynamicCache()
+    for layer in range(expected_layers):
+        key = _validate_tensor(leaves[2 * layer], 2 * layer)
+        value = _validate_tensor(leaves[2 * layer + 1], 2 * layer + 1)
+        cache_layer = DynamicLayer()
+        cache_layer.keys = key
+        cache_layer.values = value
+        cache_layer.is_initialized = True
+        cache.layers.append(cache_layer)
+    return cache
 
 
 class TensorCachePhaseWrapper(torch.nn.Module):
