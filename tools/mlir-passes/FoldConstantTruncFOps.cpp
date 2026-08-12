@@ -215,6 +215,7 @@ private:
     SmallVector<memref::LoadOp> loads;
     SmallVector<memref::StoreOp> stores;
     SmallVector<memref::CopyOp> copies;
+    SmallVector<memref::SubViewOp> subviews;
     SmallVector<memref::ReinterpretCastOp> casts;
     SmallVector<memref::ExpandShapeOp> expands;
     SmallVector<memref::CollapseShapeOp> collapses;
@@ -225,6 +226,8 @@ private:
         stores.push_back(store);
       else if (auto copy = dyn_cast<memref::CopyOp>(op))
         copies.push_back(copy);
+      else if (auto subview = dyn_cast<memref::SubViewOp>(op))
+        subviews.push_back(subview);
       else if (auto cast = dyn_cast<memref::ReinterpretCastOp>(op))
         casts.push_back(cast);
       else if (auto expand = dyn_cast<memref::ExpandShapeOp>(op))
@@ -244,6 +247,10 @@ private:
     for (memref::ReinterpretCastOp cast : llvm::reverse(casts)) {
       if (cast->use_empty())
         rewriter.eraseOp(cast);
+    }
+    for (memref::SubViewOp subview : llvm::reverse(subviews)) {
+      if (subview->use_empty())
+        rewriter.eraseOp(subview);
     }
     for (memref::ExpandShapeOp expand : llvm::reverse(expands)) {
       if (expand->use_empty())
@@ -316,6 +323,28 @@ private:
       return StaticMemRefView{sourceView->base, sourceView->offset + offsets.front(),
                               SmallVector<int64_t>(resultType.getShape()),
                               SmallVector<int64_t>(strides)};
+    }
+
+    if (auto subview = value.getDefiningOp<memref::SubViewOp>()) {
+      auto sourceView = getStaticView(subview.getSource(), argViews);
+      auto resultType = subview.getResult().getType();
+      ArrayRef<int64_t> offsets = subview.getStaticOffsets();
+      ArrayRef<int64_t> strides = subview.getStaticStrides();
+      if (!sourceView || !resultType.hasStaticShape() || !isStatic(offsets) ||
+          !isStatic(strides) || offsets.size() != sourceView->strides.size() ||
+          strides.size() != sourceView->strides.size())
+        return std::nullopt;
+
+      int64_t offset = sourceView->offset;
+      SmallVector<int64_t> resultStrides;
+      for (auto [subviewOffset, subviewStride, sourceStride] :
+           llvm::zip_equal(offsets, strides, sourceView->strides)) {
+        offset += subviewOffset * sourceStride;
+        resultStrides.push_back(subviewStride * sourceStride);
+      }
+      return StaticMemRefView{sourceView->base, offset,
+                              SmallVector<int64_t>(resultType.getShape()),
+                              std::move(resultStrides)};
     }
 
     if (auto expand = value.getDefiningOp<memref::ExpandShapeOp>()) {
