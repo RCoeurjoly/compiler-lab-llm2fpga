@@ -54,6 +54,19 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "multiple of 4"):
             module.memory_words(b"abc", width=32)
 
+    def test_sv_memory_ports_are_derived_from_main_1_header(self) -> None:
+        sv = """module main_1(
+          output logic arg_mem_0_addr0, output logic arg_mem_0_content_en,
+          output logic arg_mem_0_write_en, output logic [63:0] arg_mem_0_write_data,
+          input logic [63:0] arg_mem_0_read_data, input logic arg_mem_0_done,
+          output logic [2:0] arg_mem_1_addr0, output logic arg_mem_1_content_en,
+          output logic arg_mem_1_write_en, output logic [7:0] arg_mem_1_write_data,
+          input logic [7:0] arg_mem_1_read_data, input logic arg_mem_1_done
+        ); endmodule"""
+        ports = module.parse_sv_memory_ports(sv)
+        self.assertEqual([(port.number, port.width, port.depth) for port in ports],
+                         [(0, 64, 2), (1, 8, 8)])
+
 
 if __name__ == "__main__":
     unittest.main()

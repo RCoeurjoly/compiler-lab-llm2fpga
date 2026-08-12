@@ -15,6 +15,13 @@ class SemanticMemory:
 
 
 @dataclasses.dataclass(frozen=True)
+class SvMemoryPort:
+    number: int
+    width: int
+    depth: int
+
+
+@dataclasses.dataclass(frozen=True)
 class PhaseRoles:
     inputs: tuple[int, ...]
     outputs: tuple[int, ...]
@@ -87,3 +94,35 @@ def memory_words(payload: bytes, *, width: int) -> list[str]:
         f"{int.from_bytes(payload[offset:offset + byte_width], 'little'):0{digits}x}"
         for offset in range(0, len(payload), byte_width)
     ]
+
+
+def parse_sv_memory_ports(source: str) -> tuple[SvMemoryPort, ...]:
+    module = re.search(r"\bmodule\s+main_1\s*\((.*?)\)\s*;", source, re.DOTALL)
+    if module is None:
+        raise ValueError("SV does not define module main_1")
+    declaration = re.compile(
+        r"\b(?P<direction>input|output)\s+(?:wire\s+)?logic"
+        r"(?:\s+signed)?(?:\s+\[\s*(?P<hi>\d+)\s*:\s*(?P<lo>\d+)\s*\])?"
+        r"\s+arg_mem_(?P<number>\d+)_(?P<pin>addr0|content_en|write_en|write_data|read_data|done)\b"
+    )
+    pins: dict[int, dict[str, tuple[str, int]]] = {}
+    for match in declaration.finditer(module.group(1)):
+        width = (
+            int(match.group("hi")) - int(match.group("lo")) + 1
+            if match.group("hi") is not None else 1
+        )
+        port_pins = pins.setdefault(int(match.group("number")), {})
+        port_pins[match.group("pin")] = (match.group("direction"), width)
+    if not pins or sorted(pins) != list(range(len(pins))):
+        raise ValueError("SV memories are not a complete zero-based sequence")
+    expected = {"addr0", "content_en", "write_en", "write_data", "read_data", "done"}
+    result: list[SvMemoryPort] = []
+    for number in range(len(pins)):
+        port = pins[number]
+        if set(port) != expected:
+            raise ValueError(f"arg_mem_{number} does not expose the six memory pins")
+        width = port["read_data"][1]
+        if port["write_data"][1] != width:
+            raise ValueError(f"arg_mem_{number} read/write widths disagree")
+        result.append(SvMemoryPort(number, width, 1 << port["addr0"][1]))
+    return tuple(result)
