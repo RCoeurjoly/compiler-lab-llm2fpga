@@ -89,6 +89,20 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         )
         self.assertEqual(module.runtime_values(exported), ("b", "token"))
 
+    def test_tensor_payload_normalizes_bool_to_one_byte_per_element(self) -> None:
+        tensor = SimpleNamespace(
+            dtype="torch.bool",
+            shape=(3,),
+            detach=lambda: tensor,
+            cpu=lambda: tensor,
+            contiguous=lambda: tensor,
+            tolist=lambda: [True, False, True],
+        )
+        payload, dtype, shape = module.tensor_payload(tensor)
+        self.assertEqual(payload, b"\x01\x00\x01")
+        self.assertEqual(dtype, "torch.bool")
+        self.assertEqual(shape, (3,))
+
 
 if __name__ == "__main__":
     unittest.main()

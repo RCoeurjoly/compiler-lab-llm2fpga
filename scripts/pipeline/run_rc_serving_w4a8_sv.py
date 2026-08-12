@@ -6,6 +6,7 @@ from __future__ import annotations
 import dataclasses
 import math
 import re
+import struct
 
 
 @dataclasses.dataclass(frozen=True)
@@ -181,3 +182,31 @@ def runtime_values(exported: object) -> tuple[object, ...]:
     else:
         raise ValueError("example inputs remain after graph signature traversal")
     return tuple(values)
+
+
+def tensor_payload(tensor: object) -> tuple[bytes, str, tuple[int, ...]]:
+    value = tensor.detach().cpu().contiguous()
+    dtype = str(value.dtype)
+    shape = tuple(value.shape)
+    flat = _flatten(value.tolist())
+    formats = {
+        "torch.int8": "b",
+        "torch.int64": "q",
+        "torch.float32": "f",
+    }
+    if dtype == "torch.bool":
+        return bytes(int(item) for item in flat), dtype, shape
+    try:
+        fmt = formats[dtype]
+    except KeyError as error:
+        raise ValueError(f"unsupported W4A8 fixture tensor dtype: {dtype}") from error
+    return struct.pack(f"<{len(flat)}{fmt}", *flat), dtype, shape
+
+
+def _flatten(value: object) -> list[object]:
+    if not isinstance(value, (list, tuple)):
+        return [value]
+    result: list[object] = []
+    for item in value:
+        result.extend(_flatten(item))
+    return result
