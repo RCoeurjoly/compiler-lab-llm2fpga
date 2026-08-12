@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import math
 import re
 
 
@@ -126,3 +127,23 @@ def parse_sv_memory_ports(source: str) -> tuple[SvMemoryPort, ...]:
             raise ValueError(f"arg_mem_{number} read/write widths disagree")
         result.append(SvMemoryPort(number, width, 1 << port["addr0"][1]))
     return tuple(result)
+
+
+def validate_abi(
+    semantic: tuple[SemanticMemory, ...], rtl: tuple[SvMemoryPort, ...]
+) -> None:
+    if len(rtl) < len(semantic):
+        raise ValueError("RTL exposes fewer memories than the semantic ABI")
+    for memory in semantic:
+        port = rtl[memory.number]
+        if port.width != memory.width:
+            raise ValueError(
+                f"arg_mem_{memory.number} width {port.width} does not match "
+                f"semantic width {memory.width}"
+            )
+        required_depth = math.prod(memory.shape)
+        if port.depth < required_depth:
+            raise ValueError(
+                f"arg_mem_{memory.number} depth {port.depth} is smaller than "
+                f"semantic depth {required_depth}"
+            )

@@ -67,6 +67,13 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         self.assertEqual([(port.number, port.width, port.depth) for port in ports],
                          [(0, 64, 2), (1, 8, 8)])
 
+    def test_semantic_abi_rejects_rtl_width_or_depth_mismatch(self) -> None:
+        semantic = (module.SemanticMemory(0, (3,), 8),)
+        with self.assertRaisesRegex(ValueError, "depth"):
+            module.validate_abi(semantic, (module.SvMemoryPort(0, 8, 2),))
+        with self.assertRaisesRegex(ValueError, "width"):
+            module.validate_abi(semantic, (module.SvMemoryPort(0, 32, 4),))
+
 
 if __name__ == "__main__":
     unittest.main()
