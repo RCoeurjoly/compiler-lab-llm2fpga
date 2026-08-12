@@ -53,3 +53,51 @@ Next action: trace the source buffers feeding those four append stores, add the
 smallest reproducer for the first zero-producing operation, fix the responsible
 lowering/handshake defect, and rerun decode-8 before prefill/decode-9 or mapped
 synthesis.
+
+## Integer-to-float handshake experiment
+
+Static inspection found that CIRCT-exported `sitofp` groups wrote their result
+register unconditionally while the packaged `std_intToFp` wrapper advertises a
+two-cycle completion interval. Commit `fa2e0fa` generalized the existing
+FP-to-int handshake normalizer to gate both conversion directions with the
+converter `done` signal. The regenerated reproducible decode-8 closure is:
+
+`/nix/store/8s7207dgrj6s6s8n7gk8klx9amxpcdfa-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv`
+
+Its normalizer checked 3,408 Calyx groups and verified 335 gated floating-point
+conversion handshakes, including 207 `sitofp` captures and no remaining
+unconditional `sitofp` captures. Native Calyx-to-SV export consumed about 36
+minutes of single-threaded CPU time. This repair increased decode execution
+from 63,289 to 66,587 cycles, but did not change any observable output byte.
+The Verilator build took 339.41 seconds and simulation took 70.95 seconds.
+Therefore the handshake defect is real protocol debt but is not the cause of
+the current numerical mismatch.
+
+An isolated simulation of the exact generated `std_intToFp` module also passed:
+signed integer 45 produced IEEE-754 `0x42340000` (45.0), with the expected
+`go`/`done` timing.
+
+## Corrected zero localization
+
+Final scratch-memory contents are unsafe for tracing because Calyx reuses each
+external scratch port many times. An initial end-of-run dump showed port 95 as
+`0x0a, 0x0a` while its dequantized port 100 ended as zero. Cycle-local tracing
+of FSM states 992 through 994 corrected that interpretation:
+
+- At cycles 7,652 and 7,670, the two port-95 reads see `0xdd` (signed -35), not
+  the later final value `0x0a`.
+- The shared load register captures `0xdd` and sign-extends it to
+  `0xffffffdd`.
+- The dequantization zero point is also `0xffffffdd` (-35), so the shared
+  subtractor correctly produces zero.
+- `std_intToFp` consequently receives zero, produces zero, and port 100 is
+  written with `0x00000000` for both lanes.
+
+The sequential external-memory fixture matches Calyx's packaged `seq_mem_d1`
+contract: registered read data and `done` update together, followed by the
+split load-register state. The first wrong boundary is therefore upstream of
+this dequantization: the key-projection quantizer writes its zero point into
+port 95. The next diagnostic must trace the floating projection value entering
+the FP-to-int quantization that produces those `0xdd` words; neither the memory
+fixture nor `std_intToFp` should be changed based on the end-of-run scratch
+dump.
