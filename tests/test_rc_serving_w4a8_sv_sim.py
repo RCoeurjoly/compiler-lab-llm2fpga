@@ -118,6 +118,13 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         payload = module.decode_hex_words(text, width=32, count=2)
         self.assertEqual(payload, struct.pack("<ff", 1.0, -2.5))
 
+    def test_simulation_normalizer_pages_oversized_scalar_or_assignment(self) -> None:
+        terms = [f"state == 13'd{i}" for i in range(3000)]
+        source = "module m; logic fsm0_write_en; assign fsm0_write_en = " + " | ".join(terms) + "; endmodule"
+        normalized = module.normalize_simulation_sv(source)
+        self.assertIn("__llm2fpga_sim_fsm0_write_en_", normalized)
+        self.assertLess(max(map(len, normalized.splitlines())), 40_000)
+
 
 if __name__ == "__main__":
     unittest.main()

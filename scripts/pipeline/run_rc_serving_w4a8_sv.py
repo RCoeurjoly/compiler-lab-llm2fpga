@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import hashlib
+import importlib.util
 import json
 import math
 import re
@@ -322,6 +323,16 @@ def decode_hex_words(source: str, *, width: int, count: int) -> bytes:
     return bytes(payload)
 
 
+def normalize_simulation_sv(source: str) -> str:
+    normalizer_path = Path(__file__).with_name("run_rc_sv_equivalence.py")
+    spec = importlib.util.spec_from_file_location("_rc_sv_equivalence_normalizer", normalizer_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load simulation normalizer from {normalizer_path}")
+    normalizer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(normalizer)
+    return normalizer._normalized_sv_text(source)
+
+
 def _sha256(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
@@ -381,6 +392,8 @@ def _run(args: argparse.Namespace) -> int:
     fixture = render_fixture(rtl, roles, timeout_cycles=args.timeout_cycles)
     fixture_path = args.work_dir / "tb.sv"
     fixture_path.write_text(fixture, encoding="utf-8")
+    normalized_sv_path = args.work_dir / "main.normalized.sv"
+    normalized_sv_path.write_text(normalize_simulation_sv(sv_source), encoding="utf-8")
     compile_log = args.work_dir / "verilator-build.log"
     compile_command = [
         args.verilator,
@@ -391,7 +404,7 @@ def _run(args: argparse.Namespace) -> int:
         "-Wno-WIDTHEXPAND",
         "-Wno-WIDTHTRUNC",
         "-j", str(args.jobs),
-        str(args.sv),
+        str(normalized_sv_path),
         str(fixture_path),
     ]
     started = time.monotonic()
