@@ -1,4 +1,5 @@
 import importlib.util
+import struct
 import sys
 import unittest
 from pathlib import Path
@@ -41,6 +42,17 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         roles = module.phase_roles("prefill-8", semantic_port_count=33)
         self.assertEqual(roles.inputs, tuple(range(28)))
         self.assertEqual(roles.outputs, tuple(range(28, 33)))
+
+    def test_memory_words_preserve_signed_and_ieee_bit_patterns(self) -> None:
+        self.assertEqual(module.memory_words(bytes([0xFF, 0x80]), width=8), ["ff", "80"])
+        floats = struct.pack("<ff", 1.0, -2.5)
+        self.assertEqual(module.memory_words(floats, width=32), ["3f800000", "c0200000"])
+        integers = struct.pack("<q", 6)
+        self.assertEqual(module.memory_words(integers, width=64), ["0000000000000006"])
+
+    def test_memory_words_reject_partial_elements(self) -> None:
+        with self.assertRaisesRegex(ValueError, "multiple of 4"):
+            module.memory_words(b"abc", width=32)
 
 
 if __name__ == "__main__":

@@ -67,3 +67,23 @@ def phase_roles(phase: str, *, semantic_port_count: int) -> PhaseRoles:
         logits=outputs[0],
         cache_outputs=outputs[1:],
     )
+
+
+def memory_words(payload: bytes, *, width: int) -> list[str]:
+    if width == 1:
+        if any(value not in (0, 1) for value in payload):
+            raise ValueError("i1 memory payload must contain only zero or one bytes")
+        return [str(value) for value in payload]
+    if width % 8:
+        raise ValueError(f"unsupported non-byte memory width: {width}")
+    byte_width = width // 8
+    if len(payload) % byte_width:
+        raise ValueError(
+            f"memory payload byte count must be a multiple of {byte_width} for "
+            f"width {width}"
+        )
+    digits = byte_width * 2
+    return [
+        f"{int.from_bytes(payload[offset:offset + byte_width], 'little'):0{digits}x}"
+        for offset in range(0, len(payload), byte_width)
+    ]
