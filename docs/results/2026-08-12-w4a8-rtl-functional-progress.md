@@ -352,3 +352,36 @@ static names were misleading, but their live values were correct. Targeted
 `@protected` annotations are therefore not a functional repair and must not
 remain in the production pipeline. Localization must move earlier than the
 final integer accumulator and use dynamic first-divergence evidence.
+
+#### Dynamic LM-head and final-normalization boundary
+
+An address-for-address comparison against intermediates captured with a
+`torch.fx.Interpreter` established a sharper boundary. The PT2E LM-head input
+is the signed-int8 tensor
+`[[-127,127], [127,-127], [-126,126], [-104,104], [-65,65], [21,-21],
+[-128,127], [-122,122]]`; the weight is
+`[[-6,3], [1,0], [-1,-2], [1,2], [-2,-4], [4,7]]`. The RTL accumulator's
+first six final sums match the PT2E integer dot products exactly, but address
+6 is the first mismatch (`-1104` versus `-1143`). Thus the final signed
+multiplication, weight layout, and accumulation are functional for matching
+inputs, while the activation at token position 1 is already wrong.
+
+A second throwaway Verilator trace captured the physical 16-word float memory
+at the final LayerNorm centering write. The diagnostic build took 11:13.68
+wall time and 15,400,124 KiB maximum RSS; simulation took 10:15.20 and 11,444
+KiB maximum RSS, completing normally in 545,149 cycles. Comparing its IEEE-754
+words with `dequantize_per_tensor_95 - mean(dequantize_per_tensor_95)` from
+PT2E shows indices 0 and 1 bit-exact:
+
+```
+index 0: -0.016493970528244972
+index 1:  0.01649397239089012
+```
+
+The first divergence is index 2: RTL `0.016230067238211632` versus PT2E
+`0.016493970528244972`; indices 2 through 15 all differ. This proves the bad
+value is present before the final LayerNorm reciprocal-root and quantization
+steps and moves localization into the final residual stream. End-of-run
+contents of compiler-allocated memories must not be assigned logical tensor
+identities without operation-qualified write tracing because Calyx reuses
+those memories.
