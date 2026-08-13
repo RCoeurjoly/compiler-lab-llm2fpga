@@ -401,3 +401,22 @@ the second block's final MLP projection; it is already present in the
 `quantize_per_tensor_49` stream feeding both `dequantize_per_tensor_75` and
 `dequantize_per_tensor_76`. Localization now moves to the two operands of the
 preceding PT2E `add_8`.
+
+The dequantized left-operand trace can be inverted exactly through
+`dequantize_per_tensor_76`'s scale `0.00026395602617412806` and zero point 42.
+The expected `quantize_per_tensor_49` codes are
+`[-128,-4,0,-123,10,117,84,116,-12,1,127,123,-96,67,27,99]`; RTL supplies
+`[-128,-4,-5,-123,7,117,79,116,-19,2,125,123,-101,67,25,99]`. All odd
+indices except 9 are exact, while every even index from 2 through 14 differs.
+This structured feature-lane pattern is evidence against random floating-point
+noise and points toward one operand or lane of the preceding `add_8` stream.
+
+A candidate mapping of `add_8` to `bb0_4103` was explicitly falsified. The
+instrumented group executed 64 times (the displayed completion pulse was high
+for 24 sampled cycles) under an 8-by-8 control nest and produced values that
+cannot represent the 16-element `add_8` ABI. Its diagnostic build took
+11:16.21 wall time and 15,399,856 KiB maximum RSS; simulation took 10:19.47,
+11,352 KiB maximum RSS, and 545,149 cycles. None of its values are used as
+functional evidence. Proximity in generated block numbering is insufficient
+for mapping flat-SCF operations through Calyx; the next trace must be derived
+from loop extents and memory bindings.
