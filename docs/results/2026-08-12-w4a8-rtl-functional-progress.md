@@ -1,7 +1,8 @@
 # W4A8 RC RTL functional progress
 
-Status: functional mismatch under investigation. This is not synthesis or fit
-evidence and does not satisfy the W4A8 completion gate.
+Status: decode-8 and decode-9 pass bit-exactly; prefill-8 validation is in
+progress. This is not synthesis or fit evidence and does not yet satisfy the
+three-phase W4A8 completion gate.
 
 ## Durable inputs
 
@@ -171,3 +172,28 @@ The full temporary receipt is
 `/tmp/w4a8-decode8-globals-fixed-report.json`. Its authoritative inputs remain
 the immutable Nix closures listed above; the temporary result will be followed
 by the durable three-phase receipt set.
+
+## Bit-exact decode-9 result
+
+The same corrected fixture passed decode-9 without further RTL or harness
+changes. Its immutable inputs are:
+
+- native SV:
+  `/nix/store/0p8l2wb6ds8jra3x769phy39iznknz8v-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv`;
+- flat-SCF ABI and globals:
+  `/nix/store/qakr720c5xcfjfw8lwj3isc14vk39izz-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-flat-scf`;
+- frozen PT2E oracle:
+  `/nix/store/aqisbg3vq3zahd9snx7f97gf6zg9ih8r-tinystories-w4a8-rc-serving-mask10-vocab6-width2-frozen-bundle`.
+
+Results:
+
+- 522.06 seconds Verilator build time at `-j2`;
+- 74.33 seconds simulation time;
+- logits: 6/6 words bit-exact, maximum absolute error 0;
+- four ten-token cache leaves: 80/80 words bit-exact, maximum absolute error 0;
+- all five actual-output SHA-256 values equal their expected-output values.
+
+The full temporary receipt is
+`/tmp/w4a8-decode9-globals-fixed-report.json`. As with decode-8, the Nix store
+paths above are the authoritative reproducible inputs. Prefill-8 remains the
+only unvalidated phase before mapped synthesis can begin.
