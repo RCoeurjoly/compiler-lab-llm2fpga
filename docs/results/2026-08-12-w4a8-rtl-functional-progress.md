@@ -420,3 +420,21 @@ cannot represent the 16-element `add_8` ABI. Its diagnostic build took
 functional evidence. Proximity in generated block numbering is insufficient
 for mapping flat-SCF operations through Calyx; the next trace must be derived
 from loop extents and memory bindings.
+
+Applying that structural rule found `bb0_3639` / `std_addFN_141`: it is in an
+exact 8-by-2 control nest, reads two 16-word floating memories, and writes the
+shared 16-word scratch memory. The trace emitted exactly 16 completed
+additions, validating the ABI mapping. Its build took 11:16.87 wall time and
+15,400,112 KiB maximum RSS; simulation took 10:17.44, used 11,312 KiB maximum
+RSS, and completed in 545,149 cycles.
+
+The trace proves the attention operand `dequantize_per_tensor_74` is the
+earliest currently known divergence. At every even index RTL supplies exactly
+`0.00048828125` while PT2E supplies `0.0009765625`; all eight odd indices are
+bit-exact at `0.000244140625`. The incoming residual
+`dequantize_per_tensor_56` is bit-exact at indices 0 and 1 and first diverges
+at index 2. Thus `add_8` itself is correct, while the second block's attention
+output has a systematic factor-of-two error on feature lane zero before the
+residual addition. Localization moves through the identity `dropout_5` and
+equal-scale `quantize_per_tensor_48` toward `linear_9` /
+`quantize_per_tensor_47`.
