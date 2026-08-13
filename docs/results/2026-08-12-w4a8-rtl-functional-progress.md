@@ -542,3 +542,14 @@ address/data pair matched bit-for-bit. The mixed sequence is already present
 in `dequantize_per_tensor_67`; `permute_6` preserves it exactly. Localization
 therefore moves upstream through q41 and the layout-only `view_6` to the value
 projection producing q41.
+
+Tracing q36 at the `linear_8` boundary (`bb0_3116` source and `bb0_3141`
+write) proves the projection is already wrong and q36 correctly quantizes it.
+The diagnostic build took 11:13.86 wall time and 15,399,664 KiB maximum RSS;
+simulation took 10:23.26, used 11,456 KiB maximum RSS, and completed normally
+in 545,149 cycles. RTL `linear_8` begins with the expected q36-equivalent
+values/codes at indices 0 and 1 (`115`, `-126`), but index 2 produces code
+`-105` rather than PT2E `-114`, and later values reproduce the same mixed
+sequence seen downstream. All emitted codes match quantization of their traced
+RTL floats. The first known defect therefore lies in `linear_8` or its inputs,
+not q36, q41, q42, their dequantizations, or the intervening view/permutation.
