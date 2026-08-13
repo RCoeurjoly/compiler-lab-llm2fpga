@@ -508,3 +508,16 @@ explain the roughly factor-of-two result error. Each traced add correctly uses
 the prior sum and current product. Therefore the dominant first known defect
 is in the `cat_3` value tensor or its construction/address mapping before
 `matmul_3`, not in the MAC datapath.
+
+An address-qualified producer trace proves the value buffer is already wrong
+when written by q42 dequantization (`bb0_3220`), before `matmul_3` reads it.
+The diagnostic build took 11:15.31 wall time and 15,400,020 KiB maximum RSS;
+simulation took 10:10.90, used 11,452 KiB maximum RSS, and completed normally
+in 545,149 cycles. It emitted 16 sequential writes at addresses 0 through 15.
+Addresses 0 and 1 are bit-exact with PT2E `dequantize_per_tensor_68`, but
+address 2 is RTL `0xbd054b8c` (the PT2E value expected at address 7) instead of
+`0xbd10b86c`; address 3 repeats PT2E address 0 instead of containing
+`0x3d1eaf45`. Later addresses are likewise mixed, with a subset exact. Thus
+the bad value sequence is not created by the matmul read-side address
+linearization. `bb0_3220` only converts and stores q42, so localization moves
+upstream to `quantize_per_tensor_42` / its `permute_6` input.
