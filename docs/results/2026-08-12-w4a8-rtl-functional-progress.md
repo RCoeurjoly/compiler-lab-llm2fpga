@@ -471,3 +471,24 @@ dots are `1053` and `335`. The accumulator correctly computes the values it is
 given and the observed post-scale floats are consistent with dots 488 and 160.
 The first known defect therefore moves upstream to the producer of q46; no
 accumulator or projection-scale fix is justified by the evidence.
+
+Tracing q46's quantization loop (`bb0_3440` through `bb0_3468`) separates the
+quantizer from its floating input. A first diagnostic confirmed that it emits
+alternating codes `[42, -23]` consistently, but its displayed `42.0` and
+`-23.0` values were post-rounding, zero-point-adjusted intermediates rather
+than source activations. That build took 11:13.74 wall time and 15,399,920 KiB
+maximum RSS; simulation took 10:13.71, used 11,428 KiB maximum RSS, and
+completed in 545,149 cycles.
+
+The corrected probe at `bb0_3443` captured the actual 16 float values entering
+q46's division by scale `0.00028605051920749247`. Its build took 11:14.54 wall
+time and 15,400,004 KiB maximum RSS; simulation took 10:25.41, used 11,432 KiB
+maximum RSS, and completed normally in 545,149 cycles. Every source activation
+is already wrong. RTL alternates approximately `+0.00922/-0.00933`, while
+PT2E `view_7` alternates approximately `+0.01913/-0.02088`; for example index
+0 is RTL `0x3c170a4b` (`0.0092187626`) versus PT2E `0x3c9cd14e`
+(`0.0191427730`). The q46 quantization division, rounding, zero-point addition,
+clamping, projection accumulation, and projection scaling are therefore all
+downstream of the first known defect. Localization moves through the no-op
+`view_7`/`permute_7` layout chain to the attention-value computation that
+produces these floats.
