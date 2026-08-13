@@ -532,3 +532,13 @@ match PT2E, while index 2 is `0xbd054b8c` instead of `0xbd10b86c` and index 3
 repeats `0x3d11fd68` instead of `0x3d1eaf45`. The q42 quantization and
 dequantization paths are therefore correct. The earliest known defect is now
 the tensor entering q42, structurally corresponding to PT2E `permute_6`.
+
+A paired write trace of `dequantize_per_tensor_67` (`bb0_3164`) and the
+generated `permute_6` copy (`bb0_3168`) falsifies permutation lowering as the
+cause. The diagnostic build took 11:16.23 wall time and 15,400,136 KiB maximum
+RSS; simulation took 10:17.31, used 11,372 KiB maximum RSS, and completed in
+545,149 cycles. Both stages wrote addresses 0 through 15 in order, and every
+address/data pair matched bit-for-bit. The mixed sequence is already present
+in `dequantize_per_tensor_67`; `permute_6` preserves it exactly. Localization
+therefore moves upstream through q41 and the layout-only `view_6` to the value
+projection producing q41.
