@@ -438,3 +438,20 @@ output has a systematic factor-of-two error on feature lane zero before the
 residual addition. Localization moves through the identity `dropout_5` and
 equal-scale `quantize_per_tensor_48` toward `linear_9` /
 `quantize_per_tensor_47`.
+
+Because `dropout_5` is disabled and q47/q48 share scale `0.000244140625` and
+zero point -128, the accepted attention trace recovers the q47 codes exactly.
+PT2E expects alternating `[-124,-127]`; RTL has `[-126,-127]`. Thus the
+lane-zero error is already present at q47, not introduced by dropout or q48.
+
+The structurally mapped `linear_9` bias-add group is `bb0_3523` /
+`std_addFN_136`, also in an exact 8-by-2 nest. Its diagnostic build took
+11:13.43 wall time and 15,399,872 KiB maximum RSS; simulation took 10:15.35,
+used 11,408 KiB maximum RSS, completed in 545,149 cycles, and emitted exactly
+16 projection results. Both lane biases are zero. RTL repeats pre-q47 floats
+`[0.0004172982880845666, 0.00013681911514140666]`; PT2E repeats
+`[0.000900440732948482, 0.00028646501596085727]`. Therefore q47 correctly
+quantizes its input, but the scaled two-term integer dot product feeding
+`linear_9` is already wrong. Localization moves into the integer accumulator,
+activation zero-point subtraction, weight layout, or product scale of the
+second attention output projection.
