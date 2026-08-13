@@ -326,8 +326,29 @@ std_add_1551.left = load_542_reg.out;
 std_add_1551.right = muli_494_reg.out;
 ```
 
-The pipeline now marks every structurally analogous memory write fed by a
-two-input cell, together with that cell's two operand cells, as protected. On
-the frozen prefill Futil this protects 48 cells, retaining sharing everywhere
-else. This is structural evidence only; a fresh immutable SV closure and
-bit-exact simulation remain required before calling prefill repaired.
+The pipeline experiment marked every structurally analogous memory write fed
+by a two-input cell, together with that cell's two operand cells, as protected.
+On the frozen prefill Futil this protected 48 cells while retaining sharing
+everywhere else. The resulting immutable closure was
+`/nix/store/6a50w0406b3kwf2qd5b6a8ncixcsvbjc-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv`;
+its SV SHA-256 was
+`a21922a4552678af6b97765272eff48d8a62c251a4f23da619bccba0938e1211`.
+The full Nix invocation completed successfully in 5:38:53 wall time. Host
+samples showed about 30 GiB resident memory and 5.4 GiB swap use at the Calyx
+backend plateau; `/usr/bin/time` again measured only the Nix client and its
+439,100 KiB maximum RSS is not the builder peak.
+
+The structural repair did not change behavior. Verilator compilation took
+384.21 seconds, simulation took 616.30 seconds, and the design completed in
+545,149 cycles. Every one of the five actual output SHA-256 values was
+byte-identical to the pre-repair run, with status `mismatch`. A throwaway
+hierarchical trace then observed `bb0_4755` execute 96 writes: all 96 write-data
+values were nonzero, 48 left operands were nonzero, and 88 right operands were
+nonzero. For example, address zero accumulated `0 + 0x2fa = 0x2fa`, followed
+by `0x2fa + 0x17d = 0x477`.
+
+This falsifies the claimed accumulator-mux failure: the shared registers'
+static names were misleading, but their live values were correct. Targeted
+`@protected` annotations are therefore not a functional repair and must not
+remain in the production pipeline. Localization must move earlier than the
+final integer accumulator and use dynamic first-divergence evidence.

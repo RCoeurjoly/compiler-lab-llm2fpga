@@ -46,7 +46,6 @@ class CalyxExportNormalizationTest(unittest.TestCase):
         self.assertIn("CALYX_NORMALIZE_FOR_EXPORT", pipeline)
         self.assertIn("CALYX_NORMALIZE_FUTIL_CONSTANTS", pipeline)
         self.assertIn("CALYX_FIX_FUTIL_FPTOSI_HANDSHAKE", pipeline)
-        self.assertIn("CALYX_PROTECT_FUTIL_MEMORY_ACCUMULATORS", pipeline)
         self.assertIn("CALYX_VERIFY_F32_CONSTANT_BITS", pipeline)
         self.assertIn("CALYX_VERIFY_F32_CONSTANT_BITS", script)
         self.assertIn('"$normalize_for_export" "$input"', script)
@@ -160,7 +159,6 @@ class CalyxExportNormalizationTest(unittest.TestCase):
 
         self.assertIn("fix_futil_fptosi_handshake.py", script)
         self.assertIn("CALYX_FIX_FUTIL_FPTOSI_HANDSHAKE", script)
-        self.assertIn("CALYX_PROTECT_FUTIL_MEMORY_ACCUMULATORS", script)
         self.assertLess(
             script.index('"$normalize_futil_constants" "$tmp_exported_futil"'),
             script.index('"$fix_futil_fptosi_handshake"'),
