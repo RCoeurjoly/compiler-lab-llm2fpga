@@ -142,6 +142,7 @@ fi
   -b verilog \
   "${calyx_synthesis_args[@]}" \
   "${calyx_nested_args[@]}" \
+  -d infer-data-path \
   -d papercut \
   -o "$output_dir/sv/main.sv" >"$tmp_calyx_log" 2>&1
 rc=$?
@@ -152,6 +153,15 @@ cp "$tmp_calyx_log" "$output_dir/logs/native-calyx-to-sv.log"
 if [[ "$rc" -ne 0 || ! -s "$output_dir/sv/main.sv" ]]; then
   echo "Native Calyx-to-SV failed." >&2
   sed -n '1,160p' "$tmp_calyx_log" >&2
+  rm -f "$output_dir/sv/main.sv"
+  exit 1
+fi
+
+# Calyx 0.7.1 can continue after this optimization fails to converge and emit
+# a structurally valid but miswired mux network.  The pass is disabled above;
+# reject the artifact as well if a future driver nevertheless runs it.
+if grep -q "Data path infer did not converge" "$tmp_calyx_log"; then
+  echo "Native Calyx data-path inference did not converge; refusing corrupt SV." >&2
   rm -f "$output_dir/sv/main.sv"
   exit 1
 fi
@@ -191,6 +201,7 @@ set +e
   -l "$calyx_lib" \
   -b resources \
   --synthesis \
+  -d infer-data-path \
   -d papercut \
   -o "$output_dir/resources.csv" >"$output_dir/logs/native-calyx-resources.log" 2>&1
 rc=$?

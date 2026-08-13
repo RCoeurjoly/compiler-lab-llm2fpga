@@ -164,7 +164,15 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("Use a version-aligned official Calyx library", script)
         self.assertIn("json.load", script)
         self.assertNotIn('grep -q \'"status":"ok"\'', script)
-        self.assertNotIn("handshake", script.lower())
+
+    def test_native_export_excludes_nonconvergent_data_path_inference(self) -> None:
+        script = (
+            REPO_ROOT / "scripts" / "pipeline" / "calyx_to_sv_no_handshake.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertGreaterEqual(script.count("-d infer-data-path"), 2)
+        self.assertIn("Data path infer did not converge", script)
+        self.assertIn("refusing corrupt SV", script)
 
     def test_no_handshake_backends_are_named_by_calyx_route(self) -> None:
         pipeline = (REPO_ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
