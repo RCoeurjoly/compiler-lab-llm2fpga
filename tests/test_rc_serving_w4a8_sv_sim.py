@@ -113,6 +113,42 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         self.assertIn('$writememh("out3.hex", mem3);', fixture)
         self.assertIn("timeout_counter < 123", fixture)
 
+    def test_flat_scf_globals_bind_after_semantic_ports_in_get_global_order(self) -> None:
+        mlir = '''
+        module {
+          memref.global "private" constant @gamma : memref<2xf32> =
+            dense_resource<gamma_words>
+          memref.global "private" constant @shape : memref<1x2xi64> = dense<1>
+          memref.global "private" constant @sentinel : memref<f32> =
+            dense<-3.40282347E+38>
+          func.func @main(%arg0: memref<1xi64>) {
+            %0 = memref.get_global @gamma : memref<2xf32>
+            %1 = memref.get_global @shape : memref<1x2xi64>
+            %2 = memref.get_global @sentinel : memref<f32>
+            return
+          }
+        }
+        {-# dialect_resources: { builtin: {
+          gamma_words: "0x040000000000803F00000040"
+        } } #-}
+        '''
+        bindings = module.parse_flat_scf_global_bindings(mlir, first_port=1)
+        self.assertEqual(
+            [(binding.port, binding.symbol, binding.width, binding.words)
+             for binding in bindings],
+            [(1, "gamma", 32, (0x3F800000, 0x40000000)),
+             (2, "shape", 64, (1, 1)),
+             (3, "sentinel", 32, (0xFF7FFFFF,))],
+        )
+
+    def test_fixture_preloads_external_global_ports(self) -> None:
+        rtl = tuple(module.SvMemoryPort(i, 32, 2) for i in range(4))
+        roles = module.PhaseRoles((0, 1), (2,), 2, ())
+        fixture = module.render_fixture(
+            rtl, roles, timeout_cycles=123, initialized_ports=(3,)
+        )
+        self.assertIn('$readmemh("mem3.hex", mem3);', fixture)
+
     def test_fixture_can_dump_selected_scratch_ports(self) -> None:
         rtl = tuple(module.SvMemoryPort(i, 32, 2) for i in range(4))
         roles = module.PhaseRoles((0, 1), (2, 3), 2, (3,))

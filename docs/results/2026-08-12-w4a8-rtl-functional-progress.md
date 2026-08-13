@@ -134,3 +134,40 @@ Disposable trace logs from this investigation are
 `/tmp/w4a8-tracekey-run.log` and `/tmp/w4a8-tracekeydot-run.log`; the generated
 SV remains the immutable Nix closure recorded above. The temporary paths are
 diagnostic breadcrumbs, not required durable inputs.
+
+## Root cause and bit-exact decode-8 result
+
+Operand-level tracing proved that the key-projection weights were nonzero
+(`0xfd, 0x07, 0x05, 0x03`) while both activation operands were zero. Following
+the activation backward showed that layer normalization computed valid
+approximately +/-0.983 values, but then multiplied them by an all-zero gamma
+memory and added an all-zero beta memory.
+
+The generated Calyx module externalizes every memory, including 19
+`memref.global` constants placed immediately after the 37 semantic function
+ports. The original W4A8 fixture initialized only the 32 phase inputs and
+zero-filled every remaining external memory. In decode-8, global ordinals 15
+and 16 map to ports 52 and 53, exactly the beta and gamma memories observed as
+zero in the trace. This was a simulation-fixture ABI defect, not an arithmetic
+lowering defect.
+
+The fixture now parses `memref.get_global` order from the exact flat-SCF input,
+extracts exact f32 dense-resource payloads, supports the inline f32 sentinel
+and dense i64 shape constant, validates each binding against the RTL width and
+depth, writes its memory image, and emits the binding list in the result
+receipt. Regression coverage requires both binding order and fixture preload
+behavior.
+
+With all 19 global memories initialized, decode-8 passed bit-exactly against
+the frozen PT2E oracle:
+
+- 66,587 cycles;
+- 437.08 seconds Verilator build time at `-j2`;
+- 69.97 seconds simulation time;
+- logits: 6/6 words bit-exact, maximum absolute error 0;
+- four cache leaves: 72/72 words bit-exact, maximum absolute error 0.
+
+The full temporary receipt is
+`/tmp/w4a8-decode8-globals-fixed-report.json`. Its authoritative inputs remain
+the immutable Nix closures listed above; the temporary result will be followed
+by the durable three-phase receipt set.

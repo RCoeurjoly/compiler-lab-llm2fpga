@@ -38,6 +38,14 @@ class PhaseRoles:
     cache_outputs: tuple[int, ...]
 
 
+@dataclasses.dataclass(frozen=True)
+class GlobalMemoryBinding:
+    port: int
+    symbol: str
+    width: int
+    words: tuple[int, ...]
+
+
 _ELEMENT_WIDTHS = {"i1": 1, "i8": 8, "i64": 64, "f32": 32}
 
 
@@ -63,6 +71,75 @@ def parse_flat_scf_abi(source: str) -> tuple[SemanticMemory, ...]:
     if not items or [item.number for item in items] != list(range(len(items))):
         raise ValueError("semantic memories are not a complete zero-based sequence")
     return tuple(items)
+
+
+def parse_flat_scf_global_bindings(
+    source: str, *, first_port: int
+) -> tuple[GlobalMemoryBinding, ...]:
+    resources = {
+        match.group("name"): bytes.fromhex(match.group("hex")[2:])
+        for match in re.finditer(
+            r'(?m)^\s*(?P<name>[A-Za-z_.$][A-Za-z0-9_.$-]*)\s*:\s*'
+            r'"(?P<hex>0x[0-9A-Fa-f]+)"\s*,?\s*$', source
+        )
+    }
+    declarations = {
+        match.group("symbol"): (match.group("type"), match.group("initializer"))
+        for match in re.finditer(
+            r'(?m)^\s*memref\.global\b[^\n]*?@(?P<symbol>[A-Za-z_.$][A-Za-z0-9_.$-]*)'
+            r'\s*:\s*memref<(?P<type>[^>]+)>\s*=\s*'
+            r'(?P<initializer>dense_resource<[^>]+>|dense<[^>]+>)', source
+        )
+    }
+    gets = list(re.finditer(
+        r'(?m)^\s*%\d+\s*=\s*memref\.get_global\s+'
+        r'@(?P<symbol>[A-Za-z_.$][A-Za-z0-9_.$-]*)\s*:\s*memref<(?P<type>[^>]+)>',
+        source,
+    ))
+    bindings: list[GlobalMemoryBinding] = []
+    for ordinal, get in enumerate(gets):
+        symbol = get.group("symbol")
+        try:
+            type_text, initializer = declarations[symbol]
+        except KeyError as error:
+            raise ValueError(f"get_global references missing @{symbol}") from error
+        if type_text != get.group("type"):
+            raise ValueError(f"get_global type disagrees for @{symbol}")
+        fields = type_text.split("x")
+        element = fields[-1]
+        shape = tuple(int(field) for field in fields[:-1]) or (1,)
+        if element not in ("f32", "i64"):
+            raise ValueError(f"unsupported global element type: {element}")
+        width = _ELEMENT_WIDTHS[element]
+        resource = re.fullmatch(r"dense_resource<([^>]+)>", initializer)
+        if resource:
+            framed = resources.get(resource.group(1))
+            if framed is None or len(framed) < 4 or framed[:4] != b"\x04\x00\x00\x00":
+                raise ValueError(f"malformed dense resource for @{symbol}")
+            payload = framed[4:]
+        else:
+            scalar = re.fullmatch(r"dense<([+-]?\d+)>", initializer)
+            float_scalar = re.fullmatch(
+                r"dense<([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?)>",
+                initializer,
+            )
+            if scalar is not None and element == "i64":
+                payload = struct.pack("<q", int(scalar.group(1))) * math.prod(shape)
+            elif float_scalar is not None and element == "f32":
+                payload = struct.pack("<f", float(float_scalar.group(1))) * math.prod(shape)
+            else:
+                raise ValueError(f"unsupported inline global initializer for @{symbol}")
+        byte_width = width // 8
+        if len(payload) != math.prod(shape) * byte_width:
+            raise ValueError(f"global payload size disagrees for @{symbol}")
+        bindings.append(GlobalMemoryBinding(
+            first_port + ordinal,
+            symbol,
+            width,
+            tuple(int.from_bytes(payload[offset:offset + byte_width], "little")
+                  for offset in range(0, len(payload), byte_width)),
+        ))
+    return tuple(bindings)
 
 
 def phase_roles(phase: str, *, semantic_port_count: int) -> PhaseRoles:
@@ -221,7 +298,7 @@ def _flatten(value: object) -> list[object]:
 
 def render_fixture(
     rtl: tuple[SvMemoryPort, ...], roles: PhaseRoles, *, timeout_cycles: int,
-    debug_ports: tuple[int, ...] = (),
+    debug_ports: tuple[int, ...] = (), initialized_ports: tuple[int, ...] = (),
 ) -> str:
     if timeout_cycles <= 0:
         raise ValueError("timeout_cycles must be positive")
@@ -265,7 +342,7 @@ def render_fixture(
         initialization.append(
             f"  for (int i = 0; i < {port.depth}; i++) mem{number}[i] = '0;"
         )
-        if number in roles.inputs:
+        if number in roles.inputs or number in initialized_ports:
             initialization.append(f'  $readmemh("mem{number}.hex", mem{number});')
     dumps = [f'  $writememh("out{number}.hex", mem{number});' for number in roles.outputs]
     dumps.extend(
@@ -367,7 +444,8 @@ def _run(args: argparse.Namespace) -> int:
 
     args.work_dir.mkdir(parents=True, exist_ok=True)
     sv_source = args.sv.read_text(encoding="utf-8")
-    semantic = parse_flat_scf_abi(args.flat_scf.read_text(encoding="utf-8"))
+    flat_scf_source = args.flat_scf.read_text(encoding="utf-8")
+    semantic = parse_flat_scf_abi(flat_scf_source)
     rtl = parse_sv_memory_ports(sv_source)
     validate_abi(semantic, rtl)
     roles = phase_roles(args.phase, semantic_port_count=len(semantic))
@@ -394,11 +472,26 @@ def _run(args: argparse.Namespace) -> int:
         inputs.append(
             {"port": number, "shape": list(shape), "dtype": dtype, "sha256": _sha256(payload)}
         )
+    globals_ = parse_flat_scf_global_bindings(
+        flat_scf_source, first_port=len(semantic)
+    )
+    for binding in globals_:
+        if binding.port >= len(rtl):
+            raise ValueError(f"global @{binding.symbol} is outside the RTL memory ABI")
+        port = rtl[binding.port]
+        if port.width != binding.width or port.depth < len(binding.words):
+            raise ValueError(f"global @{binding.symbol} does not fit arg_mem_{binding.port}")
+        digits = binding.width // 4
+        (args.work_dir / f"mem{binding.port}.hex").write_text(
+            "\n".join(f"{word:0{digits}x}" for word in binding.words) + "\n",
+            encoding="ascii",
+        )
     debug_ports = tuple(args.debug_port or ())
     if any(number < 0 or number >= len(rtl) for number in debug_ports):
         raise ValueError("debug port is outside the generated RTL memory ABI")
     fixture = render_fixture(
-        rtl, roles, timeout_cycles=args.timeout_cycles, debug_ports=debug_ports
+        rtl, roles, timeout_cycles=args.timeout_cycles, debug_ports=debug_ports,
+        initialized_ports=tuple(binding.port for binding in globals_),
     )
     fixture_path = args.work_dir / "tb.sv"
     fixture_path.write_text(fixture, encoding="utf-8")
@@ -457,6 +550,7 @@ def _run(args: argparse.Namespace) -> int:
         "semantic_port_count": len(semantic),
         "rtl_port_count": len(rtl),
         "inputs": inputs,
+        "global_bindings": [dataclasses.asdict(binding) for binding in globals_],
         "comparisons": comparisons,
         "compile_seconds": compile_seconds,
         "simulation_seconds": simulation_seconds,
