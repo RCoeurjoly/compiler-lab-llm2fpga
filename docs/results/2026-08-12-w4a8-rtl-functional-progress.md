@@ -492,3 +492,19 @@ clamping, projection accumulation, and projection scaling are therefore all
 downstream of the first known defect. Localization moves through the no-op
 `view_7`/`permute_7` layout chain to the attention-value computation that
 produces these floats.
+
+The exact `matmul_3` implementation is the 8-by-2-by-8 floating MAC at
+`bb0_3424` through `bb0_3435`. Its diagnostic build took 11:16.83 wall time
+and 15,399,920 KiB maximum RSS; simulation took 10:12.23, used 11,452 KiB
+maximum RSS, completed in 545,149 cycles, and emitted exactly 128 multiplies
+and 128 accumulator additions. The first product has both operands bit-exact:
+probability `0x3e003f0e` and value `0x3d11fd68`. The first material divergence
+is the next value operand: RTL reads `-0.0325427502` (`0xbd054b8c`) where PT2E
+`cat_3` requires `-0.0353321284` (`0xbd10b86c`). Later RTL values form a
+scrambled/stale-looking sequence, with only some reduction positions exact.
+The probability stream is exact for the first term and differs by only one
+ULP on subsequent terms (`0x3dffedfc` versus PT2E `0x3dffedfd`), which cannot
+explain the roughly factor-of-two result error. Each traced add correctly uses
+the prior sum and current product. Therefore the dominant first known defect
+is in the `cat_3` value tensor or its construction/address mapping before
+`matmul_3`, not in the MAC datapath.
