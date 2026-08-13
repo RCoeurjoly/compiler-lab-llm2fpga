@@ -521,3 +521,14 @@ address 2 is RTL `0xbd054b8c` (the PT2E value expected at address 7) instead of
 the bad value sequence is not created by the matmul read-side address
 linearization. `bb0_3220` only converts and stores q42, so localization moves
 upstream to `quantize_per_tensor_42` / its `permute_6` input.
+
+The q42 source/code trace (`bb0_3172` and `bb0_3197`) clears the quantizer.
+Its diagnostic build took 11:15.04 wall time and 15,400,072 KiB maximum RSS;
+simulation took 10:10.99, used 11,436 KiB maximum RSS, and completed normally
+in 545,149 cycles. All 16 q42 codes are the correct rounded/clamped results for
+the float values supplied. Those source floats, however, already equal the
+mixed sequence later observed in the dequantized value buffer: indices 0 and 1
+match PT2E, while index 2 is `0xbd054b8c` instead of `0xbd10b86c` and index 3
+repeats `0x3d11fd68` instead of `0x3d1eaf45`. The q42 quantization and
+dequantization paths are therefore correct. The earliest known defect is now
+the tensor entering q42, structurally corresponding to PT2E `permute_6`.
