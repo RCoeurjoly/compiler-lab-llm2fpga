@@ -144,7 +144,11 @@ let
         else throw "unsupported Calyx math profile: ${calyxMathProfile}";
     in pkgs.runCommand "${name}-calyx" { buildInputs = [ mlir circt python ]; } ''
       tmp_pre_calyx="$(mktemp /tmp/no_handshake_pre_calyx_XXXXXX.mlir)"
-      ${mlir}/bin/mlir-opt ${flatScf}/flat.scf.mlir \
+      tmp_zero_seed_fixed="$(mktemp /tmp/no_handshake_zero_seed_XXXXXX.mlir)"
+      ${python}/bin/python3 ${pipelineScripts}/materialize_zero_seed_copies.py \
+        ${flatScf}/flat.scf.mlir "$tmp_zero_seed_fixed" \
+        "$out/zero-seed-materialization-receipt.json"
+      ${mlir}/bin/mlir-opt "$tmp_zero_seed_fixed" \
         --load-pass-plugin=${mlirPasses}/lib/LLM2FPGAMLIRPasses.so \
         --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx${mathPasses},llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
         -o "$tmp_pre_calyx"
@@ -157,6 +161,7 @@ let
       test -f "$out/manifest.json"
       test -f "$out/float-frontier.json"
       test -f "$out/pre-calyx-legality.json"
+      test -f "$out/zero-seed-materialization-receipt.json"
       if ${pkgs.gnugrep}/bin/grep -q '"status":"ok"' "$out/manifest.json"; then
         test -f "$out/model.calyx.mlir"
       fi

@@ -581,3 +581,30 @@ superseded. The first demonstrated divergence is already present in the
 activation tensor copied into `arg_mem_136`, whose semantic source is q33
 after the second block's first layer normalization. The next trace boundary
 is q33/layer-norm-2 production.
+
+### q33 is correct; zero-seed aliasing corrupts later LayerNorm reductions
+
+The q33 diagnostic build took 11:15.62 and 15,399,956 KiB peak RSS;
+simulation took 10:24.22, used 11,460 KiB peak RSS, and completed in 545,149
+cycles. Every q33 code is the correct rounded and clamped result for its
+traced float input, and all 16 subsequent copies into the `linear_8`
+activation memory are bit-exact. The float input is already wrong: token zero
+is near the expected `[-1, 1]`, token one is approximately `[0.9527,
+-0.8297]`, and later rows reach magnitudes above four. The quantizer is not
+the source of divergence.
+
+Flat-SCF retains the correct LayerNorm initialization. It allocates and fills
+an eight-element zero seed (`%alloc_103`), then copies that seed into each
+mean and variance reduction buffer. After SCF-to-Calyx allocation, the zero
+seed and its non-overlapping mutable destinations all map to `arg_mem_85`.
+Only the original seed fill remains (`bb0_349`); later seed copies become
+self-copies of the values left by earlier reductions. The first LayerNorm is
+therefore correct, while later LayerNorm invocations accumulate stale state.
+
+The in-scope repair materializes copies from statically zero-filled scratch
+seeds as explicit destination zero-fill loops before SCF-to-Calyx. On the
+frozen prefill flat-SCF it rewrites 12 such copies, including both reduction
+seeds for all affected LayerNorm operations, and emits a receipt listing each
+rewrite. Ordinary copies are unchanged. A focused regression covers the
+aliasing pattern; a fresh immutable lowering and three-phase RTL simulation
+remain required to validate the repair end to end.
