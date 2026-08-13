@@ -553,3 +553,31 @@ values/codes at indices 0 and 1 (`115`, `-126`), but index 2 produces code
 sequence seen downstream. All emitted codes match quantization of their traced
 RTL floats. The first known defect therefore lies in `linear_8` or its inputs,
 not q36, q41, q42, their dequantizations, or the intervening view/permutation.
+
+### `linear_8` integer boundary clears the W4 multiply and local accumulator
+
+A focused trace of generated `linear_8` blocks `bb0_2832` through `bb0_2850`
+completed in 545,149 cycles. The Verilator build took 11:14.11 and
+15,399,752 KiB peak RSS; simulation took 10:16.71 and 11,300 KiB peak RSS.
+All 16 accumulator addresses are explicitly initialized to zero, exactly two
+signed products are accumulated per output, and the result is rescaled by
+`cst_5 = 0x37d6b335` (2.559423774073366e-05). This is the correctly rounded
+float32 product of q33 activation scale 0.007759554777294397 and
+`_frozen_param7` weight scale 0.0032984158024191856.
+
+The frozen W4 weight codes are `[[-6, 5], [7, -5]]`. For token zero, PT2E q33
+codes are `[-127, 127]`; RTL produces products 762 and 635 and the correct
+accumulator 1397. For token one, PT2E requires `[126, -126]` and first-output
+accumulator -1386. RTL instead produces products -738 and -535, proving that
+its activation pair at this boundary is `[123, -107]`; it then correctly
+accumulates the supplied pair to -1273. Its second-output products 861 and
+535 independently establish the same erroneous activation pair with the
+second weight row.
+
+This clears `linear_8` indexing, signed W4 multiplication, accumulator
+initialization, integer addition, and product rescaling. The preceding
+statement that the first defect could be inside `linear_8` is therefore
+superseded. The first demonstrated divergence is already present in the
+activation tensor copied into `arg_mem_136`, whose semantic source is q33
+after the second block's first layer normalization. The next trace boundary
+is q33/layer-norm-2 production.
