@@ -145,6 +145,7 @@ let
     in pkgs.runCommand "${name}-calyx" { buildInputs = [ mlir circt python ]; } ''
       tmp_pre_calyx="$(mktemp /tmp/no_handshake_pre_calyx_XXXXXX.mlir)"
       tmp_zero_seed_fixed="$(mktemp /tmp/no_handshake_zero_seed_XXXXXX.mlir)"
+      mkdir -p "$out"
       ${python}/bin/python3 ${pipelineScripts}/materialize_zero_seed_copies.py \
         ${flatScf}/flat.scf.mlir "$tmp_zero_seed_fixed" \
         "$out/zero-seed-materialization-receipt.json"

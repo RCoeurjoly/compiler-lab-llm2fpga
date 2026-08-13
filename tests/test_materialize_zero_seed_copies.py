@@ -55,6 +55,14 @@ class MaterializeZeroSeedCopiesTest(unittest.TestCase):
             self.assertIn("memref.store %zero, %variance[", output)
             self.assertIn("memref.copy %mean_view, %variance_view", output)
 
+    def test_nix_stage_creates_output_directory_before_receipt(self):
+        pipeline = (ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
+        stage = pipeline[pipeline.index("tmp_zero_seed_fixed=") :]
+        self.assertLess(
+            stage.index('mkdir -p "$out"'),
+            stage.index("materialize_zero_seed_copies.py"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
