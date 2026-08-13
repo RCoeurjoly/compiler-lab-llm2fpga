@@ -302,3 +302,32 @@ of simulation. All five comparisons reproduce the original mismatch exactly,
 including every actual SHA-256 and error metric. This falsifies
 `infer-data-path` exclusion as a sufficient fix and moves the next controlled
 experiment to the `cell-share` pass that creates the invalid shared datapath.
+
+#### Targeted accumulator protection
+
+A global `-d cell-share` diagnostic was not viable: it ran for roughly 90
+minutes while host samples showed essentially all 30 GiB RAM and about 6 GiB
+swap occupied, then terminated without an output SV file or `/usr/bin/time`
+completion footer. Kernel OOM records were unavailable to the unprivileged
+session, so this is recorded conservatively as an external/resource-limit
+termination rather than a proven OOM-killer event.
+
+Inspection of pinned Calyx revision `5a4303847392609cad83dda6f4bdffc8cc0e5c89`
+showed that `cell-share` excludes cells carrying `@protected`. Optimizer-only
+experiments localized the minimum protected path for `bb0_4755`: the
+`std_add_1551` adder plus `load_542_reg` and `muli_494_reg`. Protecting only the
+adder was insufficient because cell sharing renamed its two operands to
+`mulf_89_reg` and `addf_81_reg`; protecting all three retained the original
+Futil assignments after `pre-opt`:
+
+```
+arg_mem_158_write_data = std_add_1551.out;
+std_add_1551.left = load_542_reg.out;
+std_add_1551.right = muli_494_reg.out;
+```
+
+The pipeline now marks every structurally analogous memory write fed by a
+two-input cell, together with that cell's two operand cells, as protected. On
+the frozen prefill Futil this protects 48 cells, retaining sharing everywhere
+else. This is structural evidence only; a fresh immutable SV closure and
+bit-exact simulation remain required before calling prefill repaired.

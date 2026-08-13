@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 normalize_for_export="${CALYX_NORMALIZE_FOR_EXPORT:-$SCRIPT_DIR/normalize_calyx_for_export.py}"
 normalize_futil_constants="${CALYX_NORMALIZE_FUTIL_CONSTANTS:-$SCRIPT_DIR/normalize_futil_float_constants.py}"
 fix_futil_fptosi_handshake="${CALYX_FIX_FUTIL_FPTOSI_HANDSHAKE:-$SCRIPT_DIR/fix_futil_fptosi_handshake.py}"
+protect_futil_memory_accumulators="${CALYX_PROTECT_FUTIL_MEMORY_ACCUMULATORS:-$SCRIPT_DIR/protect_futil_memory_accumulators.py}"
 fix_sv_roundeven_overflow="${CALYX_FIX_SV_ROUNDEVEN_OVERFLOW:-}"
 fix_sv_divsqrt_handshake="${CALYX_FIX_SV_DIVSQRT_HANDSHAKE:-}"
 verify_futil_bits="${CALYX_VERIFY_F32_CONSTANT_BITS:-$SCRIPT_DIR/verify_calyx_f32_constant_bits.py}"
@@ -66,8 +67,9 @@ tmp_calyx_log="$scratch_dir/native-calyx.log"
 tmp_normalized="$scratch_dir/normalized.mlir"
 tmp_exported_futil="$scratch_dir/model.futil"
 tmp_normalized_futil="$scratch_dir/model.constants.futil"
+tmp_handshake_fixed_futil="$scratch_dir/model.handshake.futil"
 cleanup() {
-  rm -f "$tmp_export_log" "$tmp_calyx_log" "$tmp_normalized" "$tmp_exported_futil" "$tmp_normalized_futil"
+  rm -f "$tmp_export_log" "$tmp_calyx_log" "$tmp_normalized" "$tmp_exported_futil" "$tmp_normalized_futil" "$tmp_handshake_fixed_futil"
   rmdir "$scratch_dir"
 }
 trap cleanup EXIT
@@ -104,8 +106,13 @@ python3 "$verify_futil_bits" \
 python3 "$normalize_futil_constants" "$tmp_exported_futil" "$tmp_normalized_futil" \
   >"$output_dir/logs/normalize-futil-float-constants.log" 2>&1
 
-python3 "$fix_futil_fptosi_handshake" "$tmp_normalized_futil" "$output_dir/model.futil" \
+python3 "$fix_futil_fptosi_handshake" "$tmp_normalized_futil" "$tmp_handshake_fixed_futil" \
   >"$output_dir/logs/fix-futil-fptosi-handshake.log" 2>&1
+
+python3 "$protect_futil_memory_accumulators" \
+  "$tmp_handshake_fixed_futil" "$output_dir/model.futil" \
+  "$output_dir/memory-accumulator-protection-receipt.json" \
+  >"$output_dir/logs/protect-futil-memory-accumulators.log" 2>&1
 
 missing_imports=()
 while IFS= read -r import_path; do
