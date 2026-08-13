@@ -385,3 +385,19 @@ steps and moves localization into the final residual stream. End-of-run
 contents of compiler-allocated memories must not be assigned logical tensor
 identities without operation-qualified write tracing because Calyx reuses
 those memories.
+
+An operation-qualified trace of the exact Calyx group implementing PT2E
+`add_11` (`bb0_4565`) then split the final residual into its two operands.
+The diagnostic build completed in 11:14.93 wall time with 15,399,980 KiB
+maximum RSS. Simulation completed normally in 10:17.53, used 11,340 KiB
+maximum RSS, and again took 545,149 cycles. All 16 floating operand pairs and
+sums were compared bitwise with PT2E. The left operand
+`dequantize_per_tensor_76` first differs at index 2: RTL
+`-0.012405932880938053` versus PT2E `-0.011086152866482735`. At that same
+index the right/MLP operand `dequantize_per_tensor_94` is still bit-exact at
+`0.000244140625`. The right operand first differs later, at index 4. Therefore
+the earliest known divergence is not introduced by final residual addition or
+the second block's final MLP projection; it is already present in the
+`quantize_per_tensor_49` stream feeding both `dequantize_per_tensor_75` and
+`dequantize_per_tensor_76`. Localization now moves to the two operands of the
+preceding PT2E `add_8`.
