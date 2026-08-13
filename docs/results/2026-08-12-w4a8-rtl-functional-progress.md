@@ -236,3 +236,47 @@ memory are zero. The next localization boundary is therefore the final logits
 write path and its upstream LM-head input, followed by the first cache
 divergence if that zero is merely a downstream symptom. The full temporary
 receipt is `/tmp/w4a8-prefill8-globals-fixed-report.json`.
+
+### Prefill LM-head localization and Calyx backend defect
+
+End-of-run dumps are safe for the final LM-head scratch memories because they
+are the last computation and are not reused afterward. They establish:
+
+- port 158 (`alloc_238`, 48 i32 LM-head accumulators) is all zero;
+- port 159 (`alloc_239`, 48 dequantized f32 logits) is all zero;
+- port 160 (`alloc_241`, 48 quantized i8 logits) is all zero.
+
+The exact MAC operands are nevertheless nonzero. Port 73 contains the final
+normalized activations
+`81 7f 7d 8a 7f 7f 93 6d 80 80 7f 7f 80 7f 3f 7f`, and port 157 contains the
+transposed LM-head weights
+`fa 01 ff 01 fe 04 03 00 fe 02 fc 07`. Signed software reconstruction of the
+8-by-2 times 2-by-6 MAC yields 48 nonzero accumulators (for example the first
+row is `1143, -127, -127, 127, -254, 381`). Thus zero is not mathematically
+plausible and neither operand memory is missing.
+
+The generated Futil group `bb0_4755` correctly specifies:
+
+```text
+arg_mem_158.write_data = std_add_1551.out;
+```
+
+but native Calyx's emitted SV instead contains:
+
+```text
+bb0_4755_go_out ? std_add_1560_out : 'x;
+```
+
+`std_add_1560` belongs to later floating-point rounding logic. Many unrelated
+SV mux branches also collapse onto this same last adder output, so this is not
+a one-off LM-head wiring error. The native backend log contains two warnings:
+`Data path infer did not converge after 5 iterations`, but the derivation still
+reports success. The demonstrated cause is therefore a native Calyx data-path
+mux inference failure at this design scale, after correct Futil export and
+before any llm2fpga SV simulation or synthesis normalizer.
+
+The required repair surface is systematic: reconstruct each affected emitted
+mux branch from the corresponding named Futil group assignment, validate the
+rewritten branch count and absence of contradictory drivers, then regenerate
+the immutable closure and rerun all three phases. Hard-coding port 158 would
+leave the other collapsed branches corrupt and is not acceptable.
