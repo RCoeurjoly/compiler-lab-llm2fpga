@@ -280,3 +280,25 @@ mux branch from the corresponding named Futil group assignment, validate the
 rewritten branch count and absence of contradictory drivers, then regenerate
 the immutable closure and rerun all three phases. Hard-coding port 158 would
 leave the other collapsed branches corrupt and is not acceptable.
+
+#### `infer-data-path` exclusion experiment
+
+Disabling only Calyx 0.7.1's `infer-data-path` pass is not a repair. A complete
+Nix rebuild produced the immutable closure
+`/nix/store/bm6zl9q6j9y18bcwmdsz62cw7adf2in8-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv`
+with SV SHA-256
+`9c7efa1fa6daef20117843f143864a078bd6909971e918d35a709ad87f49ef58`.
+The rebuild took 1:50:08 wall time. Host samples observed essentially all
+30 GiB RAM occupied plus about 5 GiB swap; `/usr/bin/time` measured only the
+Nix client, not the daemon-side builder, so its 439,516 KiB maximum RSS is not
+the builder peak and must not be reported as such.
+
+The non-convergence warning disappeared, but Calyx cell sharing still mapped
+`bb0_4755` onto `std_add_1560`. More importantly, that shared adder's operand
+muxes select floating-point registers during `bb0_4755`, not the Futil group's
+`load_542_reg.out` and `muli_494_reg.out`. The dedicated W4A8 harness completed
+545,149 cycles after 406.45 seconds of Verilator compilation and 618.25 seconds
+of simulation. All five comparisons reproduce the original mismatch exactly,
+including every actual SHA-256 and error metric. This falsifies
+`infer-data-path` exclusion as a sufficient fix and moves the next controlled
+experiment to the `cell-share` pass that creates the invalid shared datapath.
