@@ -39,10 +39,10 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         self.assertEqual(roles.logits, 32)
         self.assertEqual(roles.cache_outputs, (33, 34, 35, 36))
 
-    def test_prefill_phase_classifies_five_outputs_after_28_inputs(self) -> None:
-        roles = module.phase_roles("prefill-8", semantic_port_count=33)
-        self.assertEqual(roles.inputs, tuple(range(28)))
-        self.assertEqual(roles.outputs, tuple(range(28, 33)))
+    def test_prefill_phase_classifies_five_outputs_after_32_inputs(self) -> None:
+        roles = module.phase_roles("prefill-8", semantic_port_count=37)
+        self.assertEqual(roles.inputs, tuple(range(32)))
+        self.assertEqual(roles.outputs, tuple(range(32, 37)))
 
     def test_memory_words_preserve_signed_and_ieee_bit_patterns(self) -> None:
         self.assertEqual(module.memory_words(bytes([0xFF, 0x80]), width=8), ["ff", "80"])
@@ -67,6 +67,15 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         ports = module.parse_sv_memory_ports(sv)
         self.assertEqual([(port.number, port.width, port.depth) for port in ports],
                          [(0, 64, 2), (1, 8, 8)])
+
+    def test_sv_zero_extent_memory_uses_one_fixture_word(self) -> None:
+        sv = """module main_1(
+          output logic [63:0] arg_mem_0_addr0, output logic arg_mem_0_content_en,
+          output logic arg_mem_0_write_en, output logic [31:0] arg_mem_0_write_data,
+          input logic [31:0] arg_mem_0_read_data, input logic arg_mem_0_done
+        ); endmodule"""
+        ports = module.parse_sv_memory_ports(sv)
+        self.assertEqual(ports, (module.SvMemoryPort(0, 32, 1),))
 
     def test_semantic_abi_rejects_rtl_width_or_depth_mismatch(self) -> None:
         semantic = (module.SemanticMemory(0, (3,), 8),)
@@ -161,6 +170,16 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         text = "// 0x00000000\n3f800000\nc0200000\n"
         payload = module.decode_hex_words(text, width=32, count=2)
         self.assertEqual(payload, struct.pack("<ff", 1.0, -2.5))
+
+    def test_prefill_logits_compare_only_final_token_suffix(self) -> None:
+        all_logits = struct.pack("<12f", *range(12))
+        expected_last = struct.pack("<6f", *range(6, 12))
+        self.assertEqual(
+            module.select_comparison_payload(
+                all_logits, expected_last, allow_suffix=True
+            ),
+            expected_last,
+        )
 
     def test_simulation_normalizer_pages_oversized_scalar_or_assignment(self) -> None:
         terms = [f"state == 13'd{i}" for i in range(3000)]

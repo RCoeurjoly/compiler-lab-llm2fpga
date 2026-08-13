@@ -143,7 +143,7 @@ def parse_flat_scf_global_bindings(
 
 
 def phase_roles(phase: str, *, semantic_port_count: int) -> PhaseRoles:
-    input_counts = {"prefill-8": 28, "decode-8": 32, "decode-9": 32}
+    input_counts = {"prefill-8": 32, "decode-8": 32, "decode-9": 32}
     try:
         input_count = input_counts[phase]
     except KeyError as error:
@@ -210,7 +210,12 @@ def parse_sv_memory_ports(source: str) -> tuple[SvMemoryPort, ...]:
         width = port["read_data"][1]
         if port["write_data"][1] != width:
             raise ValueError(f"arg_mem_{number} read/write widths disagree")
-        result.append(SvMemoryPort(number, width, 1 << port["addr0"][1]))
+        address_width = port["addr0"][1]
+        # CIRCT represents a zero-extent memref with an i64 placeholder
+        # address. It has no addressable elements; retain one fixture word so
+        # SystemVerilog can model the otherwise-empty external memory.
+        depth = 1 if address_width == 64 else 1 << address_width
+        result.append(SvMemoryPort(number, width, depth))
     return tuple(result)
 
 
@@ -436,6 +441,16 @@ def _float_metrics(actual: bytes, expected: bytes) -> dict[str, object]:
     }
 
 
+def select_comparison_payload(
+    actual: bytes, expected: bytes, *, allow_suffix: bool = False
+) -> bytes:
+    if len(actual) == len(expected):
+        return actual
+    if allow_suffix and len(actual) > len(expected):
+        return actual[-len(expected):]
+    return actual
+
+
 def _run(args: argparse.Namespace) -> int:
     # Importing PT2E registration is required before torch.export.load can
     # resolve quantized_decomposed operators from the frozen archive.
@@ -537,6 +552,10 @@ def _run(args: argparse.Namespace) -> int:
             (args.work_dir / f"out{number}.hex").read_text(encoding="ascii"),
             width=memory.width,
             count=math.prod(memory.shape),
+        )
+        actual = select_comparison_payload(
+            actual, expected,
+            allow_suffix=args.phase == "prefill-8" and number == roles.logits,
         )
         metrics = _float_metrics(actual, expected)
         metrics.update({"port": number, "shape": list(memory.shape), "dtype": record["dtype"]})

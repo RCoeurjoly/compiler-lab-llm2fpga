@@ -1,8 +1,8 @@
 # W4A8 RC RTL functional progress
 
-Status: decode-8 and decode-9 pass bit-exactly; prefill-8 validation is in
-progress. This is not synthesis or fit evidence and does not yet satisfy the
-three-phase W4A8 completion gate.
+Status: decode-8 and decode-9 pass bit-exactly; prefill-8 completes but has a
+functional mismatch under investigation. This is not synthesis or fit evidence
+and does not yet satisfy the three-phase W4A8 completion gate.
 
 ## Durable inputs
 
@@ -197,3 +197,42 @@ The full temporary receipt is
 `/tmp/w4a8-decode9-globals-fixed-report.json`. As with decode-8, the Nix store
 paths above are the authoritative reproducible inputs. Prefill-8 remains the
 only unvalidated phase before mapped synthesis can begin.
+
+## Prefill-8 completion and mismatch
+
+Prefill native export completed successfully after about 100 minutes of
+single-threaded Calyx backend work. Read-only process samples observed a peak
+of at least 30,216,268 KiB RSS (93.0% of host RAM) before completion. Its
+immutable inputs are:
+
+- native SV:
+  `/nix/store/assf2zarkj7w8rvwvaxi3f8v6wimq1ig-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv`;
+- flat-SCF ABI and globals:
+  `/nix/store/hnrx9lj23ay9vrd2glxn8msc7ak3yh81-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-flat-scf`;
+- frozen PT2E oracle: the same `aqisbg...` bundle recorded for decode-9.
+
+The prefill ABI contains 32 inputs and five outputs. Four inputs are legitimate
+zero-extent float buffers represented by CIRCT with placeholder i64 address
+ports; the fixture now models each with one inert SystemVerilog word instead of
+incorrectly deriving a `2^64`-word array. Prefill produces all 48 token logits,
+whereas the oracle records only the final token's six logits, so comparison
+correctly selects the six-word suffix only for that output.
+
+With those fixture defects corrected, RTL execution completed in 545,149
+cycles. Verilator compilation took 550.50 seconds at `-j2` and simulation took
+604.64 seconds. All 20 externalized globals were initialized, but all five
+outputs mismatch:
+
+| output | elements compared | maximum absolute error | mean absolute error |
+| --- | ---: | ---: | ---: |
+| final-token logits | 6 | 0.0519332476 | 0.0223150673 |
+| layer 0 key cache | 16 | 0.0620839559 | 0.0182838875 |
+| layer 0 value cache | 16 | 0.0563787408 | 0.0165891654 |
+| layer 1 key cache | 16 | 0.0462513333 | 0.0152232575 |
+| layer 1 value cache | 16 | 0.0452499185 | 0.0116998931 |
+
+The cache outputs are nonzero, while the final six words of the 48-word logits
+memory are zero. The next localization boundary is therefore the final logits
+write path and its upstream LM-head input, followed by the first cache
+divergence if that zero is merely a downstream symptom. The full temporary
+receipt is `/tmp/w4a8-prefill8-globals-fixed-report.json`.
