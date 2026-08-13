@@ -455,3 +455,19 @@ quantizes its input, but the scaled two-term integer dot product feeding
 `linear_9` is already wrong. Localization moves into the integer accumulator,
 activation zero-point subtraction, weight layout, or product scale of the
 second attention output projection.
+
+An operand-level trace of the structurally corresponding integer accumulator
+(`bb0_3512` / `std_add_1164`) rules out its sequencing, address generation,
+weight layout, and downstream product scale. The diagnostic build took
+11:14.29 wall time and 15,400,016 KiB maximum RSS; simulation took 10:14.78,
+used 11,416 KiB maximum RSS, completed normally in 545,149 cycles, and emitted
+the expected 32 accumulator writes (8 positions by 2 outputs by 2 reduction
+terms). For each even output address, RTL accumulates `224 + 264 = 488`; for
+each odd address it accumulates `160 + 0 = 160`. With the frozen signed-int8
+weight rows `[7, -8]` and `[5, 0]`, these products prove that the centered RTL
+activation is `[32, -33]`, hence its pre-subtraction q46 codes are `[42, -23]`
+at zero point 10. PT2E instead supplies q46 `[77, -63]`, whose correct integer
+dots are `1053` and `335`. The accumulator correctly computes the values it is
+given and the observed post-scale floats are consistent with dots 488 and 160.
+The first known defect therefore moves upstream to the producer of q46; no
+accumulator or projection-scale fix is justified by the evidence.
