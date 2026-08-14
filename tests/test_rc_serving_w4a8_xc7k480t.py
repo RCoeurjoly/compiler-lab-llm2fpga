@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -10,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "pipeline" / "write_w4a8_xc7_evidence.py"
 MODULE = ROOT / "nix" / "rc-serving-w4a8-xc7k480t.nix"
 KEY = "tinystories-w4a8-rc-serving-mask10-vocab6-width2"
+DEFAULT_TIME = object()
 
 
 def write(path: Path, text: str) -> Path:
@@ -19,7 +21,8 @@ def write(path: Path, text: str) -> Path:
 
 def run_parser(work: Path, *, yosys_status: str, nextpnr_status: str,
                yosys_stat: str | None = None, nextpnr_log: str = "",
-               fasm: str | None = None) -> dict[str, object]:
+               fasm: str | None = None, yosys_time: object = DEFAULT_TIME,
+               nextpnr_time: object = DEFAULT_TIME) -> dict[str, object]:
     source = write(work / "source.sv", "module main; endmodule\n")
     normalized = write(work / "normalized.sv", "module main; endmodule\n")
     receipt = write(work / "normalization-receipt.json", '{"status":"ok"}\n')
@@ -27,16 +30,30 @@ def run_parser(work: Path, *, yosys_status: str, nextpnr_status: str,
     nextpnr_status_path = write(work / "nextpnr-status.txt", nextpnr_status + "\n")
     yosys_log = write(work / "yosys.log", "Yosys fixture\n")
     nextpnr_log_path = write(work / "nextpnr.log", nextpnr_log)
-    yosys_time = write(work / "yosys.time", "Elapsed (wall clock) time: 0:01.00\n")
-    nextpnr_time = write(work / "nextpnr.time", "Elapsed (wall clock) time: 0:02.00\n")
+    time_fixture = """\
+User time (seconds): 1.25
+System time (seconds): 0.50
+Elapsed (wall clock) time (h:mm:ss or m:ss): 0:02.00
+Maximum resident set size (kbytes): 123456
+"""
+    yosys_time_path = work / "yosys.time"
+    nextpnr_time_path = work / "nextpnr.time"
+    if yosys_time is not DEFAULT_TIME and yosys_time is not None:
+        write(yosys_time_path, yosys_time)
+    elif yosys_time is DEFAULT_TIME and yosys_status == "0":
+        write(yosys_time_path, time_fixture)
+    if nextpnr_time is not DEFAULT_TIME and nextpnr_time is not None:
+        write(nextpnr_time_path, nextpnr_time)
+    elif nextpnr_time is DEFAULT_TIME and nextpnr_status == "0":
+        write(nextpnr_time_path, time_fixture)
     output = work / "result.json"
     command = [
         sys.executable, str(SCRIPT), "--phase", "prefill-8",
         "--source", str(source), "--normalized", str(normalized),
         "--normalization-receipt", str(receipt),
         "--yosys-status", str(yosys_status_path), "--yosys-log", str(yosys_log),
-        "--yosys-time", str(yosys_time), "--nextpnr-status", str(nextpnr_status_path),
-        "--nextpnr-log", str(nextpnr_log_path), "--nextpnr-time", str(nextpnr_time),
+        "--yosys-time", str(yosys_time_path), "--nextpnr-status", str(nextpnr_status_path),
+        "--nextpnr-log", str(nextpnr_log_path), "--nextpnr-time", str(nextpnr_time_path),
         "--out", str(output),
     ]
     if yosys_stat is not None:
@@ -65,6 +82,14 @@ class RcServingW4A8Xc7k480tTest(unittest.TestCase):
         self.assertEqual(payload["resources"]["mapped"], {
             "bram18": 0, "bram36": 1, "clb_ffs": 7, "clb_luts": 12, "dsp": 2,
         })
+        self.assertEqual(payload["tools"]["yosys"]["time"], {
+            "status": "available",
+            "elapsed_seconds": 2.0,
+            "user_cpu_seconds": 1.25,
+            "system_cpu_seconds": 0.5,
+            "peak_rss_kbytes": 123456,
+        })
+        self.assertEqual(payload["tools"]["nextpnr"]["time"]["status"], "unavailable")
         self.assertEqual(payload["provenance"]["phase"], "prefill-8")
         self.assertEqual(len(payload["provenance"]["source_sha256"]), 64)
         self.assertEqual(len(payload["provenance"]["normalized_sha256"]), 64)
@@ -80,6 +105,38 @@ class RcServingW4A8Xc7k480tTest(unittest.TestCase):
             "stage": "yosys", "diagnostic": "Yosys fixture",
         })
         self.assertEqual(payload["tools"]["nextpnr"]["status"], "not-run")
+        self.assertEqual(payload["tools"]["yosys"]["time"]["status"], "unavailable")
+        self.assertEqual(payload["tools"]["nextpnr"]["time"]["status"], "unavailable")
+
+    def test_parser_rejects_malformed_and_absent_time_receipts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = run_parser(
+                Path(tmp),
+                yosys_status="1",
+                nextpnr_status="0",
+                yosys_time="not a GNU time receipt\n",
+                nextpnr_time=None,
+                fasm="# FASM\n",
+            )
+
+        self.assertEqual(payload["tools"]["yosys"]["time"]["status"], "unavailable")
+        self.assertEqual(payload["tools"]["nextpnr"]["time"]["status"], "unavailable")
+
+    def test_parser_uses_escaped_yosys_main_without_counting_submodules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = run_parser(
+                Path(tmp),
+                yosys_status="0",
+                nextpnr_status="not-run: Yosys mapped JSON was unavailable",
+                yosys_stat=json.dumps({"modules": {
+                    "\\main": {"num_cells_by_type": {"LUT6": 12, "FDRE": 7}},
+                    "submodule": {"num_cells_by_type": {"LUT6": 99, "FDRE": 88}},
+                }}),
+            )
+
+        self.assertEqual(payload["resources"]["mapped"], {
+            "bram18": 0, "bram36": 0, "clb_ffs": 7, "clb_luts": 12, "dsp": 0,
+        })
 
     def test_parser_records_successful_nextpnr_as_fit_with_timing(self) -> None:
         log = """\
@@ -120,6 +177,8 @@ ERROR: Failed to expand region (0, 0) |_> (309, 416) of 776182 SLICE_LUTXs
 
     def test_nix_module_keeps_all_tool_outcomes_and_uses_xc7k480t_inputs(self) -> None:
         source = MODULE.read_text(encoding="utf-8")
+        self.assertRegex(source, r'targetPart = "xc7k480tffg1156-1";')
+        self.assertRegex(source, r'targetChipdb = "xc7k480tffg1156\.bin";')
         for required in (
             "xc7k480tffg1156-1", "xc7k480tffg1156.bin",
             "RAM64X1S", "RAM128X1S", "RAM64X1D", "RAM128X1D", "mapped.json",
@@ -131,6 +190,7 @@ ERROR: Failed to expand region (0, 0) |_> (309, 416) of 776182 SLICE_LUTXs
             self.assertIn(required, source)
         self.assertRegex(source, r"nextpnr_status=\$\?")
         self.assertRegex(source, r"if \[ -s \"\$out/mapped\.json\" \]; then")
+        self.assertRegex(source, r"nextpnr-xilinx\s+--chipdb\s+\$\{chipdb\}")
 
     def test_flake_exports_each_phase_evidence_package_from_its_native_sv_closure(self) -> None:
         flake = (ROOT / "flake.nix").read_text(encoding="utf-8")
@@ -140,8 +200,20 @@ ERROR: Failed to expand region (0, 0) |_> (309, 416) of 776182 SLICE_LUTXs
         for phase in ("prefill-8", "decode-8", "decode-9"):
             package = f"{KEY}-{phase}-xc7k480t-evidence"
             native_sv = f'{KEY}-{phase}-calyx-native-sv'
-            self.assertIn(f'"{package}"', flake)
-            self.assertIn(f'rcServingW4A8PipelinePackages."{native_sv}"', flake)
+            match = re.search(
+                rf'"{re.escape(package)}"\s*=\s*'
+                r'import ./nix/rc-serving-w4a8-xc7k480t\.nix \{(?P<body>.*?)\n\s*\};',
+                flake,
+                re.DOTALL,
+            )
+            self.assertIsNotNone(match)
+            body = match.group("body")
+            self.assertIn(f'phaseName = "{phase}";', body)
+            self.assertIn(
+                f'rcServingW4A8PipelinePackages."{native_sv}"', body
+            )
+            self.assertIn("chipdb = task3MainLib.task3Toolchain.chipdb;", body)
+            self.assertIn("nextpnr = task3MainLib.task3Toolchain.nextpnr;", body)
 
 
 if __name__ == "__main__":

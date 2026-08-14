@@ -21,6 +21,20 @@ FMAX = re.compile(
     r"Max frequency for clock\s+'(?P<clock>[^']+)':\s*"
     r"(?P<mhz>\d+(?:\.\d+)?) MHz"
 )
+GNU_TIME = {
+    "user_cpu_seconds": re.compile(
+        r"^User time \(seconds\):\s*(?P<value>\d+(?:\.\d+)?)$", re.MULTILINE
+    ),
+    "system_cpu_seconds": re.compile(
+        r"^System time \(seconds\):\s*(?P<value>\d+(?:\.\d+)?)$", re.MULTILINE
+    ),
+    "elapsed": re.compile(
+        r"^Elapsed \(wall clock\) time .*?:\s*(?P<value>\S+)\s*$", re.MULTILINE
+    ),
+    "peak_rss_kbytes": re.compile(
+        r"^Maximum resident set size \(kbytes\):\s*(?P<value>\d+)$", re.MULTILINE
+    ),
+}
 
 
 def sha256(path: Path) -> str:
@@ -81,11 +95,15 @@ def mapped_resources(path: Path | None) -> dict[str, int] | None:
     if isinstance(modules, dict):
         # ``stat -json`` lists every elaborated module.  Counting all of them
         # would double-count cells below the measured top-level ``main``.
-        selected_modules = (
-            [modules["main"]]
-            if isinstance(modules.get("main"), dict)
-            else modules.values()
+        top = next(
+            (
+                modules[name]
+                for name in ("main", r"\main")
+                if isinstance(modules.get(name), dict)
+            ),
+            None,
         )
+        selected_modules = [top] if top is not None else modules.values()
         for module in selected_modules:
             if not isinstance(module, dict):
                 continue
@@ -148,9 +166,35 @@ def load_json(path: Path | None) -> object:
         return None
 
 
-def time_receipt(path: Path | None) -> dict[str, object]:
+def elapsed_seconds(value: str) -> float | None:
+    try:
+        parts = [float(part) for part in value.split(":")]
+    except ValueError:
+        return None
+    if len(parts) == 2:
+        return parts[0] * 60 + parts[1]
+    if len(parts) == 3:
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    return None
+
+
+def time_receipt(path: Path | None, tool_status: str) -> dict[str, object]:
+    if tool_status == "not-run":
+        return {"status": "unavailable"}
     text = read_text(path)
-    return {"status": "available" if text else "unavailable", "receipt": text or None}
+    matches = {name: pattern.search(text) for name, pattern in GNU_TIME.items()}
+    if not all(matches.values()):
+        return {"status": "unavailable"}
+    elapsed = elapsed_seconds(matches["elapsed"].group("value"))
+    if elapsed is None:
+        return {"status": "unavailable"}
+    return {
+        "status": "available",
+        "elapsed_seconds": elapsed,
+        "user_cpu_seconds": float(matches["user_cpu_seconds"].group("value")),
+        "system_cpu_seconds": float(matches["system_cpu_seconds"].group("value")),
+        "peak_rss_kbytes": int(matches["peak_rss_kbytes"].group("value")),
+    }
 
 
 def build_evidence(args: argparse.Namespace) -> dict[str, object]:
@@ -201,13 +245,13 @@ def build_evidence(args: argparse.Namespace) -> dict[str, object]:
                 "status": yosys_kind,
                 "exit_status": yosys_exit_status,
                 "log_path": str(args.yosys_log),
-                "time": time_receipt(args.yosys_time),
+                "time": time_receipt(args.yosys_time, yosys_kind),
             },
             "nextpnr": {
                 "status": nextpnr_kind,
                 "exit_status": nextpnr_exit_status,
                 "log_path": str(args.nextpnr_log),
-                "time": time_receipt(args.nextpnr_time),
+                "time": time_receipt(args.nextpnr_time, nextpnr_kind),
                 "fasm": "present" if fasm_present else "absent",
             },
         },
