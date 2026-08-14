@@ -480,6 +480,23 @@
         rcServingW4A8IntegratedPipelinePackages =
           pipelineLib.pipelineStagePackagesFromRegistry
           rcServingW4A8IntegratedRegistry;
+        rcServingW4A8IntegratedShell = pkgs.runCommand
+          "tinystories-w4a8-rc-serving-integrated-shell"
+          { nativeBuildInputs = [ pythonWithTinyStoriesTorchAO ]; }
+          ''
+            set -euo pipefail
+            export PYTHONPATH="${./.}:''${PYTHONPATH:-}"
+            ${pythonWithTinyStoriesTorchAO}/bin/python \
+              ${./scripts/pipeline/generate_rc_serving_w4a8_integrated_shell.py} \
+              --manifest ${rcServingW4A8IntegratedSystem.pytorchExported}/readback-manifest.json \
+              --flat-scf ${rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-flat-scf"}/flat.scf.mlir \
+              --generated-sv ${rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx-native-sv"}/sv/main.sv \
+              --exported ${rcServingW4A8IntegratedSystem.pytorchExported}/exported.pt2 \
+              --out-dir "$out"
+            ln -s ${rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx-native-sv"}/sv/main.sv \
+              "$out/generated.sv"
+            printf '%s\n' "$out/generated.sv" "$out/reference-top.sv" > "$out/sources.f"
+          '';
         rcServingW4A8Registry = builtins.listToAttrs (map (phase:
           let
             name = "${rcServingW4A8System.modelKey}-${phase.name}";
@@ -2650,6 +2667,8 @@ PY
             rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx";
           "tinystories-w4a8-rc-serving-integrated-calyx-native-sv" =
             rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx-native-sv";
+          "tinystories-w4a8-rc-serving-integrated-shell" =
+            rcServingW4A8IntegratedShell;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-pytorch-exported" =
             rcServingW4A8System.prefill8PytorchExported;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-pytorch-exported" =

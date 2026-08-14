@@ -50,6 +50,15 @@ class RcServingW4A8IntegratedNixTest(unittest.TestCase):
         self.assertNotIn("PHASE_NAMES", integrated_block)
         self.assertNotIn("map (phase", integrated_block)
 
+    def test_integrated_shell_consumes_the_one_wholesale_closure(self) -> None:
+        source = (ROOT / "flake.nix").read_text()
+        self.assertIn("rcServingW4A8IntegratedShell", source)
+        self.assertIn("generate_rc_serving_w4a8_integrated_shell.py", source)
+        self.assertIn("--flat-scf", source)
+        self.assertIn("--generated-sv", source)
+        self.assertIn("--exported", source)
+        self.assertIn('"tinystories-w4a8-rc-serving-integrated-shell"', source)
+
 
 if __name__ == "__main__":
     unittest.main()
