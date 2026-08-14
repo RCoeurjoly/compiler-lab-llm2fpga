@@ -55,7 +55,7 @@ in
 pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
   nativeBuildInputs = [ python yosys yosysSlang nextpnr pkgs.coreutils pkgs.gzip pkgs.time ];
 } ''
-  set -u -o pipefail
+  set -euo pipefail
   mkdir -p "$out"
   gzip -dc ${sourceSvGz} > "$out/source.sv"
   test "$(sha256sum "$out/source.sv" | cut -d ' ' -f 1)" = '${sourceSha256}'

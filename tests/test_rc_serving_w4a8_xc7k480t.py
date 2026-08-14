@@ -1,6 +1,7 @@
 import json
 import gzip
 import hashlib
+import os
 import re
 import subprocess
 import sys
@@ -83,6 +84,46 @@ def run_parser(work: Path, *, yosys_status: str, nextpnr_status: str,
 
 
 class RcServingW4A8Xc7k480tTest(unittest.TestCase):
+    def test_snapshot_ingestion_rejects_corrupt_or_noncanonical_sv(self) -> None:
+        module = MODULE.read_text(encoding="utf-8")
+        match = re.search(
+            r"\} ''\n(?P<script>.*?  : > \"\$out/normalized\.sv\"\n)",
+            module,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        ingestion_prefix = match.group("script")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            canonical_sv = b"module main; endmodule\n"
+            valid_snapshot = work / "valid.sv.gz"
+            with gzip.open(valid_snapshot, "wb") as stream:
+                stream.write(canonical_sv)
+            corrupt_snapshot = write(work / "corrupt.sv.gz", "not gzip data\n")
+            canonical_sha256 = hashlib.sha256(canonical_sv).hexdigest()
+
+            cases = {
+                "valid canonical snapshot": (valid_snapshot, canonical_sha256, 0, True),
+                "corrupt gzip": (corrupt_snapshot, canonical_sha256, 1, False),
+                "noncanonical hash": (valid_snapshot, "0" * 64, 1, False),
+            }
+            for name, (snapshot, sha256, expected_status, expected_normalized) in cases.items():
+                with self.subTest(name=name):
+                    out = work / name.replace(" ", "-")
+                    script = ingestion_prefix.replace(
+                        "${sourceSvGz}", str(snapshot)
+                    ).replace("${sourceSha256}", sha256)
+                    completed = subprocess.run(
+                        ["bash", "-c", script],
+                        env={**os.environ, "out": str(out)},
+                        capture_output=True,
+                        text=True,
+                    )
+
+                    self.assertEqual(completed.returncode, expected_status)
+                    self.assertEqual((out / "normalized.sv").exists(), expected_normalized)
+
     def test_parser_records_mapped_evidence_but_not_a_fit_without_pnr(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             payload = run_parser(
