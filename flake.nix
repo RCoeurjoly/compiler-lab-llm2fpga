@@ -478,6 +478,44 @@
           ]);
         rcServingW4A8PipelinePackages =
           pipelineLib.pipelineStagePackagesFromRegistry rcServingW4A8Registry;
+        rcServingW4A8Xc7Evidence = {
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-xc7k480t-evidence" =
+            import ./nix/rc-serving-w4a8-xc7k480t.nix {
+              inherit pkgs python yosysSlang;
+              yosys = yosysPkg;
+              nextpnr = task3MainLib.task3Toolchain.nextpnr;
+              chipdb = task3MainLib.task3Toolchain.chipdb;
+              normalizer = ./scripts/pipeline/fix_sv_synthesis_frontend.py;
+              evidenceWriter = ./scripts/pipeline/write_w4a8_xc7_evidence.py;
+              phaseName = "prefill-8";
+              nativeSv =
+                rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv";
+            };
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-xc7k480t-evidence" =
+            import ./nix/rc-serving-w4a8-xc7k480t.nix {
+              inherit pkgs python yosysSlang;
+              yosys = yosysPkg;
+              nextpnr = task3MainLib.task3Toolchain.nextpnr;
+              chipdb = task3MainLib.task3Toolchain.chipdb;
+              normalizer = ./scripts/pipeline/fix_sv_synthesis_frontend.py;
+              evidenceWriter = ./scripts/pipeline/write_w4a8_xc7_evidence.py;
+              phaseName = "decode-8";
+              nativeSv =
+                rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv";
+            };
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-xc7k480t-evidence" =
+            import ./nix/rc-serving-w4a8-xc7k480t.nix {
+              inherit pkgs python yosysSlang;
+              yosys = yosysPkg;
+              nextpnr = task3MainLib.task3Toolchain.nextpnr;
+              chipdb = task3MainLib.task3Toolchain.chipdb;
+              normalizer = ./scripts/pipeline/fix_sv_synthesis_frontend.py;
+              evidenceWriter = ./scripts/pipeline/write_w4a8_xc7_evidence.py;
+              phaseName = "decode-9";
+              nativeSv =
+                rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv";
+            };
+        };
         modelRegistryNoHandshake = import ./nix/models.nix {
           registerModel = pipelineLib.registerNoHandshakeModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
@@ -2640,6 +2678,7 @@ PY
           default = modelRegistryJson;
         } // pipelineStagePackages // pipelineMetadataPackages
           // quantizedLinalgDiagnosticPackages // pipelineAliasPackages
+          // rcServingW4A8Xc7Evidence
           // quantizedRepresentativeCoreStudyStagePackages;
 
         apps."rc-math-exp-paper-screen" = {
