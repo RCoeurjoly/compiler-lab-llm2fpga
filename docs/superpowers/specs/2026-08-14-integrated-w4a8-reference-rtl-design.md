@@ -49,9 +49,10 @@ token feedback is correct, or that one RTL instance completes the sequence.
 
 The existing phase artifacts remain frozen diagnostic evidence. They cannot be
 called an integrated W4A8 RTL reference and their graphs/RTL cannot be composed
-into the canonical implementation. Their recorded PT2E observations and
-quantization parameters remain the frozen numerical oracle and may seed the
-whole-graph observers needed to preserve that contract.
+into the canonical implementation. Their quantization parameters remain frozen
+and the prefill observation remains an exact cross-check. Their decode
+observations are not an end-to-end oracle because those phase programs received
+FP32-produced caches rather than the W4A8-produced cache of an integrated run.
 
 ## Alternatives considered
 
@@ -166,14 +167,16 @@ reported.
 
 ### 2. Integrated PT2E equivalence
 
-Convert and export one integrated W4A8 program. Compare every declared
-observation exactly with the accepted frozen three-phase W4A8 PT2E oracle,
-using its recorded per-phase quantization parameters when whole-graph observer
-calibration would otherwise change the frozen contract. Then save and reload
-the one program and require its outputs to match the accepted converted eager
-execution exactly. Graph inspection and the artifact receipt must confirm that
-there is one `ExportedProgram` containing the whole sequence. No gate requires
-W4A8 PT2E tensors to equal FP32 source tensors.
+Convert and export one integrated W4A8 program. Require every per-phase
+quantize/dequantize parameter and the complete prefill observation to match the
+frozen phase evidence exactly. The integrated decode observations necessarily
+become the new stateful W4A8 oracle because they consume the W4A8-produced
+cache; the old decode phase observations consumed FP32-produced caches and are
+non-compositional. Save and reload the one program and require all observations
+to match the accepted converted eager execution exactly. Graph inspection and
+the artifact receipt must confirm that there is one `ExportedProgram`
+containing the whole sequence. No gate requires W4A8 PT2E tensors to equal FP32
+source tensors.
 
 ### 3. Generated RTL equivalence
 
@@ -213,9 +216,9 @@ This milestone is complete only when all of the following are true:
 
 - one integrated FP32 eager module exactly matches the frozen ordered native
   FP32 trace at every boundary;
-- one integrated W4A8 PT2E program exactly matches the frozen three-phase W4A8
-  PT2E oracle and its saved/reloaded execution matches the accepted converted
-  eager execution;
+- one integrated W4A8 PT2E program exactly preserves the frozen per-phase
+  qparams and prefill observation, freezes its W4A8-cache-chained decode
+  observations, and matches them after save/reload;
 - that one program is lowered wholesale into one compiler-generated SV top;
 - one RTL instance executes prefill and both cached decodes with internal cache
   continuity and internal lowest-index token feedback;
