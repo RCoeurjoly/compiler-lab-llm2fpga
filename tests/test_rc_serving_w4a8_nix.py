@@ -52,6 +52,14 @@ class RcServingW4A8NixTest(unittest.TestCase):
         self.assertIn("llm2fpga-lower-rational-tanh-for-calyx", pipeline)
         self.assertIn("llm2fpga-lower-constant-fpowi-for-calyx", pipeline)
 
+    def test_native_sv_lowering_repairs_divsqrt_request_completion_protocol(self) -> None:
+        pipeline = (ROOT / "nix/pipeline.nix").read_text()
+        self.assertIn(
+            "export CALYX_FIX_SV_DIVSQRT_HANDSHAKE="
+            "${pipelineScripts}/fix_sv_divsqrt_handshake.py",
+            pipeline,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
