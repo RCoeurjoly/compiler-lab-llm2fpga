@@ -12,6 +12,12 @@ SCRIPT = ROOT / "scripts" / "pipeline" / "write_w4a8_xc7_evidence.py"
 MODULE = ROOT / "nix" / "rc-serving-w4a8-xc7k480t.nix"
 KEY = "tinystories-w4a8-rc-serving-mask10-vocab6-width2"
 DEFAULT_TIME = object()
+GNU_TIME_FIXTURE = """\
+\tUser time (seconds): 1.25
+\tSystem time (seconds): 0.50
+\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:02.00
+\tMaximum resident set size (kbytes): 123456
+"""
 
 
 def write(path: Path, text: str) -> Path:
@@ -30,22 +36,16 @@ def run_parser(work: Path, *, yosys_status: str, nextpnr_status: str,
     nextpnr_status_path = write(work / "nextpnr-status.txt", nextpnr_status + "\n")
     yosys_log = write(work / "yosys.log", "Yosys fixture\n")
     nextpnr_log_path = write(work / "nextpnr.log", nextpnr_log)
-    time_fixture = """\
-User time (seconds): 1.25
-System time (seconds): 0.50
-Elapsed (wall clock) time (h:mm:ss or m:ss): 0:02.00
-Maximum resident set size (kbytes): 123456
-"""
     yosys_time_path = work / "yosys.time"
     nextpnr_time_path = work / "nextpnr.time"
     if yosys_time is not DEFAULT_TIME and yosys_time is not None:
         write(yosys_time_path, yosys_time)
     elif yosys_time is DEFAULT_TIME and yosys_status == "0":
-        write(yosys_time_path, time_fixture)
+        write(yosys_time_path, GNU_TIME_FIXTURE)
     if nextpnr_time is not DEFAULT_TIME and nextpnr_time is not None:
         write(nextpnr_time_path, nextpnr_time)
     elif nextpnr_time is DEFAULT_TIME and nextpnr_status == "0":
-        write(nextpnr_time_path, time_fixture)
+        write(nextpnr_time_path, GNU_TIME_FIXTURE)
     output = work / "result.json"
     command = [
         sys.executable, str(SCRIPT), "--phase", "prefill-8",
@@ -121,6 +121,23 @@ class RcServingW4A8Xc7k480tTest(unittest.TestCase):
 
         self.assertEqual(payload["tools"]["yosys"]["time"]["status"], "unavailable")
         self.assertEqual(payload["tools"]["nextpnr"]["time"]["status"], "unavailable")
+
+    def test_parser_retains_indented_gnu_time_for_a_failed_tool(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = run_parser(
+                Path(tmp),
+                yosys_status="1",
+                nextpnr_status="not-run: Yosys exited 1",
+                yosys_time=GNU_TIME_FIXTURE,
+            )
+
+        self.assertEqual(payload["tools"]["yosys"]["time"], {
+            "status": "available",
+            "elapsed_seconds": 2.0,
+            "user_cpu_seconds": 1.25,
+            "system_cpu_seconds": 0.5,
+            "peak_rss_kbytes": 123456,
+        })
 
     def test_parser_uses_escaped_yosys_main_without_counting_submodules(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

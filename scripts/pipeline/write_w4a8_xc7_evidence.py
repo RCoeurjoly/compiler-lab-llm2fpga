@@ -23,16 +23,16 @@ FMAX = re.compile(
 )
 GNU_TIME = {
     "user_cpu_seconds": re.compile(
-        r"^User time \(seconds\):\s*(?P<value>\d+(?:\.\d+)?)$", re.MULTILINE
+        r"^[ \t]*User time \(seconds\):\s*(?P<value>\d+(?:\.\d+)?)$", re.MULTILINE
     ),
     "system_cpu_seconds": re.compile(
-        r"^System time \(seconds\):\s*(?P<value>\d+(?:\.\d+)?)$", re.MULTILINE
+        r"^[ \t]*System time \(seconds\):\s*(?P<value>\d+(?:\.\d+)?)$", re.MULTILINE
     ),
     "elapsed": re.compile(
-        r"^Elapsed \(wall clock\) time .*?:\s*(?P<value>\S+)\s*$", re.MULTILINE
+        r"^[ \t]*Elapsed \(wall clock\) time .*?:\s*(?P<value>\S+)\s*$", re.MULTILINE
     ),
     "peak_rss_kbytes": re.compile(
-        r"^Maximum resident set size \(kbytes\):\s*(?P<value>\d+)$", re.MULTILINE
+        r"^[ \t]*Maximum resident set size \(kbytes\):\s*(?P<value>\d+)$", re.MULTILINE
     ),
 }
 
