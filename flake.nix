@@ -439,6 +439,12 @@
           inherit pkgs pythonWithTinyStoriesTorchAO tinyStories1m;
           sourceRoot = ./.;
         };
+        rcServingW4A8IntegratedSystem =
+          import ./nix/rc-serving-w4a8-integrated-system.nix {
+            inherit pkgs pythonWithTinyStoriesTorchAO tinyStories1m;
+            phaseOracle = rcServingW4A8System.frozenBundle;
+            sourceRoot = ./.;
+          };
         rcServingW4A8Registry = builtins.listToAttrs (map (phase:
           let
             name = "${rcServingW4A8System.modelKey}-${phase.name}";
@@ -2599,6 +2605,10 @@ PY
             rcServingSystem.decode9PytorchExported;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-frozen-bundle" =
             rcServingW4A8System.frozenBundle;
+          "tinystories-w4a8-rc-serving-integrated-reference" =
+            rcServingW4A8IntegratedSystem.reference;
+          "tinystories-w4a8-rc-serving-integrated-pytorch-exported" =
+            rcServingW4A8IntegratedSystem.pytorchExported;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-pytorch-exported" =
             rcServingW4A8System.prefill8PytorchExported;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-pytorch-exported" =
