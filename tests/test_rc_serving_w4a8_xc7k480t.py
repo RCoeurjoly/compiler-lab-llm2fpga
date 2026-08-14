@@ -84,6 +84,28 @@ def run_parser(work: Path, *, yosys_status: str, nextpnr_status: str,
 
 
 class RcServingW4A8Xc7k480tTest(unittest.TestCase):
+    def test_generated_evidence_build_command_is_valid_bash(self) -> None:
+        package = f"{KEY}-prefill-8-xc7k480t-evidence"
+        with tempfile.TemporaryDirectory() as cache:
+            evaluated = subprocess.run(
+                ["nix", "derivation", "show", f".#{package}"],
+                cwd=ROOT,
+                env={**os.environ, "XDG_CACHE_HOME": cache},
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(evaluated.returncode, 0, evaluated.stderr)
+        derivation = next(iter(json.loads(evaluated.stdout)["derivations"].values()))
+        checked = subprocess.run(
+            ["bash", "-n"],
+            input=derivation["env"]["buildCommand"],
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        self.assertEqual(checked.stderr, "")
+
     def test_snapshot_ingestion_rejects_corrupt_or_noncanonical_sv(self) -> None:
         module = MODULE.read_text(encoding="utf-8")
         match = re.search(

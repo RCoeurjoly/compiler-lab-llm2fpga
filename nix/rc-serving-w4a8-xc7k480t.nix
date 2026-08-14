@@ -106,7 +106,7 @@ pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
     synth_xilinx -family xc7 -top main -flatten -run map_memory:
     tee -o "$out/mapped-stat.json" stat -json
     write_json "$out/mapped.json"
-    YOSYS
+  YOSYS
     set +e
     ${pkgs.time}/bin/time -v -o "$out/yosys.time" \
       ${yosys}/bin/yosys -m ${yosysSlang}/share/yosys/plugins/slang.so \
@@ -126,7 +126,7 @@ pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
     read_json "$out/mapped.json"
     techmap -map ${dramCompatMap}
     write_json "$out/nextpnr.json"
-    YOSYS
+  YOSYS
     set +e
     ${pkgs.time}/bin/time -v -o "$out/nextpnr-prep.time" \
       ${yosys}/bin/yosys -l "$out/nextpnr-prep.log" -s "$out/nextpnr-prep.ys" \
