@@ -28,6 +28,28 @@ class RcServingW4A8IntegratedNixTest(unittest.TestCase):
             '"tinystories-w4a8-rc-serving-integrated-pytorch-exported"', source
         )
 
+    def test_integrated_program_enters_one_wholesale_pipeline_route(self) -> None:
+        source = (ROOT / "flake.nix").read_text()
+        self.assertIn("rcServingW4A8IntegratedRegistry", source)
+        self.assertIn("rcServingW4A8IntegratedPipelinePackages", source)
+        self.assertEqual(
+            source.count('key = rcServingW4A8IntegratedSystem.modelKey;'), 1
+        )
+        for suffix in ("flat-scf", "calyx", "calyx-native-sv"):
+            self.assertIn(
+                f'"tinystories-w4a8-rc-serving-integrated-{suffix}"', source
+            )
+        integrated_block = source.split("rcServingW4A8IntegratedRegistry", 1)[1]
+        integrated_block = integrated_block.split("rcServingW4A8Registry", 1)[0]
+        self.assertIn(
+            'calyxCompilePasses = [ "compile-repeat" "no-opt" ]',
+            integrated_block,
+        )
+        self.assertIn("calyxEmitNested = false", integrated_block)
+        self.assertIn("calyxSkipResourceReport = true", integrated_block)
+        self.assertNotIn("PHASE_NAMES", integrated_block)
+        self.assertNotIn("map (phase", integrated_block)
+
 
 if __name__ == "__main__":
     unittest.main()

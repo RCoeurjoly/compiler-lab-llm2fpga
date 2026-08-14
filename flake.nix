@@ -445,6 +445,41 @@
             phaseOracle = rcServingW4A8System.frozenBundle;
             sourceRoot = ./.;
           };
+        rcServingW4A8IntegratedRegistry = {
+          "${rcServingW4A8IntegratedSystem.modelKey}" =
+            pipelineLib.registerNoHandshakeModel {
+              key = rcServingW4A8IntegratedSystem.modelKey;
+              name = rcServingW4A8IntegratedSystem.modelKey;
+              description =
+                "One wholesale stateful W4A8 serving compiler reference.";
+              source = {
+                type = "derived";
+                profile = "stateful-serving-w4a8-integrated";
+                quantization = "pt2e-static-w4a8";
+              };
+              allowHwExterns = true;
+              slangPerFileExternModules = true;
+              calyxMathProfile = "equivalence-candidate";
+              # The optimized nested backend exhausts 32 GiB RAM plus swap
+              # on this wholesale component.  This reference intentionally
+              # favors ugly, semantics-preserving low-optimization RTL.
+              calyxCompilePasses = [ "compile-repeat" "no-opt" ];
+              calyxEmitNested = false;
+              calyxSkipResourceReport = true;
+              inherit fpPrimsSv;
+              hfSnapshot = tinyStories1m.snapshot;
+              pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
+              pytorchExportedCommand = ''
+                ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/exported.pt2 "$out/exported.pt2"
+                ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/observation.json "$out/observation.json"
+                ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/readback-manifest.json "$out/readback-manifest.json"
+                ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/receipt.json "$out/integrated-receipt.json"
+              '';
+            };
+        };
+        rcServingW4A8IntegratedPipelinePackages =
+          pipelineLib.pipelineStagePackagesFromRegistry
+          rcServingW4A8IntegratedRegistry;
         rcServingW4A8Registry = builtins.listToAttrs (map (phase:
           let
             name = "${rcServingW4A8System.modelKey}-${phase.name}";
@@ -2609,6 +2644,12 @@ PY
             rcServingW4A8IntegratedSystem.reference;
           "tinystories-w4a8-rc-serving-integrated-pytorch-exported" =
             rcServingW4A8IntegratedSystem.pytorchExported;
+          "tinystories-w4a8-rc-serving-integrated-flat-scf" =
+            rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-flat-scf";
+          "tinystories-w4a8-rc-serving-integrated-calyx" =
+            rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx";
+          "tinystories-w4a8-rc-serving-integrated-calyx-native-sv" =
+            rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx-native-sv";
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-pytorch-exported" =
             rcServingW4A8System.prefill8PytorchExported;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-pytorch-exported" =

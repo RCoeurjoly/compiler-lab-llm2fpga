@@ -255,6 +255,14 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("materializeDenseResourceMemRefGlobals", pass_source)
         self.assertIn("memref::SubViewOp", pass_source)
         self.assertIn("getStaticOffsets", pass_source)
+        self.assertIn("collapse.getReassociationIndices()", pass_source)
+        self.assertIn("sourceView->strides[group.front()]", pass_source)
+        self.assertIn(
+            "StaticMemRefView{sourceView->base, offsets.front()", pass_source
+        )
+        self.assertNotIn(
+            "sourceView->offset + offsets.front()", pass_source
+        )
         self.assertIn("llvm::reverse(subviews)", pass_source)
         self.assertIn("DenseF32ResourceElementsAttr", pass_source)
         self.assertIn("tryGetAsArrayRef", pass_source)
@@ -308,6 +316,8 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("calyxTool", pipeline)
         self.assertIn("circt-translate", pipeline)
         self.assertIn("resources.json", script)
+        self.assertIn("CALYX_COMPILE_PASSES", script)
+        self.assertIn('calyx_pass_args+=(-p "$pass_name")', script)
 
     def test_current_calyx_truncf_blocker_is_minimized(self) -> None:
         reproducer_dir = REPO_ROOT / "reproducers" / "calyx-arith-truncf-constant"

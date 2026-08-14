@@ -137,9 +137,17 @@ calyx_synthesis_args=()
 if [[ "${CALYX_SYNTHESIS:-1}" == "1" ]]; then
   calyx_synthesis_args+=(--synthesis)
 fi
+calyx_pass_args=()
+if [[ -n "${CALYX_COMPILE_PASSES:-}" ]]; then
+  read -r -a requested_passes <<<"$CALYX_COMPILE_PASSES"
+  for pass_name in "${requested_passes[@]}"; do
+    calyx_pass_args+=(-p "$pass_name")
+  done
+fi
 "$calyx_bin" "$output_dir/model.futil" \
   -l "$calyx_lib" \
   -b verilog \
+  "${calyx_pass_args[@]}" \
   "${calyx_synthesis_args[@]}" \
   "${calyx_nested_args[@]}" \
   -d papercut \

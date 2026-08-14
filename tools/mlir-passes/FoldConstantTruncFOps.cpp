@@ -320,7 +320,10 @@ private:
       if (!sourceView)
         return std::nullopt;
 
-      return StaticMemRefView{sourceView->base, sourceView->offset + offsets.front(),
+      // reinterpret_cast replaces the source descriptor metadata. Its offset
+      // is relative to the underlying allocation, not to the source view's
+      // existing offset.
+      return StaticMemRefView{sourceView->base, offsets.front(),
                               SmallVector<int64_t>(resultType.getShape()),
                               SmallVector<int64_t>(strides)};
     }
@@ -361,12 +364,19 @@ private:
     if (auto collapse = value.getDefiningOp<memref::CollapseShapeOp>()) {
       auto sourceView = getStaticView(collapse.getSrc(), argViews);
       auto resultType = collapse.getResult().getType();
-      if (!sourceView || !resultType.hasStaticShape() ||
-          sourceView->strides != getIdentityStrides(sourceView->shape))
+      if (!sourceView || !resultType.hasStaticShape())
         return std::nullopt;
+
+      SmallVector<int64_t> resultStrides;
+      for (const ReassociationIndices &group :
+           collapse.getReassociationIndices()) {
+        if (group.empty())
+          return std::nullopt;
+        resultStrides.push_back(sourceView->strides[group.front()]);
+      }
       return StaticMemRefView{sourceView->base, sourceView->offset,
                               SmallVector<int64_t>(resultType.getShape()),
-                              getIdentityStrides(resultType)};
+                              std::move(resultStrides)};
     }
 
     auto memrefType = dyn_cast<MemRefType>(value.getType());
@@ -426,10 +436,6 @@ private:
     auto sourceView = getStaticView(copy.getSource(), argViews);
     auto targetView = getStaticView(copy.getTarget(), argViews);
     if (!sourceView || !targetView || sourceView->shape != targetView->shape)
-      return;
-
-    if (sourceView->base == copy.getSource() && targetView->base == copy.getTarget() &&
-        sourceView->shape.size() <= 1 && targetView->shape.size() <= 1)
       return;
 
     rewriter.setInsertionPoint(copy);

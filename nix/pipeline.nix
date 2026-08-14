@@ -174,7 +174,8 @@ let
         ${mlir}/bin/mlir-opt ${linalg} "$out"
     '';
 
-  mkCalyxNativeSvDerivation = { name, calyx }:
+  mkCalyxNativeSvDerivation = { name, calyx, calyxCompilePasses ? [ ]
+    , calyxEmitNested ? true, calyxSkipResourceReport ? false }:
     pkgs.runCommand "${name}-calyx-native-sv" {
       buildInputs = [ circt calyxTool python ];
     } ''
@@ -183,6 +184,9 @@ let
       export CALYX_FIX_FUTIL_FPTOSI_HANDSHAKE=${pipelineScripts}/fix_futil_fptosi_handshake.py
       export CALYX_FIX_SV_DIVSQRT_HANDSHAKE=${pipelineScripts}/fix_sv_divsqrt_handshake.py
       export CALYX_VERIFY_F32_CONSTANT_BITS=${pipelineScripts}/verify_calyx_f32_constant_bits.py
+      export CALYX_COMPILE_PASSES=${pkgs.lib.escapeShellArg (pkgs.lib.concatStringsSep " " calyxCompilePasses)}
+      export CALYX_EMIT_NESTED=${if calyxEmitNested then "1" else "0"}
+      export CALYX_SKIP_RESOURCE_REPORT=${if calyxSkipResourceReport then "1" else "0"}
       ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
         ${circt}/bin/circt-translate \
         ${calyxTool}/bin/calyx \
@@ -434,7 +438,9 @@ let
     , tosaFromTorch ? null, linalgFromStages ?
       ({ name, torch, ... }: mkLinalgDerivation { inherit name torch; })
     , allowHwExterns ? false, fpPrimsSv ? null
-    , slangPerFileExternModules ? false, calyxMathProfile ? "none" }:
+    , slangPerFileExternModules ? false, calyxMathProfile ? "none"
+    , calyxCompilePasses ? [ ], calyxEmitNested ? true
+    , calyxSkipResourceReport ? false }:
     let
       unavailable = stage: reason:
         mkUnavailableStage { inherit name stage reason; };
@@ -473,7 +479,8 @@ let
           flatScf = self."flat-scf";
         };
         "calyx-native-sv" = mkCalyxNativeSvDerivation {
-          inherit name;
+          inherit name calyxCompilePasses calyxEmitNested
+            calyxSkipResourceReport;
           inherit (self) calyx;
         };
         "calyx-hw-sv" = mkCalyxHwSvDerivation {
@@ -543,7 +550,9 @@ let
     , source ? { type = "local"; }, hfSnapshot ? null, pytorchToolchain ? [ ]
     , pytorchExportedCommand, pytorchExportedBuildInputs ? pytorchToolchain
     , allowHwExterns ? false, fpPrimsSv ? null
-    , slangPerFileExternModules ? false, calyxMathProfile ? "none" }:
+    , slangPerFileExternModules ? false, calyxMathProfile ? "none"
+    , calyxCompilePasses ? [ ], calyxEmitNested ? true
+    , calyxSkipResourceReport ? false }:
     let
       resolvedHfSnapshot = mkHfSnapshotDerivation { inherit name hfSnapshot; };
       resolvedPyTorchExported = mkPyTorchExportedDerivation {
@@ -564,7 +573,8 @@ let
         pytorchExported = resolvedPyTorchExported;
         torchStage = resolvedTorchStage;
         inherit allowHwExterns fpPrimsSv slangPerFileExternModules
-          calyxMathProfile;
+          calyxMathProfile calyxCompilePasses calyxEmitNested
+          calyxSkipResourceReport;
       };
       model = {
         inherit key name description;
