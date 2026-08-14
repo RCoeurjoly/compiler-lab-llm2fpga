@@ -48,8 +48,10 @@ prove that an RTL-produced cache crosses either phase boundary, that hardware
 token feedback is correct, or that one RTL instance completes the sequence.
 
 The existing phase artifacts remain frozen diagnostic evidence. They cannot be
-called an integrated W4A8 RTL reference and are not inputs to the canonical
-integrated implementation.
+called an integrated W4A8 RTL reference and their graphs/RTL cannot be composed
+into the canonical implementation. Their recorded PT2E observations and
+quantization parameters remain the frozen numerical oracle and may seed the
+whole-graph observers needed to preserve that contract.
 
 ## Alternatives considered
 
@@ -75,11 +77,12 @@ independent executable RTL specification required for later optimization.
 
 ## Numerical and stateful contract
 
-The frozen W4A8 numerical contract remains authoritative: signed W4 weights,
-signed A8 activations, recorded scales and zero points, exact rounding and
-saturation, and lowest-index tie-breaking for argmax. The integrated eager
-module must use the same frozen model, prompt, quantization data, and phase
-semantics as the accepted three-phase software trace.
+The frozen W4A8 PT2E numerical contract remains authoritative: signed W4
+weights, signed A8 activations, recorded scales and zero points, exact rounding
+and saturation, and lowest-index tie-breaking for argmax. Separately, the
+integrated FP32 source module must use the same frozen model, prompt, and phase
+semantics as the accepted ordered native trace. W4A8 PT2E tensors are never
+required to equal unquantized FP32 tensors bit-for-bit.
 
 One invocation starts from reset-cleared inference state. It consumes eight
 runtime-loadable token IDs, executes prefill followed by two greedy cached
@@ -128,7 +131,7 @@ The authoritative chain is:
 frozen three-phase PyTorch trace
             |
             v
-integrated eager PyTorch module
+integrated FP32 eager PyTorch module
             |
             v
 single integrated PT2E ExportedProgram
@@ -153,19 +156,24 @@ even if final tokens agree.
 
 Qualification proceeds in four ordered gates.
 
-### 1. Integrated eager equivalence
+### 1. Integrated FP32 stateful equivalence
 
-Execute the integrated eager module once and compare its phase-8, phase-9, and
-phase-10 tokens, logits, and flattened caches exactly with the frozen ordered
-three-phase PyTorch trace. The first mismatching phase and tensor index are
+Execute the integrated FP32 eager module once and compare its phase-8, phase-9,
+and phase-10 tokens, logits, and flattened caches exactly with the frozen
+ordered native FP32 trace. This proves stateful composition and cache
+continuity before quantization. The first mismatching phase and tensor index is
 reported.
 
 ### 2. Integrated PT2E equivalence
 
-Export one integrated program and compare all declared observations exactly
-with the accepted integrated eager result. Graph inspection and the artifact
-receipt must confirm that there is one `ExportedProgram` containing the whole
-sequence.
+Convert and export one integrated W4A8 program. Compare every declared
+observation exactly with the accepted frozen three-phase W4A8 PT2E oracle,
+using its recorded per-phase quantization parameters when whole-graph observer
+calibration would otherwise change the frozen contract. Then save and reload
+the one program and require its outputs to match the accepted converted eager
+execution exactly. Graph inspection and the artifact receipt must confirm that
+there is one `ExportedProgram` containing the whole sequence. No gate requires
+W4A8 PT2E tensors to equal FP32 source tensors.
 
 ### 3. Generated RTL equivalence
 
@@ -203,9 +211,11 @@ reference or relax the acceptance gates.
 
 This milestone is complete only when all of the following are true:
 
-- one integrated eager W4A8 module exactly matches the frozen ordered
-  three-phase PyTorch trace at every boundary;
-- one integrated PT2E program exactly matches the eager module;
+- one integrated FP32 eager module exactly matches the frozen ordered native
+  FP32 trace at every boundary;
+- one integrated W4A8 PT2E program exactly matches the frozen three-phase W4A8
+  PT2E oracle and its saved/reloaded execution matches the accepted converted
+  eager execution;
 - that one program is lowered wholesale into one compiler-generated SV top;
 - one RTL instance executes prefill and both cached decodes with internal cache
   continuity and internal lowest-index token feedback;

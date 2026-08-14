@@ -4,7 +4,7 @@
 
 **Goal:** Produce and qualify one reproducible compiler-generated SystemVerilog design whose single invocation performs the frozen W4A8 prefill and two cached greedy-decode phases exactly against PyTorch/PT2E.
 
-**Architecture:** A new integrated PyTorch module owns the complete prompt-to-three-phase dataflow, including tensor-cache continuity and lowest-index argmax feedback. It is exported once as one PT2E ExportedProgram, lowered once through the existing Calyx-native-SV route, exposed through a generated narrow transaction/readback shell, and simulated as one continuously executing RTL instance. Existing phase-local artifacts remain immutable diagnostic evidence, never implementation inputs.
+**Architecture:** A new integrated PyTorch module owns the complete prompt-to-three-phase dataflow, including tensor-cache continuity and lowest-index argmax feedback. It is exported once as one PT2E ExportedProgram, lowered once through the existing Calyx-native-SV route, exposed through a generated narrow transaction/readback shell, and simulated as one continuously executing RTL instance. Existing phase graphs and RTL are never composed into it; phase observations and qparams remain the frozen numerical oracle.
 
 **Tech Stack:** Python 3, PyTorch/PT2E torch.export, Hugging Face Transformers, Nix, MLIR/Calyx, SystemVerilog, Verilator, pytest, JSON receipts, GNU time.
 
@@ -177,7 +177,12 @@ If integrated conversion derives qparams different from the frozen phase oracle,
 
 - [ ] **Step 4: Add the exact PT2E gate**
 
-Compare all 18 converted outputs with Task 2. Inspect graph dataflow to require argmax/cache outputs feed later model-call inputs and are not lifted constants.
+Compare all 18 converted outputs with the frozen three-phase W4A8 PT2E oracle,
+canonicalizing cache leaves by semantic path. Save and reload the one integrated
+program, then compare its outputs exactly with the accepted converted eager
+execution. Do not compare quantized tensors with Task 2's unquantized FP32
+tensors. Inspect graph dataflow to require argmax/cache outputs feed later
+model-call inputs and are not lifted constants.
 
 Run: pytest -q tests/test_rc_serving_w4a8_integrated.py
 
