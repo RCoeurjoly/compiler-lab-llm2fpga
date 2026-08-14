@@ -1,8 +1,9 @@
 # W4A8 RC RTL functional progress
 
-Status: decode-8 and decode-9 pass bit-exactly; prefill-8 completes but has a
-functional mismatch under investigation. This is not synthesis or fit evidence
-and does not yet satisfy the three-phase W4A8 completion gate.
+Status: the canonical prefill-8, decode-8, and decode-9 SystemVerilog closures
+all pass bit-exactly against their frozen PT2E references. This completes the
+user-narrowed three-phase compiler-lowering and RTL-simulation gate. It is not
+synthesis or FPGA-fit evidence; those activities are explicitly deferred.
 
 ## Durable inputs
 
@@ -582,29 +583,69 @@ activation tensor copied into `arg_mem_136`, whose semantic source is q33
 after the second block's first layer normalization. The next trace boundary
 is q33/layer-norm-2 production.
 
-### q33 is correct; zero-seed aliasing corrupts later LayerNorm reductions
+### Superseded zero-seed diagnosis
 
-The q33 diagnostic build took 11:15.62 and 15,399,956 KiB peak RSS;
-simulation took 10:24.22, used 11,460 KiB peak RSS, and completed in 545,149
-cycles. Every q33 code is the correct rounded and clamped result for its
-traced float input, and all 16 subsequent copies into the `linear_8`
-activation memory are bit-exact. The float input is already wrong: token zero
-is near the expected `[-1, 1]`, token one is approximately `[0.9527,
--0.8297]`, and later rows reach magnitudes above four. The quantizer is not
-the source of divergence.
+The q33 diagnostic correctly proved that q33 quantizes and copies the float
+values supplied to it, but the conclusion that zero-seed aliasing caused those
+bad floats was false. A fresh immutable lowering materialized 12 statically
+zero-seeded copies as destination fills. Its prefill simulation reproduced the
+same q33 bytes and all five prior mismatching outputs exactly. The zero-seed
+normalizer remains an auditable semantic-preservation measure, but it is not
+the functional repair for this failure.
 
-Flat-SCF retains the correct LayerNorm initialization. It allocates and fills
-an eight-element zero seed (`%alloc_103`), then copies that seed into each
-mean and variance reduction buffer. After SCF-to-Calyx allocation, the zero
-seed and its non-overlapping mutable destinations all map to `arg_mem_85`.
-Only the original seed fill remains (`bb0_349`); later seed copies become
-self-copies of the values left by earlier reductions. The first LayerNorm is
-therefore correct, while later LayerNorm invocations accumulate stale state.
+The decisive trace captured the second LayerNorm mean path. Its reduction sums
+were correct, but the divider result used for row broadcasts changed only on
+every third invocation. The generated `std_divSqrtFN` wrapper accepted requests
+directly from level-sensitive `go`, guessed completion with a fixed-delay
+`done_buf`, and could reuse a stale HardFloat result across successive Calyx
+invocations. This exactly explained the observed three-row stale-mean pattern.
 
-The in-scope repair materializes copies from statically zero-filled scratch
-seeds as explicit destination zero-fill loops before SCF-to-Calyx. On the
-frozen prefill flat-SCF it rewrites 12 such copies, including both reduction
-seeds for all affected LayerNorm operations, and emits a receipt listing each
-rewrite. Ordinary copies are unchanged. A focused regression covers the
-aliasing pattern; a fresh immutable lowering and three-phase RTL simulation
-remain required to validate the repair end to end.
+The repository already contained a tested state-machine repair in
+`scripts/pipeline/fix_sv_divsqrt_handshake.py`: one HardFloat request is issued
+per Calyx invocation, completion follows `outValid`, the result is captured
+once, and the wrapper waits for `go` to deassert before accepting another
+request. Commit `d2eab81` enables that repair in every native-Calyx SV
+derivation. A test-first Nix regression failed before the wiring change and the
+focused W4A8 Nix plus wrapper suite then passed 9/9 tests.
+
+## Canonical repaired three-phase result
+
+Each immutable closure contains `divsqrt-handshake-receipt.json` with
+`repair_count: 1`; in every case the receipt's output SHA-256 equals the actual
+`sv/main.sv` SHA-256. All runs used the dedicated W4A8 driver and Verilator
+5.022 at `-j4`. An attempted prefill compile at `-j16` was rejected as a safe
+operating point after `cc1plus` was OOM-killed at 15,752,772 KiB process-tree
+peak RSS; `-j4` completed all canonical simulations.
+
+| phase | native-SV closure | SV SHA-256 | Nix build wall time | cycles | Verilator compile | simulation | peak RSS | result |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| prefill-8 | `/nix/store/xx13r1a2mijdymyifnpah8bwmj2rb3qy-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv` | `1657b663c6b3631c94fb2fe25d4ba0612acd57ad3664bc93fdb43884c8d28004` | 1:48:23 | 524,816 | 412.66 s | 580.66 s | 15,777,248 KiB | pass, 5/5 bit-exact |
+| decode-8 | `/nix/store/vlza9rqig7yj6wasmb60yi0szan454b1-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv` | `62255f24c12c11b699c972b824fb2cb4119d94f733d57124117b9c00a5e18fa6` | 44:03.87 | 64,044 | 348.61 s | 66.47 s | 11,647,584 KiB | pass, 5/5 bit-exact |
+| decode-9 | `/nix/store/xjgs6vissy8f803j48cgn1dp9pyv98vd-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv` | `1285316e5d743067a69447879fd51e3834c08e86344696bfb4854b6f879e7207` | 43:28.86 | 65,852 | 347.73 s | 69.38 s | 11,735,320 KiB | pass, 5/5 bit-exact |
+
+For all fifteen phase/output comparisons, `actual_sha256 == expected_sha256`,
+`bit_exact == true`, and maximum and mean absolute error are both `0.0`.
+
+Canonical semantic inputs are:
+
+- prefill-8 exported PT2E:
+  `/nix/store/b6ywnhs5b1b8rx2ixp0dglj5a5dxh7gb-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-pytorch-exported`;
+- prefill-8 flat-SCF:
+  `/nix/store/g5r6di77i2s2wbfzslz7a041w510n5w5-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-flat-scf`;
+- decode-8 exported PT2E:
+  `/nix/store/lilf26wxc1n2d75lnv0yk2qhvnrp9f9l-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-pytorch-exported`;
+- decode-8 flat-SCF:
+  `/nix/store/gvjg2jrjypsds2hl80vawfm236apjc9s-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-flat-scf`;
+- decode-9 exported PT2E:
+  `/nix/store/9rp9k0vz4gqwg213640ayz5sc24vvjph-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-pytorch-exported`;
+- decode-9 flat-SCF:
+  `/nix/store/yzx93g7bnwhadavnzg27jwq1rhsrhag0-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-flat-scf`.
+
+The native Calyx resource reports estimate 69,104 external plus 5,328
+internal bits for prefill-8, 20,618 external plus 3,062 internal bits for
+decode-8, and 21,780 external plus 3,102 internal bits for decode-9. These are
+backend estimates only, not mapped FPGA utilization.
+
+The three-phase compiler/RTL functional milestone is complete. Per the user's
+scope decision, mapped Yosys, nextpnr-xilinx, formal equivalence, manual RTL
+sharing/BRAM refinement, and DDR3 work are deferred to later goals.
