@@ -1,4 +1,6 @@
 import json
+import gzip
+import hashlib
 import re
 import subprocess
 import sys
@@ -10,6 +12,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "pipeline" / "write_w4a8_xc7_evidence.py"
 MODULE = ROOT / "nix" / "rc-serving-w4a8-xc7k480t.nix"
+SNAPSHOT_MANIFEST = ROOT / "artifacts" / "w4a8-xc7k480t-sv-snapshots.json"
+CANONICAL_RESULTS = ROOT / "docs" / "results" / "2026-08-14-w4a8-three-phase-equivalence.json"
 KEY = "tinystories-w4a8-rc-serving-mask10-vocab6-width2"
 DEFAULT_TIME = object()
 GNU_TIME_FIXTURE = """\
@@ -18,6 +22,20 @@ GNU_TIME_FIXTURE = """\
 \tElapsed (wall clock) time (h:mm:ss or m:ss): 0:02.00
 \tMaximum resident set size (kbytes): 123456
 """
+CANONICAL_SNAPSHOTS = {
+    "prefill-8": (
+        "prefill-8-main.sv.gz",
+        "1657b663c6b3631c94fb2fe25d4ba0612acd57ad3664bc93fdb43884c8d28004",
+    ),
+    "decode-8": (
+        "decode-8-main.sv.gz",
+        "62255f24c12c11b699c972b824fb2cb4119d94f733d57124117b9c00a5e18fa6",
+    ),
+    "decode-9": (
+        "decode-9-main.sv.gz",
+        "1285316e5d743067a69447879fd51e3834c08e86344696bfb4854b6f879e7207",
+    ),
+}
 
 
 def write(path: Path, text: str) -> Path:
@@ -208,15 +226,37 @@ ERROR: Failed to expand region (0, 0) |_> (309, 416) of 776182 SLICE_LUTXs
         self.assertRegex(source, r"nextpnr_status=\$\?")
         self.assertRegex(source, r"if \[ -s \"\$out/mapped\.json\" \]; then")
         self.assertRegex(source, r"nextpnr-xilinx\s+--chipdb\s+\$\{chipdb\}")
+        self.assertIn("sourceSvGz", source)
+        self.assertIn("sourceSha256", source)
+        self.assertIn("gzip -dc ${sourceSvGz} > \"$out/source.sv\"", source)
+        self.assertNotIn("nativeSv", source)
+
+    def test_snapshots_are_deterministic_hash_bound_copies_of_canonical_sv(self) -> None:
+        manifest = json.loads(SNAPSHOT_MANIFEST.read_text(encoding="utf-8"))
+        canonical = json.loads(CANONICAL_RESULTS.read_text(encoding="utf-8"))
+        canonical_hashes = {
+            phase["phase"]: phase["sv_sha256"] for phase in canonical["phases"]
+        }
+
+        self.assertEqual(manifest["compression"], "gzip -n -9")
+        for phase, (name, sha256) in CANONICAL_SNAPSHOTS.items():
+            with self.subTest(phase=phase):
+                record = manifest["phases"][phase]
+                self.assertEqual(record["snapshot"], name)
+                self.assertEqual(record["source_sha256"], sha256)
+                self.assertEqual(record["source_sha256"], canonical_hashes[phase])
+                snapshot = SNAPSHOT_MANIFEST.parent / "w4a8-xc7k480t-sv" / name
+                self.assertEqual(
+                    hashlib.sha256(gzip.open(snapshot, "rb").read()).hexdigest(), sha256
+                )
 
     def test_flake_exports_each_phase_evidence_package_from_its_native_sv_closure(self) -> None:
         flake = (ROOT / "flake.nix").read_text(encoding="utf-8")
         self.assertIn("rcServingW4A8Xc7Evidence", flake)
         self.assertIn("fix_sv_synthesis_frontend.py", flake)
         self.assertIn("write_w4a8_xc7_evidence.py", flake)
-        for phase in ("prefill-8", "decode-8", "decode-9"):
+        for phase, (snapshot, sha256) in CANONICAL_SNAPSHOTS.items():
             package = f"{KEY}-{phase}-xc7k480t-evidence"
-            native_sv = f'{KEY}-{phase}-calyx-native-sv'
             match = re.search(
                 rf'"{re.escape(package)}"\s*=\s*'
                 r'import ./nix/rc-serving-w4a8-xc7k480t\.nix \{(?P<body>.*?)\n\s*\};',
@@ -227,10 +267,12 @@ ERROR: Failed to expand region (0, 0) |_> (309, 416) of 776182 SLICE_LUTXs
             body = match.group("body")
             self.assertIn(f'phaseName = "{phase}";', body)
             self.assertIn(
-                f'rcServingW4A8PipelinePackages."{native_sv}"', body
+                f"sourceSvGz = ./artifacts/w4a8-xc7k480t-sv/{snapshot};", body
             )
+            self.assertIn(f'sourceSha256 = "{sha256}";', body)
             self.assertIn("chipdb = task3MainLib.task3Toolchain.chipdb;", body)
             self.assertIn("nextpnr = task3MainLib.task3Toolchain.nextpnr;", body)
+            self.assertNotIn("rcServingW4A8PipelinePackages.", body)
 
 
 if __name__ == "__main__":

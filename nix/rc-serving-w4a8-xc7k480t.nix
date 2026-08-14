@@ -7,7 +7,8 @@
 , normalizer
 , evidenceWriter
 , phaseName
-, nativeSv
+, sourceSvGz
+, sourceSha256
 }:
 
 let
@@ -52,11 +53,12 @@ let
   '';
 in
 pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
-  nativeBuildInputs = [ python yosys yosysSlang nextpnr pkgs.coreutils pkgs.time ];
+  nativeBuildInputs = [ python yosys yosysSlang nextpnr pkgs.coreutils pkgs.gzip pkgs.time ];
 } ''
   set -u -o pipefail
   mkdir -p "$out"
-  cp ${nativeSv}/sv/main.sv "$out/source.sv"
+  gzip -dc ${sourceSvGz} > "$out/source.sv"
+  test "$(sha256sum "$out/source.sv" | cut -d ' ' -f 1)" = '${sourceSha256}'
   : > "$out/normalized.sv"
   cp ${probeXdc} "$out/probe.xdc"
   cp ${dramCompatMap} "$out/dram-compat-map.v"

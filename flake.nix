@@ -488,8 +488,8 @@
               normalizer = ./scripts/pipeline/fix_sv_synthesis_frontend.py;
               evidenceWriter = ./scripts/pipeline/write_w4a8_xc7_evidence.py;
               phaseName = "prefill-8";
-              nativeSv =
-                rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv";
+              sourceSvGz = ./artifacts/w4a8-xc7k480t-sv/prefill-8-main.sv.gz;
+              sourceSha256 = "1657b663c6b3631c94fb2fe25d4ba0612acd57ad3664bc93fdb43884c8d28004";
             };
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-xc7k480t-evidence" =
             import ./nix/rc-serving-w4a8-xc7k480t.nix {
@@ -500,8 +500,8 @@
               normalizer = ./scripts/pipeline/fix_sv_synthesis_frontend.py;
               evidenceWriter = ./scripts/pipeline/write_w4a8_xc7_evidence.py;
               phaseName = "decode-8";
-              nativeSv =
-                rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv";
+              sourceSvGz = ./artifacts/w4a8-xc7k480t-sv/decode-8-main.sv.gz;
+              sourceSha256 = "62255f24c12c11b699c972b824fb2cb4119d94f733d57124117b9c00a5e18fa6";
             };
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-xc7k480t-evidence" =
             import ./nix/rc-serving-w4a8-xc7k480t.nix {
@@ -512,8 +512,8 @@
               normalizer = ./scripts/pipeline/fix_sv_synthesis_frontend.py;
               evidenceWriter = ./scripts/pipeline/write_w4a8_xc7_evidence.py;
               phaseName = "decode-9";
-              nativeSv =
-                rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv";
+              sourceSvGz = ./artifacts/w4a8-xc7k480t-sv/decode-9-main.sv.gz;
+              sourceSha256 = "1285316e5d743067a69447879fd51e3834c08e86344696bfb4854b6f879e7207";
             };
         };
         modelRegistryNoHandshake = import ./nix/models.nix {
