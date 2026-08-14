@@ -1,4 +1,6 @@
+import json
 import os
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -11,6 +13,8 @@ from TinyStories.rc_serving_evidence import run_native_trace, tensor_record
 from TinyStories.rc_serving_w4a8_integrated import (
     IntegratedW4A8Module,
     assert_integrated_observation_equal,
+    convert_integrated_w4a8_program,
+    materialize_integrated_bundle,
     native_cache_records_in_tensor_abi_order,
     run_integrated_eager,
 )
@@ -49,7 +53,50 @@ class RecordingModel(torch.nn.Module):
         return logits, cache
 
 
+class ExportableIntegratedFixture(torch.nn.Module):
+    def forward(self, prompt):
+        scalar = prompt.to(torch.float32).sum()
+        logits = scalar.expand(1, 6)
+        tokens = tuple(torch.argmax(logits, dim=-1, keepdim=True) for _ in range(3))
+        outputs = list(tokens)
+        for length in (8, 9, 10):
+            outputs.append(logits)
+            outputs.extend(
+                (scalar + leaf).expand(1, 1, length, 2)
+                for leaf in range(4)
+            )
+        return tuple(outputs)
+
+
 class RcServingW4A8IntegratedTest(unittest.TestCase):
+    def test_integrated_materializer_cli_has_one_program_contract(self) -> None:
+        source = Path(
+            "scripts/pipeline/materialize_rc_serving_w4a8_integrated.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("materialize_integrated_bundle", source)
+        self.assertIn("--phase-oracle", source)
+        self.assertNotIn("for phase", source)
+
+    def test_integrated_conversion_saves_one_reloadable_program(self) -> None:
+        prompt = torch.tensor([[0, 1, 2, 3, 4, 5, 0, 1]], dtype=torch.long)
+        converted = convert_integrated_w4a8_program(
+            ExportableIntegratedFixture(), prompt
+        )
+        expected = converted.module()(prompt)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "exported.pt2"
+            torch.export.save(converted, path)
+            self.assertEqual(list(Path(temporary).glob("*.pt2")), [path])
+            reloaded = torch.export.load(path)
+            actual = reloaded.module()(prompt)
+
+        self.assertEqual(len(expected), 18)
+        self.assertEqual(len(actual), 18)
+        self.assertTrue(
+            all(torch.equal(before, after) for before, after in zip(expected, actual))
+        )
+
     def test_native_cache_records_are_reordered_by_semantic_path(self) -> None:
         leaves = [
             {"path": "['key_cache']/[0]", "tensor": "K0"},
@@ -145,6 +192,39 @@ class RcServingW4A8IntegratedTest(unittest.TestCase):
                     for tensor in observation.phase_cache_leaves[phase_index]
                 ],
             )
+
+    @unittest.skipUnless(
+        os.environ.get("TINYSTORIES_MODEL_PATH")
+        and os.environ.get("W4A8_PHASE_ORACLE"),
+        "set pinned model and phase-oracle paths for the real export gate",
+    )
+    def test_real_integrated_bundle_freezes_one_chained_program(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            out_dir = Path(temporary) / "bundle"
+            materialize_integrated_bundle(
+                Path(os.environ["TINYSTORIES_MODEL_PATH"]),
+                Path("TinyStories/rc_serving_trace_input.json"),
+                Path(os.environ["W4A8_PHASE_ORACLE"]),
+                out_dir,
+            )
+            files = sorted(path.name for path in out_dir.iterdir())
+            receipt = json.loads((out_dir / "receipt.json").read_text())
+
+        self.assertEqual(
+            files,
+            [
+                "exported.pt2",
+                "graph.txt",
+                "observation.json",
+                "readback-manifest.json",
+                "receipt.json",
+            ],
+        )
+        self.assertEqual(receipt["exported_program_count"], 1)
+        self.assertEqual(receipt["quantized_decomposed_node_count"], 489)
+        self.assertTrue(receipt["frozen_phase_qparams_equal"])
+        self.assertTrue(receipt["frozen_prefill_equal"])
+        self.assertTrue(receipt["save_reload_equal"])
 
 
 if __name__ == "__main__":

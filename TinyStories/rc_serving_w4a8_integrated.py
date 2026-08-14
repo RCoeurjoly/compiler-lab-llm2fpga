@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 
 import torch
 
@@ -12,6 +15,7 @@ from .rc_serving_contract import (
     PREFILL_LENGTH,
     VOCAB_SIZE,
     phase_by_name,
+    load_trace,
     validate_token_ids,
 )
 from .rc_serving_source import native_call_kwargs
@@ -20,6 +24,13 @@ from .rc_serving_w4a8_cache_abi import (
     reconstruct_dynamic_cache,
 )
 from .rc_serving_w4a8_integrated_contract import IntegratedObservation
+from .rc_serving_w4a8_integrated_contract import (
+    build_readback_manifest,
+    write_integrated_observation,
+)
+from .rc_serving_w4a8_export import convert_w4a8_program
+from .rc_serving_evidence import enable_hf_dynamic_cache_export_support, tensor_record
+from .rc_serving_w4a8_source import build_w4a8_source_model
 
 
 _PHASES = tuple(phase_by_name(name) for name in PHASE_NAMES)
@@ -107,16 +118,40 @@ class IntegratedW4A8Module(torch.nn.Module):
         )
 
 
+def convert_integrated_w4a8_program(
+    module: torch.nn.Module, prompt: torch.Tensor
+) -> torch.export.ExportedProgram:
+    """PT2E-convert and export the complete one-call serving module once."""
+
+    if tuple(prompt.shape) != (1, PREFILL_LENGTH):
+        raise ValueError(f"integrated prompt must have shape [1, {PREFILL_LENGTH}]")
+    converted = convert_w4a8_program(module, (prompt,))
+    output = converted.module()(prompt)
+    if not isinstance(output, tuple) or len(output) != 18:
+        raise RuntimeError("integrated exported program must return 18 tensors")
+    return converted
+
+
 def run_integrated_eager(
     module: IntegratedW4A8Module, prompt: torch.Tensor
 ) -> IntegratedObservation:
     if tuple(prompt.shape) != (1, PREFILL_LENGTH):
         raise ValueError(f"integrated prompt must have shape [1, {PREFILL_LENGTH}]")
+    with torch.no_grad():
+        flat = module(prompt)
+    return integrated_observation_from_outputs(prompt, flat)
+
+
+def integrated_observation_from_outputs(
+    prompt: torch.Tensor, flat: Sequence[torch.Tensor]
+) -> IntegratedObservation:
+    """Convert the public 18-tensor output ABI into its durable observation."""
+
+    if tuple(prompt.shape) != (1, PREFILL_LENGTH):
+        raise ValueError(f"integrated prompt must have shape [1, {PREFILL_LENGTH}]")
     prompt_ids = validate_token_ids(
         tuple(int(value) for value in prompt.reshape(-1).tolist()), PREFILL_LENGTH
     )
-    with torch.no_grad():
-        flat = module(prompt)
     if len(flat) != 18:
         raise RuntimeError("integrated module must return exactly 18 tensors")
 
@@ -139,6 +174,164 @@ def run_integrated_eager(
         phase_tokens=tokens,
         phase_logits=(logits[0], logits[1], logits[2]),
         phase_cache_leaves=tuple(phase_caches),
+    )
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _quantized_nodes(exported: torch.export.ExportedProgram) -> list[torch.fx.Node]:
+    return [
+        node
+        for node in exported.graph.nodes
+        if "quantized_decomposed" in str(node.target)
+    ]
+
+
+def _qparam_signature(node: torch.fx.Node) -> tuple[str, tuple[str, ...]]:
+    return str(node.target), tuple(str(value) for value in node.args[1:6])
+
+
+def assert_frozen_phase_qparams_equal(
+    integrated: torch.export.ExportedProgram,
+    phase_programs: Sequence[torch.export.ExportedProgram],
+) -> int:
+    if len(phase_programs) != len(PHASE_NAMES):
+        raise ValueError("qparam comparison requires three phase programs")
+    integrated_nodes = _quantized_nodes(integrated)
+    phase_nodes = [_quantized_nodes(program) for program in phase_programs]
+    if any(len(nodes) != 163 for nodes in phase_nodes):
+        raise AssertionError("frozen phase programs must each contain 163 q/dq nodes")
+    if len(integrated_nodes) != sum(len(nodes) for nodes in phase_nodes):
+        raise AssertionError("integrated program does not contain 489 q/dq nodes")
+
+    integrated_shared = [
+        node for node in integrated_nodes if not node.meta.get("stack_trace")
+    ]
+    offset = 0
+    for phase_index, nodes in enumerate(phase_nodes):
+        reference_shared = [node for node in nodes if not node.meta.get("stack_trace")]
+        candidate = integrated_shared[offset : offset + len(reference_shared)]
+        if list(map(_qparam_signature, candidate)) != list(
+            map(_qparam_signature, reference_shared)
+        ):
+            raise AssertionError(f"{PHASE_NAMES[phase_index]} shared qparams differ")
+        offset += len(reference_shared)
+    if offset != len(integrated_shared):
+        raise AssertionError("integrated shared qparam partition is incomplete")
+
+    markers = (
+        "token_8, logits_8",
+        "token_9, logits_9",
+        "token_10, logits_10",
+    )
+    for phase_index, (nodes, marker) in enumerate(zip(phase_nodes, markers)):
+        reference_call = [node for node in nodes if node.meta.get("stack_trace")]
+        integrated_call = [
+            node
+            for node in integrated_nodes
+            if marker in str(node.meta.get("stack_trace", ""))
+        ]
+        if list(map(_qparam_signature, integrated_call)) != list(
+            map(_qparam_signature, reference_call)
+        ):
+            raise AssertionError(f"{PHASE_NAMES[phase_index]} call-site qparams differ")
+    return len(integrated_nodes)
+
+
+def _outputs_equal(
+    expected: Sequence[torch.Tensor], actual: Sequence[torch.Tensor]
+) -> bool:
+    return len(expected) == len(actual) and all(
+        torch.equal(before, after) for before, after in zip(expected, actual)
+    )
+
+
+def materialize_integrated_bundle(
+    model_path: Path,
+    trace_path: Path,
+    phase_oracle: Path,
+    out_dir: Path,
+) -> None:
+    if out_dir.exists():
+        raise FileExistsError(f"integrated output directory already exists: {out_dir}")
+    enable_hf_dynamic_cache_export_support()
+    trace = load_trace(trace_path)
+    prompt = torch.tensor([trace.prompt_token_ids], dtype=torch.long)
+    module = IntegratedW4A8Module(build_w4a8_source_model(model_path))
+    converted = convert_integrated_w4a8_program(module, prompt)
+    with torch.no_grad():
+        converted_outputs = converted.module()(prompt)
+    observation = integrated_observation_from_outputs(prompt, converted_outputs)
+
+    phase_programs = []
+    for phase in PHASE_NAMES:
+        exported_path = phase_oracle / phase / "exported.pt2"
+        if not exported_path.is_file():
+            raise FileNotFoundError(f"missing frozen phase program: {exported_path}")
+        phase_programs.append(torch.export.load(exported_path))
+    qdq_count = assert_frozen_phase_qparams_equal(converted, phase_programs)
+
+    prefill_reference = json.loads(
+        (phase_oracle / "prefill-8" / "reference.json").read_text(encoding="utf-8")
+    )
+    prefill_equal = (
+        tensor_record(converted_outputs[3].reshape(-1))
+        == prefill_reference["last_logits"]
+        and [tensor_record(converted_outputs[4 + index]) for index in range(4)]
+        == prefill_reference["cache_leaves"]
+    )
+    if not prefill_equal:
+        raise AssertionError("integrated W4A8 prefill differs from frozen phase oracle")
+
+    phase_shapes = {
+        phase: {
+            "token": [],
+            "logits": [VOCAB_SIZE],
+            "cache": [list(tensor.shape) for tensor in observation.phase_cache_leaves[index]],
+        }
+        for index, phase in enumerate(PHASE_NAMES)
+    }
+    manifest = build_readback_manifest(phase_shapes)
+
+    out_dir.mkdir(parents=True)
+    exported_path = out_dir / "exported.pt2"
+    torch.export.save(converted, exported_path)
+    reloaded = torch.export.load(exported_path)
+    with torch.no_grad():
+        reloaded_outputs = reloaded.module()(prompt)
+    save_reload_equal = _outputs_equal(converted_outputs, reloaded_outputs)
+    if not save_reload_equal:
+        raise AssertionError("saved integrated program changed its outputs")
+
+    graph_text = str(converted.graph) + "\n"
+    (out_dir / "graph.txt").write_text(graph_text, encoding="utf-8")
+    (out_dir / "readback-manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    observation_path = out_dir / "observation.json"
+    write_integrated_observation(observation_path, observation, manifest)
+    receipt = {
+        "schema": "rc-serving-w4a8-integrated-export-receipt-v1",
+        "artifact_kind": "single-integrated-w4a8-exported-program",
+        "exported_program_count": 1,
+        "output_tensor_count": len(converted_outputs),
+        "quantized_decomposed_node_count": qdq_count,
+        "frozen_phase_qparams_equal": True,
+        "frozen_prefill_equal": prefill_equal,
+        "phase_decode_oracle_status": "superseded-by-w4a8-cache-chained-observation",
+        "save_reload_equal": save_reload_equal,
+        "model_path": str(model_path),
+        "phase_oracle_path": str(phase_oracle),
+        "trace_sha256": _sha256(trace_path),
+        "exported_program_sha256": _sha256(exported_path),
+        "graph_sha256": hashlib.sha256(graph_text.encode()).hexdigest(),
+        "observation_sha256": _sha256(observation_path),
+        "torch_version": torch.__version__,
+    }
+    (out_dir / "receipt.json").write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
 
