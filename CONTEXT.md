@@ -172,6 +172,18 @@ _Avoid_: default pipeline, trusted backend
 The first RTL implementation that has passed the agreed PyTorch equivalence gate and is retained as the behavioral reference for RTL-to-RTL optimization.
 _Avoid_: golden source, permanently correct RTL, implementation template
 
+**Integrated stateful reference RTL**:
+A single compiler-generated RTL instance whose one accepted transaction performs the complete frozen prefill and cached-decode sequence, including cache continuity and token feedback, and passes every declared PyTorch-backed boundary check.
+_Avoid_: phase bundle, independently verified phases, integrated wrapper
+
+**Phase-local RTL evidence**:
+An RTL implementation verified for one serving phase using boundary inputs produced by the frozen software oracle; it does not establish RTL-to-RTL cache continuity or end-to-end stateful inference.
+_Avoid_: integrated RTL, end-to-end serving RTL, stateful reference RTL
+
+**Optimized RTL candidate**:
+A manually refined implementation compared against the frozen PyTorch oracle and integrated stateful reference RTL while preserving the declared transaction and observation contract.
+_Avoid_: reference RTL, compiler oracle, automatically trusted rewrite
+
 The minimum qualification bar is the one-input smoke gate plus the frozen-four gate, reset-isolation evidence, and semantic-checkpoint agreement. The 24-context bug screen and 64-context high-confidence tier strengthen the seed's trust claim but are not prerequisites for building the initial EQY flow.
 
 **Architectural contract**:

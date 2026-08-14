@@ -12,6 +12,24 @@
   the independent V=6, two-layer, width-two source-model trace for one prefill
   and two cached greedy decodes. It proves only the stated native/export state
   protocol; it is not the static W8A8 RC oracle or an FPGA-serving result.
+- **Static W8A8 RC RTL** — The earlier single generated RTL design for one
+  fixed-context forward pass with `use_cache=False`. Its context-0,
+  frozen-four, and ordered-reset results verify repeated forward transactions;
+  they do not verify cached prefill-to-decode state progression.
+- **Phase-local RTL evidence** — One generated serving-phase RTL checked with
+  phase inputs and cache state produced by the frozen software oracle. The
+  current W4A8 `prefill-8`, `decode-8`, and `decode-9` results have this status;
+  they are not one integrated RTL design and do not prove RTL-produced cache
+  continuity between phases.
+- **Integrated stateful reference RTL** — One compiler-generated RTL instance
+  whose single accepted transaction performs prefill, lowest-index argmax,
+  cached decode-8, lowest-index argmax, and cached decode-9. It becomes the
+  behavioral reference only after exact PyTorch/PT2E-backed checks at every
+  declared phase boundary and reset/reuse checks pass.
+- **Optimized RTL candidate** — A manually written or transformed RTL design
+  refined against the frozen PyTorch oracle and integrated stateful reference
+  RTL. It may change hierarchy, scheduling, storage, and latency while
+  preserving the versioned transaction and observation contract.
 - **RTLIL** — The hardware-oriented intermediate representation used as the
   fast-loop success boundary and as input to the deferred synthesis stages.
 - **Deferred validation** — Full Yosys/Xilinx synthesis run on selected fast
