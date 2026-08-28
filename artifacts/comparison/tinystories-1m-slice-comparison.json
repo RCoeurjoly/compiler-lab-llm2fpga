@@ -283,7 +283,10 @@
   },
   "model": "TinyStories-1M",
   "reasons": [
-    "slice manifest is not ready: source_artifact_unavailable"
+    "slice manifest is not ready: source_artifact_unavailable",
+    "slice manifest is not bound to the frozen contract identity",
+    "slice source metadata is absent or its content hash does not match",
+    "slice dependency closure is empty, malformed, or unbounded"
   ],
   "resources": null,
   "schema": "tinystories-1m-slice-comparison-v1",

@@ -626,11 +626,16 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         original = committed.read_bytes()
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "comparison.json"
-            self.assertEqual(comparison.main(["--contract", str(CONTRACT_PATH), "--slice-manifest", str(SLICE_MANIFEST_PATH), "--out", str(output)]), 0)
+            self.assertEqual(comparison.main([
+                "--contract", str(CONTRACT_PATH.relative_to(ROOT)),
+                "--slice-manifest", str(SLICE_MANIFEST_PATH.relative_to(ROOT)),
+                "--out", str(output),
+            ]), 0)
             result = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "incomplete")
             self.assertIsNone(result["resources"])
             self.assertIsNone(result["timing"])
+            self.assertEqual(output.read_bytes(), original)
         self.assertEqual(committed.read_bytes(), original)
 
 
