@@ -108,3 +108,35 @@ explicit reason. No trace, timing, or resource value has been fabricated.
 Fix-round-4 validation used the pinned command
 `nix develop -c python -m unittest discover -s tests -p 'test_tinystories_1m_reference_contract.py' -v`;
 all 6 tests passed. `git diff --check` also passed.
+
+## Fix round 5: pinned host/RTL semantics and frozen identities
+
+A direct audit of the pinned
+`host/kevin_jtag_cli.py` and `fpga/rtl/tinystories_packet_controller.sv`
+confirmed that `generation_count = 0` is valid. The contract now freezes its
+range as `[0, 32]`; request length remains `10 + 2 * prompt_count`, while the
+corresponding successful zero-token reply has length
+`17 + 2 * token_count = 17` bytes.
+
+The reply status ABI now records every controller status class with exact
+unsigned-8-bit values: `ok = 0`, `bad_header = 1`, `bad_crc = 2`,
+`context = 3`, and accelerator-class status base/range `16`/`[16, 255]`.
+Loader validation requires the exact field set and values and rejects booleans
+for all numeric ABI fields, including command and status encodings.
+
+The loader now compares every recorded package, tokenizer, scale-image, and
+memory-image digest against checked-in constants obtained from the inspected
+package receipt and manifest. It also compares the full fixed model,
+tokenizer, quantization, memory-image, and reference identities rather than
+accepting merely well-formed alternatives. Regression tests replace every
+recorded digest with a different valid 64-hex value, mutate each fixed identity,
+and substitute booleans at every numeric ABI location.
+
+Trace, timing, throughput, resource, and source evidence remains explicitly
+unavailable and null; no measurement or digest was inferred. The approved
+compiler design spec was pre-existing project documentation before Task 1 and
+is intentionally preserved on the branch. It is not part of this focused fix.
+
+Fix-round-5 validation uses the required pinned command
+`nix develop -c python -m unittest discover -s tests -p 'test_tinystories_1m_reference_contract.py' -v`;
+all 11 tests pass.

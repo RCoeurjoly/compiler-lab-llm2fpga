@@ -52,7 +52,15 @@
     "reply_magic_u16": 19282,
     "version": 1,
     "command_encodings": {"infer": 1},
-    "status_encodings": {"ok": 0},
+    "status_encodings": {
+      "ok": 0,
+      "bad_header": 1,
+      "bad_crc": 2,
+      "context": 3,
+      "accelerator_base": 16,
+      "accelerator_status_min": 16,
+      "accelerator_status_max": 255
+    },
     "max_context": 32,
     "token_id_bits": 16,
     "generation_count_bits": 8,
@@ -84,7 +92,7 @@
       "token_count_max": 32,
       "token_element_bytes": 2,
       "token_element_encoding": "u16",
-      "generation_count_min": 1,
+      "generation_count_min": 0,
       "generation_count_max": 32,
       "prompt_plus_generation_max": 32,
       "total_length": {"operator": "base_plus_count_times_element_bytes", "base_bytes": 10, "count_field": "prompt_count", "element_bytes": 2}

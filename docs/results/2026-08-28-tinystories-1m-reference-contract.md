@@ -18,19 +18,23 @@ The fixed software fixture is `Once upon a time`, token IDs
 ## Wire ABI
 
 `command_abi` is an executable data definition, rather than a prose-only
-description. It assigns `infer` the unsigned-8-bit command value `1` and `ok`
-the unsigned-8-bit reply-status value `0`. Every scalar is byte-aligned,
-unsigned, and little-endian; no bit-packed fields are permitted (`bit_order` is
-`lsb0`). Request magic is the little-endian `u16` value `19271` (`0x4b47`), and
-reply magic is `19282` (`0x4b52`).
+description. It assigns `infer` the unsigned-8-bit command value `1`. Reply
+status values are `ok = 0`, `bad_header = 1`, `bad_crc = 2`, and `context = 3`;
+accelerator statuses have base value `16` and occupy the valid unsigned-8-bit
+range `[16, 255]`. Every scalar is byte-aligned, unsigned, and little-endian;
+no bit-packed fields are permitted (`bit_order` is `lsb0`). Request magic is
+the little-endian `u16` value `19271` (`0x4b47`), and reply magic is `19282`
+(`0x4b52`).
 
 The request header is six bytes followed by `prompt_count` little-endian `u16`
 tokens and then the CRC trailer: its total byte length is
-`10 + 2 * prompt_count`. `prompt_count` and `generation_count` are each in
-`[1, 32]`, and their sum may not exceed 32. The reply header is thirteen bytes
-followed by `token_count` little-endian `u16` tokens and the same trailer: its
-total byte length is `17 + 2 * token_count`. A successful reply has exactly the
-requested generation count.
+`10 + 2 * prompt_count`. `prompt_count` is in `[1, 32]`,
+`generation_count` is in `[0, 32]`, and their sum may not exceed 32. A zero
+generation count is a valid request and returns a successful zero-token reply.
+The reply header is thirteen bytes followed by `token_count` little-endian
+`u16` tokens and the same trailer: its total byte length is
+`17 + 2 * token_count`. A successful reply has exactly the requested
+generation count, including zero.
 
 The trailer is an unsigned little-endian `u32` immediately after the variable
 token payload. It is CRC-32/IEEE (reflected polynomial `0xedb88320`, initial
@@ -53,3 +57,9 @@ The package directory is an external inspected checkout, not copied into this
 repository. Its receipt contains an exact hash for every package file; the
 contract preserves those identities without fabricating a repository-local
 artifact or measurement.
+
+The strict loader compares every recorded digest and fixed model, tokenizer,
+quantization, memory-image, reference, and ABI identity with checked-in
+constants taken from that receipt and manifest audit. A different but
+well-formed hexadecimal digest is therefore rejected rather than accepted as a
+new identity.
