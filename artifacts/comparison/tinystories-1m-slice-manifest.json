@@ -31,12 +31,18 @@
       "artifacts/tinystories-1m/compiler/main.rtlil",
       "artifacts/tinystories-1m/compiler-build/main.sv"
     ],
-    "status": "inspected-no-source-artifact",
+    "repository_root": ".",
+    "searched_paths": [
+      "artifacts/tinystories-1m/compiler/main.sv",
+      "artifacts/tinystories-1m/compiler/main.il",
+      "artifacts/tinystories-1m/compiler/main.rtlil",
+      "artifacts/tinystories-1m/compiler-build/main.sv"
+    ],
     "supplied_nix_outputs": []
   },
   "failure": {
     "code": "source_artifact_unavailable",
-    "reason": "No full TinyStories-1M compiler-generated SV/RTLIL artifact with matching contract metadata is checked into this repository. Historical full-model reports and Representative Core artifacts are not a substitute."
+    "reason": "no full TinyStories-1M compiler artifact found by deterministic discovery"
   },
   "model": "TinyStories-1M",
   "schema": "tinystories-1m-compiler-slice-manifest-v1",

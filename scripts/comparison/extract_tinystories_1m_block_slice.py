@@ -45,8 +45,10 @@ KNOWN_NIX_OUTPUTS = (
     },
 )
 MODULE_RE = re.compile(r"(?ms)^\s*module\s+([A-Za-z_][A-Za-z0-9_$]*)\b(.*?)\bendmodule\b")
-RTLIL_MODULE_RE = re.compile(r"(?ms)^\s*module\s+\\?([^\s]+)(.*?)^\s*end\s*$")
 RTLIL_CELL_RE = re.compile(r"(?m)^\s*cell\s+\\?([^\s]+)\s+\\?[^\s]+")
+RTLIL_MODULE_START_RE = re.compile(r"^\s*module\s+\\?([^\s]+)(?:\s.*)?$")
+RTLIL_NESTED_BLOCK_RE = re.compile(r"^\s*(?:cell|process|switch)\s+")
+RTLIL_END_RE = re.compile(r"^\s*end\s*(?:#.*)?$")
 INSTANCE_RE = re.compile(
     r"(?m)(?:^|;)\s*([A-Za-z_][A-Za-z0-9_$]*)\s*(?:#\s*\([^;]*?\))?\s+"
     r"[A-Za-z_][A-Za-z0-9_$]*\s*\("
@@ -184,14 +186,47 @@ def parse_sv_modules(text: str) -> list[tuple[str, str, set[str], int]]:
 
 
 def parse_rtlil_modules(text: str) -> list[tuple[str, str, set[str], int]]:
+    """Parse complete RTLIL modules without confusing nested ``end`` tokens.
+
+    RTLIL uses ``end`` for modules and for nested cell/process/switch blocks.
+    A non-greedy regular expression therefore truncates ordinary synthesized
+    modules at their first cell or process.  Track the grammar's block depth so
+    the emitted text is a complete, reparsable module.
+    """
     parsed: list[tuple[str, str, set[str], int]] = []
-    for match in RTLIL_MODULE_RE.finditer(text):
-        name, body = match.group(1), match.group(0)
-        dependencies = {
-            candidate for candidate in RTLIL_CELL_RE.findall(body)
-            if not candidate.startswith("$")
-        }
-        parsed.append((name, body, dependencies, match.start()))
+    offset = 0
+    module_name: str | None = None
+    module_start = 0
+    module_lines: list[str] = []
+    depth = 0
+    for line in text.splitlines(keepends=True):
+        bare = line.rstrip("\r\n")
+        if module_name is None:
+            match = RTLIL_MODULE_START_RE.match(bare)
+            if match is not None:
+                module_name = match.group(1)
+                module_start = offset
+                module_lines = [line]
+                depth = 1
+        else:
+            module_lines.append(line)
+            if RTLIL_NESTED_BLOCK_RE.match(bare):
+                depth += 1
+            elif RTLIL_END_RE.match(bare):
+                depth -= 1
+                if depth == 0:
+                    body = "".join(module_lines)
+                    parsed.append((
+                        module_name,
+                        body,
+                        set(RTLIL_CELL_RE.findall(body)),
+                        module_start,
+                    ))
+                    module_name = None
+                    module_lines = []
+        offset += len(line)
+    if module_name is not None:
+        raise ExtractionError("invalid_input", f"unterminated RTLIL module {module_name!r}")
     return parsed
 
 
@@ -231,13 +266,22 @@ def dependency_closure(anchor: str, modules: dict[str, tuple[Path, str, set[str]
         if name in closure:
             continue
         closure.add(name)
-        unresolved = modules[name][2] - set(modules)
+        dependencies = modules[name][2]
+        # A declared module is always a dependency, including generated names
+        # such as ``$paramod\\foo...``.  Undeclared ordinary/$paramod cells are
+        # unbounded dependencies; only undeclared Yosys internal ``$`` cells
+        # are primitives supplied by Yosys itself.
+        unresolved = {
+            dependency
+            for dependency in dependencies - set(modules)
+            if not (dependency.startswith("$") and not dependency.startswith("$paramod"))
+        }
         if unresolved:
             raise ExtractionError(
                 "unbounded_dependency_closure",
                 f"{name} instantiates modules not supplied as explicit inputs: {', '.join(sorted(unresolved))}",
             )
-        todo.extend(sorted(modules[name][2] - closure))
+        todo.extend(sorted((dependencies & set(modules)) - closure))
     return sorted(closure)
 
 
@@ -273,7 +317,9 @@ def extract(inputs: list[Path], metadata_path: Path, contract_path: Path, slice_
     for index, name in enumerate(closure):
         source, body, _, _ = modules[name]
         suffix = source.suffix if source.suffix.lower() in {".sv", ".v", ".il", ".rtlil"} else ".sv"
-        destination = slice_dir / f"{index:03d}-{name}{suffix}"
+        safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", name).strip("._-") or "module"
+        name_digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:8]
+        destination = slice_dir / f"{index:03d}-{safe_name}-{name_digest}{suffix}"
         extracted = body.rstrip() + "\n"
         destination.write_text(extracted, encoding="utf-8")
         copied.append({
