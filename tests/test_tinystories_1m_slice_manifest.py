@@ -52,7 +52,8 @@ class TinyStories1MSliceManifestTest(unittest.TestCase):
             source.write_text(
                 "module helper(input logic x, output logic y); assign y = x; endmodule\n"
                 "// llm2fpga.slice_kind=one_transformer_block_token_step\n"
-                "module transformer_block_token_step(input logic x, output logic y); helper u_helper(.x(x), .y(y)); endmodule\n",
+                "module transformer_block_token_step(input logic x, output logic y); helper u_helper(.x(x), .y(y)); endmodule\n"
+                "module unrelated_debug_probe(input logic x, output logic y); assign y = x; endmodule\n",
                 encoding="utf-8",
             )
             metadata = root / "metadata.json"
@@ -61,7 +62,10 @@ class TinyStories1MSliceManifestTest(unittest.TestCase):
             self.assertEqual(manifest["status"], "ready")
             self.assertEqual(manifest["slice"]["kind"], "one_transformer_block_token_step")
             self.assertEqual(manifest["slice"]["dependency_closure"], ["helper", "transformer_block_token_step"])
-            self.assertEqual(manifest["slice"]["artifacts"][0]["sha256"], hashlib.sha256(source.read_bytes()).hexdigest())
+            self.assertEqual(manifest["slice"]["artifacts"][0]["source_sha256"], hashlib.sha256(source.read_bytes()).hexdigest())
+            self.assertEqual([artifact["module"] for artifact in manifest["slice"]["artifacts"]], ["helper", "transformer_block_token_step"])
+            extracted_text = "".join(Path(artifact["extracted"]).read_text(encoding="utf-8") for artifact in manifest["slice"]["artifacts"])
+            self.assertNotIn("unrelated_debug_probe", extracted_text)
 
     def test_contract_mismatch_writes_no_comparison_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

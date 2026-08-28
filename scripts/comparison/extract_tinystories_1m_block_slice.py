@@ -14,7 +14,6 @@ import argparse
 import hashlib
 import json
 import re
-import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -161,10 +160,21 @@ def extract(inputs: list[Path], metadata_path: Path, contract_path: Path, slice_
     closure = dependency_closure(anchor, modules)
     slice_dir.mkdir(parents=True, exist_ok=True)
     copied: list[dict[str, str]] = []
-    for index, source in enumerate(inputs):
-        destination = slice_dir / f"{index:02d}-{source.name}"
-        shutil.copyfile(source, destination)
-        copied.append({"source": str(source), "extracted": str(destination), "sha256": sha256(source)})
+    # Inputs may carry unrelated modules (for example, a full generated SV
+    # bundle).  Write each selected module independently so the materialized
+    # comparison artifact is exactly the reachable dependency closure.
+    for index, name in enumerate(closure):
+        source, body, _ = modules[name]
+        destination = slice_dir / f"{index:03d}-{name}.sv"
+        extracted = body.rstrip() + "\n"
+        destination.write_text(extracted, encoding="utf-8")
+        copied.append({
+            "module": name,
+            "source": str(source),
+            "source_sha256": sha256(source),
+            "extracted": str(destination),
+            "sha256": hashlib.sha256(extracted.encode("utf-8")).hexdigest(),
+        })
     return {
         "schema": SCHEMA,
         "status": "ready",
