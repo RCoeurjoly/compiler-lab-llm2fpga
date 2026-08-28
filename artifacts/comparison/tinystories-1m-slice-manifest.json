@@ -3,6 +3,37 @@
     "path": "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
     "sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
   },
+  "discovery": {
+    "found_paths": [],
+    "manifest_paths": [
+      "artifacts/tinystories-1m/compiler-build-manifest.json",
+      "artifacts/tinystories-1m/compiler/manifest.json"
+    ],
+    "nix_output_policy": [
+      {
+        "flake_attribute": "tiny-stories-1m-baseline-float-sv",
+        "relative_artifacts": [
+          "sv/main.sv",
+          "main.sv"
+        ]
+      },
+      {
+        "flake_attribute": "tiny-stories-1m-baseline-float-il",
+        "relative_artifacts": [
+          "main.il",
+          "main.rtlil"
+        ]
+      }
+    ],
+    "repository_candidates": [
+      "artifacts/tinystories-1m/compiler/main.sv",
+      "artifacts/tinystories-1m/compiler/main.il",
+      "artifacts/tinystories-1m/compiler/main.rtlil",
+      "artifacts/tinystories-1m/compiler-build/main.sv"
+    ],
+    "status": "inspected-no-source-artifact",
+    "supplied_nix_outputs": []
+  },
   "failure": {
     "code": "source_artifact_unavailable",
     "reason": "No full TinyStories-1M compiler-generated SV/RTLIL artifact with matching contract metadata is checked into this repository. Historical full-model reports and Representative Core artifacts are not a substitute."

@@ -44,6 +44,8 @@ class TinyStories1MSliceManifestTest(unittest.TestCase):
         self.assertEqual(manifest["status"], "source_artifact_unavailable")
         self.assertEqual(manifest["slice"]["dependency_closure"], [])
         self.assertEqual(manifest["failure"]["code"], "source_artifact_unavailable")
+        self.assertEqual(manifest["discovery"]["status"], "inspected-no-source-artifact")
+        self.assertTrue(manifest["discovery"]["repository_candidates"])
 
     def test_extracts_complete_block_and_bounded_dependency_closure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -52,7 +54,7 @@ class TinyStories1MSliceManifestTest(unittest.TestCase):
             source.write_text(
                 "module helper(input logic x, output logic y); assign y = x; endmodule\n"
                 "// llm2fpga.slice_kind=one_transformer_block_token_step\n"
-                "module transformer_block_token_step(input logic x, output logic y); helper u_helper(.x(x), .y(y)); endmodule\n"
+                "module generated_opaque_9(input logic x, output logic y); helper u_helper(.x(x), .y(y)); endmodule\n"
                 "module unrelated_debug_probe(input logic x, output logic y); assign y = x; endmodule\n",
                 encoding="utf-8",
             )
@@ -61,11 +63,24 @@ class TinyStories1MSliceManifestTest(unittest.TestCase):
             manifest = extractor.extract([source], metadata, CONTRACT_PATH, root / "slice")
             self.assertEqual(manifest["status"], "ready")
             self.assertEqual(manifest["slice"]["kind"], "one_transformer_block_token_step")
-            self.assertEqual(manifest["slice"]["dependency_closure"], ["helper", "transformer_block_token_step"])
+            self.assertEqual(manifest["slice"]["dependency_closure"], ["generated_opaque_9", "helper"])
             self.assertEqual(manifest["slice"]["artifacts"][0]["source_sha256"], hashlib.sha256(source.read_bytes()).hexdigest())
-            self.assertEqual([artifact["module"] for artifact in manifest["slice"]["artifacts"]], ["helper", "transformer_block_token_step"])
+            self.assertEqual([artifact["module"] for artifact in manifest["slice"]["artifacts"]], ["generated_opaque_9", "helper"])
             extracted_text = "".join(Path(artifact["extracted"]).read_text(encoding="utf-8") for artifact in manifest["slice"]["artifacts"])
             self.assertNotIn("unrelated_debug_probe", extracted_text)
+
+    def test_discovery_records_known_paths_before_declaring_artifact_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            found, discovery = extractor.discover_sources(root)
+            self.assertEqual(found, [])
+            self.assertTrue(discovery["repository_candidates"])
+            self.assertTrue(discovery["nix_output_policy"])
+            output = root / "result.json"
+            self.assertEqual(extractor.main(["--repo-root", str(root), "--out", str(output)]), 2)
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "source_artifact_unavailable")
+            self.assertEqual(result["discovery"], discovery)
 
     def test_contract_mismatch_writes_no_comparison_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -2,10 +2,11 @@
 """Fail-closed extraction of a TinyStories-1M transformer-block RTL slice.
 
 This utility deliberately does not infer a full-model artifact from historical
-resource reports or from Representative Core outputs.  A caller must supply
-the compiler artifact and a sidecar metadata JSON explicitly.  The sidecar
-binds the artifact to the frozen reference contract before any source is
-copied into an extracted comparison slice.
+resource reports or from Representative Core outputs.  It first inventories
+fixed repository/build-manifest locations (and explicitly supplied existing Nix
+outputs); a caller may instead supply source paths directly.  A sidecar metadata
+JSON binds any discovered source to the frozen reference contract before source
+is copied into an extracted comparison slice.
 """
 
 from __future__ import annotations
@@ -23,6 +24,26 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONTRACT = ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json"
 SLICE_KIND = "one_transformer_block_token_step"
 SCHEMA = "tinystories-1m-compiler-slice-manifest-v1"
+KNOWN_REPOSITORY_ARTIFACTS = (
+    "artifacts/tinystories-1m/compiler/main.sv",
+    "artifacts/tinystories-1m/compiler/main.il",
+    "artifacts/tinystories-1m/compiler/main.rtlil",
+    "artifacts/tinystories-1m/compiler-build/main.sv",
+)
+KNOWN_MANIFESTS = (
+    "artifacts/tinystories-1m/compiler-build-manifest.json",
+    "artifacts/tinystories-1m/compiler/manifest.json",
+)
+KNOWN_NIX_OUTPUTS = (
+    {
+        "flake_attribute": "tiny-stories-1m-baseline-float-sv",
+        "relative_artifacts": ("sv/main.sv", "main.sv"),
+    },
+    {
+        "flake_attribute": "tiny-stories-1m-baseline-float-il",
+        "relative_artifacts": ("main.il", "main.rtlil"),
+    },
+)
 MODULE_RE = re.compile(r"(?ms)^\s*module\s+([A-Za-z_][A-Za-z0-9_$]*)\b(.*?)\bendmodule\b")
 INSTANCE_RE = re.compile(
     r"(?m)(?:^|;)\s*([A-Za-z_][A-Za-z0-9_$]*)\s*(?:#\s*\([^;]*?\))?\s+"
@@ -84,8 +105,67 @@ def validate_identity(metadata: dict[str, Any], contract: dict[str, Any]) -> dic
     return expected
 
 
-def parse_modules(inputs: list[Path]) -> dict[str, tuple[Path, str, set[str]]]:
-    modules: dict[str, tuple[Path, str, set[str]]] = {}
+def manifest_source_paths(manifest: Path) -> list[Path]:
+    """Return explicit artifact paths declared by a known build manifest only."""
+    try:
+        value = load_json(manifest)
+    except ExtractionError:
+        return []
+    found: list[Path] = []
+    for key in ("sv", "rtl", "rtlil", "artifact", "artifact_path", "source_path"):
+        candidate = value.get(key)
+        if isinstance(candidate, str):
+            path = Path(candidate)
+            if not path.is_absolute():
+                path = manifest.parent / path
+            if path.is_file():
+                found.append(path)
+    return found
+
+
+def discover_sources(repo_root: Path, nix_outputs: list[Path] | None = None) -> tuple[list[Path], dict[str, Any]]:
+    """Inspect fixed repository, build-manifest, and existing Nix-output paths.
+
+    It never invokes Nix or builds an output.  Nix outputs are inspected only
+    when their concrete paths are supplied through ``--nix-output``.
+    """
+    searched = [str(repo_root / relative) for relative in KNOWN_REPOSITORY_ARTIFACTS]
+    found = [repo_root / relative for relative in KNOWN_REPOSITORY_ARTIFACTS if (repo_root / relative).is_file()]
+    manifests = [repo_root / relative for relative in KNOWN_MANIFESTS]
+    for manifest in manifests:
+        found.extend(manifest_source_paths(manifest) if manifest.is_file() else [])
+    supplied_nix_outputs = [] if nix_outputs is None else list(nix_outputs)
+    for output in supplied_nix_outputs:
+        for entry in KNOWN_NIX_OUTPUTS:
+            for relative in entry["relative_artifacts"]:
+                candidate = output / relative
+                searched.append(str(candidate))
+                if candidate.is_file():
+                    found.append(candidate)
+    unique = sorted({path.resolve() for path in found}, key=str)
+    return unique, {
+        "repository_root": str(repo_root),
+        "repository_candidates": searched[:len(KNOWN_REPOSITORY_ARTIFACTS)],
+        "manifest_paths": [str(path) for path in manifests],
+        "nix_output_policy": [
+            {"flake_attribute": entry["flake_attribute"], "relative_artifacts": list(entry["relative_artifacts"])}
+            for entry in KNOWN_NIX_OUTPUTS
+        ],
+        "supplied_nix_outputs": [str(path) for path in supplied_nix_outputs],
+        "searched_paths": searched,
+        "found_paths": [str(path) for path in unique],
+    }
+
+
+def immediately_preceding_annotation(text: str, module_start: int) -> bool:
+    """Recognize the slice annotation only in comments adjoining a module."""
+    prefix = text[:module_start]
+    trailing = re.search(r"(?s)(?:(?:\s+)|(?://[^\n]*(?:\n|$))|(?:/\*.*?\*/))*$", prefix)
+    return trailing is not None and ANNOTATION in trailing.group(0)
+
+
+def parse_modules(inputs: list[Path]) -> dict[str, tuple[Path, str, set[str], bool]]:
+    modules: dict[str, tuple[Path, str, set[str], bool]] = {}
     for source in inputs:
         try:
             text = source.read_text(encoding="utf-8")
@@ -100,16 +180,16 @@ def parse_modules(inputs: list[Path]) -> dict[str, tuple[Path, str, set[str]]]:
                 for candidate in INSTANCE_RE.findall(body)
                 if candidate not in VERILOG_KEYWORDS
             }
-            modules[name] = (source, body, dependencies)
+            modules[name] = (source, body, dependencies, immediately_preceding_annotation(text, match.start()))
     if not modules:
         raise ExtractionError("boundary_not_found", "no Verilog/SystemVerilog modules found in explicit inputs")
     return modules
 
 
-def select_anchor(modules: dict[str, tuple[Path, str, set[str]]]) -> str:
+def select_anchor(modules: dict[str, tuple[Path, str, set[str], bool]]) -> str:
     matches = [
-        name for name, (_, body, _) in modules.items()
-        if ANCHOR_RE.search(name) or ANNOTATION in body
+        name for name, (_, _, _, annotated) in modules.items()
+        if ANCHOR_RE.search(name) or annotated
     ]
     if len(matches) != 1:
         detail = "none" if not matches else ", ".join(sorted(matches))
@@ -117,7 +197,7 @@ def select_anchor(modules: dict[str, tuple[Path, str, set[str]]]) -> str:
     return matches[0]
 
 
-def dependency_closure(anchor: str, modules: dict[str, tuple[Path, str, set[str]]]) -> list[str]:
+def dependency_closure(anchor: str, modules: dict[str, tuple[Path, str, set[str], bool]]) -> list[str]:
     closure: set[str] = set()
     todo = [anchor]
     while todo:
@@ -135,7 +215,7 @@ def dependency_closure(anchor: str, modules: dict[str, tuple[Path, str, set[str]
     return sorted(closure)
 
 
-def unavailable_manifest(contract_path: Path, contract: dict[str, Any], reason: str) -> dict[str, Any]:
+def unavailable_manifest(contract_path: Path, contract: dict[str, Any], reason: str, discovery: dict[str, Any] | None = None) -> dict[str, Any]:
     return {
         "schema": SCHEMA,
         "status": "source_artifact_unavailable",
@@ -143,6 +223,7 @@ def unavailable_manifest(contract_path: Path, contract: dict[str, Any], reason: 
         "contract": {"path": str(contract_path), "sha256": sha256(contract_path)},
         "slice": {"kind": SLICE_KIND, "dependency_closure": [], "status": "unavailable"},
         "failure": {"code": "source_artifact_unavailable", "reason": reason},
+        "discovery": discovery,
     }
 
 
@@ -164,7 +245,7 @@ def extract(inputs: list[Path], metadata_path: Path, contract_path: Path, slice_
     # bundle).  Write each selected module independently so the materialized
     # comparison artifact is exactly the reachable dependency closure.
     for index, name in enumerate(closure):
-        source, body, _ = modules[name]
+        source, body, _, _ = modules[name]
         destination = slice_dir / f"{index:03d}-{name}.sv"
         extracted = body.rstrip() + "\n"
         destination.write_text(extracted, encoding="utf-8")
@@ -195,17 +276,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--input", action="append", default=[], type=Path, help="explicit SV/Verilog source input (repeatable)")
     parser.add_argument("--metadata", type=Path, help="JSON sidecar containing exact contract_identity")
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
+    parser.add_argument("--repo-root", type=Path, default=ROOT, help="repository root for deterministic discovery")
+    parser.add_argument("--nix-output", action="append", default=[], type=Path, help="existing Nix output path to inspect; never builds")
     parser.add_argument("--slice-dir", type=Path, help="directory for copied source closure")
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args(argv)
     contract = load_json(args.contract)
+    discovery: dict[str, Any] | None = None
     try:
+        inputs = args.input
+        if not inputs:
+            inputs, discovery = discover_sources(args.repo_root, args.nix_output)
+        if not inputs:
+            raise ExtractionError("source_artifact_unavailable", "no full TinyStories-1M compiler artifact found by deterministic discovery")
         if args.metadata is None or args.slice_dir is None:
             raise ExtractionError("source_artifact_unavailable", "--metadata and --slice-dir are required for extraction")
-        manifest = extract(args.input, args.metadata, args.contract, args.slice_dir)
+        manifest = extract(inputs, args.metadata, args.contract, args.slice_dir)
+        manifest["discovery"] = discovery
         exit_code = 0
     except ExtractionError as error:
-        manifest = unavailable_manifest(args.contract, contract, str(error))
+        manifest = unavailable_manifest(args.contract, contract, str(error), discovery)
         manifest["status"] = error.code
         manifest["failure"]["code"] = error.code
         exit_code = 2
