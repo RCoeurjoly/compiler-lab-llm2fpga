@@ -281,6 +281,19 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         self.assertIsNone(result["resources"])
         self.assertIsNone(result["timing"])
 
+    def test_malformed_resource_and_timing_slots_fail_closed(self) -> None:
+        for side_name in ("reference", "compiler"):
+            for evidence_kind in ("resources", "timing"):
+                for malformed in (None, [], "not-a-receipt"):
+                    with self.subTest(side=side_name, evidence_kind=evidence_kind, malformed=malformed):
+                        reference, compiler = fixtures()
+                        side = reference if side_name == "reference" else compiler
+                        side[evidence_kind] = malformed
+                        result = run_compare(reference, compiler, fixture_slice_manifest())
+                        self.assertEqual(result["status"], "incomplete")
+                        self.assertIsNone(result["resources"])
+                        self.assertIsNone(result["timing"])
+
     def test_missing_report_provenance_is_incomplete_not_aligned(self) -> None:
         reference, compiler = fixtures()
         del compiler["resources"]["sha256"]

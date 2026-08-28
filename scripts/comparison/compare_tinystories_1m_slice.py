@@ -586,11 +586,15 @@ def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest:
         result["functional"] = {"checkpoint_status": "matched", "output_status": "mismatch", "first_mismatch": {"checkpoint": "final_output_tokens", "reference": expected_tokens, "compiler": compiler["output_tokens"]}}
         return result
     result["functional"] = {"checkpoint_status": "matched", "output_status": "matched", "first_mismatch": None}
-    measurement_ids = [
-        side.get(kind, {}).get("measurement_id")
+    measurement_reports = [
+        side.get(kind)
         for side in (reference, compiler)
         for kind in ("resources", "timing")
     ]
+    if any(not isinstance(report, dict) for report in measurement_reports):
+        result["reasons"] = ["resource or timing evidence is unavailable or malformed"]
+        return result
+    measurement_ids = [report.get("measurement_id") for report in measurement_reports]
     if any(not isinstance(identity, str) or not identity for identity in measurement_ids) or len(set(measurement_ids)) != len(measurement_ids):
         result["reasons"] = ["resource and timing measurement identities must be present and distinct across both sides"]
         return result
