@@ -1,0 +1,51 @@
+{
+  "contract_identity": {
+    "model": {
+      "name": "TinyStories-1M",
+      "source_model_id": "roneneldan/TinyStories-1M",
+      "source_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf"
+    },
+    "package": {
+      "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+      "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+    },
+    "quantization": {
+      "accumulator": "signed INT32",
+      "activations": "symmetric per-tensor INT8",
+      "scale_format": "little-endian float32",
+      "scale_image_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+      "weights": "symmetric per-output INT8"
+    }
+  },
+  "functional": {
+    "checkpoint_status": "unavailable",
+    "first_mismatch": null,
+    "output_status": "unavailable"
+  },
+  "inputs": {
+    "compiler_evidence": null,
+    "contract": {
+      "path": "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+      "sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
+    },
+    "reference_evidence": null,
+    "slice_manifest": {
+      "path": "artifacts/comparison/tinystories-1m-slice-manifest.json",
+      "sha256": "4b667f431bab7f80c4fd3479649a14391c225c964e02c54b795eda8eaf15f6a2"
+    }
+  },
+  "model": "TinyStories-1M",
+  "reasons": [
+    "slice manifest is not ready: source_artifact_unavailable"
+  ],
+  "resources": null,
+  "schema": "tinystories-1m-slice-comparison-v1",
+  "slice": {
+    "kind": "one_transformer_block_token_step",
+    "manifest_status": "source_artifact_unavailable",
+    "status": "unavailable"
+  },
+  "status": "incomplete",
+  "timing": null,
+  "waste_map": []
+}
