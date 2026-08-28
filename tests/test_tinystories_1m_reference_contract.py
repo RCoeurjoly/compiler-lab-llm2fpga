@@ -83,7 +83,7 @@ def load_contract() -> dict:
     if not isinstance(contract["memory_image"].get("format"), str) or not contract["memory_image"]["format"]:
         raise AssertionError("memory_image.format must be a non-empty string")
     abi = contract["command_abi"]
-    for key in ("request_magic", "reply_magic", "version", "command", "max_context", "token_id_bits", "generation_count_bits", "cycle_count_bits", "crc32"):
+    for key in ("request_magic", "reply_magic", "version", "command", "max_context", "token_id_bits", "generation_count_bits", "cycle_count_bits", "crc32", "byte_order", "request_fields", "reply_fields", "framing", "crc_algorithm", "crc_covered_bytes"):
         if key not in abi:
             raise AssertionError(f"command_abi.{key} is required")
     if not all(isinstance(abi[key], int) and not isinstance(abi[key], bool) and abi[key] > 0 for key in ("version", "max_context", "token_id_bits", "generation_count_bits", "cycle_count_bits")):
@@ -92,6 +92,18 @@ def load_contract() -> dict:
         raise AssertionError("command_abi magic values are malformed")
     if not isinstance(abi["command"], str) or not abi["command"] or not isinstance(abi["crc32"], bool):
         raise AssertionError("command_abi command/crc32 types are malformed")
+    if abi["byte_order"] != "little" or not isinstance(abi["crc_algorithm"], str) or not abi["crc_algorithm"] or not isinstance(abi["crc_covered_bytes"], str) or not abi["crc_covered_bytes"]:
+        raise AssertionError("command_abi byte order/CRC metadata is malformed")
+    for field_key in ("request_fields", "reply_fields"):
+        fields = abi[field_key]
+        if not isinstance(fields, list) or not fields or any(not isinstance(field, dict) for field in fields):
+            raise AssertionError(f"command_abi.{field_key} must be a list of field objects")
+        for field in fields:
+            if not isinstance(field.get("name"), str) or not isinstance(field.get("byte_offset"), int) or not isinstance(field.get("byte_width"), int) or field["byte_offset"] < 0 or field["byte_width"] <= 0:
+                raise AssertionError(f"command_abi.{field_key} contains malformed field")
+    framing = abi["framing"]
+    if not isinstance(framing, dict) or not all(isinstance(framing.get(key), int) and framing[key] >= 0 for key in ("header_bytes", "token_data_offset", "crc_bytes")):
+        raise AssertionError("command_abi.framing is malformed")
     reference = contract["reference"]
     reference_required = {"prompt_text", "prompt_tokens", "tokens", "generation", "reference_impl", "reference_trace_sha256"}
     if not isinstance(reference, dict) or reference_required - reference.keys():
@@ -156,6 +168,10 @@ class TinyStoriesReferenceContractTest(unittest.TestCase):
             (("command_abi", "request_magic"), "4b47"),
             (("command_abi", "command"), 1),
             (("command_abi", "crc32"), "zlib"),
+            (("command_abi", "byte_order"), 1),
+            (("command_abi", "request_fields", 0), "magic"),
+            (("command_abi", "framing"), None),
+            (("command_abi", "crc_algorithm"), None),
             (("memory_image", "format"), None),
             (("model", "source_revision"), "deadbeef"),
             (("reference", "tokens", 0), True),

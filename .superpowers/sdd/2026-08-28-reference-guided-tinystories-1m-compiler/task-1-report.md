@@ -70,3 +70,9 @@ set, 40-hex model source revision, and rejects boolean token IDs. Focused
 mutation coverage exercises each of these cases. The ABI's `crc32` field is a
 boolean capability declaration; its endian/framing description remains in the
 contract prose and command documentation.
+
+The ABI is now explicit: little-endian byte order; ordered request/reply field
+lists with byte offsets and widths; header, token-payload, and CRC framing
+boundaries; and the CRC-32/IEEE algorithm with its covered-byte rule. The
+loader requires and type-checks each of these fields, with focused corruption
+tests.
