@@ -294,13 +294,20 @@ def build_profile(contract_path: Path, qdq_path: Path, board_path: Path | None =
             "not_accepted_as_substitute": "The existing kintex self-test provenance proves only a self-test image and cannot authenticate TinyStories inference semantics.",
         }]
     else:
-        board = _load_object(board_path, "board receipt")
         try:
+            board = _load_object(board_path, "board receipt")
             result["board_evidence"] = _validate_board_evidence(
                 board, board_path=board_path, qdq=qdq, contract_path=contract_path, contract=contract, oracle=oracle
             )
         except ProfileSelectionError as error:
             result["unresolved_reasons"] = [{"code": error.code, "missing_or_conflicting_evidence": str(error)}]
+        except (OSError, TypeError, ValueError) as error:
+            # Malformed JSON (including NaN, which Python's parser otherwise
+            # accepts) is board evidence failure, never a selector crash.
+            result["unresolved_reasons"] = [{
+                "code": "board_evidence_invalid",
+                "missing_or_conflicting_evidence": f"board evidence validation failed: {type(error).__name__}",
+            }]
         else:
             result["status"] = "selected"
             result["selected_profile"] = PROFILE

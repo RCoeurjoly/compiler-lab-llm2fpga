@@ -109,6 +109,41 @@ class TinyStories1MImplementationProfileTest(unittest.TestCase):
         self.assertEqual(profile["status"], "unresolved")
         self.assertEqual(profile["unresolved_reasons"][0]["code"], "board_receipt_not_approved")
 
+    def test_explicitly_approved_file_backed_fixture_exercises_selected_path(self) -> None:
+        """A test-only registry entry models the separate evidence-review act."""
+        with tempfile.TemporaryDirectory() as temporary:
+            board_path, board = self._board_receipt(Path(temporary))
+            board_file_sha256 = selector.sha256_file(board_path)
+            original = selector.APPROVED_BOARD_RECEIPTS
+            selector.APPROVED_BOARD_RECEIPTS = {board_file_sha256: {
+                "bitstream_sha256": board["bitstream"]["sha256"],
+                "capture_sha256": board["capture"]["sha256"],
+            }}
+            try:
+                profile = selector.build_profile(CONTRACT, QDQ, board_path)
+            finally:
+                selector.APPROVED_BOARD_RECEIPTS = original
+        self.assertEqual(profile["status"], "selected")
+        self.assertEqual(profile["selected_profile"], selector.PROFILE)
+        self.assertEqual(profile["board_evidence"]["path"], str(board_path))
+        self.assertEqual(profile["board_evidence"]["sha256"], board_file_sha256)
+
+    def test_malformed_board_json_and_nan_are_unresolved_not_exceptions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            malformed = root / "malformed-board.json"
+            malformed.write_text("{not JSON", encoding="utf-8")
+            profile = selector.build_profile(CONTRACT, QDQ, malformed)
+            self.assertEqual(profile["status"], "unresolved")
+            self.assertEqual(profile["unresolved_reasons"][0]["code"], "invalid_json")
+            board_path, board = self._board_receipt(root)
+            board["board"]["temperature_c"] = float("nan")
+            board["receipt_sha256"] = "ignored because NaN is not canonical"
+            board_path = self._write_board(root, board)
+            profile = selector.build_profile(CONTRACT, QDQ, board_path)
+        self.assertEqual(profile["status"], "unresolved")
+        self.assertEqual(profile["unresolved_reasons"][0]["code"], "board_evidence_invalid")
+
     def test_conflicting_profile_and_trace_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
