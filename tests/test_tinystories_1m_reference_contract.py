@@ -39,6 +39,8 @@ def load_contract() -> dict:
         raise AssertionError("model dimensions must be integers")
     if not isinstance(model["tie_word_embeddings"], bool) or not all(isinstance(model[key], str) for key in ("name", "architecture", "source_model_id", "source_revision", "activation_function")):
         raise AssertionError("model metadata types are malformed")
+    if not re.fullmatch(r"[0-9a-f]{40}", model["source_revision"]):
+        raise AssertionError("model.source_revision must be a 40-hex revision")
     for section in ("package", "tokenizer", "memory_image"):
         if not isinstance(contract[section], dict):
             raise AssertionError(f"{section} must be an object")
@@ -51,7 +53,8 @@ def load_contract() -> dict:
             raise AssertionError(f"package.{key} is required")
     if not SHA256.fullmatch(package["manifest_sha256"]):
         raise AssertionError("package.manifest_sha256 is malformed")
-    if not isinstance(package["files"], dict) or not package["files"]:
+    expected_package_files = {"manifest.json", "weights.bin", "scales.bin", "calibration_ids.bin", "receipt.json"}
+    if not isinstance(package["files"], dict) or set(package["files"]) != expected_package_files:
         raise AssertionError("package.files must be a non-empty object")
     if not isinstance(package["origin"], str) or not package["origin"]:
         raise AssertionError("package.origin must be a non-empty string")
@@ -65,6 +68,8 @@ def load_contract() -> dict:
     for key in ("vocab_sha256", "merges_sha256"):
         if not SHA256.fullmatch(tokenizer[key]):
             raise AssertionError(f"tokenizer.{key} is malformed")
+    if not isinstance(tokenizer["type"], str) or not tokenizer["type"]:
+        raise AssertionError("tokenizer.type must be a non-empty string")
     if not isinstance(tokenizer["add_bos_token"], bool) or not isinstance(tokenizer["add_prefix_space"], bool):
         raise AssertionError("tokenizer boolean settings are malformed")
     quant = contract["quantization"]
@@ -75,6 +80,8 @@ def load_contract() -> dict:
         raise AssertionError("quantization.scale_image_sha256 is malformed")
     if not isinstance(contract["memory_image"].get("bytes"), int) or contract["memory_image"]["bytes"] <= 0:
         raise AssertionError("memory_image.bytes must be positive")
+    if not isinstance(contract["memory_image"].get("format"), str) or not contract["memory_image"]["format"]:
+        raise AssertionError("memory_image.format must be a non-empty string")
     abi = contract["command_abi"]
     for key in ("request_magic", "reply_magic", "version", "command", "max_context", "token_id_bits", "generation_count_bits", "cycle_count_bits", "crc32"):
         if key not in abi:
@@ -83,6 +90,8 @@ def load_contract() -> dict:
         raise AssertionError("command_abi numeric fields are malformed")
     if not all(isinstance(abi[key], str) and re.fullmatch(r"0x[0-9a-f]{4}", abi[key]) for key in ("request_magic", "reply_magic")):
         raise AssertionError("command_abi magic values are malformed")
+    if not isinstance(abi["command"], str) or not abi["command"] or not isinstance(abi["crc32"], bool):
+        raise AssertionError("command_abi command/crc32 types are malformed")
     reference = contract["reference"]
     reference_required = {"prompt_text", "prompt_tokens", "tokens", "generation", "reference_impl", "reference_trace_sha256"}
     if not isinstance(reference, dict) or reference_required - reference.keys():
@@ -97,7 +106,7 @@ def load_contract() -> dict:
     if trace_hash is not None and (not isinstance(trace_hash, str) or not SHA256.fullmatch(trace_hash)):
         raise AssertionError("reference_trace_sha256 must be null or a SHA-256 digest")
     tokens = reference.get("tokens")
-    if not isinstance(tokens, list) or len(tokens) != 16 or any(not isinstance(t, int) for t in tokens):
+    if not isinstance(tokens, list) or len(tokens) != 16 or any(not isinstance(t, int) or isinstance(t, bool) for t in tokens):
         raise AssertionError("reference.tokens must contain exactly 16 integer IDs")
     if contract["status"] not in {"frozen", "incomplete"}:
         raise AssertionError("unknown contract status")
@@ -140,9 +149,16 @@ class TinyStoriesReferenceContractTest(unittest.TestCase):
         value = json.loads(original)
         for path, replacement in [
             (("package", "files", "weights.bin"), "not-a-hash"),
+            (("package", "files", "extra.bin"), "f" * 64),
             (("tokenizer", "vocab_sha256"), "f" * 63),
+            (("tokenizer", "type"), 7),
             (("quantization", "scale_image_sha256"), "f" * 65),
             (("command_abi", "request_magic"), "4b47"),
+            (("command_abi", "command"), 1),
+            (("command_abi", "crc32"), "zlib"),
+            (("memory_image", "format"), None),
+            (("model", "source_revision"), "deadbeef"),
+            (("reference", "tokens", 0), True),
         ]:
             candidate = deepcopy(value)
             cursor = candidate

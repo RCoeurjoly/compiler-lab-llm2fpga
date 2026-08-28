@@ -63,3 +63,10 @@ tokenizer settings plus vocab/merges digests, quantization and scale-image
 digest, memory-image size, complete ABI framing, reference metadata and
 null-or-digest trace field, and baseline status/value types. Three regression
 tests pass, including fail-closed mutations of nested hashes and ABI values.
+
+The final strict-schema fix additionally validates tokenizer type, memory-image
+format, string command name, boolean CRC declaration, exact package-file key
+set, 40-hex model source revision, and rejects boolean token IDs. Focused
+mutation coverage exercises each of these cases. The ABI's `crc32` field is a
+boolean capability declaration; its endian/framing description remains in the
+contract prose and command documentation.

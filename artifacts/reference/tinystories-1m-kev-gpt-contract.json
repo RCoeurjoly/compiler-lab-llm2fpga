@@ -56,7 +56,7 @@
     "token_id_bits": 16,
     "generation_count_bits": 8,
     "cycle_count_bits": 64,
-    "crc32": "zlib/IEEE, little-endian trailer"
+    "crc32": true
   },
   "reference": {
     "prompt_text": "Once upon a time",
