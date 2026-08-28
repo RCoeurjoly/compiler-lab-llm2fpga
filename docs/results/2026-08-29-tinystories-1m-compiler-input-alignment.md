@@ -24,7 +24,7 @@ however, leave the compiler provenance inconsistent with the frozen contract;
 the single registry-pin change corrects that inconsistency.
 
 The validated package is present at git commit
-`df1fc45b2ffcb26fddc19cfd57621e7eedf6153f` of the GPL-3.0-or-later
+`df1fc45b2ffcb26fddc19cfd57621e7eedf6153f` of the GNU AGPL v3
 `RCoeurjoly/kev-gpt` fork.  The package is an authenticated **input**, not
 copied source or RTL.  Its relevant immutable identity is:
 

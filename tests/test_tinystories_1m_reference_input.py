@@ -67,6 +67,50 @@ class TinyStories1MReferenceInputTest(unittest.TestCase):
                 module.verify_input(CONTRACT, candidate)
 
     @unittest.skipUnless(PACKAGE.is_dir(), "validated external reference package is unavailable")
+    def test_rejects_contract_substitution_before_parsing_package_identity(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            substituted = Path(temp_dir) / "contract.json"
+            document = json.loads(CONTRACT.read_text())
+            document["model"]["source_revision"] = "0" * 40
+            substituted.write_text(json.dumps(document, sort_keys=True) + "\n")
+
+            with self.assertRaisesRegex(module.InputVerificationError, "frozen_contract_mismatch"):
+                module.verify_input(substituted, PACKAGE)
+
+    @unittest.skipUnless(PACKAGE.is_dir(), "validated external reference package is unavailable")
+    def test_rejects_nonlist_activation_scale_even_with_unchanged_binary_images(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            candidate = Path(temp_dir) / "package"
+            shutil.copytree(PACKAGE, candidate)
+            manifest = json.loads((candidate / "manifest.json").read_text())
+            first_key = next(iter(manifest["activation_scales"]))
+            manifest["activation_scales"][first_key] = 0.25
+            (candidate / "manifest.json").write_text(json.dumps(manifest, sort_keys=True))
+
+            # The raw manifest hash is pinned first, so this is rejected before
+            # the semantic scale parser can accept a substituted manifest.
+            with self.assertRaisesRegex(module.InputVerificationError, "package_hash_mismatch"):
+                module.verify_input(CONTRACT, candidate)
+
+    @unittest.skipUnless(PACKAGE.is_dir(), "validated external reference package is unavailable")
+    def test_quantization_parser_rejects_nonlist_scale_when_called_by_future_adapter(self) -> None:
+        module = load_module()
+        contract = json.loads(CONTRACT.read_text())
+        manifest = json.loads((PACKAGE / "manifest.json").read_text())
+        first_key = next(iter(manifest["activation_scales"]))
+        manifest["activation_scales"][first_key] = 0.25
+
+        with self.assertRaisesRegex(module.InputVerificationError, "must be a list"):
+            module._validate_quantization(
+                contract,
+                manifest,
+                (PACKAGE / "weights.bin").read_bytes(),
+                (PACKAGE / "scales.bin").read_bytes(),
+            )
+
+    @unittest.skipUnless(PACKAGE.is_dir(), "validated external reference package is unavailable")
     def test_cli_writes_fail_closed_identity_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             output = Path(temp_dir) / "identity.json"

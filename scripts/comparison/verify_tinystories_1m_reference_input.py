@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,9 @@ class InputVerificationError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(f"{code}: {message}")
         self.code = code
+
+
+FROZEN_CONTRACT_SHA256 = "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
 
 
 def _sha256(path: Path) -> str:
@@ -77,22 +81,11 @@ def _validate_model(contract: dict[str, Any], manifest: dict[str, Any]) -> dict[
     actual = manifest.get("model")
     _require(isinstance(expected, dict) and isinstance(actual, dict),
              "invalid_contract", "contract/package model identity missing")
-    pairs = {
-        "source_model_id": ("source_model_id", None),
-        "source_revision": ("source_revision", "source_revision"),
-        "n_layer": ("n_layer", None),
-        "hidden_size": ("hidden_size", "hidden_size"),
-        "n_head": ("n_head", "n_head"),
-        "head_dim": ("head_dim", None),
-        "vocab_size": ("vocab_size", "vocab_size"),
-        "max_context": ("max_context", "max_context"),
-        "tie_word_embeddings": ("tie_word_embeddings", "tie_word_embeddings"),
-        "activation_function": ("activation_function", "activation_function"),
-    }
     # The package manifest has no HF name or explicit head_dim.  They remain
     # authenticated by the frozen contract, while all representable package
     # fields are checked below.
     _require_equal(actual.get("source_revision"), expected["source_revision"], "model.source_revision")
+    _require_equal(actual.get("model_type"), "gpt_neo", "model.model_type")
     _require_equal(actual.get("n_layer"), expected["n_layer"], "model.n_layer")
     _require_equal(actual.get("hidden_size"), expected["hidden_size"], "model.hidden_size")
     _require_equal(actual.get("n_head"), expected["n_head"], "model.n_head")
@@ -117,7 +110,9 @@ def _validate_model(contract: dict[str, Any], manifest: dict[str, Any]) -> dict[
     }
 
 
-def _validate_quantization(contract: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
+def _validate_quantization(
+    contract: dict[str, Any], manifest: dict[str, Any], weight_image: bytes, scale_image: bytes
+) -> dict[str, Any]:
     contract_q = contract.get("quantization")
     _require(isinstance(contract_q, dict), "invalid_contract", "contract quantization missing")
     _require_equal(manifest.get("activation_format"), "symmetric_int8", "manifest.activation_format")
@@ -127,21 +122,54 @@ def _validate_quantization(contract: dict[str, Any], manifest: dict[str, Any]) -
     _require(isinstance(tensors, dict) and isinstance(overrides, dict) and isinstance(scales, dict),
              "invalid_package", "package quantization fields missing")
     int8_weights = []
+    weight_offset = 0
+    scale_offset = 0
     for name, entry in sorted(tensors.items()):
         if not isinstance(entry, dict):
             raise InputVerificationError("invalid_package", f"tensor entry {name} is malformed")
+        for key in ("offset", "nbytes", "scale_offset", "scale_nbytes", "sha256", "scale_sha256"):
+            _require(key in entry, "invalid_package", f"tensors.{name}.{key} missing")
+        _require_equal(entry["offset"], weight_offset, f"tensors.{name}.offset")
+        _require_equal(entry["scale_offset"], scale_offset, f"tensors.{name}.scale_offset")
+        _require(isinstance(entry["nbytes"], int) and entry["nbytes"] >= 0,
+                 "invalid_package", f"tensors.{name}.nbytes is invalid")
+        _require(isinstance(entry["scale_nbytes"], int) and entry["scale_nbytes"] >= 0,
+                 "invalid_package", f"tensors.{name}.scale_nbytes is invalid")
+        weight_end = weight_offset + entry["nbytes"]
+        scale_end = scale_offset + entry["scale_nbytes"]
+        _require(weight_end <= len(weight_image), "package_extent_mismatch",
+                 f"tensors.{name} exceeds weights.bin")
+        _require(scale_end <= len(scale_image), "package_extent_mismatch",
+                 f"tensors.{name} exceeds scales.bin")
+        _require_equal(hashlib.sha256(weight_image[weight_offset:weight_end]).hexdigest(),
+                       entry["sha256"], f"tensors.{name}.sha256")
+        _require_equal(hashlib.sha256(scale_image[scale_offset:scale_end]).hexdigest(),
+                       entry["scale_sha256"], f"tensors.{name}.scale_sha256")
+        weight_offset = weight_end
+        scale_offset = scale_end
         if entry.get("format") == "symmetric_int8_per_output":
             _require_equal(entry.get("bits"), 8, f"tensors.{name}.bits")
             _require_equal(entry.get("signed"), True, f"tensors.{name}.signed")
             _require(isinstance(entry.get("scale_nbytes"), int) and entry["scale_nbytes"] > 0,
                      "invalid_package", f"tensors.{name} lacks output scales")
             int8_weights.append(name)
-    _require(len(int8_weights) > 0, "invalid_package", "no INT8 per-output weights")
+    _require_equal(weight_offset, len(weight_image), "tensors.weight_extent")
+    _require_equal(scale_offset, len(scale_image), "tensors.scale_extent")
+    _require_equal(len(int8_weights), 50, "tensors.int8_per_output_count")
     _require(set(overrides) == set(int8_weights), "package_semantic_mismatch",
              "weight_overrides must name exactly the INT8 per-output tensors")
-    lengths = sorted({len(values) for values in scales.values() if isinstance(values, list)})
-    _require(len(scales) == 97 and lengths == [64, 256], "package_semantic_mismatch",
-             "expected 97 calibrated activation boundaries of width 64 or 256")
+    _require_equal(len(scales), 97, "activation_scale_entry_count")
+    lengths = set()
+    for name, values in sorted(scales.items()):
+        _require(isinstance(name, str) and isinstance(values, list), "package_semantic_mismatch",
+                 f"activation_scales.{name} must be a list")
+        _require(len(values) in (64, 256), "package_semantic_mismatch",
+                 f"activation_scales.{name} has unsupported width {len(values)}")
+        _require(all(isinstance(value, (int, float)) and not isinstance(value, bool)
+                     and math.isfinite(value) and value > 0 for value in values),
+                 "package_semantic_mismatch", f"activation_scales.{name} must be finite and positive")
+        lengths.add(len(values))
+    _require_equal(sorted(lengths), [64, 256], "activation_scale_widths")
     _require_equal(contract_q.get("weights"), "symmetric per-output INT8", "contract.quantization.weights")
     _require_equal(contract_q.get("accumulator"), "signed INT32", "contract.quantization.accumulator")
     _require_equal(contract_q.get("scale_format"), "little-endian float32", "contract.quantization.scale_format")
@@ -150,7 +178,7 @@ def _validate_quantization(contract: dict[str, Any], manifest: dict[str, Any]) -
         "int8_weight_tensor_count": len(int8_weights),
         "activation_format": "symmetric_int8",
         "activation_scale_entries": len(scales),
-        "activation_scale_lengths": lengths,
+        "activation_scale_lengths": sorted(lengths),
         "scale_format": "little-endian float32",
         "contract_detail": (
             "The frozen contract's high-level activation label is retained unchanged; "
@@ -169,6 +197,9 @@ def verify_input(contract_path: Path, package: Path) -> dict[str, Any]:
     """
     contract_path = Path(contract_path)
     package = Path(package)
+    _require(contract_path.is_file(), "frozen_contract_missing", f"missing contract: {contract_path}")
+    _require(_sha256(contract_path) == FROZEN_CONTRACT_SHA256, "frozen_contract_mismatch",
+             "contract SHA-256 does not match the immutable frozen TinyStories-1M contract")
     contract = _load_json(contract_path, "frozen contract")
     _require_equal(contract.get("schema_version"), 1, "contract.schema_version")
     _require_equal(contract.get("model", {}).get("name"), "TinyStories-1M", "contract.model.name")
@@ -184,7 +215,9 @@ def verify_input(contract_path: Path, package: Path) -> dict[str, Any]:
     receipt = _load_json(package / "receipt.json", "package receipt")
     _validate_receipt(package, receipt, manifest_hash)
     model = _validate_model(contract, manifest)
-    quantization = _validate_quantization(contract, manifest)
+    quantization = _validate_quantization(
+        contract, manifest, (package / "weights.bin").read_bytes(), (package / "scales.bin").read_bytes()
+    )
     package_files = manifest.get("files")
     _require(isinstance(package_files, dict), "invalid_package", "manifest.files missing")
     for name in ("weights.bin", "scales.bin", "calibration_ids.bin"):
