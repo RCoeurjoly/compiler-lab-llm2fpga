@@ -383,7 +383,9 @@
           '';
         tinyStories1m = let
           modelId = "roneneldan/TinyStories-1M";
-          revision = "77f1b168e219585646439073245fe87e56b3023e";
+          # The checkpoint bytes are unchanged at this revision, but this pin
+          # is the frozen source provenance of the validated 1M package.
+          revision = "ac533fb8b4f69c71894bf96badfe11e6294d9fcf";
           fetch = file: hash:
             pkgs.fetchurl {
               url =
