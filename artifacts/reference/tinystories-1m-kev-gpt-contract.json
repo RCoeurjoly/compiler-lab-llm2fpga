@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "status": "incomplete",
+  "model": {
+    "name": "TinyStories-1M",
+    "architecture": "GPT-Neo causal language model",
+    "source_model_id": "roneneldan/TinyStories-1M",
+    "source_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf",
+    "n_layer": 8,
+    "hidden_size": 64,
+    "n_head": 16,
+    "head_dim": 4,
+    "vocab_size": 50257,
+    "max_context": 32,
+    "tie_word_embeddings": true,
+    "activation_function": "gelu_new"
+  },
+  "package": {
+    "origin": "/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m",
+    "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+    "files": {
+      "manifest.json": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+      "weights.bin": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+      "scales.bin": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+      "calibration_ids.bin": "2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075",
+      "receipt.json": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2"
+    }
+  },
+  "tokenizer": {
+    "type": "GPT2Tokenizer",
+    "sha256": "f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5",
+    "vocab_sha256": "3ba3c3109ff33976c4bd966589c11ee14fcaa1f4c9e5e154c2ed7f99d80709e7",
+    "merges_sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5",
+    "add_bos_token": false,
+    "add_prefix_space": false
+  },
+  "quantization": {
+    "weights": "symmetric per-output INT8",
+    "activations": "symmetric per-tensor INT8",
+    "accumulator": "signed INT32",
+    "scale_format": "little-endian float32",
+    "scale_image_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155"
+  },
+  "memory_image": {
+    "format": "weights.bin with manifest offsets; scales.bin side image",
+    "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+    "bytes": 3632704
+  },
+  "command_abi": {
+    "request_magic": "0x4b47",
+    "reply_magic": "0x4b52",
+    "version": 1,
+    "command": "infer",
+    "max_context": 32,
+    "token_id_bits": 16,
+    "generation_count_bits": 8,
+    "cycle_count_bits": 64,
+    "crc32": "zlib/IEEE, little-endian trailer"
+  },
+  "reference": {
+    "prompt_text": "Once upon a time",
+    "prompt_tokens": [7454, 2402, 257, 640],
+    "tokens": [11, 612, 373, 257, 1310, 2576, 3706, 20037, 13, 1375, 6151, 284, 711, 2354, 287, 262],
+    "generation": "greedy top-1",
+    "reference_impl": "kev-gpt/tinystories/int_reference.py",
+    "reference_trace_sha256": null
+  },
+  "baseline": {
+    "status": "unavailable",
+    "cycles_per_token": null,
+    "clock_mhz": null,
+    "throughput_tokens_per_second": null,
+    "resources": null,
+    "source": null
+  },
+  "incomplete_reasons": [
+    "No reproducible one-stream TinyStories-1M hardware timing/resource baseline receipt is present in this repository or the inspected kev-gpt package; published multi-stream figures are not substituted."
+  ]
+}
