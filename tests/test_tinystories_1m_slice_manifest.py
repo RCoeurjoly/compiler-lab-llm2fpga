@@ -82,6 +82,32 @@ class TinyStories1MSliceManifestTest(unittest.TestCase):
             self.assertEqual(result["status"], "source_artifact_unavailable")
             self.assertEqual(result["discovery"], discovery)
 
+    def test_discovers_file_shaped_nix_rtlil_output_and_extracts_its_closure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rtlil = root / "tiny-stories-1m-baseline-float.il"
+            rtlil.write_text(
+                "# llm2fpga.slice_kind=one_transformer_block_token_step\n"
+                "module \\opaque_generated\n"
+                "  cell \\helper \\u_helper\n"
+                "  end\n"
+                "end\n"
+                "module \\helper\nend\n"
+                "module \\unrelated\nend\n",
+                encoding="utf-8",
+            )
+            found, discovery = extractor.discover_sources(root, [rtlil])
+            self.assertEqual(found, [rtlil.resolve()])
+            self.assertIn(str(rtlil), discovery["searched_paths"])
+            metadata = root / "metadata.json"
+            metadata.write_text(json.dumps({"contract_identity": contract_identity()}), encoding="utf-8")
+            manifest = extractor.extract(found, metadata, CONTRACT_PATH, root / "slice")
+            self.assertEqual(manifest["slice"]["anchor_module"], "opaque_generated")
+            self.assertEqual(manifest["slice"]["dependency_closure"], ["helper", "opaque_generated"])
+            self.assertTrue(all(Path(entry["extracted"]).suffix == ".il" for entry in manifest["slice"]["artifacts"]))
+            extracted = "".join(Path(entry["extracted"]).read_text(encoding="utf-8") for entry in manifest["slice"]["artifacts"])
+            self.assertNotIn("unrelated", extracted)
+
     def test_contract_mismatch_writes_no_comparison_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

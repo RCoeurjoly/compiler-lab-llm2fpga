@@ -45,6 +45,8 @@ KNOWN_NIX_OUTPUTS = (
     },
 )
 MODULE_RE = re.compile(r"(?ms)^\s*module\s+([A-Za-z_][A-Za-z0-9_$]*)\b(.*?)\bendmodule\b")
+RTLIL_MODULE_RE = re.compile(r"(?ms)^\s*module\s+\\?([^\s]+)(.*?)^\s*end\s*$")
+RTLIL_CELL_RE = re.compile(r"(?m)^\s*cell\s+\\?([^\s]+)\s+\\?[^\s]+")
 INSTANCE_RE = re.compile(
     r"(?m)(?:^|;)\s*([A-Za-z_][A-Za-z0-9_$]*)\s*(?:#\s*\([^;]*?\))?\s+"
     r"[A-Za-z_][A-Za-z0-9_$]*\s*\("
@@ -136,6 +138,11 @@ def discover_sources(repo_root: Path, nix_outputs: list[Path] | None = None) -> 
         found.extend(manifest_source_paths(manifest) if manifest.is_file() else [])
     supplied_nix_outputs = [] if nix_outputs is None else list(nix_outputs)
     for output in supplied_nix_outputs:
+        if output.is_file():
+            searched.append(str(output))
+            if output.suffix.lower() in {".sv", ".v", ".il", ".rtlil"}:
+                found.append(output)
+            continue
         for entry in KNOWN_NIX_OUTPUTS:
             for relative in entry["relative_artifacts"]:
                 candidate = output / relative
@@ -160,8 +167,32 @@ def discover_sources(repo_root: Path, nix_outputs: list[Path] | None = None) -> 
 def immediately_preceding_annotation(text: str, module_start: int) -> bool:
     """Recognize the slice annotation only in comments adjoining a module."""
     prefix = text[:module_start]
-    trailing = re.search(r"(?s)(?:(?:\s+)|(?://[^\n]*(?:\n|$))|(?:/\*.*?\*/))*$", prefix)
+    trailing = re.search(r"(?s)(?:(?:\s+)|(?://[^\n]*(?:\n|$))|(?:#[^\n]*(?:\n|$))|(?:/\*.*?\*/))*$", prefix)
     return trailing is not None and ANNOTATION in trailing.group(0)
+
+
+def parse_sv_modules(text: str) -> list[tuple[str, str, set[str], int]]:
+    parsed: list[tuple[str, str, set[str], int]] = []
+    for match in MODULE_RE.finditer(text):
+        name, body = match.group(1), match.group(0)
+        dependencies = {
+            candidate for candidate in INSTANCE_RE.findall(body)
+            if candidate not in VERILOG_KEYWORDS
+        }
+        parsed.append((name, body, dependencies, match.start()))
+    return parsed
+
+
+def parse_rtlil_modules(text: str) -> list[tuple[str, str, set[str], int]]:
+    parsed: list[tuple[str, str, set[str], int]] = []
+    for match in RTLIL_MODULE_RE.finditer(text):
+        name, body = match.group(1), match.group(0)
+        dependencies = {
+            candidate for candidate in RTLIL_CELL_RE.findall(body)
+            if not candidate.startswith("$")
+        }
+        parsed.append((name, body, dependencies, match.start()))
+    return parsed
 
 
 def parse_modules(inputs: list[Path]) -> dict[str, tuple[Path, str, set[str], bool]]:
@@ -171,18 +202,13 @@ def parse_modules(inputs: list[Path]) -> dict[str, tuple[Path, str, set[str], bo
             text = source.read_text(encoding="utf-8")
         except UnicodeDecodeError as error:
             raise ExtractionError("invalid_input", f"source is not UTF-8 text: {source}") from error
-        for match in MODULE_RE.finditer(text):
-            name, body = match.group(1), match.group(0)
+        parser = parse_rtlil_modules if source.suffix.lower() in {".il", ".rtlil"} else parse_sv_modules
+        for name, body, dependencies, start in parser(text):
             if name in modules:
                 raise ExtractionError("ambiguous_module", f"module {name!r} is declared more than once")
-            dependencies = {
-                candidate
-                for candidate in INSTANCE_RE.findall(body)
-                if candidate not in VERILOG_KEYWORDS
-            }
-            modules[name] = (source, body, dependencies, immediately_preceding_annotation(text, match.start()))
+            modules[name] = (source, body, dependencies, immediately_preceding_annotation(text, start))
     if not modules:
-        raise ExtractionError("boundary_not_found", "no Verilog/SystemVerilog modules found in explicit inputs")
+        raise ExtractionError("boundary_not_found", "no Verilog/SystemVerilog or RTLIL modules found in explicit inputs")
     return modules
 
 
@@ -246,7 +272,8 @@ def extract(inputs: list[Path], metadata_path: Path, contract_path: Path, slice_
     # comparison artifact is exactly the reachable dependency closure.
     for index, name in enumerate(closure):
         source, body, _, _ = modules[name]
-        destination = slice_dir / f"{index:03d}-{name}.sv"
+        suffix = source.suffix if source.suffix.lower() in {".sv", ".v", ".il", ".rtlil"} else ".sv"
+        destination = slice_dir / f"{index:03d}-{name}{suffix}"
         extracted = body.rstrip() + "\n"
         destination.write_text(extracted, encoding="utf-8")
         copied.append({
