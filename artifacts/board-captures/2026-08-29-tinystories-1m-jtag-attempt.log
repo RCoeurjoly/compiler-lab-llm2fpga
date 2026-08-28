@@ -1,0 +1,54 @@
+# Raw capture transcript: TinyStories-1M YPCB JTAG attempt
+
+Capture date: 2026-08-29 (Europe/Madrid)
+Board: YPCB-00338-1P1 / xc7k480tffg1156-1
+Device: FTDI 0403:6014, serial 210299BF3824
+
+## Exact primary attempt
+
+```text
+cwd=/home/roland/kev-gpt/.worktrees/kintex-selftest
+nix run .#kevin-jtag -- infer --prompt "Once upon a time" --max-new-tokens 16 --timeout 300 --json-receipt /tmp/task3i-tinystories-1m-inference-receipt.json
+```
+
+The Nix controller returned after building the app, while its Python child
+continued to hold `/dev/bus/usb/003/063` for 300 seconds.  The child exited
+without creating `/tmp/task3i-tinystories-1m-inference-receipt.json`.  Its
+stdout/stderr was not retained by the controller after the child detached;
+therefore no output tokens, cycles, or board result are asserted here.
+
+## Direct client diagnostics while the primary attempt owned the device
+
+```text
+$ /nix/store/dihyg78a9r6sdinv0wsysalmq40235mr-kevin-jtag/bin/kevin-jtag packet-selftest
+JTAG_PACKET_SELFTEST_PASS cases=3
+
+$ /nix/store/dihyg78a9r6sdinv0wsysalmq40235mr-kevin-jtag/bin/kevin-jtag infer --prompt "Once upon a time" --max-new-tokens 16 --timeout 300 --json-receipt /tmp/task3i-tinystories-1m-inference-receipt.json
+RuntimeError: cannot open JTAG transport: unable to claim usb device. Make sure the default FTDI driver is not in use
+```
+
+The second command was deliberately not retried: `fuser` showed that the
+first, bounded primary attempt owned the USB device.  This error does not
+establish a kernel-driver conflict; it establishes exclusive use by the
+already-running primary client.
+
+## USB state observed during the primary attempt
+
+```text
+Bus 003 Device 063: ID 0403:6014 Future Technology Devices International, Ltd FT232H Single HS USB-UART/FIFO IC
+/dev/bus/usb/003/063: crw-rw---- root plugdev 189,318
+ID_SERIAL_SHORT=210299BF3824
+ID_MODEL=Digilent_USB_Device
+Driver=usbfs
+fuser owner: python -m host.kevin_jtag_cli infer --prompt Once upon a time --max-new-tokens 16 --timeout 300 ...
+```
+
+## Checkpoint-interface audit
+
+`host/kevin_jtag_cli.py` provides `infer`, `program`, and `debug`.  `debug`
+decodes one 40-byte `DBG1` snapshot (sequencer state, layer/position, busy
+flags, embedding component, and one LayerNorm lane).  It has no command,
+capture protocol, or CSR iteration that can emit the twelve required
+block-0 token-step tensors.  The existing client therefore cannot create a
+`tinystories-1m-board-checkpoint-receipt-v1` without a separately scoped,
+board-compatible debug-interface implementation.
