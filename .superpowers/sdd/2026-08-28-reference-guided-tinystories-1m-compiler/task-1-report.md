@@ -76,3 +76,35 @@ lists with byte offsets and widths; header, token-payload, and CRC framing
 boundaries; and the CRC-32/IEEE algorithm with its covered-byte rule. The
 loader requires and type-checks each of these fields, with focused corruption
 tests.
+
+## Fix round 4: machine-semantic ABI and fail-closed layout validation
+
+The wire ABI is now represented by numeric and structural JSON values, not
+descriptive strings. `infer` is command `u8` value 1 and `ok` is status `u8`
+value 0. Magic values are numeric `u16` values, all scalar and token integers
+are explicitly unsigned little-endian and byte-aligned, and `bit_packing` is
+explicitly `none` with `lsb0` bit ordering.
+
+Request and reply layouts now include frozen ordered field definitions, the
+variable token-count bounds, payload offsets, and structured total-length
+formula operands. The formulas are request `10 + 2 * prompt_count` and reply
+`17 + 2 * token_count`; a successful reply's token count equals the requested
+generation count. CRC-32/IEEE records its reflected polynomial, initial/final
+XOR values, coverage interval, immediate-post-payload trailer placement, and
+little-endian `u32` trailer representation.
+
+The loader rejects duplicate JSON object keys and rejects any missing or extra
+field in every contract object. It also rejects ABI extra fields, invalid command
+encodings, non-little-endian packing, duplicate/overlapping/out-of-order field
+lists, offset or width changes, count and length-formula inconsistencies, and
+CRC placement, coverage, or byte-order changes. The regression suite exercises
+each failure class.
+
+Reference trace evidence remains unavailable and is recorded as a null digest
+with an explicit reason. Timing and resource evidence also remain unavailable:
+all baseline measurements, resources, and source are still null with an
+explicit reason. No trace, timing, or resource value has been fabricated.
+
+Fix-round-4 validation used the pinned command
+`nix develop -c python -m unittest discover -s tests -p 'test_tinystories_1m_reference_contract.py' -v`;
+all 6 tests passed. `git diff --check` also passed.

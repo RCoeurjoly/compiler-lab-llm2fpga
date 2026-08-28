@@ -48,35 +48,72 @@
     "bytes": 3632704
   },
   "command_abi": {
-    "request_magic": "0x4b47",
-    "reply_magic": "0x4b52",
+    "request_magic_u16": 19271,
+    "reply_magic_u16": 19282,
     "version": 1,
-    "command": "infer",
+    "command_encodings": {"infer": 1},
+    "status_encodings": {"ok": 0},
     "max_context": 32,
     "token_id_bits": 16,
     "generation_count_bits": 8,
     "cycle_count_bits": 64,
-    "crc32": true,
     "byte_order": "little",
+    "bit_order": "lsb0",
+    "bit_packing": "none",
     "request_fields": [
-      {"name": "magic", "byte_offset": 0, "byte_width": 2},
-      {"name": "version", "byte_offset": 2, "byte_width": 1},
-      {"name": "command", "byte_offset": 3, "byte_width": 1},
-      {"name": "prompt_count", "byte_offset": 4, "byte_width": 1},
-      {"name": "generation_count", "byte_offset": 5, "byte_width": 1},
-      {"name": "prompt_tokens", "byte_offset": 6, "byte_width": 2}
+      {"name": "magic", "kind": "fixed", "byte_offset": 0, "byte_width": 2, "encoding": "u16"},
+      {"name": "version", "kind": "fixed", "byte_offset": 2, "byte_width": 1, "encoding": "u8"},
+      {"name": "command", "kind": "fixed", "byte_offset": 3, "byte_width": 1, "encoding": "u8"},
+      {"name": "prompt_count", "kind": "fixed", "byte_offset": 4, "byte_width": 1, "encoding": "u8"},
+      {"name": "generation_count", "kind": "fixed", "byte_offset": 5, "byte_width": 1, "encoding": "u8"},
+      {"name": "prompt_tokens", "kind": "variable_array", "byte_offset": 6, "byte_width": 2, "encoding": "u16", "count_field": "prompt_count"}
     ],
     "reply_fields": [
-      {"name": "magic", "byte_offset": 0, "byte_width": 2},
-      {"name": "version", "byte_offset": 2, "byte_width": 1},
-      {"name": "status", "byte_offset": 3, "byte_width": 1},
-      {"name": "token_count", "byte_offset": 4, "byte_width": 1},
-      {"name": "cycles", "byte_offset": 5, "byte_width": 8},
-      {"name": "output_tokens", "byte_offset": 13, "byte_width": 2}
+      {"name": "magic", "kind": "fixed", "byte_offset": 0, "byte_width": 2, "encoding": "u16"},
+      {"name": "version", "kind": "fixed", "byte_offset": 2, "byte_width": 1, "encoding": "u8"},
+      {"name": "status", "kind": "fixed", "byte_offset": 3, "byte_width": 1, "encoding": "u8"},
+      {"name": "token_count", "kind": "fixed", "byte_offset": 4, "byte_width": 1, "encoding": "u8"},
+      {"name": "cycles", "kind": "fixed", "byte_offset": 5, "byte_width": 8, "encoding": "u64"},
+      {"name": "output_tokens", "kind": "variable_array", "byte_offset": 13, "byte_width": 2, "encoding": "u16", "count_field": "token_count"}
     ],
-    "framing": {"header_bytes": 6, "token_data_offset": 6, "crc_bytes": 4},
-    "crc_algorithm": "CRC-32/IEEE (zlib.crc32)",
-    "crc_covered_bytes": "all request/reply header and token payload bytes, excluding the 4-byte trailer"
+    "request_frame": {
+      "header_bytes": 6,
+      "token_payload_offset": 6,
+      "token_count_field": "prompt_count",
+      "token_count_min": 1,
+      "token_count_max": 32,
+      "token_element_bytes": 2,
+      "token_element_encoding": "u16",
+      "generation_count_min": 1,
+      "generation_count_max": 32,
+      "prompt_plus_generation_max": 32,
+      "total_length": {"operator": "base_plus_count_times_element_bytes", "base_bytes": 10, "count_field": "prompt_count", "element_bytes": 2}
+    },
+    "reply_frame": {
+      "header_bytes": 13,
+      "token_payload_offset": 13,
+      "token_count_field": "token_count",
+      "token_count_min": 0,
+      "token_count_max": 32,
+      "token_element_bytes": 2,
+      "token_element_encoding": "u16",
+      "ok_token_count_rule": "equals_request_generation_count",
+      "total_length": {"operator": "base_plus_count_times_element_bytes", "base_bytes": 17, "count_field": "token_count", "element_bytes": 2}
+    },
+    "crc32": {
+      "algorithm": "CRC-32/IEEE",
+      "polynomial_reflected_u32": 3988292384,
+      "initial_value_u32": 4294967295,
+      "final_xor_u32": 4294967295,
+      "reflected_input": true,
+      "reflected_output": true,
+      "coverage": {"start_offset": 0, "end_offset": "crc_trailer_start_exclusive"},
+      "trailer_placement": "immediately_after_payload",
+      "trailer_offset": {"operator": "total_bytes_minus_constant", "constant_bytes": 4},
+      "trailer_byte_width": 4,
+      "trailer_integer_encoding": "u32",
+      "trailer_byte_order": "little"
+    }
   },
   "reference": {
     "prompt_text": "Once upon a time",
@@ -84,7 +121,11 @@
     "tokens": [11, 612, 373, 257, 1310, 2576, 3706, 20037, 13, 1375, 6151, 284, 711, 2354, 287, 262],
     "generation": "greedy top-1",
     "reference_impl": "kev-gpt/tinystories/int_reference.py",
-    "reference_trace_sha256": null
+    "reference_trace": {
+      "status": "unavailable",
+      "sha256": null,
+      "reason": "No reproducible TinyStories-1M reference trace artifact is present in this repository or the inspected package."
+    }
   },
   "baseline": {
     "status": "unavailable",
@@ -92,9 +133,11 @@
     "clock_mhz": null,
     "throughput_tokens_per_second": null,
     "resources": null,
-    "source": null
+    "source": null,
+    "reason": "No reproducible one-stream TinyStories-1M hardware timing/resource baseline receipt is present in this repository or the inspected package."
   },
   "incomplete_reasons": [
+    "No reproducible TinyStories-1M reference trace artifact is present in this repository or the inspected package.",
     "No reproducible one-stream TinyStories-1M hardware timing/resource baseline receipt is present in this repository or the inspected kev-gpt package; published multi-stream figures are not substituted."
   ]
 }
