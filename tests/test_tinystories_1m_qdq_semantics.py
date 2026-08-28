@@ -50,7 +50,7 @@ class TinyStories1MQdqSemanticsTest(unittest.TestCase):
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, "integer"):
                 semantics.quantize_q16_to_int8([value], [512])
 
-    def test_serial_weight_accumulation_uses_input_index_order_and_int64(self) -> None:
+    def test_rtl_serial_weight_accumulation_uses_input_index_order_and_int64(self) -> None:
         value, terms = semantics.serial_weight_accumulate(
             activation_codes=[-128, 7, 127],
             activation_scales_q24=[3, 5, 11],
@@ -60,12 +60,6 @@ class TinyStories1MQdqSemanticsTest(unittest.TestCase):
         self.assertEqual(value, sum(terms))
         with self.assertRaisesRegex(ValueError, "same non-zero length"):
             semantics.serial_weight_accumulate([1], [1, 2], [1])
-
-    def test_float_materialization_is_ties_to_even_and_rejects_nonfinite(self) -> None:
-        self.assertEqual(semantics.float_to_fixed([0.5, 1.5, 2.5, -0.5], 0, 32), [0, 2, 2, 0])
-        for value in (math.nan, math.inf, -math.inf):
-            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "non-finite"):
-                semantics.float_to_fixed([value], 24, 24, signed=False)
 
     def test_receipt_is_fail_closed_on_the_profile_authority_conflict(self) -> None:
         receipt = json.loads(RECEIPT.read_text(encoding="utf-8"))
@@ -78,6 +72,7 @@ class TinyStories1MQdqSemanticsTest(unittest.TestCase):
                 "reference_profile_not_selected_by_frozen_contract",
                 "accumulator_width_conflict",
                 "activation_scale_granularity_conflict",
+                "non_finite_policy_unauthenticated",
                 "oracle_not_board_checkpoint_authenticated",
             },
         )
@@ -90,16 +85,33 @@ class TinyStories1MQdqSemanticsTest(unittest.TestCase):
         fixed = receipt["profiles"]["fixed_hardware_reference"]
         floating = receipt["profiles"]["floating_integer_reference"]
         self.assertEqual(floating["non_finite_policy"], "not_explicitly_rejected_by_reference_runtime")
+        self.assertEqual(floating["accumulation"]["reduction_order"], "not_guaranteed_by_numpy_api")
         self.assertEqual(fixed["activation_conversion"]["rounding"], "nearest_ties_away_from_zero")
         self.assertEqual(fixed["activation_conversion"]["clamp"], [-128, 127])
         self.assertEqual(fixed["activation_conversion"]["zero_point"], 0)
-        self.assertEqual(fixed["accumulation"]["logical_width_bits"], 64)
-        self.assertEqual(fixed["accumulation"]["input_order"], "ascending_input_index")
+        self.assertEqual(fixed["accumulation"]["reference_runtime"]["operation"], "numpy_matmul")
+        self.assertEqual(fixed["accumulation"]["reference_runtime"]["reduction_order"],
+                         "not_guaranteed_by_numpy_api")
+        self.assertEqual(fixed["accumulation"]["synthesizable_rtl"]["logical_width_bits"], 64)
+        self.assertEqual(fixed["accumulation"]["synthesizable_rtl"]["input_order"],
+                         "ascending_input_index")
         self.assertEqual(fixed["weight_scale"]["axis"], "output_channel")
         self.assertEqual(fixed["activation_boundaries"]["count"], 97)
         self.assertEqual(fixed["activation_boundaries"]["placement"],
                          "module_input_and_module_output_except_lm_head_input_only")
-        self.assertEqual(fixed["non_finite_policy"], "reject_before_fixed_point_materialization")
+        nonfinite = fixed["non_finite_behavior"]
+        self.assertEqual(nonfinite["status"], "unauthenticated")
+        self.assertFalse(nonfinite["explicit_reference_rejection"])
+        self.assertEqual(
+            nonfinite["pinned_environment_observation"]["parameter_q16_16_int32"],
+            [-2147483648, 2147483647, -2147483648],
+        )
+        self.assertEqual(
+            nonfinite["pinned_environment_observation"]["floating_reference_activation_codes"],
+            [0, 127, -128],
+        )
+        self.assertEqual(nonfinite["pinned_environment_observation"]["scale_u24"],
+                         "ValueError: Q8.24 scale does not fit unsigned 24-bit storage")
 
     def test_candidate_oracle_has_all_twelve_content_bound_checkpoints(self) -> None:
         receipt = json.loads(RECEIPT.read_text(encoding="utf-8"))

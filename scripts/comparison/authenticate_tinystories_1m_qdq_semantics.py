@@ -14,9 +14,9 @@ import argparse
 import hashlib
 import importlib
 import json
-import math
 import subprocess
 import sys
+import warnings
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -152,27 +152,6 @@ def serial_weight_accumulate(
     return accumulator, terms
 
 
-def float_to_fixed(
-    values: Iterable[Any], fractional_bits: int, width: int, *, signed: bool = True
-) -> list[int]:
-    """Materialization rule: finite binary value, nearest ties-to-even, clamp."""
-
-    if fractional_bits < 0 or width <= 0:
-        raise ValueError("fractional_bits and width are invalid")
-    lower = -(1 << (width - 1)) if signed else 0
-    upper = (1 << (width - (1 if signed else 0))) - 1
-    result = []
-    for value in values:
-        if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, float, np.integer, np.floating)):
-            raise ValueError("fixed-point inputs must be numeric")
-        numeric = float(value)
-        if not math.isfinite(numeric):
-            raise ValueError("non-finite fixed-point input")
-        rounded = round(numeric * (1 << fractional_bits))
-        result.append(max(lower, min(upper, rounded)))
-    return result
-
-
 def _authenticate_sources(reference_root: Path) -> tuple[str, list[dict[str, str]]]:
     sources = []
     for relative, expected in EXPECTED_SOURCES.items():
@@ -210,17 +189,48 @@ def _authenticate_sources(reference_root: Path) -> tuple[str, list[dict[str, str
     return revision, sources
 
 
-def _load_reference_modules(reference_root: Path) -> tuple[Any, Any]:
+def _load_reference_modules(reference_root: Path) -> tuple[Any, Any, Any]:
     root = str(reference_root.resolve())
     if root not in sys.path:
         sys.path.insert(0, root)
     integer_reference = importlib.import_module("tinystories.int_reference")
     hardware_reference = importlib.import_module("tinystories.hardware_reference")
+    fixture_writer = importlib.import_module("tinystories.write_rtl_fixture")
     if Path(integer_reference.__file__).resolve() != (reference_root / "tinystories/int_reference.py").resolve():
         raise SemanticsAuthenticationError("module_origin_mismatch", str(integer_reference.__file__))
     if Path(hardware_reference.__file__).resolve() != (reference_root / "tinystories/hardware_reference.py").resolve():
         raise SemanticsAuthenticationError("module_origin_mismatch", str(hardware_reference.__file__))
-    return integer_reference, hardware_reference
+    if Path(fixture_writer.__file__).resolve() != (reference_root / "tinystories/write_rtl_fixture.py").resolve():
+        raise SemanticsAuthenticationError("module_origin_mismatch", str(fixture_writer.__file__))
+    return integer_reference, hardware_reference, fixture_writer
+
+
+def _nonfinite_observation(integer_reference: Any, fixture_writer: Any) -> dict[str, Any]:
+    """Characterize pinned behavior without promoting it to a portable rule."""
+
+    inputs = np.asarray([np.nan, np.inf, -np.inf], dtype=np.float32)
+    floating = integer_reference.IntegerGPTNeo.__new__(integer_reference.IntegerGPTNeo)
+    floating.activation_scales = {"probe": np.ones(3, dtype=np.float32)}
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        parameters = fixture_writer._fixed(inputs, 16).tolist()
+        activation_codes = floating._a8_codes(inputs, "probe")[0].tolist()
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            fixture_writer._packed_u24(inputs)
+    except ValueError as error:  # The exact authenticated implementation is the oracle here.
+        scale_result = f"{type(error).__name__}: {error}"
+    else:
+        scale_result = "accepted"
+    return {
+        "input_order": ["nan", "positive_infinity", "negative_infinity"],
+        "numpy_version": np.__version__,
+        "parameter_q16_16_int32": [int(value) for value in parameters],
+        "floating_reference_activation_codes": [int(value) for value in activation_codes],
+        "scale_u24": scale_result,
+        "warning_categories": sorted({type(item.message).__name__ for item in caught}),
+    }
 
 
 def _profile_conflict(integer_reference: Any, hardware_reference: Any) -> dict[str, Any]:
@@ -240,8 +250,8 @@ def _profile_conflict(integer_reference: Any, hardware_reference: Any) -> dict[s
         },
         "accumulator_witness": {
             "frozen_contract": "signed INT32",
-            "floating_integer_reference": "ordered float64 scaled-product reduction",
-            "fixed_hardware_reference": "signed INT64",
+            "floating_integer_reference": "NumPy float64 sum with API-unspecified reduction order",
+            "fixed_hardware_reference": "NumPy signed-INT64 matmul with API-unspecified reduction order",
             "synthesizable_gemv": "signed 64-bit serial accumulator",
         },
         "activation_scale_granularity_witness": {
@@ -344,8 +354,9 @@ def build_receipt(reference_root: Path, contract_path: Path, package: Path) -> d
         path = package / name
         if not path.is_file() or _sha256(path) != expected:
             raise SemanticsAuthenticationError("package_identity_mismatch", name)
-    integer_reference, hardware_reference = _load_reference_modules(reference_root)
+    integer_reference, hardware_reference, fixture_writer = _load_reference_modules(reference_root)
     conflict = _profile_conflict(integer_reference, hardware_reference)
+    nonfinite = _nonfinite_observation(integer_reference, fixture_writer)
     prompt = list(contract["reference"]["prompt_tokens"])
     oracle = _fixed_oracle(hardware_reference, package, prompt)
     if oracle["next_token"] != contract["reference"]["tokens"][0]:
@@ -390,6 +401,7 @@ def build_receipt(reference_root: Path, contract_path: Path, package: Path) -> d
                     "product": "signed_int8_code_product_promoted_to_int32",
                     "scaling": "per-input-channel_activation_scale_float64_before_reduction",
                     "reduction": "numpy_sum_float64_last_axis",
+                    "reduction_order": "not_guaranteed_by_numpy_api",
                     "weight_scale_application": "per-output-channel_float64_after_reduction",
                 },
             },
@@ -420,9 +432,18 @@ def build_receipt(reference_root: Path, contract_path: Path, package: Path) -> d
                 },
                 "accumulation": {
                     "term": "activation_code_i_times_activation_scale_q24_i_times_weight_code_output_i",
-                    "input_order": "ascending_input_index",
-                    "logical_width_bits": 64,
-                    "overflow": "twos_complement_wrap",
+                    "reference_runtime": {
+                        "operation": "numpy_matmul",
+                        "operand_dtype": "signed_int64",
+                        "reduction_order": "not_guaranteed_by_numpy_api",
+                        "overflow_policy": "not_authenticated_as_portable_semantics",
+                    },
+                    "synthesizable_rtl": {
+                        "operation": "serial_multiply_accumulate",
+                        "input_order": "ascending_input_index",
+                        "logical_width_bits": 64,
+                        "overflow": "twos_complement_wrap",
+                    },
                 },
                 "weight_scale": {
                     "axis": "output_channel",
@@ -430,7 +451,15 @@ def build_receipt(reference_root: Path, contract_path: Path, package: Path) -> d
                     "rounding": "nearest_ties_away_from_zero_by_signed_shift_32",
                     "bias_order": "add_signed_q16.16_bias_after_weight_scale",
                 },
-                "non_finite_policy": "reject_before_fixed_point_materialization",
+                "non_finite_behavior": {
+                    "status": "unauthenticated",
+                    "explicit_reference_rejection": False,
+                    "pinned_environment_observation": nonfinite,
+                    "interpretation": (
+                        "Observed NumPy casts and the later scale-range failure are environment behavior, "
+                        "not a selected or portable compiler semantic."
+                    ),
+                },
                 "execution_domain": "integers_only_after_materialization",
             },
         },
@@ -456,6 +485,14 @@ def build_receipt(reference_root: Path, contract_path: Path, package: Path) -> d
                 "missing_authority": (
                     "The frozen contract says per-tensor activation INT8; the authenticated package "
                     "and executable references use 97 per-channel scale vectors."
+                ),
+            },
+            {
+                "code": "non_finite_policy_unauthenticated",
+                "missing_authority": (
+                    "The authenticated fixture and floating reference contain no explicit common "
+                    "non-finite rejection rule; pinned NumPy casts produce sentinel/clamped values "
+                    "and scale packing fails only later."
                 ),
             },
             {

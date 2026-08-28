@@ -1449,14 +1449,18 @@
       "missing_authority": "The frozen contract says per-tensor activation INT8; the authenticated package and executable references use 97 per-channel scale vectors."
     },
     {
+      "code": "non_finite_policy_unauthenticated",
+      "missing_authority": "The authenticated fixture and floating reference contain no explicit common non-finite rejection rule; pinned NumPy casts produce sentinel/clamped values and scale packing fails only later."
+    },
+    {
       "code": "oracle_not_board_checkpoint_authenticated",
       "missing_authority": "The host exposes final tokens and only a small debug snapshot, not the full 12-checkpoint block trace needed to bind this runtime oracle to board execution."
     }
   ],
   "profile_conflict": {
     "accumulator_witness": {
-      "fixed_hardware_reference": "signed INT64",
-      "floating_integer_reference": "ordered float64 scaled-product reduction",
+      "fixed_hardware_reference": "NumPy signed-INT64 matmul with API-unspecified reduction order",
+      "floating_integer_reference": "NumPy float64 sum with API-unspecified reduction order",
       "frozen_contract": "signed INT32",
       "synthesizable_gemv": "signed 64-bit serial accumulator"
     },
@@ -1473,9 +1477,18 @@
   "profiles": {
     "fixed_hardware_reference": {
       "accumulation": {
-        "input_order": "ascending_input_index",
-        "logical_width_bits": 64,
-        "overflow": "twos_complement_wrap",
+        "reference_runtime": {
+          "operand_dtype": "signed_int64",
+          "operation": "numpy_matmul",
+          "overflow_policy": "not_authenticated_as_portable_semantics",
+          "reduction_order": "not_guaranteed_by_numpy_api"
+        },
+        "synthesizable_rtl": {
+          "input_order": "ascending_input_index",
+          "logical_width_bits": 64,
+          "operation": "serial_multiply_accumulate",
+          "overflow": "twos_complement_wrap"
+        },
         "term": "activation_code_i_times_activation_scale_q24_i_times_weight_code_output_i"
       },
       "activation_boundaries": {
@@ -1501,7 +1514,33 @@
         "zero_point": 0
       },
       "execution_domain": "integers_only_after_materialization",
-      "non_finite_policy": "reject_before_fixed_point_materialization",
+      "non_finite_behavior": {
+        "explicit_reference_rejection": false,
+        "interpretation": "Observed NumPy casts and the later scale-range failure are environment behavior, not a selected or portable compiler semantic.",
+        "pinned_environment_observation": {
+          "floating_reference_activation_codes": [
+            0,
+            127,
+            -128
+          ],
+          "input_order": [
+            "nan",
+            "positive_infinity",
+            "negative_infinity"
+          ],
+          "numpy_version": "2.3.4",
+          "parameter_q16_16_int32": [
+            -2147483648,
+            2147483647,
+            -2147483648
+          ],
+          "scale_u24": "ValueError: Q8.24 scale does not fit unsigned 24-bit storage",
+          "warning_categories": [
+            "RuntimeWarning"
+          ]
+        },
+        "status": "unauthenticated"
+      },
       "parameter_materialization": {
         "byte_order": "little",
         "rounding": "nearest_ties_to_even",
@@ -1521,6 +1560,7 @@
       "accumulation": {
         "product": "signed_int8_code_product_promoted_to_int32",
         "reduction": "numpy_sum_float64_last_axis",
+        "reduction_order": "not_guaranteed_by_numpy_api",
         "scaling": "per-input-channel_activation_scale_float64_before_reduction",
         "weight_scale_application": "per-output-channel_float64_after_reduction"
       },
@@ -1539,7 +1579,7 @@
       "role": "package_quality_and_regression_reference"
     }
   },
-  "receipt_sha256": "749d2dbaf1a8f669102cf3181178e6a76d1294db054e640aadd5f1a05aa829bd",
+  "receipt_sha256": "c025c8e89ba71dca2437b89f90105d9cc5fd44366e5b51ef089288d15fde730f",
   "schema": "tinystories-1m-qdq-semantics-v1",
   "selected_profile": null,
   "status": "incomplete"
