@@ -1,0 +1,13 @@
+{
+  "contract_identity": {
+    "model": {
+      "name": "TinyStories-1M",
+      "source_model_id": "roneneldan/TinyStories-1M",
+      "source_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf"
+    },
+    "package": {
+      "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+      "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+    }
+  }
+}

@@ -1,4 +1,6 @@
 Max frequency: 100.0 MHz
-critical path delay 10.0 ns
+measurement_id: reference-timing
+clock domain 'core_clk' max frequency: 100.0 MHz
+critical path domain='core_clk' from='block/state_q[0]' to='block/out_q[0]' delay=10.0 ns
 cycles_per_token: 4
 interface_overhead_cycles: 1

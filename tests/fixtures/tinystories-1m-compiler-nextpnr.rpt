@@ -1,4 +1,6 @@
 Max frequency: 80.0 MHz
-critical path delay 12.5 ns
+measurement_id: compiler-timing
+clock domain 'core_clk' max frequency: 80.0 MHz
+critical path domain='core_clk' from='block/state_q[0]' to='block/out_q[0]' delay=12.5 ns
 cycles_per_token: 5
 interface_overhead_cycles: 2

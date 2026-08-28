@@ -18,7 +18,25 @@ from typing import Any, Iterable
 
 
 SCHEMA = "tinystories-1m-slice-comparison-v1"
+SLICE_SCHEMA = "tinystories-1m-compiler-slice-manifest-v1"
+SLICE_KIND = "one_transformer_block_token_step"
+TRACE_SCHEMA = "tinystories-1m-transformer-block-token-step-trace-v1"
+MAX_SLICE_MODULES = 4096
 RESOURCE_FIELDS = ("lut", "ff", "bram", "dsp", "memory_bits")
+CHECKPOINT_SHAPES = {
+    "block.input": (64,),
+    "block.ln_1.output": (64,),
+    "block.attention.q": (16, 4),
+    "block.attention.k": (16, 4),
+    "block.attention.v": (16, 4),
+    "block.attention.output": (64,),
+    "block.residual.attention": (64,),
+    "block.ln_2.output": (64,),
+    "block.mlp.fc_in": (256,),
+    "block.mlp.activation": (256,),
+    "block.mlp.fc_out": (64,),
+    "block.output": (64,),
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -30,6 +48,25 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{path}: expected JSON object")
     return value
+
+
+def canonical_sha256(value: Any) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _valid_sha256(value: Any) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+
+def _path_matches_hash(path_value: Any, digest: Any) -> bool:
+    if not isinstance(path_value, str) or not path_value or not _valid_sha256(digest):
+        return False
+    path = Path(path_value)
+    try:
+        return path.is_file() and sha256_file(path) == digest
+    except OSError:
+        return False
 
 
 def manifest_contract_status(contract_path: Path, manifest: dict[str, Any]) -> str:
@@ -87,41 +124,174 @@ def _tensor_shape(value: Any) -> tuple[int, ...] | None:
     return (len(value),) + child_shapes[0]
 
 
-def _checkpoint_tensors_are_valid(value: Any) -> bool:
-    return (
-        isinstance(value, dict)
-        and bool(value)
-        and all(isinstance(name, str) and bool(name) and _tensor_shape(tensor) is not None for name, tensor in value.items())
-    )
-
-
 def _output_tokens_are_valid(value: Any) -> bool:
     return isinstance(value, list) and bool(value) and all(isinstance(token, int) and not isinstance(token, bool) and 0 <= token <= 0xFFFF for token in value)
 
 
-def _validate_evidence(side: dict[str, Any], label: str) -> list[str]:
+def _manifest_contract_identity(contract: dict[str, Any]) -> dict[str, Any] | None:
+    model = contract.get("model")
+    package = contract.get("package")
+    if not isinstance(model, dict) or not isinstance(package, dict):
+        return None
+    model_keys = ("name", "source_model_id", "source_revision")
+    package_keys = ("sha256", "manifest_sha256")
+    if any(not isinstance(model.get(key), str) or not model[key] for key in model_keys):
+        return None
+    if any(not _valid_sha256(package.get(key)) for key in package_keys):
+        return None
+    return {
+        "model": {key: model[key] for key in model_keys},
+        "package": {key: package[key] for key in package_keys},
+    }
+
+
+def _validate_ready_slice_manifest(
+    manifest: dict[str, Any], contract: dict[str, Any], contract_path: Path, contract_sha256: str
+) -> list[str]:
+    reasons: list[str] = []
+    expected_identity = _manifest_contract_identity(contract)
+    if manifest.get("schema") != SLICE_SCHEMA:
+        reasons.append("slice manifest schema is not the Task 2 schema")
+    if manifest.get("status") != "ready":
+        reasons.append(f"slice manifest is not ready: {manifest.get('status')}")
+    contract_model = contract.get("model")
+    contract_model_name = contract_model.get("name") if isinstance(contract_model, dict) else None
+    if manifest.get("model") != "TinyStories-1M" or manifest.get("model") != contract_model_name:
+        reasons.append("slice manifest model is not the frozen TinyStories-1M model")
+    binding = manifest.get("contract")
+    bound_contract_path = binding.get("path") if isinstance(binding, dict) else None
+    contract_path_matches = (
+        isinstance(bound_contract_path, str)
+        and bool(bound_contract_path)
+        and Path(bound_contract_path).resolve() == contract_path.resolve()
+    )
+    if not isinstance(binding, dict) or not contract_path_matches or binding.get("sha256") != contract_sha256 or binding.get("identity") != expected_identity:
+        reasons.append("slice manifest is not bound to the frozen contract identity")
+
+    metadata = manifest.get("source_metadata")
+    if not isinstance(metadata, dict) or not _path_matches_hash(metadata.get("path"), metadata.get("sha256")):
+        reasons.append("slice source metadata is absent or its content hash does not match")
+    else:
+        try:
+            metadata_value = load_json(Path(metadata["path"]))
+        except (OSError, UnicodeError, ValueError, TypeError, json.JSONDecodeError):
+            metadata_value = {}
+        if metadata_value.get("contract_identity") != expected_identity:
+            reasons.append("slice source metadata does not bind the frozen contract identity")
+
+    slice_value = manifest.get("slice")
+    if not isinstance(slice_value, dict) or slice_value.get("kind") != SLICE_KIND:
+        reasons.append("slice kind is not one complete transformer-block token-step")
+        return reasons
+    closure = slice_value.get("dependency_closure")
+    artifacts = slice_value.get("artifacts")
+    anchor = slice_value.get("anchor_module")
+    if (
+        not isinstance(closure, list)
+        or not closure
+        or len(closure) > MAX_SLICE_MODULES
+        or any(not isinstance(name, str) or not name for name in closure)
+        or len(set(closure)) != len(closure)
+        or not isinstance(anchor, str)
+        or anchor not in closure
+    ):
+        reasons.append("slice dependency closure is empty, malformed, or unbounded")
+        return reasons
+    if not isinstance(artifacts, list) or len(artifacts) != len(closure):
+        reasons.append("slice artifacts do not exactly cover the dependency closure")
+        return reasons
+    modules: list[Any] = []
+    for artifact in artifacts:
+        if not isinstance(artifact, dict):
+            reasons.append("slice artifact record is malformed")
+            continue
+        modules.append(artifact.get("module"))
+        if not _path_matches_hash(artifact.get("source"), artifact.get("source_sha256")):
+            reasons.append(f"slice source hash is unauthenticated for module {artifact.get('module')!r}")
+        if not _path_matches_hash(artifact.get("extracted"), artifact.get("sha256")):
+            reasons.append(f"slice artifact hash is unauthenticated for module {artifact.get('module')!r}")
+    if modules != closure:
+        reasons.append("slice artifact modules do not exactly match the ordered dependency closure")
+    return reasons
+
+
+def _expected_trace_identity(
+    contract: dict[str, Any], contract_sha256: str, manifest: dict[str, Any]
+) -> dict[str, Any] | None:
+    reference = contract.get("reference")
+    prompt_tokens = reference.get("prompt_tokens") if isinstance(reference, dict) else None
+    if not _output_tokens_are_valid(prompt_tokens):
+        return None
+    return {
+        "model": "TinyStories-1M",
+        "contract_sha256": contract_sha256,
+        "slice_kind": SLICE_KIND,
+        "slice_manifest_sha256": canonical_sha256(manifest),
+        "block_index": 0,
+        "token_index": len(prompt_tokens) - 1,
+        "input_tokens_sha256": canonical_sha256(prompt_tokens),
+    }
+
+
+def _validate_trace(
+    side: dict[str, Any], label: str, expected_identity: dict[str, Any] | None
+) -> list[str]:
+    trace = side.get("trace")
+    if not isinstance(trace, dict) or set(trace) != {"schema", "identity", "checkpoints", "sha256"}:
+        return [f"{label}.trace unavailable or malformed"]
+    if trace.get("schema") != TRACE_SCHEMA or trace.get("identity") != expected_identity:
+        return [f"{label}.trace identity is not bound to the complete frozen token-step slice"]
+    supplied_trace_sha = trace.get("sha256")
+    hashed_trace = {key: value for key, value in trace.items() if key != "sha256"}
+    if not _valid_sha256(supplied_trace_sha) or supplied_trace_sha != canonical_sha256(hashed_trace):
+        return [f"{label}.trace content hash does not match"]
+    checkpoints = trace.get("checkpoints")
+    if not isinstance(checkpoints, dict) or set(checkpoints) != set(CHECKPOINT_SHAPES):
+        return [f"{label}.trace checkpoints do not exactly cover the required token-step schema"]
+    values: dict[str, Any] = {}
+    for name, expected_shape in CHECKPOINT_SHAPES.items():
+        checkpoint = checkpoints.get(name)
+        if not isinstance(checkpoint, dict) or set(checkpoint) != {"shape", "values", "sha256"}:
+            return [f"{label}.trace checkpoint {name!r} is malformed"]
+        shape = checkpoint.get("shape")
+        value = checkpoint.get("values")
+        payload = {"shape": shape, "values": value}
+        if (
+            shape != list(expected_shape)
+            or _tensor_shape(value) != expected_shape
+            or not _valid_sha256(checkpoint.get("sha256"))
+            or checkpoint["sha256"] != canonical_sha256(payload)
+        ):
+            return [f"{label}.trace checkpoint {name!r} shape, value, or content hash is invalid"]
+        values[name] = value
+    if side.get("checkpoint_tensors") != values:
+        return [f"{label}.checkpoint_tensors are not bound to the authenticated trace"]
+    return []
+
+
+def _validate_evidence(
+    side: dict[str, Any], label: str, expected_trace_identity: dict[str, Any] | None
+) -> list[str]:
     missing: list[str] = []
-    if not _checkpoint_tensors_are_valid(side.get("checkpoint_tensors")):
-        missing.append(f"{label}.checkpoint_tensors unavailable or malformed")
+    missing.extend(_validate_trace(side, label, expected_trace_identity))
     if not _output_tokens_are_valid(side.get("output_tokens")):
         missing.append(f"{label}.output_tokens unavailable or malformed")
     return missing
 
 
 def _first_checkpoint_mismatch(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[str, Any] | None:
-    ref = reference["checkpoint_tensors"]
-    comp = compiler["checkpoint_tensors"]
-    for name in sorted(set(ref) | set(comp)):
+    ref = reference["trace"]["checkpoints"]
+    comp = compiler["trace"]["checkpoints"]
+    for name in CHECKPOINT_SHAPES:
         if ref.get(name) != comp.get(name):
-            return {"checkpoint": name, "reference": ref.get(name), "compiler": comp.get(name)}
+            return {"checkpoint": name, "reference": ref.get(name, {}).get("values"), "compiler": comp.get(name, {}).get("values")}
     return None
 
 
 def _report_provenance_is_complete(report: dict[str, Any]) -> bool:
     if not (isinstance(report.get("path"), str) and bool(report["path"]) and isinstance(report.get("sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", report["sha256"]) is not None and isinstance(report.get("measurement_id"), str) and bool(report["measurement_id"])):
         return False
-    path = Path(report["path"])
-    return path.is_file() and sha256_file(path) == report["sha256"]
+    return _path_matches_hash(report["path"], report["sha256"])
 
 
 def _resource_measurement_is_valid(report: dict[str, Any]) -> bool:
@@ -158,6 +328,7 @@ def _timing_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[
     return {
         "max_frequency_mhz": {"reference": ref["max_frequency_mhz"], "compiler": comp["max_frequency_mhz"], "delta": comp["max_frequency_mhz"] - ref["max_frequency_mhz"]},
         "critical_paths": {"reference": ref["critical_paths"], "compiler": comp["critical_paths"]},
+        "clock_domains": {"reference": ref["clock_domains"], "compiler": comp["clock_domains"]},
         "cycles_per_token": {"reference": ref["cycles_per_token"], "compiler": comp["cycles_per_token"]},
         "cycles_per_token_delta": comp["cycles_per_token"] - ref["cycles_per_token"],
         "interface_overhead_cycles": {"reference": ref["interface_overhead_cycles"], "compiler": comp["interface_overhead_cycles"]},
@@ -169,15 +340,40 @@ def _positive_finite_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0
 
 
-def _critical_path_delays(value: Any) -> list[int | float] | None:
+def _critical_path_records(value: Any) -> list[dict[str, Any]] | None:
     if not isinstance(value, list) or not value:
         return None
-    delays: list[int | float] = []
+    records: list[dict[str, Any]] = []
+    required = {"clock_domain", "from", "to", "delay_ns"}
     for path in value:
-        if not isinstance(path, dict) or not _positive_finite_number(path.get("delay_ns")):
+        if not isinstance(path, dict) or set(path) != required:
             return None
-        delays.append(path["delay_ns"])
-    return delays
+        if any(not isinstance(path.get(field), str) or not path[field] for field in ("clock_domain", "from", "to")):
+            return None
+        if not _positive_finite_number(path.get("delay_ns")):
+            return None
+        records.append(dict(path))
+    return records
+
+
+def _clock_domain_records(value: Any, critical_paths: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+    if not isinstance(value, list) or not value:
+        return None
+    records: list[dict[str, Any]] = []
+    names: set[str] = set()
+    for clock in value:
+        if not isinstance(clock, dict) or set(clock) != {"name", "max_frequency_mhz"}:
+            return None
+        name = clock.get("name")
+        frequency = clock.get("max_frequency_mhz")
+        if not isinstance(name, str) or not name or name in names or not _positive_finite_number(frequency):
+            return None
+        names.add(name)
+        records.append(dict(clock))
+    path_domains = {path["clock_domain"] for path in critical_paths}
+    if path_domains != names:
+        return None
+    return records
 
 
 def _timing_measurement_is_valid(report: dict[str, Any]) -> bool:
@@ -185,23 +381,27 @@ def _timing_measurement_is_valid(report: dict[str, Any]) -> bool:
         return False
     cycles = report.get("cycles_per_token")
     overhead = report.get("interface_overhead_cycles")
-    delays = _critical_path_delays(report.get("critical_paths"))
+    critical_paths = _critical_path_records(report.get("critical_paths"))
+    clock_domains = _clock_domain_records(report.get("clock_domains"), critical_paths or [])
     if not isinstance(cycles, int) or isinstance(cycles, bool) or cycles <= 0:
         return False
     if not isinstance(overhead, int) or isinstance(overhead, bool) or overhead < 0 or overhead > cycles:
         return False
-    if delays is None:
+    if critical_paths is None or clock_domains is None:
+        return False
+    if report["max_frequency_mhz"] != min(clock["max_frequency_mhz"] for clock in clock_domains):
         return False
     try:
         parsed = parse_nextpnr_timing(Path(report["path"]))
     except (OSError, UnicodeError, ValueError, TypeError):
         return False
-    parsed_delays = _critical_path_delays(parsed.get("critical_paths"))
     return (
         parsed.get("max_frequency_mhz") == report["max_frequency_mhz"]
-        and parsed_delays == delays
+        and parsed.get("critical_paths") == critical_paths
+        and parsed.get("clock_domains") == clock_domains
         and parsed.get("cycles_per_token") == cycles
         and parsed.get("interface_overhead_cycles") == overhead
+        and parsed.get("measurement_id") == report.get("measurement_id")
     )
 
 
@@ -243,8 +443,9 @@ def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest:
     if slice_manifest.get("contract", {}).get("sha256") != frozen_contract_sha256:
         result.update(status="contract_mismatch", reasons=_reason("slice manifest contract SHA-256 differs from supplied frozen Task 1 contract"))
         return result
-    if slice_manifest.get("status") != "ready":
-        result["reasons"] = _reason(f"slice manifest is not ready: {slice_manifest.get('status')}")
+    manifest_reasons = _validate_ready_slice_manifest(slice_manifest, frozen_contract, frozen_contract_path, frozen_contract_sha256)
+    if manifest_reasons:
+        result["reasons"] = manifest_reasons
         return result
     if not _same_contract(contract, compiler.get("contract", {})):
         result.update(status="contract_mismatch", reasons=_reason("compiler contract identity or quantization differs from reference"))
@@ -252,7 +453,8 @@ def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest:
     if quantization is not None and quantization != contract.get("quantization"):
         result.update(status="contract_mismatch", reasons=_reason("requested quantization differs from frozen contract quantization"))
         return result
-    missing = _validate_evidence(reference, "reference") + _validate_evidence(compiler, "compiler")
+    trace_identity = _expected_trace_identity(frozen_contract, frozen_contract_sha256, slice_manifest)
+    missing = _validate_evidence(reference, "reference", trace_identity) + _validate_evidence(compiler, "compiler", trace_identity)
     if missing:
         result["reasons"] = missing
         return result
@@ -336,14 +538,19 @@ def parse_yosys_statistics(path: Path) -> dict[str, Any]:
 def parse_nextpnr_timing(path: Path) -> dict[str, Any]:
     """Parse a nextpnr timing receipt without discarding its original hash/path."""
     raw = path.read_text(encoding="utf-8")
-    result: dict[str, Any] = {"path": str(path), "sha256": sha256_file(path), "critical_paths": []}
+    result: dict[str, Any] = {"path": str(path), "sha256": sha256_file(path), "critical_paths": [], "clock_domains": []}
     mhz = re.search(r"(?:Max(?:imum)? frequency|Max frequency)\s*[:=]\s*([0-9.]+)\s*MHz", raw, flags=re.IGNORECASE)
     result["max_frequency_mhz"] = float(mhz.group(1)) if mhz else None
-    for match in re.finditer(r"(?:critical path|path delay).*?([0-9.]+)\s*ns", raw, flags=re.IGNORECASE):
-        result["critical_paths"].append({"delay_ns": float(match.group(1)), "raw": match.group(0)})
+    for match in re.finditer(r"clock domain ['\"]([^'\"]+)['\"] max frequency\s*[:=]\s*([0-9.]+)\s*MHz", raw, flags=re.IGNORECASE):
+        result["clock_domains"].append({"name": match.group(1), "max_frequency_mhz": float(match.group(2))})
+    path_pattern = r"critical path domain=['\"]([^'\"]+)['\"] from=['\"]([^'\"]+)['\"] to=['\"]([^'\"]+)['\"] delay\s*=\s*([0-9.]+)\s*ns"
+    for match in re.finditer(path_pattern, raw, flags=re.IGNORECASE):
+        result["critical_paths"].append({"clock_domain": match.group(1), "from": match.group(2), "to": match.group(3), "delay_ns": float(match.group(4))})
     for name, pattern in (("cycles_per_token", r"cycles[_ /-]*per[_ /-]*token\s*[:=]\s*(\d+)"), ("interface_overhead_cycles", r"interface[_ /-]*overhead[_ /-]*cycles\s*[:=]\s*(\d+)")):
         match = re.search(pattern, raw, flags=re.IGNORECASE)
         result[name] = int(match.group(1)) if match else None
+    measurement = re.search(r"measurement_id\s*[:=]\s*([A-Za-z0-9_.:-]+)", raw)
+    result["measurement_id"] = measurement.group(1) if measurement else None
     return result
 
 

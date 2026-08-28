@@ -1,0 +1,3 @@
+// llm2fpga.slice_kind=one_transformer_block_token_step
+module transformer_block_token_step;
+endmodule
