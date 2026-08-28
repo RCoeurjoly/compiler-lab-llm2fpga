@@ -53,8 +53,8 @@ def fixtures() -> tuple[dict[str, object], dict[str, object]]:
         "contract_sha256": comparison.sha256_file(CONTRACT_PATH),
         "checkpoint_tensors": {"block.out": [1, 2]},
         "output_tokens": [11, 612],
-        "resources": {"lut": 100, "ff": 20, "bram": 2, "dsp": 3, "memory_bits": 512},
-        "timing": {"max_frequency_mhz": 100.0, "critical_paths": [{"delay_ns": 10.0}], "cycles_per_token": 4, "interface_overhead_cycles": 1},
+        "resources": {"lut": 100, "ff": 20, "bram": 2, "dsp": 3, "memory_bits": 512, "path": "reference-yosys.json", "sha256": "a" * 64, "measurement_id": "reference-yosys"},
+        "timing": {"max_frequency_mhz": 100.0, "critical_paths": [{"delay_ns": 10.0}], "cycles_per_token": 4, "interface_overhead_cycles": 1, "path": "reference-nextpnr.rpt", "sha256": "b" * 64, "measurement_id": "reference-timing"},
         "provenance": {"source": "reference-fixture"},
     }
     compiler = {
@@ -62,28 +62,32 @@ def fixtures() -> tuple[dict[str, object], dict[str, object]]:
         "contract_sha256": comparison.sha256_file(CONTRACT_PATH),
         "checkpoint_tensors": {"block.out": [1, 2]},
         "output_tokens": [11, 612],
-        "resources": {"lut": 120, "ff": 25, "bram": 2, "dsp": 3, "memory_bits": 1024},
-        "timing": {"max_frequency_mhz": 80.0, "critical_paths": [{"delay_ns": 12.5}], "cycles_per_token": 5, "interface_overhead_cycles": 2},
+        "resources": {"lut": 120, "ff": 25, "bram": 2, "dsp": 3, "memory_bits": 1024, "path": "compiler-yosys.json", "sha256": "c" * 64, "measurement_id": "compiler-yosys"},
+        "timing": {"max_frequency_mhz": 80.0, "critical_paths": [{"delay_ns": 12.5}], "cycles_per_token": 5, "interface_overhead_cycles": 2, "path": "compiler-nextpnr.rpt", "sha256": "d" * 64, "measurement_id": "compiler-timing"},
         "provenance": {
             "source": "compiler-fixture",
             "annotations": [
-                {"kind": "buffer", "module": "block.buffer", "source_operation": "aten.add", "compiler_stage": "lowering", "resource": "lut", "measured_delta": 20}
+                {"kind": "buffer", "module": "block.buffer", "source_operation": "aten.add", "compiler_stage": "lowering", "resource": "lut", "measurement_id": "compiler-yosys", "measured_delta": 20}
             ],
         },
     }
     return reference, compiler
 
 
+def run_compare(reference: dict[str, object], compiler: dict[str, object], manifest: dict[str, object], **kwargs: object) -> dict[str, object]:
+    return comparison.compare(reference, compiler, manifest, frozen_contract=fixture_contract(), frozen_contract_sha256=comparison.sha256_file(CONTRACT_PATH), **kwargs)
+
+
 class TinyStories1MSliceComparisonTest(unittest.TestCase):
     def test_comparison_rejects_mismatched_quantization(self) -> None:
         reference, compiler = fixtures()
-        result = comparison.compare(reference, compiler, fixture_slice_manifest(), quantization="different")
+        result = run_compare(reference, compiler, fixture_slice_manifest(), quantization="different")
         self.assertEqual(result["status"], "contract_mismatch")
         self.assertIn("quantization", result["reasons"][0])
 
     def test_comparison_reports_resource_and_timing_fields_when_aligned(self) -> None:
         reference, compiler = fixtures()
-        result = comparison.compare(reference, compiler, fixture_slice_manifest())
+        result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["status"], "aligned")
         self.assertEqual(result["resources"]["lut_delta"], 20)
         self.assertEqual(result["timing"]["critical_paths"]["compiler"][0]["delay_ns"], 12.5)
@@ -93,7 +97,7 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
     def test_requires_exact_checkpoints_and_final_outputs_before_efficiency_deltas(self) -> None:
         reference, compiler = fixtures()
         del compiler["checkpoint_tensors"]
-        result = comparison.compare(reference, compiler, fixture_slice_manifest())
+        result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["status"], "incomplete")
         self.assertIsNone(result["resources"])
         self.assertIsNone(result["timing"])
@@ -102,7 +106,7 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         reference, compiler = fixtures()
         compiler["checkpoint_tensors"] = {}
         compiler["output_tokens"] = []
-        result = comparison.compare(reference, compiler, fixture_slice_manifest())
+        result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["status"], "incomplete")
         self.assertIsNone(result["resources"])
 
@@ -110,31 +114,42 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         reference, compiler = fixtures()
         compiler["resources"] = {}
         compiler["timing"] = {"max_frequency_mhz": 80.0, "critical_paths": [], "cycles_per_token": 5, "interface_overhead_cycles": 2}
-        result = comparison.compare(reference, compiler, fixture_slice_manifest())
+        result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["status"], "incomplete")
         self.assertIsNone(result["resources"])
         self.assertIsNone(result["timing"])
 
+    def test_missing_report_provenance_is_incomplete_not_aligned(self) -> None:
+        reference, compiler = fixtures()
+        del compiler["resources"]["sha256"]
+        result = run_compare(reference, compiler, fixture_slice_manifest())
+        self.assertEqual(result["status"], "incomplete")
+
+    def test_compare_has_no_frozen_contract_bypass(self) -> None:
+        reference, compiler = fixtures()
+        with self.assertRaises(TypeError):
+            comparison.compare(reference, compiler, fixture_slice_manifest())
+
     def test_full_contract_identity_rejects_abi_and_reference_changes(self) -> None:
         reference, compiler = fixtures()
         compiler["contract"]["command_abi"]["version"] = 99
-        result = comparison.compare(reference, compiler, fixture_slice_manifest())
+        result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["status"], "contract_mismatch")
         reference, compiler = fixtures()
         compiler["contract"]["reference"]["tokens"][0] = 12
-        result = comparison.compare(reference, compiler, fixture_slice_manifest())
+        result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["status"], "contract_mismatch")
 
     def test_frozen_contract_hash_binds_each_evidence_side(self) -> None:
         reference, compiler = fixtures()
         compiler["contract_sha256"] = "f" * 64
-        result = comparison.compare(reference, compiler, fixture_slice_manifest(), frozen_contract=fixture_contract(), frozen_contract_sha256=comparison.sha256_file(CONTRACT_PATH))
+        result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["status"], "contract_mismatch")
 
     def test_reports_functional_mismatch_before_efficiency_deltas(self) -> None:
         reference, compiler = fixtures()
         compiler["checkpoint_tensors"] = {"block.out": [1, 9]}
-        result = comparison.compare(reference, compiler, fixture_slice_manifest())
+        result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["status"], "functional_mismatch")
         self.assertIsNone(result["resources"])
         self.assertEqual(result["functional"]["first_mismatch"]["checkpoint"], "block.out")
@@ -161,6 +176,16 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         self.assertEqual(parsed["structural_cells"]["$mux"], 708653)
         self.assertIsNone(parsed["lut"])
 
+    def test_yosys_standard_stat_json_uses_top_module_cell_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "stat.json"
+            path.write_text(json.dumps({"modules": {"top": {"num_cells_by_type": {"LUT6": 11, "FDRE": 12, "RAMB36E1": 2, "DSP48E1": 3}}}}), encoding="utf-8")
+            parsed = comparison.parse_yosys_statistics(path)
+            self.assertEqual(parsed["lut"], 11)
+            self.assertEqual(parsed["ff"], 12)
+            self.assertEqual(parsed["bram"], 2)
+            self.assertEqual(parsed["dsp"], 3)
+
     def test_manifest_contract_hash_mismatch_is_not_compared(self) -> None:
         manifest = fixture_slice_manifest()
         manifest["contract"]["sha256"] = "0" * 64
@@ -168,18 +193,22 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
 
     def test_waste_entries_require_stage_and_exact_measured_delta(self) -> None:
         reference, compiler = fixtures()
-        result = comparison.compare(reference, compiler, fixture_slice_manifest())
+        result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["waste_map"][0]["measured_delta"], 20)
         del compiler["provenance"]["annotations"][0]["compiler_stage"]
-        self.assertEqual(comparison.compare(reference, compiler, fixture_slice_manifest())["waste_map"], [])
+        self.assertEqual(run_compare(reference, compiler, fixture_slice_manifest())["waste_map"], [])
 
     def test_checked_in_comparison_is_honestly_incomplete_without_full_artifacts(self) -> None:
-        output = ROOT / "artifacts/comparison/tinystories-1m-slice-comparison.json"
-        self.assertEqual(comparison.main(["--contract", str(CONTRACT_PATH), "--slice-manifest", str(SLICE_MANIFEST_PATH), "--out", str(output)]), 0)
-        result = json.loads(output.read_text(encoding="utf-8"))
-        self.assertEqual(result["status"], "incomplete")
-        self.assertIsNone(result["resources"])
-        self.assertIsNone(result["timing"])
+        committed = ROOT / "artifacts/comparison/tinystories-1m-slice-comparison.json"
+        original = committed.read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "comparison.json"
+            self.assertEqual(comparison.main(["--contract", str(CONTRACT_PATH), "--slice-manifest", str(SLICE_MANIFEST_PATH), "--out", str(output)]), 0)
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "incomplete")
+            self.assertIsNone(result["resources"])
+            self.assertIsNone(result["timing"])
+        self.assertEqual(committed.read_bytes(), original)
 
 
 if __name__ == "__main__":

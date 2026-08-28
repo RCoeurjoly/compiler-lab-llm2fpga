@@ -89,12 +89,16 @@ def _first_checkpoint_mismatch(reference: dict[str, Any], compiler: dict[str, An
     return None
 
 
+def _report_provenance_is_complete(report: dict[str, Any]) -> bool:
+    return isinstance(report.get("path"), str) and bool(report["path"]) and isinstance(report.get("sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", report["sha256"]) is not None and isinstance(report.get("measurement_id"), str) and bool(report["measurement_id"])
+
+
 def _resource_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[str, Any] | None:
     ref = reference.get("resources")
     comp = compiler.get("resources")
-    if not isinstance(ref, dict) or not isinstance(comp, dict) or any(not isinstance(ref.get(field), (int, float)) or isinstance(ref.get(field), bool) or not isinstance(comp.get(field), (int, float)) or isinstance(comp.get(field), bool) for field in RESOURCE_FIELDS):
+    if not isinstance(ref, dict) or not isinstance(comp, dict) or not _report_provenance_is_complete(ref) or not _report_provenance_is_complete(comp) or any(not isinstance(ref.get(field), (int, float)) or isinstance(ref.get(field), bool) or not isinstance(comp.get(field), (int, float)) or isinstance(comp.get(field), bool) for field in RESOURCE_FIELDS):
         return None
-    result: dict[str, Any] = {"reference": {field: ref[field] for field in RESOURCE_FIELDS}, "compiler": {field: comp[field] for field in RESOURCE_FIELDS}, "reports": {"reference": {field: ref[field] for field in ("path", "sha256") if field in ref}, "compiler": {field: comp[field] for field in ("path", "sha256") if field in comp}}}
+    result: dict[str, Any] = {"reference": {field: ref[field] for field in RESOURCE_FIELDS}, "compiler": {field: comp[field] for field in RESOURCE_FIELDS}, "reports": {"reference": {field: ref[field] for field in ("path", "sha256", "measurement_id")}, "compiler": {field: comp[field] for field in ("path", "sha256", "measurement_id")}}}
     for field in RESOURCE_FIELDS:
         result[f"{field}_delta"] = comp[field] - ref[field]
     return result
@@ -106,7 +110,7 @@ def _timing_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[
     required = ("max_frequency_mhz", "critical_paths", "cycles_per_token", "interface_overhead_cycles")
     if not isinstance(ref, dict) or not isinstance(comp, dict) or any(field not in ref or field not in comp for field in required):
         return None
-    if not isinstance(ref["max_frequency_mhz"], (int, float)) or not isinstance(comp["max_frequency_mhz"], (int, float)) or not ref["critical_paths"] or not comp["critical_paths"] or not isinstance(ref["cycles_per_token"], int) or not isinstance(comp["cycles_per_token"], int) or not isinstance(ref["interface_overhead_cycles"], int) or not isinstance(comp["interface_overhead_cycles"], int):
+    if not _report_provenance_is_complete(ref) or not _report_provenance_is_complete(comp) or not isinstance(ref["max_frequency_mhz"], (int, float)) or not isinstance(comp["max_frequency_mhz"], (int, float)) or not ref["critical_paths"] or not comp["critical_paths"] or not isinstance(ref["cycles_per_token"], int) or not isinstance(comp["cycles_per_token"], int) or not isinstance(ref["interface_overhead_cycles"], int) or not isinstance(comp["interface_overhead_cycles"], int):
         return None
     return {
         "max_frequency_mhz": {"reference": ref["max_frequency_mhz"], "compiler": comp["max_frequency_mhz"], "delta": comp["max_frequency_mhz"] - ref["max_frequency_mhz"]},
@@ -114,7 +118,7 @@ def _timing_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[
         "cycles_per_token": {"reference": ref["cycles_per_token"], "compiler": comp["cycles_per_token"]},
         "cycles_per_token_delta": comp["cycles_per_token"] - ref["cycles_per_token"],
         "interface_overhead_cycles": {"reference": ref["interface_overhead_cycles"], "compiler": comp["interface_overhead_cycles"]},
-        "reports": {"reference": {field: ref[field] for field in ("path", "sha256") if field in ref}, "compiler": {field: comp[field] for field in ("path", "sha256") if field in comp}},
+        "reports": {"reference": {field: ref[field] for field in ("path", "sha256", "measurement_id")}, "compiler": {field: comp[field] for field in ("path", "sha256", "measurement_id")}},
     }
 
 
@@ -131,7 +135,7 @@ def _waste_map(compiler: dict[str, Any], resources: dict[str, Any]) -> list[dict
         delta = resources.get(f"{resource}_delta")
         if not isinstance(delta, (int, float)) or delta <= 0 or measured_delta <= 0 or measured_delta > delta:
             continue
-        if not all(annotation.get(key) for key in ("kind", "module", "source_operation", "compiler_stage")):
+        if not all(annotation.get(key) for key in ("kind", "module", "source_operation", "compiler_stage", "measurement_id")) or annotation["measurement_id"] != compiler.get("resources", {}).get("measurement_id"):
             continue
         result.append({
             "kind": annotation["kind"],
@@ -145,7 +149,7 @@ def _waste_map(compiler: dict[str, Any], resources: dict[str, Any]) -> list[dict
     return sorted(result, key=lambda item: (-item["measured_delta"], item["module"]))
 
 
-def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest: dict[str, Any], *, quantization: str | None = None, frozen_contract: dict[str, Any] | None = None, frozen_contract_sha256: str | None = None) -> dict[str, Any]:
+def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest: dict[str, Any], *, frozen_contract: dict[str, Any], frozen_contract_sha256: str, quantization: str | None = None) -> dict[str, Any]:
     """Compare two explicit evidence objects, returning a fail-closed result."""
     contract = reference.get("contract", {})
     result = _base_result(contract, slice_manifest)
@@ -162,10 +166,10 @@ def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest:
     if missing:
         result["reasons"] = missing
         return result
-    if frozen_contract is not None and (not _same_contract(frozen_contract, contract) or not _same_contract(frozen_contract, compiler.get("contract", {}))):
+    if not _same_contract(frozen_contract, contract) or not _same_contract(frozen_contract, compiler.get("contract", {})):
         result.update(status="contract_mismatch", reasons=_reason("reference or compiler contract differs from frozen Task 1 contract"))
         return result
-    if frozen_contract_sha256 is not None and (reference.get("contract_sha256") != frozen_contract_sha256 or compiler.get("contract_sha256") != frozen_contract_sha256):
+    if not isinstance(frozen_contract_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", frozen_contract_sha256) is None or reference.get("contract_sha256") != frozen_contract_sha256 or compiler.get("contract_sha256") != frozen_contract_sha256:
         result.update(status="contract_mismatch", reasons=_reason("reference or compiler contract SHA-256 differs from frozen Task 1 contract"))
         return result
     mismatch = _first_checkpoint_mismatch(reference, compiler)
@@ -210,6 +214,15 @@ def parse_yosys_statistics(path: Path) -> dict[str, Any]:
                 "scope": value.get("scope"),
             })
             return result
+        modules = value.get("modules") if isinstance(value, dict) else None
+        if isinstance(modules, dict) and modules:
+            module = modules.get("top") if isinstance(modules.get("top"), dict) else next((entry for entry in modules.values() if isinstance(entry, dict)), {})
+            cell_types = module.get("num_cells_by_type", {}) if isinstance(module, dict) else {}
+            if isinstance(cell_types, dict):
+                def count_matching(*prefixes: str) -> int:
+                    return sum(number for name, number in cell_types.items() if isinstance(number, int) and any(str(name).upper().lstrip("$").startswith(prefix) for prefix in prefixes))
+                result.update({"lut": count_matching("LUT"), "ff": count_matching("FD", "FF"), "bram": count_matching("RAMB", "BRAM"), "dsp": count_matching("DSP"), "memory_bits": module.get("num_memory_bits"), "structural_cells": cell_types})
+                return result
         cells = value.get("cells", value.get("resources", value)) if isinstance(value, dict) else {}
         if isinstance(cells, dict):
             normalized = {str(key).lower(): number for key, number in cells.items() if isinstance(number, (int, float))}
@@ -264,8 +277,8 @@ def main(argv: Iterable[str] | None = None) -> int:
     result["inputs"] = {
         "contract": {"path": str(args.contract), "sha256": sha256_file(args.contract)},
         "slice_manifest": {"path": str(args.slice_manifest), "sha256": sha256_file(args.slice_manifest)},
-        "reference_evidence": str(args.reference_evidence) if args.reference_evidence else None,
-        "compiler_evidence": str(args.compiler_evidence) if args.compiler_evidence else None,
+        "reference_evidence": {"path": str(args.reference_evidence), "sha256": sha256_file(Path(args.reference_evidence))} if args.reference_evidence else None,
+        "compiler_evidence": {"path": str(args.compiler_evidence), "sha256": sha256_file(Path(args.compiler_evidence))} if args.compiler_evidence else None,
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
