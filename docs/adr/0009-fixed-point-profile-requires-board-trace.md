@@ -14,11 +14,12 @@ with a serial signed-INT64 accumulator, one Q8.24 scale for each activation
 channel, ties-away-from-zero activation/requantization, and signed INT8 clamp
 `[-128, 127]`.  Those are genuine semantic conflicts, not formatting details.
 
-`artifacts/kintex-selftest/provenance.json` is preserved as evidence for a
-YPCB self-test image only.  It contains neither a TinyStories bitstream nor a
-frozen-prompt result nor the twelve block-0 checkpoint tensors.  It cannot
-select the candidate profile.  The candidate runtime oracle is likewise not a
-board trace.
+The inspected external receipt at
+`/home/roland/kev-gpt/.worktrees/kintex-selftest/artifacts/kintex-selftest/provenance.json`
+is evidence for a YPCB self-test image only.  It contains neither a
+TinyStories bitstream nor a frozen-prompt result nor the twelve block-0
+checkpoint tensors.  It cannot select the candidate profile.  The candidate
+runtime oracle is likewise not a board trace.
 
 ## Decision
 
@@ -27,14 +28,23 @@ the versioned profile receipt.  With the evidence currently in the repository,
 the checked-in receipt is `unresolved` and no comparison adapter or compiler
 path may claim the fixed profile.
 
-A future receipt may select `fixed_hardware_reference` only when it binds:
+A future receipt may select `fixed_hardware_reference` only against the pinned
+canonical Task-1 and Q/DQ artifact hashes, and when its exact
+receipt-file SHA-256, bitstream-file SHA-256, and capture-file SHA-256 have
+first been added to the source-controlled approval registry following evidence
+review.  A self-hashed JSON file is not approval.  The receipt must bind:
 
 - the frozen Task-1 contract and authenticated Q/DQ receipt hashes;
-- YPCB-00338-1P1, the programmed bitstream hash, and every authenticated
-  reference-source hash;
+- YPCB-00338-1P1, an existing programmed-bitstream file whose bytes match the
+  declared hash, and every authenticated reference-source hash;
 - the frozen prompt and all sixteen expected output tokens; and
-- all twelve exact block-0 token-step checkpoint tensors, including their
-  trace hash, equal to the fixed-point runtime oracle.
+- an existing, separately hashed `board_debug_csr_readback` capture file with
+  all twelve exact block-0 token-step checkpoint tensors, including their
+  recomputed checkpoint and trace hashes, equal to the fixed-point runtime
+  oracle; and
+- existing, separately hashed raw board transcript, capture-tool, and capture-
+  protocol files, plus a separately hashed bitstream build manifest bound to
+  the programmed bitstream bytes.
 
 The selection records a supersession only for numeric implementation semantics;
 the original Task-1 contract remains immutable source/package identity.  A
