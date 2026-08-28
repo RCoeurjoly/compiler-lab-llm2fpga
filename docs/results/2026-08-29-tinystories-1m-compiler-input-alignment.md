@@ -71,7 +71,7 @@ compiler-generated RTL match the reference package.
 
 The next bounded implementation must be a new, independently implemented
 package adapter/export derivation.  It must accept a Nix-pinned checkout of
-the GPL-licensed package at `df1fc45…6153f`, run the fail-closed verifier,
+the GNU AGPL v3-licensed package at `df1fc45…6153f`, run the fail-closed verifier,
 map canonical package tensor names to GPT-Neo state keys, reconstruct each
 INT8 weight using its authenticated per-output scale, and explicitly model the
 97 calibrated activation boundaries before `torch.export`.  It must emit an
