@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import os
 import shutil
 import struct
 import subprocess
@@ -107,6 +108,47 @@ class TinyStories1MPackageAdapterTest(unittest.TestCase):
 
             with self.assertRaisesRegex(Exception, "package_hash_mismatch"):
                 self.adapter.load_authenticated_package(CONTRACT, candidate, MODEL)
+
+    def test_arbitrary_verifier_environment_override_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_verifier = Path(temp_dir) / "fake_verifier.py"
+            fake_verifier.write_text(
+                "def verify_input(contract, package):\n"
+                "    return {'schema': 'forged', 'status': 'not_verified'}\n",
+                encoding="utf-8",
+            )
+            previous = os.environ.get("TINYSTORIES_REFERENCE_VERIFIER")
+            os.environ["TINYSTORIES_REFERENCE_VERIFIER"] = str(fake_verifier)
+            try:
+                with self.assertRaisesRegex(self.adapter.PackageAdapterError, "verifier_identity_mismatch"):
+                    self.adapter.load_authenticated_package(CONTRACT, PACKAGE, MODEL)
+            finally:
+                if previous is None:
+                    os.environ.pop("TINYSTORIES_REFERENCE_VERIFIER", None)
+                else:
+                    os.environ["TINYSTORIES_REFERENCE_VERIFIER"] = previous
+
+    def test_nonverified_or_wrong_identity_verifier_receipt_is_rejected(self) -> None:
+        receipt = copy.deepcopy(self.bundle.receipt["verified_input"])
+        cases = []
+        not_verified = copy.deepcopy(receipt)
+        not_verified["status"] = "not_verified"
+        cases.append(not_verified)
+        wrong_contract = copy.deepcopy(receipt)
+        wrong_contract["frozen_contract_sha256"] = "0" * 64
+        cases.append(wrong_contract)
+        wrong_package = copy.deepcopy(receipt)
+        wrong_package["package"]["weights_sha256"] = "0" * 64
+        cases.append(wrong_package)
+        wrong_model = copy.deepcopy(receipt)
+        wrong_model["model"]["source_revision"] = "0" * 40
+        cases.append(wrong_model)
+
+        contract = json.loads(CONTRACT.read_text())
+        for candidate in cases:
+            with self.subTest(candidate=candidate):
+                with self.assertRaisesRegex(self.adapter.PackageAdapterError, "verifier_identity_mismatch"):
+                    self.adapter.validate_verifier_receipt(candidate, contract, CONTRACT, PACKAGE)
 
     def test_reconstruction_rejects_missing_extra_shape_and_scale_corruption(self) -> None:
         manifest = json.loads((PACKAGE / "manifest.json").read_text())

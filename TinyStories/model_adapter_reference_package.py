@@ -27,6 +27,7 @@ EXPORT_STRICT = False
 CONFIG_SHA256 = "ff74c30d5ebb5ab1da0f2ea479adf7197c504b42b5522a858c334ab91ed4958c"
 CONTRACT_RELATIVE = Path("artifacts/reference/tinystories-1m-kev-gpt-contract.json")
 VERIFIER_RELATIVE = Path("scripts/comparison/verify_tinystories_1m_reference_input.py")
+VERIFIER_SHA256 = "4066f5535fbf64bd732cc65c78a07a3e1534037a3696a35fa3f4f73b4cdc586c"
 CHECKPOINT_SHAPES: dict[str, tuple[int, ...]] = {
     "block.input": (64,),
     "block.ln_1.output": (64,),
@@ -107,12 +108,90 @@ def _load_verifier() -> Any:
     configured = os.environ.get("TINYSTORIES_REFERENCE_VERIFIER")
     verifier_path = Path(configured) if configured else _repo_root() / VERIFIER_RELATIVE
     _require(verifier_path.is_file(), "verifier_unavailable", f"missing frozen-input verifier: {verifier_path}")
+    _require(
+        _sha256(verifier_path) == VERIFIER_SHA256,
+        "verifier_identity_mismatch",
+        f"verifier SHA-256 is not the canonical frozen verifier: {verifier_path}",
+    )
     spec = importlib.util.spec_from_file_location("tinystories_1m_reference_input_verifier", verifier_path)
     _require(spec is not None and spec.loader is not None, "verifier_unavailable", str(verifier_path))
     module = importlib.util.module_from_spec(spec)
     assert spec is not None and spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def validate_verifier_receipt(
+    receipt: object,
+    contract: Mapping[str, Any],
+    contract_path: Path | str,
+    package_path: Path | str,
+) -> None:
+    """Require the canonical verifier to prove the exact compiler input."""
+
+    contract_path = Path(contract_path)
+    package_path = Path(package_path)
+    package_contract = contract.get("package")
+    model_contract = contract.get("model")
+    _require(
+        isinstance(receipt, dict)
+        and isinstance(package_contract, dict)
+        and isinstance(model_contract, dict),
+        "verifier_identity_mismatch",
+        "verifier receipt or frozen identity is malformed",
+    )
+    assert isinstance(receipt, dict)
+    assert isinstance(package_contract, dict)
+    assert isinstance(model_contract, dict)
+    receipt_package = receipt.get("package")
+    receipt_model = receipt.get("model")
+    _require(
+        receipt.get("schema") == "tinystories-1m-reference-compiler-input-v1"
+        and receipt.get("status") == "identity_verified_adapter_required"
+        and receipt.get("frozen_contract_sha256") == _sha256(contract_path)
+        and isinstance(receipt.get("frozen_contract_path"), str)
+        and Path(receipt["frozen_contract_path"]).resolve() == contract_path.resolve()
+        and isinstance(receipt_package, dict)
+        and isinstance(receipt_model, dict),
+        "verifier_identity_mismatch",
+        "canonical verifier did not return a verified contract-bound receipt",
+    )
+    assert isinstance(receipt_package, dict)
+    assert isinstance(receipt_model, dict)
+    expected_package = {
+        "path": str(package_path),
+        "manifest_sha256": package_contract.get("manifest_sha256"),
+        "weights_sha256": package_contract.get("sha256"),
+        "scales_sha256": package_contract.get("files", {}).get("scales.bin"),
+        "calibration_ids_sha256": package_contract.get("files", {}).get("calibration_ids.bin"),
+        "receipt_sha256": package_contract.get("files", {}).get("receipt.json"),
+        "weight_bytes": contract.get("memory_image", {}).get("bytes"),
+    }
+    _require(
+        all(receipt_package.get(key) == value for key, value in expected_package.items())
+        and isinstance(receipt_package.get("path"), str)
+        and Path(receipt_package["path"]).resolve() == package_path.resolve(),
+        "verifier_identity_mismatch",
+        "canonical verifier package identity differs from the frozen contract",
+    )
+    expected_model = {
+        "source_model_id": model_contract.get("source_model_id"),
+        "source_revision": model_contract.get("source_revision"),
+        "model_type": "gpt_neo",
+        "n_layer": model_contract.get("n_layer"),
+        "hidden_size": model_contract.get("hidden_size"),
+        "n_head": model_contract.get("n_head"),
+        "head_dim": model_contract.get("head_dim"),
+        "vocab_size": model_contract.get("vocab_size"),
+        "max_context": model_contract.get("max_context"),
+        "tie_word_embeddings": model_contract.get("tie_word_embeddings"),
+        "activation_function": model_contract.get("activation_function"),
+    }
+    _require(
+        receipt_model == expected_model,
+        "verifier_identity_mismatch",
+        "canonical verifier model identity differs from the frozen contract",
+    )
 
 
 def _expected_source_names(n_layer: int) -> set[str]:
@@ -360,6 +439,7 @@ def load_authenticated_package(
     verifier_receipt = verifier.verify_input(contract_path, package_path)
 
     contract = _load_json(contract_path, "contract")
+    validate_verifier_receipt(verifier_receipt, contract, contract_path, package_path)
     manifest = _load_json(package_path / "manifest.json", "package manifest")
     config = _validate_config(model_path, manifest)
     model = AutoModelForCausalLM.from_config(config).eval()
