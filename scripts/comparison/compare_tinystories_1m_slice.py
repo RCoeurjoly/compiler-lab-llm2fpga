@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import math
 import re
@@ -23,6 +24,15 @@ SLICE_KIND = "one_transformer_block_token_step"
 TRACE_SCHEMA = "tinystories-1m-transformer-block-token-step-trace-v1"
 MAX_SLICE_MODULES = 4096
 RESOURCE_FIELDS = ("lut", "ff", "bram", "dsp", "memory_bits")
+MEASUREMENT_BINDING_FIELDS = (
+    "side",
+    "measurement_kind",
+    "contract_sha256",
+    "slice_manifest_sha256",
+    "artifact_path",
+    "artifact_sha256",
+    "measurement_id",
+)
 CHECKPOINT_SHAPES = {
     "block.input": (64,),
     "block.ln_1.output": (64,),
@@ -212,6 +222,43 @@ def _validate_ready_slice_manifest(
             reasons.append(f"slice artifact hash is unauthenticated for module {artifact.get('module')!r}")
     if modules != closure:
         reasons.append("slice artifact modules do not exactly match the ordered dependency closure")
+    if reasons:
+        return reasons
+
+    # A collection of self-consistent hashes is not proof that the files are
+    # the RTL slice named by the manifest.  Reuse Task 2's parser and closure
+    # algorithm to derive the subject again from the authenticated sources.
+    extractor_path = Path(__file__).with_name("extract_tinystories_1m_block_slice.py")
+    spec = importlib.util.spec_from_file_location("tinystories_1m_slice_extractor_for_validation", extractor_path)
+    if spec is None or spec.loader is None:
+        return ["Task 2 RTL parser is unavailable"]
+    extractor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(extractor)
+    source_paths = list(dict.fromkeys(Path(artifact["source"]) for artifact in artifacts))
+    try:
+        parsed_modules = extractor.parse_modules(source_paths)
+        parsed_anchor = extractor.select_anchor(parsed_modules)
+        parsed_closure = extractor.dependency_closure(parsed_anchor, parsed_modules)
+    except (OSError, UnicodeError, extractor.ExtractionError) as error:
+        return [f"slice sources do not parse as a bounded Task 2 RTL module closure: {error}"]
+    if parsed_anchor != anchor:
+        reasons.append("slice anchor module does not match the anchor derived from RTL")
+    if parsed_closure != closure:
+        reasons.append("slice dependency closure does not match the closure derived from RTL")
+    for artifact in artifacts:
+        module_name = artifact["module"]
+        parsed_module = parsed_modules.get(module_name)
+        if parsed_module is None:
+            reasons.append(f"slice module {module_name!r} is absent from its authenticated RTL source")
+            continue
+        try:
+            extracted_text = Path(artifact["extracted"]).read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            reasons.append(f"slice extracted content is unreadable for module {module_name!r}")
+            continue
+        expected_text = parsed_module[1].rstrip() + "\n"
+        if extracted_text != expected_text:
+            reasons.append(f"slice extracted module content differs from Task 2 extraction for module {module_name!r}")
     return reasons
 
 
@@ -288,14 +335,43 @@ def _first_checkpoint_mismatch(reference: dict[str, Any], compiler: dict[str, An
     return None
 
 
-def _report_provenance_is_complete(report: dict[str, Any]) -> bool:
-    if not (isinstance(report.get("path"), str) and bool(report["path"]) and isinstance(report.get("sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", report["sha256"]) is not None and isinstance(report.get("measurement_id"), str) and bool(report["measurement_id"])):
+def _report_provenance_is_complete(
+    report: dict[str, Any],
+    parsed: dict[str, Any],
+    *,
+    side: str,
+    measurement_kind: str,
+    contract_sha256: str,
+    slice_manifest_sha256: str,
+) -> bool:
+    if not (
+        isinstance(report.get("path"), str)
+        and bool(report["path"])
+        and _valid_sha256(report.get("sha256"))
+        and isinstance(report.get("measurement_id"), str)
+        and bool(report["measurement_id"])
+    ):
         return False
-    return _path_matches_hash(report["path"], report["sha256"])
+    expected = {
+        "side": side,
+        "measurement_kind": measurement_kind,
+        "contract_sha256": contract_sha256,
+        "slice_manifest_sha256": slice_manifest_sha256,
+    }
+    if any(report.get(key) != value for key, value in expected.items()):
+        return False
+    if any(parsed.get(key) != report.get(key) for key in MEASUREMENT_BINDING_FIELDS):
+        return False
+    return (
+        _path_matches_hash(report["path"], report["sha256"])
+        and _path_matches_hash(report.get("artifact_path"), report.get("artifact_sha256"))
+    )
 
 
-def _resource_measurement_is_valid(report: dict[str, Any]) -> bool:
-    if not _report_provenance_is_complete(report):
+def _resource_measurement_is_valid(
+    report: dict[str, Any], *, side: str, contract_sha256: str, slice_manifest_sha256: str
+) -> bool:
+    if not isinstance(report.get("path"), str) or not report["path"]:
         return False
     if any(not isinstance(report.get(field), int) or isinstance(report.get(field), bool) or report[field] < 0 for field in RESOURCE_FIELDS):
         return False
@@ -303,28 +379,48 @@ def _resource_measurement_is_valid(report: dict[str, Any]) -> bool:
         parsed = parse_yosys_statistics(Path(report["path"]))
     except (OSError, UnicodeError, ValueError, TypeError):
         return False
+    if not _report_provenance_is_complete(
+        report,
+        parsed,
+        side=side,
+        measurement_kind="resources",
+        contract_sha256=contract_sha256,
+        slice_manifest_sha256=slice_manifest_sha256,
+    ):
+        return False
     return all(parsed.get(field) == report[field] for field in RESOURCE_FIELDS)
 
 
-def _resource_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[str, Any] | None:
+def _resource_deltas(
+    reference: dict[str, Any], compiler: dict[str, Any], *, contract_sha256: str, slice_manifest_sha256: str
+) -> dict[str, Any] | None:
     ref = reference.get("resources")
     comp = compiler.get("resources")
-    if not isinstance(ref, dict) or not isinstance(comp, dict) or not _resource_measurement_is_valid(ref) or not _resource_measurement_is_valid(comp):
+    if (
+        not isinstance(ref, dict)
+        or not isinstance(comp, dict)
+        or not _resource_measurement_is_valid(ref, side="reference", contract_sha256=contract_sha256, slice_manifest_sha256=slice_manifest_sha256)
+        or not _resource_measurement_is_valid(comp, side="compiler", contract_sha256=contract_sha256, slice_manifest_sha256=slice_manifest_sha256)
+    ):
         return None
-    result: dict[str, Any] = {"reference": {field: ref[field] for field in RESOURCE_FIELDS}, "compiler": {field: comp[field] for field in RESOURCE_FIELDS}, "reports": {"reference": {field: ref[field] for field in ("path", "sha256", "measurement_id")}, "compiler": {field: comp[field] for field in ("path", "sha256", "measurement_id")}}}
+    provenance_fields = ("path", "sha256", *MEASUREMENT_BINDING_FIELDS)
+    result: dict[str, Any] = {"reference": {field: ref[field] for field in RESOURCE_FIELDS}, "compiler": {field: comp[field] for field in RESOURCE_FIELDS}, "reports": {"reference": {field: ref[field] for field in provenance_fields}, "compiler": {field: comp[field] for field in provenance_fields}}}
     for field in RESOURCE_FIELDS:
         result[f"{field}_delta"] = comp[field] - ref[field]
     return result
 
 
-def _timing_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[str, Any] | None:
+def _timing_deltas(
+    reference: dict[str, Any], compiler: dict[str, Any], *, contract_sha256: str, slice_manifest_sha256: str
+) -> dict[str, Any] | None:
     ref = reference.get("timing")
     comp = compiler.get("timing")
     required = ("max_frequency_mhz", "critical_paths", "cycles_per_token", "interface_overhead_cycles")
     if not isinstance(ref, dict) or not isinstance(comp, dict) or any(field not in ref or field not in comp for field in required):
         return None
-    if not _timing_measurement_is_valid(ref) or not _timing_measurement_is_valid(comp):
+    if not _timing_measurement_is_valid(ref, side="reference", contract_sha256=contract_sha256, slice_manifest_sha256=slice_manifest_sha256) or not _timing_measurement_is_valid(comp, side="compiler", contract_sha256=contract_sha256, slice_manifest_sha256=slice_manifest_sha256):
         return None
+    provenance_fields = ("path", "sha256", *MEASUREMENT_BINDING_FIELDS)
     return {
         "max_frequency_mhz": {"reference": ref["max_frequency_mhz"], "compiler": comp["max_frequency_mhz"], "delta": comp["max_frequency_mhz"] - ref["max_frequency_mhz"]},
         "critical_paths": {"reference": ref["critical_paths"], "compiler": comp["critical_paths"]},
@@ -332,7 +428,7 @@ def _timing_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[
         "cycles_per_token": {"reference": ref["cycles_per_token"], "compiler": comp["cycles_per_token"]},
         "cycles_per_token_delta": comp["cycles_per_token"] - ref["cycles_per_token"],
         "interface_overhead_cycles": {"reference": ref["interface_overhead_cycles"], "compiler": comp["interface_overhead_cycles"]},
-        "reports": {"reference": {field: ref[field] for field in ("path", "sha256", "measurement_id")}, "compiler": {field: comp[field] for field in ("path", "sha256", "measurement_id")}},
+        "reports": {"reference": {field: ref[field] for field in provenance_fields}, "compiler": {field: comp[field] for field in provenance_fields}},
     }
 
 
@@ -376,8 +472,10 @@ def _clock_domain_records(value: Any, critical_paths: list[dict[str, Any]]) -> l
     return records
 
 
-def _timing_measurement_is_valid(report: dict[str, Any]) -> bool:
-    if not _report_provenance_is_complete(report) or not _positive_finite_number(report.get("max_frequency_mhz")):
+def _timing_measurement_is_valid(
+    report: dict[str, Any], *, side: str, contract_sha256: str, slice_manifest_sha256: str
+) -> bool:
+    if not isinstance(report.get("path"), str) or not report["path"] or not _positive_finite_number(report.get("max_frequency_mhz")):
         return False
     cycles = report.get("cycles_per_token")
     overhead = report.get("interface_overhead_cycles")
@@ -394,6 +492,15 @@ def _timing_measurement_is_valid(report: dict[str, Any]) -> bool:
     try:
         parsed = parse_nextpnr_timing(Path(report["path"]))
     except (OSError, UnicodeError, ValueError, TypeError):
+        return False
+    if not _report_provenance_is_complete(
+        report,
+        parsed,
+        side=side,
+        measurement_kind="timing",
+        contract_sha256=contract_sha256,
+        slice_manifest_sha256=slice_manifest_sha256,
+    ):
         return False
     return (
         parsed.get("max_frequency_mhz") == report["max_frequency_mhz"]
@@ -479,8 +586,27 @@ def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest:
         result["functional"] = {"checkpoint_status": "matched", "output_status": "mismatch", "first_mismatch": {"checkpoint": "final_output_tokens", "reference": expected_tokens, "compiler": compiler["output_tokens"]}}
         return result
     result["functional"] = {"checkpoint_status": "matched", "output_status": "matched", "first_mismatch": None}
-    resources = _resource_deltas(reference, compiler)
-    timing = _timing_deltas(reference, compiler)
+    measurement_ids = [
+        side.get(kind, {}).get("measurement_id")
+        for side in (reference, compiler)
+        for kind in ("resources", "timing")
+    ]
+    if any(not isinstance(identity, str) or not identity for identity in measurement_ids) or len(set(measurement_ids)) != len(measurement_ids):
+        result["reasons"] = ["resource and timing measurement identities must be present and distinct across both sides"]
+        return result
+    slice_manifest_sha256 = canonical_sha256(slice_manifest)
+    resources = _resource_deltas(
+        reference,
+        compiler,
+        contract_sha256=frozen_contract_sha256,
+        slice_manifest_sha256=slice_manifest_sha256,
+    )
+    timing = _timing_deltas(
+        reference,
+        compiler,
+        contract_sha256=frozen_contract_sha256,
+        slice_manifest_sha256=slice_manifest_sha256,
+    )
     if resources is None or timing is None:
         absent = []
         if resources is None:
@@ -499,6 +625,9 @@ def parse_yosys_statistics(path: Path) -> dict[str, Any]:
     result: dict[str, Any] = {"path": str(path), "sha256": sha256_file(path)}
     try:
         value = json.loads(raw)
+        evidence_binding = value.get("evidence_binding") if isinstance(value, dict) else None
+        if isinstance(evidence_binding, dict):
+            result.update({key: evidence_binding.get(key) for key in MEASUREMENT_BINDING_FIELDS})
         statistics = value.get("statistics", {}) if isinstance(value, dict) else {}
         if isinstance(statistics, dict) and "num_memory_bits" in statistics:
             result.update({
@@ -549,8 +678,18 @@ def parse_nextpnr_timing(path: Path) -> dict[str, Any]:
     for name, pattern in (("cycles_per_token", r"cycles[_ /-]*per[_ /-]*token\s*[:=]\s*(\d+)"), ("interface_overhead_cycles", r"interface[_ /-]*overhead[_ /-]*cycles\s*[:=]\s*(\d+)")):
         match = re.search(pattern, raw, flags=re.IGNORECASE)
         result[name] = int(match.group(1)) if match else None
-    measurement = re.search(r"measurement_id\s*[:=]\s*([A-Za-z0-9_.:-]+)", raw)
-    result["measurement_id"] = measurement.group(1) if measurement else None
+    token_patterns = {
+        "side": r"^side\s*[:=]\s*([A-Za-z0-9_.:-]+)\s*$",
+        "measurement_kind": r"^measurement_kind\s*[:=]\s*([A-Za-z0-9_.:-]+)\s*$",
+        "contract_sha256": r"^contract_sha256\s*[:=]\s*([0-9a-f]{64})\s*$",
+        "slice_manifest_sha256": r"^slice_manifest_sha256\s*[:=]\s*([0-9a-f]{64})\s*$",
+        "artifact_path": r"^artifact_path\s*[:=]\s*(\S(?:.*\S)?)\s*$",
+        "artifact_sha256": r"^artifact_sha256\s*[:=]\s*([0-9a-f]{64})\s*$",
+        "measurement_id": r"^measurement_id\s*[:=]\s*([A-Za-z0-9_.:-]+)\s*$",
+    }
+    for name, pattern in token_patterns.items():
+        match = re.search(pattern, raw, flags=re.MULTILINE)
+        result[name] = match.group(1) if match else None
     return result
 
 

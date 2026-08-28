@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -95,6 +96,7 @@ def load_module():
 
 
 comparison = load_module()
+_FIXTURE_TEMP_DIRS: list[tempfile.TemporaryDirectory[str]] = []
 
 
 def fixture_contract() -> dict[str, object]:
@@ -140,11 +142,52 @@ def metadata_contract_identity() -> dict[str, object]:
 
 
 def fixtures() -> tuple[dict[str, object], dict[str, object]]:
-    reference_resource_report = ROOT / "tests/fixtures/tinystories-1m-reference-yosys.json"
-    compiler_resource_report = ROOT / "tests/fixtures/tinystories-1m-compiler-yosys.json"
-    reference_timing_report = ROOT / "tests/fixtures/tinystories-1m-reference-nextpnr.rpt"
-    compiler_timing_report = ROOT / "tests/fixtures/tinystories-1m-compiler-nextpnr.rpt"
     manifest = fixture_slice_manifest()
+    report_directory = tempfile.TemporaryDirectory(prefix="tinystories-1m-evidence-")
+    _FIXTURE_TEMP_DIRS.append(report_directory)
+    report_root = Path(report_directory.name)
+    reference_artifact = report_root / "reference-netlist.v"
+    compiler_artifact = report_root / "compiler-netlist.v"
+    shutil.copyfile(ROOT / "tests/fixtures/tinystories-1m-slice-extracted.sv", reference_artifact)
+    shutil.copyfile(ROOT / "tests/fixtures/tinystories-1m-slice-extracted.sv", compiler_artifact)
+    contract_sha256 = comparison.sha256_file(CONTRACT_PATH)
+    slice_manifest_sha256 = canonical_sha256(manifest)
+
+    def binding(side: str, kind: str, artifact: Path, measurement_id: str) -> dict[str, object]:
+        return {
+            "side": side,
+            "measurement_kind": kind,
+            "contract_sha256": contract_sha256,
+            "slice_manifest_sha256": slice_manifest_sha256,
+            "artifact_path": str(artifact),
+            "artifact_sha256": comparison.sha256_file(artifact),
+            "measurement_id": measurement_id,
+        }
+
+    reference_resource_report = report_root / "reference-yosys.json"
+    compiler_resource_report = report_root / "compiler-yosys.json"
+    reference_resource_binding = binding("reference", "resources", reference_artifact, "reference-yosys")
+    compiler_resource_binding = binding("compiler", "resources", compiler_artifact, "compiler-yosys")
+    reference_resource_report.write_text(json.dumps({"cells": {"lut": 100, "ff": 20, "bram": 2, "dsp": 3, "memory_bits": 512}, "evidence_binding": reference_resource_binding}), encoding="utf-8")
+    compiler_resource_report.write_text(json.dumps({"cells": {"lut": 120, "ff": 25, "bram": 2, "dsp": 3, "memory_bits": 1024}, "evidence_binding": compiler_resource_binding}), encoding="utf-8")
+
+    def timing_receipt(path: Path, evidence_binding: dict[str, object], frequency: float, delay: float, cycles: int, overhead: int) -> None:
+        lines = [
+            f"Max frequency: {frequency} MHz",
+            *(f"{key}: {value}" for key, value in evidence_binding.items()),
+            f"clock domain 'core_clk' max frequency: {frequency} MHz",
+            f"critical path domain='core_clk' from='block/state_q[0]' to='block/out_q[0]' delay={delay} ns",
+            f"cycles_per_token: {cycles}",
+            f"interface_overhead_cycles: {overhead}",
+        ]
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    reference_timing_report = report_root / "reference-nextpnr.rpt"
+    compiler_timing_report = report_root / "compiler-nextpnr.rpt"
+    reference_timing_binding = binding("reference", "timing", reference_artifact, "reference-timing")
+    compiler_timing_binding = binding("compiler", "timing", compiler_artifact, "compiler-timing")
+    timing_receipt(reference_timing_report, reference_timing_binding, 100.0, 10.0, 4, 1)
+    timing_receipt(compiler_timing_report, compiler_timing_binding, 80.0, 12.5, 5, 2)
     trace = make_trace(manifest)
     checkpoint_tensors = {name: entry["values"] for name, entry in trace["checkpoints"].items()}
     reference = {
@@ -153,8 +196,8 @@ def fixtures() -> tuple[dict[str, object], dict[str, object]]:
         "checkpoint_tensors": checkpoint_tensors,
         "trace": json.loads(json.dumps(trace)),
         "output_tokens": fixture_contract()["reference"]["tokens"],
-        "resources": {"lut": 100, "ff": 20, "bram": 2, "dsp": 3, "memory_bits": 512, "path": str(reference_resource_report), "sha256": comparison.sha256_file(reference_resource_report), "measurement_id": "reference-yosys"},
-        "timing": {"max_frequency_mhz": 100.0, "critical_paths": [{"clock_domain": "core_clk", "from": "block/state_q[0]", "to": "block/out_q[0]", "delay_ns": 10.0}], "clock_domains": [{"name": "core_clk", "max_frequency_mhz": 100.0}], "cycles_per_token": 4, "interface_overhead_cycles": 1, "path": str(reference_timing_report), "sha256": comparison.sha256_file(reference_timing_report), "measurement_id": "reference-timing"},
+        "resources": {"lut": 100, "ff": 20, "bram": 2, "dsp": 3, "memory_bits": 512, "path": str(reference_resource_report), "sha256": comparison.sha256_file(reference_resource_report), **reference_resource_binding},
+        "timing": {"max_frequency_mhz": 100.0, "critical_paths": [{"clock_domain": "core_clk", "from": "block/state_q[0]", "to": "block/out_q[0]", "delay_ns": 10.0}], "clock_domains": [{"name": "core_clk", "max_frequency_mhz": 100.0}], "cycles_per_token": 4, "interface_overhead_cycles": 1, "path": str(reference_timing_report), "sha256": comparison.sha256_file(reference_timing_report), **reference_timing_binding},
         "provenance": {"source": "reference-fixture"},
     }
     compiler = {
@@ -163,8 +206,8 @@ def fixtures() -> tuple[dict[str, object], dict[str, object]]:
         "checkpoint_tensors": json.loads(json.dumps(checkpoint_tensors)),
         "trace": json.loads(json.dumps(trace)),
         "output_tokens": fixture_contract()["reference"]["tokens"],
-        "resources": {"lut": 120, "ff": 25, "bram": 2, "dsp": 3, "memory_bits": 1024, "path": str(compiler_resource_report), "sha256": comparison.sha256_file(compiler_resource_report), "measurement_id": "compiler-yosys"},
-        "timing": {"max_frequency_mhz": 80.0, "critical_paths": [{"clock_domain": "core_clk", "from": "block/state_q[0]", "to": "block/out_q[0]", "delay_ns": 12.5}], "clock_domains": [{"name": "core_clk", "max_frequency_mhz": 80.0}], "cycles_per_token": 5, "interface_overhead_cycles": 2, "path": str(compiler_timing_report), "sha256": comparison.sha256_file(compiler_timing_report), "measurement_id": "compiler-timing"},
+        "resources": {"lut": 120, "ff": 25, "bram": 2, "dsp": 3, "memory_bits": 1024, "path": str(compiler_resource_report), "sha256": comparison.sha256_file(compiler_resource_report), **compiler_resource_binding},
+        "timing": {"max_frequency_mhz": 80.0, "critical_paths": [{"clock_domain": "core_clk", "from": "block/state_q[0]", "to": "block/out_q[0]", "delay_ns": 12.5}], "clock_domains": [{"name": "core_clk", "max_frequency_mhz": 80.0}], "cycles_per_token": 5, "interface_overhead_cycles": 2, "path": str(compiler_timing_report), "sha256": comparison.sha256_file(compiler_timing_report), **compiler_timing_binding},
         "provenance": {
             "source": "compiler-fixture",
             "annotations": [
@@ -243,6 +286,11 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         del compiler["resources"]["sha256"]
         result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["status"], "incomplete")
+        for evidence_kind in ("resources", "timing"):
+            with self.subTest(evidence_kind=evidence_kind, field="path"):
+                reference, compiler = fixtures()
+                del compiler[evidence_kind]["path"]
+                self.assertEqual(run_compare(reference, compiler, fixture_slice_manifest())["status"], "incomplete")
 
     def test_compare_has_no_frozen_contract_bypass(self) -> None:
         reference, compiler = fixtures()
@@ -272,6 +320,35 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         compiler["resources"]["sha256"] = "0" * 64
         result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["status"], "incomplete")
+
+    def test_cross_side_resource_or_timing_receipt_reuse_is_rejected(self) -> None:
+        for evidence_kind in ("resources", "timing"):
+            with self.subTest(evidence_kind=evidence_kind):
+                reference, compiler = fixtures()
+                compiler[evidence_kind] = json.loads(json.dumps(reference[evidence_kind]))
+                result = run_compare(reference, compiler, fixture_slice_manifest())
+                self.assertEqual(result["status"], "incomplete")
+                self.assertIsNone(result[evidence_kind])
+
+    def test_stale_synthesized_artifact_binding_is_rejected(self) -> None:
+        for evidence_kind in ("resources", "timing"):
+            with self.subTest(evidence_kind=evidence_kind):
+                reference, compiler = fixtures()
+                Path(compiler[evidence_kind]["artifact_path"]).write_text(
+                    "module stale_netlist; endmodule\n", encoding="utf-8"
+                )
+                self.assertEqual(run_compare(reference, compiler, fixture_slice_manifest())["status"], "incomplete")
+
+    def test_every_measurement_identity_must_be_distinct(self) -> None:
+        reference, compiler = fixtures()
+        resource_path = Path(compiler["resources"]["path"])
+        resource_receipt = json.loads(resource_path.read_text(encoding="utf-8"))
+        duplicate_id = reference["resources"]["measurement_id"]
+        resource_receipt["evidence_binding"]["measurement_id"] = duplicate_id
+        resource_path.write_text(json.dumps(resource_receipt), encoding="utf-8")
+        compiler["resources"]["measurement_id"] = duplicate_id
+        compiler["resources"]["sha256"] = comparison.sha256_file(resource_path)
+        self.assertEqual(run_compare(reference, compiler, fixture_slice_manifest())["status"], "incomplete")
 
     def test_correctly_hashed_unrelated_report_cannot_authenticate_claimed_measurements(self) -> None:
         reference, compiler = fixtures()
@@ -353,6 +430,70 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
                 else:
                     manifest["contract"]["identity"]["model"]["source_revision"] = "forged"
                 self.assertEqual(run_compare(reference, compiler, manifest)["status"], "incomplete")
+
+    def test_ready_manifest_rejects_hashed_non_rtl_artifact(self) -> None:
+        manifest = fixture_slice_manifest()
+        artifact = manifest["slice"]["artifacts"][0]
+        artifact["source"] = str(CONTRACT_PATH)
+        artifact["source_sha256"] = comparison.sha256_file(CONTRACT_PATH)
+        artifact["extracted"] = str(CONTRACT_PATH)
+        artifact["sha256"] = comparison.sha256_file(CONTRACT_PATH)
+        reasons = comparison._validate_ready_slice_manifest(
+            manifest,
+            fixture_contract(),
+            CONTRACT_PATH,
+            comparison.sha256_file(CONTRACT_PATH),
+        )
+        self.assertTrue(reasons)
+        self.assertTrue(any("RTL" in reason or "module" in reason for reason in reasons))
+
+    def test_ready_manifest_rejects_extracted_module_content_not_from_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            extracted = Path(directory) / "forged.sv"
+            extracted.write_text("module transformer_block_token_step; wire forged; endmodule\n", encoding="utf-8")
+            manifest = fixture_slice_manifest()
+            artifact = manifest["slice"]["artifacts"][0]
+            artifact["extracted"] = str(extracted)
+            artifact["sha256"] = comparison.sha256_file(extracted)
+            reasons = comparison._validate_ready_slice_manifest(
+                manifest,
+                fixture_contract(),
+                CONTRACT_PATH,
+                comparison.sha256_file(CONTRACT_PATH),
+            )
+            self.assertTrue(any("content" in reason for reason in reasons))
+
+    def test_ready_manifest_rederives_anchor_and_dependency_closure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "slice.sv"
+            source.write_text(
+                "module helper; endmodule\n"
+                "// llm2fpga.slice_kind=one_transformer_block_token_step\n"
+                "module transformer_block_token_step; helper u_helper(); endmodule\n",
+                encoding="utf-8",
+            )
+            helper = root / "helper.sv"
+            anchor = root / "anchor.sv"
+            helper.write_text("module helper; endmodule\n", encoding="utf-8")
+            anchor.write_text("module transformer_block_token_step; helper u_helper(); endmodule\n", encoding="utf-8")
+            manifest = fixture_slice_manifest()
+            manifest["slice"] = {
+                "kind": "one_transformer_block_token_step",
+                "anchor_module": "helper",
+                "dependency_closure": ["helper", "transformer_block_token_step"],
+                "artifacts": [
+                    {"module": "helper", "source": str(source), "source_sha256": comparison.sha256_file(source), "extracted": str(helper), "sha256": comparison.sha256_file(helper)},
+                    {"module": "transformer_block_token_step", "source": str(source), "source_sha256": comparison.sha256_file(source), "extracted": str(anchor), "sha256": comparison.sha256_file(anchor)},
+                ],
+            }
+            reasons = comparison._validate_ready_slice_manifest(
+                manifest,
+                fixture_contract(),
+                CONTRACT_PATH,
+                comparison.sha256_file(CONTRACT_PATH),
+            )
+            self.assertTrue(any("anchor module" in reason for reason in reasons))
 
     def test_arbitrary_missing_or_extra_checkpoints_cannot_align(self) -> None:
         cases = {
