@@ -714,6 +714,11 @@ def main(argv: Iterable[str] | None = None) -> int:
     if manifest_contract_status(args.contract, manifest) != "aligned":
         result = _base_result(contract, manifest)
         result.update(status="contract_mismatch", reasons=_reason("slice manifest contract SHA-256 differs from supplied frozen contract"))
+    elif manifest.get("status") == "contract_mismatch":
+        failure = manifest.get("failure")
+        detail = failure.get("reason") if isinstance(failure, dict) and isinstance(failure.get("reason"), str) else "source artifact identity differs from the frozen contract"
+        result = _base_result(contract, manifest)
+        result.update(status="contract_mismatch", reasons=_reason(f"compiler artifact metadata does not match the frozen contract: {detail}"))
     else:
         reference = _read_optional(args.reference_evidence) or {"contract": contract}
         compiler = _read_optional(args.compiler_evidence) or {"contract": contract}

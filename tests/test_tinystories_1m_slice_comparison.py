@@ -13,6 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts/comparison/compare_tinystories_1m_slice.py"
+REGEN_SCRIPT_PATH = ROOT / "scripts/comparison/regenerate_tinystories_1m_materialization_receipts.py"
 CONTRACT_PATH = ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json"
 SLICE_MANIFEST_PATH = ROOT / "artifacts/comparison/tinystories-1m-slice-manifest.json"
 
@@ -96,6 +97,18 @@ def load_module():
 
 
 comparison = load_module()
+
+
+def load_regenerator():
+    spec = importlib.util.spec_from_file_location("regenerate_tinystories_1m_materialization_receipts", REGEN_SCRIPT_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"unable to import {REGEN_SCRIPT_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+regenerator = load_regenerator()
 _FIXTURE_TEMP_DIRS: list[tempfile.TemporaryDirectory[str]] = []
 
 
@@ -621,7 +634,7 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         del compiler["provenance"]["annotations"][0]["compiler_stage"]
         self.assertEqual(run_compare(reference, compiler, fixture_slice_manifest())["waste_map"], [])
 
-    def test_checked_in_comparison_is_honestly_incomplete_without_full_artifacts(self) -> None:
+    def test_checked_in_comparison_records_realized_subject_contract_mismatch(self) -> None:
         committed = ROOT / "artifacts/comparison/tinystories-1m-slice-comparison.json"
         original = committed.read_bytes()
         with tempfile.TemporaryDirectory() as directory:
@@ -632,11 +645,34 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
                 "--out", str(output),
             ]), 0)
             result = json.loads(output.read_text(encoding="utf-8"))
-            self.assertEqual(result["status"], "incomplete")
+            self.assertEqual(result["status"], "contract_mismatch")
             self.assertIsNone(result["resources"])
             self.assertIsNone(result["timing"])
+            self.assertIn("compiler artifact metadata", result["reasons"][0])
             self.assertEqual(output.read_bytes(), original)
         self.assertEqual(committed.read_bytes(), original)
+
+    def test_materialization_receipt_regeneration_is_byte_stable_and_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "realized-full-model.sv"
+            source.write_text("module generated_full_model; endmodule\n", encoding="utf-8")
+            metadata = root / "metadata.json"
+            manifest = root / "manifest.json"
+            receipt = root / "comparison.json"
+            kwargs = {
+                "flake_attribute": "tiny-stories-1m-baseline-float-sv",
+                "source_model_id": "roneneldan/TinyStories-1M",
+                "source_revision": "77f1b168e219585646439073245fe87e56b3023e",
+            }
+            self.assertEqual(regenerator.regenerate(source, CONTRACT_PATH, metadata, manifest, receipt, **kwargs), 0)
+            first = tuple(path.read_bytes() for path in (metadata, manifest, receipt))
+            self.assertEqual(regenerator.regenerate(source, CONTRACT_PATH, metadata, manifest, receipt, **kwargs), 0)
+            self.assertEqual(tuple(path.read_bytes() for path in (metadata, manifest, receipt)), first)
+            self.assertEqual(json.loads(manifest.read_text(encoding="utf-8"))["status"], "contract_mismatch")
+            comparison_receipt = json.loads(receipt.read_text(encoding="utf-8"))
+            self.assertEqual(comparison_receipt["status"], "contract_mismatch")
+            self.assertIn("compiler artifact metadata", comparison_receipt["reasons"][0])
 
 
 if __name__ == "__main__":

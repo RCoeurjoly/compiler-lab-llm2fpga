@@ -1,0 +1,21 @@
+{
+  "artifact": {
+    "bytes": 310344726,
+    "flake_attribute": "tiny-stories-1m-baseline-float-sv",
+    "sha256": "04b090f78c358757dfca4b56f2d45ee1d05281a8ed9d803ee267ac3000fe9d06",
+    "source": "/nix/store/rl80y735sa4jr5yqxb6280imqm4h50am-tiny-stories-1m-baseline-float-sv/sv/main.sv"
+  },
+  "contract_identity": {
+    "model": {
+      "name": "TinyStories-1M",
+      "source_model_id": "roneneldan/TinyStories-1M",
+      "source_revision": "77f1b168e219585646439073245fe87e56b3023e"
+    },
+    "package": {
+      "manifest_sha256": null,
+      "sha256": null
+    }
+  },
+  "note": "Compiler artifact identity recorded as observed; this is not an assertion of frozen kev-gpt contract equivalence.",
+  "schema": "tinystories-1m-compiler-artifact-metadata-v1"
+}

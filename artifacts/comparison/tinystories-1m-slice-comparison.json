@@ -278,24 +278,21 @@
     "reference_evidence": null,
     "slice_manifest": {
       "path": "artifacts/comparison/tinystories-1m-slice-manifest.json",
-      "sha256": "4b667f431bab7f80c4fd3479649a14391c225c964e02c54b795eda8eaf15f6a2"
+      "sha256": "08d55729c7f1e4525f0dcaae6eff328b7bb4e10e56aa9e00cd43447fc9864646"
     }
   },
   "model": "TinyStories-1M",
   "reasons": [
-    "slice manifest is not ready: source_artifact_unavailable",
-    "slice manifest is not bound to the frozen contract identity",
-    "slice source metadata is absent or its content hash does not match",
-    "slice dependency closure is empty, malformed, or unbounded"
+    "compiler artifact metadata does not match the frozen contract: artifact metadata contract_identity does not exactly match the frozen TinyStories-1M contract"
   ],
   "resources": null,
   "schema": "tinystories-1m-slice-comparison-v1",
   "slice": {
     "kind": "one_transformer_block_token_step",
-    "manifest_status": "source_artifact_unavailable",
+    "manifest_status": "contract_mismatch",
     "status": "unavailable"
   },
-  "status": "incomplete",
+  "status": "contract_mismatch",
   "timing": null,
   "waste_map": []
 }

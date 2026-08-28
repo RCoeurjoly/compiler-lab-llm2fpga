@@ -4,17 +4,24 @@ Date: 2026-08-28
 
 ## Result
 
-The comparison result is **incomplete**, not a functional or efficiency
-claim.  The checked-in compiler slice manifest reports
-`source_artifact_unavailable`: no full TinyStories-1M compiler-generated RTL
-artifact was found by its deterministic discovery policy.  Therefore no
-reference/compiler checkpoint pair, final token pair, Yosys resource receipt,
-or nextpnr timing receipt exists for the selected slice.
+The comparison result is **`contract_mismatch`**, not a functional or
+efficiency claim.  The checked-in metadata records a realized full
+TinyStories-1M compiler SV artifact: 310,344,726 bytes with SHA-256
+`04b090f78c358757dfca4b56f2d45ee1d05281a8ed9d803ee267ac3000fe9d06`.
+The compiler registry identifies it as HuggingFace revision
+`77f1b168e219585646439073245fe87e56b3023e`; the frozen kev-gpt contract
+requires revision `ac533fb8b4f69c71894bf96badfe11e6294d9fcf` and its
+quantized-package hashes.  The strict extractor therefore deliberately made
+no slice artifact.  Consequently no reference/compiler checkpoint pair, final
+token pair, Yosys resource receipt, or nextpnr timing receipt exists for the
+selected slice.
 
 The machine-readable receipt is
 [`tinystories-1m-slice-comparison.json`](../../artifacts/comparison/tinystories-1m-slice-comparison.json).
 It pins the reference contract and the slice-manifest hashes and leaves
-resources, timing, and the provenance-linked waste map null/empty.
+resources, timing, and the provenance-linked waste map null/empty.  The
+published compiler metadata is
+[`tinystories-1m-baseline-float-sv-metadata.json`](../../artifacts/comparison/tinystories-1m-baseline-float-sv-metadata.json).
 
 ## Gate semantics
 
@@ -28,7 +35,8 @@ The harness accepts only these statuses:
 - `incomplete`: any required evidence is unavailable.  No efficiency delta or
   waste candidate is emitted in this state.
 
-Once the full compiler artifact is produced, provide explicit reference and
+Before extracting a slice, authenticate one common model revision and package
+identity for the compiler and reference.  Then provide explicit reference and
 compiler evidence JSON files containing their frozen contracts, exact
 checkpoint tensors, final tokens, resource measurements, timing measurements,
 and provenance annotations.  Each evidence side must bind to the exact Task 1

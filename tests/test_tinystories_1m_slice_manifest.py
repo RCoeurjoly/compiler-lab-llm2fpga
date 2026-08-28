@@ -38,16 +38,14 @@ def contract_identity() -> dict[str, object]:
 
 
 class TinyStories1MSliceManifestTest(unittest.TestCase):
-    def test_checked_in_manifest_honestly_records_missing_full_model_artifact(self) -> None:
+    def test_checked_in_manifest_honestly_records_realized_subject_contract_mismatch(self) -> None:
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         self.assertEqual(manifest["model"], "TinyStories-1M")
         self.assertEqual(manifest["slice"]["kind"], "one_transformer_block_token_step")
-        self.assertEqual(manifest["status"], "source_artifact_unavailable")
+        self.assertEqual(manifest["status"], "contract_mismatch")
         self.assertEqual(manifest["slice"]["dependency_closure"], [])
-        self.assertEqual(manifest["failure"]["code"], "source_artifact_unavailable")
-        self.assertEqual(manifest["discovery"]["found_paths"], [])
-        self.assertEqual(manifest["discovery"]["repository_root"], ".")
-        self.assertTrue(manifest["discovery"]["repository_candidates"])
+        self.assertEqual(manifest["failure"]["code"], "contract_mismatch")
+        self.assertIsNone(manifest["discovery"])
 
     def test_extracts_complete_block_and_bounded_dependency_closure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -188,7 +186,7 @@ class TinyStories1MSliceManifestTest(unittest.TestCase):
                 extractor.extract([missing], metadata, CONTRACT_PATH, root / "missing-slice")
             self.assertEqual(caught.exception.code, "unbounded_dependency_closure")
 
-    def test_checked_in_unavailable_manifest_is_cli_reproducible(self) -> None:
+    def test_discovery_without_a_materialized_subject_remains_cli_reproducible(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "manifest.json"
             self.assertEqual(extractor.main([
@@ -196,7 +194,9 @@ class TinyStories1MSliceManifestTest(unittest.TestCase):
                 "--contract", "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
                 "--out", str(output),
             ]), 2)
-            self.assertEqual(output.read_bytes(), MANIFEST_PATH.read_bytes())
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "source_artifact_unavailable")
+            self.assertEqual(result["failure"]["code"], "source_artifact_unavailable")
 
     def test_contract_mismatch_writes_no_comparison_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
