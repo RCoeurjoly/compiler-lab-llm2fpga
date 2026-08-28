@@ -8,13 +8,16 @@ The comparison result is **`contract_mismatch`**, not a functional or
 efficiency claim.  The checked-in metadata records a realized full
 TinyStories-1M compiler SV artifact: 310,344,726 bytes with SHA-256
 `04b090f78c358757dfca4b56f2d45ee1d05281a8ed9d803ee267ac3000fe9d06`.
-The compiler registry identifies it as HuggingFace revision
+The historical build that produced this artifact (source commit
+`cc8d7e69edd6e7296be976d84f15b4fc5e4d90ac`) used HuggingFace revision
 `77f1b168e219585646439073245fe87e56b3023e`; the frozen kev-gpt contract
-requires revision `ac533fb8b4f69c71894bf96badfe11e6294d9fcf` and its
-quantized-package hashes.  The strict extractor therefore deliberately made
-no slice artifact.  Consequently no reference/compiler checkpoint pair, final
-token pair, Yosys resource receipt, or nextpnr timing receipt exists for the
-selected slice.
+requires `ac533fb8b4f69c71894bf96badfe11e6294d9fcf` and its quantized-package
+hashes.  This historical receipt is therefore a `contract_mismatch`, and the
+strict extractor deliberately made no slice artifact.  The current registry
+was subsequently repinned to `ac533…9fcf`; it still requires a fresh full SV
+materialization and extraction before it can replace this historical receipt.
+Consequently no reference/compiler checkpoint pair, final token pair, Yosys
+resource receipt, or nextpnr timing receipt exists for the selected slice.
 
 The machine-readable receipt is
 [`tinystories-1m-slice-comparison.json`](../../artifacts/comparison/tinystories-1m-slice-comparison.json).

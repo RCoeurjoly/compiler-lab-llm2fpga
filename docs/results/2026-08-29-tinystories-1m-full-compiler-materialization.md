@@ -7,12 +7,16 @@ SystemVerilog.  The complete `main.sv` is 310,344,726 bytes, SHA-256
 `04b090f78c358757dfca4b56f2d45ee1d05281a8ed9d803ee267ac3000fe9d06`, at Nix
 output `/nix/store/rl80y735sa4jr5yqxb6280imqm4h50am-tiny-stories-1m-baseline-float-sv`.
 
-This does not yet satisfy the reference-guided comparison gate.  The compiler
-registry pins `roneneldan/TinyStories-1M` revision
+This historical materialization does not satisfy the reference-guided
+comparison gate.  At the build's source commit
+`cc8d7e69edd6e7296be976d84f15b4fc5e4d90ac`, the compiler registry used
+`roneneldan/TinyStories-1M` revision
 `77f1b168e219585646439073245fe87e56b3023e`; the frozen kev-gpt contract pins
 `ac533fb8b4f69c71894bf96badfe11e6294d9fcf` and a distinct quantized-package
-identity.  The strict extractor therefore returned `contract_mismatch`, made
-no slice artifact, and the comparison receipt remains incomplete.
+identity.  The strict extractor therefore returned `contract_mismatch` and
+made no slice artifact.  The current registry has since been repinned to
+`ac533…9fcf`; a new full SV build and extraction are still required before any
+comparison can proceed.
 
 The next required decision is to authenticate a single common model revision
 and package identity before extracting or comparing a transformer-block
