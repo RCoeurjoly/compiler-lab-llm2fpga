@@ -40,14 +40,8 @@ def manifest_contract_status(contract_path: Path, manifest: dict[str, Any]) -> s
 
 
 def _contract_identity(contract: dict[str, Any]) -> dict[str, Any]:
-    model = contract.get("model", {})
-    package = contract.get("package", {})
-    quantization = contract.get("quantization", {})
-    return {
-        "model": {key: model.get(key) for key in ("name", "source_model_id", "source_revision")},
-        "package": {key: package.get(key) for key in ("sha256", "manifest_sha256")},
-        "quantization": {key: quantization.get(key) for key in ("weights", "activations", "accumulator", "scale_format", "scale_image_sha256")},
-    }
+    """The whole Task 1 contract is identity, including ABI and reference."""
+    return contract
 
 
 def _reason(message: str) -> list[str]:
@@ -75,13 +69,13 @@ def _base_result(contract: dict[str, Any], manifest: dict[str, Any]) -> dict[str
 
 
 def _same_contract(expected: dict[str, Any], observed: dict[str, Any]) -> bool:
-    return _contract_identity(expected) == _contract_identity(observed)
+    return json.dumps(_contract_identity(expected), sort_keys=True, separators=(",", ":")) == json.dumps(_contract_identity(observed), sort_keys=True, separators=(",", ":"))
 
 
 def _validate_evidence(side: dict[str, Any], label: str) -> list[str]:
     missing: list[str] = []
     for field in ("checkpoint_tensors", "output_tokens"):
-        if field not in side or side[field] is None:
+        if field not in side or not side[field]:
             missing.append(f"{label}.{field} unavailable")
     return missing
 
@@ -98,9 +92,9 @@ def _first_checkpoint_mismatch(reference: dict[str, Any], compiler: dict[str, An
 def _resource_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[str, Any] | None:
     ref = reference.get("resources")
     comp = compiler.get("resources")
-    if not isinstance(ref, dict) or not isinstance(comp, dict) or any(field not in ref or field not in comp for field in RESOURCE_FIELDS):
+    if not isinstance(ref, dict) or not isinstance(comp, dict) or any(not isinstance(ref.get(field), (int, float)) or isinstance(ref.get(field), bool) or not isinstance(comp.get(field), (int, float)) or isinstance(comp.get(field), bool) for field in RESOURCE_FIELDS):
         return None
-    result: dict[str, Any] = {"reference": {field: ref[field] for field in RESOURCE_FIELDS}, "compiler": {field: comp[field] for field in RESOURCE_FIELDS}}
+    result: dict[str, Any] = {"reference": {field: ref[field] for field in RESOURCE_FIELDS}, "compiler": {field: comp[field] for field in RESOURCE_FIELDS}, "reports": {"reference": {field: ref[field] for field in ("path", "sha256") if field in ref}, "compiler": {field: comp[field] for field in ("path", "sha256") if field in comp}}}
     for field in RESOURCE_FIELDS:
         result[f"{field}_delta"] = comp[field] - ref[field]
     return result
@@ -112,12 +106,15 @@ def _timing_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[
     required = ("max_frequency_mhz", "critical_paths", "cycles_per_token", "interface_overhead_cycles")
     if not isinstance(ref, dict) or not isinstance(comp, dict) or any(field not in ref or field not in comp for field in required):
         return None
+    if not isinstance(ref["max_frequency_mhz"], (int, float)) or not isinstance(comp["max_frequency_mhz"], (int, float)) or not ref["critical_paths"] or not comp["critical_paths"] or not isinstance(ref["cycles_per_token"], int) or not isinstance(comp["cycles_per_token"], int) or not isinstance(ref["interface_overhead_cycles"], int) or not isinstance(comp["interface_overhead_cycles"], int):
+        return None
     return {
         "max_frequency_mhz": {"reference": ref["max_frequency_mhz"], "compiler": comp["max_frequency_mhz"], "delta": comp["max_frequency_mhz"] - ref["max_frequency_mhz"]},
         "critical_paths": {"reference": ref["critical_paths"], "compiler": comp["critical_paths"]},
         "cycles_per_token": {"reference": ref["cycles_per_token"], "compiler": comp["cycles_per_token"]},
         "cycles_per_token_delta": comp["cycles_per_token"] - ref["cycles_per_token"],
         "interface_overhead_cycles": {"reference": ref["interface_overhead_cycles"], "compiler": comp["interface_overhead_cycles"]},
+        "reports": {"reference": {field: ref[field] for field in ("path", "sha256") if field in ref}, "compiler": {field: comp[field] for field in ("path", "sha256") if field in comp}},
     }
 
 
@@ -128,27 +125,27 @@ def _waste_map(compiler: dict[str, Any], resources: dict[str, Any]) -> list[dict
         if not isinstance(annotation, dict):
             continue
         resource = annotation.get("resource")
-        amount = annotation.get("amount")
-        if resource not in RESOURCE_FIELDS or not isinstance(amount, (int, float)):
+        measured_delta = annotation.get("measured_delta")
+        if resource not in RESOURCE_FIELDS or not isinstance(measured_delta, (int, float)) or isinstance(measured_delta, bool):
             continue
         delta = resources.get(f"{resource}_delta")
-        if not isinstance(delta, (int, float)) or delta <= 0 or amount <= 0:
+        if not isinstance(delta, (int, float)) or delta <= 0 or measured_delta <= 0 or measured_delta > delta:
             continue
-        if not all(annotation.get(key) for key in ("kind", "module", "source_operation")):
+        if not all(annotation.get(key) for key in ("kind", "module", "source_operation", "compiler_stage")):
             continue
         result.append({
             "kind": annotation["kind"],
             "module": annotation["module"],
             "source_operation": annotation["source_operation"],
             "resource": resource,
-            "measured_delta": min(amount, delta),
-            "compiler_stage": annotation.get("compiler_stage"),
+            "measured_delta": measured_delta,
+            "compiler_stage": annotation["compiler_stage"],
             "evidence": "compiler provenance annotation and measured resource delta",
         })
     return sorted(result, key=lambda item: (-item["measured_delta"], item["module"]))
 
 
-def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest: dict[str, Any], *, quantization: str | None = None) -> dict[str, Any]:
+def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest: dict[str, Any], *, quantization: str | None = None, frozen_contract: dict[str, Any] | None = None, frozen_contract_sha256: str | None = None) -> dict[str, Any]:
     """Compare two explicit evidence objects, returning a fail-closed result."""
     contract = reference.get("contract", {})
     result = _base_result(contract, slice_manifest)
@@ -158,12 +155,18 @@ def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest:
     if not _same_contract(contract, compiler.get("contract", {})):
         result.update(status="contract_mismatch", reasons=_reason("compiler contract identity or quantization differs from reference"))
         return result
-    if quantization is not None and quantization != _contract_identity(contract)["quantization"]:
+    if quantization is not None and quantization != contract.get("quantization"):
         result.update(status="contract_mismatch", reasons=_reason("requested quantization differs from frozen contract quantization"))
         return result
     missing = _validate_evidence(reference, "reference") + _validate_evidence(compiler, "compiler")
     if missing:
         result["reasons"] = missing
+        return result
+    if frozen_contract is not None and (not _same_contract(frozen_contract, contract) or not _same_contract(frozen_contract, compiler.get("contract", {}))):
+        result.update(status="contract_mismatch", reasons=_reason("reference or compiler contract differs from frozen Task 1 contract"))
+        return result
+    if frozen_contract_sha256 is not None and (reference.get("contract_sha256") != frozen_contract_sha256 or compiler.get("contract_sha256") != frozen_contract_sha256):
+        result.update(status="contract_mismatch", reasons=_reason("reference or compiler contract SHA-256 differs from frozen Task 1 contract"))
         return result
     mismatch = _first_checkpoint_mismatch(reference, compiler)
     if mismatch is not None:
@@ -195,17 +198,30 @@ def parse_yosys_statistics(path: Path) -> dict[str, Any]:
     result: dict[str, Any] = {"path": str(path), "sha256": sha256_file(path)}
     try:
         value = json.loads(raw)
+        statistics = value.get("statistics", {}) if isinstance(value, dict) else {}
+        if isinstance(statistics, dict) and "num_memory_bits" in statistics:
+            result.update({
+                "lut": None,
+                "ff": None,
+                "bram": None,
+                "dsp": None,
+                "memory_bits": statistics["num_memory_bits"],
+                "structural_cells": statistics.get("num_cells_by_type", {}),
+                "scope": value.get("scope"),
+            })
+            return result
         cells = value.get("cells", value.get("resources", value)) if isinstance(value, dict) else {}
         if isinstance(cells, dict):
             normalized = {str(key).lower(): number for key, number in cells.items() if isinstance(number, (int, float))}
-            result.update({"lut": normalized.get("lut", normalized.get("lut6", 0)), "ff": normalized.get("ff", normalized.get("fdre", 0)), "bram": normalized.get("bram", normalized.get("ramb36e1", 0)), "dsp": normalized.get("dsp", normalized.get("dsp48e1", 0)), "memory_bits": normalized.get("memory_bits", 0)})
+            result.update({"lut": normalized.get("lut", normalized.get("lut6")), "ff": normalized.get("ff", normalized.get("fdre")), "bram": normalized.get("bram", normalized.get("ramb36e1")), "dsp": normalized.get("dsp", normalized.get("dsp48e1")), "memory_bits": normalized.get("memory_bits"), "structural_cells": None})
             return result
     except json.JSONDecodeError:
         pass
     patterns = {"lut": r"\b(?:LUT|LUTs)\s*:\s*(\d+)", "ff": r"\b(?:FF|FDRE)\s*:\s*(\d+)", "bram": r"\b(?:BRAM|RAMB(?:18|36))\w*\s*:\s*(\d+)", "dsp": r"\b(?:DSP|DSP48)\w*\s*:\s*(\d+)", "memory_bits": r"\bmemory_bits\s*:\s*(\d+)"}
     for name, pattern in patterns.items():
         match = re.search(pattern, raw, flags=re.IGNORECASE)
-        result[name] = int(match.group(1)) if match else 0
+        result[name] = int(match.group(1)) if match else None
+    result["structural_cells"] = None
     return result
 
 
@@ -243,7 +259,8 @@ def main(argv: Iterable[str] | None = None) -> int:
     else:
         reference = _read_optional(args.reference_evidence) or {"contract": contract}
         compiler = _read_optional(args.compiler_evidence) or {"contract": contract}
-        result = compare(reference, compiler, manifest)
+        frozen_sha256 = sha256_file(args.contract)
+        result = compare(reference, compiler, manifest, frozen_contract=contract, frozen_contract_sha256=frozen_sha256)
     result["inputs"] = {
         "contract": {"path": str(args.contract), "sha256": sha256_file(args.contract)},
         "slice_manifest": {"path": str(args.slice_manifest), "sha256": sha256_file(args.slice_manifest)},

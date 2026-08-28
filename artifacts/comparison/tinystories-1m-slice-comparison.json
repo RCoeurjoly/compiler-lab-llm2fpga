@@ -1,12 +1,215 @@
 {
   "contract_identity": {
+    "baseline": {
+      "clock_mhz": null,
+      "cycles_per_token": null,
+      "reason": "No reproducible one-stream TinyStories-1M hardware timing/resource baseline receipt is present in this repository or the inspected package.",
+      "resources": null,
+      "source": null,
+      "status": "unavailable",
+      "throughput_tokens_per_second": null
+    },
+    "command_abi": {
+      "bit_order": "lsb0",
+      "bit_packing": "none",
+      "byte_order": "little",
+      "command_encodings": {
+        "infer": 1
+      },
+      "crc32": {
+        "algorithm": "CRC-32/IEEE",
+        "coverage": {
+          "end_offset": "crc_trailer_start_exclusive",
+          "start_offset": 0
+        },
+        "final_xor_u32": 4294967295,
+        "initial_value_u32": 4294967295,
+        "polynomial_reflected_u32": 3988292384,
+        "reflected_input": true,
+        "reflected_output": true,
+        "trailer_byte_order": "little",
+        "trailer_byte_width": 4,
+        "trailer_integer_encoding": "u32",
+        "trailer_offset": {
+          "constant_bytes": 4,
+          "operator": "total_bytes_minus_constant"
+        },
+        "trailer_placement": "immediately_after_payload"
+      },
+      "cycle_count_bits": 64,
+      "generation_count_bits": 8,
+      "max_context": 32,
+      "reply_fields": [
+        {
+          "byte_offset": 0,
+          "byte_width": 2,
+          "encoding": "u16",
+          "kind": "fixed",
+          "name": "magic"
+        },
+        {
+          "byte_offset": 2,
+          "byte_width": 1,
+          "encoding": "u8",
+          "kind": "fixed",
+          "name": "version"
+        },
+        {
+          "byte_offset": 3,
+          "byte_width": 1,
+          "encoding": "u8",
+          "kind": "fixed",
+          "name": "status"
+        },
+        {
+          "byte_offset": 4,
+          "byte_width": 1,
+          "encoding": "u8",
+          "kind": "fixed",
+          "name": "token_count"
+        },
+        {
+          "byte_offset": 5,
+          "byte_width": 8,
+          "encoding": "u64",
+          "kind": "fixed",
+          "name": "cycles"
+        },
+        {
+          "byte_offset": 13,
+          "byte_width": 2,
+          "count_field": "token_count",
+          "encoding": "u16",
+          "kind": "variable_array",
+          "name": "output_tokens"
+        }
+      ],
+      "reply_frame": {
+        "header_bytes": 13,
+        "ok_token_count_rule": "equals_request_generation_count",
+        "token_count_field": "token_count",
+        "token_count_max": 32,
+        "token_count_min": 0,
+        "token_element_bytes": 2,
+        "token_element_encoding": "u16",
+        "token_payload_offset": 13,
+        "total_length": {
+          "base_bytes": 17,
+          "count_field": "token_count",
+          "element_bytes": 2,
+          "operator": "base_plus_count_times_element_bytes"
+        }
+      },
+      "reply_magic_u16": 19282,
+      "request_fields": [
+        {
+          "byte_offset": 0,
+          "byte_width": 2,
+          "encoding": "u16",
+          "kind": "fixed",
+          "name": "magic"
+        },
+        {
+          "byte_offset": 2,
+          "byte_width": 1,
+          "encoding": "u8",
+          "kind": "fixed",
+          "name": "version"
+        },
+        {
+          "byte_offset": 3,
+          "byte_width": 1,
+          "encoding": "u8",
+          "kind": "fixed",
+          "name": "command"
+        },
+        {
+          "byte_offset": 4,
+          "byte_width": 1,
+          "encoding": "u8",
+          "kind": "fixed",
+          "name": "prompt_count"
+        },
+        {
+          "byte_offset": 5,
+          "byte_width": 1,
+          "encoding": "u8",
+          "kind": "fixed",
+          "name": "generation_count"
+        },
+        {
+          "byte_offset": 6,
+          "byte_width": 2,
+          "count_field": "prompt_count",
+          "encoding": "u16",
+          "kind": "variable_array",
+          "name": "prompt_tokens"
+        }
+      ],
+      "request_frame": {
+        "generation_count_max": 32,
+        "generation_count_min": 0,
+        "header_bytes": 6,
+        "prompt_plus_generation_max": 32,
+        "token_count_field": "prompt_count",
+        "token_count_max": 32,
+        "token_count_min": 1,
+        "token_element_bytes": 2,
+        "token_element_encoding": "u16",
+        "token_payload_offset": 6,
+        "total_length": {
+          "base_bytes": 10,
+          "count_field": "prompt_count",
+          "element_bytes": 2,
+          "operator": "base_plus_count_times_element_bytes"
+        }
+      },
+      "request_magic_u16": 19271,
+      "status_encodings": {
+        "accelerator_base": 16,
+        "accelerator_status_max": 255,
+        "accelerator_status_min": 16,
+        "bad_crc": 2,
+        "bad_header": 1,
+        "context": 3,
+        "ok": 0
+      },
+      "token_id_bits": 16,
+      "version": 1
+    },
+    "incomplete_reasons": [
+      "No reproducible TinyStories-1M reference trace artifact is present in this repository or the inspected package.",
+      "No reproducible one-stream TinyStories-1M hardware timing/resource baseline receipt is present in this repository or the inspected kev-gpt package; published multi-stream figures are not substituted."
+    ],
+    "memory_image": {
+      "bytes": 3632704,
+      "format": "weights.bin with manifest offsets; scales.bin side image",
+      "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+    },
     "model": {
+      "activation_function": "gelu_new",
+      "architecture": "GPT-Neo causal language model",
+      "head_dim": 4,
+      "hidden_size": 64,
+      "max_context": 32,
+      "n_head": 16,
+      "n_layer": 8,
       "name": "TinyStories-1M",
       "source_model_id": "roneneldan/TinyStories-1M",
-      "source_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf"
+      "source_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf",
+      "tie_word_embeddings": true,
+      "vocab_size": 50257
     },
     "package": {
+      "files": {
+        "calibration_ids.bin": "2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075",
+        "manifest.json": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+        "receipt.json": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
+        "scales.bin": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+        "weights.bin": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+      },
       "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+      "origin": "/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m",
       "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
     },
     "quantization": {
@@ -15,6 +218,50 @@
       "scale_format": "little-endian float32",
       "scale_image_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
       "weights": "symmetric per-output INT8"
+    },
+    "reference": {
+      "generation": "greedy top-1",
+      "prompt_text": "Once upon a time",
+      "prompt_tokens": [
+        7454,
+        2402,
+        257,
+        640
+      ],
+      "reference_impl": "kev-gpt/tinystories/int_reference.py",
+      "reference_trace": {
+        "reason": "No reproducible TinyStories-1M reference trace artifact is present in this repository or the inspected package.",
+        "sha256": null,
+        "status": "unavailable"
+      },
+      "tokens": [
+        11,
+        612,
+        373,
+        257,
+        1310,
+        2576,
+        3706,
+        20037,
+        13,
+        1375,
+        6151,
+        284,
+        711,
+        2354,
+        287,
+        262
+      ]
+    },
+    "schema_version": 1,
+    "status": "incomplete",
+    "tokenizer": {
+      "add_bos_token": false,
+      "add_prefix_space": false,
+      "merges_sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5",
+      "sha256": "f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5",
+      "type": "GPT2Tokenizer",
+      "vocab_sha256": "3ba3c3109ff33976c4bd966589c11ee14fcaa1f4c9e5e154c2ed7f99d80709e7"
     }
   },
   "functional": {

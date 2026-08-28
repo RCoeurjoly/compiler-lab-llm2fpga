@@ -31,8 +31,15 @@ The harness accepts only these statuses:
 Once the full compiler artifact is produced, provide explicit reference and
 compiler evidence JSON files containing their frozen contracts, exact
 checkpoint tensors, final tokens, resource measurements, timing measurements,
-and provenance annotations.  The harness preserves report paths and SHA-256
-hashes when parsing Yosys and nextpnr receipts.  A waste-map entry requires
-both a positive measured resource delta and a compiler provenance annotation
-with module and source operation; it is never inferred from module naming
-alone.
+and provenance annotations.  Each evidence side must bind to the exact Task 1
+contract SHA-256 and its whole semantic contract (including ABI and frozen
+reference fields).  Empty checkpoint/token/report data is incomplete evidence,
+never an aligned result.  The harness preserves report paths and SHA-256 hashes
+when parsing Yosys and nextpnr receipts.  A waste-map entry requires an exact,
+positive per-entry measured delta (not a clipped estimate), a compiler stage,
+module, and source operation; it is never inferred from module naming alone.
+
+The existing `yosys-slang` structural-utilization receipt is intentionally not
+treated as FPGA LUT/FF/BRAM/DSP data.  Its memory-bit and cell-type statistics
+are retained as structural statistics, while unavailable technology-mapped
+resources remain `null`.
