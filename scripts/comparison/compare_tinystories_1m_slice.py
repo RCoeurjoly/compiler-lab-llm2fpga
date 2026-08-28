@@ -90,7 +90,10 @@ def _first_checkpoint_mismatch(reference: dict[str, Any], compiler: dict[str, An
 
 
 def _report_provenance_is_complete(report: dict[str, Any]) -> bool:
-    return isinstance(report.get("path"), str) and bool(report["path"]) and isinstance(report.get("sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", report["sha256"]) is not None and isinstance(report.get("measurement_id"), str) and bool(report["measurement_id"])
+    if not (isinstance(report.get("path"), str) and bool(report["path"]) and isinstance(report.get("sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", report["sha256"]) is not None and isinstance(report.get("measurement_id"), str) and bool(report["measurement_id"])):
+        return False
+    path = Path(report["path"])
+    return path.is_file() and sha256_file(path) == report["sha256"]
 
 
 def _resource_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[str, Any] | None:
@@ -144,15 +147,22 @@ def _waste_map(compiler: dict[str, Any], resources: dict[str, Any]) -> list[dict
             "resource": resource,
             "measured_delta": measured_delta,
             "compiler_stage": annotation["compiler_stage"],
+            "measurement_id": annotation["measurement_id"],
             "evidence": "compiler provenance annotation and measured resource delta",
         })
     return sorted(result, key=lambda item: (-item["measured_delta"], item["module"]))
 
 
-def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest: dict[str, Any], *, frozen_contract: dict[str, Any], frozen_contract_sha256: str, quantization: str | None = None) -> dict[str, Any]:
+def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest: dict[str, Any], *, frozen_contract: dict[str, Any], frozen_contract_path: Path, frozen_contract_sha256: str, quantization: str | None = None) -> dict[str, Any]:
     """Compare two explicit evidence objects, returning a fail-closed result."""
     contract = reference.get("contract", {})
     result = _base_result(contract, slice_manifest)
+    if not frozen_contract_path.is_file() or sha256_file(frozen_contract_path) != frozen_contract_sha256 or not _same_contract(load_json(frozen_contract_path), frozen_contract):
+        result.update(status="contract_mismatch", reasons=_reason("supplied frozen contract content or SHA-256 does not match its file"))
+        return result
+    if slice_manifest.get("contract", {}).get("sha256") != frozen_contract_sha256:
+        result.update(status="contract_mismatch", reasons=_reason("slice manifest contract SHA-256 differs from supplied frozen Task 1 contract"))
+        return result
     if slice_manifest.get("status") != "ready":
         result["reasons"] = _reason(f"slice manifest is not ready: {slice_manifest.get('status')}")
         return result
@@ -180,6 +190,11 @@ def compare(reference: dict[str, Any], compiler: dict[str, Any], slice_manifest:
     if reference["output_tokens"] != compiler["output_tokens"]:
         result.update(status="functional_mismatch", reasons=_reason("final output tokens differ"))
         result["functional"] = {"checkpoint_status": "matched", "output_status": "mismatch", "first_mismatch": {"checkpoint": "final_output_tokens", "reference": reference["output_tokens"], "compiler": compiler["output_tokens"]}}
+        return result
+    expected_tokens = frozen_contract.get("reference", {}).get("tokens")
+    if not isinstance(expected_tokens, list) or reference["output_tokens"] != expected_tokens:
+        result.update(status="functional_mismatch", reasons=_reason("final output tokens differ from the frozen Task 1 reference"))
+        result["functional"] = {"checkpoint_status": "matched", "output_status": "mismatch", "first_mismatch": {"checkpoint": "final_output_tokens", "reference": expected_tokens, "compiler": compiler["output_tokens"]}}
         return result
     result["functional"] = {"checkpoint_status": "matched", "output_status": "matched", "first_mismatch": None}
     resources = _resource_deltas(reference, compiler)
@@ -273,7 +288,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         reference = _read_optional(args.reference_evidence) or {"contract": contract}
         compiler = _read_optional(args.compiler_evidence) or {"contract": contract}
         frozen_sha256 = sha256_file(args.contract)
-        result = compare(reference, compiler, manifest, frozen_contract=contract, frozen_contract_sha256=frozen_sha256)
+        result = compare(reference, compiler, manifest, frozen_contract=contract, frozen_contract_path=args.contract, frozen_contract_sha256=frozen_sha256)
     result["inputs"] = {
         "contract": {"path": str(args.contract), "sha256": sha256_file(args.contract)},
         "slice_manifest": {"path": str(args.slice_manifest), "sha256": sha256_file(args.slice_manifest)},

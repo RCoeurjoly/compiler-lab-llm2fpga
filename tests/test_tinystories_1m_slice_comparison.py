@@ -48,22 +48,24 @@ def fixture_slice_manifest() -> dict[str, object]:
 
 
 def fixtures() -> tuple[dict[str, object], dict[str, object]]:
+    report_sha256 = comparison.sha256_file(CONTRACT_PATH)
+    report_path = str(CONTRACT_PATH)
     reference = {
         "contract": fixture_contract(),
         "contract_sha256": comparison.sha256_file(CONTRACT_PATH),
         "checkpoint_tensors": {"block.out": [1, 2]},
-        "output_tokens": [11, 612],
-        "resources": {"lut": 100, "ff": 20, "bram": 2, "dsp": 3, "memory_bits": 512, "path": "reference-yosys.json", "sha256": "a" * 64, "measurement_id": "reference-yosys"},
-        "timing": {"max_frequency_mhz": 100.0, "critical_paths": [{"delay_ns": 10.0}], "cycles_per_token": 4, "interface_overhead_cycles": 1, "path": "reference-nextpnr.rpt", "sha256": "b" * 64, "measurement_id": "reference-timing"},
+        "output_tokens": fixture_contract()["reference"]["tokens"],
+        "resources": {"lut": 100, "ff": 20, "bram": 2, "dsp": 3, "memory_bits": 512, "path": report_path, "sha256": report_sha256, "measurement_id": "reference-yosys"},
+        "timing": {"max_frequency_mhz": 100.0, "critical_paths": [{"delay_ns": 10.0}], "cycles_per_token": 4, "interface_overhead_cycles": 1, "path": report_path, "sha256": report_sha256, "measurement_id": "reference-timing"},
         "provenance": {"source": "reference-fixture"},
     }
     compiler = {
         "contract": fixture_contract(),
         "contract_sha256": comparison.sha256_file(CONTRACT_PATH),
         "checkpoint_tensors": {"block.out": [1, 2]},
-        "output_tokens": [11, 612],
-        "resources": {"lut": 120, "ff": 25, "bram": 2, "dsp": 3, "memory_bits": 1024, "path": "compiler-yosys.json", "sha256": "c" * 64, "measurement_id": "compiler-yosys"},
-        "timing": {"max_frequency_mhz": 80.0, "critical_paths": [{"delay_ns": 12.5}], "cycles_per_token": 5, "interface_overhead_cycles": 2, "path": "compiler-nextpnr.rpt", "sha256": "d" * 64, "measurement_id": "compiler-timing"},
+        "output_tokens": fixture_contract()["reference"]["tokens"],
+        "resources": {"lut": 120, "ff": 25, "bram": 2, "dsp": 3, "memory_bits": 1024, "path": report_path, "sha256": report_sha256, "measurement_id": "compiler-yosys"},
+        "timing": {"max_frequency_mhz": 80.0, "critical_paths": [{"delay_ns": 12.5}], "cycles_per_token": 5, "interface_overhead_cycles": 2, "path": report_path, "sha256": report_sha256, "measurement_id": "compiler-timing"},
         "provenance": {
             "source": "compiler-fixture",
             "annotations": [
@@ -75,7 +77,7 @@ def fixtures() -> tuple[dict[str, object], dict[str, object]]:
 
 
 def run_compare(reference: dict[str, object], compiler: dict[str, object], manifest: dict[str, object], **kwargs: object) -> dict[str, object]:
-    return comparison.compare(reference, compiler, manifest, frozen_contract=fixture_contract(), frozen_contract_sha256=comparison.sha256_file(CONTRACT_PATH), **kwargs)
+    return comparison.compare(reference, compiler, manifest, frozen_contract=fixture_contract(), frozen_contract_path=CONTRACT_PATH, frozen_contract_sha256=comparison.sha256_file(CONTRACT_PATH), **kwargs)
 
 
 class TinyStories1MSliceComparisonTest(unittest.TestCase):
@@ -129,6 +131,30 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         reference, compiler = fixtures()
         with self.assertRaises(TypeError):
             comparison.compare(reference, compiler, fixture_slice_manifest())
+
+    def test_equal_side_outputs_that_differ_from_frozen_reference_are_mismatch(self) -> None:
+        reference, compiler = fixtures()
+        reference["output_tokens"] = [99]
+        compiler["output_tokens"] = [99]
+        result = run_compare(reference, compiler, fixture_slice_manifest())
+        self.assertEqual(result["status"], "functional_mismatch")
+
+    def test_public_api_rejects_slice_manifest_contract_sha_mismatch(self) -> None:
+        reference, compiler = fixtures()
+        manifest = fixture_slice_manifest()
+        manifest["contract"]["sha256"] = "0" * 64
+        result = run_compare(reference, compiler, manifest)
+        self.assertEqual(result["status"], "contract_mismatch")
+
+    def test_report_provenance_requires_existing_content_matching_hash(self) -> None:
+        reference, compiler = fixtures()
+        compiler["timing"]["path"] = "/does/not/exist"
+        result = run_compare(reference, compiler, fixture_slice_manifest())
+        self.assertEqual(result["status"], "incomplete")
+        reference, compiler = fixtures()
+        compiler["resources"]["sha256"] = "0" * 64
+        result = run_compare(reference, compiler, fixture_slice_manifest())
+        self.assertEqual(result["status"], "incomplete")
 
     def test_full_contract_identity_rejects_abi_and_reference_changes(self) -> None:
         reference, compiler = fixtures()
@@ -195,6 +221,7 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         reference, compiler = fixtures()
         result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["waste_map"][0]["measured_delta"], 20)
+        self.assertEqual(result["waste_map"][0]["measurement_id"], "compiler-yosys")
         del compiler["provenance"]["annotations"][0]["compiler_stage"]
         self.assertEqual(run_compare(reference, compiler, fixture_slice_manifest())["waste_map"], [])
 

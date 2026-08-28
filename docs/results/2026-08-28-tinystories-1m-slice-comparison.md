@@ -33,13 +33,17 @@ compiler evidence JSON files containing their frozen contracts, exact
 checkpoint tensors, final tokens, resource measurements, timing measurements,
 and provenance annotations.  Each evidence side must bind to the exact Task 1
 contract SHA-256 and its whole semantic contract (including ABI and frozen
-reference fields).  Empty checkpoint/token/report data is incomplete evidence,
+reference fields).  The public API verifies the manifest binding against the
+supplied, on-disk frozen-contract SHA-256.  Empty checkpoint/token/report data is incomplete evidence,
 never an aligned result.  Every aligned resource/timing input must provide a
 report path, SHA-256, and measurement identifier.  The harness preserves them
 when parsing Yosys and nextpnr receipts.  A waste-map entry requires an exact,
 positive per-entry measured delta (not a clipped estimate), a compiler stage,
 module, source operation, and the matching compiler resource measurement
 identifier; it is never inferred from module naming alone.
+
+Side-to-side output agreement is also insufficient: both final output sequences
+must equal the frozen Task 1 reference token sequence.
 
 The existing `yosys-slang` structural-utilization receipt is intentionally not
 treated as FPGA LUT/FF/BRAM/DSP data.  Its memory-bit and cell-type statistics
