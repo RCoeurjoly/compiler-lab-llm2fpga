@@ -1,0 +1,18 @@
+{
+  "contract": {
+    "path": "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+    "sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
+  },
+  "failure": {
+    "code": "source_artifact_unavailable",
+    "reason": "No full TinyStories-1M compiler-generated SV/RTLIL artifact with matching contract metadata is checked into this repository. Historical full-model reports and Representative Core artifacts are not a substitute."
+  },
+  "model": "TinyStories-1M",
+  "schema": "tinystories-1m-compiler-slice-manifest-v1",
+  "slice": {
+    "dependency_closure": [],
+    "kind": "one_transformer_block_token_step",
+    "status": "unavailable"
+  },
+  "status": "source_artifact_unavailable"
+}
