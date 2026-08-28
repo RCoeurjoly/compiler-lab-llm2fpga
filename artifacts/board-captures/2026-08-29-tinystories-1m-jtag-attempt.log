@@ -1,4 +1,4 @@
-# Raw capture transcript: TinyStories-1M YPCB JTAG attempt
+# Reconstructed observation summary: TinyStories-1M YPCB JTAG attempt
 
 Capture date: 2026-08-29 (Europe/Madrid)
 Board: YPCB-00338-1P1 / xc7k480tffg1156-1
@@ -11,11 +11,12 @@ cwd=/home/roland/kev-gpt/.worktrees/kintex-selftest
 nix run .#kevin-jtag -- infer --prompt "Once upon a time" --max-new-tokens 16 --timeout 300 --json-receipt /tmp/task3i-tinystories-1m-inference-receipt.json
 ```
 
-The Nix controller returned after building the app, while its Python child
-continued to hold `/dev/bus/usb/003/063` for 300 seconds.  The child exited
-without creating `/tmp/task3i-tinystories-1m-inference-receipt.json`.  Its
-stdout/stderr was not retained by the controller after the child detached;
-therefore no output tokens, cycles, or board result are asserted here.
+During subsequent read-only USB diagnostics, a process with this exact command
+line owned `/dev/bus/usb/003/063`.  After the command's configured 300-second
+window, no `/tmp/task3i-tinystories-1m-inference-receipt.json` existed and the
+observed process was gone.  The primary invocation's stdout, stderr, and exit
+status were not captured, so this record does not assert why it ended.  No
+output tokens, cycles, or board result are asserted here.
 
 ## Direct client diagnostics while the primary attempt owned the device
 
@@ -28,9 +29,9 @@ RuntimeError: cannot open JTAG transport: unable to claim usb device. Make sure 
 ```
 
 The second command was deliberately not retried: `fuser` showed that the
-first, bounded primary attempt owned the USB device.  This error does not
-establish a kernel-driver conflict; it establishes exclusive use by the
-already-running primary client.
+primary client then owned the USB device.  This error does not establish a
+kernel-driver conflict; it only establishes that the device could not be
+claimed while the other client held it.
 
 ## USB state observed during the primary attempt
 
