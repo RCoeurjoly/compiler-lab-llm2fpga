@@ -39,3 +39,27 @@ The worktree had a pre-existing staged modification to
 `docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md`;
 Git included it in the commit when the scoped files were staged. Other dirty
 changes remain untouched.
+
+## Fix round
+
+The loader now validates required nested fields and types for model identity,
+all package file hashes, tokenizer vocab/merges hashes and boolean settings,
+quantization scale-image hash, memory-image size, every ABI field, reference
+fixture types, and baseline metadata. Regression coverage mutates representative
+nested hashes and ABI values and confirms fail-closed behavior.
+
+No reproducible trace artifact was available in the inspected package or this
+repository. The contract therefore retains `reference_trace_sha256: null` as an
+explicit unavailable-evidence field; the report does not invent a digest.
+
+Fix-round validation command (pinned environment):
+`nix develop -c python -m unittest discover -s tests -p 'test_tinystories_1m_reference_contract.py' -v`
+passes all 3 tests. Pytest remains unavailable in the pinned environment and no
+dependency was added.
+
+The fix-round loader checks all required nested fields and value types, including
+model dimensions/metadata, package origin and every package-file digest,
+tokenizer settings plus vocab/merges digests, quantization and scale-image
+digest, memory-image size, complete ABI framing, reference metadata and
+null-or-digest trace field, and baseline status/value types. Three regression
+tests pass, including fail-closed mutations of nested hashes and ABI values.
