@@ -1,0 +1,4 @@
+Max frequency: 80.0 MHz
+critical path delay 12.5 ns
+cycles_per_token: 5
+interface_overhead_cycles: 2

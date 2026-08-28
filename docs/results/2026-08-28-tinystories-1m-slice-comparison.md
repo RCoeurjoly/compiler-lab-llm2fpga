@@ -35,9 +35,15 @@ and provenance annotations.  Each evidence side must bind to the exact Task 1
 contract SHA-256 and its whole semantic contract (including ABI and frozen
 reference fields).  The public API verifies the manifest binding against the
 supplied, on-disk frozen-contract SHA-256.  Empty checkpoint/token/report data is incomplete evidence,
-never an aligned result.  Every aligned resource/timing input must provide a
-report path, SHA-256, and measurement identifier.  The harness preserves them
-when parsing Yosys and nextpnr receipts.  A waste-map entry requires an exact,
+never an aligned result. Checkpoint values must be finite numeric scalars or
+non-empty rectangular arrays; nulls, booleans, ragged arrays, and non-numeric
+values are malformed. Every aligned resource/timing input must provide a
+report path, SHA-256, and measurement identifier. The harness reparses that
+exact hashed Yosys or nextpnr receipt and requires every claimed measurement to
+equal its parsed value; the presence of an unrelated hashed file authenticates
+nothing. Timing frequencies and path delays must be finite and positive, token
+cycles must be positive integers, and interface overhead must be a
+non-negative integer no larger than the token cycle count. A waste-map entry requires an exact,
 positive per-entry measured delta (not a clipped estimate), a compiler stage,
 module, source operation, and the matching compiler resource measurement
 identifier; it is never inferred from module naming alone.

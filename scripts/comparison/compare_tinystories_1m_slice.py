@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any, Iterable
@@ -72,11 +73,38 @@ def _same_contract(expected: dict[str, Any], observed: dict[str, Any]) -> bool:
     return json.dumps(_contract_identity(expected), sort_keys=True, separators=(",", ":")) == json.dumps(_contract_identity(observed), sort_keys=True, separators=(",", ":"))
 
 
+def _tensor_shape(value: Any) -> tuple[int, ...] | None:
+    """Return a rectangular numeric tensor shape, or None for invalid data."""
+    if isinstance(value, bool) or (not isinstance(value, (int, float)) and not isinstance(value, list)):
+        return None
+    if isinstance(value, (int, float)):
+        return () if math.isfinite(value) else None
+    if not value:
+        return None
+    child_shapes = [_tensor_shape(item) for item in value]
+    if any(shape is None for shape in child_shapes) or len(set(child_shapes)) != 1:
+        return None
+    return (len(value),) + child_shapes[0]
+
+
+def _checkpoint_tensors_are_valid(value: Any) -> bool:
+    return (
+        isinstance(value, dict)
+        and bool(value)
+        and all(isinstance(name, str) and bool(name) and _tensor_shape(tensor) is not None for name, tensor in value.items())
+    )
+
+
+def _output_tokens_are_valid(value: Any) -> bool:
+    return isinstance(value, list) and bool(value) and all(isinstance(token, int) and not isinstance(token, bool) and 0 <= token <= 0xFFFF for token in value)
+
+
 def _validate_evidence(side: dict[str, Any], label: str) -> list[str]:
     missing: list[str] = []
-    for field in ("checkpoint_tensors", "output_tokens"):
-        if field not in side or not side[field]:
-            missing.append(f"{label}.{field} unavailable")
+    if not _checkpoint_tensors_are_valid(side.get("checkpoint_tensors")):
+        missing.append(f"{label}.checkpoint_tensors unavailable or malformed")
+    if not _output_tokens_are_valid(side.get("output_tokens")):
+        missing.append(f"{label}.output_tokens unavailable or malformed")
     return missing
 
 
@@ -96,10 +124,22 @@ def _report_provenance_is_complete(report: dict[str, Any]) -> bool:
     return path.is_file() and sha256_file(path) == report["sha256"]
 
 
+def _resource_measurement_is_valid(report: dict[str, Any]) -> bool:
+    if not _report_provenance_is_complete(report):
+        return False
+    if any(not isinstance(report.get(field), int) or isinstance(report.get(field), bool) or report[field] < 0 for field in RESOURCE_FIELDS):
+        return False
+    try:
+        parsed = parse_yosys_statistics(Path(report["path"]))
+    except (OSError, UnicodeError, ValueError, TypeError):
+        return False
+    return all(parsed.get(field) == report[field] for field in RESOURCE_FIELDS)
+
+
 def _resource_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[str, Any] | None:
     ref = reference.get("resources")
     comp = compiler.get("resources")
-    if not isinstance(ref, dict) or not isinstance(comp, dict) or not _report_provenance_is_complete(ref) or not _report_provenance_is_complete(comp) or any(not isinstance(ref.get(field), (int, float)) or isinstance(ref.get(field), bool) or not isinstance(comp.get(field), (int, float)) or isinstance(comp.get(field), bool) for field in RESOURCE_FIELDS):
+    if not isinstance(ref, dict) or not isinstance(comp, dict) or not _resource_measurement_is_valid(ref) or not _resource_measurement_is_valid(comp):
         return None
     result: dict[str, Any] = {"reference": {field: ref[field] for field in RESOURCE_FIELDS}, "compiler": {field: comp[field] for field in RESOURCE_FIELDS}, "reports": {"reference": {field: ref[field] for field in ("path", "sha256", "measurement_id")}, "compiler": {field: comp[field] for field in ("path", "sha256", "measurement_id")}}}
     for field in RESOURCE_FIELDS:
@@ -113,7 +153,7 @@ def _timing_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[
     required = ("max_frequency_mhz", "critical_paths", "cycles_per_token", "interface_overhead_cycles")
     if not isinstance(ref, dict) or not isinstance(comp, dict) or any(field not in ref or field not in comp for field in required):
         return None
-    if not _report_provenance_is_complete(ref) or not _report_provenance_is_complete(comp) or not isinstance(ref["max_frequency_mhz"], (int, float)) or not isinstance(comp["max_frequency_mhz"], (int, float)) or not ref["critical_paths"] or not comp["critical_paths"] or not isinstance(ref["cycles_per_token"], int) or not isinstance(comp["cycles_per_token"], int) or not isinstance(ref["interface_overhead_cycles"], int) or not isinstance(comp["interface_overhead_cycles"], int):
+    if not _timing_measurement_is_valid(ref) or not _timing_measurement_is_valid(comp):
         return None
     return {
         "max_frequency_mhz": {"reference": ref["max_frequency_mhz"], "compiler": comp["max_frequency_mhz"], "delta": comp["max_frequency_mhz"] - ref["max_frequency_mhz"]},
@@ -123,6 +163,46 @@ def _timing_deltas(reference: dict[str, Any], compiler: dict[str, Any]) -> dict[
         "interface_overhead_cycles": {"reference": ref["interface_overhead_cycles"], "compiler": comp["interface_overhead_cycles"]},
         "reports": {"reference": {field: ref[field] for field in ("path", "sha256", "measurement_id")}, "compiler": {field: comp[field] for field in ("path", "sha256", "measurement_id")}},
     }
+
+
+def _positive_finite_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0
+
+
+def _critical_path_delays(value: Any) -> list[int | float] | None:
+    if not isinstance(value, list) or not value:
+        return None
+    delays: list[int | float] = []
+    for path in value:
+        if not isinstance(path, dict) or not _positive_finite_number(path.get("delay_ns")):
+            return None
+        delays.append(path["delay_ns"])
+    return delays
+
+
+def _timing_measurement_is_valid(report: dict[str, Any]) -> bool:
+    if not _report_provenance_is_complete(report) or not _positive_finite_number(report.get("max_frequency_mhz")):
+        return False
+    cycles = report.get("cycles_per_token")
+    overhead = report.get("interface_overhead_cycles")
+    delays = _critical_path_delays(report.get("critical_paths"))
+    if not isinstance(cycles, int) or isinstance(cycles, bool) or cycles <= 0:
+        return False
+    if not isinstance(overhead, int) or isinstance(overhead, bool) or overhead < 0 or overhead > cycles:
+        return False
+    if delays is None:
+        return False
+    try:
+        parsed = parse_nextpnr_timing(Path(report["path"]))
+    except (OSError, UnicodeError, ValueError, TypeError):
+        return False
+    parsed_delays = _critical_path_delays(parsed.get("critical_paths"))
+    return (
+        parsed.get("max_frequency_mhz") == report["max_frequency_mhz"]
+        and parsed_delays == delays
+        and parsed.get("cycles_per_token") == cycles
+        and parsed.get("interface_overhead_cycles") == overhead
+    )
 
 
 def _waste_map(compiler: dict[str, Any], resources: dict[str, Any]) -> list[dict[str, Any]]:

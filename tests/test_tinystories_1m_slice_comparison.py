@@ -48,15 +48,17 @@ def fixture_slice_manifest() -> dict[str, object]:
 
 
 def fixtures() -> tuple[dict[str, object], dict[str, object]]:
-    report_sha256 = comparison.sha256_file(CONTRACT_PATH)
-    report_path = str(CONTRACT_PATH)
+    reference_resource_report = ROOT / "tests/fixtures/tinystories-1m-reference-yosys.json"
+    compiler_resource_report = ROOT / "tests/fixtures/tinystories-1m-compiler-yosys.json"
+    reference_timing_report = ROOT / "tests/fixtures/tinystories-1m-reference-nextpnr.rpt"
+    compiler_timing_report = ROOT / "tests/fixtures/tinystories-1m-compiler-nextpnr.rpt"
     reference = {
         "contract": fixture_contract(),
         "contract_sha256": comparison.sha256_file(CONTRACT_PATH),
         "checkpoint_tensors": {"block.out": [1, 2]},
         "output_tokens": fixture_contract()["reference"]["tokens"],
-        "resources": {"lut": 100, "ff": 20, "bram": 2, "dsp": 3, "memory_bits": 512, "path": report_path, "sha256": report_sha256, "measurement_id": "reference-yosys"},
-        "timing": {"max_frequency_mhz": 100.0, "critical_paths": [{"delay_ns": 10.0}], "cycles_per_token": 4, "interface_overhead_cycles": 1, "path": report_path, "sha256": report_sha256, "measurement_id": "reference-timing"},
+        "resources": {"lut": 100, "ff": 20, "bram": 2, "dsp": 3, "memory_bits": 512, "path": str(reference_resource_report), "sha256": comparison.sha256_file(reference_resource_report), "measurement_id": "reference-yosys"},
+        "timing": {"max_frequency_mhz": 100.0, "critical_paths": [{"delay_ns": 10.0}], "cycles_per_token": 4, "interface_overhead_cycles": 1, "path": str(reference_timing_report), "sha256": comparison.sha256_file(reference_timing_report), "measurement_id": "reference-timing"},
         "provenance": {"source": "reference-fixture"},
     }
     compiler = {
@@ -64,8 +66,8 @@ def fixtures() -> tuple[dict[str, object], dict[str, object]]:
         "contract_sha256": comparison.sha256_file(CONTRACT_PATH),
         "checkpoint_tensors": {"block.out": [1, 2]},
         "output_tokens": fixture_contract()["reference"]["tokens"],
-        "resources": {"lut": 120, "ff": 25, "bram": 2, "dsp": 3, "memory_bits": 1024, "path": report_path, "sha256": report_sha256, "measurement_id": "compiler-yosys"},
-        "timing": {"max_frequency_mhz": 80.0, "critical_paths": [{"delay_ns": 12.5}], "cycles_per_token": 5, "interface_overhead_cycles": 2, "path": report_path, "sha256": report_sha256, "measurement_id": "compiler-timing"},
+        "resources": {"lut": 120, "ff": 25, "bram": 2, "dsp": 3, "memory_bits": 1024, "path": str(compiler_resource_report), "sha256": comparison.sha256_file(compiler_resource_report), "measurement_id": "compiler-yosys"},
+        "timing": {"max_frequency_mhz": 80.0, "critical_paths": [{"delay_ns": 12.5}], "cycles_per_token": 5, "interface_overhead_cycles": 2, "path": str(compiler_timing_report), "sha256": comparison.sha256_file(compiler_timing_report), "measurement_id": "compiler-timing"},
         "provenance": {
             "source": "compiler-fixture",
             "annotations": [
@@ -112,6 +114,23 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         self.assertEqual(result["status"], "incomplete")
         self.assertIsNone(result["resources"])
 
+    def test_null_or_malformed_checkpoint_tensor_is_incomplete(self) -> None:
+        malformed_values = (None, True, [1, True], [1, None], [[1], [2, 3]], [float("inf")], "not-a-tensor", {})
+        for value in malformed_values:
+            with self.subTest(value=value):
+                reference, compiler = fixtures()
+                compiler["checkpoint_tensors"] = {"block.out": value}
+                result = run_compare(reference, compiler, fixture_slice_manifest())
+                self.assertEqual(result["status"], "incomplete")
+                self.assertIsNone(result["resources"])
+
+    def test_boolean_or_out_of_range_output_token_is_incomplete(self) -> None:
+        for value in ([True], [-1], [0x10000], [1.5]):
+            with self.subTest(value=value):
+                reference, compiler = fixtures()
+                compiler["output_tokens"] = value
+                self.assertEqual(run_compare(reference, compiler, fixture_slice_manifest())["status"], "incomplete")
+
     def test_empty_resource_or_timing_evidence_is_incomplete_not_aligned(self) -> None:
         reference, compiler = fixtures()
         compiler["resources"] = {}
@@ -155,6 +174,47 @@ class TinyStories1MSliceComparisonTest(unittest.TestCase):
         compiler["resources"]["sha256"] = "0" * 64
         result = run_compare(reference, compiler, fixture_slice_manifest())
         self.assertEqual(result["status"], "incomplete")
+
+    def test_correctly_hashed_unrelated_report_cannot_authenticate_claimed_measurements(self) -> None:
+        reference, compiler = fixtures()
+        compiler["resources"]["path"] = str(CONTRACT_PATH)
+        compiler["resources"]["sha256"] = comparison.sha256_file(CONTRACT_PATH)
+        result = run_compare(reference, compiler, fixture_slice_manifest())
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIsNone(result["resources"])
+        reference, compiler = fixtures()
+        compiler["timing"]["path"] = str(CONTRACT_PATH)
+        compiler["timing"]["sha256"] = comparison.sha256_file(CONTRACT_PATH)
+        self.assertEqual(run_compare(reference, compiler, fixture_slice_manifest())["status"], "incomplete")
+
+    def test_report_measurements_must_equal_parsed_contents(self) -> None:
+        reference, compiler = fixtures()
+        compiler["resources"]["lut"] = 121
+        result = run_compare(reference, compiler, fixture_slice_manifest())
+        self.assertEqual(result["status"], "incomplete")
+        reference, compiler = fixtures()
+        compiler["timing"]["cycles_per_token"] = 6
+        result = run_compare(reference, compiler, fixture_slice_manifest())
+        self.assertEqual(result["status"], "incomplete")
+
+    def test_timing_numeric_domains_are_strict(self) -> None:
+        mutations = (
+            ("max_frequency_mhz", 0),
+            ("max_frequency_mhz", True),
+            ("cycles_per_token", 0),
+            ("cycles_per_token", True),
+            ("interface_overhead_cycles", -1),
+        )
+        for field, value in mutations:
+            with self.subTest(field=field, value=value):
+                reference, compiler = fixtures()
+                compiler["timing"][field] = value
+                self.assertEqual(run_compare(reference, compiler, fixture_slice_manifest())["status"], "incomplete")
+        for value in (None, True, 0, -1, float("inf"), float("nan"), "12.5"):
+            with self.subTest(delay_ns=value):
+                reference, compiler = fixtures()
+                compiler["timing"]["critical_paths"] = [{"delay_ns": value}]
+                self.assertEqual(run_compare(reference, compiler, fixture_slice_manifest())["status"], "incomplete")
 
     def test_full_contract_identity_rejects_abi_and_reference_changes(self) -> None:
         reference, compiler = fixtures()
