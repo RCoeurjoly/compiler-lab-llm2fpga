@@ -20,5 +20,19 @@ backend scope.
 **Behavioral golden reference**: The frozen model, inputs, outputs, and
 observable checkpoints used to judge functional equivalence.
 
+**Exact executable model**: The model structure, package, tokenizer,
+quantization, arithmetic semantics, and token-selection behavior whose
+execution is compared across reference, compiler, RTL, and hardware.
+_Avoid_: Same checkpoint, same model name
+
+**Authenticated compiler input**: An exported program whose complete identity
+and observable behavior are proven to match the exact executable model before
+compiler lowering begins.
+_Avoid_: Reconstructed FP32 model
+
+**Compiler frontier**: The earliest pipeline boundary that cannot produce a
+valid artifact or preserve the authenticated compiler input's behavior.
+_Avoid_: Final error, downstream failure
+
 **Resource baseline**: Measured implementation data used to compare area,
 timing, memory, and throughput; it is not itself a functional specification.

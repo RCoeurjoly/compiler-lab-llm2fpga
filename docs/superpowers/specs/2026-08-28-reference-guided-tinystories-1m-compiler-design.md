@@ -1,105 +1,185 @@
-# Reference-guided TinyStories-1M compiler design
+# Exact-input TinyStories-1M compiler design
 
-**Status:** proposed for implementation plannin
+**Status:** accepted
 
 ## Purpose
 
-Finish the active compiler-pipeline work for Tasks 4–6 by making the full
-TinyStories-1M model the first faithful compiler target. The working
-kev-gpt-derived TinyStories-1M accelerator is used as a behavioral and
-high-level architectural reference, not as source to copy into compiler output
-or submitted RTL.
+Determine what the existing LLM2FPGA compiler pipeline can actually lower when
+its input is the exact TinyStories-1M quantized execution used by the proven
+kev-gpt-derived accelerator. The observed compiler frontier, rather than an
+assumed backend architecture, will determine the next implementation step.
+
+The immediate objective is diagnostic and causal: remove model identity,
+package layout, quantization, tokenizer, and arithmetic semantics as possible
+explanations before debugging Torch-MLIR, CIRCT, Calyx, generated RTL, resource
+use, or board integration.
 
 ## Scope
 
 In scope:
 
-- the pinned TinyStories-1M checkpoint and tokenizer;
-- the existing compiler-generated TinyStories-1M RTL;
-- one complete transformer-block token-step vertical slice;
-- contract alignment, simulation equivalence, synthesis/resource comparison,
-  and FPGA validation;
-- later extension of the same backend to TinyStories-3M, 8M, 28M, and 33M.
+- the exact TinyStories-1M model and tokenizer used by the proven accelerator;
+- the complete authenticated kev-gpt package, including weights, scales,
+  calibration inputs, layout, and hashes;
+- an executable PyTorch representation of the same quantized/fixed-point
+  computation;
+- the existing PyTorch -> Torch-MLIR -> CIRCT/Calyx -> SystemVerilog pipeline;
+- capture and classification of the first reproducible compiler frontier;
+- evidence-driven selection of the next compiler or architecture change;
+- eventual BRAM-only TinyStories-1M inference on the YPCB.
 
-Out of scope for this phase:
+Out of scope until the exact-input frontier is established:
 
 - arbitrary PyTorch models;
-- TinyStories-1Layer-21M;
-- DDR3 integration or reliability work;
-- PCIe transport changes;
-- treating the Representative Core as a milestone or acceptance gate.
+- other TinyStories sizes;
+- the Representative Core as an active milestone;
+- DDR3 or PCIe integration;
+- speculative custom RTL kernels, new scheduling architectures, or backend
+  substitutions;
+- resource comparisons between semantically different models.
 
-## Reference contract
+## Gate 0: exact executable identity
 
-The first frozen contract contains:
+“Same model” means the same executable computation, not merely the same model
+name or Hugging Face checkpoint. Gate 0 freezes and verifies:
 
-- model, tokenizer, and source revisions plus hashes;
-- exact quantization formats and scales;
-- serialized weight/memory image format and hash;
-- prompt token IDs and expected 16-token output;
-- host/accelerator command interface;
-- baseline timing, resource, latency, and throughput metadata.
+- Hugging Face model ID and immutable revision;
+- model configuration and architecture dimensions;
+- kev-gpt source revision and any relevant working-tree patch;
+- package manifest and every package-file hash;
+- tensor names, shapes, offsets, layouts, and tied-weight rules;
+- weight and activation quantization granularity;
+- scale representation and application order;
+- accumulator widths, rounding, saturation, overflow, and nonlinear semantics;
+- tokenizer files and configuration;
+- prompt token IDs, greedy-selection rule, expected 16 tokens, and named
+  intermediate checkpoints.
 
-The contract-alignment gate requires the compiler artifact and kev-gpt reference
-to agree on checkpoint, tokenizer, operator semantics, quantization/scales,
-tensor layouts, and one-block inputs/outputs before resource differences are
-interpreted.
+The existing reference contract is not accepted unchanged. It currently says
+that activation quantization is per-tensor while the package and executable
+references contain 97 per-channel activation-scale vectors. Gate 0 must resolve
+this and every similar conflict by tracing the package generator and executable
+reference. Missing authority produces an explicit blocked result.
 
-## Architecture and data flow
+## Exact PyTorch input
 
-The compiler retains its staged pipeline:
+The compiler input is an authenticated PyTorch program that executes the frozen
+package semantics. Reconstructing floating-point weights from the package is
+insufficient: the program must include the observable quantization,
+dequantization, fixed-point conversion, rounding, saturation, accumulation,
+LayerNorm, Softmax, GELU, residual, and token-selection behavior used by the
+accelerator.
+
+Before compiler lowering, the exported program must match the executable
+kev-gpt reference for:
+
+1. package and model identity;
+2. the frozen prompt and 16 generated tokens;
+3. named block-0 token-step checkpoints;
+4. logits or their authenticated fixed-point equivalent at each selected
+   token; and
+5. deterministic repeated execution.
+
+Failure here is an input-model problem, not a compiler problem.
+
+## Current-pipeline experiment
+
+Once Gate 0 passes, feed the authenticated exported program into the existing
+pipeline:
 
 ```text
-TinyStories-1M model/export
-        -> TinyStories-specific IR
-        -> scheduling and memory assignment
-        -> parameterized RTL generation
-        -> simulation and synthesis
-        -> FPGA inference
+authenticated kev-gpt package + frozen model structure
+        -> exact quantized PyTorch program
+        -> torch.export
+        -> Torch-MLIR
+        -> existing Linalg/SCF normalization
+        -> existing CIRCT/Calyx lowering
+        -> existing SystemVerilog route
 ```
 
-The first implementation target is one complete transformer-block token step,
-including weight lookup, quantized arithmetic, memory access, and an observable
-checkpoint. The existing compiler RTL is analyzed first; regeneration or
-compiler changes follow only after the comparison identifies a concrete waste
-or contract defect.
+Only the authenticated input adapter and provenance wiring may change before
+this experiment. Do not add external RTL primitives, replace nonlinear
+operators, change quantization, or introduce a new scheduler merely to move the
+frontier.
 
-kev-gpt supplies the behavioral oracle and high-level reference choices for
-layouts, buffering, scheduling, and quantization. The compiler’s RTL and
-templates remain independently maintained.
+Every stage records its input and output hashes, tool revisions, command line,
+operation census, diagnostics, and validity. Partial output after an upstream
+diagnostic is not a successful lowering.
 
-## Validation gates
+## Frontier classification
 
-1. **Contract alignment:** all model and representation fields match.
-2. **Simulation:** the one-block token-step slice matches the reference at the
-   agreed checkpoint and final output.
-3. **Resource/timing comparison:** report LUT, FF, BRAM, DSP, memory bits,
-   operator/buffer counts, Fmax, critical paths, cycles/token, and interface
-   overhead for both implementations.
-4. **Waste map:** map excess generated structures to compiler stages and source
-   operations using provenance annotations.
-5. **Full 1M FPGA gate:** exact frozen 16-token output on hardware, three
-   matching cold starts, with timing/resource results reported separately.
+The first failure is classified at the earliest causal boundary:
+
+- `identity_frontier`: the package or executable semantics remain ambiguous;
+- `export_frontier`: the exact PyTorch computation cannot be exported;
+- `torch_mlir_frontier`: Torch-MLIR cannot represent or lower an operation;
+- `pre_calyx_frontier`: required normalization leaves unsupported IR;
+- `calyx_frontier`: CIRCT/Calyx rejects or mis-lowers the valid input;
+- `sv_frontier`: Calyx cannot emit valid synthesizable SystemVerilog;
+- `functional_frontier`: generated RTL executes but differs from the oracle;
+- `resource_frontier`: functionally correct RTL cannot fit;
+- `timing_frontier`: fitting RTL does not meet constraints;
+- `board_frontier`: timing-closed RTL fails deterministic board inference.
+
+The frontier receipt must contain a minimal reproducer when practical and the
+first mismatching checkpoint or diagnostic. Later cascading failures are not
+reported as independent blockers.
+
+## Post-frontier decision gate
+
+No replacement architecture is selected in advance. The observed frontier
+determines the smallest justified response:
+
+- repair or add a compiler pass when the representation is sound but lowering
+  is missing;
+- define a bit-accurate compiler primitive when a supported TinyStories
+  operation has no viable generic lowering;
+- introduce scheduling, memory, streaming, or reuse abstractions when correct
+  generated RTL is structurally too large or slow;
+- introduce a stable autoregressive runtime boundary only when the tensor
+  compiler output is correct but cannot express the complete token lifecycle.
+
+StreamTensor is relevant precedent for the latter two cases: it treats
+individual kernels as designed/generated components and compiles their tiling,
+fusion, streaming, buffering, DMA, and runtime composition. It is not evidence
+that arbitrary tensor semantics can be lowered mechanically into efficient RTL.
+
+Any chosen change must be tied to the exact frontier, preserve the authenticated
+input contract, and pass a before/after regression at that boundary.
+
+## Validation ladder
+
+1. **Identity gate:** exact source, package, tokenizer, and semantics are
+   authenticated and internally consistent.
+2. **Executable-input gate:** PyTorch/exported execution matches the kev-gpt
+   oracle and frozen 16-token result.
+3. **Stage-validity gate:** each current-pipeline stage either produces valid,
+   hash-bound output or a precise frontier receipt.
+4. **RTL functional gate:** if RTL is produced, simulation matches the earliest
+   available oracle checkpoints before resource work begins.
+5. **Implementation gate:** Yosys and constrained nextpnr report fit and timing
+   without weakened constraints.
+6. **Hardware gate:** BRAM-only YPCB inference matches the frozen 16 tokens on
+   three cold starts.
+
+Gates 4–6 are conditional on resolving the first observed frontier; they are
+not assumed consequences of completing Gate 0.
 
 ## Required artifacts
 
-- frozen TinyStories-1M reference manifest;
-- existing compiler RTL and extracted slice manifest;
-- reference/compiler checkpoint traces;
-- synthesis and timing reports for both baselines;
-- provenance-linked comparison report;
-- machine-readable comparison JSON;
-- hardware inference logs and hashes.
+- corrected exact-input contract and conflict-resolution report;
+- complete package/source/tokenizer provenance manifest;
+- executable quantized PyTorch adapter and exported-program hash;
+- kev-gpt-versus-PyTorch checkpoint and token-equivalence receipt;
+- per-stage current-pipeline manifests;
+- first-frontier receipt and minimal reproducer;
+- decision record for the evidence-backed next change;
+- when reached, RTL simulation, synthesis, timing, and board evidence.
 
-## Provenance and NLnet compliance
+## Provenance and compliance
 
-Existing LLM-assisted history is preserved and explicitly identified. New
-substantive assistance is provenance-tracked. kev-gpt source is not copied into
-compiler output or submitted RTL. Before reference-derived artifacts are
-claimed as funded deliverables, NLnet guidance is requested and recorded.
-
-## Deferred work
-
-DDR3 integration, UberDDR3 reliability, larger-than-BRAM models, PCIe transport
-changes, and arbitrary-model generality are separate follow-up work. They do
-not block the on-chip TinyStories-1M compiler milestone.
+The exact package and kev-gpt executable are reference evidence. Their source
+is not silently copied into compiler-generated deliverables. Any reference-
+derived semantics or implementation choice is documented, and LLM assistance
+remains disclosed. NLnet guidance is required before reference-derived work is
+treated as a funded deliverable.
