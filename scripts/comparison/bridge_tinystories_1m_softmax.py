@@ -38,6 +38,7 @@ def require(condition: bool, code: str, message: str) -> None:
 
 
 _EVIDENCE_TOKEN = object()
+_ISSUED_CAPABILITIES: set[int] = set()
 
 
 class _EvidenceCapability(Mapping[str, Any]):
@@ -112,7 +113,7 @@ def load_evidence(contract_path: Path, diagnostic_path: Path) -> Mapping[str, An
         require(isinstance(actual, dict), "softmax_contract_mismatch", section)
         for key, value in fields.items():
             require(actual.get(key) == value, "softmax_contract_mismatch", f"{section}.{key}")
-    return _EvidenceCapability(_EVIDENCE_TOKEN, {
+    capability = _EvidenceCapability(_EVIDENCE_TOKEN, {
         "contract_sha256": CONTRACT_SHA256,
         "diagnostic_sha256": SOFTMAX_DIAGNOSTIC_SHA256,
         "package_manifest_sha256": package["manifest_sha256"],
@@ -122,6 +123,8 @@ def load_evidence(contract_path: Path, diagnostic_path: Path) -> Mapping[str, An
         "model_revision": contract["model"]["source_revision"],
         "contract": recovered,
     })
+    _ISSUED_CAPABILITIES.add(id(capability))
+    return capability
 
 
 def _pattern_evidence(graph: str) -> dict[str, Any]:
@@ -181,6 +184,7 @@ def _pattern_evidence(graph: str) -> dict[str, Any]:
     delta_load_index, delta_load = find(r"%([^ ]+)\s*=\s*memref\.load\s+%([^\[]+)\[([^\]]+)\]", store_delta_index + 1)
     require(delta_load.group(2) == store_delta.group(2) and delta_load.group(3) == store_delta.group(3), "dataflow_not_proven", "delta load does not read delta store")
     require(delta_load.group(1) == exp_input, "dataflow_not_proven", "math.exp does not consume loaded delta")
+    require(store_delta_index < delta_load_index < exp_line, "dataflow_not_proven", "delta producer/use ordering")
     exp_store_index, exp_store = find(r"memref\.store\s+%([^,]+),\s*%([^\[]+)\[([^\]]+)\]", exp_line + 1)
     require(exp_store.group(1) == exp_result, "dataflow_not_proven", "exp result is not stored")
     exp_load_index, exp_load = find(r"%([^ ]+)\s*=\s*memref\.load\s+%([^\[]+)\[([^\]]+)\]", exp_store_index + 1)
@@ -190,6 +194,7 @@ def _pattern_evidence(graph: str) -> dict[str, Any]:
     sum_result = sum_match.group(1)
     div_index, div_match = find(r"%([^ ]+)\s*=\s*arith\.divf\s+%([^, ]+)\s*,\s*%([^ ]+)", sum_index + 1)
     require(div_match.group(2) == exp_load.group(1) and div_match.group(3) == sum_result, "dataflow_not_proven", "normalization division is not exp/sum")
+    require(exp_line < exp_store_index < exp_load_index < sum_index < div_index, "dataflow_not_proven", "softmax SSA producer/use ordering")
     causal = re.compile(r"^%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule),\s*%time_index,\s*%position(?:\s|:|$)", re.IGNORECASE)
     require(any(causal.match(line) for line in lines[region_start:region_end + 1]), "pattern_not_proven", "executable causal time_index <= position comparison")
     return {"exp_site_line": exp_line + 1, "matched_edges": ["subf_score_rowmax", "delta_store_load", "exp", "exp_store_load", "sum_reduction", "normalization_division", "causal_cmpi"]}
@@ -198,8 +203,19 @@ def _pattern_evidence(graph: str) -> dict[str, Any]:
 def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str) -> dict[str, Any]:
     require(isinstance(graph, str) and graph, "graph_missing", source_name)
     require(isinstance(evidence, _EvidenceCapability), "evidence_capability_required", "use load_evidence result")
+    require(id(evidence) in _ISSUED_CAPABILITIES, "evidence_capability_unissued", "capability was not issued by load_evidence")
     require(evidence.valid(), "evidence_capability_invalidated", "evidence changed after authentication")
-    require(set(evidence) >= {"contract_sha256", "diagnostic_sha256", "package_manifest_sha256", "package_weights_sha256"}, "evidence_missing", "package/contract hashes")
+    canonical = {
+        "contract_sha256": CONTRACT_SHA256,
+        "diagnostic_sha256": SOFTMAX_DIAGNOSTIC_SHA256,
+        "package_manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+        "package_weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+        "package_scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+        "package_calibration_ids_sha256": "2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075",
+        "model_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf",
+        "contract": evidence["contract"],
+    }
+    require(dict(evidence) == canonical, "evidence_payload_mismatch", "canonical contract/package evidence")
     pattern = _pattern_evidence(graph)
     attributes = {
         "score_width": 32,

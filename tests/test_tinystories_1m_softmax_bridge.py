@@ -93,6 +93,27 @@ class SoftmaxBridgeTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             module._EvidenceCapability({})
 
+    def test_forged_token_and_payload_are_rejected(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        forged = module._EvidenceCapability(module._EVIDENCE_TOKEN, dict(evidence))
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, "evidence_capability_unissued"):
+            module.bridge_graph(GRAPH, forged, source_name="forged-token.mlir")
+
+    def test_use_before_definition_is_rejected(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        before = GRAPH.replace(
+            "  %exp = math.exp %delta_loaded : f32\n",
+            "  %exp = math.exp %delta_loaded : f32\n  %delta_loaded = memref.load %delta_mem[%i] : memref<32xf32>\n",
+        ).replace("  %delta_loaded = memref.load %delta_mem[%i] : memref<32xf32>\n  %exp = math.exp", "  %exp = math.exp", 1)
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, "dataflow_not_proven"):
+            module.bridge_graph(before, evidence, source_name="use-before-def.mlir")
+
     def test_invalid_wrapper_and_cross_region_chain_are_rejected(self):
         evidence = module.load_evidence(
             ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
