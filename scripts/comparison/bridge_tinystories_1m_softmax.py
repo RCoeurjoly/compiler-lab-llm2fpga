@@ -889,6 +889,19 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                 # enclosing loop domain; this rejects cross-region stitching.
                 if loop_contexts(pred_entry[0]) != loop_contexts(i):
                     continue
+                # A causal predicate must come from the model's authenticated
+                # boolean mask input, not an arbitrary i1 temporary.  Bind it
+                # to a function i1 argument and require position-only
+                # indexing: the outer/head induction variable must not enter
+                # the mask coordinate.  The lowered graph does not retain the
+                # original comparison direction, so anything else fails
+                # closed rather than being guessed as causal.
+                signature = lines[function_start]
+                i1_args = {x.lstrip("%") for x in re.findall(r"(%arg\d+)(?=:\s*memref<[^>]*i1)", signature)}
+                pred_base = canonical_memref(pred_entry[1].group(2), pred_entry[0])
+                pred_loops = loop_contexts(pred_entry[0])
+                if pred_base not in i1_args or not pred_loops or not pred_deps.issubset({x[0] for x in pred_loops[1:]}):
+                    continue
                 fallback = select.group(4).lstrip("%")
                 fallback_load = next((m for candidate in reversed(lines[:i])
                                       if (m := re.match(rf"%{re.escape(fallback)}\s*=\s*memref\.load\s+%([^\[]+)\[\]", candidate))), None)
