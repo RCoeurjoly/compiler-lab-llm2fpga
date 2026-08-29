@@ -290,9 +290,12 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
 
     def defined_before(value: str, line_number: int) -> bool:
         name = value.lstrip("%")
-        return any(re.match(rf"%{re.escape(name)}\s*=", line) or
-                   re.search(rf"scf\.(?:for|parallel)\s+%{re.escape(name)}\s*=", line)
-                   for line in lines[function_start:line_number])
+        for line in lines[function_start:line_number]:
+            if re.search(rf"scf\.(?:for|parallel)\s+%{re.escape(name)}\s*=", line):
+                return True
+            if re.match(rf"%{re.escape(name)}\s*=", line):
+                return bool(re.search(r":\s*index(?:\s|$)", line))
+        return False
 
     def reduction_loop_header(line_number: int) -> tuple[str, int, int] | None:
         """Find the enclosing reduction loop header, without crossing a region."""
