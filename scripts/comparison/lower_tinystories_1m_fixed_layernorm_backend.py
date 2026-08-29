@@ -37,12 +37,86 @@ VECTOR_FILE_SHA256 = "750007e58f6303cbb0fe3b67c7a424d3d28ebd4c8bf4fc0428c3181c35
 VECTOR_SHA256 = "1b84d6194874f1f9e6074a99f06527aa01e633ecc6daf92340136a86806d6304"
 WIDTH = 64
 MASK64 = (1 << 64) - 1
+_CALYX_VALIDATION_CAPABILITY = object()
 
 
 class BackendLoweringError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(f"{code}: {message}")
         self.code = code
+
+
+class _CurrentCalyxValidation:
+    """Unforgeable-by-data capability for one current conversion invocation."""
+
+    __slots__ = (
+        "_path",
+        "_stat",
+        "_calyx_sha256",
+        "_reparsed_sha256",
+        "_command",
+        "_receipt",
+    )
+
+    def __init__(
+        self,
+        capability: object,
+        *,
+        path: Path,
+        calyx_mlir: str,
+        reparsed_mlir: str,
+        command: Sequence[str],
+        receipt: Mapping[str, Any],
+    ) -> None:
+        if capability is not _CALYX_VALIDATION_CAPABILITY:
+            raise BackendLoweringError(
+                "calyx_validation_not_from_current_conversion",
+                "validation capabilities are created only by run_calyx_conversion",
+            )
+        self._path = Path(path)
+        self._stat = self._path.stat()
+        self._calyx_sha256 = sha256_bytes(calyx_mlir.encode())
+        self._reparsed_sha256 = sha256_bytes(reparsed_mlir.encode())
+        self._command = tuple(command)
+        # Detach from the builder's mutable mapping.
+        self._receipt = json.loads(json.dumps(receipt, sort_keys=True))
+
+    def release(self, *, calyx_mlir: str, command: Sequence[str]) -> dict[str, Any]:
+        try:
+            current_stat = self._path.stat()
+        except OSError as error:
+            raise BackendLoweringError(
+                "calyx_current_output_missing", str(self._path)
+            ) from error
+        require(
+            (current_stat.st_dev, current_stat.st_ino, current_stat.st_size, current_stat.st_mtime_ns)
+            == (self._stat.st_dev, self._stat.st_ino, self._stat.st_size, self._stat.st_mtime_ns)
+            and sha256_file(self._path) == self._calyx_sha256
+            and sha256_bytes(calyx_mlir.encode()) == self._calyx_sha256
+            and tuple(command) == self._command,
+            "calyx_current_output_mismatch",
+            "the validated conversion output or command changed before report creation",
+        )
+        require(
+            self._receipt.get("calyx_sha256") == self._calyx_sha256
+            and self._receipt.get("reparsed_calyx_sha256") == self._reparsed_sha256
+            and self._receipt.get("conversion_command") == list(self._command)
+            and self._receipt.get("reparse_command")
+            == [
+                self._command[0],
+                str(self._path),
+                "--verify-each",
+                "-o",
+                "<temporary-reparse-output>",
+            ]
+            and self._receipt.get("sha256")
+            == canonical_sha256(
+                {key: value for key, value in self._receipt.items() if key != "sha256"}
+            ),
+            "calyx_validation_mismatch",
+            "opaque validation receipt",
+        )
+        return json.loads(json.dumps(self._receipt, sort_keys=True))
 
 
 def require(condition: bool, code: str, message: str) -> None:
@@ -510,12 +584,20 @@ def run_calyx_conversion(
             ],
         }
         validation["sha256"] = canonical_sha256(validation)
+        attestation = _CurrentCalyxValidation(
+            _CALYX_VALIDATION_CAPABILITY,
+            path=calyx_out,
+            calyx_mlir=calyx_mlir,
+            reparsed_mlir=reparsed_mlir,
+            command=command,
+            receipt=validation,
+        )
         diagnostic = "\n".join(item for item in (conversion_diagnostic, reparse_diagnostic) if item)
         return {
             "calyx_mlir": calyx_mlir,
             "command": command,
             "diagnostic": diagnostic,
-            "validation": validation,
+            "validation": attestation,
         }
     except (OSError, UnicodeError, BackendLoweringError) as error:
         calyx_out.unlink(missing_ok=True)
@@ -531,7 +613,7 @@ def make_report(
     calyx_mlir: str | None,
     calyx_command: Sequence[str] | None,
     calyx_diagnostic: str,
-    calyx_validation: Mapping[str, Any] | None,
+    calyx_validation: _CurrentCalyxValidation | None,
 ) -> dict[str, Any]:
     require(flat_scf == render_flat_scf(bundle), "rendered_backend_ir_mismatch", "flat SCF")
     algorithm_result = execute_lowered_algorithm(bundle["vector"])
@@ -539,9 +621,18 @@ def make_report(
     require(algorithm_result == expected, "lowered_algorithm_trace_mismatch", "Task3o vector")
     calyx_artifact = None
     backend_status = "flat_scf_emitted"
+    public_validation = None
     if calyx_mlir is not None:
         validate_calyx_structure(bundle, calyx_mlir)
-        require(isinstance(calyx_validation, Mapping), "calyx_validation_missing", "converted output must be independently reparsed")
+        require(
+            isinstance(calyx_validation, _CurrentCalyxValidation),
+            "calyx_validation_not_from_current_conversion",
+            "converted output must carry run_calyx_conversion's current-output capability",
+        )
+        public_validation = calyx_validation.release(
+            calyx_mlir=calyx_mlir,
+            command=list(calyx_command or ()),
+        )
         required_validation_keys = {
             "schema",
             "status",
@@ -552,15 +643,15 @@ def make_report(
             "reparse_command",
             "sha256",
         }
-        require(set(calyx_validation) == required_validation_keys, "calyx_validation_mismatch", "receipt keys")
+        require(set(public_validation) == required_validation_keys, "calyx_validation_mismatch", "receipt keys")
         require(
-            calyx_validation.get("schema") == "tinystories-1m-calyx-validation-v1"
-            and calyx_validation.get("status") == "converted_and_reparsed"
-            and calyx_validation.get("flat_scf_sha256") == sha256_bytes(flat_scf.encode())
-            and calyx_validation.get("calyx_sha256") == sha256_bytes(calyx_mlir.encode())
-            and calyx_validation.get("conversion_command") == list(calyx_command or ())
-            and calyx_validation.get("sha256")
-            == canonical_sha256({key: value for key, value in calyx_validation.items() if key != "sha256"}),
+            public_validation.get("schema") == "tinystories-1m-calyx-validation-v1"
+            and public_validation.get("status") == "converted_and_reparsed"
+            and public_validation.get("flat_scf_sha256") == sha256_bytes(flat_scf.encode())
+            and public_validation.get("calyx_sha256") == sha256_bytes(calyx_mlir.encode())
+            and public_validation.get("conversion_command") == list(calyx_command or ())
+            and public_validation.get("sha256")
+            == canonical_sha256({key: value for key, value in public_validation.items() if key != "sha256"}),
             "calyx_validation_mismatch",
             "conversion/reparse receipt",
         )
@@ -582,7 +673,7 @@ def make_report(
             "max_integer_width": 64,
             "calyx_command": list(calyx_command) if calyx_command is not None else None,
             "calyx_diagnostic": calyx_diagnostic,
-            "calyx_validation": dict(calyx_validation) if calyx_validation is not None else None,
+            "calyx_validation": public_validation,
         },
         "numeric_trace": {
             "status": "algorithm_matched_backend_execution_not_run",

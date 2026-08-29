@@ -87,7 +87,10 @@ class FixedLayerNormBackendTest(unittest.TestCase):
     def test_report_rejects_unvalidated_calyx_output(self) -> None:
         mlir = self.module.render_flat_scf(self.bundle)
         calyx = CALYX.read_text(encoding="utf-8")
-        with self.assertRaisesRegex(self.module.BackendLoweringError, "calyx_validation_missing"):
+        with self.assertRaisesRegex(
+            self.module.BackendLoweringError,
+            "calyx_validation_not_from_current_conversion",
+        ):
             self.module.make_report(
                 self.bundle,
                 mlir,
@@ -95,6 +98,34 @@ class FixedLayerNormBackendTest(unittest.TestCase):
                 calyx_command=["circt-opt", "--lower-scf-to-calyx=top-level-function=main"],
                 calyx_diagnostic="",
                 calyx_validation=None,
+            )
+
+    def test_report_rejects_mutated_calyx_with_fabricated_self_hashed_receipt(self) -> None:
+        mlir = self.module.render_flat_scf(self.bundle)
+        original = CALYX.read_text(encoding="utf-8")
+        mutated = original.replace("42950", "42951", 1)
+        self.assertNotEqual(mutated, original)
+        fabricated = json.loads(
+            (ROOT / "artifacts/comparison/tinystories-1m-fixed-layernorm-backend.json").read_text(
+                encoding="utf-8"
+            )
+        )["backend_ir"]["calyx_validation"]
+        fabricated["calyx_sha256"] = self.module.sha256_bytes(mutated.encode())
+        fabricated["sha256"] = self.module.canonical_sha256(
+            {key: value for key, value in fabricated.items() if key != "sha256"}
+        )
+
+        with self.assertRaisesRegex(
+            self.module.BackendLoweringError,
+            "calyx_validation_not_from_current_conversion",
+        ):
+            self.module.make_report(
+                self.bundle,
+                mlir,
+                calyx_mlir=mutated,
+                calyx_command=fabricated["conversion_command"],
+                calyx_diagnostic="",
+                calyx_validation=fabricated,
             )
 
     def write_fake_circt(self, directory: Path, body: str) -> Path:
