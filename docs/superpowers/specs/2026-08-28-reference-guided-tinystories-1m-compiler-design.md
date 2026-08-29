@@ -38,6 +38,50 @@ Out of scope until the exact-input frontier is established:
   substitutions;
 - resource comparisons between semantically different models.
 
+## Frozen deployed YPCB model contract
+
+The compiler target is the exact TinyStories-1M configuration already shown
+performing BRAM-only inference on the YPCB. It is not a newly selected or
+approximately equivalent TinyStories model:
+
+| Field | Frozen value |
+|---|---|
+| Hugging Face model | `roneneldan/TinyStories-1M` |
+| Immutable model revision | `ac533fb8b4f69c71894bf96badfe11e6294d9fcf` |
+| Architecture | GPT-Neo; 8 layers; hidden size 64; 16 heads; head dimension 4 |
+| Vocabulary and context | 50,257 tokens; 32-token maximum runtime context |
+| Other model semantics | tied word embeddings; `gelu_new`; greedy top-1 generation |
+| Weight representation | signed INT8, symmetric, one scale per output channel (`symmetric_int8_per_output`) |
+| Activation representation | signed INT8 with 97 named per-channel Q/DQ scale vectors of width 64 or 256 |
+| Bias and LayerNorm package representation | FP32, converted to signed Q16.16 for the deployed fixed-point execution |
+| Internal value format | signed Q16.16 |
+| Hardware scale format | unsigned Q8.24 |
+| GEMV accumulation | signed 64-bit serial accumulator |
+| Nonlinear and normalization behavior | deployed integer/fixed-point LayerNorm plus LUT-based GELU and attention softmax |
+
+The canonical package is
+`/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m`
+and is frozen by these SHA-256 values:
+
+- `manifest.json`: `374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35`;
+- `weights.bin`: `caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e`;
+- `scales.bin`: `a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155`;
+- `calibration_ids.bin`: `2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075`;
+- tokenizer JSON: `f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5`.
+
+The frozen generation fixture is prompt `Once upon a time`, prompt token IDs
+`[7454, 2402, 257, 640]`, and the following 16 greedy output token IDs:
+
+```text
+[11, 612, 373, 257, 1310, 2576, 3706, 20037,
+ 13, 1375, 6151, 284, 711, 2354, 287, 262]
+```
+
+This table and these hashes are the compiler input contract. Gate 0 may refine
+the bit-exact ordering, rounding, saturation, overflow, and nonlinear details
+from the deployed sources, but it may not silently substitute a different
+checkpoint, quantization policy, package, tokenizer, or generation fixture.
+
 ## Gate 0: exact executable identity
 
 “Same model” means the same executable computation, not merely the same model
@@ -55,11 +99,12 @@ name or Hugging Face checkpoint. Gate 0 freezes and verifies:
 - prompt token IDs, greedy-selection rule, expected 16 tokens, and named
   intermediate checkpoints.
 
-The existing reference contract is not accepted unchanged. It currently says
-that activation quantization is per-tensor while the package and executable
-references contain 97 per-channel activation-scale vectors. Gate 0 must resolve
-this and every similar conflict by tracing the package generator and executable
-reference. Missing authority produces an explicit blocked result.
+The historical reference contract is not accepted unchanged. Its per-tensor
+activation and signed-INT32 accumulator descriptions contradict the deployed
+package and implementation summarized above. Gate 0 must preserve the deployed
+per-channel activation vectors and signed 64-bit GEMV accumulation, and resolve
+remaining lower-level semantic conflicts by tracing the package generator and
+executable reference. Missing authority produces an explicit blocked result.
 
 ## Exact PyTorch input
 

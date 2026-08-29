@@ -14,6 +14,11 @@
 
 - Scope is the frozen TinyStories-1M configuration, not arbitrary PyTorch models or other TinyStories sizes.
 - The input must use the exact package at `/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m` and fail closed if any hash differs.
+- The model is `roneneldan/TinyStories-1M` at immutable revision `ac533fb8b4f69c71894bf96badfe11e6294d9fcf`: GPT-Neo, 8 layers, hidden size 64, 16 heads, head dimension 4, vocabulary 50,257, context 32, tied embeddings, and `gelu_new`.
+- Freeze package hashes: manifest `374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35`, weights `caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e`, scales `a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155`, calibration IDs `2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075`, and tokenizer JSON `f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5`.
+- Preserve the deployed numeric profile: signed symmetric INT8 weights with one scale per output channel; signed INT8 activations with 97 per-channel scale vectors; FP32 package biases and LayerNorm parameters converted to Q16.16; signed Q16.16 internal values; unsigned Q8.24 hardware scales; and signed 64-bit GEMV accumulation.
+- Preserve deployed integer/fixed-point LayerNorm, LUT-based GELU and attention softmax, and deterministic greedy top-1 token selection. Any unresolved sub-operation ordering, rounding, saturation, or overflow rule remains a Gate 0 question, not permission to substitute a different implementation.
+- Freeze prompt `Once upon a time`, prompt IDs `[7454, 2402, 257, 640]`, and expected output IDs `[11, 612, 373, 257, 1310, 2576, 3706, 20037, 13, 1375, 6151, 284, 711, 2354, 287, 262]`.
 - Run Python only through `nix develop -c python` or a Nix derivation.
 - Before the first frontier is captured, change only the authenticated input adapter, provenance wiring, model registration, tests, and receipts.
 - Do not add external RTL primitives, nonlinear approximations, custom scheduling, DDR3, PCIe, or board-shell changes.
@@ -57,6 +62,12 @@ Expected: FAIL because the current contract says `per-tensor` and lacks a comple
 - [x] **Step 3: Implement the fail-closed audit**
 
 Parse and hash every package file, validate tensor offset ranges and overlaps, count and shape all activation-scale vectors, record the Hugging Face revision, record `git rev-parse HEAD` plus the relevant kev-gpt working-tree diff hash, and compare the package generator/reference semantics with the contract. Emit `identity_frontier` with named conflicts when two authorities disagree.
+
+Require the frozen model dimensions, all five artifact hashes, the 50
+`symmetric_int8_per_output` weight tensors, the 58 FP32 tensors, the 97
+activation-scale vectors, the fixed-point formats, the 64-bit GEMV accumulator,
+and the frozen prompt/output tokens recorded in the spec. A mismatch in any of
+these fields is an identity failure.
 
 - [x] **Step 4: Correct only fields established by authoritative evidence**
 
