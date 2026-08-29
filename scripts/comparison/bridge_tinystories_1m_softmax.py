@@ -403,9 +403,11 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         carried_match = re.search(r"iter_args\(\s*%([^ ]+)\s*=", max_header)
         max_op = next((re.match(r"%([^ ]+)\s*=\s*arith\.maximumf\s+%([^, ]+)\s*,\s*%([^ ]+)", line)
                        for line in max_body if "arith.maximumf" in line), None)
+        score_load_value = next((re.match(r"%([^ ]+)\s*=\s*memref\.load", line).group(1)
+                                 for line in max_body if score_mem in line and re.match(r"%[^ ]+\s*=\s*memref\.load", line)), None)
         require(carried_match is not None and max_op is not None and
                 carried_match.group(1) in max_op.groups()[1:] and
-                any(score_mem in line and re.match(r"%([^ ]+)\s*=\s*memref\.load", line) for line in max_body),
+                score_load_value is not None and score_load_value in max_op.groups()[1:],
                 "dataflow_not_proven", f"site {number} row-max is not a loop-carried reduction")
         require(any(re.match(rf"scf\.yield\s+%{re.escape(max_op.group(1))}", line) for line in max_body),
                 "dataflow_not_proven", f"site {number} row-max result is not yielded")
@@ -520,8 +522,13 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         select_line = next(line for line in lines[causal[0] + 1:function_end + 1]
                            if re.search(rf"arith\.select\s+%{re.escape(causal_result)}\b", line))
         select_match = re.search(r"arith\.select\s+%[^, ]+,\s*%([^, ]+),\s*%([^ ]+)", select_line)
-        require(select_match is not None and select_match.group(1) != select_match.group(2),
+        div_result = div_entry[1].group(1)
+        require(select_match is not None and select_match.group(1) == div_result and select_match.group(2) == "fzero",
                 "dataflow_not_proven", f"site {number} causal select has no observable alternative")
+        select_result = re.match(r"%([^ ]+)", select_line).group(1)
+        require(any(re.search(rf"memref\.store\s+%{re.escape(select_result)}\b", line)
+                    for line in lines[causal[0] + 1:function_end + 1]),
+                "dataflow_not_proven", f"site {number} masked probability is not observable")
         used_causal.add(causal[0])
         sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
                       "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_cmpi"]})

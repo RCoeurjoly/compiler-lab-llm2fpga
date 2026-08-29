@@ -102,6 +102,7 @@ def lowered_separate_loop_graph(site_count: int = 8) -> str:
             f"    %prob_raw{head} = arith.divf %elpost{head}, %sum_loaded{head} : f32",
             f"    %causal{head} = arith.cmpi sle, %time_index{head}, %position{head} : i32",
             f"    %prob{head} = arith.select %causal{head}, %prob_raw{head}, %fzero : f32",
+            f"    memref.store %prob{head}, %score_mem{head}[%n{head}] : memref<4xf32>",
             "  }",
         ])
     return "module {\n  func.func @main(" + ", ".join(args) + ") {\n" + "\n".join(body) + "\n  func.return\n  }\n}\n"
