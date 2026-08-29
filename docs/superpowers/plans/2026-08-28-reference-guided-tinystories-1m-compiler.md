@@ -1,323 +1,320 @@
-# Reference-guided TinyStories-1M compiler Implementation Plan
+# Exact-input TinyStories-1M Compiler Frontier Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the existing compiler pipeline reproduce the validated kev-gpt TinyStories-1M implementation, beginning with a contract-aligned one-block token-step comparison and ending with exact FPGA inference.
+**Goal:** Run an authenticated executable representation of the exact kev-gpt TinyStories-1M model through the unchanged LLM2FPGA compiler pipeline and capture its first causal frontier.
 
-**Architecture:** Treat kev-gpt as a behavioral and high-level architectural reference, never as source to copy. Analyze the existing compiler-generated 1M RTL first, align its model/quantization/memory contract, extract one complete transformer-block token step, and use provenance-linked resource/timing evidence to select one compiler change before attempting full-model hardware validation.
+**Architecture:** Establish one hash-bound source of truth for model, package, tokenizer, quantization, and integer semantics. Prove an exact PyTorch/exported-program implementation against the kev-gpt oracle before registering it as a compiler model; then run the existing Torch-MLIR, Linalg/SCF, CIRCT/Calyx, and SystemVerilog stages without backend substitutions. Stop at and document the first invalid or behavior-changing boundary.
 
-**Tech Stack:** Nix flake, pinned PyTorch/Torch-MLIR/CIRCT, SystemVerilog, Yosys, nextpnr-xilinx/OpenXC7, existing YPCB programming and inference tools, Python 3.11 inside the Nix environment.
+**Tech Stack:** Python 3.11 and PyTorch inside Nix, Hugging Face Transformers, torch.export, Torch-MLIR, MLIR, CIRCT/Calyx, SystemVerilog, repository JSON receipts, SHA-256.
 
 **Spec:** `docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md`
 
 ## Global Constraints
 
-- The active compiler backend targets TinyStories-1M first; later family targets are 3M, 8M, 28M, and 33M.
-- TinyStories-1Layer-21M and arbitrary PyTorch models are out of scope for this phase.
-- The Representative Core is historical research only, not a milestone or acceptance gate.
-- DDR3 integration, UberDDR3 reliability work, and PCIe transport changes are deferred.
-- The kev-gpt source is not copied into compiler output or submitted RTL.
-- Existing LLM-assisted history is preserved and disclosed; new substantive assistance is provenance-tracked.
-- Do not program hardware with an artifact that has not passed timing and provenance checks.
-- Use the fixed frozen model/package, tokenizer, quantization, prompt, and 16-token reference throughout the 1M gate.
-- FPGA acceptance requires three matching cold-start runs; timing/resource/latency/throughput are reported separately.
+- Scope is the frozen TinyStories-1M configuration, not arbitrary PyTorch models or other TinyStories sizes.
+- The input must use the exact package at `/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m` and fail closed if any hash differs.
+- Run Python only through `nix develop -c python` or a Nix derivation.
+- Before the first frontier is captured, change only the authenticated input adapter, provenance wiring, model registration, tests, and receipts.
+- Do not add external RTL primitives, nonlinear approximations, custom scheduling, DDR3, PCIe, or board-shell changes.
+- Partial compiler output following a diagnostic is invalid.
+- Each task begins and ends with `scripts/agent/pre_final_check.sh` and one verified commit.
+- If an authority required for exact semantics is missing, commit a user-approved diagnostic checkpoint rather than inventing semantics.
 
 ---
 
-### Task 1: Inventory and freeze the TinyStories-1M reference contract
+### Task 1: Authenticate the exact executable contract
 
 **Files:**
-- Create: `artifacts/reference/tinystories-1m-kev-gpt-contract.json`
-- Create: `docs/results/2026-08-28-tinystories-1m-reference-contract.md`
-- Inspect: `docs/project-plan_v2.org`, `artifacts/`, and the pinned kev-gpt package manifest
-- Test: `tests/test_tinystories_1m_reference_contract.py`
+- Create: `scripts/comparison/audit_tinystories_1m_exact_input.py`
+- Create: `tests/test_tinystories_1m_exact_input_audit.py`
+- Create: `artifacts/reference/tinystories-1m-exact-input-audit.json`
+- Modify: `artifacts/reference/tinystories-1m-kev-gpt-contract.json`
+- Modify: `scripts/comparison/verify_tinystories_1m_reference_input.py`
+- Inspect: `scripts/comparison/authenticate_tinystories_1m_qdq_semantics.py`
+- Inspect: `/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m/{manifest.json,receipt.json,weights.bin,scales.bin,calibration_ids.bin}`
 
 **Interfaces:**
-- Consumes: the validated kev-gpt model package, tokenizer, prompt fixture, and existing hardware/reference logs.
-- Produces: a schema-validated JSON contract with model/tokenizer/package hashes, quantization, memory image hash, command ABI, prompt IDs, expected 16 tokens, and baseline measurements.
+- Consumes: `audit_exact_input(contract_path: Path, package_path: Path, kev_root: Path) -> dict[str, object]`.
+- Produces: schema `tinystories-1m-exact-input-audit-v1` with `status` equal to `authenticated` or `identity_frontier`, exact hashes, source revision/patch identity, resolved semantics, and `conflicts`.
 
-- [ ] **Step 1: Write the failing contract-schema test**
+- [ ] **Step 1: Write a failing audit test for the known activation-granularity contradiction**
 
 ```python
-def test_contract_contains_frozen_1m_identity():
-    contract = load_contract()
-    assert contract["model"]["name"] == "TinyStories-1M"
-    assert contract["model"]["n_layer"] == 8
-    assert contract["model"]["hidden_size"] == 64
-    assert len(contract["reference"]["tokens"]) == 16
+def test_audit_rejects_the_old_per_tensor_contract():
+    result = audit_exact_input(CONTRACT, PACKAGE, KEV_ROOT)
+    assert result["activation_quantization"]["scale_vector_count"] == 97
+    assert result["contract"]["activation_granularity"] == "per_channel"
+    assert result["conflicts"] == []
 ```
 
-- [ ] **Step 2: Run the test and verify it fails because the contract file is absent**
+- [ ] **Step 2: Verify the test fails for the current contract**
 
-Run: `nix develop -c python -m unittest discover -s tests -p 'test_tinystories_1m_reference_contract.py' -v`.
+Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_input_audit.py -v`
 
-Expected: FAIL with a missing contract/artifact error.
+Expected: FAIL because the current contract says `per-tensor` and lacks a complete executable-semantics authority.
 
-- [ ] **Step 3: Populate the contract from hashes and existing evidence**
+- [ ] **Step 3: Implement the fail-closed audit**
 
-Record the exact kev-gpt package manifest hash, tokenizer hash, model image hash, quantization/scales, command ABI, prompt token IDs, expected tokens, and baseline timing/resource metadata. Do not infer missing values; mark the contract incomplete and stop if an identity cannot be verified.
+Parse and hash every package file, validate tensor offset ranges and overlaps, count and shape all activation-scale vectors, record the Hugging Face revision, record `git rev-parse HEAD` plus the relevant kev-gpt working-tree diff hash, and compare the package generator/reference semantics with the contract. Emit `identity_frontier` with named conflicts when two authorities disagree.
 
-- [ ] **Step 4: Implement strict contract loading**
+- [ ] **Step 4: Correct only fields established by authoritative evidence**
 
-Add `load_contract()` to the test helper. It must reject missing fields, wrong model identity, wrong layer/hidden/head dimensions, non-16-token references, and malformed hashes.
+Change the contract activation description to the package-observed granularity and add explicit fields for scale application, accumulator width, rounding, saturation, overflow, LayerNorm, Softmax, GELU, and token selection only when the audit can cite their source path and SHA-256. Leave unresolved fields absent and report them as conflicts; do not choose values heuristically.
 
-- [ ] **Step 5: Run the focused test**
+- [ ] **Step 5: Run the audit tests and canonical audit**
 
-Run: `nix develop -c python -m unittest discover -s tests -p 'test_tinystories_1m_reference_contract.py' -v`
+Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_input_audit.py tests/test_tinystories_1m_reference_input.py tests/test_tinystories_1m_reference_contract.py -v`
 
-Expected: PASS with the frozen contract loaded from the repository artifact.
+Run: `nix develop -c python scripts/comparison/audit_tinystories_1m_exact_input.py --contract artifacts/reference/tinystories-1m-kev-gpt-contract.json --package /home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m --kev-root /home/roland/kev-gpt/.worktrees/kintex-selftest --output artifacts/reference/tinystories-1m-exact-input-audit.json`
 
-- [ ] **Step 6: Commit the contract**
+Expected: either `authenticated` with no conflicts or a precise `identity_frontier`. Task 2 is forbidden unless status is `authenticated`.
+
+- [ ] **Step 6: Commit the identity gate**
 
 ```bash
-git add artifacts/reference/tinystories-1m-kev-gpt-contract.json docs/results/2026-08-28-tinystories-1m-reference-contract.md tests/test_tinystories_1m_reference_contract.py
-git commit -m "docs: freeze TinyStories-1M reference contract"
+git add scripts/comparison/audit_tinystories_1m_exact_input.py tests/test_tinystories_1m_exact_input_audit.py artifacts/reference/tinystories-1m-exact-input-audit.json artifacts/reference/tinystories-1m-kev-gpt-contract.json scripts/comparison/verify_tinystories_1m_reference_input.py
+git commit -m "authenticate exact TinyStories compiler input"
 ```
 
-### Task 2: Locate and extract the existing compiler 1M RTL slice
+### Task 2: Build an exact quantized PyTorch model
 
 **Files:**
-- Create: `artifacts/comparison/tinystories-1m-slice-manifest.json`
-- Create: `scripts/comparison/extract_tinystories_1m_block_slice.py`
-- Create: `tests/test_tinystories_1m_slice_manifest.py`
-- Inspect: existing TinyStories MLIR/SV/RTLIL artifacts and Nix derivations referenced by `flake.nix`
+- Create: `TinyStories/model_adapter_exact_package.py`
+- Create: `tests/test_tinystories_1m_exact_package_model.py`
+- Create: `artifacts/reference/tinystories-1m-exact-package-model.json`
+- Reuse: `TinyStories/model_adapter_reference_package.py`
 
 **Interfaces:**
-- Consumes: the frozen contract from Task 1 and the existing compiler-generated TinyStories-1M RTL artifact.
-- Produces: a manifest identifying the one complete transformer-block token-step slice, its source locations, dependency closure, and artifact hashes.
+- Consumes: Task 1 audit with `status == "authenticated"`.
+- Produces: `load_exact_model(contract_path: Path, package_path: Path, model_path: Path) -> ExactModelBundle` and `export_exact_program(bundle: ExactModelBundle) -> torch.export.ExportedProgram`.
+- `ExactModelBundle.model(input_ids: Tensor) -> Tensor` returns authenticated fixed-point logits for a context of at most 32 tokens.
 
-- [ ] **Step 1: Write the failing manifest test**
+- [ ] **Step 1: Write failing tests for exact arithmetic and fail-closed identity**
 
 ```python
-def test_slice_manifest_names_one_complete_block():
-    manifest = load_slice_manifest()
-    assert manifest["model"] == "TinyStories-1M"
-    assert manifest["slice"]["kind"] == "one_transformer_block_token_step"
-    assert manifest["slice"]["dependency_closure"]
+def test_exact_model_matches_frozen_block_zero_checkpoints():
+    bundle = load_exact_model(CONTRACT, PACKAGE, MODEL)
+    trace = bundle.trace(torch.tensor([[7454, 2402, 257, 640]]))
+    assert trace["trace_sha256"] == FROZEN_TRACE_SHA256
+
+def test_exact_model_rejects_non_authenticated_audit():
+    with self.assertRaisesRegex(ExactModelError, "identity_frontier"):
+        load_exact_model(CONFLICTING_CONTRACT, PACKAGE, MODEL)
 ```
 
-- [ ] **Step 2: Run the test and verify it fails**
+- [ ] **Step 2: Verify tests fail because no exact adapter exists**
 
-Run: `nix develop -c python -m unittest discover -s tests -p 'test_tinystories_1m_slice_manifest.py' -v`
+Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_package_model.py -v`
 
-Expected: FAIL because no extracted-slice manifest exists.
+Expected: FAIL importing `model_adapter_exact_package`.
 
-- [ ] **Step 3: Implement deterministic artifact discovery and extraction**
+- [ ] **Step 3: Implement package-bound quantized execution**
 
-The script must accept explicit input paths, identify the block/token-step boundary from module names or provenance annotations, copy only the required source/IR artifacts, compute SHA-256 hashes, and fail closed if the closure includes an unbounded full-model dependency.
+Reuse authenticated tensor reconstruction but execute the Task 1 semantics explicitly at every named Q/DQ boundary. Keep integer codes, scale application, accumulation, rounding, and saturation observable. Do not delegate these rules to default PyTorch quantization behavior.
 
-- [ ] **Step 4: Add contract identity checks**
+- [ ] **Step 4: Export and replay the exact program**
 
-Require the source artifact’s model/package metadata to match Task 1 before writing the manifest. A mismatch must produce `contract_mismatch`, not a comparison artifact.
+Export the logits-only forward using the frozen prompt shape, replay `exported.module()`, and compare every named block-0 checkpoint and final logits hash against eager execution.
 
-- [ ] **Step 5: Run focused tests**
+- [ ] **Step 5: Verify exact-model tests**
 
-Run: `nix develop -c python -m unittest discover -s tests -p 'test_tinystories_1m_slice_manifest.py' -v`
+Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_package_model.py tests/test_tinystories_1m_package_adapter.py -v`
 
-Expected: PASS and a manifest with stable hashes and explicit source provenance.
+Expected: PASS with the exact package, and rejection after mutating any package hash or arithmetic field.
 
-- [ ] **Step 6: Commit the slice manifest**
+- [ ] **Step 6: Commit the exact adapter**
 
 ```bash
-git add scripts/comparison/extract_tinystories_1m_block_slice.py tests/test_tinystories_1m_slice_manifest.py artifacts/comparison/tinystories-1m-slice-manifest.json
-git commit -m "feat: identify TinyStories-1M comparison slice"
+git add TinyStories/model_adapter_exact_package.py tests/test_tinystories_1m_exact_package_model.py artifacts/reference/tinystories-1m-exact-package-model.json
+git commit -m "add exact TinyStories package model"
 ```
 
-### Task 3: Build the kev-gpt/reference and compiler slice comparison harness
+### Task 3: Prove frozen generation equivalence before lowering
 
 **Files:**
-- Create: `scripts/comparison/compare_tinystories_1m_slice.py`
-- Create: `tests/test_tinystories_1m_slice_comparison.py`
-- Create: `artifacts/comparison/tinystories-1m-slice-comparison.json`
-- Create: `docs/results/2026-08-28-tinystories-1m-slice-comparison.md`
+- Create: `scripts/comparison/verify_tinystories_1m_exact_generation.py`
+- Create: `tests/test_tinystories_1m_exact_generation.py`
+- Create: `artifacts/reference/tinystories-1m-exact-generation.json`
 
 **Interfaces:**
-- Consumes: Task 1 contract, Task 2 slice manifest, reference traces, compiler RTL simulation traces, Yosys statistics, and nextpnr timing reports.
-- Produces: a machine-readable comparison and a report containing equivalence status, resource/timing deltas, and provenance-linked waste candidates.
+- Consumes: `ExactModelBundle`, prompt IDs `[7454, 2402, 257, 640]`, and the frozen 16-token sequence.
+- Produces: `verify_generation(bundle, prompt_ids, expected_tokens, count=3) -> dict[str, object]` with per-step logits hashes, selected token IDs, checkpoint hashes, and repeated-run hashes.
 
-- [ ] **Step 1: Write failing tests for contract mismatch and successful comparison**
+- [ ] **Step 1: Write a failing exact-generation test**
 
 ```python
-def test_comparison_rejects_mismatched_quantization():
-    result = compare(reference, compiler, quantization="different")
-    assert result["status"] == "contract_mismatch"
-
-def test_comparison_reports_resource_and_timing_fields():
-    result = compare(reference_fixture, compiler_fixture)
-    assert result["status"] == "aligned"
-    assert "lut_delta" in result["resources"]
-    assert "critical_paths" in result["timing"]
+def test_three_runs_match_the_frozen_sequence():
+    result = verify_generation(BUNDLE, [7454, 2402, 257, 640], EXPECTED, count=3)
+    assert result["status"] == "matched"
+    assert [run["tokens"] for run in result["runs"]] == [EXPECTED] * 3
 ```
 
-- [ ] **Step 2: Run tests to verify the comparison harness is absent**
+- [ ] **Step 2: Verify the missing harness fails**
 
-Run: `nix develop -c python -m unittest discover -s tests -p 'test_tinystories_1m_slice_comparison.py' -v`
+Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_generation.py -v`
 
-Expected: FAIL with missing comparison function/artifact errors.
+Expected: FAIL importing the verifier.
 
-- [ ] **Step 3: Implement comparison inputs and status model**
+- [ ] **Step 3: Implement deterministic greedy generation**
 
-Implement explicit statuses `contract_mismatch`, `functional_mismatch`, `aligned`, and `incomplete`. Require exact checkpoint tensors and final token outputs before calculating efficiency deltas.
+For each token, run the exact model with the current context, hash the authenticated fixed-point logits, select the smallest token ID among equal maxima, append it, and stop after 16 tokens. Repeat three times in fresh model instances.
 
-- [ ] **Step 4: Add resource/timing parsers**
+- [ ] **Step 4: Compare eager and exported execution**
 
-Parse Yosys LUT/FF/BRAM/DSP/memory statistics and nextpnr maximum frequencies, worst paths, cycles/token, and interface overhead. Preserve raw report hashes and paths in the JSON output.
+Require both execution modes to produce identical per-step logits hashes, checkpoint hashes, and tokens. Report the first token/checkpoint mismatch and do not register the compiler model on failure.
 
-- [ ] **Step 5: Add provenance-linked waste-map generation**
+- [ ] **Step 5: Run focused verification**
 
-For each excess buffer, operator, mux, or reduction, record the compiler stage/module and source operation from RTL annotations. Never label an item as waste without a measured delta.
+Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_generation.py -v`
 
-- [ ] **Step 6: Run focused tests and the real comparison**
+Expected: PASS and an `exact-generation` receipt bound to the Task 1 and Task 2 hashes.
 
-Run: `nix develop -c python -m unittest discover -s tests -p 'test_tinystories_1m_slice_comparison.py' -v`
-
-Then run the Nix-managed simulation and synthesis/report commands for the extracted slice. Expected result: either a precise contract/functional mismatch or an aligned comparison with a ranked waste map.
-
-- [ ] **Step 7: Commit the comparison harness and report**
+- [ ] **Step 6: Commit the generation gate**
 
 ```bash
-git add scripts/comparison/compare_tinystories_1m_slice.py tests/test_tinystories_1m_slice_comparison.py artifacts/comparison/tinystories-1m-slice-comparison.json docs/results/2026-08-28-tinystories-1m-slice-comparison.md
-git commit -m "feat: compare compiler RTL with TinyStories-1M reference"
+git add scripts/comparison/verify_tinystories_1m_exact_generation.py tests/test_tinystories_1m_exact_generation.py artifacts/reference/tinystories-1m-exact-generation.json
+git commit -m "prove exact TinyStories generation input"
 ```
 
-### Task 4: Apply one evidence-backed compiler optimization
+### Task 4: Register the exact model without changing the backend
 
 **Files:**
-- Modify: the specific compiler lowering/scheduling/template file named by the Task 3 waste map
-- Create: `tests/test_tinystories_1m_optimization_regression.py`
-- Create: `artifacts/comparison/tinystories-1m-optimization-result.json`
-- Update: `docs/results/2026-08-28-tinystories-1m-slice-comparison.md`
+- Modify: `nix/models.nix`
+- Modify: `flake.nix`
+- Create: `tests/test_tinystories_1m_exact_pipeline_registration.py`
 
 **Interfaces:**
-- Consumes: one ranked waste candidate from Task 3.
-- Produces: one isolated compiler change with before/after functional, resource, and timing evidence.
+- Consumes: `TinyStories/model_adapter_exact_package.py` and canonical Task 1–3 receipts.
+- Produces: model key `tiny-stories-1m-kev-gpt-exact` using the existing pipeline stage constructors and a package-aware exported-program derivation.
 
-- [ ] **Step 1: Write a regression test for the selected waste candidate**
+- [ ] **Step 1: Write a failing registration test**
 
-The test must exercise the exact slice and assert the frozen checkpoint/output plus the expected structural property (for example, one buffer instead of two or a pipelined reduction boundary).
-
-- [ ] **Step 2: Run the regression test before changing code**
-
-Run the focused Nix/Python test command recorded in the comparison report. Expected: PASS for current behavior and a baseline structural count.
-
-- [ ] **Step 3: Implement only the selected change**
-
-Do not modify PCIe, DDR3, tokenizer, model weights, or unrelated lowering stages. Keep the change independently attributable to the waste-map entry.
-
-- [ ] **Step 4: Re-run simulation and structural checks**
-
-Run the focused regression, Yosys elaboration, and slice simulation. Expected: exact functional match and no new unresolved modules or blackboxes.
-
-- [ ] **Step 5: Re-run resource/timing measurement**
-
-Use the same Nix derivations, constraints, and tool versions as Task 3. Accept the optimization only if it preserves functional equivalence and improves the targeted measured cost without regressing required timing.
-
-- [ ] **Step 6: Commit the isolated optimization**
-
-```bash
-git add tests/test_tinystories_1m_optimization_regression.py artifacts/comparison/tinystories-1m-optimization-result.json docs/results/2026-08-28-tinystories-1m-slice-comparison.md
-git commit -m "opt: reduce measured TinyStories-1M compiler overhead"
+```python
+def test_exact_model_uses_existing_pipeline_and_canonical_package():
+    registration = load_registration("tiny-stories-1m-kev-gpt-exact")
+    assert registration["backend_overrides"] == []
+    assert registration["package_manifest_sha256"] == EXPECTED_MANIFEST_SHA256
 ```
 
-Also stage the exact lowering/scheduling/template source path recorded by the
-Task 3 comparison manifest before committing.
+- [ ] **Step 2: Verify the model key is absent**
 
-### Task 5: Integrate the validated compiler path into full TinyStories-1M
+Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_pipeline_registration.py -v`
+
+Expected: FAIL because `tiny-stories-1m-kev-gpt-exact` is not registered.
+
+- [ ] **Step 3: Add the package-aware Nix registration**
+
+Use the existing `registerModel` stage graph. The exported command must pass explicit contract, package, and model paths and must verify Task 1–3 receipt hashes before writing `exported.pt2`. Do not add passes or alter shared pipeline scripts.
+
+- [ ] **Step 4: Evaluate registration and build only the export stage**
+
+Run: `nix eval .#packages.x86_64-linux.tiny-stories-1m-kev-gpt-exact-pytorch-exported.name`
+
+Run: `nix build .#tiny-stories-1m-kev-gpt-exact-pytorch-exported -L`
+
+Expected: the export derivation succeeds with a manifest bound to the exact-input audit and generation receipt.
+
+- [ ] **Step 5: Run registration tests**
+
+Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_pipeline_registration.py -v`
+
+- [ ] **Step 6: Commit the registration**
+
+```bash
+git add nix/models.nix flake.nix tests/test_tinystories_1m_exact_pipeline_registration.py
+git commit -m "register exact TinyStories compiler model"
+```
+
+### Task 5: Run the unchanged pipeline and capture its first frontier
 
 **Files:**
-- Modify: existing TinyStories-1M compiler pipeline configuration and RTL integration files identified by Tasks 2–4
-- Create: `artifacts/tinystories-1m/compiler-build-manifest.json`
-- Create: `docs/results/2026-08-28-tinystories-1m-compiler-build.md`
-- Test: existing Nix simulation, Yosys, and nextpnr targets for the 1M path
+- Create: `scripts/pipeline/classify_tinystories_1m_exact_frontier.py`
+- Create: `tests/test_tinystories_1m_exact_frontier.py`
+- Create: `artifacts/comparison/tinystories-1m-exact-current-pipeline-frontier.json`
+- Create: `docs/results/2026-08-29-tinystories-1m-exact-current-pipeline-frontier.md`
 
 **Interfaces:**
-- Consumes: the aligned and optimized one-block slice.
-- Produces: complete compiler-generated TinyStories-1M RTL, synthesis reports, timing-closed bitstream candidate, and provenance manifest.
+- Consumes: the registered stage outputs and logs for `pytorch-exported`, `torch-mlir`, `linalg`, `scf`, `flat-scf`, `calyx`, and `calyx-native-sv`.
+- Produces: `classify_frontier(stage_records: list[StageRecord]) -> FrontierReceipt`, using the statuses defined by the spec and naming the earliest invalid stage only.
 
-- [ ] **Step 1: Add a full-model contract gate**
+- [ ] **Step 1: Write failing classifier tests**
 
-Before building, verify that the generated package, tokenizer, quantization, memory image, and command ABI equal Task 1. Abort on mismatch.
-
-- [ ] **Step 2: Run full-model simulation**
-
-Run the deterministic 16-token frozen prompt through the compiler-generated RTL and compare every available checkpoint plus final tokens against the reference. Expected: exact match before hardware work.
-
-- [ ] **Step 3: Run Yosys and constrained nextpnr-xilinx**
-
-Use the fixed target board, constraints, clock requirements, and reproducible tool closure. Record LUT/FF/BRAM/DSP, Fmax, worst paths, seed, and all source hashes.
-
-- [ ] **Step 4: Reject non-fitting artifacts**
-
-Do not program or publish a bitstream candidate unless required clocks close and the provenance manifest verifies.
-
-- [ ] **Step 5: Commit the full compiler build manifest and report**
-
-```bash
-git add artifacts/tinystories-1m/compiler-build-manifest.json docs/results/2026-08-28-tinystories-1m-compiler-build.md
-git commit -m "build: close compiler-generated TinyStories-1M path"
+```python
+def test_classifier_reports_the_earliest_invalid_stage():
+    result = classify_frontier([valid("torch_mlir"), invalid("calyx", "math.exp"), invalid("sv", "cascade")])
+    assert result.frontier == "calyx_frontier"
+    assert result.diagnostic == "math.exp"
 ```
 
-### Task 6: Perform the three-run TinyStories-1M FPGA gate
+- [ ] **Step 2: Verify the classifier is absent**
+
+Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_frontier.py -v`
+
+- [ ] **Step 3: Implement strict stage validation and hashing**
+
+Require each successful stage to have a nonempty artifact, SHA-256, command, tool revision, and zero terminal diagnostic. Reject partial Calyx output when its log contains an unhandled operation even if the process exits zero.
+
+- [ ] **Step 4: Build stages sequentially until the first failure**
+
+Run each target in order, stopping after the first invalid stage:
+
+```bash
+nix build .#tiny-stories-1m-kev-gpt-exact-torch-mlir -L
+nix build .#tiny-stories-1m-kev-gpt-exact-linalg -L
+nix build .#tiny-stories-1m-kev-gpt-exact-scf -L
+nix build .#tiny-stories-1m-kev-gpt-exact-flat-scf -L
+nix build .#tiny-stories-1m-kev-gpt-exact-calyx -L
+nix build .#tiny-stories-1m-kev-gpt-exact-calyx-native-sv -L
+```
+
+- [ ] **Step 5: Generate the frontier receipt and minimal reproducer**
+
+Run: `nix develop -c python scripts/pipeline/classify_tinystories_1m_exact_frontier.py --model tiny-stories-1m-kev-gpt-exact --output artifacts/comparison/tinystories-1m-exact-current-pipeline-frontier.json`
+
+Extract the smallest IR retaining the same diagnostic when the failing stage supports reduction. Record both full-artifact and reproducer hashes.
+
+- [ ] **Step 6: Verify and commit the frontier**
+
+Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_frontier.py -v`
+
+```bash
+git add scripts/pipeline/classify_tinystories_1m_exact_frontier.py tests/test_tinystories_1m_exact_frontier.py artifacts/comparison/tinystories-1m-exact-current-pipeline-frontier.json docs/results/2026-08-29-tinystories-1m-exact-current-pipeline-frontier.md reproducers/
+git commit -m "record exact TinyStories compiler frontier"
+```
+
+### Task 6: Select the next change from the observed frontier
 
 **Files:**
-- Create: `artifacts/hardware/tinystories-1m-compiler-cold-runs.json`
-- Create: `docs/results/2026-08-28-tinystories-1m-compiler-hardware.md`
-- Use: existing YPCB programming and inference scripts; do not alter transport or DDR3 configuration
+- Create: `docs/results/2026-08-29-tinystories-1m-exact-frontier-decision.md`
+- Create: `artifacts/comparison/tinystories-1m-exact-frontier-decision.json`
+- Modify: `docs/working-notes.org`
 
 **Interfaces:**
-- Consumes: Task 5 timing-closed bitstream and verified package manifest.
-- Produces: three cold-start hardware logs, exact-token comparison, latency, and final acceptance status.
+- Consumes: Task 5 frontier and reproducer.
+- Produces: one ranked next action with `frontier_hash`, rejected alternatives, expected observable improvement, regression command, and scope boundary.
 
-- [ ] **Step 1: Verify board and artifact identity**
+- [ ] **Step 1: Compare the frontier against the four permitted response classes**
 
-Check the bitstream SHA-256 and board target against the manifest. Do not proceed with a stale or unverified image.
+Classify the response as exactly one of `compiler_pass`, `bit_accurate_primitive`, `scheduling_or_memory_architecture`, or `autoregressive_runtime_boundary`. Cite the failing operation/structure and explain why each rejected class does not address that causal boundary.
 
-- [ ] **Step 2: Program and run the frozen prompt once**
+- [ ] **Step 2: Define the next regression before implementation**
 
-Capture token output, cycle count, wall-clock latency, status, and any available trace hash. Expected: exact 16-token match within 300 seconds.
+Record the exact command and expected before/after result. The regression must retain all Task 1–3 identity and generation hashes.
 
-- [ ] **Step 3: Repeat two cold starts**
+- [ ] **Step 3: Validate decision binding**
 
-Power-cycle/reinitialize according to the documented board protocol and repeat without changing inputs or artifacts. Expected: all three outputs and required hashes match.
+Run: `nix develop -c python -m json.tool artifacts/comparison/tinystories-1m-exact-frontier-decision.json`
 
-- [ ] **Step 4: Write the acceptance report**
+Verify that `frontier_hash` equals the on-disk Task 5 receipt hash and that only one response class is selected.
 
-Mark success only when all three runs match exactly and timing/provenance gates are green. Otherwise classify the first failing gate and retain all logs.
-
-- [ ] **Step 5: Commit the hardware evidence**
+- [ ] **Step 4: Commit the decision checkpoint**
 
 ```bash
-git add artifacts/hardware/tinystories-1m-compiler-cold-runs.json docs/results/2026-08-28-tinystories-1m-compiler-hardware.md
-git commit -m "test: validate compiler-generated TinyStories-1M on FPGA"
+git add docs/results/2026-08-29-tinystories-1m-exact-frontier-decision.md artifacts/comparison/tinystories-1m-exact-frontier-decision.json docs/working-notes.org
+git commit -m "select next exact-input compiler change"
 ```
 
-### Task 7: Extend the backend to the remaining TinyStories family
-
-**Files:**
-- Modify: TinyStories-specific model import/configuration and RTL-generation templates
-- Create: `artifacts/scaling/tinystories-family-results.json`
-- Create: `docs/results/2026-08-28-tinystories-family-scaling.md`
-- Test: per-model contract, simulation, synthesis, and hardware gates as capacity allows
-
-**Interfaces:**
-- Consumes: the validated 1M backend and contract format.
-- Produces: reproducible 3M/8M/28M/33M scaling matrix; each model is classified as fitting, non-fitting, or blocked with evidence.
-
-- [ ] **Step 1: Add model-config contract tests**
-
-Require each model manifest to identify checkpoint, tokenizer, dimensions, quantization, memory estimate, and expected acceptance mode.
-
-- [ ] **Step 2: Generate and simulate each model**
-
-Run the same TinyStories-specific lowering and exact reference comparison. Record failures at contract, simulation, synthesis, timing, or hardware gates.
-
-- [ ] **Step 3: Generate resource/timing matrix**
-
-Fit only descriptive scaling trends to measured results; do not extrapolate an unmeasured hardware success claim.
-
-- [ ] **Step 4: Commit the scaling report**
-
-```bash
-git add artifacts/scaling/tinystories-family-results.json docs/results/2026-08-28-tinystories-family-scaling.md
-git commit -m "docs: characterize TinyStories compiler scaling"
-```
+This plan ends at the evidence-backed decision gate. Implementing the selected
+compiler or architecture change requires a follow-up plan because its files,
+tests, and acceptance criteria depend on the frontier observed in Task 5.
