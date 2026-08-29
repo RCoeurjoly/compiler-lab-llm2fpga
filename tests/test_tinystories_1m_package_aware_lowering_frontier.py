@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import unittest
 from pathlib import Path
 
@@ -24,6 +25,11 @@ class PackageAwareLoweringFrontierTest(unittest.TestCase):
             "manifest_sha256", "receipt_sha256", "weights_sha256",
             "scales_sha256", "calibration_ids_sha256",
         })
+        unsigned = {key: value for key, value in self.report.items() if key != "sha256"}
+        self.assertEqual(
+            self.report["sha256"],
+            hashlib.sha256(json.dumps(unsigned, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest(),
+        )
 
     def test_stage_chain_has_recorded_hashes_and_sizes(self) -> None:
         stages = self.report["stages"]
@@ -38,7 +44,7 @@ class PackageAwareLoweringFrontierTest(unittest.TestCase):
         self.assertEqual(frontier["unmodified_circt"]["source_line"], 337)
         self.assertEqual(frontier["existing_pre_calyx_passes"]["status"], "succeeded")
         self.assertEqual(frontier["next_circt"]["operation"], "math.exp")
-        self.assertEqual(frontier["next_circt"]["semantic_role"], "GELU")
+        self.assertEqual(frontier["next_circt"]["semantic_role"], "attention softmax")
         self.assertEqual(frontier["next_circt"]["source_line"], 830)
 
     def test_no_downstream_success_is_claimed(self) -> None:
