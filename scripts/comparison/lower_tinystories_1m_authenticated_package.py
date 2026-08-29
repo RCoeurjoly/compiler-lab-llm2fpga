@@ -8,10 +8,11 @@ ordinary FP32 pipeline would silently drop the implementation profile and make
 an apparently successful, but unaligned, compiler artifact.
 
 The script therefore preserves the authenticated inputs and emits a stable
-lowering-attempt sidecar.  It only invokes a lowering command after an adapter
-receipt says that all boundary execution semantics are representable.  Until
-then its successful process exit means that the evidence was recorded; the
-JSON ``status`` remains ``unsupported`` and cannot be mistaken for alignment.
+lowering-attempt sidecar.  A separately versioned fixed-hardware Q/DQ profile
+may supply execution rules, but its runtime oracle is not board authority and
+the compiler must still explicitly implement that profile.  Until then its
+successful process exit means that the evidence was recorded; the JSON
+``status`` remains ``unsupported`` and cannot be mistaken for alignment.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from TinyStories import model_adapter_reference_package as package_adapter  # noqa: E402
+from scripts.comparison import fixed_hardware_qdq_profile as fixed_qdq  # noqa: E402
 
 
 SCHEMA = "tinystories-1m-authenticated-package-lowering-v1"
@@ -184,12 +186,22 @@ def _prepare_output(out_dir: Path) -> Path:
 def lower_gate(
     contract_path: Path, package_export: Path, package: Path, out_dir: Path,
     lower_command: list[str] | None = None, verified_input_provider=_canonical_verified_input,
+    fixed_qdq_profile: Path | None = None, qdq_receipt: Path | None = None,
 ) -> dict[str, Any]:
     contract = _load_json(contract_path)
     identity = _contract_identity(contract)
     receipt_path = package_export / "adapter-receipt.json"
     receipt = _load_json(receipt_path)
     _verified_receipt(receipt, contract, contract_path, package, verified_input_provider)
+    if (fixed_qdq_profile is None) != (qdq_receipt is None):
+        raise LoweringGateError("fixed_qdq_profile_arguments_mismatch",
+                                "--fixed-qdq-profile and --qdq-receipt must be supplied together")
+    runtime_profile: dict[str, Any] | None = None
+    if fixed_qdq_profile is not None and qdq_receipt is not None:
+        try:
+            runtime_profile = fixed_qdq.validate_profile(fixed_qdq_profile, contract_path, qdq_receipt)
+        except fixed_qdq.FixedHardwareProfileError as error:
+            raise LoweringGateError(error.code, str(error)) from error
     staging = _prepare_output(out_dir)
     try:
         receipt_files = {
@@ -197,6 +209,10 @@ def lower_gate(
             "adapter_receipt": _copy_required(receipt_path, staging / "adapter-receipt.json"),
             "package_receipt": _copy_required(package / "receipt.json", staging / "package-receipt.json"),
         }
+        if runtime_profile is not None:
+            receipt_files["fixed_qdq_profile"] = _copy_required(
+                fixed_qdq_profile, staging / "fixed-hardware-qdq-profile.json",
+            )
         artifacts = receipt["artifacts"]
         export_item = artifacts["exported_program"]
         trace_item = artifacts["numeric_trace"]
@@ -231,12 +247,17 @@ def lower_gate(
             },
             "activation_qdq_execution": qdq,
             "activation_qdq_boundary_count": len(activation_boundaries) if isinstance(activation_boundaries, dict) else None,
+            "fixed_hardware_qdq_profile": (
+                {"path": "fixed-hardware-qdq-profile.json", "sha256": receipt_files["fixed_qdq_profile"],
+                 "status": runtime_profile["status"], "board_authenticated": False}
+                if runtime_profile is not None else None
+            ),
             # Compatible with Task 2's source metadata identity check.  It is not
             # a source claim until a representable lowering has produced one.
             "task2_source_metadata": {"contract_identity": identity},
             "alignment_status": "unaligned",
         }
-        if qdq_error:
+        if qdq_error and runtime_profile is None:
             result = base | {
                 "status": "unsupported",
                 "compiler_artifact": None,
@@ -246,6 +267,24 @@ def lower_gate(
                     "message": (
                         "the authenticated package has 97 activation boundaries, but its adapter receipt "
                         "declares metadata_only because rounding, saturation, and clamp semantics are unavailable"
+                    ),
+                },
+            }
+            _write_json(staging / "lowering-attempt.json", result)
+            _write_json(staging / "compiler-artifact-metadata.json", result)
+            os.replace(staging, out_dir)
+            return result
+
+        if runtime_profile is not None and not lower_command:
+            result = base | {
+                "status": "unsupported",
+                "compiler_artifact": None,
+                "failure": {
+                    "stage": "authenticated-fixed-hardware-qdq-lowering-preflight",
+                    "code": "fixed_hardware_qdq_compiler_lowering_not_implemented",
+                    "message": (
+                        "the Q8.24/signed-64 fixed-hardware profile and its runtime trace are authenticated, "
+                        "but the compiler has no lowering that consumes this profile without dropping semantics"
                     ),
                 },
             }
@@ -285,9 +324,12 @@ def main() -> None:
     parser.add_argument("--package-export", required=True, type=Path)
     parser.add_argument("--package", required=True, type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
+    parser.add_argument("--fixed-qdq-profile", type=Path)
+    parser.add_argument("--qdq-receipt", type=Path)
     parser.add_argument("--lower-command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
-    lower_gate(args.contract, args.package_export, args.package, args.out_dir, args.lower_command or None)
+    lower_gate(args.contract, args.package_export, args.package, args.out_dir, args.lower_command or None,
+               fixed_qdq_profile=args.fixed_qdq_profile, qdq_receipt=args.qdq_receipt)
 
 
 if __name__ == "__main__":

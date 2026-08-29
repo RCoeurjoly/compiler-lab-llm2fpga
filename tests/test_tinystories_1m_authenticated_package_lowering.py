@@ -15,6 +15,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/comparison/lower_tinystories_1m_authenticated_package.py"
 MATERIALIZER = ROOT / "scripts/comparison/materialize_tinystories_1m_package_export.py"
+FIXED_QDQ_PROFILE = ROOT / "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json"
+QDQ_RECEIPT = ROOT / "artifacts/reference/tinystories-1m-qdq-semantics.json"
 EXTERNAL_PACKAGE = Path("/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m")
 EXTERNAL_MODEL = Path("/home/roland/.cache/huggingface/hub/models--roneneldan--TinyStories-1M/snapshots/77f1b168e219585646439073245fe87e56b3023e")
 
@@ -126,6 +128,19 @@ class AuthenticatedPackageLoweringTest(unittest.TestCase):
         self.assertEqual(attempt["failure"]["code"], "activation_rounding_semantics_unavailable")
         self.assertIsNone(attempt["compiler_artifact"])
 
+    def test_fixed_profile_refuses_a_noncanonical_contract_before_staging_output(self) -> None:
+        """A runtime profile cannot be rebound to a synthetic adapter receipt."""
+        output = self.root / "fixed-profile"
+        with self.assertRaisesRegex(GATE.LoweringGateError, "contract_artifact_identity_mismatch"):
+            GATE.lower_gate(
+                self.contract_path, self.export, self.package, output,
+                fixed_qdq_profile=FIXED_QDQ_PROFILE, qdq_receipt=QDQ_RECEIPT,
+                verified_input_provider=lambda _contract, _package: json.loads(
+                    (self.export / "adapter-receipt.json").read_text()
+                )["verified_input"],
+            )
+        self.assertFalse(output.exists())
+
     def test_rejects_rehashed_unrelated_verified_input_and_boundary_content(self) -> None:
         self.mutate_receipt(lambda receipt: receipt["verified_input"].__setitem__("status", "forged"))
         with self.assertRaisesRegex(GATE.LoweringGateError, "verifier_identity_mismatch"):
@@ -175,6 +190,8 @@ class AuthenticatedPackageLoweringTest(unittest.TestCase):
         self.assertIn('"tinystories-1m-authenticated-package-lowering"', flake)
         block = flake[flake.index('"tinystories-1m-authenticated-package-lowering"'):]
         self.assertIn("lower_tinystories_1m_authenticated_package.py", block)
+        self.assertIn("tinystories-1m-fixed-hardware-qdq-profile.json", block)
+        self.assertIn("tinystories-1m-qdq-semantics.json", block)
         self.assertNotIn("representative-core", block[:3500])
         self.assertNotIn("pcie", block[:3500].lower())
         self.assertNotIn("ddr3", block[:3500].lower())

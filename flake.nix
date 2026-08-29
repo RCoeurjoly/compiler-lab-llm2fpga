@@ -446,7 +446,9 @@
                 --package "$package" --model-path "$model_path" --out-dir "$tmp_dir/package-export"
               ${pythonWithTinyStories}/bin/python ${sourceRoot}/scripts/comparison/lower_tinystories_1m_authenticated_package.py \
                 --contract ${sourceRoot}/artifacts/reference/tinystories-1m-kev-gpt-contract.json \
-                --package-export "$tmp_dir/package-export" --package "$package" --out-dir "$out_dir"
+                --package-export "$tmp_dir/package-export" --package "$package" --out-dir "$out_dir" \
+                --fixed-qdq-profile ${sourceRoot}/artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json \
+                --qdq-receipt ${sourceRoot}/artifacts/reference/tinystories-1m-qdq-semantics.json
             '';
           };
 
