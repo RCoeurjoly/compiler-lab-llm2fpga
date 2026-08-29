@@ -169,6 +169,19 @@ class SoftmaxBridgeTest(unittest.TestCase):
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-sibling-iv.mlir")
 
+    def test_lowered_then_branch_index_does_not_dominate_else(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = lowered_separate_loop_graph().replace(
+            "  %idx0 = arith.constant 0 : index",
+            "  scf.if %cond0 {\n    %idx0 = arith.constant 0 : index\n  } else {\n    %other0 = arith.constant 0 : index\n  }",
+            1,
+        )
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module.bridge_graph(graph, evidence, source_name="lowered-then-else-index.mlir")
+
     def test_lowered_in_loop_sum_store_cannot_bypass_loop_result(self):
         evidence = module.load_evidence(
             ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",

@@ -261,14 +261,16 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
     scope_stack: list[int] = []
     next_scope = 0
     for line in lines:
-        scope_paths.append(tuple(scope_stack))
         opens, closes = line.count("{"), line.count("}")
-        for _ in range(opens):
-            next_scope += 1
-            scope_stack.append(next_scope)
         for _ in range(closes):
             if scope_stack:
                 scope_stack.pop()
+        # Close events precede open events on `} else {`; otherwise the else
+        # branch inherits the then-branch's lexical scope.
+        scope_paths.append(tuple(scope_stack))
+        for _ in range(opens):
+            next_scope += 1
+            scope_stack.append(next_scope)
     exp_lines = [i for i, line in enumerate(lines) if re.match(r"%[^ ]+\s*=\s*math\.exp\s+%[^ ]+", line)]
     require(len(exp_lines) == expected_exp_sites, "pattern_not_proven",
             f"expected {expected_exp_sites} stabilized exp sites, found {len(exp_lines)}")
