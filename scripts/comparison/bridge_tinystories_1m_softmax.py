@@ -292,6 +292,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
     used_exp_memrefs: set[str] = set()
     used_delta_memrefs: set[str] = set()
     used_sum_memrefs: set[str] = set()
+    used_operand_memrefs: set[str] = set()
     for number, exp_i in enumerate(exp_lines, 1):
         exp_m = re.match(r"%([^ ]+)\s*=\s*math\.exp\s+%([^ ]+)", lines[exp_i])
         assert exp_m
@@ -308,10 +309,12 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         delta_stores = [(i, m) for i, line in enumerate(lines) if i < delta_load_i and (m := store_re.match(line)) and m.group(2).strip() == delta_mem and same_index(m.group(3).strip(), i, delta_idx, delta_load_i)]
         require(delta_stores, "dataflow_not_proven", f"site {number} delta load has no same-index store")
         delta_store_i, delta_store = delta_stores[-1]
+        require(function_start <= delta_store_i <= function_end, "dataflow_not_proven", f"site {number} delta store is outside function")
         delta_value = delta_store.group(1).strip()
         sub_defs = [(i, m) for i, line in enumerate(lines) if i < delta_store_i and (m := sub_re.match(line)) and m.group(1) == delta_value]
         require(sub_defs, "dataflow_not_proven", f"site {number} delta store has no dominating arith.subf")
         sub_i, sub = sub_defs[-1]
+        require(function_start <= sub_i <= function_end, "dataflow_not_proven", f"site {number} subtraction is outside function")
         # Both score and row-max must be values loaded in this component.  We
         # intentionally do not infer their meaning from SSA spelling.
         operand_loads = {}
@@ -319,8 +322,13 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
             candidates = [(i, m) for i, line in enumerate(lines) if i < sub_i and (m := load_re.match(line)) and m.group(1) == operand]
             require(candidates, "dataflow_not_proven", f"site {number} subtraction operand is not a loaded tensor value")
             operand_loads[operand] = candidates[-1][1]
+            require(function_start <= candidates[-1][0] <= function_end, "dataflow_not_proven", f"site {number} operand load is outside function")
         require(operand_loads[sub.group(2)].group(2).strip() != operand_loads[sub.group(3)].group(2).strip(),
                 "dataflow_not_proven", f"site {number} score and row-max loads are not distinct")
+        for operand in sub.groups()[1:]:
+            resource = operand_loads[operand].group(2).strip()
+            require(resource not in used_operand_memrefs, "dataflow_not_proven", f"site {number} reuses another head's operand memref")
+            used_operand_memrefs.add(resource)
         # Exp store/load and normalization may occur in later loops.  Bind by
         # exact exp memref/index and SSA edges, never by proximity alone.
         exp_store_candidates = [(i, m) for i, line in enumerate(lines) if i > exp_i and (m := store_re.match(line)) and m.group(1).strip() == exp_result]
@@ -359,6 +367,8 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
                     break
         require(complete, "dataflow_not_proven", f"site {number} reduction/division does not consume a same-memref exp reload")
         exp_load_i, exp_load, add_i, add, div_entry = complete[0]
+        require(all(function_start <= index <= function_end for index in (exp_load_i, add_i, div_entry[0])),
+                "dataflow_not_proven", f"site {number} normalization escapes function")
         exp_loaded = exp_load.group(1)
         sum_value = add.group(1)
         # A reduction is complete only when its accumulator is materialized
@@ -366,6 +376,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         sum_store_matches = [(i, m) for i, line in enumerate(lines) if i > add_i and (m := store_re.match(line)) and m.group(1).strip() == sum_value]
         require(sum_store_matches, "dataflow_not_proven", f"site {number} reduction result is not materialized")
         sum_mem_for_site = sum_store_matches[0][1].group(2).strip()
+        require(function_start <= sum_store_matches[0][0] <= function_end, "dataflow_not_proven", f"site {number} sum store is outside function")
         require(sum_mem_for_site not in used_sum_memrefs, "dataflow_not_proven", f"site {number} reuses another head's sum memref")
         used_sum_memrefs.add(sum_mem_for_site)
         div_candidates = [div_entry]
