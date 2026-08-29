@@ -78,7 +78,9 @@ def lowered_separate_loop_graph(site_count: int = 8) -> str:
             f"    %elpre{head} = memref.load %exp_mem{head}[%q{head}] : memref<4xf32>",
             f"    %el{head} = memref.load %exp_mem{head}[%q{head}] : memref<4xf32>",
             f"    %sum{head} = arith.addf %oldsum{head}, %el{head} : f32",
-            f"    %prob{head} = arith.divf %el{head}, %sum{head} : f32",
+            f"    memref.store %sum{head}, %sum_mem{head}[%q{head}] : memref<4xf32>",
+            f"    %sum_loaded{head} = memref.load %sum_mem{head}[%q{head}] : memref<4xf32>",
+            f"    %prob{head} = arith.divf %el{head}, %sum_loaded{head} : f32",
             f"    %causal{head} = arith.cmpi sle, %time_index{head}, %position{head} : i32",
             "  }",
         ])
@@ -95,6 +97,17 @@ class SoftmaxBridgeTest(unittest.TestCase):
         descriptor = module.bridge_graph(graph, evidence, source_name="lowered.mlir")
         self.assertEqual(descriptor["source"]["exp_site_count"], 8)
         self.assertEqual(descriptor["source"]["binding_mode"], "lowered_memref_loop_structure")
+
+    def test_lowered_inverse_causal_direction_fails_closed(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = lowered_separate_loop_graph().replace(
+            "%time_index0, %position0", "%position0, %time_index0"
+        )
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module.bridge_graph(graph, evidence, source_name="lowered-inverse.mlir")
 
     def test_exact_stabilized_attention_pattern_emits_authenticated_custom_op(self):
         evidence = module.load_evidence(

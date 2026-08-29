@@ -326,9 +326,21 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
             adds = [(i, m) for i, line in enumerate(lines) if i > candidate_i and (m := add_re.match(line)) and candidate_value in (m.group(2), m.group(3))]
             for add_i_candidate, add_candidate in adds:
                 sum_candidate = add_candidate.group(1)
-                divs = [(i, m) for i, line in enumerate(lines) if i > add_i_candidate and (m := div_re.match(line)) and m.group(2) == candidate_value and m.group(3) == sum_candidate]
-                if divs:
-                    complete.append((candidate_i, candidate, add_i_candidate, add_candidate, divs[0]))
+                # The reduction result is materialized and reloaded before
+                # division in the lowered graph.  Bind that reload to the
+                # exact sum store/index, rather than trusting its SSA name.
+                sum_stores = [(i, m) for i, line in enumerate(lines) if i > add_i_candidate and (m := store_re.match(line)) and m.group(1).strip() == sum_candidate]
+                for sum_store_i, sum_store in sum_stores:
+                    sum_mem, sum_idx = sum_store.group(2).strip(), sum_store.group(3).strip()
+                    sum_loads = [(i, m) for i, line in enumerate(lines) if i > sum_store_i and (m := load_re.match(line)) and m.group(2).strip() == sum_mem and same_index(m.group(3).strip(), i, sum_idx, sum_store_i)]
+                    for sum_load_i, sum_load in sum_loads:
+                        divs = [(i, m) for i, line in enumerate(lines) if i > sum_load_i and (m := div_re.match(line)) and m.group(2) == candidate_value and m.group(3) == sum_load.group(1)]
+                        if divs:
+                            complete.append((candidate_i, candidate, add_i_candidate, add_candidate, divs[0]))
+                            break
+                    if complete:
+                        break
+                if complete:
                     break
         require(complete, "dataflow_not_proven", f"site {number} reduction/division does not consume a same-memref exp reload")
         exp_load_i, exp_load, add_i, add, div_entry = complete[0]
@@ -336,9 +348,15 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         sum_value = add.group(1)
         div_candidates = [div_entry]
         head_digits = "".join(re.findall(r"\d+", exp_mem))
-        causal = [i for i, line in enumerate(lines) if i not in used_causal and
-                  re.match(r"%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule),\s*%[^, ]+,\s*%[^ ]+", line) and
-                  (not head_digits or head_digits in line)]
+        causal = []
+        causal_re = re.compile(r"%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule),\s*(%[^, ]+),\s*(%[^ ]+)")
+        for i, line in enumerate(lines):
+            match = causal_re.match(line)
+            if (i not in used_causal and match and
+                    match.group(1).lower().startswith("%time_index") and
+                    match.group(2).lower().startswith("%position") and
+                    (not head_digits or head_digits in line)):
+                causal.append(i)
         require(causal, "pattern_not_proven", f"site {number} lacks executable causal comparison")
         used_causal.add(causal[0])
         sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
