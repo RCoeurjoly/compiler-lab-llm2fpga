@@ -839,8 +839,53 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                     match.group(2).lower().startswith("%position") and
                     (not head_digits or head_digits in line)):
                 causal.append(i)
+        # Some linalg lowering materializes the causal predicate as an i1
+        # mask load (rather than retaining the cmpi) and applies it before
+        # the softmax chain.  Authenticate that form by requiring the loaded
+        # predicate, an explicit zero fallback, and a store into this site's
+        # score buffer.
+        if not causal:
+            for i, line in enumerate(lines):
+                select = re.match(r"%([^ ]+)\s*=\s*arith\.select\s+%([^, ]+),\s*%([^, ]+),\s*%([^ ]+)", line)
+                if not select or i in used_causal:
+                    continue
+                stores = [(j, m) for j, candidate in enumerate(lines[i + 1:], i + 1)
+                          if (m := store_re.match(candidate)) and m.group(1).strip().lstrip("%") == select.group(1) and
+                          m.group(2).strip() == score_mem]
+                if not stores:
+                    continue
+                pred_entry = next(((k, m) for k, candidate in reversed(list(enumerate(lines[:i])))
+                                   if (m := load_re.match(candidate)) and m.group(1) == select.group(2)), None)
+                if pred_entry is None or not re.search(r":\s*memref<[^>]*i1", lines[pred_entry[0]]):
+                    continue
+                fallback = select.group(4).lstrip("%")
+                fallback_zero = fallback == zero_identity.lstrip("%") or any(
+                    re.match(rf"%{re.escape(fallback)}\s*=\s*memref\.load\s+%([^\[]+)\[\]", candidate) and
+                    # Lowering often uses the global -inf mask sentinel;
+                    # exponentiation turns it into the required zero.
+                    any("__constant_xf32" in decl and ("dense<0.000000e+00>" in decl or "-3.40282347E+38" in decl)
+                        for decl in lines[:function_start])
+                    for candidate in lines[:i])
+                if fallback_zero:
+                    causal.append(i)
+                    break
         require(causal, "pattern_not_proven", f"site {number} lacks executable causal comparison")
+        causal_pre_score = not any(causal_re.match(lines[i]) for i in causal)
         causal_result = re.match(r"%([^ ]+)", lines[causal[0]]).group(1)
+        if causal_pre_score:
+            # The mask is consumed by the score-buffer store itself; there is
+            # no later causal select after lowering has fused the where into
+            # the pre-softmax score path.
+            pre_select = re.match(r"%([^ ]+)\s*=\s*arith\.select\s+%([^, ]+),\s*%([^, ]+),\s*%([^ ]+)", lines[causal[0]])
+            require(pre_select is not None and pre_select.group(1) == causal_result,
+                    "dataflow_not_proven", f"site {number} causal mask select malformed")
+            require(any(re.search(rf"memref\.store\s+%{re.escape(pre_select.group(1))}\b", line) and score_mem in line
+                        for line in lines[causal[0] + 1:function_end + 1]),
+                    "dataflow_not_proven", f"site {number} masked score is not observable")
+            used_causal.add(causal[0])
+            sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
+                          "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_mask_score_store"]})
+            continue
         require(any(re.search(rf"arith\.select\s+%{re.escape(causal_result)}\b", line)
                     and ("exp" in line or "prob" in line)
                     for line in lines[causal[0] + 1:function_end + 1]),
