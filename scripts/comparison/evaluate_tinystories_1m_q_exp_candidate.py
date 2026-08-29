@@ -24,6 +24,9 @@ RTL = ROOT / "task3-main/rtl/fp/circt_fp_primitives.sv"
 PACKAGE_DEFAULT = Path("/tmp/kev-gpt-startinit/model_packages/tinystories-1m")
 QDQ = ROOT / "artifacts/reference/tinystories-1m-qdq-semantics.json"
 CONTRACT = ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json"
+EXPECTED_CONTRACT_SHA256 = "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
+EXPECTED_QDQ_FILE_SHA256 = "a274d61ec5f634fac8fb501339ddfe7ae4bf774d950840498d54c32b90d79e77"
+EXPECTED_QDQ_RECEIPT_SHA256 = "c025c8e89ba71dca2437b89f90105d9cc5fd44366e5b51ef089288d15fde730f"
 
 Q = 1 << 16
 I32_MIN, I32_MAX = -(1 << 31), (1 << 31) - 1
@@ -165,6 +168,8 @@ def evaluate_grid() -> dict[str, Any]:
 
 
 def package_evidence(package: Path) -> dict[str, Any]:
+    if sha256_file(CONTRACT) != EXPECTED_CONTRACT_SHA256:
+        raise ValueError("contract file hash mismatch")
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
     expected = contract.get("package", {}).get("files", {})
     required = tuple(expected) if expected else ("manifest.json", "weights.bin", "scales.bin", "calibration_ids.bin", "receipt.json")
@@ -188,10 +193,16 @@ def package_evidence(package: Path) -> dict[str, Any]:
 
 
 def assess_checkpoint_boundary() -> dict[str, Any]:
+    if sha256_file(CONTRACT) != EXPECTED_CONTRACT_SHA256:
+        raise ValueError("contract file hash mismatch")
+    if sha256_file(QDQ) != EXPECTED_QDQ_FILE_SHA256:
+        raise ValueError("Q/DQ receipt file hash mismatch")
     receipt = json.loads(QDQ.read_text(encoding="utf-8"))
     if receipt.get("schema") != "tinystories-1m-qdq-semantics-v1":
         raise ValueError("Q/DQ receipt schema mismatch")
     receipt_digest = receipt.get("receipt_sha256")
+    if receipt_digest != EXPECTED_QDQ_RECEIPT_SHA256:
+        raise ValueError("Q/DQ receipt hash mismatch")
     if receipt_digest != canonical_sha256({k: v for k, v in receipt.items() if k != "receipt_sha256"}):
         raise ValueError("Q/DQ receipt self-hash mismatch")
     identity = receipt.get("identity", {})

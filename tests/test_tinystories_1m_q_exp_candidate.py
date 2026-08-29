@@ -6,6 +6,7 @@ import importlib.util
 import json
 import shutil
 import tempfile
+from unittest import mock
 import unittest
 from pathlib import Path
 
@@ -53,6 +54,29 @@ class QExpCandidateTest(unittest.TestCase):
             (copy / "weights.bin").write_bytes((copy / "weights.bin").read_bytes()[:1] + b"tampered")
             with self.assertRaisesRegex(ValueError, "package hash mismatch"):
                 self.module.package_evidence(copy)
+
+    def test_rehashed_contract_and_qdq_substitution_is_rejected(self):
+        """Self-rehashing both files must not bypass immutable identities."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            altered_contract = root / "contract.json"
+            contract = json.loads(self.module.CONTRACT.read_text(encoding="utf-8"))
+            contract["reference"]["prompt_text"] = "substituted"
+            altered_contract.write_text(json.dumps(contract, sort_keys=True), encoding="utf-8")
+            with mock.patch.object(self.module, "CONTRACT", altered_contract):
+                with self.assertRaisesRegex(ValueError, "contract file hash mismatch"):
+                    self.module.package_evidence(Path("/tmp/does-not-matter"))
+
+            altered_qdq = root / "qdq.json"
+            qdq = json.loads(self.module.QDQ.read_text(encoding="utf-8"))
+            qdq["identity"]["contract_sha256"] = "0" * 64
+            qdq["receipt_sha256"] = self.module.canonical_sha256(
+                {key: value for key, value in qdq.items() if key != "receipt_sha256"}
+            )
+            altered_qdq.write_text(json.dumps(qdq, sort_keys=True), encoding="utf-8")
+            with mock.patch.object(self.module, "QDQ", altered_qdq):
+                with self.assertRaisesRegex(ValueError, "Q/DQ receipt file hash mismatch"):
+                    self.module.assess_checkpoint_boundary()
 
     def test_q_exp_conversion_truncates_not_rounds(self):
         # INT32_MAX is the high saturation result in RTL; IEEE conversion of
