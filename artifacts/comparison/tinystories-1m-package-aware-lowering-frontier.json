@@ -1,0 +1,77 @@
+{
+  "schema": "tinystories-1m-package-aware-lowering-frontier-v1",
+  "status": "unsupported",
+  "model": "TinyStories-1M",
+  "contract_sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
+  "package": {
+    "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "receipt_sha256": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
+    "weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+    "scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+    "calibration_ids_sha256": "2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075"
+  },
+  "stages": {
+    "exported_program": {
+      "bytes": 15628966,
+      "sha256": "481486f8ae6eae08535895532a61ce58b95e9edef9fb71e93fe68b93b93e53a8"
+    },
+    "torch_mlir": {
+      "bytes": 29060435,
+      "sha256": "dd1d864f940fa513b4262e0914ab97ce3c03bfdcde1e2bcac092924bc1bf865f"
+    },
+    "linalg": {
+      "bytes": 29142081,
+      "sha256": "82119011db5f0296701b088f728b1e7c18de8210af69b5ec5bfc96be4c1b5354"
+    },
+    "scf": {
+      "bytes": 29221149,
+      "sha256": "98dc99264388ad836b98fade83c71abb4d194a6840371e26cdb98465916c0c33"
+    },
+    "flat_scf": {
+      "bytes": 29375724,
+      "sha256": "52382658fed8629d5e6757c6e9d7cb400d30dc1e05453c371c23d8ea8785ab9c"
+    },
+    "pre_calyx": {
+      "bytes": 29336775,
+      "sha256": "e33e8015440dc89e2c3812daa07e5ac85991752729656d1950f6ddef4875e090"
+    }
+  },
+  "frontier": {
+    "unmodified_circt": {
+      "status": "failed",
+      "operation": "arith.uitofp",
+      "type": "i1 to f32",
+      "source_line": 337,
+      "diagnostic": "failed to legalize operation 'arith.uitofp' that was explicitly marked illegal"
+    },
+    "existing_pre_calyx_passes": {
+      "status": "succeeded",
+      "artifact": "pre_calyx",
+      "pass": "llm2fpga-lower-i1-uitofp-for-calyx"
+    },
+    "next_circt": {
+      "status": "failed",
+      "operation": "math.exp",
+      "semantic_role": "GELU",
+      "source_line": 830,
+      "diagnostic": "Unhandled operation during BuildOpGroups()"
+    }
+  },
+  "commands": {
+    "torch_mlir": "scripts/compile-pytorch.py",
+    "linalg": "scripts/pipeline/torch_to_linalg.sh",
+    "scf": "scripts/pipeline/linalg_to_scf_no_handshake.sh",
+    "flat_scf": "scripts/pipeline/scf_to_flat_scf_no_handshake.sh",
+    "pre_calyx": "mlir-opt --load-pass-plugin=LLM2FPGAMLIRPasses.so --pass-pipeline=builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)",
+    "calyx": "circt-opt --lower-scf-to-calyx=top-level-function=main"
+  },
+  "claims": {
+    "functional_equivalence": false,
+    "systemverilog": false,
+    "rtlil": false,
+    "timing_closure": false,
+    "hardware_inference": false,
+    "reference_source_or_rtl_copied": false
+  },
+  "note": "This is a bounded package-aware compiler frontier observation. It records no equivalence, optimization, RTL, timing, or hardware success claim."
+}
