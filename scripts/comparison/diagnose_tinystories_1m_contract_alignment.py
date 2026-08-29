@@ -21,7 +21,7 @@ SCHEMA = "tinystories-1m-contract-alignment-v1"
 CANONICAL_CONTRACT = Path(__file__).resolve().parents[2] / "artifacts/reference/tinystories-1m-kev-gpt-contract.json"
 CANONICAL_METADATA = Path(__file__).resolve().parents[2] / "artifacts/comparison/tinystories-1m-baseline-float-sv-metadata.json"
 CANONICAL_CONTRACT_SHA256 = "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
-CANONICAL_METADATA_SHA256 = "158ef76497aa0e0f1509a260059ca28880389d6c1234acee7a81f41ee609a3a1"
+CANONICAL_METADATA_SHA256 = "6119ee17ec35d2225fb9dff56959b3052fa158fbb298844ea5d5279231f44a46"
 CONTRACT_SCHEMA_VERSION = 1
 METADATA_SCHEMA = "tinystories-1m-compiler-artifact-metadata-v1"
 
@@ -108,10 +108,19 @@ def _diagnose_documents(contract: dict[str, Any], metadata: dict[str, Any], *,
                 })
     if mismatches:
         status = "contract_mismatch"
+        boundary_code = (
+            "compiler_package_identity"
+            if all(item["path"].startswith("package.") for item in mismatches)
+            else "compiler_artifact_identity"
+        )
         boundary = {
-            "code": "compiler_artifact_identity",
+            "code": boundary_code,
             "component": "compiler_artifact_metadata",
-            "reason": "the realized compiler sidecar does not authenticate the frozen TinyStories-1M package",
+            "reason": (
+                "the realized compiler sidecar does not authenticate the frozen TinyStories-1M package"
+                if boundary_code == "compiler_artifact_identity"
+                else "the realized compiler sidecar omits the frozen TinyStories-1M package and manifest hashes"
+            ),
         }
     else:
         status = "compiler_quantization_unverified"

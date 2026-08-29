@@ -11,14 +11,14 @@
     }
   },
   "first_boundary": {
-    "code": "compiler_artifact_identity",
+    "code": "compiler_package_identity",
     "component": "compiler_artifact_metadata",
-    "reason": "the realized compiler sidecar does not authenticate the frozen TinyStories-1M package"
+    "reason": "the realized compiler sidecar omits the frozen TinyStories-1M package and manifest hashes"
   },
   "inputs": {
     "compiler_metadata": {
       "path": "artifacts/comparison/tinystories-1m-baseline-float-sv-metadata.json",
-      "sha256": "158ef76497aa0e0f1509a260059ca28880389d6c1234acee7a81f41ee609a3a1"
+      "sha256": "6119ee17ec35d2225fb9dff56959b3052fa158fbb298844ea5d5279231f44a46"
     },
     "contract": {
       "path": "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
@@ -26,11 +26,6 @@
     }
   },
   "mismatches": [
-    {
-      "expected": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf",
-      "observed": "77f1b168e219585646439073245fe87e56b3023e",
-      "path": "model.source_revision"
-    },
     {
       "expected": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
       "observed": null,
@@ -57,7 +52,7 @@
     "model": {
       "name": "TinyStories-1M",
       "source_model_id": "roneneldan/TinyStories-1M",
-      "source_revision": "77f1b168e219585646439073245fe87e56b3023e"
+      "source_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf"
     },
     "package": {
       "manifest_sha256": null,
@@ -70,6 +65,6 @@
     "reference_source_or_rtl_copied": false
   },
   "schema": "tinystories-1m-contract-alignment-v1",
-  "sha256": "4bb8e043de5bc458db9fef6d2081d5c52a5f8f05868fd254bd622a5e3c465686",
+  "sha256": "1a9bd5acd97c6e13be0de1a6684f9d11a1cfb5ba556adb8c58cb06fa45e9a565",
   "status": "contract_mismatch"
 }

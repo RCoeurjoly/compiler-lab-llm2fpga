@@ -32,9 +32,8 @@ class TinyStories1MContractAlignmentTest(unittest.TestCase):
     def test_realized_compiler_sidecar_reports_each_identity_mismatch(self) -> None:
         result = alignment.diagnose(CONTRACT, METADATA)
         self.assertEqual(result["status"], "contract_mismatch")
-        self.assertEqual(result["first_boundary"]["code"], "compiler_artifact_identity")
+        self.assertEqual(result["first_boundary"]["code"], "compiler_package_identity")
         paths = {item["path"] for item in result["mismatches"]}
-        self.assertIn("model.source_revision", paths)
         self.assertIn("package.sha256", paths)
         self.assertIn("package.manifest_sha256", paths)
         self.assertIn("compiler_quantization", result["next_boundary"]["required_evidence"])
@@ -84,7 +83,7 @@ class TinyStories1MContractAlignmentTest(unittest.TestCase):
     def test_checked_in_report_is_self_consistent_and_fail_closed(self) -> None:
         result = json.loads(REPORT.read_text(encoding="utf-8"))
         self.assertEqual(result["status"], "contract_mismatch")
-        self.assertEqual(result["first_boundary"]["code"], "compiler_artifact_identity")
+        self.assertEqual(result["first_boundary"]["code"], "compiler_package_identity")
         self.assertEqual(
             result["sha256"],
             alignment.canonical_sha256({key: value for key, value in result.items() if key != "sha256"}),
