@@ -18,6 +18,7 @@ spec.loader.exec_module(module)
 
 
 GRAPH = """module {
+  func.func @main(%score: f32, %row_max: f32, %old_sum: f32, %time_index: i32, %position: i32, %delta_mem: memref<32xf32>, %exp_mem: memref<32xf32>, %i: index) {
   %delta = arith.subf %score, %row_max : f32
   memref.store %delta, %delta_mem[%i] : memref<32xf32>
   %delta_loaded = memref.load %delta_mem[%i] : memref<32xf32>
@@ -27,6 +28,7 @@ GRAPH = """module {
   %sum = arith.addf %old_sum, %exp_loaded : f32
   %prob = arith.divf %exp_loaded, %sum : f32
   %causal = arith.cmpi sle, %time_index, %position : i32
+  }
 }
 """
 
@@ -64,7 +66,7 @@ class SoftmaxBridgeTest(unittest.TestCase):
         with self.assertRaisesRegex(module.SoftmaxBridgeError, "pattern_not_proven"):
             module.bridge_graph(comments, evidence, source_name="comments.mlir")
         unlinked = GRAPH.replace("%delta_loaded = memref.load %delta_mem[%i] : memref<32xf32>", "%delta_loaded = memref.load %other_mem[%i] : memref<32xf32>")
-        with self.assertRaisesRegex(module.SoftmaxBridgeError, "dataflow_not_proven"):
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(unlinked, evidence, source_name="unlinked.mlir")
 
     def test_plain_or_mutated_evidence_is_not_accepted(self):
@@ -77,6 +79,32 @@ class SoftmaxBridgeTest(unittest.TestCase):
         evidence._payload["contract_sha256"] = "forged"
         with self.assertRaisesRegex(module.SoftmaxBridgeError, "evidence_capability_invalidated"):
             module.bridge_graph(GRAPH, evidence, source_name="mutated.mlir")
+
+    def test_inverse_causal_direction_is_rejected(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        inverse = GRAPH.replace("%time_index, %position", "%position, %time_index")
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, "pattern_not_proven"):
+            module.bridge_graph(inverse, evidence, source_name="inverse.mlir")
+
+    def test_capability_constructor_is_not_public(self):
+        with self.assertRaises(TypeError):
+            module._EvidenceCapability({})
+
+    def test_invalid_wrapper_and_cross_region_chain_are_rejected(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, "pattern_not_proven"):
+            module.bridge_graph(GRAPH.replace("func.func @main", "not_a_func @main"), evidence, source_name="invalid.mlir")
+        first, second = GRAPH.split("  %exp = math.exp", 1)
+        second_body = second.rsplit("\n  }\n}\n", 1)[0]
+        cross = first + "  }\n  func.func @other(%delta_loaded: f32) {\n  %exp = math.exp" + second_body + "\n  }\n}\n"
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module.bridge_graph(cross, evidence, source_name="cross-region.mlir")
 
     def test_forged_contract_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

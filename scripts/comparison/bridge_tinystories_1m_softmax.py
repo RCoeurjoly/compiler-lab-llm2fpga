@@ -43,7 +43,8 @@ _EVIDENCE_TOKEN = object()
 class _EvidenceCapability(Mapping[str, Any]):
     """Opaque, mutation-detecting capability returned by ``load_evidence``."""
 
-    def __init__(self, payload: Mapping[str, Any]) -> None:
+    def __init__(self, token: object, payload: Mapping[str, Any]) -> None:
+        require(token is _EVIDENCE_TOKEN, "evidence_capability_required", "private construction token")
         self._payload = dict(payload)
         self._fingerprint = canonical_sha256(self._payload)
         self._token = _EVIDENCE_TOKEN
@@ -111,7 +112,7 @@ def load_evidence(contract_path: Path, diagnostic_path: Path) -> Mapping[str, An
         require(isinstance(actual, dict), "softmax_contract_mismatch", section)
         for key, value in fields.items():
             require(actual.get(key) == value, "softmax_contract_mismatch", f"{section}.{key}")
-    return _EvidenceCapability({
+    return _EvidenceCapability(_EVIDENCE_TOKEN, {
         "contract_sha256": CONTRACT_SHA256,
         "diagnostic_sha256": SOFTMAX_DIAGNOSTIC_SHA256,
         "package_manifest_sha256": package["manifest_sha256"],
@@ -131,24 +132,46 @@ def _pattern_evidence(graph: str) -> dict[str, Any]:
     # then checked against the producer/consumer immediately below.
     lines = [re.sub(r"//.*$", "", line).strip() for line in graph.splitlines()]
     lines = [line for line in lines if line]
+    require(lines and lines[0].startswith("module"), "pattern_not_proven", "MLIR module wrapper")
+    require(graph.count("{") == graph.count("}"), "pattern_not_proven", "unbalanced MLIR regions")
+    function_lines = [index for index, line in enumerate(lines) if re.match(r"func\.func\s+@[^\s(]+\(", line)]
+    require(function_lines, "pattern_not_proven", "MLIR func.func wrapper")
+    # Find the lexical function region containing the exp operation.  The
+    # chain must not be stitched together from separate functions.
+    function_spans: list[tuple[int, int]] = []
+    for start in function_lines:
+        depth = 0
+        opened = False
+        end = None
+        for index in range(start, len(lines)):
+            depth += lines[index].count("{") - lines[index].count("}")
+            opened |= "{" in lines[index]
+            if opened and depth == 0:
+                end = index
+                break
+        require(end is not None, "pattern_not_proven", "unterminated func.func region")
+        function_spans.append((start, end))
     executable = "\n".join(lines)
     exp_sites = list(re.finditer(r"^\s*%[A-Za-z0-9_.$-]+\s*=\s*math\.exp\b", executable, re.MULTILINE))
     require(exp_sites, "pattern_not_proven", "no executable math.exp operation")
     require(len(exp_sites) == 1, "pattern_not_proven", f"expected one stabilized exp site, found {len(exp_sites)}")
     exp_line = executable[: exp_sites[0].start()].count("\n")
+    containing = [span for span in function_spans if span[0] <= exp_line <= span[1]]
+    require(len(containing) == 1, "pattern_not_proven", "math.exp is not in one function region")
+    region_start, region_end = containing[0]
     exp_line_text = lines[exp_line]
     exp_match = re.match(r"%([^ ]+)\s*=\s*math\.exp\s+%([^ ]+)", exp_line_text)
     require(exp_match is not None, "pattern_not_proven", "malformed math.exp operation")
     exp_result, exp_input = exp_match.groups()
 
-    def find(pattern: str, start: int = 0) -> tuple[int, re.Match[str]]:
-        for index in range(start, len(lines)):
+    def find(pattern: str, start: int = region_start, end: int = region_end + 1) -> tuple[int, re.Match[str]]:
+        for index in range(start, end):
             match = re.match(pattern, lines[index], re.IGNORECASE)
             if match:
                 return index, match
         raise SoftmaxBridgeError("dataflow_not_proven", pattern)
 
-    require(any("arith.subf" in line for line in lines), "pattern_not_proven", "no executable score-minus-row-max operation")
+    require(any("arith.subf" in line for line in lines[region_start:region_end + 1]), "pattern_not_proven", "no executable score-minus-row-max operation")
     sub_index, sub = find(r"%([^ ]+)\s*=\s*arith\.subf\s+%([^, ]+)\s*,\s*%([^ ]+)")
     delta = sub.group(1)
     require(sub.group(2).lower().startswith("score"), "dataflow_not_proven", "subf lhs is not score")
@@ -167,8 +190,8 @@ def _pattern_evidence(graph: str) -> dict[str, Any]:
     sum_result = sum_match.group(1)
     div_index, div_match = find(r"%([^ ]+)\s*=\s*arith\.divf\s+%([^, ]+)\s*,\s*%([^ ]+)", sum_index + 1)
     require(div_match.group(2) == exp_load.group(1) and div_match.group(3) == sum_result, "dataflow_not_proven", "normalization division is not exp/sum")
-    causal = re.compile(r"^%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule).*%[^ ]*time[^ ]*.*%[^ ]*position|^%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule).*%[^ ]*position[^ ]*.*%[^ ]*time", re.IGNORECASE)
-    require(any(causal.match(line) for line in lines), "pattern_not_proven", "executable causal time_index <= position comparison")
+    causal = re.compile(r"^%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule),\s*%time_index,\s*%position(?:\s|:|$)", re.IGNORECASE)
+    require(any(causal.match(line) for line in lines[region_start:region_end + 1]), "pattern_not_proven", "executable causal time_index <= position comparison")
     return {"exp_site_line": exp_line + 1, "matched_edges": ["subf_score_rowmax", "delta_store_load", "exp", "exp_store_load", "sum_reduction", "normalization_division", "causal_cmpi"]}
 
 
