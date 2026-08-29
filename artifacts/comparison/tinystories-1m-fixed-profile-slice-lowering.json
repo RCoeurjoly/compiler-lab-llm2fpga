@@ -1,0 +1,92 @@
+{
+  "alignment_status": "unaligned",
+  "board_authenticated": false,
+  "compiler_artifacts": {
+    "mlir": null,
+    "rtlil": null,
+    "systemverilog": null
+  },
+  "compiler_slice_equivalence": {
+    "reason_code": "compiler_slice_not_emitted",
+    "status": "not_run"
+  },
+  "evidence": {
+    "adapter_receipt_sha256": "276915df4d14d8934e642851ce560cae0bf59d6785ec2ccf776c576a98d2b229",
+    "contract_sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
+    "exported_program_sha256": "389964a2f39a8256bc824b58b60f681bd136f2868633125e8872ce9791c8e73e",
+    "lowering_attempt_sha256": "5eef20aef6cd08b17e28579f96bc6b680dd84c405900107b350291677258efec",
+    "numeric_trace_sha256": "d83df8e12aa2658709b78a47849e29e19ef4e95b57bb052654377d541f04f215",
+    "package_receipt_sha256": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
+    "profile_sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6",
+    "qdq_receipt_sha256": "a274d61ec5f634fac8fb501339ddfe7ae4bf774d950840498d54c32b90d79e77",
+    "task2_metadata_sha256": "08d55729c7f1e4525f0dcaae6eff328b7bb4e10e56aa9e00cd43447fc9864646"
+  },
+  "first_unsupported_operation": {
+    "checkpoint": "block.ln_1",
+    "code": "fixed_layer_norm_semantics_unavailable",
+    "graph_index": 149,
+    "missing_semantics": [
+      "mean_reduction_order_and_width",
+      "variance_reduction_order_and_width",
+      "epsilon_representation",
+      "inverse_square_root_algorithm",
+      "gamma_beta_rounding_saturation_and_overflow"
+    ],
+    "name": "layer_norm",
+    "output_checkpoint": "block.ln_1.output",
+    "reason": "the authenticated fixed-hardware profile gives LayerNorm input/output checkpoints but no executable fixed-point LayerNorm semantics; example values cannot define an operator",
+    "target": "aten.layer_norm.default"
+  },
+  "graph": {
+    "call_function_count": 394,
+    "exported_program_sha256": "389964a2f39a8256bc824b58b60f681bd136f2868633125e8872ce9791c8e73e",
+    "operation_sequence_sha256": "571e331e1886c16576560cb7e09069eee0a5eb8a2700ede1215c635485f559ac"
+  },
+  "model": "TinyStories-1M",
+  "profile": {
+    "name": "fixed_hardware_reference",
+    "profile_sha256": "7d54acda88f1d1a6979fd0ca8a3b0445e20ef127a399e5124a994427565caad0",
+    "status": "runtime_authenticated_not_board_checkpoint_authenticated"
+  },
+  "provenance": {
+    "compiler_source": "LLM2FPGA",
+    "llm_assistance_disclosure_required": true,
+    "reference_role": "content_authenticated_behavioral_oracle_only",
+    "reference_source_or_rtl_copied": false
+  },
+  "schema": "tinystories-1m-fixed-profile-slice-lowering-v1",
+  "semantically_defined_prefix": [
+    "block.input.activation_qdq"
+  ],
+  "slice": {
+    "block_index": 0,
+    "kind": "one_transformer_block_token_step",
+    "token_index": 3
+  },
+  "software_trace": {
+    "checkpoint_count": 12,
+    "checkpoint_order": [
+      "block.input",
+      "block.ln_1.output",
+      "block.attention.q",
+      "block.attention.k",
+      "block.attention.v",
+      "block.attention.output",
+      "block.residual.attention",
+      "block.ln_2.output",
+      "block.mlp.fc_in",
+      "block.mlp.activation",
+      "block.mlp.fc_out",
+      "block.output"
+    ],
+    "sha256": "ac0118fe0068aea3790c3fc7414f75cd56abd5690f0d7f4bc13b143d05249d1d",
+    "status": "authenticated_profile_trace_validated"
+  },
+  "status": "unsupported",
+  "task2_metadata": {
+    "schema": "tinystories-1m-compiler-slice-manifest-v1",
+    "sha256": "08d55729c7f1e4525f0dcaae6eff328b7bb4e10e56aa9e00cd43447fc9864646",
+    "slice_kind": "one_transformer_block_token_step",
+    "status": "contract_mismatch"
+  }
+}
