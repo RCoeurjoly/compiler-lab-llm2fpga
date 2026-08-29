@@ -24,15 +24,15 @@ class RealGraphSoftmaxBoundaryTest(unittest.TestCase):
     def test_real_graph_attempt_is_fail_closed_and_authenticated(self) -> None:
         report = json.loads(REPORT.read_text(encoding="utf-8"))
         self.assertEqual(report["schema"], "tinystories-1m-softmax-real-graph-bridge-boundary-v1")
-        self.assertEqual(report["bridge_revision"], "1f116c6")
+        self.assertEqual(report["bridge_revision"], "156d885")
         self.assertEqual(report["status"], "unsupported")
         attempt = report["attempt"]
         self.assertEqual(attempt["expected_exp_sites"], 8)
         self.assertEqual(attempt["observed_exp_sites"], 8)
         mismatch = attempt["first_mismatch"]
         self.assertEqual(mismatch["code"], "dataflow_not_proven")
-        self.assertEqual(mismatch["site"], 1)
-        self.assertEqual(mismatch["message"], "site 1 lhs is not score")
+        self.assertEqual(mismatch["site"], 2)
+        self.assertEqual(mismatch["message"], "site 2 reuses another head's delta memref")
         self.assertFalse(report["claims"]["authenticated_bridge_emitted"])
         self.assertFalse(report["claims"]["hardware_inference"])
 

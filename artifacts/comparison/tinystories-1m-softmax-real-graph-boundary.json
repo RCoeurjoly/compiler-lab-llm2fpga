@@ -4,8 +4,8 @@
   "status": "unsupported",
   "bridge_status": "real_graph_pattern_mismatch",
   "bridge_script": "scripts/comparison/bridge_tinystories_1m_softmax.py",
-  "bridge_revision": "1f116c6",
-  "bridge_script_sha256": "a10581558125fd28553d5ec784ccbb1d61960fa122eddc957e077933c238e819",
+  "bridge_revision": "156d885",
+  "bridge_script_sha256": "217db94526cd58cceefe2737765d04866910f623db40613da7f35ccb7ac3bc60",
   "frontier_report": {
     "path": "artifacts/comparison/tinystories-1m-package-aware-lowering-frontier.json",
     "sha256": "81a8ea6b29ceb5a362c70dc7f5adf6b469e41a6f79d6067fc378280abe8b447e"
@@ -41,10 +41,10 @@
     "pattern_parser": "_pattern_evidence",
     "first_mismatch": {
       "code": "dataflow_not_proven",
-      "site": 1,
-      "message": "site 1 lhs is not score",
-      "flat_scf_line": 836,
-      "arith_subf_line": 823,
+      "site": 2,
+      "message": "site 2 reuses another head's delta memref",
+      "flat_scf_line": 1724,
+      "arith_subf_line": 1711,
       "arith_subf": "%118 = arith.subf %114, %117 : f32",
       "context": [
         "%114 = memref.load %alloc_37[%113] : memref<256xf32, strided<[1]>>",
@@ -61,5 +61,5 @@
     "hardware_inference": false
   },
   "next_action": "Adapt the bridge to prove tensor-level score/row-max provenance through linalg.generic lowering, while retaining all eight-site and same-function dataflow checks.",
-  "sha256": "00c6b1a2bf41c740dc4e75ade95a255f3e5fdcbc475c75ae45347caa913e4e7e"
+  "sha256": "754a84f06bffb26c620906dfed756ca48411418ed21a2761b9985f4f800b9d80"
 }
