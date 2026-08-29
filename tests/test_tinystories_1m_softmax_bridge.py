@@ -125,6 +125,28 @@ class SoftmaxBridgeTest(unittest.TestCase):
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-fake-reduction.mlir")
 
+    def test_lowered_undefined_shared_index_fails_closed(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = lowered_separate_loop_graph().replace("  %idx0 = arith.constant 0 : index\n", "", 1)
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module.bridge_graph(graph, evidence, source_name="lowered-undefined-index.mlir")
+
+    def test_lowered_in_loop_sum_store_cannot_bypass_loop_result(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = lowered_separate_loop_graph().replace(
+            "  memref.store %red0, %sum_mem0[%idx0] : memref<4xf32>",
+            "",
+            1,
+        )
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module.bridge_graph(graph, evidence, source_name="lowered-partial-sum.mlir")
+
     def test_exact_stabilized_attention_pattern_emits_authenticated_custom_op(self):
         evidence = module.load_evidence(
             ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
