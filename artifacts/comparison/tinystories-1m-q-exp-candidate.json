@@ -1,0 +1,196 @@
+{
+  "candidate": {
+    "encoding": "signed Q16.16",
+    "name": "q_exp_approx",
+    "polynomial": "fourth-order Taylor with Q16.16 multiply and signed truncating divisions",
+    "rtl": "task3-main/rtl/fp/circt_fp_primitives.sv",
+    "rtl_sha256": "e125c75bebf5c7afc83d74618ef99cf559e8054faa767a1b79060f9092dacb75",
+    "saturation": {
+      "high_output": "INT32_MAX",
+      "input_ge": 8.0,
+      "input_le": -8.0,
+      "low_output": 0
+    }
+  },
+  "candidate_characterization": {
+    "extended_probe": {
+      "boundary_vectors": [
+        {
+          "input": -8.0,
+          "input_bits": "0xc1000000",
+          "observed": 0.0,
+          "q16_16": 0,
+          "reference": 0.000335462624207139
+        },
+        {
+          "input": -1.0,
+          "input_bits": "0xbf800000",
+          "observed": 0.375,
+          "q16_16": 24576,
+          "reference": 0.3678794503211975
+        },
+        {
+          "input": -0.5,
+          "input_bits": "0xbf000000",
+          "observed": 0.6067657470703125,
+          "q16_16": 39765,
+          "reference": 0.6065306663513184
+        },
+        {
+          "input": -0.0,
+          "input_bits": "0x80000000",
+          "observed": 1.0,
+          "q16_16": 65536,
+          "reference": 1.0
+        },
+        {
+          "input": 0.0,
+          "input_bits": "0x00000000",
+          "observed": 1.0,
+          "q16_16": 65536,
+          "reference": 1.0
+        },
+        {
+          "input": 8.0,
+          "input_bits": "0x41000000",
+          "observed": 32768.0,
+          "q16_16": 2147483647,
+          "reference": 2980.9580078125
+        }
+      ],
+      "domain": {
+        "max": 8.5,
+        "min": -8.5
+      },
+      "max_absolute_error": 29787.0419921875,
+      "max_relative_error": 328835.9552273349,
+      "sample_count": 65540,
+      "worst_case": {
+        "absolute_error": 29787.0419921875,
+        "input": 8.0,
+        "input_bits": "0x41000000",
+        "observed": 32768.0,
+        "observed_bits": "0x47000000",
+        "q16_16": 2147483647,
+        "reference": 2980.9580078125,
+        "reference_bits": "0x453a4f54"
+      }
+    },
+    "stabilized_domain": {
+      "boundary_vectors": [
+        {
+          "input": -8.0,
+          "input_bits": "0xc1000000",
+          "observed": 0.0,
+          "q16_16": 0,
+          "reference": 0.000335462624207139
+        },
+        {
+          "input": -1.0,
+          "input_bits": "0xbf800000",
+          "observed": 0.375,
+          "q16_16": 24576,
+          "reference": 0.3678794503211975
+        },
+        {
+          "input": -0.5,
+          "input_bits": "0xbf000000",
+          "observed": 0.6067657470703125,
+          "q16_16": 39765,
+          "reference": 0.6065306663513184
+        },
+        {
+          "input": -0.0,
+          "input_bits": "0x80000000",
+          "observed": 1.0,
+          "q16_16": 65536,
+          "reference": 1.0
+        },
+        {
+          "input": 0.0,
+          "input_bits": "0x00000000",
+          "observed": 1.0,
+          "q16_16": 65536,
+          "reference": 1.0
+        },
+        {
+          "input": 8.0,
+          "input_bits": "0x41000000",
+          "observed": 32768.0,
+          "q16_16": 2147483647,
+          "reference": 2980.9580078125
+        }
+      ],
+      "domain": {
+        "max": -0.0,
+        "min": -8.0
+      },
+      "max_absolute_error": 110.32563800716889,
+      "max_relative_error": 328835.9552273349,
+      "sample_count": 65537,
+      "worst_case": {
+        "absolute_error": 110.32563800716889,
+        "input": -7.9998779296875,
+        "input_bits": "0xc0ffff00",
+        "observed": 110.32597351074219,
+        "observed_bits": "0x42dca6e6",
+        "q16_16": 7230323,
+        "reference": 0.00033550357329659164,
+        "reference_bits": "0x39afe687"
+      }
+    }
+  },
+  "claims": {
+    "full_attention_row_error": false,
+    "full_model_output_equivalence": false,
+    "hardware_inference": false,
+    "rtl_lowering": false
+  },
+  "contract": {
+    "path": "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+    "sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
+  },
+  "decision": {
+    "accepted": false,
+    "message": "Do not promote q_exp_approx: only bounded primitive characterization is available; the authenticated TinyStories-1M trace lacks complete causal score rows and a softmax-output oracle.",
+    "reason_code": "full_attention_score_rows_unavailable"
+  },
+  "model": "TinyStories-1M",
+  "package": {
+    "available": true,
+    "manifest_model": {
+      "activation_function": "gelu_new",
+      "head_dim": 4,
+      "hidden_size": 64,
+      "local_window": 256,
+      "max_context": 32,
+      "model_type": "gpt_neo",
+      "n_head": 16,
+      "n_layer": 8,
+      "schema_version": 1,
+      "source_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf",
+      "tie_word_embeddings": true,
+      "vocab_size": 50257
+    },
+    "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+    "weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+  },
+  "qdq_boundary": {
+    "comparison_status": "unsupported",
+    "complete_causal_score_rows_available": false,
+    "k_checkpoint_shape": [
+      16,
+      4
+    ],
+    "q_checkpoint_shape": [
+      16,
+      4
+    ],
+    "qdq_receipt_sha256": "a274d61ec5f634fac8fb501339ddfe7ae4bf774d950840498d54c32b90d79e77",
+    "reason": "authenticated trace stores final-token Q/K vectors, not complete causal attention score rows"
+  },
+  "schema": "tinystories-1m-q-exp-candidate-evaluation-v1",
+  "sha256": "0f89a583a734a4d87b22f38538fc1ebb5ef5f0044d6cdaf1d9aa2166c0a1993d",
+  "status": "unsupported"
+}
