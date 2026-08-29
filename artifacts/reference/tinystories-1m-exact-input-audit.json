@@ -8,26 +8,45 @@
       256
     ]
   },
-  "conflicts": [
-    {
-      "code": "implementation_profile_unresolved",
-      "reason": "the selected executable implementation profile is not resolved"
-    },
-    {
-      "code": "board_checkpoint_trace_unavailable",
-      "reason": "the fixed-point profile is not authenticated by a board checkpoint trace"
-    },
-    {
-      "code": "nonfinite_policy_unresolved",
-      "reason": "the executable references do not define one portable non-finite policy"
-    }
-  ],
+  "conflicts": [],
   "contract": {
     "activation_granularity": "per_channel",
     "path": "artifacts/reference/tinystories-1m-exact-input-contract.json",
-    "sha256": "afe95a25cbfbc82439096918c7fa4d9b48557685a07bf86709ec9ec76cf1d44c"
+    "sha256": "00cafffc6b501ae1dcd9fb7c23804d2d359246f518709b336bac719a2645e7fc"
   },
-  "next_gate": "resolve_all_identity_frontier_conflicts",
+  "fixed_point": {
+    "gemv_accumulator": "signed 64-bit serial accumulator",
+    "scale_format": "unsigned Q8.24",
+    "value_format": "signed Q16.16"
+  },
+  "implementation_profile": {
+    "historical_selector_status": "unresolved",
+    "name": "fixed_hardware_reference",
+    "selection": "accepted_spec_deployed_reference_and_synthesizable_rtl",
+    "semantics_sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6",
+    "semantics_source": "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json"
+  },
+  "model": {
+    "architecture": "gpt_neo",
+    "head_dim": 4,
+    "hidden_size": 64,
+    "max_context": 32,
+    "n_head": 16,
+    "n_layer": 8,
+    "name": "TinyStories-1M",
+    "source_model_id": "roneneldan/TinyStories-1M",
+    "source_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf",
+    "vocab_size": 50257
+  },
+  "next_gate": "exact_quantized_pytorch_model",
+  "nonfinite_policy": "reject_nonfinite_adapter_input",
+  "observability_limitations": [
+    {
+      "classification": "observability_limitation_not_identity_conflict",
+      "code": "board_checkpoint_trace_unavailable",
+      "reason": "No internal board checkpoint trace is claimed; package/source identity and the frozen deployed token fixture are authenticated independently."
+    }
+  ],
   "package": {
     "files": {
       "calibration_ids.bin": {
@@ -78,36 +97,103 @@
     "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
     "path": "/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m"
   },
+  "quantization": {
+    "activation_boundary_count": 97,
+    "activation_vector_widths": [
+      64,
+      256
+    ],
+    "activations": "symmetric per-channel INT8",
+    "scale_format": "little-endian float32",
+    "weights": "symmetric per-output INT8"
+  },
+  "reference_fixture": {
+    "expected_tokens": [
+      11,
+      612,
+      373,
+      257,
+      1310,
+      2576,
+      3706,
+      20037,
+      13,
+      1375,
+      6151,
+      284,
+      711,
+      2354,
+      287,
+      262
+    ],
+    "fixed_reference_tokens": [
+      11,
+      612,
+      373,
+      257,
+      1310,
+      2576,
+      3706,
+      20037,
+      13,
+      1375,
+      6151,
+      284,
+      711,
+      2354,
+      287,
+      262
+    ],
+    "prompt_ids": [
+      7454,
+      2402,
+      257,
+      640
+    ]
+  },
   "schema": "tinystories-1m-exact-input-audit-v1",
   "semantic_receipts": {
     "fixed_profile": {
+      "contract_sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6",
       "path": "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json",
       "sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6",
       "status": "runtime_authenticated_not_board_checkpoint_authenticated"
     },
     "implementation_profile": {
+      "contract_sha256": "756627744bf1e3f8dcab27e9d0accbe9a1ab38d93a73fbbbb01557c08470819b",
       "path": "artifacts/reference/tinystories-1m-implementation-profile.json",
       "sha256": "756627744bf1e3f8dcab27e9d0accbe9a1ab38d93a73fbbbb01557c08470819b",
       "status": "unresolved"
     },
     "qdq": {
+      "contract_sha256": "a274d61ec5f634fac8fb501339ddfe7ae4bf774d950840498d54c32b90d79e77",
       "path": "artifacts/reference/tinystories-1m-qdq-semantics.json",
       "sha256": "a274d61ec5f634fac8fb501339ddfe7ae4bf774d950840498d54c32b90d79e77",
       "status": "incomplete"
     }
   },
-  "sha256": "df504e29375bb1dd7de126e9560bc8c3cbfca7a8f46846f9ff8b66bb32f56ef3",
+  "sha256": "d8b5b58493fe914571a2444a74b0dae0b47bc42d90743ab93e93faa0bfb8a19f",
   "source": {
     "head_revision": "df1fc45b2ffcb26fddc19cfd57621e7eedf6153f",
     "package_revision": "3e19d413972b931268dc99c708e9cf547cc9278e",
     "reference_source_status": [],
     "reference_source_worktree_clean": true,
     "reference_sources": {
+      "fpga/rtl/gptneo_iterative_divider.sv": "8665cc99e7bf98e0415775a36c78aa4ff242d30c976dce0719e6d465686a1540",
+      "fpga/rtl/gptneo_resident_gemv.sv": "2dc80a527e6c6c8bb48f76f607df20b8674e505c7e1162d2acf9901fc2c7ebb5",
+      "host/kevin_jtag_cli.py": "e22a5916eef0cddeaaa0be9934e7b075f655b7d41f842ec8150d67c80f91204f",
       "tinystories/build_package.py": "606b99a64d20d143e6b715eb8d2e96688121f1d962c1b5ddd096d27763cd16e5",
       "tinystories/hardware_reference.py": "3780015d7f4be69cae3952fb630af971a37490a17cf8519fd6ac81a7bb080371",
       "tinystories/int_reference.py": "b6353d10d4227d676f78a7130af9a73fca2f0d68422f3215aec9307e0fb893d8",
-      "tinystories/quantize.py": "6a1388005d9d455a4732a7f59d32d48486c67cf4dc3cbed5027d7d911b0be6f4"
+      "tinystories/quantize.py": "6a1388005d9d455a4732a7f59d32d48486c67cf4dc3cbed5027d7d911b0be6f4",
+      "tinystories/write_rtl_fixture.py": "c920b5e05cf44cef859ed40fd85d67b473a094e782a6e5b86941c0509714cb74"
     }
   },
-  "status": "identity_frontier"
+  "status": "authenticated",
+  "tokenizer": {
+    "merges_sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5",
+    "sha256": "f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5",
+    "type": "GPT2Tokenizer",
+    "vocab_sha256": "3ba3c3109ff33976c4bd966589c11ee14fcaa1f4c9e5e154c2ed7f99d80709e7"
+  }
 }

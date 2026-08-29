@@ -1,6 +1,10 @@
 {
-  "schema": "tinystories-1m-exact-input-contract-v1",
-  "status": "identity_frontier",
+  "schema": "tinystories-1m-exact-input-contract-v2",
+  "status": "authenticated",
+  "selection_authority": {
+    "path": "docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md",
+    "sha256": "99632d030170ceaf0194b8f41c1fa784f262bb82d4f33f35f5fe90f2b4926bfc"
+  },
   "historical_contract": {
     "path": "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
     "sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
@@ -20,7 +24,26 @@
   "package": {
     "origin": "/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m",
     "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
-    "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+    "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+    "files": {
+      "calibration_ids.bin": {"sha256": "2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075", "size": 808},
+      "manifest.json": {"sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35", "size": 247111},
+      "merges.txt": {"sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5", "size": 456318},
+      "quality.json": {"sha256": "ff4daefcf3d24feb2386aaff72a43c5b568ef0fed7a8942307962caeb0a93b69", "size": 20363},
+      "regressions.json": {"sha256": "ce5cdeb32d052425db62cc6b6f11fac10edbe2164d788264fce8035ad582941a", "size": 1657},
+      "scales.bin": {"sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155", "size": 219588},
+      "special_tokens_map.json": {"sha256": "98412137ae43c77f8af52eb51b19c3536d3242cb55339167d841005fa94a23b7", "size": 438},
+      "tokenizer.json": {"sha256": "f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5", "size": 2107652},
+      "tokenizer_config.json": {"sha256": "3d76da0fd37493fbfcd3f0fa9757753d31f92e1779ebd9130809b45546a60261", "size": 722},
+      "vocab.json": {"sha256": "3ba3c3109ff33976c4bd966589c11ee14fcaa1f4c9e5e154c2ed7f99d80709e7", "size": 798156},
+      "weights.bin": {"sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e", "size": 3632704}
+    }
+  },
+  "tokenizer": {
+    "type": "GPT2Tokenizer",
+    "sha256": "f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5",
+    "vocab_sha256": "3ba3c3109ff33976c4bd966589c11ee14fcaa1f4c9e5e154c2ed7f99d80709e7",
+    "merges_sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5"
   },
   "quantization": {
     "weights": "symmetric per-output INT8",
@@ -29,14 +52,46 @@
     "activation_vector_widths": [64, 256],
     "scale_format": "little-endian float32"
   },
-  "semantic_authorities": {
-    "qdq": "artifacts/reference/tinystories-1m-qdq-semantics.json",
-    "implementation_profile": "artifacts/reference/tinystories-1m-implementation-profile.json",
-    "fixed_profile": "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json"
+  "fixed_point": {
+    "value_format": "signed Q16.16",
+    "scale_format": "unsigned Q8.24",
+    "gemv_accumulator": "signed 64-bit serial accumulator"
   },
-  "unresolved": [
-    "implementation_profile_unresolved",
-    "board_checkpoint_trace_unavailable",
-    "nonfinite_policy_unresolved"
-  ]
+  "reference": {
+    "prompt_text": "Once upon a time",
+    "prompt_tokens": [7454, 2402, 257, 640],
+    "tokens": [11, 612, 373, 257, 1310, 2576, 3706, 20037, 13, 1375, 6151, 284, 711, 2354, 287, 262],
+    "generation": "greedy top-1"
+  },
+  "deployed_profile": {
+    "name": "fixed_hardware_reference",
+    "revision": "df1fc45b2ffcb26fddc19cfd57621e7eedf6153f",
+    "input_domain": "finite_integer_or_fixed_point_only",
+    "nonfinite_policy": "reject_nonfinite_adapter_input",
+    "sources": {
+      "tinystories/quantize.py": "6a1388005d9d455a4732a7f59d32d48486c67cf4dc3cbed5027d7d911b0be6f4",
+      "tinystories/build_package.py": "606b99a64d20d143e6b715eb8d2e96688121f1d962c1b5ddd096d27763cd16e5",
+      "tinystories/int_reference.py": "b6353d10d4227d676f78a7130af9a73fca2f0d68422f3215aec9307e0fb893d8",
+      "tinystories/hardware_reference.py": "3780015d7f4be69cae3952fb630af971a37490a17cf8519fd6ac81a7bb080371",
+      "tinystories/write_rtl_fixture.py": "c920b5e05cf44cef859ed40fd85d67b473a094e782a6e5b86941c0509714cb74",
+      "fpga/rtl/gptneo_resident_gemv.sv": "2dc80a527e6c6c8bb48f76f607df20b8674e505c7e1162d2acf9901fc2c7ebb5",
+      "fpga/rtl/gptneo_iterative_divider.sv": "8665cc99e7bf98e0415775a36c78aa4ff242d30c976dce0719e6d465686a1540",
+      "host/kevin_jtag_cli.py": "e22a5916eef0cddeaaa0be9934e7b075f655b7d41f842ec8150d67c80f91204f"
+    }
+  },
+  "semantic_authorities": {
+    "qdq": {
+      "path": "artifacts/reference/tinystories-1m-qdq-semantics.json",
+      "sha256": "a274d61ec5f634fac8fb501339ddfe7ae4bf774d950840498d54c32b90d79e77"
+    },
+    "implementation_profile": {
+      "path": "artifacts/reference/tinystories-1m-implementation-profile.json",
+      "sha256": "756627744bf1e3f8dcab27e9d0accbe9a1ab38d93a73fbbbb01557c08470819b"
+    },
+    "fixed_profile": {
+      "path": "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json",
+      "sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6"
+    }
+  },
+  "unresolved": []
 }

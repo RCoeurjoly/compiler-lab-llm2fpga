@@ -7,7 +7,9 @@ import argparse
 import hashlib
 import json
 import math
+import struct
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +23,16 @@ REFERENCE_SOURCES = (
     "tinystories/build_package.py",
     "tinystories/int_reference.py",
     "tinystories/hardware_reference.py",
+    "tinystories/write_rtl_fixture.py",
+    "fpga/rtl/gptneo_resident_gemv.sv",
+    "fpga/rtl/gptneo_iterative_divider.sv",
+    "host/kevin_jtag_cli.py",
 )
+FROZEN_PROMPT_IDS = [7454, 2402, 257, 640]
+FROZEN_EXPECTED_TOKENS = [
+    11, 612, 373, 257, 1310, 2576, 3706, 20037,
+    13, 1375, 6151, 284, 711, 2354, 287, 262,
+]
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -52,6 +63,133 @@ def _canonical_sha256(value: dict[str, Any]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise ValueError(message)
+
+
+def validate_finite_adapter_input(value: Any) -> None:
+    """Reject non-finite values before they can enter the integer datapath."""
+
+    if isinstance(value, bool):
+        raise ValueError("adapter input must be integer token IDs, not booleans")
+    if isinstance(value, int):
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("adapter input contains a non-finite value")
+        raise ValueError("adapter input must be integer token IDs")
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            validate_finite_adapter_input(item)
+        return
+    raise ValueError("adapter input must be integer token IDs")
+
+
+def _validate_finite_package_values(package_path: Path, manifest: dict[str, Any]) -> None:
+    """The fixed profile has no NaN/Inf representation after materialization."""
+
+    for file_name in ("scales.bin",):
+        payload = (package_path / file_name).read_bytes()
+        _require(len(payload) % 4 == 0, f"{file_name} is not float32-aligned")
+        for (value,) in struct.iter_unpack("<f", payload):
+            _require(math.isfinite(value), f"package {file_name} contains a non-finite value")
+    image = (package_path / "weights.bin").read_bytes()
+    tensors = manifest.get("tensors")
+    _require(isinstance(tensors, dict), "manifest tensor table is missing")
+    for name, descriptor in tensors.items():
+        if not isinstance(descriptor, dict) or descriptor.get("format") != "float32":
+            continue
+        offset = descriptor.get("offset")
+        nbytes = descriptor.get("nbytes")
+        _require(isinstance(offset, int) and isinstance(nbytes, int) and nbytes % 4 == 0,
+                 f"manifest float32 tensor is malformed: {name}")
+        _require(0 <= offset <= len(image) and offset + nbytes <= len(image),
+                 f"manifest float32 tensor is out of range: {name}")
+        for (value,) in struct.iter_unpack("<f", image[offset:offset + nbytes]):
+            _require(math.isfinite(value), f"package tensor contains a non-finite value: {name}")
+
+
+def _run_fixed_reference(kev_root: Path, package_path: Path) -> list[int]:
+    """Run the content-authenticated deployed fixed-point reference once."""
+
+    program = """\
+import json
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from tinystories.hardware_reference import FixedGPTNeo
+print(json.dumps(FixedGPTNeo(Path(sys.argv[2])).generate([7454, 2402, 257, 640], 16)))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", program, str(kev_root), str(package_path)],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    tokens = json.loads(result.stdout)
+    _require(
+        isinstance(tokens, list)
+        and all(isinstance(token, int) and not isinstance(token, bool) for token in tokens),
+        "fixed reference returned malformed tokens",
+    )
+    return tokens
+
+
+def _validate_deployed_contract(contract: dict[str, Any]) -> dict[str, Any]:
+    """Validate the accepted-spec selection without reinterpreting old receipts."""
+
+    model = contract.get("model")
+    package = contract.get("package")
+    tokenizer = contract.get("tokenizer")
+    quantization = contract.get("quantization")
+    fixed_point = contract.get("fixed_point")
+    reference = contract.get("reference")
+    deployed = contract.get("deployed_profile")
+    selection_authority = contract.get("selection_authority")
+    _require(isinstance(model, dict), "contract model identity is missing")
+    _require(isinstance(package, dict) and isinstance(package.get("files"), dict),
+             "contract complete package identity is missing")
+    _require(isinstance(tokenizer, dict), "contract tokenizer identity is missing")
+    _require(isinstance(quantization, dict), "contract quantization profile is missing")
+    _require(isinstance(fixed_point, dict), "contract fixed-point profile is missing")
+    _require(isinstance(reference, dict), "contract reference fixture is missing")
+    _require(isinstance(deployed, dict), "contract deployed profile is missing")
+    _require(isinstance(selection_authority, dict), "contract selection authority is missing")
+    selection_path = selection_authority.get("path")
+    _require(isinstance(selection_path, str)
+             and selection_authority.get("sha256") == _sha256(ROOT / selection_path),
+             "accepted-spec selection authority mismatch")
+    _require(model.get("source_revision") == "ac533fb8b4f69c71894bf96badfe11e6294d9fcf",
+             "contract model revision differs from the accepted spec")
+    _require(tokenizer.get("sha256") == package["files"].get("tokenizer.json", {}).get("sha256"),
+             "contract tokenizer hash is not bound to the complete package")
+    _require(quantization == {
+        "weights": "symmetric per-output INT8",
+        "activations": "symmetric per-channel INT8",
+        "activation_boundary_count": 97,
+        "activation_vector_widths": [64, 256],
+        "scale_format": "little-endian float32",
+    }, "contract quantization profile differs from the deployed package")
+    _require(fixed_point == {
+        "value_format": "signed Q16.16",
+        "scale_format": "unsigned Q8.24",
+        "gemv_accumulator": "signed 64-bit serial accumulator",
+    }, "contract fixed-point profile differs from the accepted spec")
+    _require(reference.get("prompt_tokens") == FROZEN_PROMPT_IDS
+             and reference.get("tokens") == FROZEN_EXPECTED_TOKENS
+             and reference.get("generation") == "greedy top-1",
+             "contract frozen generation fixture differs from the accepted spec")
+    _require(deployed.get("name") == "fixed_hardware_reference"
+             and deployed.get("input_domain") == "finite_integer_or_fixed_point_only"
+             and deployed.get("nonfinite_policy") == "reject_nonfinite_adapter_input",
+             "contract deployed profile or non-finite policy is not fail closed")
+    sources = deployed.get("sources")
+    _require(isinstance(sources, dict) and set(sources) == set(REFERENCE_SOURCES),
+             "contract deployed source set is incomplete")
+    return deployed
+
+
 def audit_exact_input(
     contract_path: Path, package_path: Path, kev_root: Path
 ) -> dict[str, Any]:
@@ -61,6 +199,20 @@ def audit_exact_input(
     qdq = _load_json(QDQ_RECEIPT)
     implementation = _load_json(IMPLEMENTATION_PROFILE)
     fixed_profile = _load_json(FIXED_PROFILE)
+    deployed = _validate_deployed_contract(contract)
+    semantic_authorities = contract.get("semantic_authorities")
+    _require(isinstance(semantic_authorities, dict), "contract semantic authorities are missing")
+    expected_receipts = {
+        "qdq": QDQ_RECEIPT,
+        "implementation_profile": IMPLEMENTATION_PROFILE,
+        "fixed_profile": FIXED_PROFILE,
+    }
+    for name, path in expected_receipts.items():
+        authority = semantic_authorities.get(name)
+        _require(isinstance(authority, dict)
+                 and authority.get("path") == str(path.relative_to(ROOT))
+                 and authority.get("sha256") == _sha256(path),
+                 f"semantic receipt identity mismatch: {name}")
 
     receipt_files = receipt.get("files")
     if not isinstance(receipt_files, dict):
@@ -85,6 +237,8 @@ def audit_exact_input(
         raise ValueError("contract manifest identity mismatch")
     if package_contract.get("sha256") != _sha256(package_path / "weights.bin"):
         raise ValueError("contract weight identity mismatch")
+    if package_contract.get("files") != package_files:
+        raise ValueError("contract complete package identity mismatch")
 
     activation_scales = manifest.get("activation_scales")
     if not isinstance(activation_scales, dict):
@@ -102,6 +256,8 @@ def audit_exact_input(
         ):
             raise ValueError(f"activation scale vector is invalid: {name}")
         widths.add(len(values))
+    _validate_finite_package_values(package_path, manifest)
+    validate_finite_adapter_input(FROZEN_PROMPT_IDS)
 
     quantization = contract.get("quantization")
     if not isinstance(quantization, dict):
@@ -119,35 +275,25 @@ def audit_exact_input(
                 "reason": "contract activation label disagrees with 97 package scale vectors",
             }
         )
-    if implementation.get("status") != "resolved":
-        conflicts.append(
-            {
-                "code": "implementation_profile_unresolved",
-                "reason": "the selected executable implementation profile is not resolved",
-            }
-        )
-    if fixed_profile.get("board_authenticated") is not True:
-        conflicts.append(
-            {
-                "code": "board_checkpoint_trace_unavailable",
-                "reason": "the fixed-point profile is not authenticated by a board checkpoint trace",
-            }
-        )
-    incomplete_reasons = qdq.get("incomplete_reasons")
-    if isinstance(incomplete_reasons, list) and any(
-        "non-finite" in str(reason).lower() for reason in incomplete_reasons
-    ):
-        conflicts.append(
-            {
-                "code": "nonfinite_policy_unresolved",
-                "reason": "the executable references do not define one portable non-finite policy",
-            }
-        )
-
     source_files = {
         name: _sha256(kev_root / name) for name in REFERENCE_SOURCES
     }
+    if source_files != deployed["sources"]:
+        raise ValueError("deployed reference-source identity mismatch")
     relevant_status = _git(kev_root, "status", "--short", "--", *REFERENCE_SOURCES)
+    if relevant_status:
+        raise ValueError("deployed reference sources have uncommitted changes")
+    if _git(kev_root, "rev-parse", "HEAD") != deployed.get("revision"):
+        raise ValueError("deployed reference revision mismatch")
+    if fixed_profile.get("profile") != deployed["name"]:
+        raise ValueError("fixed hardware profile selection mismatch")
+    if fixed_profile.get("semantics", {}).get("execution_domain") != "integers_only_after_materialization":
+        raise ValueError("fixed hardware profile is not an integer/fixed-point domain")
+    if fixed_profile.get("semantics", {}).get("accumulation", {}).get("synthesizable_rtl", {}).get("logical_width_bits") != 64:
+        raise ValueError("fixed hardware profile does not use signed 64-bit GEMV accumulation")
+    generated_tokens = _run_fixed_reference(kev_root, package_path)
+    if generated_tokens != FROZEN_EXPECTED_TOKENS:
+        raise ValueError("deployed fixed reference token fixture mismatch")
     source = {
         "head_revision": _git(kev_root, "rev-parse", "HEAD"),
         "package_revision": _git(
@@ -166,6 +312,7 @@ def audit_exact_input(
             "sha256": _sha256(contract_path),
             "activation_granularity": activation_granularity,
         },
+        "model": contract["model"],
         "package": {
             "path": str(package_path),
             "manifest_sha256": manifest_hash,
@@ -177,12 +324,33 @@ def audit_exact_input(
             "boundary_count": len(activation_scales),
             "vector_widths": sorted(widths),
         },
+        "tokenizer": contract["tokenizer"],
+        "quantization": contract["quantization"],
+        "fixed_point": contract["fixed_point"],
         "source": source,
         "semantic_receipts": {
-            "qdq": {"path": str(QDQ_RECEIPT.relative_to(ROOT)), "status": qdq.get("status"), "sha256": _sha256(QDQ_RECEIPT)},
-            "implementation_profile": {"path": str(IMPLEMENTATION_PROFILE.relative_to(ROOT)), "status": implementation.get("status"), "sha256": _sha256(IMPLEMENTATION_PROFILE)},
-            "fixed_profile": {"path": str(FIXED_PROFILE.relative_to(ROOT)), "status": fixed_profile.get("status"), "sha256": _sha256(FIXED_PROFILE)},
+            "qdq": {"path": str(QDQ_RECEIPT.relative_to(ROOT)), "status": qdq.get("status"), "sha256": _sha256(QDQ_RECEIPT), "contract_sha256": semantic_authorities["qdq"]["sha256"]},
+            "implementation_profile": {"path": str(IMPLEMENTATION_PROFILE.relative_to(ROOT)), "status": implementation.get("status"), "sha256": _sha256(IMPLEMENTATION_PROFILE), "contract_sha256": semantic_authorities["implementation_profile"]["sha256"]},
+            "fixed_profile": {"path": str(FIXED_PROFILE.relative_to(ROOT)), "status": fixed_profile.get("status"), "sha256": _sha256(FIXED_PROFILE), "contract_sha256": semantic_authorities["fixed_profile"]["sha256"]},
         },
+        "implementation_profile": {
+            "name": deployed["name"],
+            "selection": "accepted_spec_deployed_reference_and_synthesizable_rtl",
+            "semantics_source": str(FIXED_PROFILE.relative_to(ROOT)),
+            "semantics_sha256": _sha256(FIXED_PROFILE),
+            "historical_selector_status": implementation.get("status"),
+        },
+        "nonfinite_policy": deployed["nonfinite_policy"],
+        "reference_fixture": {
+            "prompt_ids": FROZEN_PROMPT_IDS,
+            "expected_tokens": FROZEN_EXPECTED_TOKENS,
+            "fixed_reference_tokens": generated_tokens,
+        },
+        "observability_limitations": [{
+            "code": "board_checkpoint_trace_unavailable",
+            "classification": "observability_limitation_not_identity_conflict",
+            "reason": "No internal board checkpoint trace is claimed; package/source identity and the frozen deployed token fixture are authenticated independently.",
+        }],
         "conflicts": conflicts,
         "next_gate": (
             "exact_quantized_pytorch_model"
