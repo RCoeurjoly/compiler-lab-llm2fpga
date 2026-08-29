@@ -48,7 +48,7 @@ FROZEN_PROFILE_SELF_SHA256 = "7d54acda88f1d1a6979fd0ca8a3b0445e20ef127a399e5124a
 FROZEN_CONTRACT_SHA256 = "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c"
 FROZEN_AUDIT_FILE_SHA256 = "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd"
 REACHABLE_CERTIFICATE_RELATIVE = Path("artifacts/reference/tinystories-1m-exact-reachable-domain.json")
-REACHABLE_CERTIFICATE_SHA256 = "9c0ae7b65960b42422ef03137c383b2126fc7d9395a39f600b45b3fcee6449ba"
+REACHABLE_CERTIFICATE_SHA256 = "35c64f4aacecca9e6a0df3635f16ba8f5cc3af770f683cb19781c62b1b456464"
 FIXED_LOGITS_ORACLE_RELATIVE = Path("artifacts/reference/tinystories-1m-fixed-logits-oracle.json")
 FIXED_LOGITS_ORACLE_SHA256 = "258bbcc081a5166b8f302ff6d736730f1743d7fa448413bae6c3774b9f5ff533"
 
@@ -405,23 +405,60 @@ def _validate_reachable_certificate(certificate: Mapping[str, Any], contract: Ma
              and tuple(call.get("name") for call in gemv_calls) == GEMV_NAMES
              and gemv.get("failing_call") is None
              and gemv.get("failing_output") is None
-             and gemv.get("failing_inequality") is None,
+             and gemv.get("failing_inequality") is None
+             and gemv.get("first_failure_witness") is None,
              "identity_frontier", "GEMV reachable-domain call coverage is incomplete")
     for call in gemv_calls:
         output_count = call.get("output_count")
-        bounds = call.get("per_output_bounds", {})
+        summaries = call.get("per_output_summaries", {})
+        summary_terms = {
+            "accumulator_min", "accumulator_max",
+            "pre_output_q16_min", "pre_output_q16_max",
+        }
         _require(call.get("status") == "proven"
-                 and call.get("first_failing_output") is None
-                 and call.get("failing_inequality") is None
+                 and call.get("first_failure_witness") is None
                  and isinstance(output_count, int) and output_count > 0
-                 and all(isinstance(bounds.get(name), list)
-                         and len(bounds[name]) == output_count for name in (
-                             "accumulator_min", "accumulator_max",
-                             "pre_output_q16_min", "pre_output_q16_max",
-                         ))
+                 and "per_output_bounds" not in call
+                 and set(summaries) == summary_terms
                  and all(call.get("proof", {}).get("inequalities", {}).values())
                  and call.get("proof", {}).get("pre_output_q16_abs_bound", 1 << 31) < (1 << 31),
                  "identity_frontier", f"GEMV proof is incomplete: {call.get('name')}")
+        for term, summary in summaries.items():
+            digest = summary.get("ordered_values_sha256")
+            minimum = summary.get("signed_minimum", {})
+            maximum = summary.get("signed_maximum", {})
+            absolute = summary.get("absolute_maximum", {})
+            witness = summary.get("worst_case_witness", {})
+            indices = (
+                minimum.get("output_index"), maximum.get("output_index"),
+                absolute.get("output_index"), witness.get("output"),
+            )
+            _require(isinstance(digest, str) and len(digest) == 64
+                     and all(character in "0123456789abcdef" for character in digest)
+                     and summary.get("element_count") == output_count
+                     and all(isinstance(index, int) and 0 <= index < output_count
+                             for index in indices)
+                     and isinstance(minimum.get("value"), int)
+                     and isinstance(maximum.get("value"), int)
+                     and minimum["value"] <= maximum["value"]
+                     and isinstance(absolute.get("value"), int)
+                     and absolute.get("magnitude") == abs(absolute["value"])
+                     and absolute["magnitude"] >= max(
+                         abs(minimum["value"]), abs(maximum["value"])
+                     )
+                     and witness == {
+                         "module": call["name"], "output": absolute["output_index"],
+                         "term": term, "value": absolute["value"],
+                         "absolute_value": absolute["magnitude"],
+                     }
+                     and summary.get("first_failure_witness") is None,
+                     "identity_frontier", f"GEMV compact summary is incomplete: {call.get('name')}:{term}")
+        pre_output_abs = max(
+            summaries["pre_output_q16_min"]["absolute_maximum"]["magnitude"],
+            summaries["pre_output_q16_max"]["absolute_maximum"]["magnitude"],
+        )
+        _require(pre_output_abs == call["proof"]["pre_output_q16_abs_bound"],
+                 "identity_frontier", f"GEMV compact extrema differ: {call.get('name')}")
 
 
 def _validate_fixed_logits_oracle(oracle: Mapping[str, Any], contract: Mapping[str, Any],

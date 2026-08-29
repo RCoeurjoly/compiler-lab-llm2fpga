@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "1cac1a76fad202e1e385b426f26500658d4398624c81daec36b4bcb3e55200b5",
+  "artifact_sha256": "8f74d35cc90d534fb385608c9cdf1f6f5bb0a5aad83eb6c34133e4b7b6f1e938",
   "execution": {
     "activation_codes": "signed_int8_saturated",
     "activation_rounding": "nearest_ties_away_from_zero",
@@ -49,7 +49,7 @@
     "fixed_profile": {
       "sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6"
     },
-    "model_receipt_sha256": "deadde74b882b4b01b1381fba232cf88b858d1b11763dc227a7f20f9c6f579c4",
+    "model_receipt_sha256": "f061dbf4f91bf5389acb0f27ce4b9e672f6f3831478907e01900e60e8869235b",
     "package": {
       "files": {
         "calibration_ids.bin": {
@@ -99,18 +99,18 @@
       }
     },
     "reachable_certificate": {
-      "certificate_sha256": "f8cc7be750d14e7f0349242178b09a64960b78aeb08239657b44d43d389014d6",
-      "file_sha256": "9c0ae7b65960b42422ef03137c383b2126fc7d9395a39f600b45b3fcee6449ba"
+      "certificate_sha256": "4c7a55d9673f2b42dcf0f0ec676b63f4094b161f860962b7d430643769a7e9c9",
+      "file_sha256": "35c64f4aacecca9e6a0df3635f16ba8f5cc3af770f683cb19781c62b1b456464"
     },
     "source_files": {
-      "TinyStories/model_adapter_exact_package.py": "ba4e087c2c3fd7481b5e584823cee7883c08283b68912457431a2a05fbb0db33",
+      "TinyStories/model_adapter_exact_package.py": "ee2af98f4f2dfcae20dbe43432bc4bcf6e8ea9340308ec735bd2c1549c16b92c",
       "TinyStories/model_adapter_reference_package.py": "190f334868557614719c394961fe676a13b6fd865d443973917f87424be3c367",
       "scripts/comparison/audit_tinystories_1m_exact_input.py": "93b51d87dbb0a61911abdb951573c37018c90358dfed2f27b67832a6c1eea92d",
       "scripts/comparison/build_tinystories_1m_exact_package_model_artifact.py": "38245c5defb023c3420feab4e16479e63b739fdfc8a492a4c3904c6df9030b2a",
       "scripts/comparison/capture_tinystories_1m_fixed_logits.py": "fb455d4e977407cb886b1522872b44fe829133465e81e2c5e7d13f1c92f3744e",
-      "scripts/comparison/certify_tinystories_1m_exact_reachable_domain.py": "b766e37d4efa754e0b5d01218df9cb9d7a3a923dc1ecc7032daae1d2442b68ad",
-      "tests/test_tinystories_1m_exact_package_model.py": "ae87ef3035cd2727351af5df97a28e1f0a73e71afe557d777bdd1cd3ae1fd160",
-      "tests/test_tinystories_1m_exact_reachable_domain.py": "b71041f98ee11832488c3857eab2981c329c7a8695d7a86a748ea30e60b1ca73"
+      "scripts/comparison/certify_tinystories_1m_exact_reachable_domain.py": "4d71f3006400d90bc2d17d114e805810b3137d6b8c52cbf0d7951e03505a5359",
+      "tests/test_tinystories_1m_exact_package_model.py": "68c931907d49857c699e71b1ef86a7cf464daadbf56bc0cee438c29573efed8d",
+      "tests/test_tinystories_1m_exact_reachable_domain.py": "634e4f06a646d055be0e9682b035d0e79481b4aa164ff98b1b89a7a072307f06"
     }
   },
   "schema": "tinystories-1m-exact-package-model-v1",

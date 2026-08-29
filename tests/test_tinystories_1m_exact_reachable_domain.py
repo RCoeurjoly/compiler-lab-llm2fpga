@@ -9,6 +9,8 @@ import copy
 import unittest
 from pathlib import Path
 
+import torch
+
 
 ROOT = Path(__file__).resolve().parents[1]
 CERTIFIER = ROOT / "scripts/comparison/certify_tinystories_1m_exact_reachable_domain.py"
@@ -21,6 +23,47 @@ PROFILE = ROOT / "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.
 SOFTMAX = ROOT / "artifacts/reference/tinystories-1m-fixed-softmax-checkpoints.json"
 PACKAGE = Path("/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m")
 REFERENCE = Path("/home/roland/kev-gpt/.worktrees/kintex-selftest")
+
+
+def canonical_digest(values: list[int]) -> str:
+    return hashlib.sha256(json.dumps(values, separators=(",", ":")).encode()).hexdigest()
+
+
+def expected_summary(values: list[int], module: str, term: str) -> dict:
+    minimum = min(values)
+    maximum = max(values)
+    worst_index = max(range(len(values)), key=lambda index: abs(values[index]))
+    worst = values[worst_index]
+    return {
+        "ordered_values_sha256": canonical_digest(values),
+        "element_count": len(values),
+        "signed_minimum": {"value": minimum, "output_index": values.index(minimum)},
+        "signed_maximum": {"value": maximum, "output_index": values.index(maximum)},
+        "absolute_maximum": {
+            "value": worst, "magnitude": abs(worst), "output_index": worst_index,
+        },
+        "worst_case_witness": {
+            "module": module, "output": worst_index, "term": term,
+            "value": worst, "absolute_value": abs(worst),
+        },
+        "first_failure_witness": None,
+    }
+
+
+def gemv_specs() -> list[tuple[str, str, str | None]]:
+    specs = []
+    for layer in range(8):
+        block, source = f"blocks.{layer}", f"transformer.h.{layer}"
+        specs.extend((
+            (f"{source}.attn.attention.q_proj", f"{block}.attn.q.weight", None),
+            (f"{source}.attn.attention.k_proj", f"{block}.attn.k.weight", None),
+            (f"{source}.attn.attention.v_proj", f"{block}.attn.v.weight", None),
+            (f"{source}.attn.attention.out_proj", f"{block}.attn.out.weight",
+             f"{block}.attn.out.bias"),
+            (f"{source}.mlp.c_fc", f"{block}.mlp.fc.weight", f"{block}.mlp.fc.bias"),
+            (f"{source}.mlp.c_proj", f"{block}.mlp.proj.weight", f"{block}.mlp.proj.bias"),
+        ))
+    return specs + [("lm_head", "token_embedding.weight", None)]
 
 
 def load_script(path: Path, name: str):
@@ -158,9 +201,74 @@ class ExactReachableDomainCertificateTest(unittest.TestCase):
         source_paths = set(self.certificate["identity"]["semantic_sources"])
         self.assertEqual(source_paths, set(authentication["materialized_sources"]))
 
-    def test_all_49_gemvs_prove_serial_accumulator_product_and_preoutput_ranges(self) -> None:
+    def _independent_gemv_summaries(self) -> dict[str, dict[str, dict]]:
+        manifest = json.loads((PACKAGE / "manifest.json").read_text(encoding="utf-8"))
+        weights_image = (PACKAGE / "weights.bin").read_bytes()
+        scales_image = (PACKAGE / "scales.bin").read_bytes()
+        result = {}
+        for module, weight_name, bias_name in gemv_specs():
+            descriptor = manifest["tensors"][weight_name]
+            weight_raw = weights_image[
+                descriptor["offset"]:descriptor["offset"] + descriptor["nbytes"]
+            ]
+            weights = torch.frombuffer(bytearray(weight_raw), dtype=torch.int8).reshape(
+                descriptor["logical_shape"]
+            ).to(torch.int64)
+            input_scales = torch.round(torch.tensor(
+                manifest["activation_scales"][f"{module}.input"], dtype=torch.float64
+            ) * (1 << 24)).to(torch.int64)
+            lower_scaled, upper_scaled = -128 * input_scales, 127 * input_scales
+            first, second = (
+                weights * lower_scaled.unsqueeze(0), weights * upper_scaled.unsqueeze(0)
+            )
+            accumulator_min = torch.minimum(first, second).sum(dim=1).tolist()
+            accumulator_max = torch.maximum(first, second).sum(dim=1).tolist()
+            scale_raw = scales_image[
+                descriptor["scale_offset"]:
+                descriptor["scale_offset"] + descriptor["scale_nbytes"]
+            ]
+            weight_scales = torch.round(
+                torch.frombuffer(bytearray(scale_raw), dtype=torch.float32).to(torch.float64)
+                * (1 << 24)
+            ).to(torch.int64).tolist()
+            if bias_name is None:
+                bias = [0] * len(accumulator_min)
+            else:
+                bias_descriptor = manifest["tensors"][bias_name]
+                bias_raw = weights_image[
+                    bias_descriptor["offset"]:
+                    bias_descriptor["offset"] + bias_descriptor["nbytes"]
+                ]
+                bias = torch.round(
+                    torch.frombuffer(bytearray(bias_raw), dtype=torch.float32).to(torch.float64)
+                    * (1 << 16)
+                ).to(torch.int64).tolist()
+
+            def round_shift(value: int) -> int:
+                rounded = (abs(value) + (1 << 31)) >> 32
+                return -rounded if value < 0 else rounded
+
+            pre_min = [round_shift(value * scale) + offset for value, scale, offset in zip(
+                accumulator_min, weight_scales, bias, strict=True
+            )]
+            pre_max = [round_shift(value * scale) + offset for value, scale, offset in zip(
+                accumulator_max, weight_scales, bias, strict=True
+            )]
+            arrays = {
+                "accumulator_min": accumulator_min,
+                "accumulator_max": accumulator_max,
+                "pre_output_q16_min": pre_min,
+                "pre_output_q16_max": pre_max,
+            }
+            result[module] = {
+                term: expected_summary(values, module, term) for term, values in arrays.items()
+            }
+        return result
+
+    def test_all_49_gemvs_rederive_compact_ordered_summaries_and_ranges(self) -> None:
         gemv = self.certificate["gemv"]
         calls = gemv["calls"]
+        expected = self._independent_gemv_summaries()
 
         self.assertEqual(gemv["status"], "all_preoutput_q16_ranges_proven")
         self.assertEqual(len(calls), 49)
@@ -169,17 +277,34 @@ class ExactReachableDomainCertificateTest(unittest.TestCase):
         for call in calls:
             with self.subTest(call=call["name"]):
                 output_count = call["output_count"]
-                bounds = call["per_output_bounds"]
-                self.assertEqual(len(bounds["accumulator_min"]), output_count)
-                self.assertEqual(len(bounds["accumulator_max"]), output_count)
-                self.assertEqual(len(bounds["pre_output_q16_min"]), output_count)
-                self.assertEqual(len(bounds["pre_output_q16_max"]), output_count)
+                self.assertNotIn("per_output_bounds", call)
+                summaries = call["per_output_summaries"]
+                self.assertEqual(summaries, expected[call["name"]])
+                self.assertTrue(all(
+                    summary["element_count"] == output_count for summary in summaries.values()
+                ))
                 self.assertTrue(all(call["proof"]["inequalities"].values()))
                 self.assertLess(call["proof"]["pre_output_q16_abs_bound"], 2**31)
-                self.assertIsNone(call["first_failing_output"])
-                self.assertIsNone(call["failing_inequality"])
+                self.assertIsNone(call["first_failure_witness"])
         self.assertEqual(max(call["proof"]["pre_output_q16_abs_bound"] for call in calls),
                          6848534)
+
+    def test_certificate_compacts_raw_exhaustive_arrays_without_losing_order_identity(self) -> None:
+        self.assertLess(CERTIFICATE.stat().st_size, 1_000_000)
+        first = self.certifier.summarize_ordered_values(
+            [7, -9, 7], "test.module", "test_term"
+        )
+        reordered = self.certifier.summarize_ordered_values(
+            [7, 7, -9], "test.module", "test_term"
+        )
+
+        self.assertEqual(first, expected_summary([7, -9, 7], "test.module", "test_term"))
+        self.assertEqual(reordered,
+                         expected_summary([7, 7, -9], "test.module", "test_term"))
+        self.assertNotEqual(first["ordered_values_sha256"], reordered["ordered_values_sha256"])
+        self.assertEqual(first["element_count"], reordered["element_count"])
+        self.assertEqual(first["signed_minimum"]["value"],
+                         reordered["signed_minimum"]["value"])
 
     def test_expanded_gemv_input_box_fails_at_the_first_module_output_inequality(self) -> None:
         result = self.certifier.derive_gemv_certificate(
@@ -191,6 +316,11 @@ class ExactReachableDomainCertificateTest(unittest.TestCase):
         self.assertEqual(result["failing_output"], 0)
         self.assertEqual(result["failing_inequality"],
                          "gemv_term_fits_signed_int64")
+        self.assertEqual(result["first_failure_witness"], {
+            "module": "transformer.h.0.attn.attention.q_proj",
+            "output": 0,
+            "term": "gemv_term_fits_signed_int64",
+        })
 
 
 @unittest.skipUnless(PACKAGE.is_dir() and REFERENCE.is_dir(), "canonical inputs unavailable")

@@ -266,6 +266,21 @@ class TinyStories1MExactPackageModelTest(unittest.TestCase):
              ["operator_equivalence"]["divider"].__setitem__("status", "identity_frontier")),
             ("gemv", lambda value: value["gemv"]["calls"][48]["proof"]["inequalities"]
              .__setitem__("pre_output_q16_fits_signed_int32", False)),
+            ("gemv_summary_count", lambda value: value["gemv"]["calls"][48]
+             ["per_output_summaries"]["accumulator_min"].__setitem__("element_count", 1)),
+            ("gemv_summary_extremum", lambda value: value["gemv"]["calls"][0]
+             ["per_output_summaries"]["pre_output_q16_max"]["signed_maximum"]
+             .__setitem__("output_index", 64)),
+            ("gemv_summary_witness", lambda value: value["gemv"]["calls"][0]
+             ["per_output_summaries"]["accumulator_max"]["worst_case_witness"]
+             .__setitem__("module", "substituted.module")),
+            ("gemv_failure_witness", lambda value: value["gemv"]["calls"][0].__setitem__(
+                "first_failure_witness", {
+                    "module": "transformer.h.0.attn.attention.q_proj",
+                    "output": 0,
+                    "term": "substituted_failure",
+                }
+            )),
         )
         for label, mutate in mutations:
             with self.subTest(label=label):

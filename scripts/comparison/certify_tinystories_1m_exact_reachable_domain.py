@@ -73,6 +73,35 @@ def certificate_sha256(value: Mapping[str, Any]) -> str:
     return canonical_sha256({key: item for key, item in value.items() if key != "certificate_sha256"})
 
 
+def summarize_ordered_values(values: list[int], module: str, term: str,
+                             first_failure_witness: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Compact a fully computed ordered vector without losing content or witnesses."""
+
+    _require(bool(values) and all(isinstance(value, int) and not isinstance(value, bool)
+                                  for value in values),
+             "summary_input_malformed", f"{module}:{term}")
+    minimum = min(values)
+    maximum = max(values)
+    worst_index = max(range(len(values)), key=lambda index: abs(values[index]))
+    worst = values[worst_index]
+    return {
+        "ordered_values_sha256": canonical_sha256(values),
+        "element_count": len(values),
+        "signed_minimum": {"value": minimum, "output_index": values.index(minimum)},
+        "signed_maximum": {"value": maximum, "output_index": values.index(maximum)},
+        "absolute_maximum": {
+            "value": worst, "magnitude": abs(worst), "output_index": worst_index,
+        },
+        "worst_case_witness": {
+            "module": module, "output": worst_index, "term": term,
+            "value": worst, "absolute_value": abs(worst),
+        },
+        "first_failure_witness": (
+            dict(first_failure_witness) if first_failure_witness is not None else None
+        ),
+    }
+
+
 def _load(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     _require(isinstance(value, dict), "invalid_json", str(path))
@@ -681,6 +710,19 @@ def _first_unsafe_gemv_output(input_min: int, input_max: int, input_scales: list
     return None
 
 
+def _gemv_failure(name: str, weight_name: str, bias_name: str | None,
+                  output_boundary: str | None, output_count: int,
+                  output: int, inequality: str) -> dict[str, Any]:
+    return {
+        "name": name, "weight": weight_name, "bias": bias_name,
+        "input_boundary": f"{name}.input", "output_boundary": output_boundary,
+        "output_count": output_count, "status": "identity_frontier",
+        "first_failure_witness": {
+            "module": name, "output": output, "term": inequality,
+        },
+    }
+
+
 def _prove_gemv(name: str, weight_name: str, bias_name: str | None,
                 output_boundary: str | None, manifest: Mapping[str, Any], weights: bytes,
                 scales_image: bytes, input_code_min: int, input_code_max: int) -> dict[str, Any]:
@@ -693,12 +735,10 @@ def _prove_gemv(name: str, weight_name: str, bias_name: str | None,
     )
     if unsafe is not None:
         output, inequality = unsafe
-        return {
-            "name": name, "weight": weight_name, "bias": bias_name,
-            "input_boundary": f"{name}.input", "output_boundary": output_boundary,
-            "output_count": int(codes.shape[0]), "status": "identity_frontier",
-            "first_failing_output": output, "failing_inequality": inequality,
-        }
+        return _gemv_failure(
+            name, weight_name, bias_name, output_boundary,
+            int(codes.shape[0]), output, inequality,
+        )
 
     lower_scaled = input_scales * input_code_min
     upper_scaled = input_scales * input_code_max
@@ -710,18 +750,35 @@ def _prove_gemv(name: str, weight_name: str, bias_name: str | None,
     term_abs = int(torch.maximum(term_lower.abs(), term_upper.abs()).max())
     scaled_input_abs = int(torch.maximum(lower_scaled.abs(), upper_scaled.abs()).max())
     weight_scales = _q24_scales(manifest["tensors"][weight_name], scales_image)
-    product_min = [int(value) * int(scale) for value, scale in zip(
-        accumulator_min.tolist(), weight_scales.tolist(), strict=True
-    )]
-    product_max = [int(value) * int(scale) for value, scale in zip(
-        accumulator_max.tolist(), weight_scales.tolist(), strict=True
-    )]
-    bias = ([0] * len(product_min) if bias_name is None
+    accumulator_min_values = accumulator_min.tolist()
+    accumulator_max_values = accumulator_max.tolist()
+    weight_scale_values = weight_scales.tolist()
+    bias = ([0] * len(accumulator_min_values) if bias_name is None
             else _parameter_q16(bias_name, manifest, weights))
-    pre_min = [_round_shift(value, 32) + offset
-               for value, offset in zip(product_min, bias, strict=True)]
-    pre_max = [_round_shift(value, 32) + offset
-               for value, offset in zip(product_max, bias, strict=True)]
+    product_min: list[int] = []
+    product_max: list[int] = []
+    pre_min: list[int] = []
+    pre_max: list[int] = []
+    for output, (accumulator_lo, accumulator_hi, scale, offset) in enumerate(zip(
+        accumulator_min_values, accumulator_max_values, weight_scale_values, bias, strict=True
+    )):
+        product_lo, product_hi = accumulator_lo * scale, accumulator_hi * scale
+        if max(abs(product_lo), abs(product_hi)) >= (1 << 63):
+            return _gemv_failure(
+                name, weight_name, bias_name, output_boundary, int(codes.shape[0]),
+                output, "weight_scale_product_fits_signed_int64",
+            )
+        pre_lo = _round_shift(product_lo, 32) + offset
+        pre_hi = _round_shift(product_hi, 32) + offset
+        if pre_lo < -(1 << 31) or pre_hi >= (1 << 31):
+            return _gemv_failure(
+                name, weight_name, bias_name, output_boundary, int(codes.shape[0]),
+                output, "pre_output_q16_fits_signed_int32",
+            )
+        product_min.append(product_lo)
+        product_max.append(product_hi)
+        pre_min.append(pre_lo)
+        pre_max.append(pre_hi)
     inequalities = {
         "scaled_input_fits_signed_int64": scaled_input_abs < (1 << 63),
         "gemv_term_fits_signed_int64": term_abs < (1 << 63),
@@ -733,14 +790,13 @@ def _prove_gemv(name: str, weight_name: str, bias_name: str | None,
             min(pre_min) >= -(1 << 31) and max(pre_max) < (1 << 31)
         ),
     }
-    failing = next((key for key, value in inequalities.items() if not value), None)
-    failing_output = None
-    if failing == "weight_scale_product_fits_signed_int64":
-        failing_output = next(index for index, (lo, hi) in enumerate(zip(product_min, product_max))
-                              if max(abs(lo), abs(hi)) >= (1 << 63))
-    elif failing == "pre_output_q16_fits_signed_int32":
-        failing_output = next(index for index, (lo, hi) in enumerate(zip(pre_min, pre_max))
-                              if lo < -(1 << 31) or hi >= (1 << 31))
+    _require(all(inequalities.values()), "internal_gemv_proof_error", name)
+    arrays = {
+        "accumulator_min": accumulator_min_values,
+        "accumulator_max": accumulator_max_values,
+        "pre_output_q16_min": pre_min,
+        "pre_output_q16_max": pre_max,
+    }
     return {
         "name": name, "weight": weight_name, "bias": bias_name,
         "input_boundary": f"{name}.input", "output_boundary": output_boundary,
@@ -754,14 +810,11 @@ def _prove_gemv(name: str, weight_name: str, bias_name: str | None,
             "scales_sha256": canonical_sha256(weight_scales.tolist()),
         },
         "output_count": len(pre_min),
-        "status": "proven" if failing is None else "identity_frontier",
-        "first_failing_output": failing_output,
-        "failing_inequality": failing,
-        "per_output_bounds": {
-            "accumulator_min": accumulator_min.tolist(),
-            "accumulator_max": accumulator_max.tolist(),
-            "pre_output_q16_min": pre_min,
-            "pre_output_q16_max": pre_max,
+        "status": "proven",
+        "first_failure_witness": None,
+        "per_output_summaries": {
+            term: summarize_ordered_values(values, name, term)
+            for term, values in arrays.items()
         },
         "proof": {
             "scaled_input_abs_bound": scaled_input_abs,
@@ -802,8 +855,9 @@ def derive_gemv_certificate(package: Path, *, input_code_min: int = -128,
         "input_code_domain": [input_code_min, input_code_max],
         "calls": calls,
         "failing_call": failure["name"] if failure else None,
-        "failing_output": failure["first_failing_output"] if failure else None,
-        "failing_inequality": failure["failing_inequality"] if failure else None,
+        "failing_output": failure["first_failure_witness"]["output"] if failure else None,
+        "failing_inequality": failure["first_failure_witness"]["term"] if failure else None,
+        "first_failure_witness": failure["first_failure_witness"] if failure else None,
     }
 
 
