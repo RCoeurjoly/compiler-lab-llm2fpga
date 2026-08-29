@@ -1,0 +1,37 @@
+{
+  "schema": "tinystories-1m-sv-mux-factor-candidate-v1",
+  "status": "diagnostic_structural_candidate",
+  "input": {
+    "path": "/tmp/fullpoly/raw-normalized.sv",
+    "sha256": "989a1eb4173511e7762cc2b537e17c9fe1ffe500b5c7d6f6829d110402103e47"
+  },
+  "output": {
+    "path": "/tmp/fullpoly/raw-factored.sv",
+    "sha256": "678637db0b7e4903bed54d8f2d6629f592f16e5c456d93e712eb0ad5adf1a59c",
+    "bytes": 18808756,
+    "factor_count": 15659,
+    "yosys_stat": {
+      "result": "completed",
+      "time_seconds": 17.70,
+      "cells_including_submodules": 141040,
+      "wires": 505550,
+      "wire_bits": 1822559,
+      "log_sha256": "c877933e3368901bbc8f295dcbe93ebb0ae23e6fdfdbdb14c0591edca8136967"
+    },
+    "yosys_check": {
+      "result": "failed_closed_on_primitive_source_parse",
+      "reported_problems": 0,
+      "primitive_closure": "RISCV HardFloat and Calyx sources included",
+      "failure": "Yosys syntax error in divSqrtFN.sv at default case",
+      "log_sha256": "1bc84502f1b7480c3b739ab15d3c61c44501370f7555ccce4ae19538247d3cdb"
+    }
+  },
+  "decision": "retain_for_full_primitive_closure_test",
+  "reason": "Corrected factoring preserves conditional ordering on the unit fixture, keeps size growth to 4%, and changes Yosys from timeout to 17.7-second structural parsing/statistics. Full check is not yet meaningful because HardFloat primitives are unresolved.",
+  "claims": {
+    "functional_equivalence": false,
+    "resource_improvement": false,
+    "timing_closure": false,
+    "hardware_inference": false
+  }
+}

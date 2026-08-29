@@ -1,0 +1,12 @@
+{
+  "status": "resource_scout_only",
+  "input_sha256": "52382658fed8629d5e6757c6e9d7cb400d30dc1e05453c371c23d8ea8785ab9c",
+  "output_sha256": "30836a134bc64320f27c7e9074b845560016ecaa73d076ff63d822ad27ceb670",
+  "sites_rewritten": 8,
+  "baseline_ops": {"math.exp": 8, "arith.addf": 206, "arith.mulf": 149},
+  "scout_ops": {"math.exp": 0, "arith.addf": 246, "arith.mulf": 213},
+  "behavioral_equivalence": false,
+  "timing_closed": false,
+  "hardware_inference": false,
+  "decision": "retain only as a full-graph resource probe; do not promote to the authenticated implementation"
+}

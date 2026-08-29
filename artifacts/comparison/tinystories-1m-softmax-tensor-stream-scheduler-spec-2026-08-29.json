@@ -1,0 +1,26 @@
+{
+  "schema": "tinystories-1m-softmax-tensor-stream-scheduler-spec-v1",
+  "status": "specified_not_implemented",
+  "compiler_signature": {
+    "input": "tensor<16x32xi32>",
+    "position": "i32",
+    "output": "tensor<16x32xi32>"
+  },
+  "rtl_stream": {
+    "rows": 16,
+    "scores_per_row": 32,
+    "score_encoding": "signed Q8.8",
+    "probability_encoding": "unsigned Q1.20",
+    "row_order": "head-major, head 0 through 15",
+    "element_order": "key index 0 through 31",
+    "causal_rule": "forward position to core; entries after position are excluded",
+    "output_order": "same head-major/key-major order"
+  },
+  "required_controller": [
+    "latch packed tensor and position",
+    "iterate 16 rows and stream 32 scores per row",
+    "wait for each row's out_valid/out_ready sequence",
+    "repack 21-bit probabilities into compiler result representation"
+  ],
+  "claims": {"packing_defined": true, "scheduler_implemented": false, "compiler_equivalence": false, "hardware_inference": false}
+}

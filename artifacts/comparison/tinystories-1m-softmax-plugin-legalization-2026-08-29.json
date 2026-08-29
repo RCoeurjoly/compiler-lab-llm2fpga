@@ -1,0 +1,14 @@
+{
+  "schema": "tinystories-1m-softmax-plugin-legalization-v1",
+  "status": "external_call_boundary_emitted",
+  "plugin": "/nix/store/5vdf86hc77c6jvxrh9gn4zq1chbhyid4-llm2fpga-mlir-passes-0.1.0/lib/LLM2FPGAMLIRPasses.so",
+  "plugin_sha256": "d518fce072fead70ede827a0946b19df0edd1d1e5377b2869ce0e1f18cdd65b6",
+  "pass": "llm2fpga-lower-attention-softmax-fixed",
+  "input": "artifacts/comparison/tinystories-1m-softmax-bridge-regenerated-2026-08-29.mlir",
+  "output": "/tmp/attention-lowered-final.mlir",
+  "output_sha256": "e5b4f62067a1b95d0cf6ac62655b8a0af50acbe38532ab760ff02bc7eaba3ddf",
+  "driver": "mlir-opt (circt-opt is incompatible with this plugin ABI and segfaults before pass execution)",
+  "observed": "llm2fpga.attention_softmax_fixed -> func.call @llm2fpga_attention_softmax_fixed",
+  "claims": {"plugin_compiles": true, "custom_op_consumed": true, "rtl_implementation": false, "compiler_equivalence": false, "hardware_inference": false},
+  "next_step": "Provide and verify the external RTL component ABI, then lower/link it through the Calyx/SystemVerilog backend."
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "tinystories-1m-layernorm-signext-register-hypothesis-v1",
+  "source_sha256": "39cbc992c1261500f0c8001d6ec52b8e225df3ba16e4392f23d02acdc7661ee4",
+  "hypothesis": "Clock the shared std_signext_63 output while go is asserted to break the guard-controlled combinational feedback.",
+  "result": {
+    "build": "passed",
+    "done_seen": true,
+    "cycles": 5894,
+    "output_writes": 64,
+    "output_mismatches": 64,
+    "status": "rejected_functional_mismatch"
+  },
+  "interpretation": "A naive register at this boundary changes the schedule/data alignment and fails every authenticated output. Any accepted fix must preserve Calyx control latency, likely by introducing an explicit handshake/stage boundary rather than clocking the shared primitive unconditionally.",
+  "scope": {
+    "production_rtl_changed": false,
+    "equivalence": false,
+    "timing_closure": false,
+    "hardware_inference": false
+  }
+}

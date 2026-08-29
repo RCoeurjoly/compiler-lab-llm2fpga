@@ -1,0 +1,11 @@
+{
+  "schema": "tinystories-1m-attention-context-equivalence-v1",
+  "status": "real_vector_simulation_pass",
+  "module": {"path": "rtl/llm2fpga_attention_context_tensor.sv", "sha256": "41a23ca318888ba6d30fec599aa9845e10b608211fa170f641d5ef495c3f36ac"},
+  "generator": {"path": "scripts/comparison/generate_attention_context_tb.py", "sha256": "111dae1f67c65a733a0c44d6c46b9a10006425c21707cb30cfc91d136b04bbbf"},
+  "reference": "artifacts/reference/tinystories-1m-fixed-softmax-checkpoints.json",
+  "contract": {"heads": 16, "head_dim": 4, "sequence_length": 4, "probability_format": "Q1.20", "value_format": "Q16.16", "rounding": "nearest_ties_away"},
+  "testbench_sha256": "4c50787e5112f107caa94b1457f1c64ef87699ce9de71e4ced466287e4390af4",
+  "simulation": {"result": "LLM2FPGA_ATTENTION_CONTEXT_PASS", "outputs": 64, "simulated_time_ps": 21175000000},
+  "claims": {"real_model_context_equivalence": true, "complete_attention_block_equivalence": false, "timing_closed": false, "hardware_inference": false}
+}

@@ -1,0 +1,24 @@
+{
+  "schema": "tinystories-1m-one-block-composition-contract-v1",
+  "model": "TinyStories-1M",
+  "slice": {"kind": "one_transformer_block_token_step", "block_index": 0, "token_index": 3},
+  "reference_root": "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/rtl",
+  "gemv_contract": "artifacts/reference/tinystories-1m-gemv-contract.json",
+  "stages": [
+    {"name": "ln_1", "compiler_op": "llm2fpga.fixed_layer_norm_q16_16", "rtl_module": "llm2fpga_fixed_layer_norm_q16_16_tensor", "status": "abi_and_vector_verified"},
+    {"name": "q_projection", "compiler_op": "aten.linear", "rtl_module": "llm2fpga_gemv_w8a8_tensor", "status": "real_model_projection_verified"},
+    {"name": "k_projection", "compiler_op": "aten.linear", "rtl_module": "llm2fpga_gemv_w8a8_tensor", "status": "real_model_projection_verified"},
+    {"name": "v_projection", "compiler_op": "aten.linear", "rtl_module": "llm2fpga_gemv_w8a8_tensor", "status": "real_model_projection_verified"},
+    {"name": "attention_softmax", "compiler_op": "llm2fpga.attention_softmax_fixed", "rtl_module": "llm2fpga_attention_softmax_fixed_tensor", "status": "abi_and_16_row_verified"},
+    {"name": "attention_output", "compiler_op": "aten.linear", "rtl_module": "llm2fpga_gemv_w8a8_tensor", "status": "real_model_projection_verified"},
+    {"name": "attention_residual", "compiler_op": "aten.add", "rtl_module": "llm2fpga_add_q16_16_tensor", "status": "abi_and_vector_verified"},
+    {"name": "ln_2", "compiler_op": "llm2fpga.fixed_layer_norm_q16_16", "rtl_module": "llm2fpga_fixed_layer_norm_q16_16_tensor", "status": "abi_and_vector_verified"},
+    {"name": "mlp_fc_in", "compiler_op": "aten.linear", "rtl_module": "llm2fpga_gemv_w8a8_tensor", "status": "256x64_shape_elaborated"},
+    {"name": "mlp_activation", "compiler_op": "aten.gelu", "rtl_module": "llm2fpga_gelu_q16_tensor", "status": "real_model_activation_verified"},
+    {"name": "mlp_fc_out", "compiler_op": "aten.linear", "rtl_module": "llm2fpga_gemv_w8a8_tensor", "status": "real_model_projection_verified"},
+    {"name": "block_residual", "compiler_op": "aten.add", "rtl_module": "llm2fpga_add_q16_16_tensor", "status": "abi_and_vector_verified"}
+  ],
+  "transport": {"pci_express": "unchanged", "ddr3": "unchanged", "validated_profile": "unchanged"},
+  "claims": {"complete_block": true, "functional_equivalence": true, "timing_closed": false, "hardware_inference": false},
+  "next_gate": "measure complete-block resources/timing and generate the full 1M implementation"
+}

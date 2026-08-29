@@ -1,0 +1,10 @@
+{
+  "schema": "tinystories-1m-transformer-block-equivalence-v1",
+  "status": "real_vector_simulation_pass",
+  "module": {"path": "rtl/llm2fpga_transformer_block_tensor.sv", "sha256": "80357255c724906e740a85630f4994bc1efcd7cef590e9ea4f3e1adb476fc55d"},
+  "generator": {"path": "scripts/comparison/generate_transformer_block_tb.py", "sha256": "acd4e8ed82ec457405964144f293915b7f8a9027fadc091fa8fb5e1bb34a6e4b"},
+  "reference": "artifacts/reference/tinystories-1m-candidate-oracle.json",
+  "testbench_sha256": "2027b0ca06a4d8283cdb2e97722e606f73ba5439265abeb17085af2dac5b9ce5",
+  "simulation": {"result": "LLM2FPGA_TRANSFORMER_BLOCK_PASS", "output_lanes": 64, "simulated_time_ps": 692215000},
+  "claims": {"complete_one_block_functional_equivalence": true, "resource_measured": false, "timing_closed": false, "hardware_inference": false}
+}

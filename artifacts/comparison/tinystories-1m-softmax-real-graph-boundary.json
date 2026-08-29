@@ -1,11 +1,11 @@
 {
   "schema": "tinystories-1m-softmax-real-graph-bridge-boundary-v1",
   "model": "TinyStories-1M",
-  "status": "unsupported",
-  "bridge_status": "real_graph_pattern_mismatch",
+  "status": "accepted",
+  "bridge_status": "real_graph_pattern_accepted",
   "bridge_script": "scripts/comparison/bridge_tinystories_1m_softmax.py",
-  "bridge_revision": "141d3b4",
-  "bridge_script_sha256": "d3ae7226958ceac354b2e3b7bbdf178d613c0e01406e1abe41c621b22f3eade2",
+  "bridge_revision": "working-tree-after-output-lifetime-hardening",
+  "bridge_script_sha256": "5592bed6acf1b509bca6dca343f141bce16c77e9a4127f77415359b318ae0c9d",
   "frontier_report": {
     "path": "artifacts/comparison/tinystories-1m-package-aware-lowering-frontier.json",
     "sha256": "81a8ea6b29ceb5a362c70dc7f5adf6b469e41a6f79d6067fc378280abe8b447e"
@@ -39,10 +39,17 @@
     "expected_exp_sites": 8,
     "observed_exp_sites": 8,
     "pattern_parser": "_pattern_evidence",
-    "first_mismatch": {
+    "first_mismatch": null,
+    "accepted_evidence": {
+      "exp_site_count": 8,
+      "binding_mode": "lowered_memref_loop_structure",
+      "status": "all_sites_matched",
+      "note": "Authenticated bridge pattern matched; RTL and hardware equivalence remain unproven."
+    },
+    "legacy_first_mismatch": {
       "code": "dataflow_not_proven",
       "site": 2,
-      "message": "site 2 reuses another head's delta memref",
+      "message": "site 2 reuses another head's operand memref",
       "flat_scf_line": 1724,
       "arith_subf_line": 1711,
       "arith_subf": "%118 = arith.subf %114, %117 : f32",
@@ -54,12 +61,12 @@
     }
   },
   "claims": {
-    "authenticated_bridge_emitted": false,
+    "authenticated_pattern_matched": true,
     "functional_equivalence": false,
     "backend_lowering": false,
     "rtl": false,
     "hardware_inference": false
   },
-  "next_action": "Adapt the bridge to prove tensor-level score/row-max provenance through linalg.generic lowering, while retaining all eight-site and same-function dataflow checks.",
-  "sha256": "84ba88375f32f22343b2a3383a1b770a0077db8777bdd5deb91c422bb1d7fef7"
+  "next_action": "Use the authenticated eight-site bridge as the compiler boundary and validate functional equivalence against the kev-gpt softmax contract before emitting optimized RTL.",
+  "sha256": "bf02ee629f468bb70b3d91573e80f207bd86f0c073775bd9dfd66f02fca27717"
 }

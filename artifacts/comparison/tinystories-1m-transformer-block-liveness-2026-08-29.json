@@ -1,0 +1,8 @@
+{
+  "schema": "tinystories-1m-transformer-block-liveness-v1",
+  "status": "zero_stimulus_liveness_pass",
+  "module_sha256": "80357255c724906e740a85630f4994bc1efcd7cef590e9ea4f3e1adb476fc55d",
+  "testbench_sha256": "479062eef635b2cb247bffcf70eaef4d7458a167dd2f639723331532c75b025f",
+  "simulation": {"result": "LLM2FPGA_TRANSFORMER_SHELL_LIVENESS_PASS", "simulated_time_ps": 629335000},
+  "claims": {"handshake_liveness": true, "functional_equivalence": false, "timing_closed": false, "hardware_inference": false}
+}

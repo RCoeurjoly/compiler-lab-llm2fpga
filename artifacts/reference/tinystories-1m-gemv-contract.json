@@ -1,0 +1,123 @@
+{
+  "claims": {
+    "compiler_adapter": false,
+    "fixed_gemv_semantics_authenticated": true,
+    "hardware_inference": false
+  },
+  "contract": {
+    "accumulation": {
+      "reference_runtime": {
+        "operand_dtype": "signed_int64",
+        "operation": "numpy_matmul",
+        "overflow_policy": "not_authenticated_as_portable_semantics",
+        "reduction_order": "not_guaranteed_by_numpy_api"
+      },
+      "synthesizable_rtl": {
+        "input_order": "ascending_input_index",
+        "logical_width_bits": 64,
+        "operation": "serial_multiply_accumulate",
+        "overflow": "twos_complement_wrap"
+      },
+      "term": "activation_code_i_times_activation_scale_q24_i_times_weight_code_output_i"
+    },
+    "activation_boundaries": {
+      "count": 97,
+      "names_sha256": "008e71f83e0b04f9477a4a94ecdc76b908cbfdb8f1e318977afcf69875b92376",
+      "placement": "module_input_and_module_output_except_lm_head_input_only",
+      "scale_interpretation": "one positive scale per last-dimension channel",
+      "widths": [
+        64,
+        256
+      ]
+    },
+    "activation_conversion": {
+      "clamp": [
+        -128,
+        127
+      ],
+      "dequantization": "signed_int8_code_times_q8.24_scale_then_signed_half_away_shift_by_8",
+      "input": "signed_q16.16_int32",
+      "result": "signed_q16.16_int32",
+      "rounding": "nearest_ties_away_from_zero",
+      "scale": "per-channel_unsigned_q8.24_u24",
+      "zero_point": 0
+    },
+    "execution_domain": "integers_only_after_materialization",
+    "non_finite_behavior": {
+      "explicit_reference_rejection": false,
+      "interpretation": "Observed NumPy casts and the later scale-range failure are environment behavior, not a selected or portable compiler semantic.",
+      "pinned_environment_observation": {
+        "floating_reference_activation_codes": [
+          0,
+          127,
+          -128
+        ],
+        "input_order": [
+          "nan",
+          "positive_infinity",
+          "negative_infinity"
+        ],
+        "numpy_version": "2.3.4",
+        "parameter_q16_16_int32": [
+          -2147483648,
+          2147483647,
+          -2147483648
+        ],
+        "scale_u24": "ValueError: Q8.24 scale does not fit unsigned 24-bit storage",
+        "warning_categories": [
+          "RuntimeWarning"
+        ]
+      },
+      "status": "unauthenticated"
+    },
+    "parameter_materialization": {
+      "byte_order": "little",
+      "rounding": "nearest_ties_to_even",
+      "scale_format": "unsigned_q8.24_u24",
+      "source_scale_format": "little-endian_float32",
+      "value_format": "signed_q16.16_int32"
+    },
+    "role": "synthesizable_datapath_reference",
+    "weight_scale": {
+      "application": "signed_int64_accumulator_times_unsigned_q8.24_scale",
+      "axis": "output_channel",
+      "bias_order": "add_signed_q16.16_bias_after_weight_scale",
+      "rounding": "nearest_ties_away_from_zero_by_signed_shift_32"
+    }
+  },
+  "matrix_shapes": {
+    "hidden_projections": [
+      {
+        "input_width": 64,
+        "name": "q_proj",
+        "output_width": 64
+      },
+      {
+        "input_width": 64,
+        "name": "k_proj",
+        "output_width": 64
+      },
+      {
+        "input_width": 64,
+        "name": "v_proj",
+        "output_width": 64
+      },
+      {
+        "input_width": 64,
+        "name": "out_proj",
+        "output_width": 64
+      }
+    ],
+    "mlp_in": {
+      "input_width": 64,
+      "output_width": 256
+    },
+    "mlp_out": {
+      "input_width": 256,
+      "output_width": 64
+    }
+  },
+  "reference_rtl": "fpga/rtl/gptneo_resident_gemv.sv",
+  "schema": "tinystories-1m-gemv-contract-v1",
+  "source_receipt_sha256": "a274d61ec5f634fac8fb501339ddfe7ae4bf774d950840498d54c32b90d79e77"
+}

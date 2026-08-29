@@ -1,0 +1,16 @@
+{
+  "schema": "tinystories-1m-full-softmax-external-abi-v1",
+  "status": "verified_in_both_plugin_abis",
+  "bridge_mlir_sha256": "a962666e943de0b60c0b593ea764c4d991071c4ef0df500bfc1638a8888573d8",
+  "lowered_mlir": "/tmp/bridge-full-call.mlir",
+  "lowering_pass": "llm2fpga-lower-attention-softmax-fixed",
+  "circt_plugin_lowering": "verified with llm2fpgaCirctPasses and circt-opt",
+  "call": "@llm2fpga_attention_softmax_fixed(tensor<16x32xi32>, i32) -> tensor<16x32xi32>",
+  "rtl_adapter": "rtl/llm2fpga_attention_softmax_fixed_tensor.sv",
+  "rtl_adapter_present": true,
+  "contract_attributes_preserved": true,
+  "limitations": [
+    "This validates the full softmax boundary and ABI only.",
+    "The enclosing transformer block and backend execution remain incomplete."
+  ]
+}

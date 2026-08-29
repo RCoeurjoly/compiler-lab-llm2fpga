@@ -1,0 +1,12 @@
+{
+  "schema": "tinystories-1m-softmax-packed-abi-probe-v1",
+  "status": "backend_probe_reached_calyx_then_failed",
+  "logical_abi": "tensor<16x32xi32> -> tensor<16x32xi32>",
+  "packed_abi": "i16384 -> i16384",
+  "transformer": "strict standalone bridge renderer replacement",
+  "result": "Calyx accepted integer width past the prior tensor-type assertion, then aborted while lowering the empty external function declaration",
+  "interpretation": "Packed integer ports are compatible with the Calyx type domain, but the external declaration must be represented with a backend-supported instance/primitive rather than an empty func.func body.",
+  "functional_claim": false,
+  "hardware_claim": false,
+  "next_step": "emit a Calyx external primitive instance with explicit packed ports and clock/reset protocol"
+}

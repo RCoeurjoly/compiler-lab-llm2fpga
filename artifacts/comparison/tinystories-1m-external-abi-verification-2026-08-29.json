@@ -1,0 +1,25 @@
+{
+  "schema": "tinystories-1m-external-abi-verification-v1",
+  "status": "pass",
+  "checks": {
+    "softmax_call_present": true,
+    "softmax_signature_present": true,
+    "layernorm_call_present": true,
+    "layernorm_signature_present": true,
+    "softmax_adapter_present": true,
+    "layernorm_adapter_present": true
+  },
+  "mlir": {
+    "softmax_sha256": "e5b4f62067a1b95d0cf6ac62655b8a0af50acbe38532ab760ff02bc7eaba3ddf",
+    "layernorm_sha256": "8c503a7b5134a7a939ce6bdcbb17a1aaa6271c168751ad42d488904a0de55b88"
+  },
+  "rtl": {
+    "softmax_sha256": "48b38d390b8d36ac94f3784fad465838bfd468daacaa54f18024f3fab8f40290",
+    "layernorm_sha256": "77693aad03fb9eeb49e8809b60e50010dee9b0166f2f9073740f5527dbef59cd"
+  },
+  "claims": {
+    "call_signatures_match_packed_adapters": true,
+    "full_block_equivalence": false,
+    "hardware_inference": false
+  }
+}

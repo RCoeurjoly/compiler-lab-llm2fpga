@@ -1,0 +1,11 @@
+{
+  "schema": "tinystories-1m-mlp-composition-equivalence-v1",
+  "status": "real_vector_simulation_pass",
+  "module": {"path": "rtl/llm2fpga_mlp_block_tensor.sv", "sha256": "869dce35e90a212b8355740939d79c98e659aaf51bc6872b4d16f0013360ab2c"},
+  "generator": {"path": "scripts/comparison/generate_mlp_composition_tb.py", "sha256": "7a277c97c24fd08a106a89178aa88a4cc073d68d11078b45b1423101a44c93eb"},
+  "reference": "artifacts/reference/tinystories-1m-candidate-oracle.json",
+  "path": ["block.ln_2.output", "block.mlp.fc_in", "block.mlp.activation", "block.mlp.fc_out", "block.output"],
+  "testbench_sha256": "f34bfa6d61d7212a1a7ee99eb8b616f70a2adb546963527b8de3711ce64654ca",
+  "simulation": {"result": "LLM2FPGA_MLP_COMPOSITION_PASS", "outputs": 64, "simulated_time_ps": 343825000},
+  "claims": {"mlp_residual_functional_equivalence": true, "complete_attention_block_equivalence": false, "timing_closed": false, "hardware_inference": false}
+}

@@ -1,0 +1,21 @@
+{
+  "schema": "tinystories-1m-ypcb-bram-shell-contract-v1",
+  "status": "interface_only",
+  "top_module": "tinystories_1m_ypcb_bram_top",
+  "clock": "SYS_CLK",
+  "reset": {"port": "SYS_RSTN", "active": "low"},
+  "storage": {"weights": "fpga_bram", "activations": "fpga_bram", "external_memory": false},
+  "transport": {"included": false, "note": "bind the proven kev-gpt shell/controller separately"},
+  "core_module": "llm2fpga_tinystories_1m_core",
+  "core_handshake": {
+    "inputs": ["clk", "rst", "clear", "prompt_valid", "prompt_token", "start", "requested_tokens", "token_ready"],
+    "outputs": ["prompt_ready", "token_valid", "token_id", "busy", "error", "error_code", "debug_status", "debug_embedding", "debug_layernorm"]
+  },
+  "reference_tops": [
+    "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/rtl/tinystories_selftest_top.sv",
+    "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/rtl/tinystories_interactive_top.sv"
+  ],
+  "functional_inference": false,
+  "timing_closed": false,
+  "hardware_verified": false
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "tinystories-1m-layernorm-cellshare-audit-v1",
+  "input_futil": {
+    "path": "/tmp/lnexec/model.futil",
+    "sha256": "71e08610f53ca5756ef8de0ff44727cbcd0452cc9d3d9c9e213d1021e74d5794"
+  },
+  "candidate_futil": {
+    "path": "/tmp/lnexec/model_cellshare.futil",
+    "sha256": "48e76ea2fc70019518fe39289b959155b4e151184e4f6f705ae35859b2971fd2"
+  },
+  "pass": "cell-share",
+  "signed_divider_instance_count": {"before": 65, "after": 65, "delta": 0},
+  "decision": "not_promoted",
+  "scope": {
+    "functional_equivalence": false,
+    "resource_measurement": false,
+    "timing_closure": false,
+    "optimization_claim": false
+  }
+}

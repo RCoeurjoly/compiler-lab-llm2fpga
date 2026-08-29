@@ -1,0 +1,9 @@
+{
+  "schema": "tinystories-1m-softmax-interpreter-execution-v1",
+  "status": "executed_interpreter_only",
+  "model": "TinyStories-1M",
+  "binding": {"path": "artifacts/comparison/tinystories-1m-score-input-binding.json", "source_oracle_sha256": "0fd4b60df44989c4603f508ce6481a279d87336d6cb37cf27a3eda419bf2a7f6"},
+  "output": {"path": "artifacts/comparison/tinystories-1m-bound-softmax-interpreter.json", "sha256": "43eea17a4a97ef92f1cc73187a2cfd339cd344f190c498715f32313ad04111e4", "checkpoints": 64, "max_absolute_error": 4.1698494657183005e-08},
+  "scope": "float softmax interpreter over authenticated score inputs; not lowered RTL or hardware equivalence",
+  "claims": {"interpreter_executed": true, "compiler_rtl_equivalence": false, "hardware_equivalence": false}
+}

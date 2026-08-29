@@ -1,0 +1,30 @@
+{
+  "schema": "tinystories-1m-layernorm-yosys-techmap-loop-v1",
+  "source_sha256": "ebd7a3827c2dee5cb5698ab76db8c43c86bfcbd473adee914f45485407a7be2a",
+  "tool": "yosys 0.66",
+  "stage": "techmap",
+  "status": "stopped_on_combinational_loop_diagnostics",
+  "first_loop_signals": [
+    "std_signext_63_in",
+    "std_add_251_right",
+    "std_slice_127_out",
+    "std_add_251_out"
+  ],
+  "cell_kinds": {
+    "std_signext_63": "combinational",
+    "std_add_251": "combinational",
+    "std_slice_127": "combinational"
+  },
+  "guarded_assignments": {
+    "std_slice_127_in": ["_guard127:std_add_251_out", "_guard382:divsi_64_reg_out"],
+    "std_add_251_right": ["_guard1038:std_signext_63_out", "_guard1165:constant_1"],
+    "std_signext_63_in": ["_guard92257:std_slice_127_out", "_guard92264:load_39_reg_out", "..."]
+  },
+  "interpretation": "The flattened guard-controlled schedule contains a temporal-reuse feedback cycle that Yosys cannot break during techmap; this is a synthesis-path blocker requiring stage-boundary analysis.",
+  "scope": {
+    "rtl_fix_applied": false,
+    "timing_closure": false,
+    "functional_equivalence": false,
+    "hardware_inference": false
+  }
+}

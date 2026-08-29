@@ -1,0 +1,25 @@
+{
+  "schema": "tinystories-1m-layernorm-yosys-check-v1",
+  "source_sha256": "fe4b846705ff1bdb7b026b341894059af5570c88db017eb4f15d6a8f95121d8f",
+  "log_sha256": "916e2ef345bbd310585271454e6eabc7e3c9c3912e7f4091f77cfaf68bf4cdc7",
+  "tool": "yosys 0.66",
+  "command": "read_verilog -sv -defer; hierarchy -top main_1; proc; opt; check -assert",
+  "status": "failed_structural_check",
+  "problems": 96,
+  "findings": {
+    "undriven_external_memory_write_data_bits": true,
+    "undriven_ports": [
+      "arg_mem_0_write_data[31:0]",
+      "arg_mem_1_write_data[31:0]",
+      "arg_mem_2_write_data[31:0]"
+    ],
+    "combinational_loop_reported": false
+  },
+  "interpretation": "Procedure lowering and optimization complete, but the direct main_1 diagnostic boundary leaves external-memory write-data bits undriven. The earlier techmap loop is not reported by this pre-techmap check; it is introduced or exposed during techmap.",
+  "scope": {
+    "rtl_fix_applied": false,
+    "timing_closure": false,
+    "functional_equivalence": false,
+    "hardware_inference": false
+  }
+}

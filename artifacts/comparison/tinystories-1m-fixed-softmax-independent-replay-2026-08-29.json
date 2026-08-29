@@ -1,0 +1,18 @@
+{
+  "claims": {
+    "compiler_equivalence": false,
+    "fixed_softmax_contract_replayed": true,
+    "hardware_inference": false
+  },
+  "contract": {
+    "heads": 16,
+    "lut_entries": 4096,
+    "lut_rounding": "nearest",
+    "probability_rounding": "floor"
+  },
+  "mismatches": [],
+  "reference_sha256": "bc69971007ec5b2b4eb855b9f362a3535d93d749f99f98ea792143cb7922f5b9",
+  "rows_checked": 16,
+  "schema": "tinystories-1m-fixed-softmax-independent-replay-v1",
+  "status": "pass"
+}

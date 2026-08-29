@@ -1,0 +1,59 @@
+{
+  "schema": "tinystories-1m-layernorm-calyx-backend-variant-v1",
+  "input_futil_sha256": "71e08610f53ca5756ef8de0ff44727cbcd0452cc9d3d9c9e213d1021e74d5794",
+  "variant": {
+    "command": "calyx model.futil -b verilog --synthesis --nested -d papercut",
+    "verilog_sha256": "e13a8b49af93a7e77c5f0d3b4cffa9eea6f4280340601e79cf93711c43ad9732",
+    "verilog_lines": 26500,
+    "yosys_techmap_status": "completed_but_structural_check_failed",
+    "yosys_techmap_log_sha256": "d042f74ae1e9161b0f3283a47a8fcb9bb89a6e5f1f4191c8829e470f8a53b243",
+    "yosys_post_techmap_cells": 927672,
+    "yosys_post_techmap_log_sha256": "f60b0f30374eae53a7f4637a19f2c3538fc59820beaa6d490219085fbd2a6c84",
+    "yosys_abc_status": "timed_out_while_breaking_feedback_loops",
+    "yosys_abc_log_sha256": "a597e3f0fe62e4ed45e4de7ba2b294d586d519a9d317faf715253bd8e27441b8",
+    "yosys_abc_interpretation": "Techmap completion does not establish an acyclic implementation; ABC still reports sign-extension feedback involving std_signext_63 and std_add_251.",
+    "yosys_post_techmap_check_status": "failed_structural_check",
+    "yosys_post_techmap_check_problems": 128,
+    "yosys_post_techmap_check_log_sha256": "291d9f33c9175a828769329a86244c94f710757e5dc0f4bc927c59e24ddcf605"
+  },
+  "flag_isolation": {
+    "nested_without_synthesis": {
+      "verilog_sha256": "fc375db708f6bc84c5d4e40a0f8b0a623452391985d9e1af62428c2d64eafce7",
+      "verilog_lines": 26948,
+      "yosys_status": "parser_failed_at_generated_string_plusargs"
+    },
+    "conclusion": "The synthesis flag is required for a Yosys-consumable output in this experiment; nested emission alone is insufficient."
+  },
+  "baseline": {
+    "verilog_sha256": "ebd7a3827c2dee5cb5698ab76db8c43c86bfcbd473adee914f45485407a7be2a",
+    "verilog_lines": 171446,
+    "yosys_techmap_status": "stopped_on_combinational_loop_diagnostics",
+    "yosys_proc_opt_cells": 7654,
+    "yosys_proc_opt_wires": 150512,
+    "yosys_proc_opt_submodules": 2035
+  },
+  "fair_structural_comparison": {
+    "variant_yosys_proc_opt_cells": 7654,
+    "variant_yosys_proc_opt_wires": 12233,
+    "variant_yosys_proc_opt_submodules": 2035,
+    "variant_log_sha256": "1205e261fa053e3b0a48b2aba0d261fd6d3e2351f4ec412f6e60f6dd6db06a3c",
+    "baseline_log_sha256": "b63a1f4ad93f6fc2ed8bfb02b50e3729683c1c57621be264230af454470d14e7",
+    "interpretation": "The backend flags preserve the cell/submodule schedule while reducing generated wiring; the first demonstrated synthesis-path improvement is techmap completion, not yet FPGA resource reduction."
+  },
+  "functional_probe": {
+    "testbench_sha256": "0d6f62e40c89bab5c3c347ff324a8686c0765d984afc1d10de5d159e151d04b9",
+    "trace_sha256": "88faa99527d0a1d0d4ad60740dec42268914e707f881fc5a46579d6ddcd683a6",
+    "done_seen": true,
+    "cycles": 5829,
+    "output_writes": 64,
+    "output_mismatches": 0
+  },
+  "status": "promising_backend_configuration_candidate",
+  "interpretation": "The repository-style synthesis/nested Calyx backend output preserves the authenticated direct LayerNorm vector and reaches Yosys techmap without the baseline loop. This is a candidate compiler/backend optimization, not yet a complete TinyStories block comparison or timing-closed FPGA result.",
+  "scope": {
+    "full_transformer_equivalence": false,
+    "timing_closure": false,
+    "hardware_inference": false,
+    "pcie_or_ddr3_changed": false
+  }
+}

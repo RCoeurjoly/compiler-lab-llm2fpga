@@ -22,6 +22,20 @@ software checkpoints are hash-validated as the authenticated profile trace;
 the reference implementation was not rerun as part of this compiler probe.
 Board authentication remains unresolved.
 
+## Backend execution follow-up (2026-08-29)
+
+The authenticated flat-SCF backend was exported with the pinned
+`circt-translate --export-calyx`, emitted by native Calyx, and run through the
+existing four-memory Icarus harness.  `main_1` completed in 5,829 cycles,
+issued 256 ordered memory transactions, wrote all 64 outputs, and matched the
+authenticated result with zero mismatches.  The executable evidence is bound
+to the Futil/SV/vector hashes in
+[`tinystories-1m-fixed-layernorm-backend-execution-2026-08-29.json`](../../artifacts/comparison/tinystories-1m-fixed-layernorm-backend-execution-2026-08-29.json).
+
+This closes execution for the LayerNorm compiler slice only.  It does not
+establish complete transformer-block equivalence, FPGA timing closure, or
+TinyStories hardware inference.
+
 ## Evidence
 
 - authenticated exported program SHA-256:

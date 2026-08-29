@@ -1,0 +1,38 @@
+{
+  "schema": "tinystories-1m-layernorm-structural-proxy-v1",
+  "source": {
+    "path": "/tmp/lnexec/main.sv",
+    "sha256": "ebd7a3827c2dee5cb5698ab76db8c43c86bfcbd473adee914f45485407a7be2a",
+    "main1_lines": 169843,
+    "main1_chars": 6652064,
+    "logic_declarations": 5737
+  },
+  "primitive_instance_counts": {
+    "std_add": 254,
+    "std_ge": 32,
+    "std_lsh": 2,
+    "std_lt": 64,
+    "std_mult_pipe": 1,
+    "std_mux": 63,
+    "std_or": 1,
+    "std_pad": 65,
+    "std_reg": 133,
+    "std_rsh": 32,
+    "std_sdiv_pipe": 65,
+    "std_signext": 64,
+    "std_slice": 2,
+    "std_slt": 1,
+    "std_srsh": 1,
+    "std_sub": 32,
+    "std_wire": 1288,
+    "undef": 65
+  },
+  "total_instances": 2165,
+  "scope": {
+    "measurement_kind": "generated-source-structural-proxy",
+    "post_synthesis_resources": false,
+    "timing_closure": false,
+    "functional_equivalence": false,
+    "hardware_inference": false
+  }
+}

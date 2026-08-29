@@ -1,0 +1,38 @@
+{
+  "claims": {
+    "functional_equivalence": false,
+    "hardware_inference": false,
+    "rtl_equivalence": false
+  },
+  "comparison": {
+    "blocking_artifact": {
+      "path": "artifacts/comparison/tinystories-1m-bound-softmax-interpreter.json",
+      "reason": "fixed_rows_missing"
+    },
+    "first_mismatch": null,
+    "first_missing_checkpoint": "compiler_fixed_point_softmax_rows",
+    "matched_rows": 0,
+    "reference_row_count": 16
+  },
+  "reference": {
+    "path": "artifacts/reference/tinystories-1m-fixed-softmax-checkpoints.json",
+    "row_count": 16,
+    "slice": {
+      "block_index": 0,
+      "head_dim": 4,
+      "kind": "one_transformer_block_token_step",
+      "next_token": 11,
+      "num_heads": 16,
+      "prompt_tokens": [
+        7454,
+        2402,
+        257,
+        640
+      ],
+      "sequence_length": 4,
+      "token_index": 3
+    }
+  },
+  "schema": "tinystories-1m-kev-gpt-fixed-conversion-trace-v1",
+  "status": "fail_closed"
+}

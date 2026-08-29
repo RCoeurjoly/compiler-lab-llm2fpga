@@ -1,0 +1,30 @@
+{
+  "schema": "tinystories-1m-layernorm-yosys-stat-v1",
+  "source": {
+    "path": "/tmp/lnexec/main.sv",
+    "sha256": "ebd7a3827c2dee5cb5698ab76db8c43c86bfcbd473adee914f45485407a7be2"
+  },
+  "top": "main_1",
+  "tool": "yosys 0.66",
+  "mode": "read_verilog -sv -defer; hierarchy -top main_1; stat",
+  "runtime": {"seconds": 158.65, "peak_memory_mib": 1234.43},
+  "statistics": {
+    "wires": 231137,
+    "wire_bits": 1147135,
+    "public_wires": 149681,
+    "public_wire_bits": 249178,
+    "ports": 28,
+    "port_bits": 296,
+    "processes": 143,
+    "cells": 81456,
+    "submodules": 2165,
+    "signed_divider_submodules": 65,
+    "register_submodules": 133,
+    "wire_submodules": 1288
+  },
+  "scope": {
+    "post_synthesis_resource_count": false,
+    "timing_closure": false,
+    "functional_equivalence": false
+  }
+}

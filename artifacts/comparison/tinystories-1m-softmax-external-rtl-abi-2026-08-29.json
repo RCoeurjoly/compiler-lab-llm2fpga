@@ -1,0 +1,25 @@
+{
+  "schema": "tinystories-1m-softmax-external-rtl-abi-v1",
+  "status": "interface_mismatch_requires_dedicated_softmax_component",
+  "reference_rtl": {
+    "path": "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/rtl/gptneo_attention.sv",
+    "sha256": "b42c1ed824198e49b685d827a49036bfb41ce6218e6a391a69208fbf48ef1ba9",
+    "module": "gptneo_attention"
+  },
+  "parameters": {"D": 64, "NHEAD": 16, "HEAD_DIM": 4, "TMAX": 32},
+  "stream_abi": {
+    "input": "start/position then 64 cycles of in_valid,in_q,in_k,in_v; in_ready backpressure",
+    "output": "out_valid,out_ready,out_index,out_context; 64 context words",
+    "reset": "rst or cache_reset",
+    "clock": "clk"
+  },
+  "compiler_boundary": {
+    "mlir_call": "llm2fpga_attention_softmax_fixed",
+    "logical_inputs": "tensor<16x32xi32>, i32",
+    "required_adapter": "not semantically valid: compiler op carries scores/probabilities, while gptneo_attention consumes Q/K/V and computes scores internally",
+    "required_resolution": "add a dedicated softmax-only RTL component with score/probability ABI, or redesign the compiler op to represent full Q/K/V attention"
+  },
+  "wrapper": {"path": "rtl/llm2fpga_attention_softmax_fixed.sv", "sha256": "aaaffee96e378ae552863c293dea38a44135413ced3b2c60bfbeea6616e892a2", "module": "llm2fpga_attention_softmax_fixed", "compile_exit_code": 0},
+  "simulation": {"testbench_sha256": "9a69d67bede4aa18315a0b60774b7e647d3cb5090461361c3d9e2ff251b0ff2b", "rows": 16, "result": "GPTNEO_SOFTMAX_ONLY_16_ROWS_PASS"},
+  "claims": {"rtl_contract_authenticated": true, "abi_adapter_implemented": false, "direct_adapter_valid": false, "named_external_wrapper_compiles": true, "named_external_wrapper_16_row_match": true, "linked_compiler_rtl": false, "hardware_inference": false}
+}

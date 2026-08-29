@@ -1,0 +1,28 @@
+{
+  "schema": "tinystories-1m-fresh-materialization-v1",
+  "status": "materialized_but_slice_boundary_unavailable",
+  "model": "TinyStories-1M",
+  "contract": {
+    "path": "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+    "sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
+    "source_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf"
+  },
+  "materialization": {
+    "flake_attribute": "tiny-stories-1m-baseline-float-sv",
+    "command": "nix build .#tiny-stories-1m-baseline-float-sv -L",
+    "output": "/nix/store/zgvl2l7b1xcmcljjrbymx8cx6whbglj8-tiny-stories-1m-baseline-float-sv",
+    "source": "/nix/store/zgvl2l7b1xcmcljjrbymx8cx6whbglj8-tiny-stories-1m-baseline-float-sv/sv/main.sv",
+    "bytes": 310344726,
+    "sha256": "04b090f78c358757dfca4b56f2d45ee1d05281a8ed9d803ee267ac3000fe9d06",
+    "result": "success"
+  },
+  "extraction": {
+    "command": "nix develop -c python scripts/comparison/extract_tinystories_1m_block_slice.py --input /nix/store/zgvl2l7b1xcmcljjrbymx8cx6whbglj8-tiny-stories-1m-baseline-float-sv/sv/main.sv --metadata artifacts/comparison/tinystories-1m-baseline-float-sv-metadata.json --contract artifacts/reference/tinystories-1m-kev-gpt-contract.json --slice-dir <temporary>/closure --out <temporary>/manifest.json",
+    "result": "failed_closed",
+    "exit_code": 2,
+    "failure_code": "boundary_not_found",
+    "failure_reason": "expected exactly one block/token-step anchor, found none",
+    "slice_artifact_emitted": false
+  },
+  "interpretation": "The current-contract compiler pipeline does produce a fresh full SV artifact, byte-identical to the previously observed FP32 artifact, but the generated bundle contains no authenticated one-transformer-block token-step boundary. No comparison slice is claimed."
+}

@@ -1,0 +1,50 @@
+<h2>LLM2FPGA completion architecture</h2>
+<p class="subtitle">A TinyStories-family accelerator flow evolved from the attributed kev-gpt fork</p>
+
+<div class="mockup">
+  <div class="mockup-header">Build-time flow — one reproducible bitstream per model and memory mode</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr auto 1.15fr auto 1.15fr auto 1fr;gap:10px;align-items:center;text-align:center">
+      <div style="padding:18px 10px;border:2px solid #4263eb;border-radius:10px"><strong>Published TinyStories checkpoint</strong><br><small>1M · 3M · 8M · 28M · 33M</small></div>
+      <div style="font-size:25px">→</div>
+      <div style="padding:18px 10px;border:2px solid #0c8599;border-radius:10px"><strong>Model package builder</strong><br><small>W8A8 tensors, tokenizer, dimensions, oracle</small></div>
+      <div style="font-size:25px">→</div>
+      <div style="padding:18px 10px;border:2px solid #7048e8;border-radius:10px"><strong>Accelerator generator</strong><br><small>kev-gpt-derived, parameterized RTL + manifests</small></div>
+      <div style="font-size:25px">→</div>
+      <div style="padding:18px 10px;border:2px solid #2f9e44;border-radius:10px"><strong>OSS FPGA build</strong><br><small>Nix · Yosys · nextpnr-xilinx · bitstream</small></div>
+    </div>
+  </div>
+</div>
+
+<div class="split" style="margin-top:22px">
+  <div class="mockup">
+    <div class="mockup-header">On-chip deployment (required for 1M)</div>
+    <div class="mockup-body" style="text-align:center">
+      <div style="padding:14px;border:2px solid #2f9e44;border-radius:10px"><strong>FPGA accelerator</strong><br><small>weights + activations + KV/scratch in BRAM/URAM</small></div>
+      <div style="margin:10px">↕ PCIe commands and tokens</div>
+      <div style="padding:10px;border:1px solid #868e96;border-radius:8px">Host CLI</div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">DDR3-backed deployment (required for all five)</div>
+    <div class="mockup-body" style="text-align:center">
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px">
+        <div style="padding:14px;border:2px solid #2f9e44;border-radius:10px"><strong>FPGA accelerator</strong><br><small>compute + bounded local buffers</small></div>
+        <div style="font-size:22px">↔</div>
+        <div style="padding:14px;border:2px solid #e8590c;border-radius:10px"><strong>DDR3 service</strong><br><small>weights; KV/state when required</small></div>
+      </div>
+      <div style="margin:10px">↕ PCIe package load, commands, and tokens</div>
+      <div style="padding:10px;border:1px solid #868e96;border-radius:8px">Host CLI</div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:22px">
+  <span class="label">Boundary decisions</span>
+  <ul>
+    <li>The generic MLIR/CIRCT pipeline is preserved as evidence, not used on the completion path.</li>
+    <li>The fork owns upstream-derived accelerator RTL; LLM2FPGA owns packaging, generation, integration, evaluation, and reproducible builds.</li>
+    <li>The accelerator—not the host—executes the complete 16-token autoregressive loop.</li>
+    <li>JTAG is diagnostic only; accepted demonstrations use PCIe.</li>
+  </ul>
+</div>

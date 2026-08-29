@@ -1,0 +1,20 @@
+{
+  "attention_exp_site_count": 0,
+  "claims": {
+    "all_heads_covered": false,
+    "attention_softmax_present": false,
+    "head_count_equals_exp_site_count": false
+  },
+  "exp_site_count": 8,
+  "graph": {
+    "bytes": 30243346,
+    "path": "/nix/store/g0wrh3vdr28446kxwwfy07npibm46mxa-tiny-stories-1m-baseline-float-calyx/flat.scf.mlir",
+    "sha256": "eeeb9ea3a735706be4cdfbd4a5fa4a5899f367782a41ed017f3dd8bb8e4e2c76"
+  },
+  "head_count": 16,
+  "interpretation": "one executable softmax site per layer; each site iterates all heads",
+  "layer_count": 8,
+  "layernorm_exp_site_count": 8,
+  "sites": [],
+  "status": "fail"
+}

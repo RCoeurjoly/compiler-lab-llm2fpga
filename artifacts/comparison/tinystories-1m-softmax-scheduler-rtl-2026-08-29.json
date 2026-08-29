@@ -1,0 +1,9 @@
+{
+  "schema": "tinystories-1m-softmax-scheduler-rtl-v1",
+  "status": "sixteen_row_simulation_pass",
+  "rtl": {"path": "rtl/llm2fpga_attention_softmax_scheduler.sv", "sha256": "b62d27ba2498d83ebf48aa51c16844393d3093300c7769ffb7abeade022b0e7a"},
+  "mapping": {"input": "packed tensor<16x32xi32>", "row_order": "head-major", "serialization": "one row core, keys 0..position", "output": "packed tensor<16x32xQ1.20>"},
+  "compile": {"tool": "iverilog", "exit_code": 0},
+  "simulation": {"rows": 16, "testbench_sha256": "86285b6ffa54f4381bbed9ddaa08fe23031654cfcf2414929da191506cb8a992", "result": "GPTNEO_SOFTMAX_SCHEDULER_16_ROWS_PASS"},
+  "claims": {"scheduler_compiles": true, "scheduler_simulation": true, "compiler_equivalence": false, "hardware_inference": false}
+}

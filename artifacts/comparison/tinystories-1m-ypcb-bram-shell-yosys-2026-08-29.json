@@ -1,0 +1,13 @@
+{
+  "schema": "tinystories-1m-ypcb-bram-shell-yosys-v1",
+  "status": "structural_only",
+  "top": "tinystories_1m_ypcb_bram_top",
+  "rtl_inputs": {
+    "shell_sha256": "48bd29718e1d164076acd11ff59a70445ac1a7cd666eec1fb9229fc14def5b42",
+    "core_contract_sha256": "938bc93de1749322119f19a8628bef6026166e414f0d47d88c50804d9edf576f"
+  },
+  "yosys": {"version": "0.66", "check_errors": 0, "cells": {"$logic_not": 1, "llm2fpga_tinystories_1m_core": 1}, "wires": 19, "wire_bits": 315},
+  "functional_inference": false,
+  "timing_closed": false,
+  "hardware_verified": false
+}

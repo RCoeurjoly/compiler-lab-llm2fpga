@@ -2649,6 +2649,19 @@ PY
           model-registry = modelRegistryJson;
           default = modelRegistryJson;
         } // pipelineStagePackages // pipelineMetadataPackages // {
+          # Keep the no-handshake stages addressable without colliding with
+          # the regular Handshake pipeline packages.  These names are used by
+          # the reference-guided native-Calyx comparison and must not silently
+          # resolve to the regular pipeline's intentionally-unavailable Calyx
+          # stage.
+          "tiny-stories-1m-baseline-float-no-handshake-calyx" =
+            pipelineStagePackagesNoHandshake."tiny-stories-1m-baseline-float-calyx";
+          "tiny-stories-1m-baseline-float-no-handshake-calyx-native-sv" =
+            pipelineStagePackagesNoHandshake."tiny-stories-1m-baseline-float-calyx-native-sv";
+          "tiny-stories-1m-baseline-float-no-handshake-calyx-hw-sv" =
+            pipelineStagePackagesNoHandshake."tiny-stories-1m-baseline-float-calyx-hw-sv";
+          "tiny-stories-1m-baseline-float-no-handshake-calyx-sv" =
+            pipelineStagePackagesNoHandshake."tiny-stories-1m-baseline-float-calyx-sv";
           "tinystories-1m-authenticated-package-lowering" =
             authenticatedPackageLowering;
           "tinystories-1m-package-aware-export" = packageAwareExport;

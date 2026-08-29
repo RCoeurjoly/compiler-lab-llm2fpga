@@ -1,0 +1,10 @@
+{
+  "schema": "tinystories-1m-attention-resource-baseline-v1",
+  "status": "yosys_stat_pass",
+  "tool": "yosys 0.68+post",
+  "modules": {
+    "llm2fpga_attention_scores_tensor": {"cells": 66, "wire_bits": 215658, "mul_cells": 1},
+    "llm2fpga_attention_context_tensor": {"cells": 69, "wire_bits": 95323, "mul_cells": 1}
+  },
+  "claims": {"resource_baseline": true, "timing_closed": false, "fpga_placed": false, "hardware_inference": false}
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "tinystories-1m-softmax-circt-backend-probe-v1",
+  "status": "rejected_unregistered_operation",
+  "input": "artifacts/comparison/tinystories-1m-softmax-bridge-regenerated-2026-08-29.mlir",
+  "command": "nix develop -c circt-opt <input>",
+  "exit_code": 1,
+  "first_diagnostic": "operation being parsed with an unregistered dialect: llm2fpga.attention_softmax_fixed",
+  "meaning": "The bridge artifact is valid inspectable MLIR, but no registered CIRCT/backend dialect or legalization pass consumes the custom operation.",
+  "required_next_step": "Add a loadable plugin legalization that lowers llm2fpga.attention_softmax_fixed to backend-supported integer/memory operations or a verified external RTL component.",
+  "claims": {"backend_legalization": false, "compiler_equivalence": false, "hardware_inference": false}
+}

@@ -1,0 +1,25 @@
+{
+  "schema": "tinystories-1m-layernorm-guard-exclusivity-v1",
+  "source_sha256": "67c5a52aae61d847aaee8ac94af0f628b3c3747526f2d1abaa8dbf0784e92063",
+  "testbench_sha256": "d42d56bdb153de216748f926d2cceeca87818c0d5428d14a0409786748d87e2b",
+  "execution": {
+    "done_seen": true,
+    "cycles": 5829,
+    "output_writes": 64,
+    "output_mismatches": 0,
+    "simultaneous_loop_guard_cycles": 0,
+    "seeds": [0, 1, 2, 3, 4],
+    "each_seed_output_mismatches": 0,
+    "each_seed_cycles": 5829
+  },
+  "guards": ["std_slice_127_in→std_add_251_out", "std_add_251_right→std_signext_63_out", "std_signext_63_in→std_slice_127_out"],
+  "status": "runtime_exclusive_structural_loop_false_positive_candidate",
+  "interpretation": "Across five deterministic balanced ±1 inputs, the three mux conditions forming the reported combinational cycle never overlap and every output matches. This strengthens the missing temporal-exclusivity hypothesis, but does not prove exclusivity for all legal inputs or schedules.",
+  "scope": {
+    "production_rtl_changed": false,
+    "compiler_optimization": false,
+    "full_transformer_equivalence": false,
+    "timing_closure": false,
+    "hardware_inference": false
+  }
+}

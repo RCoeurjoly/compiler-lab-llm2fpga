@@ -1,0 +1,12 @@
+{
+  "schema": "tinystories-1m-gemv-qkv-projection-equivalence-v1",
+  "status": "simulation_pass",
+  "adapter": {"path": "rtl/llm2fpga_gemv_w8a8_tensor.sv", "sha256": "5f86c3170fd932de9e5c697b7811d25611325a16b0335bdb0cc07e520627c873"},
+  "model": "TinyStories-1M",
+  "input_checkpoint": "block.ln_1.output",
+  "projections": [{"name": "q", "weight": "blocks.0.attn.q.weight", "output_checkpoint": "block.attention.q"}, {"name": "k", "weight": "blocks.0.attn.k.weight", "output_checkpoint": "block.attention.k"}, {"name": "v", "weight": "blocks.0.attn.v.weight", "output_checkpoint": "block.attention.v"}],
+  "oracle_sha256": "2efd1f02b2500297442c5fc5f34e7ba33224472b2aefef6632a400e3cd7d8ecd",
+  "testbench_sha256": "c3f4e14d2e1adb2709e4a341621591997ac6565e024e644564c1d2987865a6b8",
+  "simulation": {"result": "LLM2FPGA_GEMV_QKV_PROJECTIONS_PASS", "outputs_per_projection": 64, "simulated_time_ps": 124905000},
+  "claims": {"real_model_qkv_equivalence": true, "full_block_equivalence": false, "timing_closed": false, "hardware_inference": false}
+}

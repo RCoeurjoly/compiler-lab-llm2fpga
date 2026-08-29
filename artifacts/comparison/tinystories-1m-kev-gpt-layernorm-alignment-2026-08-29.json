@@ -1,0 +1,43 @@
+{
+  "schema": "tinystories-1m-kev-gpt-layernorm-alignment-v1",
+  "status": "reference_rtl_verified_compiler_slice_aligned",
+  "model": "TinyStories-1M",
+  "slice": {"kind": "one_transformer_block_token_step", "block_index": 0, "token_index": 3, "operator": "block.ln_1"},
+  "reference": {
+    "rtl": {"path": "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/rtl/gptneo_layernorm.sv", "sha256": "354104a1d2b57552bdca54f291764d90d6b9f7d6f8a2ecc2cb0d95a396430e1b"},
+    "divider_rtl": {"path": "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/rtl/gptneo_iterative_divider.sv", "sha256": "8665cc99e7bf98e0415775a36c78aa4ff242d30c976dce0719e6d465686a1540"},
+    "testbench": {"path": "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/tb/tb_gptneo_layernorm.sv", "sha256": "37954651819bd5d3355e7a6138801b1d2fe7d26fdfe167854ad2308ffe1f6ea8"},
+    "command": "nix shell nixpkgs#iverilog -c iverilog -g2012 -s tb_gptneo_layernorm -o /tmp/kev-ln.out gptneo_layernorm.sv gptneo_iterative_divider.sv tb_gptneo_layernorm.sv",
+    "result": "GPTNEO_LAYERNORM_PASS"
+  },
+  "semantic_alignment": {
+    "width": 64,
+    "input_gamma_beta_format": "signed Q16.16 i32",
+    "epsilon_q32": 42950,
+    "population_variance": true,
+    "mean_reduction": "ascending serial sum, signed i64, divide by 64",
+    "variance_reduction": "ascending serial square sum, divide by 64",
+    "sqrt": "integer restoring floor square root",
+    "normalization": "signed truncation toward zero of (delta << 16) / deviation",
+    "affine": "(normalized * gamma) >>> 16 + beta, i32 wrap"
+  },
+  "compiler_slice": {
+    "calyx_mlir_sha256": "0f2d1097b59f45d6de948eac5e888900bb9eded2fd0697b8416c918e9bb74d53",
+    "systemverilog_sha256": "e13a8b49af93a7e77c5f0d3b4cffa9eea6f4280340601e79cf93711c43ad9732",
+    "execution_receipt": "artifacts/comparison/tinystories-1m-fixed-layernorm-backend-execution-2026-08-29.json",
+    "result_sha256": "4ddab4aecb186dce77618426b3cf008e7d7ea085f637f26e81747ced27a5c465",
+    "cycles": 5829,
+    "mismatches": 0
+  },
+  "claims": {
+    "reference_primitive_simulation": true,
+    "compiler_slice_exact_vector_match": true,
+    "complete_transformer_block_equivalence": false,
+    "full_model_inference": false
+  },
+  "provenance": {
+    "reference_role": "behavioral_and_RTL_comparison_only",
+    "reference_rtl_copied": false,
+    "llm_assistance_disclosure_required": true
+  }
+}

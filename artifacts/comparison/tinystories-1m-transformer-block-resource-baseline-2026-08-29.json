@@ -1,0 +1,9 @@
+{
+  "schema": "tinystories-1m-transformer-block-resource-baseline-v1",
+  "status": "yosys_stat_pass",
+  "tool": {"name": "yosys", "version": "0.68+post", "elapsed_seconds": 117.75, "peak_memory_mb": 2160.52},
+  "top": "llm2fpga_transformer_block_tensor",
+  "hierarchy": {"cells_including_submodules": 117087, "wires": 104502, "wire_bits": 4638587, "public_wire_bits": 2204420, "ports": 326, "port_bits": 2104439, "memories": 0},
+  "cell_summary": {"mul": 46, "div": 13, "add": 293, "mux": 96714, "dffe": 13338},
+  "claims": {"resource_baseline": true, "technology_mapped": false, "timing_closed": false, "fpga_placed": false, "hardware_inference": false}
+}

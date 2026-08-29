@@ -1,0 +1,330 @@
+{
+  "alignment_status": "custom_op_emitted_backend_unverified",
+  "board_authenticated": false,
+  "claims": {
+    "functional_equivalence": false,
+    "hardware_inference": false,
+    "reference_source_or_rtl_copied": false,
+    "rtl_equivalence": false,
+    "timing_closure": false
+  },
+  "compiler_artifacts": {
+    "mlir": {
+      "kind": "custom_op_ir",
+      "sha256": "a962666e943de0b60c0b593ea764c4d991071c4ef0df500bfc1638a8888573d8"
+    },
+    "rtlil": null,
+    "systemverilog": null
+  },
+  "custom_op": {
+    "attributes": {
+      "attention_heads_per_layer": 16,
+      "attention_layer_sites": 8,
+      "causal_mask": "prefix_time_index_le_position",
+      "division_rounding": "truncation_toward_zero",
+      "exp_fraction_bits": 20,
+      "exp_lut_entries": 4096,
+      "exp_width": 21,
+      "exp_zero_delta_value": 1048576,
+      "normalization": "unsigned_restoring_magnitude_signed_reapply",
+      "score_fraction_bits": 8,
+      "score_post_shift": 24,
+      "score_width": 32,
+      "sum_width": 64
+    },
+    "evidence": {
+      "contract_sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
+      "diagnostic_sha256": "ef052961445168cc8e05b2522ce3cd05e11cd21235ab876907d6a4c6344a05ca",
+      "model_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf",
+      "package_calibration_ids_sha256": "2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075",
+      "package_manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+      "package_scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+      "package_weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+      "pre_lowering_provenance_manifest_sha256": "c9194fb25bc61c6e7dac336ad58fd9a7031198d490d828ad9cfc22a9b9f14e5c"
+    },
+    "op": "llm2fpga.attention_softmax_fixed",
+    "operand_types": [
+      "tensor<16x32xi32>",
+      "i32"
+    ],
+    "result_types": [
+      "tensor<16x32xi32>"
+    ],
+    "schema": "llm2fpga-tinystories-1m-softmax-op-v1",
+    "sha256": "dafd0229a13da66dad40d4f1d64deef9b29595155439483ea4e4063ea9fdfdeb",
+    "source": {
+      "artifact": "/tmp/task3x-flat/flat.scf.mlir",
+      "binding_mode": "lowered_memref_loop_structure",
+      "exp_site_count": 8,
+      "matched_edges": [
+        "subf_operand_loads",
+        "delta_store_load_same_index",
+        "exp",
+        "exp_store_load_same_index",
+        "sum_reduction",
+        "normalization_division",
+        "causal_cmpi"
+      ],
+      "pre_lowering_provenance_manifest_sha256": "c9194fb25bc61c6e7dac336ad58fd9a7031198d490d828ad9cfc22a9b9f14e5c",
+      "sha256": "52382658fed8629d5e6757c6e9d7cb400d30dc1e05453c371c23d8ea8785ab9c",
+      "sites": [
+        {
+          "causal_cmpi_line": 739,
+          "exp_site_line": 836,
+          "matched_edges": [
+            "subf_operand_loads",
+            "delta_store_load_same_index",
+            "exp",
+            "exp_store_load_same_index",
+            "sum_reduction",
+            "normalization_division",
+            "causal_mask_score_store"
+          ],
+          "site": 1
+        },
+        {
+          "causal_cmpi_line": 1646,
+          "exp_site_line": 1724,
+          "matched_edges": [
+            "subf_operand_loads",
+            "delta_store_load_same_index",
+            "exp",
+            "exp_store_load_same_index",
+            "sum_reduction",
+            "normalization_division",
+            "causal_mask_score_store"
+          ],
+          "site": 2
+        },
+        {
+          "causal_cmpi_line": 2508,
+          "exp_site_line": 2586,
+          "matched_edges": [
+            "subf_operand_loads",
+            "delta_store_load_same_index",
+            "exp",
+            "exp_store_load_same_index",
+            "sum_reduction",
+            "normalization_division",
+            "causal_mask_score_store"
+          ],
+          "site": 3
+        },
+        {
+          "causal_cmpi_line": 3370,
+          "exp_site_line": 3448,
+          "matched_edges": [
+            "subf_operand_loads",
+            "delta_store_load_same_index",
+            "exp",
+            "exp_store_load_same_index",
+            "sum_reduction",
+            "normalization_division",
+            "causal_mask_score_store"
+          ],
+          "site": 4
+        },
+        {
+          "causal_cmpi_line": 4232,
+          "exp_site_line": 4310,
+          "matched_edges": [
+            "subf_operand_loads",
+            "delta_store_load_same_index",
+            "exp",
+            "exp_store_load_same_index",
+            "sum_reduction",
+            "normalization_division",
+            "causal_mask_score_store"
+          ],
+          "site": 5
+        },
+        {
+          "causal_cmpi_line": 5094,
+          "exp_site_line": 5172,
+          "matched_edges": [
+            "subf_operand_loads",
+            "delta_store_load_same_index",
+            "exp",
+            "exp_store_load_same_index",
+            "sum_reduction",
+            "normalization_division",
+            "causal_mask_score_store"
+          ],
+          "site": 6
+        },
+        {
+          "causal_cmpi_line": 5956,
+          "exp_site_line": 6034,
+          "matched_edges": [
+            "subf_operand_loads",
+            "delta_store_load_same_index",
+            "exp",
+            "exp_store_load_same_index",
+            "sum_reduction",
+            "normalization_division",
+            "causal_mask_score_store"
+          ],
+          "site": 7
+        },
+        {
+          "causal_cmpi_line": 6818,
+          "exp_site_line": 6890,
+          "matched_edges": [
+            "subf_operand_loads",
+            "delta_store_load_same_index",
+            "exp",
+            "exp_store_load_same_index",
+            "sum_reduction",
+            "normalization_division",
+            "causal_mask_score_store"
+          ],
+          "site": 8
+        }
+      ]
+    }
+  },
+  "first_unsupported_operation": {
+    "code": "softmax_backend_lowering_not_implemented",
+    "pipeline_stage": "custom_op_to_linalg_or_calyx",
+    "reason": "the exact stabilized softmax boundary is authenticated, but no backend legalization or execution is claimed",
+    "target": "llm2fpga.attention_softmax_fixed"
+  },
+  "model": "TinyStories-1M",
+  "provenance": {
+    "llm_assistance_disclosure_required": true,
+    "reference_role": "content_authenticated_behavioral_oracle_only"
+  },
+  "schema": "tinystories-1m-softmax-compiler-bridge-v1",
+  "sha256": "776b4c8ee0f074d2a2ee96ea11965a20a2d89805897f46ebf4f53807958e5ca0",
+  "source": {
+    "artifact": "/tmp/task3x-flat/flat.scf.mlir",
+    "binding_mode": "lowered_memref_loop_structure",
+    "exp_site_count": 8,
+    "matched_edges": [
+      "subf_operand_loads",
+      "delta_store_load_same_index",
+      "exp",
+      "exp_store_load_same_index",
+      "sum_reduction",
+      "normalization_division",
+      "causal_cmpi"
+    ],
+    "pre_lowering_provenance_manifest_sha256": "c9194fb25bc61c6e7dac336ad58fd9a7031198d490d828ad9cfc22a9b9f14e5c",
+    "sha256": "52382658fed8629d5e6757c6e9d7cb400d30dc1e05453c371c23d8ea8785ab9c",
+    "sites": [
+      {
+        "causal_cmpi_line": 739,
+        "exp_site_line": 836,
+        "matched_edges": [
+          "subf_operand_loads",
+          "delta_store_load_same_index",
+          "exp",
+          "exp_store_load_same_index",
+          "sum_reduction",
+          "normalization_division",
+          "causal_mask_score_store"
+        ],
+        "site": 1
+      },
+      {
+        "causal_cmpi_line": 1646,
+        "exp_site_line": 1724,
+        "matched_edges": [
+          "subf_operand_loads",
+          "delta_store_load_same_index",
+          "exp",
+          "exp_store_load_same_index",
+          "sum_reduction",
+          "normalization_division",
+          "causal_mask_score_store"
+        ],
+        "site": 2
+      },
+      {
+        "causal_cmpi_line": 2508,
+        "exp_site_line": 2586,
+        "matched_edges": [
+          "subf_operand_loads",
+          "delta_store_load_same_index",
+          "exp",
+          "exp_store_load_same_index",
+          "sum_reduction",
+          "normalization_division",
+          "causal_mask_score_store"
+        ],
+        "site": 3
+      },
+      {
+        "causal_cmpi_line": 3370,
+        "exp_site_line": 3448,
+        "matched_edges": [
+          "subf_operand_loads",
+          "delta_store_load_same_index",
+          "exp",
+          "exp_store_load_same_index",
+          "sum_reduction",
+          "normalization_division",
+          "causal_mask_score_store"
+        ],
+        "site": 4
+      },
+      {
+        "causal_cmpi_line": 4232,
+        "exp_site_line": 4310,
+        "matched_edges": [
+          "subf_operand_loads",
+          "delta_store_load_same_index",
+          "exp",
+          "exp_store_load_same_index",
+          "sum_reduction",
+          "normalization_division",
+          "causal_mask_score_store"
+        ],
+        "site": 5
+      },
+      {
+        "causal_cmpi_line": 5094,
+        "exp_site_line": 5172,
+        "matched_edges": [
+          "subf_operand_loads",
+          "delta_store_load_same_index",
+          "exp",
+          "exp_store_load_same_index",
+          "sum_reduction",
+          "normalization_division",
+          "causal_mask_score_store"
+        ],
+        "site": 6
+      },
+      {
+        "causal_cmpi_line": 5956,
+        "exp_site_line": 6034,
+        "matched_edges": [
+          "subf_operand_loads",
+          "delta_store_load_same_index",
+          "exp",
+          "exp_store_load_same_index",
+          "sum_reduction",
+          "normalization_division",
+          "causal_mask_score_store"
+        ],
+        "site": 7
+      },
+      {
+        "causal_cmpi_line": 6818,
+        "exp_site_line": 6890,
+        "matched_edges": [
+          "subf_operand_loads",
+          "delta_store_load_same_index",
+          "exp",
+          "exp_store_load_same_index",
+          "sum_reduction",
+          "normalization_division",
+          "causal_mask_score_store"
+        ],
+        "site": 8
+      }
+    ]
+  },
+  "status": "unsupported"
+}

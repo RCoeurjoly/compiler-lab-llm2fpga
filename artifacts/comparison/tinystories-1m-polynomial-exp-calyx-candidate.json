@@ -1,0 +1,68 @@
+{
+  "schema": "tinystories-1m-polynomial-exp-calyx-candidate-v1",
+  "status": "candidate_native_emission_unresolved",
+  "semantic_status": "unverified_approximation",
+  "input_flat_scf": {
+    "path": "/nix/store/g0wrh3vdr28446kxwwfy07npibm46mxa-tiny-stories-1m-baseline-float-calyx/flat.scf.mlir",
+    "sha256": "eeeb9ea3a735706be4cdfbd4a5fa4a5899f367782a41ed017f3dd8bb8e4e2c76"
+  },
+  "legalized_pre_calyx": {
+    "path": "/tmp/full-pre-poly.mlir",
+    "sha256": "f1fe517dca97e96591f20c656d38e2daef94d5153e7b5721e2a1c4553eb8a774",
+    "bytes": 30249674,
+    "pass": "llm2fpga-lower-polynomial-exp-for-calyx"
+  },
+  "calyx_mlir": {
+    "path": "/tmp/full-poly.calyx.mlir",
+    "sha256": "14e260a7696b8d6cd4ecacd1332617818ba905afa503e51e5065e8e75d7cd20f",
+    "bytes": 3416491,
+    "scf_to_calyx": "completed"
+  },
+  "native_emission": {
+    "command": "calyx --synthesis --nested -d papercut -b verilog",
+    "result": "did_not_complete_within_diagnostic_run",
+    "normal_stack_result": "stack_overflow",
+    "unlimited_stack_result": "terminated_after_no_output",
+    "no_cell_share_result": "timeout_180s_without_output",
+    "logged_phase_evidence": {
+      "verilog_main_generation_seconds": 0.077,
+      "verilog_main_1_generation_seconds": 2.379,
+      "post_generation_phase": "morty primitive-closure processing",
+      "log_sha256": "137f9cc814b908447e095ee09fef8d1ddb3b3d7b06a22e498c4776e7f08d0ce0"
+    },
+    "raw_component_capture": {
+      "path": "/tmp/fullpoly/raw.sv",
+      "sha256": "600d5169e7c5a634ed9aad06edc6062432afd57ed96dfe0caae46a740c1bc4e0",
+      "bytes": 18094131,
+      "component_generation": "completed; primitive closure failed on HardFloat source path"
+    },
+    "synthesis_frontend_probe": {
+      "normalized_path": "/tmp/fullpoly/raw-normalized.sv",
+      "normalized_sha256": "989a1eb4173511e7762cc2b537e17c9fe1ffe500b5c7d6f6829d110402103e47",
+      "assertion_blocks_removed": 2967,
+      "yosys_result": "timeout_180s_during_ast_simplification",
+      "yosys_log_sha256": "5d41f7c3ad61948fca73247f69430b1cb84627c77ac3faa93c989d94c88848a1"
+    },
+    "nested_mode_probe": {
+      "nested_raw_sha256": "600d5169e7c5a634ed9aad06edc6062432afd57ed96dfe0caae46a740c1bc4e0",
+      "non_nested_raw_sha256": "600d5169e7c5a634ed9aad06edc6062432afd57ed96dfe0caae46a740c1bc4e0",
+      "identical": true,
+      "interpretation": "nested flag does not change this generated component text"
+    },
+    "primitive_closure_techmap_probe": {
+      "top": "main_1",
+      "primitive_sources": "Calyx primitives plus RISCV HardFloat; divSqrtFN reset normalized only in /tmp diagnostic copy",
+      "techmap_result": "reached techmap and completed primitive expansion; bounded post-techmap stat run exceeded 180 seconds during opt_dff",
+      "techmap_log_sha256": "21e7aeee5235c17abc14e60112ba23f0eee0b956e02751589454647fe8ea4f9a",
+      "resource_report": "not produced",
+      "interpretation": "primitive closure is parseable, but optimization/resource extraction is not yet tractable; no timing or FPGA claim"
+    },
+    "transport_changed": false
+  },
+  "claims": {
+    "functional_equivalence": false,
+    "full_block_equivalence": false,
+    "timing_closure": false,
+    "hardware_inference": false
+  }
+}

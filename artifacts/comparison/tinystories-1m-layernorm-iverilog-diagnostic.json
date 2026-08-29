@@ -1,0 +1,35 @@
+{
+  "schema": "tinystories-1m-layernorm-iverilog-diagnostic-v1",
+  "generated_verilog": {
+    "path": "/tmp/lnexec/main.sv",
+    "sha256": "ebd7a3827c2dee5cb5698ab76db8c43c86bfcbd473adee914f45485407a7be2"
+  },
+  "testbench": {
+    "path": "reproducers/calyx-layernorm-memory-harness/full_model_tb.sv",
+    "sha256": "123f19cf7d4a74dc9372ab02a4aafe9d79066456af04694b8ad167852bed77d2"
+  },
+  "toolchain": {
+    "simulator": "iverilog-13.0",
+    "execution": "nix shell nixpkgs#iverilog"
+  },
+  "input": {
+    "length": 64,
+    "values": "alternating +1/-1 Q16.16",
+    "gamma": "+1 Q16.16",
+    "beta": "0"
+  },
+  "results": {
+    "go_held_high": {"status": "done", "mismatches": 0, "completion_time_units": 11667},
+    "go_pulsed": {"status": "timeout", "cycles_bound": 200000, "memory_done": "0000"}
+  },
+  "diagnostic_modifications": [
+    "Icarus-only copy replaced generated one-hot $fatal calls with $display to bypass time-zero X-state assertions.",
+    "go is held high to test the wrapper memory-gating hypothesis."
+  ],
+  "scope": {
+    "wrapper_go_memory_gating_evidenced": true,
+    "claims_production_rtl_fixed": false,
+    "claims_tinystories_equivalence": false,
+    "claims_hardware_inference": false
+  }
+}

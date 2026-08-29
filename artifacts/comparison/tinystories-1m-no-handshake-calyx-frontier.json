@@ -1,0 +1,32 @@
+{
+  "schema": "tinystories-1m-no-handshake-calyx-frontier-v1",
+  "status": "blocked_unsupported_math_exp",
+  "route": "PyTorch ExportedProgram -> torch-mlir -> Linalg -> SCF -> flat-SCF -> native Calyx",
+  "package": {
+    "flake_attribute": "tiny-stories-1m-baseline-float-no-handshake-calyx",
+    "store_path": "/nix/store/g0wrh3vdr28446kxwwfy07npibm46mxa-tiny-stories-1m-baseline-float-calyx"
+  },
+  "flat_scf": {
+    "path": "/nix/store/g0wrh3vdr28446kxwwfy07npibm46mxa-tiny-stories-1m-baseline-float-calyx/flat.scf.mlir",
+    "sha256": "eeeb9ea3a735706be4cdfbd4a5fa4a5899f367782a41ed017f3dd8bb8e4e2c76"
+  },
+  "frontier": {
+    "path": "/nix/store/g0wrh3vdr28446kxwwfy07npibm46mxa-tiny-stories-1m-baseline-float-calyx/float-frontier.json",
+    "sha256": "9f803afda2ab150015c867a10f4c32dbd82d0a74c2d3a18becb96dca8b569e15",
+    "total_float_ops": 505,
+    "total_unsupported_ops": 8,
+    "unsupported_ops": {"math.exp": 8}
+  },
+  "lowering": {
+    "status": "failed",
+    "first_unsupported_operation": "math.exp",
+    "partial_output_discarded": true,
+    "log_sha256": "9a30b9ed8d07a5d39843c6d5839b000cf598b630f90b2ce3cab2466d564d35f2"
+  },
+  "claims": {
+    "full_block_artifact": false,
+    "cell_share_comparison": false,
+    "timing_closure": false,
+    "hardware_inference": false
+  }
+}

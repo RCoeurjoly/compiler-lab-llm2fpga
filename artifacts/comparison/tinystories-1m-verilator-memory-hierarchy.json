@@ -1,0 +1,27 @@
+{
+  "all_expected_memory_fields_present": true,
+  "claim_scope": "hierarchy_compile_probe_only",
+  "expected_memory_fields": [
+    "main__DOT__mem_0__DOT__mem",
+    "main__DOT__mem_1__DOT__mem",
+    "main__DOT__mem_2__DOT__mem",
+    "main__DOT__mem_3__DOT__mem"
+  ],
+  "field_shape": {
+    "depth": 64,
+    "width_bits": 32
+  },
+  "inference_executed": false,
+  "memory_fields": [
+    "main__DOT__mem_0__DOT__mem",
+    "main__DOT__mem_1__DOT__mem",
+    "main__DOT__mem_2__DOT__mem",
+    "main__DOT__mem_3__DOT__mem"
+  ],
+  "public_flat_rw": true,
+  "root_header": "obj_dir/Vmain___024root.h",
+  "root_header_sha256": "e132ace52bd680b22c476dfe70bdb46590eee30ad7ef92afb63158effbaa53c6",
+  "schema": "verilator-calyx-memory-hierarchy-probe-v1",
+  "sha256": "2fd94a52c791df6de5c3170017d69f1ca33e32b6a75defc4a1662828cfe7015b",
+  "top": "main"
+}

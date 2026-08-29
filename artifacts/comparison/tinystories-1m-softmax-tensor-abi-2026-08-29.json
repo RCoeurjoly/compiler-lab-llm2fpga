@@ -1,0 +1,27 @@
+{
+  "schema": "tinystories-1m-softmax-tensor-abi-v1",
+  "status": "simulation_pass",
+  "rtl": {
+    "path": "rtl/llm2fpga_attention_softmax_fixed_tensor.sv",
+    "sha256": "48b38d390b8d36ac94f3784fad465838bfd468daacaa54f18024f3fab8f40290"
+  },
+  "abi": {
+    "input": "tensor<16x32xi32> signed Q8.8 score lanes plus i32 position",
+    "output": "tensor<16x32xi32> with unsigned Q1.20 in low 21 bits and zero upper bits",
+    "serialization": "head-major packed 32-bit lanes",
+    "transport": "clocked start/done/busy; no PCIe or DDR3 changes"
+  },
+  "simulation": {
+    "testbench": "scripts/comparison/generate_softmax_tensor_abi_tb.py",
+    "testbench_sha256": "47ac5f44743c14e97eaf5216d43449bcce0b80adb90643593ee0cb040ea2aee6",
+    "rows": 16,
+    "result": "GPTNEO_SOFTMAX_TENSOR_ABI_16_ROWS_PASS"
+  },
+  "claims": {
+    "mlir_lane_shape_aligned": true,
+    "functional_softmax_slice": true,
+    "full_block_equivalence": false,
+    "synthesis_timing": false,
+    "hardware_inference": false
+  }
+}

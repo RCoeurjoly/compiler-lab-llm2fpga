@@ -1,0 +1,240 @@
+{
+  "accepted_one_block_metrics": {
+    "latency": {
+      "compiler": {
+        "reason": "no latency receipt supplied",
+        "status": "unavailable"
+      },
+      "reference": {
+        "reason": "no latency receipt supplied",
+        "status": "unavailable"
+      },
+      "status": "unavailable"
+    },
+    "memory": {
+      "compiler": {
+        "reason": "no memory receipt supplied",
+        "status": "unavailable"
+      },
+      "reference": {
+        "reason": "no memory receipt supplied",
+        "status": "unavailable"
+      },
+      "status": "unavailable"
+    },
+    "resources": {
+      "compiler": {
+        "reason": "no resources receipt supplied",
+        "status": "unavailable"
+      },
+      "reference": {
+        "reason": "no resources receipt supplied",
+        "status": "unavailable"
+      },
+      "status": "unavailable"
+    },
+    "throughput": {
+      "compiler": {
+        "reason": "no throughput receipt supplied",
+        "status": "unavailable"
+      },
+      "reference": {
+        "reason": "no throughput receipt supplied",
+        "status": "unavailable"
+      },
+      "status": "unavailable"
+    },
+    "timing": {
+      "compiler": {
+        "reason": "no timing receipt supplied",
+        "status": "unavailable"
+      },
+      "reference": {
+        "reason": "no timing receipt supplied",
+        "status": "unavailable"
+      },
+      "status": "unavailable"
+    }
+  },
+  "blocking_reasons": [
+    "slice manifest schema, model, kind, or accepted status is invalid",
+    "complete reference/compiler functional traces and matching output are unavailable",
+    "resources evidence is unavailable or invalid on one or both sides",
+    "timing evidence is unavailable or invalid on one or both sides",
+    "memory evidence is unavailable or invalid on one or both sides",
+    "latency evidence is unavailable or invalid on one or both sides",
+    "throughput evidence is unavailable or invalid on one or both sides",
+    "both sides lack complete provenance disclosure"
+  ],
+  "compiler_graph_handoff": {
+    "alignment_status": "unaligned",
+    "compiler_artifacts": {
+      "mlir": null,
+      "rtlil": null,
+      "systemverilog": null
+    },
+    "evidence": {
+      "adapter_receipt_sha256": "276915df4d14d8934e642851ce560cae0bf59d6785ec2ccf776c576a98d2b229",
+      "contract_sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
+      "exported_program_sha256": "389964a2f39a8256bc824b58b60f681bd136f2868633125e8872ce9791c8e73e",
+      "lowering_attempt_sha256": "5eef20aef6cd08b17e28579f96bc6b680dd84c405900107b350291677258efec",
+      "numeric_trace_sha256": "d83df8e12aa2658709b78a47849e29e19ef4e95b57bb052654377d541f04f215",
+      "package_receipt_sha256": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
+      "profile_sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6",
+      "qdq_receipt_sha256": "a274d61ec5f634fac8fb501339ddfe7ae4bf774d950840498d54c32b90d79e77",
+      "task2_metadata_sha256": "08d55729c7f1e4525f0dcaae6eff328b7bb4e10e56aa9e00cd43447fc9864646"
+    },
+    "first_unsupported_operation": {
+      "checkpoint": "block.ln_1",
+      "code": "fixed_layer_norm_semantics_unavailable",
+      "graph_index": 149,
+      "missing_semantics": [
+        "mean_reduction_order_and_width",
+        "variance_reduction_order_and_width",
+        "epsilon_representation",
+        "inverse_square_root_algorithm",
+        "gamma_beta_rounding_saturation_and_overflow"
+      ],
+      "name": "layer_norm",
+      "output_checkpoint": "block.ln_1.output",
+      "reason": "the authenticated fixed-hardware profile gives LayerNorm input/output checkpoints but no executable fixed-point LayerNorm semantics; example values cannot define an operator",
+      "target": "aten.layer_norm.default"
+    },
+    "source": {
+      "exists": true,
+      "path": "artifacts/comparison/tinystories-1m-fixed-profile-slice-lowering.json",
+      "sha256": "9af2668e4e9d264622b45db8bd780c07dce9b52be6e2ff4d323a4a1c71f2ee22"
+    },
+    "status": "unsupported",
+    "task2_metadata": {
+      "schema": "tinystories-1m-compiler-slice-manifest-v1",
+      "sha256": "08d55729c7f1e4525f0dcaae6eff328b7bb4e10e56aa9e00cd43447fc9864646",
+      "slice_kind": "one_transformer_block_token_step",
+      "status": "contract_mismatch"
+    }
+  },
+  "compiler_package_identity": {
+    "calibration_ids_sha256": "2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075",
+    "contract_file_sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
+    "contract_path": "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+    "contract_sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
+    "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "memory_image": {
+      "bytes": 3632704,
+      "format": "weights.bin with manifest offsets; scales.bin side image",
+      "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+    },
+    "model": {
+      "activation_function": "gelu_new",
+      "architecture": "GPT-Neo causal language model",
+      "head_dim": 4,
+      "hidden_size": 64,
+      "max_context": 32,
+      "n_head": 16,
+      "n_layer": 8,
+      "name": "TinyStories-1M",
+      "source_model_id": "roneneldan/TinyStories-1M",
+      "source_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf",
+      "tie_word_embeddings": true,
+      "vocab_size": 50257
+    },
+    "package_receipt_sha256": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
+    "scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+    "weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+  },
+  "first_missing_gate": "slice manifest schema, model, kind, or accepted status is invalid",
+  "rejected_or_non_one_block_artifacts": {
+    "baseline_float_memory_utilization": {
+      "reported_utilization": {
+        "bram36_equivalent_pct": 0.0,
+        "dsp_pct": 0.0,
+        "ff_pct": 9724.133791024782,
+        "lut_pct": 13535.192900200938
+      },
+      "source": {
+        "exists": true,
+        "path": "references/task3/tiny-stories-1m-baseline-float-selftest-all-memory-utilization/summary.json",
+        "sha256": "b1274dba287e213703080d469900db59322b58131e07f5c56dee0b2b17695485"
+      },
+      "status": "not_compiler_one_block_evidence"
+    },
+    "compiler_nextpnr_fixture": {
+      "source": {
+        "exists": true,
+        "path": "tests/fixtures/tinystories-1m-compiler-nextpnr.rpt",
+        "sha256": "d749504c61724b620bd8ae26bd36e97462b85a684bc333b1486534cc8f59aed6"
+      },
+      "status": "fixture_only_not_provenance_bound"
+    },
+    "compiler_yosys_fixture": {
+      "source": {
+        "exists": true,
+        "path": "tests/fixtures/tinystories-1m-compiler-yosys.json",
+        "sha256": "63b3b654d17a3aed8283509aff7200253323c1c5996db06897126d7dda34b71a"
+      },
+      "status": "fixture_only_not_provenance_bound"
+    },
+    "full_w8a8_yosys_slang_structural": {
+      "reported_status": "ok",
+      "scope": "pre-proc structural RTL; not technology-mapped FPGA utilization",
+      "source": {
+        "exists": true,
+        "path": "artifacts/full-tinystories-pt2e-w8a8-scout/yosys-slang-structural-utilization.json",
+        "sha256": "012a4df5fd8b478174afefff007a580c712a9b879134355c9455ca2923a8b949"
+      },
+      "status": "not_one_block_evidence"
+    }
+  },
+  "schema": "tinystories-1m-one-block-evidence-inventory-v1",
+  "slice_comparison_status": {
+    "resources": null,
+    "source": {
+      "exists": true,
+      "path": "artifacts/comparison/tinystories-1m-slice-comparison.json",
+      "sha256": "5b711b3f2ddc2b5c125dbe91b48b28f326de8d06fc38cde39e94a8fd96a0400c"
+    },
+    "status": "contract_mismatch",
+    "timing": null
+  },
+  "status": "blocked",
+  "trace_checkpoints": {
+    "board_authenticated": false,
+    "checkpoint_count": 12,
+    "checkpoint_hashes": {
+      "block.attention.k": "434b82f2e692836381355fbc9400d8e597a9ea9768734c13109e32870efb92a5",
+      "block.attention.output": "b8a362876c047fcec8c14286c9c64df0930e8519e0fa8c60970094be6a7f9eeb",
+      "block.attention.q": "caa771925998871b7431570e7f7c6c6ac4b163c6ab3bd67ca3d5c7703a288f3f",
+      "block.attention.v": "ac5c3f5ff49e52260f6cee72c39d59ff990d1242e76faf3e052632ec53a3a922",
+      "block.input": "c310f302cfb5fd58e2f0b00e6d6a9d36fc23121e7e04eb6b09c7aa630c00e12e",
+      "block.ln_1.output": "233de767e3744ac70d9d074f9d0174e5e973fda4a11c20efd392061b4c0e7eee",
+      "block.ln_2.output": "220e940d35a173b443992377dd47195606ee1e9aed448d13e24bcc64019341c1",
+      "block.mlp.activation": "31fecd6626fb19dd762374022aa485e5b45e4dc140ffae34eaae48206ae32a3d",
+      "block.mlp.fc_in": "f40eb2c071374cb265c3795e09697efab06477caac34da12614e6ce7170e052b",
+      "block.mlp.fc_out": "b1e511d393cc2a84de8781ae642838a167da568156c98336428d89125600a200",
+      "block.output": "116356f5887b36c3d1c7bfb57ce247a2013000699cfaee6c4fee056175cca7ea",
+      "block.residual.attention": "41a33e2b0933e0fb8846766e78b8edd2c661431340e295b32497b3eed34eecf5"
+    },
+    "checkpoint_order": [
+      "block.input",
+      "block.ln_1.output",
+      "block.attention.q",
+      "block.attention.k",
+      "block.attention.v",
+      "block.attention.output",
+      "block.residual.attention",
+      "block.ln_2.output",
+      "block.mlp.fc_in",
+      "block.mlp.activation",
+      "block.mlp.fc_out",
+      "block.output"
+    ],
+    "profile_status": "runtime_authenticated_not_board_checkpoint_authenticated",
+    "source": {
+      "exists": true,
+      "path": "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json",
+      "sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6"
+    },
+    "status": "authenticated_profile_trace_validated",
+    "trace_sha256": "ac0118fe0068aea3790c3fc7414f75cd56abd5690f0d7f4bc13b143d05249d1d"
+  }
+}

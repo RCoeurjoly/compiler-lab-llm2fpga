@@ -24,16 +24,13 @@ class RealGraphSoftmaxBoundaryTest(unittest.TestCase):
     def test_real_graph_attempt_is_fail_closed_and_authenticated(self) -> None:
         report = json.loads(REPORT.read_text(encoding="utf-8"))
         self.assertEqual(report["schema"], "tinystories-1m-softmax-real-graph-bridge-boundary-v1")
-        self.assertEqual(report["bridge_revision"], "141d3b4")
-        self.assertEqual(report["status"], "unsupported")
+        self.assertEqual(report["bridge_revision"], "working-tree-after-output-lifetime-hardening")
+        self.assertEqual(report["status"], "accepted")
         attempt = report["attempt"]
         self.assertEqual(attempt["expected_exp_sites"], 8)
         self.assertEqual(attempt["observed_exp_sites"], 8)
-        mismatch = attempt["first_mismatch"]
-        self.assertEqual(mismatch["code"], "dataflow_not_proven")
-        self.assertEqual(mismatch["site"], 2)
-        self.assertEqual(mismatch["message"], "site 2 reuses another head's delta memref")
-        self.assertFalse(report["claims"]["authenticated_bridge_emitted"])
+        self.assertIsNone(attempt["first_mismatch"])
+        self.assertTrue(report["claims"]["authenticated_pattern_matched"])
         self.assertFalse(report["claims"]["hardware_inference"])
 
     def test_report_tamper_is_rejected_before_stage_acceptance(self) -> None:
@@ -44,6 +41,19 @@ class RealGraphSoftmaxBoundaryTest(unittest.TestCase):
             tampered.write_text(json.dumps(value), encoding="utf-8")
             with self.assertRaisesRegex(verifier.BoundaryVerificationError, "boundary_report_self_hash_mismatch"):
                 verifier.verify(tampered, FRONTIER, BRIDGE, {})
+
+    def test_positive_authenticated_verification_reproduces_acceptance(self) -> None:
+        paths = {
+            "torch_mlir": Path("/tmp/task3x-torch.mlir"),
+            "linalg": Path("/tmp/task3x-linalg.mlir"),
+            "scf": Path("/tmp/task3x-scf.mlir"),
+            "flat_scf": Path("/tmp/task3x-flat/flat.scf.mlir"),
+        }
+        if not all(path.is_file() for path in paths.values()):
+            self.skipTest("real package-aware stage materialization is not present")
+        result = verifier.verify(REPORT, FRONTIER, BRIDGE, paths)
+        self.assertEqual(result["status"], "verified_accepted")
+        self.assertEqual(result["pattern"]["exp_site_count"], 8)
 
     def test_stage_tamper_is_rejected_even_when_pattern_still_matches(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

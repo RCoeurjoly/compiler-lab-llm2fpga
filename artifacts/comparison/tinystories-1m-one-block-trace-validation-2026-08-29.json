@@ -1,0 +1,127 @@
+{
+  "checkpoint_order": [
+    "block.input",
+    "block.ln_1.output",
+    "block.attention.q",
+    "block.attention.k",
+    "block.attention.v",
+    "block.attention.output",
+    "block.residual.attention",
+    "block.ln_2.output",
+    "block.mlp.fc_in",
+    "block.mlp.activation",
+    "block.mlp.fc_out",
+    "block.output"
+  ],
+  "checkpoints": [
+    {
+      "checkpoint": "block.input",
+      "evidence_receipt": null,
+      "sha256": "c310f302cfb5fd58e2f0b00e6d6a9d36fc23121e7e04eb6b09c7aa630c00e12e",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "checkpoint": "block.ln_1.output",
+      "evidence_receipt": "tinystories-1m-layernorm-tensor-abi-2026-08-29.json",
+      "sha256": "233de767e3744ac70d9d074f9d0174e5e973fda4a11c20efd392061b4c0e7eee",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "checkpoint": "block.attention.q",
+      "evidence_receipt": "tinystories-1m-gemv-q-projection-equivalence-2026-08-29.json",
+      "sha256": "caa771925998871b7431570e7f7c6c6ac4b163c6ab3bd67ca3d5c7703a288f3f",
+      "shape": [
+        16,
+        4
+      ]
+    },
+    {
+      "checkpoint": "block.attention.k",
+      "evidence_receipt": "tinystories-1m-gemv-qkv-projection-equivalence-2026-08-29.json",
+      "sha256": "434b82f2e692836381355fbc9400d8e597a9ea9768734c13109e32870efb92a5",
+      "shape": [
+        16,
+        4
+      ]
+    },
+    {
+      "checkpoint": "block.attention.v",
+      "evidence_receipt": "tinystories-1m-gemv-qkv-projection-equivalence-2026-08-29.json",
+      "sha256": "ac5c3f5ff49e52260f6cee72c39d59ff990d1242e76faf3e052632ec53a3a922",
+      "shape": [
+        16,
+        4
+      ]
+    },
+    {
+      "checkpoint": "block.attention.output",
+      "evidence_receipt": "tinystories-1m-gemv-attention-output-equivalence-2026-08-29.json",
+      "sha256": "b8a362876c047fcec8c14286c9c64df0930e8519e0fa8c60970094be6a7f9eeb",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "checkpoint": "block.residual.attention",
+      "evidence_receipt": "tinystories-1m-residual-add-abi-2026-08-29.json",
+      "sha256": "41a33e2b0933e0fb8846766e78b8edd2c661431340e295b32497b3eed34eecf5",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "checkpoint": "block.ln_2.output",
+      "evidence_receipt": "tinystories-1m-layernorm-tensor-abi-2026-08-29.json",
+      "sha256": "220e940d35a173b443992377dd47195606ee1e9aed448d13e24bcc64019341c1",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "checkpoint": "block.mlp.fc_in",
+      "evidence_receipt": "tinystories-1m-gemv-mlp-fc-in-equivalence-2026-08-29.json",
+      "sha256": "f40eb2c071374cb265c3795e09697efab06477caac34da12614e6ce7170e052b",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "checkpoint": "block.mlp.activation",
+      "evidence_receipt": "tinystories-1m-gelu-equivalence-2026-08-29.json",
+      "sha256": "31fecd6626fb19dd762374022aa485e5b45e4dc140ffae34eaae48206ae32a3d",
+      "shape": [
+        256
+      ]
+    },
+    {
+      "checkpoint": "block.mlp.fc_out",
+      "evidence_receipt": "tinystories-1m-gemv-mlp-fc-out-equivalence-2026-08-29.json",
+      "sha256": "b1e511d393cc2a84de8781ae642838a167da568156c98336428d89125600a200",
+      "shape": [
+        64
+      ]
+    },
+    {
+      "checkpoint": "block.output",
+      "evidence_receipt": "tinystories-1m-residual-add-abi-2026-08-29.json",
+      "sha256": "116356f5887b36c3d1c7bfb57ce247a2013000699cfaee6c4fee056175cca7ea",
+      "shape": [
+        64
+      ]
+    }
+  ],
+  "claims": {
+    "adapter_evidence_bound": true,
+    "hardware_inference": false,
+    "ordered_checkpoint_hashes": true,
+    "rtl_composed": false
+  },
+  "contract": "artifacts/comparison/tinystories-1m-one-block-composition-contract-2026-08-29.json",
+  "oracle": "artifacts/reference/tinystories-1m-candidate-oracle.json",
+  "schema": "tinystories-1m-one-block-trace-validation-v1",
+  "status": "ordered_oracle_trace_validated"
+}

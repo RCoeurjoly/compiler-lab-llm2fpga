@@ -1,16 +1,157 @@
 #include "circt/Dialect/Calyx/CalyxDialect.h"
 #include "circt/Dialect/Calyx/CalyxOps.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Location.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Tools/Plugins/PassPlugin.h"
 #include "llvm/Config/llvm-config.h"
 
 using namespace mlir;
 using namespace circt;
 
+
 namespace {
+struct FoldIdentityIntegerArithmeticPass
+    : public PassWrapper<FoldIdentityIntegerArithmeticPass,
+                         OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FoldIdentityIntegerArithmeticPass)
+
+  StringRef getArgument() const final {
+    return "llm2fpga-fold-identity-integer-arithmetic";
+  }
+  StringRef getDescription() const final {
+    return "Fold integer add-zero and multiply-one operations.";
+  }
+
+  static bool isIntegerConstant(Value value, int64_t expected) {
+    Attribute attr;
+    if (!matchPattern(value, m_Constant(&attr)))
+      return false;
+    auto integer = dyn_cast<IntegerAttr>(attr);
+    return integer && integer.getValue() == expected;
+  }
+
+  void runOnOperation() final {
+    IRRewriter rewriter(getOperation().getContext());
+    SmallVector<Operation *> candidates;
+    getOperation().walk([&](Operation *op) {
+      StringRef name = op->getName().getStringRef();
+      if (name == "arith.addi" || name == "arith.muli")
+        candidates.push_back(op);
+    });
+    for (Operation *op : candidates) {
+      if (op->getNumOperands() != 2 || op->getNumResults() != 1)
+        continue;
+      int64_t identity = op->getName().getStringRef() == "arith.addi" ? 0 : 1;
+      Value replacement;
+      if (isIntegerConstant(op->getOperand(0), identity))
+        replacement = op->getOperand(1);
+      else if (isIntegerConstant(op->getOperand(1), identity))
+        replacement = op->getOperand(0);
+      if (replacement && replacement.getType() == op->getResult(0).getType())
+        rewriter.replaceOp(op, replacement);
+    }
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<arith::ArithDialect>();
+  }
+};
+
+struct LowerAuthenticatedSoftmaxCallPass
+    : public PassWrapper<LowerAuthenticatedSoftmaxCallPass,
+                         OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerAuthenticatedSoftmaxCallPass)
+  StringRef getArgument() const final {
+    return "llm2fpga-lower-attention-softmax-fixed";
+  }
+  StringRef getDescription() const final {
+    return "Lower the authenticated tensor softmax operation to an RTL call boundary.";
+  }
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<func::FuncDialect>();
+  }
+  void runOnOperation() final {
+    ModuleOp module = getOperation();
+    MLIRContext *context = module.getContext();
+    SmallVector<Operation *> ops;
+    module.walk([&](Operation *op) {
+      if (op->getName().getStringRef() == "llm2fpga.attention_softmax_fixed")
+        ops.push_back(op);
+    });
+    for (Operation *op : ops) {
+      auto resultType = op->getResult(0).getType();
+      auto calleeType = FunctionType::get(context, op->getOperandTypes(), resultType);
+      auto callee = module.lookupSymbol<func::FuncOp>("llm2fpga_attention_softmax_fixed");
+      if (!callee) {
+        callee = func::FuncOp::create(op->getLoc(),
+                                      "llm2fpga_attention_softmax_fixed", calleeType);
+        callee.setPrivate();
+        module.push_back(callee);
+      }
+      OpBuilder builder(op);
+      auto call = builder.create<func::CallOp>(op->getLoc(), callee.getName(),
+                                                TypeRange{resultType}, op->getOperands());
+      op->replaceAllUsesWith(call.getResults());
+      op->erase();
+    }
+  }
+};
+
+// Resource-scout-only legalization.  This is intentionally not a behavioral
+// replacement for the authenticated softmax exp contract.
+struct LowerPolynomialExpScoutPass
+    : public PassWrapper<LowerPolynomialExpScoutPass,
+                         OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerPolynomialExpScoutPass)
+  StringRef getArgument() const final {
+    return "llm2fpga-lower-polynomial-exp-scout";
+  }
+  StringRef getDescription() const final {
+    return "Replace f32 exp with a fifth-order resource-scout polynomial.";
+  }
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<arith::ArithDialect, math::MathDialect>();
+  }
+  void runOnOperation() final {
+    SmallVector<math::ExpOp> ops;
+    getOperation().walk([&](math::ExpOp op) {
+      if (op.getResult().getType().isF32()) ops.push_back(op);
+    });
+    IRRewriter rewriter(getOperation().getContext());
+    for (math::ExpOp op : ops) {
+      rewriter.setInsertionPoint(op);
+      Location loc = op.getLoc();
+      auto type = rewriter.getF32Type();
+      auto c = [&](double value) -> Value {
+        return arith::ConstantOp::create(rewriter, loc, type,
+                                          rewriter.getFloatAttr(type, value));
+      };
+      Value x = op.getOperand(), x2 = arith::MulFOp::create(rewriter, loc, x, x);
+      Value x3 = arith::MulFOp::create(rewriter, loc, x2, x);
+      Value x4 = arith::MulFOp::create(rewriter, loc, x3, x);
+      Value x5 = arith::MulFOp::create(rewriter, loc, x4, x);
+      Value result = arith::AddFOp::create(rewriter, loc, c(1.0), x);
+      result = arith::AddFOp::create(rewriter, loc, result,
+          arith::MulFOp::create(rewriter, loc, x2, c(0.5)));
+      result = arith::AddFOp::create(rewriter, loc, result,
+          arith::MulFOp::create(rewriter, loc, x3, c(1.0 / 6.0)));
+      result = arith::AddFOp::create(rewriter, loc, result,
+          arith::MulFOp::create(rewriter, loc, x4, c(1.0 / 24.0)));
+      result = arith::AddFOp::create(rewriter, loc, result,
+          arith::MulFOp::create(rewriter, loc, x5, c(1.0 / 120.0)));
+      rewriter.replaceOp(op, result);
+    }
+  }
+};
+
 struct CalyxPipelineSanityPass
     : public PassWrapper<CalyxPipelineSanityPass, OperationPass<ModuleOp>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CalyxPipelineSanityPass)
@@ -95,6 +236,9 @@ struct CalyxHwPreflightPass
 } // namespace
 
 static void registerLLM2FPGACIRCTPasses() {
+  PassRegistration<FoldIdentityIntegerArithmeticPass>();
+  PassRegistration<LowerAuthenticatedSoftmaxCallPass>();
+  PassRegistration<LowerPolynomialExpScoutPass>();
   PassRegistration<CalyxPipelineSanityPass>();
   PassRegistration<CalyxHwPreflightPass>();
 }

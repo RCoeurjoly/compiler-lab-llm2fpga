@@ -1,0 +1,20 @@
+{
+  "schema": "tinystories-1m-softmax-score-input-binding-v1",
+  "source_oracle": "artifacts/comparison/tinystories-1m-attention-softmax-oracle.json",
+  "source_oracle_sha256": "0fd4b60df44989c4603f508ce6481a279d87336d6cb37cf27a3eda419bf2a7f6",
+  "prompt_tokens": [7454, 2402, 257, 640],
+  "block_index": 0,
+  "tensor": {
+    "shape": [16, 4, 4],
+    "layout": "head,query,key",
+    "dtype": "float32",
+    "source": "oracle.trace.rows[*].score_rows"
+  },
+  "lowered_binding": {
+    "producer_buffer": "%alloc_43",
+    "masked_score_buffer": "%alloc_37",
+    "binding_kind": "authenticated_pre_mask_score_to_causal_select"
+  },
+  "status": "input_binding_defined_interpreter_pending",
+  "functional_equivalence": false
+}

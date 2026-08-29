@@ -1,0 +1,10 @@
+{
+  "schema": "tinystories-1m-softmax-bridge-attempt-v1",
+  "graph": "/tmp/task3x-flat/flat.scf.mlir",
+  "status": "initial_rejection_then_authenticated",
+  "error_codes": ["pattern_not_proven", "dataflow_not_proven"],
+  "diagnostic": "The full compiler SCF graph does not expose the authenticated named score-row/zero-identity pattern required by the existing bridge; it must not be converted to the fixed-softmax custom ABI by heuristic matching.",
+  "decision": "authenticated_with_repaired_provenance_manifest",
+  "authenticated_result": "full graph bridge emits llm2fpga.attention_softmax_fixed; backend legalization remains unimplemented",
+  "next_step": "legalize the explicit tensor softmax operation to the existing RTL ABI"
+}

@@ -1,0 +1,32 @@
+{
+  "schema": "tinystories-1m-layernorm-tensor-abi-v1",
+  "status": "simulation_pass",
+  "adapter": {
+    "path": "rtl/llm2fpga_fixed_layer_norm_q16_16_tensor.sv",
+    "sha256": "77693aad03fb9eeb49e8809b60e50010dee9b0166f2f9073740f5527dbef59cd",
+    "abi": "three packed tensor<64xi32> inputs to one packed tensor<64xi32> output",
+    "output_encoding": "signed Q16.16 32-bit lanes"
+  },
+  "reference": {
+    "layernorm_rtl": "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/rtl/gptneo_layernorm.sv",
+    "layernorm_rtl_sha256": "354104a1d2b57552bdca54f291764d90d6b9f7d6f8a2ecc2cb0d95a396430e1b",
+    "divider_rtl": "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/rtl/gptneo_iterative_divider.sv",
+    "divider_rtl_sha256": "8665cc99e7bf98e0415775a36c78aa4ff242d30c976dce0719e6d465686a1540",
+    "vector_sha256": "750007e58f6303cbb0fe3b67c7a424d3d28ebd4c8bf4fc0428c3181c356c4c5e"
+  },
+  "simulation": {
+    "testbench": "scripts/comparison/generate_layernorm_tensor_abi_tb.py",
+    "testbench_sha256": "626bca27b02a36a74f075baefedc686ff383bfad1fd286fd4051d6f98ab3574a",
+    "lanes": 64,
+    "result": "GPTNEO_LAYERNORM_TENSOR_ABI_PASS",
+    "simulated_time_ps": 66345000,
+    "start_semantics": "start arms packed tensors; adapter streams 64 lanes and launches automatically"
+  },
+  "claims": {
+    "packed_abi_functional": true,
+    "compiler_external_call_shape_aligned": true,
+    "full_block_equivalence": false,
+    "synthesis_timing": false,
+    "hardware_inference": false
+  }
+}

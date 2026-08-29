@@ -1,6 +1,6 @@
 # Reference-guided TinyStories-1M compiler design
 
-**Status:** proposed for implementation planning
+**Status:** proposed for implementation plannin
 
 ## Purpose
 

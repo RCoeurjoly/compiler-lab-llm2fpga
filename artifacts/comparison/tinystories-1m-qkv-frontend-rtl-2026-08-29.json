@@ -1,0 +1,7 @@
+{
+  "schema": "tinystories-1m-qkv-frontend-rtl-v1",
+  "status": "interface_compile_pass",
+  "module": {"path": "rtl/llm2fpga_qkv_frontend_tensor.sv", "sha256": "0ba4fc320d852ea603bb118c9897ebb0379389edd9e7d4f386ee8e03a68a37ea"},
+  "path": ["block.input", "LN1", "Q projection", "K projection", "V projection"],
+  "claims": {"real_model_equivalence": false, "interface_compiles": true, "complete_transformer_block_equivalence": false, "timing_closed": false, "hardware_inference": false}
+}

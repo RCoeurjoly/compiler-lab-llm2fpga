@@ -1,0 +1,10 @@
+{
+  "schema": "tinystories-1m-gemv-mlp-fc-in-equivalence-v1",
+  "status": "simulation_pass",
+  "adapter": {"path": "rtl/llm2fpga_gemv_w8a8_tensor.sv", "sha256": "5f86c3170fd932de9e5c697b7811d25611325a16b0335bdb0cc07e520627c873"},
+  "projection": {"name": "blocks.0.mlp.fc.weight", "shape": [256, 64], "input_checkpoint": "block.ln_2.output", "output_checkpoint": "block.mlp.fc_in"},
+  "oracle_sha256": "2efd1f02b2500297442c5fc5f34e7ba33224472b2aefef6632a400e3cd7d8ecd",
+  "testbench_sha256": "1090fa64f91817051094e966fe1e0917417d9f0b1f7d5b142b45710a9ad5bb01",
+  "simulation": {"result": "LLM2FPGA_GEMV_FC_IN_PASS", "outputs": 256, "simulated_time_ps": 166445000},
+  "claims": {"real_model_projection_equivalence": true, "full_block_equivalence": false, "hardware_inference": false}
+}

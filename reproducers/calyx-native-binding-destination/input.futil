@@ -1,0 +1,34 @@
+// Minimal guard against cross-destination assignment emission in native Calyx.
+// `std_signext_63.out` may drive only `std_add_62.right`; the unrelated
+// `std_add_251.right` must remain the literal one.
+import "primitives/core.futil";
+import "primitives/binary_operators.futil";
+
+component main(@go go: 1) -> (@done done: 1, out_a: 64, out_b: 64) {
+  cells {
+    std_add_62 = std_add(64);
+    std_add_251 = std_add(64);
+    std_signext_63 = std_signext(32, 64);
+    result = std_reg(64);
+  }
+  wires {
+    out_a = std_add_62.out;
+    out_b = std_add_251.out;
+    group first {
+      std_signext_63.in = 32'd7;
+      std_add_62.left = 64'd3;
+      std_add_62.right = std_signext_63.out;
+      result.in = std_add_62.out;
+      result.write_en = 1'd1;
+      first[done] = result.done;
+    }
+    group second {
+      std_add_251.left = 64'd2;
+      std_add_251.right = 64'd1;
+      result.in = std_add_251.out;
+      result.write_en = 1'd1;
+      second[done] = result.done;
+    }
+  }
+  control { seq { first; second; } }
+}

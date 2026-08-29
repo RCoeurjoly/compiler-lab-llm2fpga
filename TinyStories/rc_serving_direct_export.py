@@ -198,7 +198,6 @@ def materialize_direct_export_bundle(
         raise ValueError("native reference does not contain all serving phases")
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    model = build_source_model(model_path)
     source_files = (
         "rc_serving_contract.py",
         "rc_serving_source.py",
@@ -215,6 +214,11 @@ def materialize_direct_export_bundle(
 
     phase_digests: dict[str, str] = {}
     for phase_name in PHASE_NAMES:
+        # Export/conformance may mutate model/cache internals; isolate each
+        # phase so a prior export cannot contaminate later cache shapes.
+        import torch._dynamo
+        torch._dynamo.reset()
+        model = build_source_model(model_path)
         invocation = fresh_phase_invocation(model, trace, phase_name)
         exported = export_direct_phase(model, invocation)
         phase_dir = out_dir / phase_name

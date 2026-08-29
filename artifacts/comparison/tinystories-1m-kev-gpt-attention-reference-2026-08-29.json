@@ -1,0 +1,14 @@
+{
+  "schema": "tinystories-1m-kev-gpt-attention-reference-v1",
+  "status": "reference_rtl_verified",
+  "model": "TinyStories-1M",
+  "rtl": {"path": "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/rtl/gptneo_attention.sv", "sha256": "b42c1ed824198e49b685d827a49036bfb41ce6218e6a391a69208fbf48ef1ba9"},
+  "lut": {"path": "/tmp/kev-attn/gptneo_exp.mem", "sha256": "7b3592d97348bccb5b8dde9985b7443bb25bb59e3f29d2bc4863fbbf117d45f0", "entries": 4096, "format": "Q0.20 exp(delta), delta=(index-4096)/256"},
+  "testbench": {"path": "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/tb/tb_gptneo_attention.sv", "sha256": "7696743031f5468e93e62030df2879c0e10351cd710abe138c2d57c9eff80023"},
+  "command": "nix shell nixpkgs#iverilog -c iverilog -g2012 -s tb_gptneo_attention -o /tmp/kev-attn/a.out gptneo_attention.sv gptneo_iterative_divider.sv tb_gptneo_attention.sv",
+  "result": "GPTNEO_ATTN_PASS",
+  "contract": {"hidden_size": 64, "heads": 16, "head_dim": 4, "context_max": 32, "score_scaling": "unscaled dot product >>>24", "causal_mask": "entries above position are zero", "exp_clamp": "[-16,0]", "exp_spacing": "1/256"},
+  "compiler_alignment": {"status": "not_aligned", "reason": "compiler graph still expresses floating-point score/select/subtract and math.exp"},
+  "claims": {"reference_attention_simulation": true, "compiler_attention_equivalence": false, "full_model_inference": false},
+  "provenance": {"reference_rtl_copied": false, "llm_assistance_disclosure_required": true}
+}

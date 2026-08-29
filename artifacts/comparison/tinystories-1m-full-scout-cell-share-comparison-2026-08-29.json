@@ -1,0 +1,32 @@
+{
+  "schema": "tinystories-1m-full-scout-cell-share-comparison-v1",
+  "scope": "full TinyStories-1M SCF artifact with polynomial-exp resource-scout legalization",
+  "status": "measured_not_behaviorally_authenticated",
+  "baseline": {
+    "calyx_pass_profile": "-d papercut",
+    "verilog_bytes": 1023692,
+    "yosys_cells_including_submodules": 11548,
+    "yosys_wires": 21270,
+    "yosys_wire_bits": 362486,
+    "yosys_memories": 4
+  },
+  "cell_share": {
+    "calyx_pass_profile": "-d papercut -d cell-share",
+    "verilog_bytes": 1356771,
+    "yosys_cells_including_submodules": 12486,
+    "yosys_wires": 32774,
+    "yosys_wire_bits": 800666,
+    "yosys_memories": 4
+  },
+  "delta": {
+    "cells": 938,
+    "wires": 11504,
+    "wire_bits": 438180,
+    "verilog_bytes": 333079
+  },
+  "decision": "cell_share_rejected_for_full_scout",
+  "limitations": [
+    "polynomial exp is an explicitly approximate resource scout",
+    "no functional equivalence, FPGA timing, or hardware inference claim"
+  ]
+}

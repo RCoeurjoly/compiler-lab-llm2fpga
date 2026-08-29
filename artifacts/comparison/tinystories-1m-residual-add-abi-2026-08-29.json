@@ -1,0 +1,8 @@
+{
+  "schema": "tinystories-1m-residual-add-abi-v1",
+  "status": "simulation_pass",
+  "rtl": {"path": "rtl/llm2fpga_add_q16_16_tensor.sv", "sha256": "4503d0daad18e0f1869b7e0ba61dca54c74d4a0b30607adb80e739e9f92b6551"},
+  "abi": {"inputs": "two tensor<64xi32> signed Q16.16 vectors", "output": "tensor<64xi32> signed Q16.16", "overflow": "32-bit two's-complement wrap", "latency": "one cycle after start"},
+  "simulation": {"testbench_sha256": "28ebc9da1d713e5b188992537aa5d527409025c12f6a762f422fef394c08e9c6", "lanes": 64, "result": "LLM2FPGA_ADD_Q16_16_PASS"},
+  "claims": {"residual_abi_functional": true, "full_block_equivalence": false, "hardware_inference": false}
+}

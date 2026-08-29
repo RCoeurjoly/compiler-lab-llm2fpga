@@ -1,0 +1,11 @@
+{
+  "schema": "tinystories-1m-attention-residual-equivalence-v1",
+  "status": "real_vector_simulation_pass",
+  "module": {"path": "rtl/llm2fpga_attention_residual_tensor.sv", "sha256": "f1cb11478721eeed30c1a81509d171dfddee75454ffceae98d01650e12cf82cb"},
+  "generator": {"path": "scripts/comparison/generate_attention_residual_tb.py", "sha256": "10aff38cb3430ccd925d4fe985ee0bf19283a1798d7a1b2a5f44192533c96479"},
+  "reference": "artifacts/reference/tinystories-1m-candidate-oracle.json",
+  "path": ["Q/K/V", "scores", "softmax", "context", "out_projection", "attention_residual"],
+  "testbench_sha256": "9f06e4f7e217168548137c1fc09626a045893cc4692de1406511d1c12ec59cdf",
+  "simulation": {"result": "LLM2FPGA_ATTENTION_RESIDUAL_PASS", "outputs": 64, "simulated_time_ps": 90905000000},
+  "claims": {"attention_residual_functional_equivalence": true, "complete_transformer_block_equivalence": false, "timing_closed": false, "hardware_inference": false}
+}

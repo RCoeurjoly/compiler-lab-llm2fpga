@@ -1,0 +1,8 @@
+{
+  "schema": "tinystories-1m-mlp-composition-rtl-v1",
+  "status": "interface_compile_pass",
+  "module": {"path": "rtl/llm2fpga_mlp_block_tensor.sv", "sha256": "869dce35e90a212b8355740939d79c98e659aaf51bc6872b4d16f0013360ab2c"},
+  "stages": ["fc_in", "gelu", "fc_out", "attention_residual"],
+  "simulation": {"tool": "iverilog", "mode": "-tnull", "result": "compile_pass"},
+  "claims": {"composed_rtl_simulation": false, "functional_equivalence": false, "timing_closed": false, "hardware_inference": false}
+}

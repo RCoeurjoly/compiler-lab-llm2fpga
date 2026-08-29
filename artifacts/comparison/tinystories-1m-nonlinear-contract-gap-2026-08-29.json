@@ -1,0 +1,21 @@
+{
+  "schema": "tinystories-1m-nonlinear-contract-gap-v1",
+  "status": "alignment_gap_identified",
+  "model": "TinyStories-1M",
+  "reference": {
+    "source": {"path": "/home/roland/kev-gpt/.worktrees/kintex-selftest/fpga/rtl/gptneo_attention.sv", "sha256": "b42c1ed824198e49b685d827a49036bfb41ce6218e6a391a69208fbf48ef1ba9"},
+    "softmax_exp": "Q0.20 lookup, clamped score delta [-16,0], 1/256 spacing, causal entries forced zero",
+    "attention_score_scaling": "unscaled integer dot product with >>>24"
+  },
+  "compiler_candidate": {
+    "flat_scf_sha256": "eeeb9ea3a735706be4cdfbd4a5fa4a5899f367782a41ed017f3dd8bb8e4e2c76",
+    "operation": "math.exp",
+    "exp_sites": 8,
+    "legalization": "llm2fpga-lower-polynomial-exp-for-calyx",
+    "status": "approximate_only",
+    "reason": "fifth-order Taylor polynomial is not the kev-gpt LUT contract"
+  },
+  "required_next_step": "Add a loadable MLIR legalization matching the Q0.20 LUT/clamp/causal-zero contract, then compare complete attention checkpoints before full-graph synthesis.",
+  "claims": {"reference_contract_verified": true, "compiler_alignment": false, "full_model_inference": false},
+  "provenance": {"reference_rtl_copied": false, "llm_assistance_disclosure_required": true}
+}

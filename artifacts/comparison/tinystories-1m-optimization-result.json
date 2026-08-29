@@ -2,18 +2,44 @@
   "schema": "tinystories-1m-optimization-result-v1",
   "model": "TinyStories-1M",
   "task": "Task 4: apply one evidence-backed compiler optimization",
-  "status": "blocked_missing_evidence",
-  "candidate_status": "none_ranked",
-  "selected_candidate": null,
-  "structural_property": null,
-  "source_change": null,
+  "status": "candidate_validated_slice_only",
+  "candidate_status": "evidence_backed_slice_candidate",
+  "selected_candidate": "disable Calyx cell-share",
+  "structural_property": "remove native Calyx Futil-to-Verilog assignment rebinding that introduces the authenticated LayerNorm synthesis loop",
+  "source_change": {
+    "path": "scripts/pipeline/calyx_to_sv_no_handshake.sh",
+    "change": "switch Calyx Verilog emission from `-d papercut` to `-d cell-share` for the compiler path under evaluation",
+    "applied_to_production": false
+  },
   "modified_paths": [],
-  "before": null,
-  "after": null,
+  "before": {
+    "verilog_sha256": "e13a8b49af93a7e77c5f0d3b4cffa9eea6f4280340601e79cf93711c43ad9732",
+    "yosys_techmap": "128 combinational-loop problems",
+    "functional_equivalence": {
+      "exact_layernorm_vector_match": true,
+      "cycles": 5829,
+      "output_writes": 64,
+      "mismatches": 0
+    }
+  },
+  "after": {
+    "verilog_sha256": "4e4c85e9167fd99a52bcd338680c43c83553120694a134c7cd783ffaf9e4038f",
+    "calyx_invocation": "calyx --synthesis --nested -d cell-share",
+    "yosys_techmap": "completed; check reports 96 undriven external-memory write-data bits and no combinational-loop problems",
+    "binding_audit": "accepted",
+    "functional_equivalence": {
+      "exact_layernorm_vector_match": true,
+      "cycles": 5577,
+      "output_writes": 64,
+      "mismatches": 0
+    }
+  },
   "acceptance": {
-    "functional_equivalence": false,
+    "functional_equivalence": true,
     "resource_improvement": false,
     "timing_preserved": false,
+    "full_block_equivalence": false,
+    "hardware_accepted": false,
     "accepted": false
   },
   "inputs": {
@@ -21,26 +47,30 @@
       "path": "artifacts/comparison/tinystories-1m-slice-comparison.json",
       "sha256": "5b711b3f2ddc2b5c125dbe91b48b28f326de8d06fc38cde39e94a8fd96a0400c"
     },
-    "required_evidence": [
+    "candidate_receipt": {
+      "path": "artifacts/comparison/tinystories-1m-layernorm-cell-share-disabled-optimization.json",
+      "sha256": "3821eb1dd3dc5d548b7aab4160e94f64274e702a2067251b5b3ed40f9a9c8397"
+    },
+    "required_evidence_still_missing": [
       "aligned one-transformer-block token-step comparison",
-      "ranked provenance-linked waste-map candidate",
-      "compiler before/after functional checkpoint evidence",
+      "complete reference/compiler checkpoint pair for the full transformer block",
       "technology-mapped resource receipts",
-      "constrained timing receipts"
+      "constrained timing receipts",
+      "three cold-start hardware inferences"
     ]
   },
   "blocking_reasons": [
-    "Task 3 comparison status is contract_mismatch, not aligned.",
-    "Task 3 emitted no ranked provenance-linked waste candidate.",
-    "No compiler or reference resource receipt is available for this slice.",
-    "No compiler or reference timing receipt is available for this slice.",
-    "No exact reference/compiler checkpoint pair is available for this slice."
+    "Task 3 slice comparison remains contract_mismatch, so the accepted candidate is only authenticated on the isolated LayerNorm slice.",
+    "No complete-block reference/compiler checkpoint pair exists yet for this candidate.",
+    "No technology-mapped FPGA resource receipt exists for the candidate.",
+    "No constrained nextpnr timing receipt exists for the candidate.",
+    "No hardware inference receipt exists for the candidate."
   ],
-  "decision": "Do not modify a lowering, scheduling, or template path and do not claim an optimization until the required Task 3 evidence exists.",
+  "decision": "Treat this as a slice-scoped evidence-backed candidate only. Do not claim full-block optimization, timing preservation, or FPGA acceptance until the same change is validated through the complete TinyStories-1M block comparison and downstream implementation gates.",
   "provenance": {
     "compiler_source_modified": false,
     "pcie_ddr3_transport_modified": false,
     "llm_assistance_disclosed": true
   },
-  "sha256": "c95e1405252fc7d86d56ca587f4466f77b59c32be7671f4e26ccdfc4f5e3bf7a"
+  "sha256": "e5be71b70d2b8c4524a162a31745c3a8bdc7827ddeec54d079cf36dfecafbbab"
 }

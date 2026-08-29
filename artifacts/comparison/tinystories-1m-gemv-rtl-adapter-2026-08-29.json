@@ -1,0 +1,10 @@
+{
+  "schema": "tinystories-1m-gemv-rtl-adapter-v1",
+  "status": "hidden_shape_simulation_and_mlp_shape_elaboration_pass",
+  "rtl": {"path": "rtl/llm2fpga_gemv_w8a8_tensor.sv", "sha256": "5f86c3170fd932de9e5c697b7811d25611325a16b0335bdb0cc07e520627c873"},
+  "contract": "artifacts/reference/tinystories-1m-gemv-contract.json",
+  "interface": {"activations": "K packed signed Q16.16 lanes", "input_scales": "K packed unsigned Q8.24 lanes", "weights": "M*K packed signed INT8 lanes", "weight_scales": "M packed unsigned Q8.24 lanes", "bias": "M packed signed Q16.16 lanes", "output_scales": "M packed unsigned Q8.24 lanes", "outputs": "M packed signed Q16.16 lanes"},
+  "simulation": {"parameters": {"M": 64, "K": 64}, "testbench_sha256": "3500fb74e3eda7022a47b875efc51bad4e235134c70654cdd9abdda9fe2b1fa6", "result": "LLM2FPGA_GEMV_64X64_PASS", "stimulus": "zero activations/weights/biases with nonzero Q8.24 scales"},
+  "elaboration": {"results": [{"parameters": {"M": 256, "K": 64}, "result": "GEMV_256X64_ELAB_PASS"}, {"parameters": {"M": 64, "K": 256}, "result": "GEMV_64X256_ELAB_PASS"}]},
+  "claims": {"arithmetic_contract_exercised": true, "hidden_projection_shape_simulated": true, "both_mlp_projection_shapes_elaborated": true, "full_block_equivalence": false, "timing_closed": false, "hardware_inference": false}
+}

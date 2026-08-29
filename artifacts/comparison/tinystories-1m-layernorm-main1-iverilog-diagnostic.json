@@ -1,0 +1,42 @@
+{
+  "schema": "tinystories-1m-layernorm-main1-iverilog-diagnostic-v1",
+  "generated_verilog": {
+    "path": "/tmp/lnexec/main.sv",
+    "sha256": "ebd7a3827c2dee5cb5698ab76db8c43c86bfcbd473adee914f45485407a7be2"
+  },
+  "testbench": {
+    "path": "reproducers/calyx-layernorm-memory-harness/main1_external_tb.sv",
+    "sha256": "0d6f62e40c89bab5c3c347ff324a8686c0765d984afc1d10de5d159e151d04b9"
+  },
+  "toolchain": {"simulator": "iverilog-13.0", "execution": "nix shell nixpkgs#iverilog"},
+  "reference_vector": {
+    "path": "artifacts/reference/tinystories-1m-rtl-layernorm-vector.json",
+    "sha256": "1b84d6194874f1f9e6074a99f06527aa01e633ecc6daf92340136a86806d6304",
+    "input_matches_testbench": true,
+    "expected_output_matches_testbench": true
+  },
+  "result": {
+    "done_seen": true,
+    "cycles_until_done_event": 5829,
+    "output_writes": 64,
+    "output_mismatches": 0,
+    "done_level_after_event": 0,
+    "ordered_memory_trace": {
+      "path": "/tmp/lnexec/main1-memory-trace.csv",
+      "sha256": "88faa99527d0a1d0d4ad60740dec42268914e707f881fc5a46579d6ddcd683a6",
+      "transactions": 256,
+      "format": "cycle,port,address,write_enable,data_hex"
+    }
+  },
+  "diagnostic_modifications": [
+    "Icarus-only copy replaced generated one-hot $fatal calls with $display.",
+    "main_1 was instantiated directly with a one-cycle external-memory response service.",
+    "done_seen is latched on the done rising edge because the generated done is a pulse."
+  ],
+  "scope": {
+    "layernorm_vector_functional_witness": true,
+    "claims_production_rtl_fixed": false,
+    "claims_tinystories_equivalence": false,
+    "claims_hardware_inference": false
+  }
+}

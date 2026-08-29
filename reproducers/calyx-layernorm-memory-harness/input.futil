@@ -1,0 +1,110 @@
+// Small external-memory execution fixture for the fixed LayerNorm backend.
+//
+// This is intentionally a diagnostic harness, not a reduced TinyStories
+// implementation.  It exercises the same four single-ported, one-cycle
+// external memory interfaces emitted by the Calyx backend and performs the
+// affine operation output[i] = input[i] + gamma[i] + beta[i] for four words.
+// Keeping the loop unrolled makes the generated Verilog small enough for a
+// fast Verilator test while preserving the memory read/write handshake.
+import "primitives/core.futil";
+import "primitives/memories/seq.futil";
+
+component main(@go go: 1) -> (@done done: 1) {
+  cells {
+    @external in_mem = seq_mem_d1(32, 4, 2);
+    @external gamma = seq_mem_d1(32, 4, 2);
+    @external beta = seq_mem_d1(32, 4, 2);
+    @external out_mem = seq_mem_d1(32, 4, 2);
+    add0 = std_add(32);
+    add1 = std_add(32);
+    add2 = std_add(32);
+    add3 = std_add(32);
+    out0 = std_reg(32);
+    out1 = std_reg(32);
+    out2 = std_reg(32);
+    out3 = std_reg(32);
+  }
+  wires {
+    group read0 {
+      in_mem.addr0 = 2'd0;
+      in_mem.content_en = 1'd1;
+      gamma.addr0 = 2'd0;
+      gamma.content_en = 1'd1;
+      beta.addr0 = 2'd0;
+      beta.content_en = 1'd1;
+      read0[done] = (in_mem.done & gamma.done & beta.done) ? 1'd1;
+    }
+    group word0 {
+      add0.left = in_mem.read_data;
+      add0.right = gamma.read_data;
+      add1.left = add0.out;
+      add1.right = beta.read_data;
+      out_mem.addr0 = 2'd0;
+      out_mem.content_en = 1'd1;
+      out_mem.write_data = add1.out;
+      out_mem.write_en = 1'd1;
+      word0[done] = out_mem.done;
+    }
+    group read1 {
+      in_mem.addr0 = 2'd1;
+      in_mem.content_en = 1'd1;
+      gamma.addr0 = 2'd1;
+      gamma.content_en = 1'd1;
+      beta.addr0 = 2'd1;
+      beta.content_en = 1'd1;
+      read1[done] = (in_mem.done & gamma.done & beta.done) ? 1'd1;
+    }
+    group word1 {
+      add2.left = in_mem.read_data;
+      add2.right = gamma.read_data;
+      add3.left = add2.out;
+      add3.right = beta.read_data;
+      out_mem.addr0 = 2'd1;
+      out_mem.content_en = 1'd1;
+      out_mem.write_data = add3.out;
+      out_mem.write_en = 1'd1;
+      word1[done] = out_mem.done;
+    }
+    group read2 {
+      in_mem.addr0 = 2'd2;
+      in_mem.content_en = 1'd1;
+      gamma.addr0 = 2'd2;
+      gamma.content_en = 1'd1;
+      beta.addr0 = 2'd2;
+      beta.content_en = 1'd1;
+      read2[done] = (in_mem.done & gamma.done & beta.done) ? 1'd1;
+    }
+    group word2 {
+      add0.left = in_mem.read_data;
+      add0.right = gamma.read_data;
+      add1.left = add0.out;
+      add1.right = beta.read_data;
+      out_mem.addr0 = 2'd2;
+      out_mem.content_en = 1'd1;
+      out_mem.write_data = add1.out;
+      out_mem.write_en = 1'd1;
+      word2[done] = out_mem.done;
+    }
+    group read3 {
+      in_mem.addr0 = 2'd3;
+      in_mem.content_en = 1'd1;
+      gamma.addr0 = 2'd3;
+      gamma.content_en = 1'd1;
+      beta.addr0 = 2'd3;
+      beta.content_en = 1'd1;
+      read3[done] = (in_mem.done & gamma.done & beta.done) ? 1'd1;
+    }
+    group word3 {
+      add2.left = in_mem.read_data;
+      add2.right = gamma.read_data;
+      add3.left = add2.out;
+      add3.right = beta.read_data;
+      out_mem.addr0 = 2'd3;
+      out_mem.content_en = 1'd1;
+      out_mem.write_data = add3.out;
+      out_mem.write_en = 1'd1;
+      word3[done] = out_mem.done;
+    }
+  }
+  control { seq { read0; word0; read1; word1; read2; word2; read3; word3; } }
+}

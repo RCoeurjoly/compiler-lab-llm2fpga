@@ -1,0 +1,15 @@
+{
+  "schema": "tinystories-1m-attention-head-count-gap-v1",
+  "status": "alignment_failure",
+  "model": "TinyStories-1M",
+  "contract": {"n_head": 16, "hidden_size": 64, "head_dim": 4},
+  "compiler": {
+    "flat_scf": {"path": "/nix/store/g0wrh3vdr28446kxwwfy07npibm46mxa-tiny-stories-1m-baseline-float-calyx/flat.scf.mlir", "sha256": "52382658fed8629d5e6757c6e9d7cb400d30dc1e05453c371c23d8ea8785ab9c"},
+    "math_exp_sites": 8,
+    "bridge_provenance_heads": 8,
+    "observed_head_indices": [0, 1, 2, 3, 4, 5, 6, 7]
+  },
+  "reason": "The accepted softmax bridge covers eight head-local regions, but the frozen TinyStories-1M contract requires sixteen heads. This cannot be promoted to a complete one-block comparison until the compiler artifact and bridge cover all sixteen heads.",
+  "claims": {"complete_attention_alignment": false, "full_block_equivalence": false, "hardware_inference": false},
+  "provenance": {"reference_rtl_copied": false, "llm_assistance_disclosure_required": true}
+}

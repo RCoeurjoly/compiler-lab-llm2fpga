@@ -1,0 +1,34 @@
+{
+  "schema": "tinystories-1m-layernorm-resource-comparison-v1",
+  "status": "structural_comparison_complete",
+  "model": "TinyStories-1M",
+  "slice": {"kind": "one_transformer_block_token_step", "block_index": 0, "token_index": 3, "operator": "block.ln_1"},
+  "method": {"tool": "Yosys 0.66", "pipeline": "read_verilog -sv; hierarchy; proc; opt; stat", "timing": "not measured"},
+  "reference": {
+    "source_sha256": "354104a1d2b57552bdca54f291764d90d6b9f7d6f8a2ecc2cb0d95a396430e1b",
+    "top": "gptneo_layernorm",
+    "cells": 152,
+    "wires": 161,
+    "wire_bits": 3545,
+    "submodules": 0,
+    "memories": 3,
+    "memory_bits": 6144,
+    "log_sha256": "cffe93570ce98fa4cf54e9091f3e410542728615d30884097bef783706035bf5"
+  },
+  "compiler": {
+    "source_sha256": "e13a8b49af93a7e77c5f0d3b4cffa9eea6f4280340601e79cf93711c43ad9732",
+    "top": "main_1",
+    "cells": 7654,
+    "wires": 12233,
+    "wire_bits": 133452,
+    "submodules": 2035,
+    "log_sha256": "59ef3ead11f4bc4258bf237de8ad5ce59b5b6292c4d051ef8a6f0aa3d4ae0558"
+  },
+  "derived": {
+    "cell_ratio_compiler_over_reference": 50.3552631579,
+    "wire_ratio_compiler_over_reference": 75.9813664596,
+    "wire_bit_ratio_compiler_over_reference": 37.645134
+  },
+  "interpretation": "The compiler slice is functionally exact but structurally far larger than the hand-written kev-gpt primitive; this identifies control/wiring lowering as the first resource-reduction target. These are pre-technology-map structural counts, not FPGA utilization or timing closure.",
+  "claims": {"functional_match": true, "fpga_resources": false, "timing": false, "full_block_equivalence": false}
+}

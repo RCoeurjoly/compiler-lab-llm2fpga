@@ -167,10 +167,33 @@ def discover_sources(repo_root: Path, nix_outputs: list[Path] | None = None) -> 
 
 
 def immediately_preceding_annotation(text: str, module_start: int) -> bool:
-    """Recognize the slice annotation only in comments adjoining a module."""
-    prefix = text[:module_start]
-    trailing = re.search(r"(?s)(?:(?:\s+)|(?://[^\n]*(?:\n|$))|(?:#[^\n]*(?:\n|$))|(?:/\*.*?\*/))*$", prefix)
-    return trailing is not None and ANNOTATION in trailing.group(0)
+    """Recognize the slice annotation only in comments adjoining a module.
+
+    This scans backwards over the small comment/whitespace region immediately
+    before the declaration.  Applying a repeated ``.*`` regex to the entire
+    prefix made extraction of a large generated SV bundle effectively
+    quadratic (and could hang before anchor selection).
+    """
+    cursor = module_start
+    adjoining: list[str] = []
+    while cursor > 0:
+        while cursor > 0 and text[cursor - 1].isspace():
+            cursor -= 1
+        if cursor >= 2 and text[cursor - 2:cursor] == "*/":
+            comment_start = text.rfind("/*", 0, cursor - 2)
+            if comment_start < 0:
+                return False
+            adjoining.append(text[comment_start:cursor])
+            cursor = comment_start
+            continue
+        line_start = text.rfind("\n", 0, cursor) + 1
+        line = text[line_start:cursor].strip()
+        if line.startswith("//") or line.startswith("#"):
+            adjoining.append(text[line_start:cursor])
+            cursor = line_start
+            continue
+        break
+    return ANNOTATION in "\n".join(reversed(adjoining))
 
 
 def parse_sv_modules(text: str) -> list[tuple[str, str, set[str], int]]:

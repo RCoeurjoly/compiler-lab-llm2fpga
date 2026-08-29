@@ -1,0 +1,10 @@
+{
+  "schema": "tinystories-1m-softmax-calyx-boundary-v1",
+  "status": "rejected_by_backend_type_boundary",
+  "input": "func.call @llm2fpga_attention_softmax_fixed(tensor<16x32xi32>, i32) -> tensor<16x32xi32>",
+  "observed_failure": "Calyx lowering asserts on unsupported tensor return type",
+  "backend_assertion": "BuildReturnRegs: (isa<IntegerType>(convArgType) || isa<FloatType>(convArgType)) && unsupported return type",
+  "conclusion": "The external call legalization is correct, but Calyx requires a packed integer ABI or a dedicated HW/external-instance lowering before this operation can enter the backend.",
+  "transport_unchanged": true,
+  "next_step": "add a verified tensor-to-packed-integer external-instance conversion"
+}

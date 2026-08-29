@@ -1,0 +1,39 @@
+{
+  "aggregate": {
+    "cycles_at_100mhz": 62596,
+    "simulated_time_ps": 625955000,
+    "tokens_per_second_if_serial": 1597.5461690842865
+  },
+  "claims": {
+    "complete_block_latency": false,
+    "functional_subpaths_verified": true,
+    "hardware_throughput": false,
+    "timing_closed": false
+  },
+  "clock_hz": 100000000,
+  "memory": {
+    "activation_bytes": 1792,
+    "attention_out_weights_bytes": 4096,
+    "mlp_weights_bytes": 32768,
+    "qkv_weights_bytes": 12288
+  },
+  "schema": "tinystories-1m-one-block-metrics-v1",
+  "stages": [
+    {
+      "cycles_at_100mhz": 19122,
+      "name": "qkv_frontend",
+      "simulated_time_ps": 191225000
+    },
+    {
+      "cycles_at_100mhz": 9090,
+      "name": "attention_residual",
+      "simulated_time_ps": 90905000
+    },
+    {
+      "cycles_at_100mhz": 34382,
+      "name": "mlp_residual",
+      "simulated_time_ps": 343825000
+    }
+  ],
+  "status": "measured_serial_slice_summary"
+}

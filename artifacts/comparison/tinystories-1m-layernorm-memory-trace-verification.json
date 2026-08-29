@@ -1,0 +1,15 @@
+{
+  "addresses_ascending": true,
+  "output_matches_reference": true,
+  "per_port_transactions": {
+    "0": 64,
+    "1": 64,
+    "2": 64,
+    "3": 64
+  },
+  "schema": "tinystories-1m-layernorm-memory-trace-verification-v1",
+  "status": "accepted",
+  "trace_sha256": "88faa99527d0a1d0d4ad60740dec42268914e707f881fc5a46579d6ddcd683a6",
+  "transactions": 256,
+  "vector_sha256": "1b84d6194874f1f9e6074a99f06527aa01e633ecc6daf92340136a86806d6304"
+}

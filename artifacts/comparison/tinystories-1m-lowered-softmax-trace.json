@@ -1,0 +1,17 @@
+{
+  "first_unsupported": {
+    "index": "%113",
+    "line": 835,
+    "memref": "%alloc_37",
+    "reason": "runtime_memref_value_unbound",
+    "required": "authenticated score tensor contents or executable lowered runtime",
+    "value": "114"
+  },
+  "flat_scf": {
+    "exp_sites": 8,
+    "path": "/tmp/task3x-flat/flat.scf.mlir"
+  },
+  "schema": "tinystories-1m-lowered-softmax-trace-v1",
+  "status": "fail_closed",
+  "trace": []
+}

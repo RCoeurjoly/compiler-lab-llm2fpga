@@ -1,0 +1,16 @@
+{
+  "status": "verified",
+  "input": "/tmp/bridge-packed.mlir",
+  "output": "/tmp/bridge-calyx.futil",
+  "input_sha256": "c3a33cf692d10ade021c2093b1e5ed3bcb3f3085eb926de5c8185af79516855d",
+  "output_sha256": "cf40cd22e6359e03fa4629af022391ea397576626af920e9f5c16963a77938da",
+  "verilog_sha256": "f3ddd9bf3db6a94f95889e37a593f9d329945b7f29fa0b9785d1465e2cbe0382",
+  "abi": "i16384 scores, i32 position -> i16384 result",
+  "primitive": "llm2fpga_attention_softmax_fixed_tensor",
+  "rtl_sha256": "48b38d390b8d36ac94f3784fad465838bfd468daacaa54f18024f3fab8f40290",
+  "entrypoint": "tinystories_1m_attention_softmax",
+  "verification": "circt-translate, pinned Calyx Verilog generation, and Yosys hierarchy/check succeeded",
+  "yosys": {"top": "tinystories_1m_attention_softmax", "wrapper_cells": 1, "submodules": ["llm2fpga_attention_softmax_fixed_tensor"], "check_errors": 0},
+  "hardware_inference": false,
+  "timing_closure": false
+}

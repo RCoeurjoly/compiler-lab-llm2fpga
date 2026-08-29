@@ -1,0 +1,10 @@
+{
+  "schema": "tinystories-1m-softmax-bridge-regeneration-v1",
+  "status": "blocked_structural_provenance",
+  "graph": "/nix/store/g0wrh3vdr28446kxwwfy07npibm46mxa-tiny-stories-1m-baseline-float-calyx/flat.scf.mlir",
+  "manifest": "artifacts/comparison/tinystories-1m-softmax-provenance-repaired-2026-08-29.json",
+  "repair_result": "constants and 8-layer x 16-head metadata authenticated",
+  "first_structural_diagnostic": "site 1 row-max buffer lacks -infinity initialization",
+  "interpretation": "The current graph's allocation/store ordering differs from the bridge matcher; do not weaken the matcher or claim a bridge until that dataflow is proven.",
+  "claims": {"bridge_regenerated": false, "fixed_point_compiler_trace": false, "compiler_equivalence": false, "hardware_inference": false}
+}

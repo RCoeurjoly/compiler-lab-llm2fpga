@@ -1,0 +1,33 @@
+{
+  "schema": "tinystories-1m-softmax-functional-equivalence-gate-v1",
+  "status": "fail_closed",
+  "scope": "one frozen prompt, block 0, all authenticated softmax sites",
+  "oracle": {
+    "path": "artifacts/comparison/tinystories-1m-attention-softmax-oracle.json",
+    "sha256": "0fd4b60df44989c4603f508ce6481a279d87336d6cb37cf27a3eda419bf2a7f6",
+    "domain": "float32 dequantized package weights",
+    "prompt_tokens": [7454, 2402, 257, 640],
+    "block_index": 0,
+    "heads": 16,
+    "causal_score_count": 160,
+    "frozen_next_token": 11
+  },
+  "candidate": {
+    "bridge_receipt": "artifacts/comparison/tinystories-1m-softmax-real-graph-boundary.json",
+    "bridge_status": "authenticated_8_site_pattern",
+    "rtl_equivalence": false,
+    "hardware_equivalence": false
+  },
+  "comparison": {
+    "status": "not_executed",
+    "reason": "The lowered SCF artifact has structural bridge evidence but no executable numerical interpreter or emitted RTL checkpoint for per-site comparison.",
+    "first_missing_checkpoint": "lowered_softmax_numeric_trace",
+    "required_next_step": "Emit deterministic lowered/RTL trace for score, row_max, delta, exp, sum, and normalized output before claiming functional equivalence."
+  },
+  "claims": {
+    "functional_equivalence": false,
+    "qdq_equivalence": false,
+    "rtl_equivalence": false,
+    "hardware_inference": false
+  }
+}

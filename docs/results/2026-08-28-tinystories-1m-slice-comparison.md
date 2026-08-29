@@ -101,15 +101,33 @@ from a technology-mapped resource report.
 
 ## Task 4 optimization gate
 
-Task 4 is currently **`blocked_missing_evidence`**.  The comparison receipt is
-`contract_mismatch`, its functional checkpoints are unavailable, and its
-`waste_map` is empty.  There is therefore no ranked, provenance-linked
-compiler candidate with measured before/after resource and timing cost.
+Task 4 is no longer in the original `blocked_missing_evidence` state, but it
+is also not accepted.  The first evidence-backed candidate is now
+**`disable Calyx cell-share`** for the authenticated LayerNorm slice only.
+That candidate is bound to
+[`tinystories-1m-layernorm-cell-share-disabled-optimization.json`](../../artifacts/comparison/tinystories-1m-layernorm-cell-share-disabled-optimization.json).
+It preserves the exact authenticated 64-word LayerNorm output vector, reduces
+the direct `main_1` probe latency from 5,829 to 5,577 cycles, and clears the
+specific Yosys techmap combinational-loop diagnostic that blocked the baseline
+slice (`128 combinational-loop problems` becomes `completed; check reports 96
+undriven external-memory write-data bits and no combinational-loop problems`).
 
-The fail-closed result is
+The variant was independently rerun through the identical four-memory Icarus
+harness on 2026-08-29: 5,577 cycles, 256 transactions, 64 output writes, and
+zero mismatches.  Its ordered trace and exact result hash are recorded in the
+optimization receipt.
+
+This remains a **slice-scoped** candidate, not a full compiler optimization
+acceptance.  The broader comparison receipt is still `contract_mismatch`, so
+the candidate has not yet been authenticated through a complete
+transformer-block token-step comparison, technology-mapped FPGA resource
+receipts, constrained timing receipts, or any hardware inference gate.
+
+The current Task 4 state is recorded in
 [`tinystories-1m-optimization-result.json`](../../artifacts/comparison/tinystories-1m-optimization-result.json).
-No lowering, scheduling, or template source was modified, and no optimization
-claim is made.  The next valid Task 4 attempt requires a fresh aligned slice
-comparison, exact functional evidence, and technology-mapped resource and
-timing receipts for both sides; structural guesses or an unmeasured change do
-not satisfy this gate.
+It points at the compiler path under evaluation
+([`scripts/pipeline/calyx_to_sv_no_handshake.sh`](../../scripts/pipeline/calyx_to_sv_no_handshake.sh))
+but does not claim that the production pipeline has been switched yet.  The
+next valid step is to carry this exact backend-mode change through the
+complete one-block comparison and implementation receipts before promoting it
+to the full TinyStories-1M build.

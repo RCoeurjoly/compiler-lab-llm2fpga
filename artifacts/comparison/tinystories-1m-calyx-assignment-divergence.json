@@ -1,0 +1,10 @@
+{
+  "schema": "calyx-assignment-divergence-location-v1",
+  "needle": "std_add_251.right = std_signext_63.out",
+  "first": {
+    "line": 937001,
+    "pass": "dead-cell-removal",
+    "text": "std_add_251.right = std_signext_63.out;"
+  },
+  "occurrence_count": 1430
+}

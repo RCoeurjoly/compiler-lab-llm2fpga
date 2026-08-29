@@ -9,6 +9,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Tools/Plugins/PassPlugin.h"
 
@@ -23,6 +24,177 @@ using namespace mlir;
 void registerLegalizePt2eTosaZeroPointPass();
 
 namespace {
+struct LowerAttentionSoftmaxFixedPass
+    : public PassWrapper<LowerAttentionSoftmaxFixedPass,
+                         OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerAttentionSoftmaxFixedPass)
+  StringRef getArgument() const final { return "llm2fpga-lower-attention-softmax-fixed"; }
+  StringRef getDescription() const final {
+    return "Lower authenticated fixed attention softmax to an external RTL-call boundary.";
+  }
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<func::FuncDialect>();
+  }
+  void runOnOperation() final {
+    ModuleOp module = getOperation();
+    MLIRContext *context = module.getContext();
+    SmallVector<Operation *> ops;
+    module.walk([&](Operation *op) {
+      if (op->getName().getStringRef() == "llm2fpga.attention_softmax_fixed")
+        ops.push_back(op);
+    });
+    for (Operation *op : ops) {
+      auto resultType = op->getResult(0).getType();
+      SmallVector<Type> resultTypes{resultType};
+      auto calleeType = FunctionType::get(context, op->getOperandTypes(), resultTypes);
+      auto callee = module.lookupSymbol<func::FuncOp>("llm2fpga_attention_softmax_fixed");
+      if (!callee)
+        callee = func::FuncOp::create(op->getLoc(), "llm2fpga_attention_softmax_fixed", calleeType);
+      if (callee->getParentOp() == nullptr)
+        callee.setPrivate();
+      if (callee->getParentOp() == nullptr)
+        module.push_back(callee);
+      OpBuilder builder(op);
+      auto call = builder.create<func::CallOp>(op->getLoc(), callee.getName(),
+                                                resultTypes, op->getOperands());
+      op->replaceAllUsesWith(call.getResults());
+      op->erase();
+    }
+  }
+};
+
+struct LowerFixedLayerNormQ16Pass
+    : public PassWrapper<LowerFixedLayerNormQ16Pass,
+                         OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerFixedLayerNormQ16Pass)
+  StringRef getArgument() const final {
+    return "llm2fpga-lower-fixed-layernorm-q16";
+  }
+  StringRef getDescription() const final {
+    return "Lower authenticated fixed Q16.16 LayerNorm to an external RTL call.";
+  }
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<func::FuncDialect>();
+  }
+  void runOnOperation() final {
+    ModuleOp module = getOperation();
+    MLIRContext *context = module.getContext();
+    SmallVector<Operation *> ops;
+    module.walk([&](Operation *op) {
+      if (op->getName().getStringRef() == "llm2fpga.fixed_layer_norm_q16_16")
+        ops.push_back(op);
+    });
+    for (Operation *op : ops) {
+      auto resultType = op->getResult(0).getType();
+      SmallVector<Type> resultTypes{resultType};
+      auto calleeType = FunctionType::get(context, op->getOperandTypes(), resultTypes);
+      auto callee = module.lookupSymbol<func::FuncOp>("llm2fpga_fixed_layer_norm_q16_16");
+      if (!callee)
+        callee = func::FuncOp::create(op->getLoc(), "llm2fpga_fixed_layer_norm_q16_16", calleeType);
+      if (callee->getParentOp() == nullptr)
+        callee.setPrivate();
+      if (callee->getParentOp() == nullptr)
+        module.push_back(callee);
+      OpBuilder builder(op);
+      auto call = builder.create<func::CallOp>(op->getLoc(), callee.getName(),
+                                                resultTypes, op->getOperands());
+      op->replaceAllUsesWith(call.getResults());
+      op->erase();
+    }
+  }
+};
+
+// Remove only cast chains whose identity is provable from the integer widths.
+// In particular, trunc(extsi|extui(x)) is an identity when the truncation
+// returns to x's original width.  This is deliberately narrower than MLIR's
+// general canonicalization so fixed-point wraparound semantics are preserved.
+struct FoldRedundantIntegerCastsPass
+    : public PassWrapper<FoldRedundantIntegerCastsPass,
+                         OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FoldRedundantIntegerCastsPass)
+
+  StringRef getArgument() const final {
+    return "llm2fpga-fold-redundant-integer-casts";
+  }
+  StringRef getDescription() const final {
+    return "Fold provably identity integer extension/truncation pairs.";
+  }
+
+  void runOnOperation() final {
+    IRRewriter rewriter(getOperation().getContext());
+    SmallVector<arith::TruncIOp> truncs;
+    getOperation().walk([&](arith::TruncIOp op) { truncs.push_back(op); });
+    for (arith::TruncIOp trunc : truncs) {
+      auto resultInt = dyn_cast<IntegerType>(trunc.getType());
+      if (!resultInt)
+        continue;
+      Operation *def = trunc.getIn().getDefiningOp();
+      if (!def || (def->getName().getStringRef() != "arith.extsi" &&
+                   def->getName().getStringRef() != "arith.extui"))
+        continue;
+      auto sourceInt = dyn_cast<IntegerType>(def->getOperand(0).getType());
+      auto extendedInt = dyn_cast<IntegerType>(def->getResult(0).getType());
+      if (!sourceInt || !extendedInt ||
+          sourceInt.getWidth() >= extendedInt.getWidth() ||
+          sourceInt.getWidth() != resultInt.getWidth())
+        continue;
+      rewriter.replaceOp(trunc, def->getOperand(0));
+    }
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<arith::ArithDialect>();
+  }
+};
+
+struct FoldIdentityIntegerArithmeticPass
+    : public PassWrapper<FoldIdentityIntegerArithmeticPass,
+                         OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FoldIdentityIntegerArithmeticPass)
+
+  StringRef getArgument() const final {
+    return "llm2fpga-fold-identity-integer-arithmetic";
+  }
+  StringRef getDescription() const final {
+    return "Fold integer add-zero and multiply-one operations.";
+  }
+
+  static bool isIntegerConstant(Value value, int64_t expected) {
+    Attribute attr;
+    if (!matchPattern(value, m_Constant(&attr)))
+      return false;
+    auto integer = dyn_cast<IntegerAttr>(attr);
+    return integer && integer.getValue() == expected;
+  }
+
+  void runOnOperation() final {
+    IRRewriter rewriter(getOperation().getContext());
+    SmallVector<Operation *> candidates;
+    getOperation().walk([&](Operation *op) {
+      StringRef name = op->getName().getStringRef();
+      if (name == "arith.addi" || name == "arith.muli")
+        candidates.push_back(op);
+    });
+    for (Operation *op : candidates) {
+      if (op->getNumOperands() != 2 || op->getNumResults() != 1)
+        continue;
+      StringRef name = op->getName().getStringRef();
+      int64_t identity = name == "arith.addi" ? 0 : 1;
+      Value replacement;
+      if (isIntegerConstant(op->getOperand(0), identity))
+        replacement = op->getOperand(1);
+      else if (isIntegerConstant(op->getOperand(1), identity))
+        replacement = op->getOperand(0);
+      if (replacement && replacement.getType() == op->getResult(0).getType())
+        rewriter.replaceOp(op, replacement);
+    }
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<arith::ArithDialect>();
+  }
+};
+
 struct StaticMemRefView {
   Value base;
   int64_t offset = 0;
@@ -918,6 +1090,14 @@ struct LowerRationalTanhForCalyxPass
 
 MLIR_DECLARE_EXPLICIT_TYPE_ID(FoldConstantTruncFOpsPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(FoldConstantTruncFOpsPass)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerAttentionSoftmaxFixedPass)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerAttentionSoftmaxFixedPass)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerFixedLayerNormQ16Pass)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerFixedLayerNormQ16Pass)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(FoldRedundantIntegerCastsPass)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(FoldRedundantIntegerCastsPass)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(FoldIdentityIntegerArithmeticPass)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(FoldIdentityIntegerArithmeticPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerStaticMemRefViewsForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerStaticMemRefViewsForCalyxPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(DropCalyxUnsupportedAssertOpsPass)
@@ -941,6 +1121,10 @@ extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo mlirGetPassPluginInfo() {
   return {MLIR_PLUGIN_API_VERSION, "LLM2FPGAMLIRPasses", LLVM_VERSION_STRING,
           []() {
             PassRegistration<FoldConstantTruncFOpsPass>();
+            PassRegistration<LowerAttentionSoftmaxFixedPass>();
+            PassRegistration<LowerFixedLayerNormQ16Pass>();
+            PassRegistration<FoldRedundantIntegerCastsPass>();
+            PassRegistration<FoldIdentityIntegerArithmeticPass>();
             PassRegistration<LowerStaticMemRefViewsForCalyxPass>();
             PassRegistration<DropCalyxUnsupportedAssertOpsPass>();
             PassRegistration<LowerRoundEvenForCalyxPass>();

@@ -1,0 +1,145 @@
+{
+  "contract_sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
+  "heads": [
+    {
+      "head": 0,
+      "identities": {
+        "causal": "%168[head=0]",
+        "delta": "%173[head=0]",
+        "exp": "%174[head=0]",
+        "normalization": "%177[head=0]",
+        "output": "softmax_output:%177[head=0]",
+        "row_max": "%values[head=0]",
+        "score": "%172[head=0]",
+        "sum": "%176[head=0]"
+      }
+    },
+    {
+      "head": 1,
+      "identities": {
+        "causal": "%168[head=1]",
+        "delta": "%173[head=1]",
+        "exp": "%174[head=1]",
+        "normalization": "%177[head=1]",
+        "output": "softmax_output:%177[head=1]",
+        "row_max": "%values[head=1]",
+        "score": "%172[head=1]",
+        "sum": "%176[head=1]"
+      }
+    },
+    {
+      "head": 2,
+      "identities": {
+        "causal": "%168[head=2]",
+        "delta": "%173[head=2]",
+        "exp": "%174[head=2]",
+        "normalization": "%177[head=2]",
+        "output": "softmax_output:%177[head=2]",
+        "row_max": "%values[head=2]",
+        "score": "%172[head=2]",
+        "sum": "%176[head=2]"
+      }
+    },
+    {
+      "head": 3,
+      "identities": {
+        "causal": "%168[head=3]",
+        "delta": "%173[head=3]",
+        "exp": "%174[head=3]",
+        "normalization": "%177[head=3]",
+        "output": "softmax_output:%177[head=3]",
+        "row_max": "%values[head=3]",
+        "score": "%172[head=3]",
+        "sum": "%176[head=3]"
+      }
+    },
+    {
+      "head": 4,
+      "identities": {
+        "causal": "%168[head=4]",
+        "delta": "%173[head=4]",
+        "exp": "%174[head=4]",
+        "normalization": "%177[head=4]",
+        "output": "softmax_output:%177[head=4]",
+        "row_max": "%values[head=4]",
+        "score": "%172[head=4]",
+        "sum": "%176[head=4]"
+      }
+    },
+    {
+      "head": 5,
+      "identities": {
+        "causal": "%168[head=5]",
+        "delta": "%173[head=5]",
+        "exp": "%174[head=5]",
+        "normalization": "%177[head=5]",
+        "output": "softmax_output:%177[head=5]",
+        "row_max": "%values[head=5]",
+        "score": "%172[head=5]",
+        "sum": "%176[head=5]"
+      }
+    },
+    {
+      "head": 6,
+      "identities": {
+        "causal": "%168[head=6]",
+        "delta": "%173[head=6]",
+        "exp": "%174[head=6]",
+        "normalization": "%177[head=6]",
+        "output": "softmax_output:%177[head=6]",
+        "row_max": "%values[head=6]",
+        "score": "%172[head=6]",
+        "sum": "%176[head=6]"
+      }
+    },
+    {
+      "head": 7,
+      "identities": {
+        "causal": "%168[head=7]",
+        "delta": "%173[head=7]",
+        "exp": "%174[head=7]",
+        "normalization": "%177[head=7]",
+        "output": "softmax_output:%177[head=7]",
+        "row_max": "%values[head=7]",
+        "score": "%172[head=7]",
+        "sum": "%176[head=7]"
+      }
+    }
+  ],
+  "lowering_stages": {
+    "flat_scf": {
+      "bytes": 29375724,
+      "path": "/tmp/task3x-flat/flat.scf.mlir",
+      "sha256": "52382658fed8629d5e6757c6e9d7cb400d30dc1e05453c371c23d8ea8785ab9c"
+    },
+    "linalg": {
+      "bytes": 29142081,
+      "path": "/tmp/task3x-linalg.mlir",
+      "sha256": "82119011db5f0296701b088f728b1e7c18de8210af69b5ec5bfc96be4c1b5354"
+    },
+    "scf": {
+      "bytes": 29221149,
+      "path": "/tmp/task3x-scf.mlir",
+      "sha256": "98dc99264388ad836b98fade83c71abb4d194a6840371e26cdb98465916c0c33"
+    },
+    "torch_mlir": {
+      "bytes": 29060435,
+      "path": "/tmp/task3x-torch.mlir",
+      "sha256": "dd1d864f940fa513b4262e0914ab97ce3c03bfdcde1e2bcac092924bc1bf865f"
+    }
+  },
+  "model": "TinyStories-1M",
+  "package": {
+    "calibration_ids_sha256": "2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075",
+    "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+    "weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+  },
+  "pre_lowering_source": {
+    "kind": "torch-mlir-ssa",
+    "path": "/tmp/task3x-torch.mlir",
+    "sha256": "dd1d864f940fa513b4262e0914ab97ce3c03bfdcde1e2bcac092924bc1bf865f"
+  },
+  "schema": "tinystories-1m-softmax-provenance-v1",
+  "sha256": "cedd6d46839fcacb2f0d341534a3608930679c56576f8f7c8e81382728615ebf"
+}

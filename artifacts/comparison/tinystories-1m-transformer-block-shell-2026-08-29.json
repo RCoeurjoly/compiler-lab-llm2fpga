@@ -1,0 +1,8 @@
+{
+  "schema": "tinystories-1m-transformer-block-shell-v1",
+  "status": "interface_compile_pass",
+  "module": {"path": "rtl/llm2fpga_transformer_block_tensor.sv", "sha256": "80357255c724906e740a85630f4994bc1efcd7cef590e9ea4f3e1adb476fc55d"},
+  "sequence": ["LN1/QKV", "attention residual", "LN2", "MLP residual"],
+  "tool": "iverilog -g2012 -tnull",
+  "claims": {"interface_compiles": true, "complete_block_simulation": false, "timing_closed": false, "hardware_inference": false}
+}

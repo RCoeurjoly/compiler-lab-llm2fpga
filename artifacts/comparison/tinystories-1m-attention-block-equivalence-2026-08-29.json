@@ -1,0 +1,11 @@
+{
+  "schema": "tinystories-1m-attention-block-equivalence-v1",
+  "status": "real_vector_simulation_pass",
+  "module": {"path": "rtl/llm2fpga_attention_block_tensor.sv", "sha256": "e3692773f38d6f44cdaffc9b2c02d9aef746b350693ebf713c53b8836286208f"},
+  "generator": {"path": "scripts/comparison/generate_attention_block_tb.py", "sha256": "016556ac2f7cc5e8463039b96760bbc7c8f7397e5a117f271aecd875085f9fab"},
+  "reference": "artifacts/reference/tinystories-1m-fixed-softmax-checkpoints.json",
+  "path": ["query/key", "scores", "softmax", "context"],
+  "testbench_sha256": "4783b291b6b3fb2df12ba2451adc6cae173d65e1f4d7cbbea784182af53635a6",
+  "simulation": {"result": "LLM2FPGA_ATTENTION_BLOCK_PASS", "outputs": 64, "simulated_time_ps": 49235000000},
+  "claims": {"attention_block_functional_equivalence": true, "complete_transformer_block_equivalence": false, "timing_closed": false, "hardware_inference": false}
+}

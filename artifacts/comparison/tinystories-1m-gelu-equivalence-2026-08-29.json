@@ -1,0 +1,12 @@
+{
+  "schema": "tinystories-1m-gelu-equivalence-v1",
+  "status": "simulation_pass",
+  "adapter": {"path": "rtl/llm2fpga_gelu_q16_tensor.sv", "sha256": "efeb6d00d6554976dc22a0cd6017c49d04a346cf8407e195d277f3be9d83c24b"},
+  "generator": {"path": "scripts/comparison/generate_gelu_tensor_abi_tb.py", "sha256": "a8623c1ecf9a2f986d1d134a267efcd5a64f40f4c7922a03afecd950dab651a6"},
+  "reference": "artifacts/reference/tinystories-1m-candidate-oracle.json",
+  "input_checkpoint": "block.mlp.fc_in",
+  "output_checkpoint": "block.mlp.activation",
+  "lut": {"entries": 8192, "format": "Q4.12", "source": "kev-gpt tinystories.hardware_reference._gelu_table"},
+  "simulation": {"result": "LLM2FPGA_GELU_TENSOR_PASS", "outputs": 256, "simulated_time_ps": 12855000000},
+  "claims": {"real_model_activation_equivalence": true, "complete_block_equivalence": false, "hardware_inference": false}
+}

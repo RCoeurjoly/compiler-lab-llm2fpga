@@ -1,0 +1,156 @@
+#+title: LLM2FPGA Working Notes
+
+* Purpose
+
+Canonical continuity record for project reasoning. The formal scope remains in
+=docs/project-plan_v2.org=; durable architectural decisions are recorded in
+=docs/adr/=; stable terminology belongs in =CONTEXT.md=.
+
+* 2026-08-28 — Current direction
+
+** Status
+
+- Highest priority: finish Tasks 4, 5, and 6.
+- The kev-gpt-derived accelerator demonstrates fast TinyStories-1M inference
+  on hardware with weights resident in FPGA memory and no DDR3.
+- The compiler-generated TinyStories RTL has not yet produced a working,
+  fitting FPGA design.
+- Integrated UberDDR3 is flaky under integration pressure; DDR3 and larger
+  models are deferred.
+
+** Approved decisions
+
+- Continue the compiler-pipeline architecture, using kev-gpt as a behavioral
+  and high-level architectural reference.
+- The current compiler backend targets the ordinary TinyStories family:
+  1M, 3M, 8M, 28M, and 33M. Arbitrary PyTorch models are deferred.
+- TinyStories-1Layer-21M is excluded from the first milestone; it is a later
+  wide-datapath/DDR3 stress case.
+- Reproduction means the same frozen model/package, prompt, quantization, and
+  exact 16-token FPGA output, repeated across three cold starts. Intermediate
+  traces are diagnostic; performance metrics are separate characterization.
+- kev-gpt source is not copied into compiler output or submitted RTL. The
+  project defines an independent reference contract and implementation.
+- Existing LLM-assisted history is preserved and disclosed. New substantive
+  assistance is provenance-tracked, and NLnet guidance is requested.
+
+** Open questions
+
+- Which reference-contract fields must be frozen first?
+- What is the smallest compiler vertical slice that can reproduce 1M?
+- Which Task 4–6 plan wording needs updating to reflect the deferred DDR3
+  phase?
+- Whether the existing RC should be the compiler’s fast iteration target before
+  full TinyStories-1M reproduction.
+- Existing ADR 0002 prioritizes DDR3 before scaling; the new deferred-DDR3
+  direction would need an explicit superseding decision.
+
+** Next actions
+
+- Freeze the reference contract from the working accelerator.
+- Build a TinyStories-specific compiler vertical slice.
+- Validate simulation equivalence before attempting a full FPGA build.
+
+** Reference-contract starting point (approved)
+
+Freeze the smallest complete TinyStories-1M contract first:
+
+- model and tokenizer hashes;
+- exact quantization format;
+- serialized weight/memory image format and hash;
+- prompt token IDs and expected 16-token output;
+- host/accelerator command interface;
+- timing and resource measurements as baseline metadata.
+
+Extend this contract to larger TinyStories configurations only after the 1M
+contract is stable.
+
+** RC fast-loop target (approved)
+
+Use the deterministic Representative Core as the compiler’s fast iteration
+target. RC equivalence, synthesis, and resource comparisons accelerate
+compiler development, but do not replace the mandatory full TinyStories-1M
+FPGA reproduction gate. The validation ladder is RC first, then TinyStories-1M,
+then larger in-scope TinyStories variants.
+
+Use the existing frozen RC and its prior validation artifacts unchanged. Add an
+explicit RC-to-TinyStories-1M mapping that records shared operators,
+interfaces, reduced dimensions, non-transferable behaviors, and which resource
+or timing observations are predictive.
+
+** Direction revision
+
+The RC is not the reference-guided comparison target: it is a different model
+and could confuse the comparison because kev-gpt’s validated reference is
+TinyStories-1M. The kev-gpt-guided compiler path must compare directly against
+the full 1M contract. The existing RC may remain only as an independent,
+optional compiler smoke test, not as evidence of 1M reproduction.
+
+** Direction revision (approved)
+
+The RC is removed from the active completion path because it has not shown that
+it shortens or de-risks TinyStories-1M inference. Existing RC artifacts remain
+historical compiler research. The active path is now direct TinyStories-1M
+contract alignment, compiler comparison, and FPGA reproduction.
+
+** kev-gpt parameterization finding
+
+The kev-gpt RTL exposes parameters for several dimensions (for example context
+length, vocabulary, hidden/GEMV widths, weight depth, and external memory), but
+its supported package schema and sequencer still hard-code the validated 1M
+contract: eight layers, hidden size 64, sixteen heads, fixed layer byte offsets,
+and a fixed MLP width. Therefore changing to an arbitrary RC is not a simple
+configuration change; it requires package-layout and sequencer validation.
+
+** Model-evidence clarification
+
+The checked-out validated kev-gpt artifact inspected on 2026-08-28 is
+explicitly TinyStories-1M: eight layers, hidden size 64, and sixteen heads. A
+separate claim that kev-gpt demonstrated TinyStories-33M must be tied to a
+specific package, bitstream, model manifest, and hardware evidence before it
+can define the compiler comparison target.
+
+The current faithful comparison target is therefore TinyStories-1M. The 33M
+claim remains out of scope unless independently evidenced by those artifacts.
+
+** Execution order (approved)
+
+Complete the RC and TinyStories-1M compiler-guided FPGA inference path using
+on-chip memory first. DDR3 integration, reliability work, and larger-model
+support are later work; this explicitly supersedes the DDR3-first ordering in
+ADR 0002.
+
+** Compiler/reference comparison (approved direction)
+
+The existing compiler-lowered TinyStories-1M RTL should be compared against the
+working kev-gpt-derived implementation on the agreed one-block token-step
+vertical slice. Provenance annotations in the generated RTL should be used to
+map expensive structures back to compiler stages and source operations. The
+comparison is intended to identify avoidable resource and timing overhead, not
+to copy kev-gpt source.
+
+kev-gpt is the behavioral golden reference. Its measured implementation is a
+resource/timing baseline, not an assumption that every internal design choice
+is optimal.
+
+** First comparison artifact (approved)
+
+Begin with the existing compiler-generated TinyStories-1M RTL. Extract the
+approved one-block token-step slice, compare it against the corresponding
+kev-gpt/reference behavior, and produce the resource/timing waste map before
+regenerating or changing the compiler.
+
+** Contract-alignment gate (approved)
+
+Before interpreting resource or timing differences as compiler inefficiency,
+the existing RTL and kev-gpt reference must be aligned on checkpoint,
+tokenizer, operator semantics, quantization/scales, tensor layouts, and the
+one-block inputs/outputs. A failure at this gate is reported as a contract
+mismatch rather than a waste-map result.
+
+** Comparison-study outputs (approved)
+
+Produce a reproducible report and machine-readable JSON manifest containing the
+aligned contract, source and artifact hashes, RC/1M slice definitions,
+functional results, resource/timing tables, provenance-linked waste map,
+rejected hypotheses, and proposed next compiler changes.

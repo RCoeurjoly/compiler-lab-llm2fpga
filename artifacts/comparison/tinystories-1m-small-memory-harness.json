@@ -1,0 +1,32 @@
+{
+  "schema": "tinystories-1m-small-external-memory-harness-v1",
+  "fixture": {
+    "path": "reproducers/calyx-layernorm-memory-harness/input.futil",
+    "sha256": "c7ce840d00c8f6609dd87f95dcb8bff271645d8a41e036791043eebf6aafee5c"
+  },
+  "probe": {
+    "path": "scripts/comparison/probe_small_external_memory.cpp",
+    "sha256": "ef25d489db1b68ffb8bc286a3001c27619857a0a13dde244d4e3a9f277837358"
+  },
+  "generated_verilog": {
+    "sha256": "a0bd9e2e706746271bae9cd1c170531392e4616e722abdd4d8bc185b9df71765"
+  },
+  "toolchain": {
+    "calyx": "0.7.1",
+    "verilator": "5.022",
+    "execution": "nix develop"
+  },
+  "result": {
+    "status": "ok",
+    "done": true,
+    "cycles": 16
+  },
+  "scope": {
+    "external_memories": 4,
+    "memory_shape": {"width_bits": 32, "depth": 4},
+    "operation": "out = in + gamma + beta",
+    "claims_layernorm_equivalence": false,
+    "claims_tinystories_equivalence": false,
+    "claims_hardware_inference": false
+  }
+}

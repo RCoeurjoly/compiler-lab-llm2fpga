@@ -1,0 +1,34 @@
+{
+  "schema": "tinystories-1m-compiler-plugin-experiment-v1",
+  "pass": [
+    "llm2fpga-fold-redundant-integer-casts",
+    "llm2fpga-fold-identity-integer-arithmetic"
+  ],
+  "status": "built_and_semantically_checked",
+  "plugin": "result/lib/LLM2FPGAMLIRPasses.so",
+  "fixture": {
+    "safe_pairs_removed": 2,
+    "unsafe_non_identity_pair_preserved": true
+  },
+  "authenticated_layernorm_sc": {
+    "input_cast_ops": 513,
+    "output_cast_ops": 513,
+    "input_addi_muli_ops": 449,
+    "output_addi_muli_ops": 445,
+    "identity_add_zero_folds": 4,
+    "resource_or_latency_improvement_observed": false
+  },
+  "backend_lowering": {
+    "baseline_calyx_assign": 65219,
+    "optimized_calyx_assign": 65219,
+    "baseline_calyx_enable": 449,
+    "optimized_calyx_enable": 449,
+    "baseline_std_add": 316,
+    "optimized_std_add": 316,
+    "baseline_std_mult_pipe": 128,
+    "optimized_std_mult_pipe": 128,
+    "structural_improvement_observed": false
+  },
+  "decision": "rejected_no_backend_structural_benefit",
+  "notes": "Both passes are available as loadable plugins. Cast folding preserves fixed-point semantics by requiring the truncation width to equal the original operand width. Identity arithmetic folding removes only integer add-zero/multiply-one operations. The four-fold IR reduction is erased by SCF-to-Calyx lowering and produces no backend structural change, so it is not the Task 4 optimization."
+}

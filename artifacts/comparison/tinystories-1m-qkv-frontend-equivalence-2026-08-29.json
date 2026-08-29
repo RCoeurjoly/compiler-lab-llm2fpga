@@ -1,0 +1,10 @@
+{
+  "schema": "tinystories-1m-qkv-frontend-equivalence-v1",
+  "status": "real_vector_simulation_pass",
+  "module": {"path": "rtl/llm2fpga_qkv_frontend_tensor.sv", "sha256": "0ba4fc320d852ea603bb118c9897ebb0379389edd9e7d4f386ee8e03a68a37ea"},
+  "generator": {"path": "scripts/comparison/generate_qkv_frontend_tb.py", "sha256": "a51dc3631f9f01192782448785700a62a8ff4e0c8d65d141ebc209ebd27ac0f8"},
+  "reference": "artifacts/reference/tinystories-1m-candidate-oracle.json",
+  "testbench_sha256": "d1008c3ce93be082bec3cdf58b8754c353f362422e3a7d2fa4dd853910f53e39",
+  "simulation": {"result": "LLM2FPGA_QKV_FRONTEND_PASS", "outputs": {"q": 64, "k": 64, "v": 64}, "simulated_time_ps": 191225000},
+  "claims": {"real_model_qkv_equivalence": true, "complete_transformer_block_equivalence": false, "timing_closed": false, "hardware_inference": false}
+}

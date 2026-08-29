@@ -262,6 +262,22 @@ memref.store %out, %post[%q] : memref<4xf32>"""
             with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
                 module.causal_pre_mask_site_evidence(mutation, **kwargs)
 
+    def test_temporal_workspace_reuse_requires_strictly_disjoint_regions(self):
+        self.assertTrue(module.temporal_reuse_safe([(10, 20)], 21))
+        self.assertFalse(module.temporal_reuse_safe([(10, 30)], 20))
+        self.assertFalse(module.temporal_reuse_safe([(10, 30)], 25))
+        # Alias canonicalization is performed before this helper is called;
+        # two views sharing one allocation therefore use the same interval.
+        self.assertFalse(module.temporal_reuse_safe([(10, 30), (40, 60)], 55))
+
+    def test_exp_workspace_reuse_is_temporal_and_alias_canonicalized(self):
+        # Exp workspaces use the same lifetime rule as delta workspaces.
+        self.assertTrue(module.temporal_reuse_safe([(100, 150)], 151))
+        self.assertFalse(module.temporal_reuse_safe([(100, 150)], 150))
+        # Alias views are canonicalized before calling the helper; overlapping
+        # intervals must therefore reject reuse even when names differ.
+        self.assertFalse(module.temporal_reuse_safe([(100, 200), (210, 260)], 250))
+
     def test_lowered_closed_loop_induction_value_is_not_dominating(self):
         evidence = module.load_evidence(
             ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",

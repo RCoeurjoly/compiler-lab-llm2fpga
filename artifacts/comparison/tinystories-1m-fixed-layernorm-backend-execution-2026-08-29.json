@@ -1,0 +1,52 @@
+{
+  "schema": "tinystories-1m-fixed-layernorm-backend-execution-evidence-v1",
+  "status": "executed_exact_vector",
+  "model": "TinyStories-1M",
+  "slice": {"kind": "one_transformer_block_token_step", "block_index": 0, "token_index": 3, "operator": "block.ln_1"},
+  "inputs": {
+    "backend_calyx_mlir": {"path": "artifacts/comparison/tinystories-1m-fixed-layernorm-backend.calyx.mlir", "sha256": "0f2d1097b59f45d6de948eac5e888900bb9eded2fd0697b8416c918e9bb74d53"},
+    "exported_futil_sha256": "71e08610f53ca5756ef8de0ff44727cbcd0452cc9d3d9c9e213d1021e74d5794",
+    "emitted_systemverilog_sha256": "e13a8b49af93a7e77c5f0d3b4cffa9eea6f4280340601e79cf93711c43ad9732",
+    "vector": {"path": "artifacts/reference/tinystories-1m-rtl-layernorm-vector.json", "sha256": "1b84d6194874f1f9e6074a99f06527aa01e633ecc6daf92340136a86806d6304"}
+  },
+  "execution": {
+    "simulator": "Icarus Verilog",
+    "command": "nix shell nixpkgs#iverilog -c iverilog -g2012 -s main1_external_tb -o /tmp/lnexec/a.out /tmp/lnexec/backend.sv reproducers/calyx-layernorm-memory-harness/main1_external_tb.sv",
+    "memory_contract": "four 64x32 external memories, one-cycle response",
+    "done": true,
+    "cycles": 5829,
+    "output_writes": 64,
+    "mismatches": 0,
+    "transaction_count": 256,
+    "latency_cycles": 5829,
+    "throughput_outputs_per_cycle": 0.010979584834448447,
+    "ordered_trace_sha256": "88faa99527d0a1d0d4ad60740dec42268914e707f881fc5a46579d6ddcd683a6",
+    "output_result_sha256": "4ddab4aecb186dce77618426b3cf008e7d7ea085f637f26e81747ced27a5c465"
+  },
+  "memory": {
+    "external_memories": 4,
+    "word_bytes": 4,
+    "input_memory_reads": 64,
+    "gamma_memory_reads": 64,
+    "beta_memory_reads": 64,
+    "output_memory_writes": 64,
+    "total_transactions": 256,
+    "read_bytes": 768,
+    "write_bytes": 256,
+    "total_bytes": 1024,
+    "working_set_bytes": 1024
+  },
+  "claims": {
+    "compiler_slice_execution": true,
+    "exact_vector_match": true,
+    "full_transformer_block_equivalence": false,
+    "fpga_timing_closure": false,
+    "hardware_inference": false
+  },
+  "provenance": {
+    "reference_role": "content_authenticated_behavioral_oracle_only",
+    "reference_source_or_rtl_copied": false,
+    "compiler_source": "LLM2FPGA",
+    "llm_assistance_disclosure_required": true
+  }
+}

@@ -90,14 +90,25 @@ def verify(report_path: Path, frontier_path: Path, bridge_path: Path, stage_path
     actual_count = len(re.findall(r"^\s*%[A-Za-z0-9_.$-]+\s*=\s*math\.exp\b", text, re.MULTILINE))
     require(actual_count == expected_count, f"exp_site_count_mismatch:{actual_count}")
     bridge = load_bridge(bridge_path)
+    zero_matches = re.findall(r"%(cst_[A-Za-z0-9_]+)\s*=\s*arith\.constant\s+0(?:\.0+)?(?:e[+\-]?0+)?\s*:\s*f32", text, re.I)
+    require(len(set(zero_matches)) == 1, f"zero_identity_not_authenticated:{sorted(set(zero_matches))}")
+    zero_identity = zero_matches[0]
     try:
-        bridge._pattern_evidence(text, expected_exp_sites=expected_count)
+        pattern = bridge._pattern_evidence(text, expected_exp_sites=expected_count, zero_identity=zero_identity)
     except bridge.SoftmaxBridgeError as error:
         mismatch = report["attempt"]["first_mismatch"]
+        require(isinstance(mismatch, dict), "mismatch_missing_for_rejected_pattern")
         require(error.code == mismatch["code"], "mismatch_code_changed")
         require(str(error).split(": ", 1)[1] == mismatch["message"], "mismatch_message_changed")
     else:
-        raise BoundaryVerificationError("bridge_unexpectedly_matched")
+        require(report.get("status") == "accepted", "accepted_status_missing")
+        require(report.get("bridge_status") == "real_graph_pattern_accepted", "accepted_bridge_status_missing")
+        require(report.get("attempt", {}).get("first_mismatch") is None, "accepted_mismatch_present")
+        require(report.get("claims", {}).get("authenticated_pattern_matched") is True, "accepted_pattern_claim_missing")
+        accepted = report.get("attempt", {}).get("accepted_evidence", {})
+        require(pattern.get("exp_site_count") == accepted.get("exp_site_count"), "accepted_site_count_mismatch")
+        require(pattern.get("binding_mode") == accepted.get("binding_mode"), "accepted_binding_mode_mismatch")
+        return {"status": "verified_accepted", "stage_hashes": report["stages"], "pattern": pattern}
 
     lines = [line.rstrip("\n") for line in text.splitlines()]
     mismatch = report["attempt"]["first_mismatch"]

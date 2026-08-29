@@ -1,0 +1,21 @@
+{
+  "schema": "tinystories-1m-full-softmax-bridge-v1",
+  "status": "authenticated_boundary_emitted",
+  "source_graph": "/tmp/task3x-flat/flat.scf.mlir",
+  "source_graph_sha256": "52382658fed8629d5e6757c6e9d7cb400d30dc1e05453c371c23d8ea8785ab9c",
+  "emitted_mlir_sha256": "a962666e943de0b60c0b593ea764c4d991071c4ef0df500bfc1638a8888573d8",
+  "operation": "llm2fpga.attention_softmax_fixed",
+  "shape": "tensor<16x32xi32>",
+  "attributes": {
+    "attention_layer_sites": 8,
+    "attention_heads_per_layer": 16,
+    "score_fraction_bits": 8,
+    "exp_lut_entries": 4096,
+    "exp_fraction_bits": 20,
+    "sum_width": 64,
+    "division_rounding": "truncation_toward_zero"
+  },
+  "backend_status": "not_implemented",
+  "provenance": "contract and repaired flat-SCF provenance manifest authenticated",
+  "next_step": "legalize the explicit tensor softmax operation to the existing RTL ABI"
+}

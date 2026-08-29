@@ -1,0 +1,20 @@
+{
+  "schema": "tinystories-1m-softmax-provenance-repair-v1",
+  "status": "repair_specification",
+  "model": "TinyStories-1M",
+  "source_manifest": "artifacts/comparison/tinystories-1m-softmax-provenance.json",
+  "current_flat_graph": {
+    "path": "/nix/store/g0wrh3vdr28446kxwwfy07npibm46mxa-tiny-stories-1m-baseline-float-calyx/flat.scf.mlir",
+    "math_exp_layer_sites": 8,
+    "heads_per_layer": 16,
+    "zero_f32_identity": "%cst_6",
+    "negative_infinity_identity": "%cst_7"
+  },
+  "required_manifest_fields": {
+    "layer_count": 8,
+    "heads_per_layer": 16,
+    "constants.zero_f32.lowered_identities.flat_scf": "%cst_6"
+  },
+  "reason": "The existing manifest predates the constants requirement and labels layer sites as heads; this overlay records the exact repair needed before bridge regeneration.",
+  "claims": {"bridge_regenerated": false, "compiler_equivalence": false, "hardware_inference": false}
+}

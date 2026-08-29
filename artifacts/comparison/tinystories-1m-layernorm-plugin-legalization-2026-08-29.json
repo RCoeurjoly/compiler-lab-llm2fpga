@@ -1,0 +1,22 @@
+{
+  "schema": "tinystories-1m-layernorm-plugin-legalization-v1",
+  "status": "external_call_boundary_emitted",
+  "plugin": "/nix/store/zdiypv5kpshnzpjqkdrr6rc4aiiwcj3w-llm2fpga-mlir-passes-0.1.0/lib/LLM2FPGAMLIRPasses.so",
+  "plugin_sha256": "28280566aae7107f95d4199256953d4648f6874a2385f6192c88242a3c8e1c75",
+  "pass": "llm2fpga-lower-fixed-layernorm-q16",
+  "driver": "mlir-opt",
+  "minimal_input": "/tmp/min_ln.mlir",
+  "minimal_output_sha256": "5f817e68cdd2484ed710f9870abe22dc4748dfd88456ed408e5455ee8aba65ed",
+  "real_input": "/tmp/task3p-layernorm-bridge-final.mlir",
+  "real_output": "/tmp/layernorm-lowered-final.mlir",
+  "real_output_sha256": "8c503a7b5134a7a939ce6bdcbb17a1aaa6271c168751ad42d488904a0de55b88",
+  "observed": "llm2fpga.fixed_layer_norm_q16_16 -> func.call @llm2fpga_fixed_layer_norm_q16_16",
+  "claims": {
+    "plugin_compiles": true,
+    "custom_op_consumed": true,
+    "external_call_emitted": true,
+    "rtl_implementation": false,
+    "compiler_equivalence": false,
+    "hardware_inference": false
+  }
+}

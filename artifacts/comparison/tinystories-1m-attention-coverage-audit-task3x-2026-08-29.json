@@ -1,0 +1,85 @@
+{
+  "attention_exp_site_count": 8,
+  "claims": {
+    "all_heads_covered": true,
+    "attention_softmax_present": true,
+    "head_count_equals_exp_site_count": false
+  },
+  "exp_site_count": 8,
+  "graph": {
+    "bytes": 29375724,
+    "path": "/tmp/task3x-flat/flat.scf.mlir",
+    "sha256": "52382658fed8629d5e6757c6e9d7cb400d30dc1e05453c371c23d8ea8785ab9c"
+  },
+  "head_count": 16,
+  "interpretation": "one executable softmax site per layer; each site iterates all heads",
+  "layer_count": 8,
+  "layernorm_exp_site_count": 0,
+  "sites": [
+    {
+      "exp_line": 836,
+      "head_count": 16,
+      "head_loop_line": 828,
+      "induction": "arg18",
+      "lower": "%c0",
+      "upper": "%c16"
+    },
+    {
+      "exp_line": 1724,
+      "head_count": 16,
+      "head_loop_line": 1716,
+      "induction": "arg18",
+      "lower": "%c0",
+      "upper": "%c16"
+    },
+    {
+      "exp_line": 2586,
+      "head_count": 16,
+      "head_loop_line": 2578,
+      "induction": "arg18",
+      "lower": "%c0",
+      "upper": "%c16"
+    },
+    {
+      "exp_line": 3448,
+      "head_count": 16,
+      "head_loop_line": 3440,
+      "induction": "arg18",
+      "lower": "%c0",
+      "upper": "%c16"
+    },
+    {
+      "exp_line": 4310,
+      "head_count": 16,
+      "head_loop_line": 4302,
+      "induction": "arg18",
+      "lower": "%c0",
+      "upper": "%c16"
+    },
+    {
+      "exp_line": 5172,
+      "head_count": 16,
+      "head_loop_line": 5164,
+      "induction": "arg18",
+      "lower": "%c0",
+      "upper": "%c16"
+    },
+    {
+      "exp_line": 6034,
+      "head_count": 16,
+      "head_loop_line": 6026,
+      "induction": "arg18",
+      "lower": "%c0",
+      "upper": "%c16"
+    },
+    {
+      "exp_line": 6890,
+      "head_count": 16,
+      "head_loop_line": 6882,
+      "induction": "arg18",
+      "lower": "%c0",
+      "upper": "%c16"
+    }
+  ],
+  "status": "pass"
+}

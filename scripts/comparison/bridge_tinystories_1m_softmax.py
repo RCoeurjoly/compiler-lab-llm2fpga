@@ -39,6 +39,11 @@ def require(condition: bool, code: str, message: str) -> None:
         raise SoftmaxBridgeError(code, message)
 
 
+def temporal_reuse_safe(existing: list[tuple[int, int]], start: int) -> bool:
+    """Return true only when every prior use ended before this producer."""
+    return all(end < start for _, end in existing)
+
+
 def causal_pre_mask_site_evidence(graph: str, *, score_input: str,
                                   score_output: str, mask_input: str,
                                   position_index: str | None = None) -> dict[str, str]:
@@ -158,8 +163,9 @@ def load_evidence(contract_path: Path, diagnostic_path: Path) -> Mapping[str, An
 def load_provenance_manifest(path: Path) -> Mapping[str, Any]:
     """Load the authenticated pre-lowering semantic receipt.
 
-    The manifest is an explicit capability boundary: its eight head-local
-    identities are not reconstructed from lowered text.  This keeps the
+    The manifest is an explicit capability boundary: its eight layer-local
+    identities are not reconstructed from lowered text.  Each layer identity
+    covers the sixteen head lanes in the source tensor.  This keeps the
     structural matcher fail-closed while preserving the semantic names lost
     by linalg/SCF conversion.
     """
@@ -178,9 +184,10 @@ def load_provenance_manifest(path: Path) -> Mapping[str, Any]:
 
 
 def _named_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, Any]:
-    """Require a complete, independently linked chain for every attention head.
+    """Require a complete, independently linked chain for every layer site.
 
-    The package-aware export contains one attention softmax per head.  It is
+    The package-aware export contains one attention softmax per transformer
+    layer, with the head dimension represented inside that tensor.  It is
     important that this check does not find the producer for one ``exp`` and
     the reduction for another: a textual graph-wide search would make such a
     malformed graph appear valid.  Each site is therefore bounded by its
@@ -379,6 +386,12 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
     def has_negative_infinity_initialization(memref: str, before_line: int) -> bool:
         """Prove a max buffer was copied from a full -infinity seed buffer."""
         target = canonical_memref(memref, before_line)
+        for direct_line in range(before_line - 1, function_start - 1, -1):
+            store = store_re.match(lines[direct_line])
+            if store and canonical_memref(store.group(2), direct_line) == target:
+                value = store.group(1).strip().lstrip("%")
+                if re.search(rf"%{re.escape(value)}\s*=\s*arith\.constant\s+(?:0xFF800000|-3\.40282347[Ee][+\-]?38)\s*:\s*f32", "\n".join(lines[function_start:direct_line]), re.I):
+                    return True
         for copy_line in range(before_line - 1, function_start - 1, -1):
             copy = copy_re.match(lines[copy_line])
             if not copy or canonical_memref(copy.group(2), copy_line) != target:
@@ -593,13 +606,13 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
         return None
     sites = []
     used_causal: set[int] = set()
-    used_exp_memrefs: set[str] = set()
+    exp_regions: dict[str, list[tuple[int, int]]] = {}
     # A workspace buffer may be reused temporally by successive heads/sites.
     # Record complete producer-to-normalization regions and reject only an
     # overlap, rather than treating buffer identity as permanent ownership.
     delta_regions: dict[str, list[tuple[int, int]]] = {}
     used_sum_memrefs: set[str] = set()
-    used_operand_memrefs: set[str] = set()
+    operand_regions: dict[str, list[tuple[int, int]]] = {}
     for number, exp_i in enumerate(exp_lines, 1):
         exp_m = re.match(r"%([^ ]+)\s*=\s*math\.exp\s+%([^ ]+)", lines[exp_i])
         assert exp_m
@@ -610,12 +623,16 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
         require(delta_loads, "dataflow_not_proven", f"site {number} exp input has no dominating memref.load")
         delta_load_i, delta_load = delta_loads[-1]
         delta_mem, delta_idx = delta_load.group(2).strip(), delta_load.group(3).strip()
+        delta_key = canonical_memref(delta_mem, delta_load_i)
         require(defined_before(delta_idx, delta_load_i), "dataflow_not_proven", f"site {number} delta index is undefined")
         require(function_start <= delta_load_i <= function_end, "dataflow_not_proven", f"site {number} delta load is outside function")
-        delta_stores = [(i, m) for i, line in enumerate(lines) if i < delta_load_i and (m := store_re.match(line)) and m.group(2).strip() == delta_mem and same_index(m.group(3).strip(), i, delta_idx, delta_load_i)]
+        delta_stores = [(i, m) for i, line in enumerate(lines)
+                        if i < delta_load_i and (m := store_re.match(line))
+                        and canonical_memref(m.group(2).strip(), i) == delta_key
+                        and same_index(m.group(3).strip(), i, delta_idx, delta_load_i)]
         require(delta_stores, "dataflow_not_proven", f"site {number} delta load has no same-index store")
         delta_store_i, delta_store = delta_stores[-1]
-        require(all(end < delta_store_i for _, end in delta_regions.get(delta_mem, [])),
+        require(temporal_reuse_safe(delta_regions.get(delta_key, []), delta_store_i),
                 "dataflow_not_proven", f"site {number} overlaps a prior delta region")
         require(function_start <= delta_store_i <= function_end, "dataflow_not_proven", f"site {number} delta store is outside function")
         delta_value = delta_store.group(1).strip()
@@ -709,8 +726,10 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                 "dataflow_not_proven", f"site {number} score and row-max loads are not distinct")
         for operand in sub.groups()[1:]:
             resource = operand_loads[operand].group(2).strip()
-            require(resource not in used_operand_memrefs, "dataflow_not_proven", f"site {number} reuses another head's operand memref")
-            used_operand_memrefs.add(resource)
+            operand_i = operand_load_lines[operand]
+            resource_key = canonical_memref(resource, operand_i)
+            require(temporal_reuse_safe(operand_regions.get(resource_key, []), operand_i),
+                    "dataflow_not_proven", f"site {number} overlaps a prior operand region")
         # Exp store/load and normalization may occur in later loops.  Bind by
         # exact exp memref/index and SSA edges, never by proximity alone.
         exp_store_candidates = [(i, m) for i, line in enumerate(lines) if i > exp_i and (m := store_re.match(line)) and m.group(1).strip() == exp_result]
@@ -732,9 +751,10 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
         require(same_affine_index(exp_idx, exp_store_i, delta_idx, delta_load_i),
                 "dataflow_not_proven", f"site {number} exponential store index does not match delta index")
         require(function_start <= exp_store_i <= function_end, "dataflow_not_proven", f"site {number} exp store is outside function")
-        require(exp_mem not in used_exp_memrefs, "dataflow_not_proven", f"site {number} reuses another head's exp memref")
-        used_exp_memrefs.add(exp_mem)
-        exp_load_candidates = [(i, m) for i, line in enumerate(lines) if i > exp_store_i and (m := load_re.match(line)) and m.group(2).strip() == exp_mem and same_index(m.group(3).strip(), i, exp_idx, exp_store_i)]
+        exp_key = canonical_memref(exp_mem, exp_store_i)
+        require(temporal_reuse_safe(exp_regions.get(exp_key, []), exp_store_i),
+                "dataflow_not_proven", f"site {number} overlaps a prior exp region")
+        exp_load_candidates = [(i, m) for i, line in enumerate(lines) if i > exp_store_i and (m := load_re.match(line)) and canonical_memref(m.group(2), i) == exp_key and same_index(m.group(3).strip(), i, exp_idx, exp_store_i)]
         require(exp_load_candidates, "dataflow_not_proven", f"site {number} exp store has no same-index load")
         # A later loop can reload the same exp element more than once.  Pick
         # only a complete load -> reduction -> division chain; never assume
@@ -767,7 +787,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                     sum_loads = [(i, m) for i, line in enumerate(lines) if i > sum_store_i and (m := load_re.match(line)) and m.group(2).strip() == sum_mem and same_index(m.group(3).strip(), i, sum_idx, sum_store_i)]
                     for sum_load_i, sum_load in sum_loads:
                         exp_reload_values = {candidate_value}
-                        exp_reload_values.update(m.group(1) for i, line in enumerate(lines) if i > sum_load_i and (m := load_re.match(line)) and m.group(2).strip() == exp_mem and same_index(m.group(3).strip(), i, exp_idx, exp_store_i))
+                        exp_reload_values.update(m.group(1) for i, line in enumerate(lines) if i > sum_load_i and (m := load_re.match(line)) and canonical_memref(m.group(2), i) == exp_key and same_index(m.group(3).strip(), i, exp_idx, exp_store_i))
                         divs = [(i, m) for i, line in enumerate(lines) if i > sum_load_i and (m := div_re.match(line)) and m.group(2) in exp_reload_values and m.group(3) == sum_load.group(1)]
                         if divs:
                             complete.append((candidate_i, candidate, add_i_candidate, add_candidate, divs[0]))
@@ -931,6 +951,13 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                 pred_loops = loop_contexts(pred_entry[0])
                 if pred_base not in i1_args or not pred_loops or not pred_deps.issubset({x[0] for x in pred_loops[1:]}):
                     continue
+                # The package-aware entry point passes one causal mask per
+                # head in alternating mask/scale argument positions. Bind
+                # this site to its authenticated head-specific mask instead
+                # of accepting another valid i1 argument.
+                expected_mask = f"arg{2 * (number - 1)}"
+                if pred_base != expected_mask:
+                    continue
                 fallback = select.group(4).lstrip("%")
                 fallback_load = next((m for candidate in reversed(lines[:i])
                                       if (m := re.match(rf"%{re.escape(fallback)}\s*=\s*memref\.load\s+%([^\[]+)\[\]", candidate))), None)
@@ -960,7 +987,17 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                         for line in lines[causal[0] + 1:function_end + 1]),
                     "dataflow_not_proven", f"site {number} masked score is not observable")
             used_causal.add(causal[0])
-            delta_regions.setdefault(delta_mem, []).append((delta_store_i, div_entry[0]))
+            output_end = next((j for j, candidate in enumerate(lines[div_entry[0] + 1:function_end + 1], div_entry[0] + 1)
+                               if (m := store_re.match(candidate))
+                               and m.group(1).strip() == div_entry[1].group(1)
+                               and canonical_memref(m.group(2), j) == canonical_memref(score_mem, div_entry[0])
+                               and same_affine_index(m.group(3), j, exp_idx, exp_store_i)), div_entry[0])
+            delta_regions.setdefault(delta_key, []).append((delta_store_i, output_end))
+            exp_regions.setdefault(exp_key, []).append((exp_store_i, output_end))
+            for operand in sub.groups()[1:]:
+                operand_i = operand_load_lines[operand]
+                resource_key = canonical_memref(operand_loads[operand].group(2).strip(), operand_i)
+                operand_regions.setdefault(resource_key, []).append((operand_i, output_end))
             sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
                           "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_mask_score_store"]})
             continue
@@ -988,7 +1025,17 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                 output_match.group(3).strip().lstrip("%") == loop_context(causal[0])[0],
                 "dataflow_not_proven", f"site {number} masked output is not head-local")
         used_causal.add(causal[0])
-        delta_regions.setdefault(delta_mem, []).append((delta_store_i, div_entry[0]))
+        output_end = next((j for j, candidate in enumerate(lines[div_entry[0] + 1:function_end + 1], div_entry[0] + 1)
+                           if (m := store_re.match(candidate))
+                           and m.group(1).strip() == div_entry[1].group(1)
+                           and canonical_memref(m.group(2), j) == canonical_memref(score_mem, div_entry[0])
+                           and same_affine_index(m.group(3), j, exp_idx, exp_store_i)), div_entry[0])
+        delta_regions.setdefault(delta_key, []).append((delta_store_i, output_end))
+        exp_regions.setdefault(exp_key, []).append((exp_store_i, output_end))
+        for operand in sub.groups()[1:]:
+            operand_i = operand_load_lines[operand]
+            resource_key = canonical_memref(operand_loads[operand].group(2).strip(), operand_i)
+            operand_regions.setdefault(resource_key, []).append((operand_i, output_end))
         sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
                       "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_cmpi"]})
     return {"exp_site_count": len(sites), "sites": sites,
@@ -1052,6 +1099,10 @@ def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str, e
         zero_identity = provenance_manifest["constants"]["zero_f32"]["lowered_identities"]["flat_scf"]
     pattern = _pattern_evidence(graph, expected_exp_sites=expected_exp_sites, zero_identity=zero_identity)
     attributes = {
+        # In the flattened graph an exp site is a transformer-layer body;
+        # each body iterates over all sixteen attention heads.
+        "attention_layer_sites": expected_exp_sites,
+        "attention_heads_per_layer": 16,
         "score_width": 32,
         "score_fraction_bits": 8,
         "score_post_shift": 24,

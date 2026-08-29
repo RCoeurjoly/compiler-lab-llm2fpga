@@ -1,0 +1,27 @@
+{
+  "schema": "tinystories-1m-compiler-vs-kev-gpt-representation-gate-v1",
+  "status": "fail_closed",
+  "compiler_slice": {
+    "scope": "authenticated attention softmax only",
+    "representation": "lowered float32 score/max/delta/exp/sum/div",
+    "softmax_interpreter": "scripts/comparison/run_bound_softmax_interpreter.py",
+    "softmax_only_max_absolute_error": 4.1698494657183005e-08
+  },
+  "kev_gpt_reference": {
+    "profile": "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json",
+    "profile_sha256": "7d54acda88f1d1a6979fd0ca8a3b0445e20ef127a399e5124a994427565caad0",
+    "representation": "fixed-point Q16.16/Q8.24 with integer accumulation and explicit saturation/rounding rules",
+    "full_block_checkpoints": 12
+  },
+  "comparison": {
+    "status": "not_equivalent",
+    "first_missing_checkpoint": "compiler_float32_to_authenticated_q16_16_q8_24_conversion",
+    "reason": "The compiler slice has no authenticated fixed-point conversion, rounding, saturation, or integer accumulation trace corresponding to the kev-gpt checkpoints.",
+    "required_next_step": "Add the explicit conversion/quantization checkpoint and compare ordered fixed-point values before claiming cross-implementation equivalence."
+  },
+  "claims": {
+    "functional_equivalence": false,
+    "rtl_equivalence": false,
+    "hardware_equivalence": false
+  }
+}

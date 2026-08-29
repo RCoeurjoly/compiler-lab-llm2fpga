@@ -137,12 +137,19 @@ calyx_synthesis_args=()
 if [[ "${CALYX_SYNTHESIS:-1}" == "1" ]]; then
   calyx_synthesis_args+=(--synthesis)
 fi
+calyx_disabled_pass_args=(-d papercut)
+if [[ "${CALYX_DISABLE_CELL_SHARE:-0}" == "1" ]]; then
+  # The validated LayerNorm-slice candidate disables Calyx cell sharing.  It
+  # is opt-in so the historical pipeline remains byte-for-byte unchanged by
+  # default; the generated manifest records the selected mode below.
+  calyx_disabled_pass_args+=(-d cell-share)
+fi
 "$calyx_bin" "$output_dir/model.futil" \
   -l "$calyx_lib" \
   -b verilog \
   "${calyx_synthesis_args[@]}" \
   "${calyx_nested_args[@]}" \
-  -d papercut \
+  "${calyx_disabled_pass_args[@]}" \
   -o "$output_dir/sv/main.sv" >"$tmp_calyx_log" 2>&1
 rc=$?
 set -e
@@ -180,9 +187,8 @@ fi
 
 if [[ "${CALYX_SKIP_RESOURCE_REPORT:-0}" == "1" ]]; then
   printf '%s\n' "$output_dir/sv/main.sv" >"$output_dir/sources.f"
-  cat >"$output_dir/manifest.json" <<'JSON'
-{"backend":"native-calyx","stage":"calyx-sv","status":"ok","sources":"sources.f"}
-JSON
+  printf '{"backend":"native-calyx","stage":"calyx-sv","status":"ok","sources":"sources.f","cell_share_disabled":%s}\n' \
+    "$([[ "${CALYX_DISABLE_CELL_SHARE:-0}" == "1" ]] && echo true || echo false)" >"$output_dir/manifest.json"
   exit 0
 fi
 
@@ -191,7 +197,7 @@ set +e
   -l "$calyx_lib" \
   -b resources \
   --synthesis \
-  -d papercut \
+  "${calyx_disabled_pass_args[@]}" \
   -o "$output_dir/resources.csv" >"$output_dir/logs/native-calyx-resources.log" 2>&1
 rc=$?
 set -e
@@ -227,6 +233,5 @@ PY
 
 printf '%s\n' "$output_dir/sv/main.sv" >"$output_dir/sources.f"
 
-cat >"$output_dir/manifest.json" <<'JSON'
-{"backend":"native-calyx","resources":"resources.json","stage":"calyx-sv","status":"ok","sources":"sources.f"}
-JSON
+printf '{"backend":"native-calyx","resources":"resources.json","stage":"calyx-sv","status":"ok","sources":"sources.f","cell_share_disabled":%s}\n' \
+  "$([[ "${CALYX_DISABLE_CELL_SHARE:-0}" == "1" ]] && echo true || echo false)" >"$output_dir/manifest.json"
