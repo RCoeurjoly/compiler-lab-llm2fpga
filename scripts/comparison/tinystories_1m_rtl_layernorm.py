@@ -111,14 +111,18 @@ def fixed_layer_norm_rtl(
 
 
 def compiler_integration_status() -> dict[str, Any]:
-    """Truthful compiler bridge state; no runtime/RTL equivalence is implied."""
+    """Truthful post-Task-3p state; no backend/board equivalence is implied."""
     return {
         "status": "unsupported",
-        "code": "rtl_layer_norm_compiler_bridge_not_implemented",
-        "reason": "the independent RTL-width primitive exists, but no torch.export/MLIR lowering bridge emits it",
+        "bridge_status": "custom_op_emitted",
+        "code": "fixed_layer_norm_backend_lowering_not_implemented",
+        "reason": (
+            "the authenticated package export is bridged to an inspectable "
+            "llm2fpga custom op, but the current Linalg/Calyx backend has no legalization for it"
+        ),
         "runtime_equivalent": False,
         "board_authenticated": False,
-        "next_unsupported_operation": "aten.layer_norm.default",
+        "next_unsupported_operation": "llm2fpga.fixed_layer_norm_q16_16",
     }
 
 

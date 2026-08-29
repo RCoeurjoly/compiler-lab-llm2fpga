@@ -60,11 +60,13 @@ class RtlLayerNormTest(unittest.TestCase):
         )
         self.assertEqual(details, vector["result"])
 
-    def test_lowering_reports_missing_compiler_bridge_not_runtime_equivalence(self) -> None:
-        """Relabelling the NumPy runtime as RTL-equivalent must make this test fail."""
+    def test_lowering_reports_backend_boundary_not_missing_compiler_bridge(self) -> None:
+        """Regressing to the pre-bridge boundary or claiming equivalence must fail."""
         state = self.module.compiler_integration_status()
         self.assertEqual(state["status"], "unsupported")
-        self.assertEqual(state["code"], "rtl_layer_norm_compiler_bridge_not_implemented")
+        self.assertEqual(state["bridge_status"], "custom_op_emitted")
+        self.assertEqual(state["code"], "fixed_layer_norm_backend_lowering_not_implemented")
+        self.assertEqual(state["next_unsupported_operation"], "llm2fpga.fixed_layer_norm_q16_16")
         self.assertFalse(state["runtime_equivalent"])
         self.assertFalse(state["board_authenticated"])
 
