@@ -99,6 +99,47 @@ class SoftmaxManifestTest(unittest.TestCase):
         descriptor = bridge.bridge_graph(graph, evidence, source_name="lowered-with-cst6.mlir", provenance_manifest=sealed)
         self.assertEqual(descriptor["source"]["pre_lowering_provenance_manifest_sha256"], sealed["sha256"])
 
+    def _bridge_with_manifest(self, value, graph=None):
+        fixture_spec = importlib.util.spec_from_file_location("softmax_bridge_tests", ROOT / "tests/test_tinystories_1m_softmax_bridge.py")
+        assert fixture_spec and fixture_spec.loader
+        fixtures = importlib.util.module_from_spec(fixture_spec)
+        fixture_spec.loader.exec_module(fixtures)
+        evidence = bridge.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        return bridge.bridge_graph(graph or fixtures.lowered_separate_loop_graph().replace("%fzero", "%cst_6"), evidence,
+                                   source_name="manifest-negative.mlir", provenance_manifest=manifest.seal(value))
+
+    def test_manifest_supplied_without_zero_fails_closed(self):
+        with self.assertRaisesRegex(bridge.SoftmaxBridgeError, "constants required"):
+            self._bridge_with_manifest(payload())
+
+    def test_manifest_wrong_zero_value_fails_closed(self):
+        value = payload()
+        value["constants"] = {"zero_f32": {"value": "1.0", "type": "f32", "pre_lowering_identity": "%0",
+                                             "lowered_identities": {name: "%cst_6" for name in ("torch_mlir", "linalg", "scf", "flat_scf")}}}
+        with self.assertRaisesRegex(manifest.ManifestError, "zero_f32 value/type"):
+            manifest.seal(value)
+
+    def test_manifest_malformed_zero_identity_fails_closed(self):
+        value = payload()
+        value["constants"] = {"zero_f32": {"value": "0.0", "type": "f32", "pre_lowering_identity": "%0",
+                                             "lowered_identities": {name: "cst_6" for name in ("torch_mlir", "linalg", "scf", "flat_scf")}}}
+        with self.assertRaisesRegex(manifest.ManifestError, "zero_f32\.torch_mlir"):
+            manifest.seal(value)
+
+    def test_manifest_renamed_zero_identity_does_not_fallback(self):
+        value = payload()
+        value["constants"] = {"zero_f32": {"value": "0.0", "type": "f32", "pre_lowering_identity": "%0",
+                                             "lowered_identities": {name: "%renamed_zero" for name in ("torch_mlir", "linalg", "scf", "flat_scf")}}}
+        fixture_spec = importlib.util.spec_from_file_location("softmax_bridge_tests", ROOT / "tests/test_tinystories_1m_softmax_bridge.py")
+        assert fixture_spec and fixture_spec.loader
+        fixtures = importlib.util.module_from_spec(fixture_spec)
+        fixture_spec.loader.exec_module(fixtures)
+        with self.assertRaisesRegex(bridge.SoftmaxBridgeError, "authenticated floating zero constant"):
+            bridge._lowered_pattern_evidence(fixtures.lowered_separate_loop_graph().replace("%fzero", "%cst_6"), zero_identity="%renamed_zero")
+
     def test_duplicate_role_identity_fails_closed(self):
         value = payload()
         value["heads"][1]["identities"]["exp"] = value["heads"][0]["identities"]["exp"]

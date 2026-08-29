@@ -637,13 +637,17 @@ def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str, e
             "calibration_ids_sha256": canonical["package_calibration_ids_sha256"],
         },
                 "provenance_manifest_invalid", "package identity")
+        constants = provenance_manifest.get("constants")
+        require(isinstance(constants, Mapping), "provenance_manifest_invalid", "constants required")
+        zero = constants.get("zero_f32")
+        require(isinstance(zero, Mapping) and zero.get("value") == "0.0" and zero.get("type") == "f32",
+                "provenance_manifest_invalid", "exact zero_f32 required")
+        lowered = zero.get("lowered_identities")
+        require(isinstance(lowered, Mapping) and isinstance(lowered.get("flat_scf"), str) and lowered["flat_scf"].startswith("%"),
+                "provenance_manifest_invalid", "flat_scf zero identity required")
     zero_identity = "fzero"
     if provenance_manifest is not None:
-        constants = provenance_manifest.get("constants")
-        if isinstance(constants, Mapping) and isinstance(constants.get("zero_f32"), Mapping):
-            lowered = constants["zero_f32"].get("lowered_identities")
-            if isinstance(lowered, Mapping) and isinstance(lowered.get("flat_scf"), str):
-                zero_identity = lowered["flat_scf"]
+        zero_identity = provenance_manifest["constants"]["zero_f32"]["lowered_identities"]["flat_scf"]
     pattern = _pattern_evidence(graph, expected_exp_sites=expected_exp_sites, zero_identity=zero_identity)
     attributes = {
         "score_width": 32,
