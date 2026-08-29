@@ -185,6 +185,25 @@ class AuthenticatedPackageLoweringTest(unittest.TestCase):
             GATE.lower_gate(ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json", export, package, output)
         self.assertFalse(output.exists())
 
+    @unittest.skipUnless(EXTERNAL_PACKAGE.is_dir() and EXTERNAL_MODEL.is_dir(), "canonical package inputs unavailable")
+    def test_fixed_profile_cannot_bypass_unsupported_gate_with_lower_command(self) -> None:
+        export = self.root / "runtime-export"
+        materialized = subprocess.run([
+            "python", str(MATERIALIZER), "--contract", str(ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json"),
+            "--package", str(EXTERNAL_PACKAGE), "--model-path", str(EXTERNAL_MODEL), "--out-dir", str(export),
+        ], cwd=ROOT, text=True, capture_output=True, check=False)
+        self.assertEqual(materialized.returncode, 0, materialized.stderr)
+        output = self.root / "runtime-lowered"
+        attempt = GATE.lower_gate(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json", export, EXTERNAL_PACKAGE, output,
+            lower_command=["sh", "-c", "printf forged > compiler.mlir"],
+            fixed_qdq_profile=FIXED_QDQ_PROFILE, qdq_receipt=QDQ_RECEIPT,
+        )
+        self.assertEqual(attempt["status"], "unsupported")
+        self.assertIsNone(attempt["compiler_artifact"])
+        self.assertEqual(attempt["failure"]["code"], "fixed_hardware_qdq_compiler_lowering_not_implemented")
+        self.assertFalse((output / "compiler.mlir").exists())
+
     def test_nix_entrypoint_is_declared_without_rc_or_transport(self) -> None:
         flake = (ROOT / "flake.nix").read_text(encoding="utf-8")
         self.assertIn('"tinystories-1m-authenticated-package-lowering"', flake)

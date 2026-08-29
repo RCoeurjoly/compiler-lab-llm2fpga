@@ -275,7 +275,10 @@ def lower_gate(
             os.replace(staging, out_dir)
             return result
 
-        if runtime_profile is not None and not lower_command:
+        # A command line is not evidence that it understands the profile.  No
+        # fixed-QDQ lowering exists yet, so executing an arbitrary command
+        # here could turn a forged compiler.mlir into a false success claim.
+        if runtime_profile is not None:
             result = base | {
                 "status": "unsupported",
                 "compiler_artifact": None,
