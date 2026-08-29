@@ -145,7 +145,9 @@ def load_provenance_manifest(path: Path) -> Mapping[str, Any]:
         value = module.load_authenticated(path)
     except (OSError, ValueError) as error:
         raise SoftmaxBridgeError("provenance_manifest_invalid", str(error)) from error
-    require(value.get("sha256") == sha256_file(path), "provenance_manifest_invalid", "file hash")
+    # ``sha256`` authenticates the canonical JSON payload, not the raw file
+    # bytes (whose whitespace/order would make the identity formatting-
+    # dependent).  ``load_authenticated`` has already verified that binding.
     return value
 
 

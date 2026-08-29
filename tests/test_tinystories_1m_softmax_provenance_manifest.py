@@ -14,6 +14,11 @@ spec = importlib.util.spec_from_file_location("softmax_manifest", SCRIPT)
 assert spec and spec.loader
 manifest = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(manifest)
+BRIDGE_SCRIPT = ROOT / "scripts/comparison/bridge_tinystories_1m_softmax.py"
+bridge_spec = importlib.util.spec_from_file_location("softmax_bridge", BRIDGE_SCRIPT)
+assert bridge_spec and bridge_spec.loader
+bridge = importlib.util.module_from_spec(bridge_spec)
+bridge_spec.loader.exec_module(bridge)
 
 
 def payload() -> dict:
@@ -61,6 +66,13 @@ class SoftmaxManifestTest(unittest.TestCase):
             loaded = manifest.load_authenticated(path)
             self.assertEqual(loaded["sha256"], manifest.canonical_sha256({k: v for k, v in loaded.items() if k != "sha256"}))
             self.assertEqual(len(loaded["heads"]), 8)
+
+    def test_bridge_loader_accepts_sealed_manifest_without_raw_file_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "manifest.json"
+            path.write_text(json.dumps(manifest.seal(payload()), indent=2), encoding="utf-8")
+            loaded = bridge.load_provenance_manifest(path)
+            self.assertEqual(loaded["sha256"], manifest.canonical_sha256({k: v for k, v in loaded.items() if k != "sha256"}))
 
     def test_duplicate_role_identity_fails_closed(self):
         value = payload()
