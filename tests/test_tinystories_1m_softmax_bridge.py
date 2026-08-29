@@ -156,6 +156,19 @@ class SoftmaxBridgeTest(unittest.TestCase):
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-closed-iv.mlir")
 
+    def test_lowered_sibling_loop_value_is_not_dominating(self):
+        # Reusing the induction value from the preceding sibling phase must
+        # not be confused with a valid equivalent index in the current loop.
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = lowered_separate_loop_graph().replace(
+            "%a0 = memref.load %score_mem0[%d0]", "%a0 = memref.load %score_mem0[%r0]", 1
+        )
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module.bridge_graph(graph, evidence, source_name="lowered-sibling-iv.mlir")
+
     def test_lowered_in_loop_sum_store_cannot_bypass_loop_result(self):
         evidence = module.load_evidence(
             ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",

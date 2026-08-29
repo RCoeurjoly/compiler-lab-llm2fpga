@@ -305,20 +305,14 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
 
     def defined_before(value: str, line_number: int) -> bool:
         name = value.lstrip("%")
-        active_ivs: set[str] = set()
-        loop_decl = re.compile(r"scf\.(?:for|parallel)\s+%([^ ]+)\s*=")
-        for prior in lines[function_start:line_number + 1]:
-            declaration = loop_decl.search(prior)
-            if declaration:
-                active_ivs.add(declaration.group(1))
-            # A closing region ends the innermost loop declaration.  This is
-            # intentionally lexical and conservative for the textual IR.
-            if prior.strip() == "}" and active_ivs:
-                active_ivs.pop()
         use_scope = scope_paths[line_number]
         for definition_line, line in enumerate(lines[function_start:line_number], function_start):
             if re.search(rf"scf\.(?:for|parallel)\s+%{re.escape(name)}\s*=", line):
-                return name in active_ivs
+                definition_scope = scope_paths[definition_line]
+                # An induction variable is visible only in its loop body,
+                # never in a sibling or after the loop closes.
+                return (len(use_scope) > len(definition_scope) and
+                        definition_scope == use_scope[:len(definition_scope)])
             if re.match(rf"%{re.escape(name)}\s*=", line):
                 definition_scope = scope_paths[definition_line]
                 return (definition_scope == use_scope[:len(definition_scope)] and
@@ -378,6 +372,8 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
             require(candidates, "dataflow_not_proven", f"site {number} subtraction operand is not a loaded tensor value")
             operand_loads[operand] = candidates[-1][1]
             require(function_start <= candidates[-1][0] <= function_end, "dataflow_not_proven", f"site {number} operand load is outside function")
+            require(same_index(candidates[-1][1].group(3).strip(), candidates[-1][0], delta_idx, delta_load_i),
+                    "dataflow_not_proven", f"site {number} subtraction operand index does not match delta index")
         require(operand_loads[sub.group(2)].group(2).strip() != operand_loads[sub.group(3)].group(2).strip(),
                 "dataflow_not_proven", f"site {number} score and row-max loads are not distinct")
         for operand in sub.groups()[1:]:
