@@ -74,7 +74,7 @@ def lowered_separate_loop_graph(site_count: int = 8) -> str:
             f"    %exp{head} = math.exp %dl{head} : f32",
             f"    memref.store %exp{head}, %exp_mem{head}[%e{head}] : memref<4xf32>",
             "  }",
-            f"  scf.for %q{head} = %c0 to %c4 step %c1 {{",
+            f"  scf.for %q{head} = %c0 to %c4 step %c1 iter_args(%oldsum{head} = %zero) {{",
             f"    %elpre{head} = memref.load %exp_mem{head}[%q{head}] : memref<4xf32>",
             f"    %el{head} = memref.load %exp_mem{head}[%q{head}] : memref<4xf32>",
             f"    %sum{head} = arith.addf %oldsum{head}, %el{head} : f32",
@@ -108,6 +108,17 @@ class SoftmaxBridgeTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-inverse.mlir")
+
+    def test_lowered_non_loop_carried_sum_fails_closed(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = lowered_separate_loop_graph().replace(
+            " step %c1 iter_args(%oldsum0 = %zero)", " step %c1", 1
+        )
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module.bridge_graph(graph, evidence, source_name="lowered-fake-reduction.mlir")
 
     def test_exact_stabilized_attention_pattern_emits_authenticated_custom_op(self):
         evidence = module.load_evidence(

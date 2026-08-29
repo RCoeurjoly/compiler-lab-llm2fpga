@@ -287,6 +287,15 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         lctx, rctx = loop_context(lhs_line), loop_context(rhs_line)
         return (lctx is not None and rctx is not None and
                 lhs.lstrip("%") == lctx[0] and rhs.lstrip("%") == rctx[0] and lctx[1:] == rctx[1:])
+
+    def reduction_loop_header(line_number: int) -> str | None:
+        """Find the enclosing reduction loop header, without crossing a region."""
+        depth = 0
+        for i in range(line_number, -1, -1):
+            depth += lines[i].count("}") - lines[i].count("{")
+            if re.search(r"scf\.for\s+%[^ ]+\s*=", lines[i]) and depth <= 0:
+                return lines[i]
+        return None
     sites = []
     used_causal: set[int] = set()
     used_exp_memrefs: set[str] = set()
@@ -371,6 +380,12 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
                 "dataflow_not_proven", f"site {number} normalization escapes function")
         exp_loaded = exp_load.group(1)
         sum_value = add.group(1)
+        # A single add followed by a store is not evidence of a row
+        # reduction.  Require an explicit loop-carried accumulator; otherwise
+        # fail closed rather than accepting a fake one-element reduction.
+        reduction_header = reduction_loop_header(add_i)
+        require(reduction_header is not None and "iter_args" in reduction_header,
+                "dataflow_not_proven", f"site {number} reduction is not loop-carried")
         # A reduction is complete only when its accumulator is materialized
         # into a unique sum buffer and subsequently reloaded for division.
         sum_store_matches = [(i, m) for i, line in enumerate(lines) if i > add_i and (m := store_re.match(line)) and m.group(1).strip() == sum_value]
@@ -385,7 +400,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         causal_re = re.compile(r"%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule),\s*(%[^, ]+),\s*(%[^ ]+)")
         for i, line in enumerate(lines):
             match = causal_re.match(line)
-            if (i not in used_causal and match and
+            if (i not in used_causal and function_start <= i <= function_end and match and
                     match.group(1).lower().startswith("%time_index") and
                     match.group(2).lower().startswith("%position") and
                     (not head_digits or head_digits in line)):
