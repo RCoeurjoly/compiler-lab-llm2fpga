@@ -39,7 +39,7 @@ board-bound trace selects it.
 XDG_CACHE_HOME=/tmp/task3n-nix-cache nix develop -c python -m unittest \
   discover -s tests -p 'test_tinystories_1m_layernorm_semantics.py' -v
 
-Ran 5 tests ... OK
+Ran 7 tests ... OK
 ```
 
 The suite re-derives the checked-in receipt, rejects a tampered Q/DQ profile,
