@@ -50,7 +50,8 @@ nix build .#tinystories-1m-authenticated-package-lowering --no-link -L
 nix run .#tinystories-1m-authenticated-package-lowering -- ...
 ```
 
-The hardened focused suite passes four package-independent tests: receipt/QDQ
+The hardened focused suite passes five tests, including package-independent
+trust-boundary fixtures: receipt/QDQ
 preservation and honest unsupported status; rejection of re-hashed unrelated
 verifier receipts and Q/DQ content; rejection of a bad canonical adapter
 receipt hash plus atomic refusal to overwrite a nonempty output directory; and
@@ -59,6 +60,10 @@ adapter's canonical self-hash/schema/status/exact identity, delegates
 `verified_input` validation to the shared Task 3f strict validator, verifies
 the frozen package receipt hash, and re-derives all 97 boundary names, widths,
 values, and content hashes from the package manifest before staging output.
+It additionally reruns the hash-pinned canonical frozen-input verifier against
+the current package before inspecting boundaries and requires its newly
+computed receipt to exactly equal the adapter's stored `verified_input`; a
+mutated package manifest is rejected before any output directory is created.
 The final command materialized the full authenticated export and generated the
 verified unsupported receipt.
 

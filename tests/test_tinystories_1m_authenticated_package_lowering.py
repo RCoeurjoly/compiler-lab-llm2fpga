@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -13,6 +14,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/comparison/lower_tinystories_1m_authenticated_package.py"
+MATERIALIZER = ROOT / "scripts/comparison/materialize_tinystories_1m_package_export.py"
+EXTERNAL_PACKAGE = Path("/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m")
+EXTERNAL_MODEL = Path("/home/roland/.cache/huggingface/hub/models--roneneldan--TinyStories-1M/snapshots/77f1b168e219585646439073245fe87e56b3023e")
 
 
 def load_adapter():
@@ -25,6 +29,17 @@ def load_adapter():
 
 
 ADAPTER = load_adapter()
+
+
+def load_gate():
+    spec = importlib.util.spec_from_file_location("package_lowering_gate", SCRIPT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+GATE = load_gate()
 
 
 class AuthenticatedPackageLoweringTest(unittest.TestCase):
@@ -92,8 +107,10 @@ class AuthenticatedPackageLoweringTest(unittest.TestCase):
         receipt["receipt_sha256"] = ADAPTER.receipt_sha256(receipt)
         self.write_json(self.export / "adapter-receipt.json", receipt)
 
-    def run_gate(self, output: Path) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(["python", str(SCRIPT), "--contract", str(self.contract_path), "--package-export", str(self.export), "--package", str(self.package), "--out-dir", str(output)], cwd=ROOT, text=True, capture_output=True, check=False)
+    def run_gate(self, output: Path) -> dict:
+        def synthetic_canonical(_contract: Path, _package: Path) -> dict:
+            return json.loads((self.export / "adapter-receipt.json").read_text())["verified_input"]
+        return GATE.lower_gate(self.contract_path, self.export, self.package, output, verified_input_provider=synthetic_canonical)
 
     def mutate_receipt(self, mutate) -> None:
         path = self.export / "adapter-receipt.json"
@@ -104,23 +121,19 @@ class AuthenticatedPackageLoweringTest(unittest.TestCase):
 
     def test_metadata_only_qdq_is_preserved_and_cannot_be_labelled_aligned(self) -> None:
         output = self.root / "lowered"
-        completed = self.run_gate(output)
-        self.assertEqual(completed.returncode, 0, completed.stderr)
-        attempt = json.loads((output / "lowering-attempt.json").read_text())
+        attempt = self.run_gate(output)
         self.assertEqual((attempt["status"], attempt["alignment_status"], attempt["activation_qdq_boundary_count"]), ("unsupported", "unaligned", 97))
         self.assertEqual(attempt["failure"]["code"], "activation_rounding_semantics_unavailable")
         self.assertIsNone(attempt["compiler_artifact"])
 
     def test_rejects_rehashed_unrelated_verified_input_and_boundary_content(self) -> None:
         self.mutate_receipt(lambda receipt: receipt["verified_input"].__setitem__("status", "forged"))
-        completed = self.run_gate(self.root / "bad-verifier")
-        self.assertNotEqual(completed.returncode, 0)
-        self.assertIn("verifier_identity_mismatch", completed.stderr)
+        with self.assertRaisesRegex(GATE.LoweringGateError, "verifier_identity_mismatch"):
+            self.run_gate(self.root / "bad-verifier")
         self._write_fixture()
         self.mutate_receipt(lambda receipt: receipt["activation_qdq_boundaries"]["lm_head.input"].__setitem__("width", 17))
-        completed = self.run_gate(self.root / "bad-boundary")
-        self.assertNotEqual(completed.returncode, 0)
-        self.assertIn("activation_boundary_content_mismatch", completed.stderr)
+        with self.assertRaisesRegex(GATE.LoweringGateError, "activation_boundary_content_mismatch"):
+            self.run_gate(self.root / "bad-boundary")
 
     def test_rejects_bad_adapter_hash_and_nonempty_output_atomically(self) -> None:
         receipt_path = self.export / "adapter-receipt.json"
@@ -128,17 +141,34 @@ class AuthenticatedPackageLoweringTest(unittest.TestCase):
         receipt["receipt_sha256"] = "0" * 64
         self.write_json(receipt_path, receipt)
         output = self.root / "bad-hash"
-        completed = self.run_gate(output)
-        self.assertNotEqual(completed.returncode, 0)
-        self.assertIn("adapter_receipt_hash_mismatch", completed.stderr)
+        with self.assertRaisesRegex(GATE.LoweringGateError, "adapter_receipt_hash_mismatch"):
+            self.run_gate(output)
         self.assertFalse(output.exists())
         self._write_fixture()
         output.mkdir()
         (output / "preserve-me").write_text("x", encoding="utf-8")
-        completed = self.run_gate(output)
-        self.assertNotEqual(completed.returncode, 0)
-        self.assertIn("output_not_empty", completed.stderr)
+        with self.assertRaisesRegex(GATE.LoweringGateError, "output_not_empty"):
+            self.run_gate(output)
         self.assertEqual((output / "preserve-me").read_text(encoding="utf-8"), "x")
+
+    @unittest.skipUnless(EXTERNAL_PACKAGE.is_dir() and EXTERNAL_MODEL.is_dir(), "canonical package inputs unavailable")
+    def test_canonical_verifier_rejects_mutated_current_manifest_before_output(self) -> None:
+        export = self.root / "real-export"
+        materialized = subprocess.run([
+            "python", str(MATERIALIZER), "--contract", str(ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json"),
+            "--package", str(EXTERNAL_PACKAGE), "--model-path", str(EXTERNAL_MODEL), "--out-dir", str(export),
+        ], cwd=ROOT, text=True, capture_output=True, check=False)
+        self.assertEqual(materialized.returncode, 0, materialized.stderr)
+        package = self.root / "mutated-package"
+        shutil.copytree(EXTERNAL_PACKAGE, package)
+        manifest_path = package / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["tampered_for_test"] = True
+        self.write_json(manifest_path, manifest)
+        output = self.root / "must-not-exist"
+        with self.assertRaisesRegex(GATE.LoweringGateError, "package_hash_mismatch"):
+            GATE.lower_gate(ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json", export, package, output)
+        self.assertFalse(output.exists())
 
     def test_nix_entrypoint_is_declared_without_rc_or_transport(self) -> None:
         flake = (ROOT / "flake.nix").read_text(encoding="utf-8")

@@ -83,8 +83,24 @@ def _contract_identity(contract: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _canonical_verified_input(contract_path: Path, package: Path) -> dict[str, Any]:
+    """Recompute the canonical verifier receipt from the package currently on disk."""
+    try:
+        verifier = package_adapter._load_verifier()
+        verified = verifier.verify_input(contract_path, package)
+    except package_adapter.PackageAdapterError as error:
+        raise LoweringGateError(error.code, str(error)) from error
+    except Exception as error:
+        code = getattr(error, "code", "canonical_verifier_failed")
+        raise LoweringGateError(code, str(error)) from error
+    if not isinstance(verified, dict):
+        raise LoweringGateError("canonical_verifier_failed", "canonical verifier did not return an object")
+    return verified
+
+
 def _verified_receipt(
-    receipt: dict[str, Any], contract: dict[str, Any], contract_path: Path, package: Path
+    receipt: dict[str, Any], contract: dict[str, Any], contract_path: Path, package: Path,
+    verified_input_provider=_canonical_verified_input,
 ) -> None:
     if receipt.get("schema") != CONTRACT_SCHEMA or receipt.get("status") != "dequantized_weight_export_ready":
         raise LoweringGateError("adapter_receipt_schema_mismatch", "adapter receipt schema is not canonical")
@@ -102,9 +118,15 @@ def _verified_receipt(
     }
     if identity != expected_identity:
         raise LoweringGateError("adapter_receipt_identity_mismatch", "adapter receipt model/package identity differs")
+    canonical_verified_input = verified_input_provider(contract_path, package)
+    if receipt.get("verified_input") != canonical_verified_input:
+        raise LoweringGateError(
+            "verified_input_recomputation_mismatch",
+            "adapter receipt verified_input differs from canonical verification of current package files",
+        )
     try:
         package_adapter.validate_verifier_receipt(
-            receipt.get("verified_input"), contract, contract_path, package
+            canonical_verified_input, contract, contract_path, package
         )
     except package_adapter.PackageAdapterError as error:
         raise LoweringGateError(error.code, str(error)) from error
@@ -159,12 +181,15 @@ def _prepare_output(out_dir: Path) -> Path:
     return Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.staging-", dir=out_dir.parent))
 
 
-def lower_gate(contract_path: Path, package_export: Path, package: Path, out_dir: Path, lower_command: list[str] | None = None) -> dict[str, Any]:
+def lower_gate(
+    contract_path: Path, package_export: Path, package: Path, out_dir: Path,
+    lower_command: list[str] | None = None, verified_input_provider=_canonical_verified_input,
+) -> dict[str, Any]:
     contract = _load_json(contract_path)
     identity = _contract_identity(contract)
     receipt_path = package_export / "adapter-receipt.json"
     receipt = _load_json(receipt_path)
-    _verified_receipt(receipt, contract, contract_path, package)
+    _verified_receipt(receipt, contract, contract_path, package, verified_input_provider)
     staging = _prepare_output(out_dir)
     try:
         receipt_files = {
