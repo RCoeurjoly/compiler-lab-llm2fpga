@@ -5,6 +5,11 @@
   "bridge_status": "real_graph_pattern_mismatch",
   "bridge_script": "scripts/comparison/bridge_tinystories_1m_softmax.py",
   "bridge_revision": "861862d",
+  "bridge_script_sha256": "4027710af59bd696ca7bef86881299a30612aebb95e8dfe59137cdcf2d128708",
+  "frontier_report": {
+    "path": "artifacts/comparison/tinystories-1m-package-aware-lowering-frontier.json",
+    "sha256": "81a8ea6b29ceb5a362c70dc7f5adf6b469e41a6f79d6067fc378280abe8b447e"
+  },
   "contract_sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
   "package": {
     "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
@@ -39,6 +44,8 @@
       "site": 1,
       "message": "site 1 lhs is not score",
       "flat_scf_line": 836,
+      "arith_subf_line": 823,
+      "arith_subf": "%118 = arith.subf %114, %117 : f32",
       "context": [
         "%114 = memref.load %alloc_37[%113] : memref<256xf32, strided<[1]>>",
         "%115 = math.exp %114 : f32",
@@ -53,5 +60,6 @@
     "rtl": false,
     "hardware_inference": false
   },
-  "next_action": "Adapt the bridge to prove tensor-level score/row-max provenance through linalg.generic lowering, while retaining all eight-site and same-function dataflow checks."
+  "next_action": "Adapt the bridge to prove tensor-level score/row-max provenance through linalg.generic lowering, while retaining all eight-site and same-function dataflow checks.",
+  "sha256": "c4828e586a21ce4796eec2551900c5f459fdf47942c8509834705004524c54a3"
 }
