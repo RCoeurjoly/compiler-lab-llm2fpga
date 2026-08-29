@@ -594,7 +594,10 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
     sites = []
     used_causal: set[int] = set()
     used_exp_memrefs: set[str] = set()
-    used_delta_memrefs: set[str] = set()
+    # A workspace buffer may be reused temporally by successive heads/sites.
+    # Record complete producer-to-normalization regions and reject only an
+    # overlap, rather than treating buffer identity as permanent ownership.
+    delta_regions: dict[str, list[tuple[int, int]]] = {}
     used_sum_memrefs: set[str] = set()
     used_operand_memrefs: set[str] = set()
     for number, exp_i in enumerate(exp_lines, 1):
@@ -609,11 +612,11 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
         delta_mem, delta_idx = delta_load.group(2).strip(), delta_load.group(3).strip()
         require(defined_before(delta_idx, delta_load_i), "dataflow_not_proven", f"site {number} delta index is undefined")
         require(function_start <= delta_load_i <= function_end, "dataflow_not_proven", f"site {number} delta load is outside function")
-        require(delta_mem not in used_delta_memrefs, "dataflow_not_proven", f"site {number} reuses another head's delta memref")
-        used_delta_memrefs.add(delta_mem)
         delta_stores = [(i, m) for i, line in enumerate(lines) if i < delta_load_i and (m := store_re.match(line)) and m.group(2).strip() == delta_mem and same_index(m.group(3).strip(), i, delta_idx, delta_load_i)]
         require(delta_stores, "dataflow_not_proven", f"site {number} delta load has no same-index store")
         delta_store_i, delta_store = delta_stores[-1]
+        require(all(end < delta_store_i for _, end in delta_regions.get(delta_mem, [])),
+                "dataflow_not_proven", f"site {number} overlaps a prior delta region")
         require(function_start <= delta_store_i <= function_end, "dataflow_not_proven", f"site {number} delta store is outside function")
         delta_value = delta_store.group(1).strip()
         sub_defs = [(i, m) for i, line in enumerate(lines) if i < delta_store_i and (m := sub_re.match(line)) and m.group(1) == delta_value]
@@ -957,6 +960,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                         for line in lines[causal[0] + 1:function_end + 1]),
                     "dataflow_not_proven", f"site {number} masked score is not observable")
             used_causal.add(causal[0])
+            delta_regions.setdefault(delta_mem, []).append((delta_store_i, div_entry[0]))
             sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
                           "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_mask_score_store"]})
             continue
@@ -984,6 +988,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                 output_match.group(3).strip().lstrip("%") == loop_context(causal[0])[0],
                 "dataflow_not_proven", f"site {number} masked output is not head-local")
         used_causal.add(causal[0])
+        delta_regions.setdefault(delta_mem, []).append((delta_store_i, div_entry[0]))
         sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
                       "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_cmpi"]})
     return {"exp_site_count": len(sites), "sites": sites,
