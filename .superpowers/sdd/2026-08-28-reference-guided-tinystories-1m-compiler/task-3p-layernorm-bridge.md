@@ -25,7 +25,9 @@ changed or reordered checkpoint hashes, and altered numeric trace hashes.  The
 lowering hook repeats source, evidence, descriptor, and checkpoint validation;
 the report additionally requires byte-exact MLIR regeneration.  The MLIR
 module manifest carries the source/export identities, arithmetic and numeric
-trace identities, and every ordered checkpoint name/hash.
+trace identities, and every ordered checkpoint name/hash.  The deterministic
+bridge evidence receipt itself is pinned to SHA-256 `83ee250e39f65e2484c4bf918bccf60d3de7c38e8c74b786766ad5c33cac5bda`;
+rehashed substitutions are rejected by both lowering and report generation.
 
 The precise next unsupported boundary is
 `fixed_layer_norm_backend_lowering_not_implemented`: the existing
@@ -60,7 +62,7 @@ nix develop -c python -m unittest \
   tests/test_tinystories_1m_rtl_layernorm.py \
   tests/test_tinystories_1m_rtl_layernorm_bridge.py -v
 
-Ran 37 tests ... OK
+Ran 38 tests ... OK
 
 nix develop -c circt-opt --allow-unregistered-dialect \
   artifacts/comparison/tinystories-1m-fixed-layernorm-bridge.mlir

@@ -43,6 +43,7 @@ CHECKPOINT_TRACE_SHA256 = "ac0118fe0068aea3790c3fc7414f75cd56abd5690f0d7f4bc13b1
 ARITHMETIC_PROFILE_SHA256 = "6f3218b10e5460926c15f5ba27efc42f93240acc7f02a8ceb6809def34ad43f6"
 NUMERIC_INPUT_SHA256 = "e7125f4b339f3ddce65a5f71c99b82f43eb107f581da1e4697aa3ecf7645dfba"
 NUMERIC_RESULT_SHA256 = "4ddab4aecb186dce77618426b3cf008e7d7ea085f637f26e81747ced27a5c465"
+BRIDGE_EVIDENCE_SHA256 = "83ee250e39f65e2484c4bf918bccf60d3de7c38e8c74b786766ad5c33cac5bda"
 CHECKPOINT_SHAPES: dict[str, tuple[int, ...]] = {
     "block.input": (64,),
     "block.ln_1.output": (64,),
@@ -240,9 +241,11 @@ def validate_evidence(evidence: Mapping[str, Any]) -> None:
         "exact fixed-width result",
     )
     require(
-        evidence.get("sha256") == canonical_sha256({key: value for key, value in evidence.items() if key != "sha256"}),
+        evidence.get("sha256")
+        == canonical_sha256({key: value for key, value in evidence.items() if key != "sha256"})
+        == BRIDGE_EVIDENCE_SHA256,
         "bridge_evidence_hash_mismatch",
-        "evidence self hash",
+        "canonical evidence receipt hash",
     )
 
 
@@ -557,13 +560,13 @@ def validate_descriptor(descriptor: Mapping[str, Any]) -> None:
         "numeric_input_sha256": NUMERIC_INPUT_SHA256,
         "numeric_software_result_sha256": NUMERIC_RESULT_SHA256,
         "numeric_bridge_result_sha256": NUMERIC_RESULT_SHA256,
-        "sha256": descriptor.get("evidence", {}).get("sha256") if isinstance(descriptor.get("evidence"), Mapping) else None,
+        "sha256": BRIDGE_EVIDENCE_SHA256,
     }
     evidence = descriptor.get("evidence")
     require(isinstance(evidence, dict) and set(evidence) == set(expected_evidence), "bridge_descriptor_evidence_mismatch", "evidence keys")
     evidence_without_self = {key: value for key, value in expected_evidence.items() if key != "sha256"}
     require(all(evidence.get(key) == value for key, value in evidence_without_self.items()), "bridge_descriptor_evidence_mismatch", "artifact identities")
-    require(isinstance(evidence.get("sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", evidence["sha256"]) is not None, "bridge_descriptor_evidence_mismatch", "evidence receipt hash")
+    require(evidence.get("sha256") == BRIDGE_EVIDENCE_SHA256, "bridge_descriptor_evidence_mismatch", "canonical evidence receipt hash")
     checkpoints = descriptor.get("checkpoint_identities")
     require(isinstance(checkpoints, dict) and list(checkpoints) == list(CHECKPOINT_IDENTITIES) and checkpoints == CHECKPOINT_IDENTITIES, "checkpoint_identity_mismatch", "descriptor checkpoints")
     require(

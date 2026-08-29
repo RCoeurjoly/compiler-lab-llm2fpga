@@ -173,6 +173,23 @@ class RtlLayerNormBridgeTest(unittest.TestCase):
             with self.subTest(section=section, key=key), self.assertRaises(self.module.LayerNormBridgeError):
                 self.module.lower_custom_op_to_mlir(candidate)
 
+    def test_lowering_and_report_reject_rehashed_forged_evidence_receipt_identity(self) -> None:
+        descriptor = self.module.bridge_source_op(self.source_op(), self.evidence, token_index=3)
+        candidate = copy.deepcopy(descriptor)
+        candidate["evidence"]["sha256"] = "0" * 64
+        candidate["sha256"] = self.module.canonical_sha256(
+            {name: value for name, value in candidate.items() if name != "sha256"}
+        )
+        with self.assertRaisesRegex(self.module.LayerNormBridgeError, "bridge_descriptor_evidence_mismatch"):
+            self.module.lower_custom_op_to_mlir(candidate)
+        with self.assertRaisesRegex(self.module.LayerNormBridgeError, "bridge_descriptor_evidence_mismatch"):
+            self.module.make_report(
+                source_op=self.source_op(),
+                descriptor=candidate,
+                mlir=self.module.lower_custom_op_to_mlir(descriptor),
+                evidence=self.evidence,
+            )
+
     def test_report_revalidates_all_inputs_and_exact_rendering(self) -> None:
         descriptor = self.module.bridge_source_op(self.source_op(), self.evidence, token_index=3)
         mlir = self.module.lower_custom_op_to_mlir(descriptor)
