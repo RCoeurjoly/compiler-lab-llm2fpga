@@ -1,6 +1,7 @@
 result
 result-*
 __pycache__/
+obj_dir/
 *.pyc
 .direnv/
 refresult

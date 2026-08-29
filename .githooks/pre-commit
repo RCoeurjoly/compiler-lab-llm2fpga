@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+failed=0
+
+if ! git diff --quiet --ignore-submodules --; then
+  echo "git hygiene gate: unstaged changes remain" >&2
+  git diff --name-status >&2
+  failed=1
+fi
+
+untracked="$(git ls-files --others --exclude-standard)"
+if [[ -n "${untracked}" ]]; then
+  echo "git hygiene gate: untracked files remain" >&2
+  printf '%s\n' "${untracked}" >&2
+  failed=1
+fi
+
+if [[ "${failed}" -ne 0 ]]; then
+  echo "stage, commit, ignore, or explicitly remove every remaining path" >&2
+  exit 1
+fi
