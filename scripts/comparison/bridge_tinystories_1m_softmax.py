@@ -309,11 +309,14 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
     def dominates_exact_zero(use_line: int) -> bool:
         name = zero_identity.lstrip("%")
         use_scope = scope_paths[use_line]
-        return any(re.match(rf"%{re.escape(name)}\s*=\s*arith\.constant\s+0(?:\.0+)?(?:e[+\-]?0+)?\s*:\s*f32", lines[i], re.IGNORECASE) and
-                   scope_paths[i] == use_scope[:len(scope_paths[i])]
+        function_body_scope = scope_paths[function_start + 1]
+        return any(re.match(rf"%{re.escape(name)}\s*=\s*arith\.constant\s+(?:0(?:\.0+)?|0\.0+e[+\-]0+)\s*:\s*f32", lines[i], re.IGNORECASE) and
+                   # Only a function-body definition is globally dominating;
+                   # a same-named constant in a closed scf.if is a decoy.
+                   scope_paths[i] == function_body_scope
                    for i in range(function_start, use_line))
 
-    require(any(re.match(rf"%{re.escape(zero_identity.lstrip('%'))}\s*=\s*arith\.constant\s+0(?:\.0+)?(?:e[+\-]?0+)?\s*:\s*f32", line, re.IGNORECASE) for line in lines),
+    require(any(re.match(rf"%{re.escape(zero_identity.lstrip('%'))}\s*=\s*arith\.constant\s+(?:0(?:\.0+)?|0\.0+e[+\-]0+)\s*:\s*f32", line, re.IGNORECASE) for line in lines),
             "pattern_not_proven", "authenticated floating zero constant")
     exp_lines = [i for i, line in enumerate(lines) if re.match(r"%[^ ]+\s*=\s*math\.exp\s+%[^ ]+", line)]
     require(len(exp_lines) == expected_exp_sites, "pattern_not_proven",
@@ -321,9 +324,71 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
 
     load_re = re.compile(r"%([^ ]+)\s*=\s*memref\.load\s+%([^\[]+)\[([^\]]+)\]")
     store_re = re.compile(r"memref\.store\s+%([^,]+),\s*%([^\[]+)\[([^\]]+)\]")
+    copy_re = re.compile(r"memref\.copy\s+%([^, ]+)\s*,\s*%([^ ]+)")
     sub_re = re.compile(r"%([^ ]+)\s*=\s*arith\.subf\s+%([^, ]+)\s*,\s*%([^ ]+)")
     add_re = re.compile(r"%([^ ]+)\s*=\s*arith\.addf\s+%([^, ]+)\s*,\s*%([^ ]+)")
     div_re = re.compile(r"%([^ ]+)\s*=\s*arith\.divf\s+%([^, ]+)\s*,\s*%([^ ]+)")
+
+    # Flattening leaves view values on copy operations.  Resolve only the
+    # explicit reinterpret-cast aliases; no global name or allocation
+    # similarity is inferred.
+    memref_aliases: list[tuple[int, str, str]] = []
+    for alias_line, line in enumerate(lines[:function_end + 1]):
+        alias = re.match(r"%([^ ]+)\s*=\s*memref\.(?:reinterpret_cast|expand_shape|collapse_shape)\s+%([^ ]+)", line)
+        if alias:
+            memref_aliases.append((alias_line, alias.group(1), alias.group(2)))
+
+    def canonical_memref(value: str, use_line: int | None = None) -> str:
+        value = value.strip().lstrip("%")
+        seen: set[str] = set()
+        while value not in seen:
+            seen.add(value)
+            aliases = [(line, base) for line, view, base in memref_aliases
+                       if view == value and (use_line is None or line < use_line)]
+            if not aliases:
+                break
+            value = aliases[-1][1].lstrip("%")
+        return value
+
+    def has_negative_infinity_initialization(memref: str, before_line: int) -> bool:
+        """Prove a max buffer was copied from a full -infinity seed buffer."""
+        target = canonical_memref(memref, before_line)
+        for copy_line in range(before_line - 1, function_start - 1, -1):
+            copy = copy_re.match(lines[copy_line])
+            if not copy or canonical_memref(copy.group(2), copy_line) != target:
+                continue
+            source = canonical_memref(copy.group(1), copy_line)
+            for init_line in range(copy_line - 1, function_start - 1, -1):
+                store = store_re.match(lines[init_line])
+                if not store or canonical_memref(store.group(2), init_line) != source:
+                    continue
+                value = store.group(1).strip().lstrip("%")
+                if re.search(rf"%{re.escape(value)}\s*=\s*arith\.constant\s+(?:0xFF800000|-3\.40282347[Ee][+\-]?38)\s*:\s*f32", "\n".join(lines[function_start:copy_line]), re.IGNORECASE):
+                    return True
+        return False
+
+    def has_zero_initialization(memref: str, before_line: int) -> bool:
+        """Prove an accumulator is zero-seeded, including one copy/view hop."""
+        target = canonical_memref(memref, before_line)
+
+        def zero_store(store_line: int, wanted: str) -> bool:
+            store = store_re.match(lines[store_line])
+            if not store or canonical_memref(store.group(2), store_line) != wanted:
+                return False
+            value = store.group(1).strip().lstrip("%")
+            return any(re.search(rf"%{re.escape(value)}\s*=\s*arith\.constant\s+(?:0(?:\.0+)?|0\.0+e[+\-]0+)\s*:\s*f32", line, re.I)
+                       for line in lines[function_start:store_line])
+
+        for line_no in range(before_line - 1, function_start - 1, -1):
+            if zero_store(line_no, target):
+                return True
+            copy = copy_re.match(lines[line_no])
+            if not copy or canonical_memref(copy.group(2), line_no) != target:
+                continue
+            source = canonical_memref(copy.group(1), line_no)
+            if any(zero_store(i, source) for i in range(line_no - 1, function_start - 1, -1)):
+                return True
+        return False
 
     def loop_context(line_number: int) -> tuple[str, str, str, str] | None:
         """Return a normalized single-induction-loop signature for a line."""
@@ -405,6 +470,25 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
         if cast:
             return index_dependencies(cast.group(1), definition_line, seen)
         return set()
+
+    def same_affine_index(lhs: str, lhs_line: int, rhs: str, rhs_line: int) -> bool:
+        """Prove two flattened index expressions denote the same domain.
+
+        Equal textual SSA spellings are insufficient because MLIR reuses names
+        in sibling loops.  For distinct definitions, require identical
+        induction-variable dependencies and identical enclosing loop bounds.
+        """
+        lhs_def, rhs_def = _definition_line(lhs, lhs_line), _definition_line(rhs, rhs_line)
+        if lhs_def == rhs_def and lhs_def is not None:
+            return True
+        lhs_loops, rhs_loops = loop_contexts(lhs_line), loop_contexts(rhs_line)
+        if lhs_loops != rhs_loops:
+            return False
+        lhs_deps, rhs_deps = index_dependencies(lhs, lhs_line), index_dependencies(rhs, rhs_line)
+        if lhs_deps or rhs_deps:
+            return lhs_deps == rhs_deps
+        # Compact fixtures use loop-IV spellings without explicit definitions.
+        return lhs.lstrip("%") == rhs.lstrip("%")
 
     def same_row_index(score: str, score_line: int, row_max: str, row_max_line: int) -> bool:
         """Prove a flattened score index and row-max index share row coordinates.
@@ -534,20 +618,24 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
         max_operand = sub.group(3)
         max_load_candidates = [(i, m) for i, line in enumerate(lines) if i < sub_i and (m := load_re.match(line)) and m.group(1) == max_operand]
         require(max_load_candidates, "dataflow_not_proven", f"site {number} row-max operand is not loaded")
-        max_mem = max_load_candidates[-1][1].group(2).strip()
-        max_stores = [(i, m) for i, line in enumerate(lines) if i < max_load_candidates[-1][0] and (m := store_re.match(line)) and m.group(2).strip() == max_mem]
-        require(max_stores, "dataflow_not_proven", f"site {number} row-max buffer has no producer")
-        max_value = max_stores[-1][1].group(1).strip()
-        max_header_i = next((i for i, line in enumerate(lines[:max_stores[-1][0]])
-                             if re.match(rf"%{re.escape(max_value.lstrip('%'))}\s*=\s*scf\.for\b", line)), None)
-        require(max_header_i is not None, "dataflow_not_proven", f"site {number} row-max has no matching loop result")
-        require(dominates_exact_zero(max_header_i),
-                "dataflow_not_proven", f"site {number} zero constant does not dominate row max")
-        max_header_info = reduction_loop_header(max_header_i)
+        max_load_i, max_load = max_load_candidates[-1]
+        max_mem = max_load.group(2).strip()
+        max_stores = [(i, m) for i, line in enumerate(lines) if i < max_load_i and (m := store_re.match(line)) and canonical_memref(m.group(2), i) == canonical_memref(max_mem, max_load_i)]
+        # In the compact fixture the max is returned by an iter_args loop and
+        # then stored before the subtraction loop.  In the real lowered graph
+        # the selected value is stored in-place by its producer loop.  Locate
+        # the producer from the store, rather than from the later consumer
+        # load (which is in the subtraction loop).
+        max_result_header = None
+        if max_stores:
+            result_name = max_stores[-1][1].group(1).strip().lstrip("%")
+            max_result_header = next((i for i, line in enumerate(lines[:max_stores[-1][0]])
+                                      if re.match(rf"%{re.escape(result_name)}\s*=\s*scf\.for\b", line)), None)
+        max_header_info = reduction_loop_header((max_result_header + 1) if max_result_header is not None else (max_stores[-1][0] if max_stores else max_load_i))
         max_header = max_header_info[0] if max_header_info else None
-        require(max_header is not None and "iter_args" in max_header,
-                "dataflow_not_proven", f"site {number} row-max is not loop-carried")
-        max_end = max_header_info[2]
+        require(max_header_info is not None and max_header is not None,
+                "dataflow_not_proven", f"site {number} row-max has no enclosing reduction loop")
+        max_header_i, max_end = max_header_info[1], max_header_info[2]
         score_mem = operand_loads[sub.group(2)].group(2).strip()
         max_body = lines[max_header_i:max_end]
         carried_match = re.search(r"iter_args\(\s*%([^ ]+)\s*=", max_header)
@@ -555,12 +643,39 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                        for line in max_body if "arith.maximumf" in line), None)
         score_load_value = next((re.match(r"%([^ ]+)\s*=\s*memref\.load", line).group(1)
                                  for line in max_body if score_mem in line and re.match(r"%[^ ]+\s*=\s*memref\.load", line)), None)
-        require(carried_match is not None and max_op is not None and
-                carried_match.group(1) in max_op.groups()[1:] and
-                score_load_value is not None and score_load_value in max_op.groups()[1:],
-                "dataflow_not_proven", f"site {number} row-max is not a loop-carried reduction")
-        require(any(re.match(rf"scf\.yield\s+%{re.escape(max_op.group(1))}", line) for line in max_body),
-                "dataflow_not_proven", f"site {number} row-max result is not yielded")
+        if carried_match is not None and max_op is not None:
+            require(max_result_header is not None and
+                    max_stores and max_stores[-1][1].group(1).strip().lstrip("%") ==
+                    re.match(r"%([^ ]+)", max_header).group(1) and
+                    carried_match.group(1) in max_op.groups()[1:] and
+                    score_load_value is not None and score_load_value in max_op.groups()[1:],
+                    "dataflow_not_proven", f"site {number} row-max is not a loop-carried reduction")
+            require(any(re.match(rf"scf\.yield\s+%{re.escape(max_op.group(1))}", line) for line in max_body),
+                    "dataflow_not_proven", f"site {number} row-max result is not yielded")
+        else:
+            # The real linalg-to-loops lowering uses a memory-carried max:
+            # cmpf/select updates the initialized max buffer in place.  Bind
+            # the selected score and old max to this exact loop and require
+            # its seed to be copied from a -infinity initialized buffer.
+            require(max_stores, "dataflow_not_proven", f"site {number} row-max buffer has no producer")
+            require(has_negative_infinity_initialization(max_mem, max_load_i),
+                    "dataflow_not_proven", f"site {number} row-max buffer lacks -infinity initialization")
+            max_value = max_load.group(1)
+            score_cmp = next((re.match(r"%([^ ]+)\s*=\s*arith\.cmpf\s+ugt,\s*%([^, ]+),\s*%([^ ]+)", line)
+                              for line in max_body if "arith.cmpf ugt" in line), None)
+            selects = [(line, re.match(r"%([^ ]+)\s*=\s*arith\.select\s+%([^, ]+),\s*%([^, ]+),\s*%([^ ]+)", line))
+                       for line in max_body if "arith.select" in line]
+            max_store_value = max_stores[-1][1].group(1).strip().lstrip("%") if max_stores else None
+            selected = next((match for line, match in selects if match and
+                             match.group(1) == max_store_value), None)
+            first_selected = next((match for _, match in selects if match and match.group(2) == score_cmp.group(1)), None)
+            require(score_cmp is not None and selected is not None and
+                    score_load_value is not None and score_load_value in score_cmp.groups()[1:] and
+                    max_value in score_cmp.groups()[1:] and
+                    first_selected is not None and
+                    first_selected.group(1) in selected.groups()[2:] and
+                    selected.group(1) == max_store_value,
+                    "dataflow_not_proven", f"site {number} row-max memory-carried update is not proven")
         require(operand_loads[sub.group(2)].group(2).strip() != operand_loads[sub.group(3)].group(2).strip(),
                 "dataflow_not_proven", f"site {number} score and row-max loads are not distinct")
         for operand in sub.groups()[1:]:
@@ -575,8 +690,18 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
         exp_mem, exp_idx = exp_store.group(2).strip(), exp_store.group(3).strip()
         require(defined_before(exp_idx, exp_store_i), "dataflow_not_proven", f"site {number} exp index is undefined")
         exp_loop = loop_context(exp_store_i)
-        require(exp_loop is not None and exp_idx.lstrip("%") == exp_loop[0],
-                "dataflow_not_proven", f"site {number} exponential store is not indexed by its loop IV")
+        exp_loops = loop_contexts(exp_store_i)
+        exp_dependencies = index_dependencies(exp_idx, exp_store_i)
+        require((exp_loop is not None and exp_idx.lstrip("%") == exp_loop[0]) or
+                (bool(exp_dependencies) and bool(exp_loops) and
+                 {loop[0] for loop in exp_loops}.issubset(exp_dependencies)),
+                "dataflow_not_proven", f"site {number} exponential store is not indexed by its loop domain")
+        # The real flattened graph uses an affine 3-D score index rather than
+        # the innermost loop IV.  Bind it to the exact delta index; this keeps
+        # the store/load chain head-local without requiring textual equality
+        # with a loop variable.
+        require(same_affine_index(exp_idx, exp_store_i, delta_idx, delta_load_i),
+                "dataflow_not_proven", f"site {number} exponential store index does not match delta index")
         require(function_start <= exp_store_i <= function_end, "dataflow_not_proven", f"site {number} exp store is outside function")
         require(exp_mem not in used_exp_memrefs, "dataflow_not_proven", f"site {number} reuses another head's exp memref")
         used_exp_memrefs.add(exp_mem)
@@ -597,9 +722,17 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                 candidate_info = reduction_loop_header(add_i_candidate)
                 candidate_header = candidate_info[0] if candidate_info else None
                 result_match = re.match(r"%([^ ]+)\s*=\s*scf\.for\b", candidate_header or "")
-                require(result_match is not None, "dataflow_not_proven", f"site {number} reduction has no SSA loop result")
-                candidate_result = result_match.group(1)
-                sum_stores = [(i, m) for i, line in enumerate(lines) if i > candidate_info[2] and (m := store_re.match(line)) and m.group(1).strip() == candidate_result]
+                # Linalg-to-loops may carry the accumulator in memory rather
+                # than an scf.for result.  The latter is accepted only after
+                # proving an in-place load/add/store chain in this loop.
+                candidate_result = result_match.group(1) if result_match else None
+                if candidate_info is None:
+                    continue
+                if candidate_result is not None:
+                    sum_stores = [(i, m) for i, line in enumerate(lines) if i > candidate_info[2] and (m := store_re.match(line)) and m.group(1).strip() == candidate_result]
+                else:
+                    sum_stores = [(i, m) for i, line in enumerate(lines[add_i_candidate + 1:candidate_info[2]], add_i_candidate + 1)
+                                  if (m := store_re.match(line)) and m.group(1).strip() == sum_candidate]
                 for sum_store_i, sum_store in sum_stores:
                     sum_mem, sum_idx = sum_store.group(2).strip(), sum_store.group(3).strip()
                     sum_loads = [(i, m) for i, line in enumerate(lines) if i > sum_store_i and (m := load_re.match(line)) and m.group(2).strip() == sum_mem and same_index(m.group(3).strip(), i, sum_idx, sum_store_i)]
@@ -625,32 +758,73 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
         # fail closed rather than accepting a fake one-element reduction.
         reduction_info = reduction_loop_header(add_i)
         reduction_header = reduction_info[0] if reduction_info else None
-        require(reduction_info is not None and "iter_args" in reduction_header,
-                "dataflow_not_proven", f"site {number} reduction is not loop-carried")
+        # Memory-carried reductions are proved below from the accumulator
+        # load/add/store chain.  Keep the old SSA-loop proof unchanged.
+        if reduction_info is not None and "iter_args" not in reduction_header:
+            reduction_end = reduction_info[2]
+            acc_store = next((store_re.match(line) for line in lines[add_i + 1:reduction_end]
+                              if (store_re.match(line)) and store_re.match(line).group(1).strip() == sum_value), None)
+            require(acc_store is not None, "dataflow_not_proven", f"site {number} memory reduction has no accumulator store")
+            acc_mem, acc_idx = acc_store.group(2).strip(), acc_store.group(3).strip()
+            acc_load = next((m for i, line in enumerate(lines[reduction_info[1]:add_i], reduction_info[1])
+                             if (m := load_re.match(line)) and m.group(2).strip() == acc_mem and
+                             same_index(m.group(3).strip(), i, acc_idx, add_i)), None)
+            require(acc_load is not None, "dataflow_not_proven", f"site {number} memory reduction has no accumulator load")
+            require(acc_load.group(1) in add.groups()[1:], "dataflow_not_proven", f"site {number} add does not consume accumulator")
+            require(same_index(acc_idx, add_i, acc_load.group(3), add_i), "dataflow_not_proven", f"site {number} accumulator index changes")
+            # Require a dominating zero seed for this exact buffer; arbitrary
+            # preinitialization must not be mistaken for a sum reduction.
+            require(has_zero_initialization(acc_mem, add_i), "dataflow_not_proven",
+                    f"site {number} memory reduction lacks zero initialization")
+        else:
+            require(reduction_info is not None and "iter_args" in reduction_header,
+                    "dataflow_not_proven", f"site {number} reduction is not loop-carried")
         result_match = re.match(r"%([^ ]+)\s*=\s*scf\.for\b", reduction_header)
-        require(result_match is not None, "dataflow_not_proven", f"site {number} reduction has no SSA loop result")
+        if "iter_args" in reduction_header:
+            require(result_match is not None, "dataflow_not_proven", f"site {number} reduction has no SSA loop result")
+        if result_match is None:
+            result_match = None
+        if result_match is None:
+            reduction_result = None
+        else:
+            reduction_result = result_match.group(1)
+        if reduction_result is None:
+            sum_store_matches = [(i, m) for i, line in enumerate(lines[add_i + 1:reduction_info[2]], add_i + 1)
+                                 if (m := store_re.match(line)) and m.group(1).strip() == sum_value]
+        else:
+            sum_store_matches = [(i, m) for i, line in enumerate(lines) if i > reduction_info[2] and (m := store_re.match(line)) and m.group(1).strip() == reduction_result]
+        require(sum_store_matches, "dataflow_not_proven", f"site {number} reduction result is not materialized")
+        # Memory-carried stores are already the materialization; SSA loops
+        # retain the original post-loop result checks below.
+        if reduction_result is None:
+            pass
         require(dominates_exact_zero(reduction_info[1]),
                 "dataflow_not_proven", f"site {number} zero constant does not dominate reduction")
-        carried_match = re.search(r"iter_args\(\s*%([^ ]+)\s*=", reduction_header)
-        require(carried_match is not None, "dataflow_not_proven", f"site {number} reduction carried value is malformed")
-        carried = carried_match.group(1)
-        add_operands = add.groups()[1:]
-        require(any(operand.lstrip("%") == carried for operand in add_operands),
-                "dataflow_not_proven", f"site {number} reduction add does not consume carried accumulator")
-        _, reduction_start, reduction_end = reduction_info
-        yield_found = any(re.match(rf"scf\.yield\s+%{re.escape(sum_value)}(?:\s|:|$)", line)
-                          for line in lines[add_i + 1:reduction_end])
-        require(yield_found, "dataflow_not_proven", f"site {number} reduction has no matching scf.yield")
+        if reduction_result is None:
+            reduction_result = sum_value
+        if reduction_result != sum_value:
+            carried_match = re.search(r"iter_args\(\s*%([^ ]+)\s*=", reduction_header)
+            require(carried_match is not None, "dataflow_not_proven", f"site {number} reduction carried value is malformed")
+            carried = carried_match.group(1)
+            add_operands = add.groups()[1:]
+            require(any(operand.lstrip("%") == carried for operand in add_operands),
+                    "dataflow_not_proven", f"site {number} reduction add does not consume carried accumulator")
+            _, reduction_start, reduction_end = reduction_info
+            yield_found = any(re.match(rf"scf\.yield\s+%{re.escape(sum_value)}(?:\s|:|$)", line)
+                              for line in lines[add_i + 1:reduction_end])
+            require(yield_found, "dataflow_not_proven", f"site {number} reduction has no matching scf.yield")
         # A reduction is complete only when its accumulator is materialized
         # into a unique sum buffer and subsequently reloaded for division.
-        reduction_result = result_match.group(1)
-        sum_store_matches = [(i, m) for i, line in enumerate(lines) if i > reduction_info[2] and (m := store_re.match(line)) and m.group(1).strip() == reduction_result]
-        require(sum_store_matches, "dataflow_not_proven", f"site {number} reduction result is not materialized")
+        reduction_result = reduction_result
         sum_mem_for_site = sum_store_matches[0][1].group(2).strip()
         require(defined_before(sum_store_matches[0][1].group(3).strip(), sum_store_matches[0][0]), "dataflow_not_proven", f"site {number} sum index is undefined")
         sum_loop = loop_context(sum_store_matches[0][0])
-        require(sum_loop is not None and sum_store_matches[0][1].group(3).strip().lstrip("%") == sum_loop[0],
-                "dataflow_not_proven", f"site {number} sum store is not indexed by its loop IV")
+        if reduction_result == sum_value:
+            require(sum_loop is not None and same_affine_index(sum_store_matches[0][1].group(3).strip(), sum_store_matches[0][0], acc_idx, add_i),
+                    "dataflow_not_proven", f"site {number} sum store index does not match accumulator")
+        else:
+            require(sum_loop is not None and sum_store_matches[0][1].group(3).strip().lstrip("%") == sum_loop[0],
+                    "dataflow_not_proven", f"site {number} sum store is not indexed by its loop IV")
         require(function_start <= sum_store_matches[0][0] <= function_end, "dataflow_not_proven", f"site {number} sum store is outside function")
         require(sum_mem_for_site not in used_sum_memrefs, "dataflow_not_proven", f"site {number} reuses another head's sum memref")
         used_sum_memrefs.add(sum_mem_for_site)
