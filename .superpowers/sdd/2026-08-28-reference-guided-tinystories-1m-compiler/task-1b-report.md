@@ -96,7 +96,53 @@ datapath.
 
 ## Commit
 
-Pending at report creation; filled after verified commit.
+Pre-fix commit: `fead7b2e651dd217f272b0cdb8cf37c0c76fc0b5`.
+The following fix-round commit contains this report; its final object hash is
+reported in the task handoff because a Git object cannot truthfully embed its
+own content hash.
+
+## Fix round 1: pinned source closure and invocation boundary
+
+The original source list was incomplete and incorrectly used live worktree
+bytes.  The contract and audit now bind the complete transitive deployed
+semantic closure as Git blobs at pinned kev-gpt revision
+`df1fc45b2ffcb26fddc19cfd57621e7eedf6153f`.  The closure is derived from
+the sequencer synthesis source list in `flake.nix`, the actual RTL
+instantiations, and the Python import chain.  It includes build/package
+sources; the interactive top, transport and packet control; sequencer;
+LayerNorm, attention, GELU, GEMV and iterative-divider RTL; and their direct
+supporting source files.
+
+The audit now records blob IDs and SHA-256 content hashes from the pinned Git
+commit rather than from the live worktree.  The current kev-gpt worktree is
+explicitly reported as dirty: `fpga/rtl/gptneo_sequencer.sv`, with relevant
+diff SHA-256 `8c8b5afa8ee31f7d1e6098579c80e390ecb3fc9ed0020da53de5b4e61c668da3`.
+That dirt does not alter the pinned source identity or the fixed-reference
+invocation, which materializes its Python modules from Git blobs.  If the
+pinned commit cannot be authenticated, the audit returns
+`identity_frontier` with `pinned_commit_unavailable`.
+
+Finite-domain validation now runs immediately adjacent to the audited
+`FixedGPTNeo.generate` invocation, for both package materialization values and
+prompt IDs.  `validate_finite_adapter_input` remains a reusable policy helper;
+Task 2 must apply it at its adapter boundary and no Task 2 adapter is claimed
+to be secured here.
+
+Fix-round red evidence:
+
+```text
+nix develop -c python -m unittest tests/test_tinystories_1m_exact_input_audit.py -v
+FAIL: dirty gptneo_sequencer was omitted from the source boundary
+ERROR: fixed-reference call accepted no prompt-boundary validation interface
+ERROR: unavailable pinned commit raised instead of returning identity_frontier
+```
+
+Fix-round green command:
+
+```text
+nix develop -c python -m unittest tests/test_tinystories_1m_exact_input_audit.py -v
+5 tests passed
+```
 
 ## Concerns
 
@@ -107,3 +153,6 @@ Pending at report creation; filled after verified commit.
   `incomplete`/`unresolved` statuses because they are bound to the superseded
   historical contract.  The exact-input v2 contract binds them as historical
   evidence while explicitly selecting the accepted deployed fixed profile.
+- The live kev-gpt worktree remains dirty in the relevant sequencer source.
+  The audit discloses it but uses only pinned Git blobs for identity and
+  invocation; no claim is made that the live worktree itself is clean.

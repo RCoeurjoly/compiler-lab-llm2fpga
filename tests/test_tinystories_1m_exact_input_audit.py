@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import math
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -25,6 +27,37 @@ def load_auditor():
 
 @unittest.skipUnless(PACKAGE.is_dir() and KEV_ROOT.is_dir(), "canonical kev-gpt input unavailable")
 class TinyStories1MExactInputAuditTest(unittest.TestCase):
+    def test_missing_pinned_commit_is_an_identity_frontier(self):
+        contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        contract["deployed_profile"]["revision"] = "0" * 40
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "contract.json"
+            path.write_text(json.dumps(contract), encoding="utf-8")
+            result = load_auditor().audit_exact_input(path, PACKAGE, KEV_ROOT)
+
+        self.assertEqual(result["status"], "identity_frontier")
+        self.assertEqual(result["conflicts"][0]["code"], "pinned_commit_unavailable")
+
+    def test_audit_uses_pinned_blob_closure_when_the_live_reference_is_dirty(self):
+        result = load_auditor().audit_exact_input(CONTRACT, PACKAGE, KEV_ROOT)
+
+        source = result["source"]
+        self.assertFalse(source["reference_source_worktree_clean"])
+        self.assertIn("fpga/rtl/gptneo_sequencer.sv", source["relevant_dirty_paths"])
+        self.assertRegex(source["relevant_worktree_diff_sha256"], r"^[0-9a-f]{64}$")
+        closure = source["pinned_semantic_source_closure"]
+        self.assertEqual(
+            set(closure),
+            set(load_auditor().REFERENCE_SOURCES),
+        )
+        self.assertTrue(all("git_blob_sha1" in identity for identity in closure.values()))
+
+    def test_fixed_reference_rejects_nonfinite_prompt_at_its_call_boundary(self):
+        auditor = load_auditor()
+
+        with self.assertRaisesRegex(ValueError, "non-finite"):
+            auditor._run_fixed_reference(KEV_ROOT, PACKAGE, [7454, math.nan])
+
     def test_adapter_input_policy_rejects_nonfinite_values(self):
         auditor = load_auditor()
 

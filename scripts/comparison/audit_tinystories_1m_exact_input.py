@@ -10,6 +10,7 @@ import math
 import struct
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -19,13 +20,27 @@ QDQ_RECEIPT = ROOT / "artifacts/reference/tinystories-1m-qdq-semantics.json"
 IMPLEMENTATION_PROFILE = ROOT / "artifacts/reference/tinystories-1m-implementation-profile.json"
 FIXED_PROFILE = ROOT / "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json"
 REFERENCE_SOURCES = (
+    "flake.nix",
+    "tinystories/__init__.py",
     "tinystories/quantize.py",
     "tinystories/build_package.py",
+    "tinystories/gptneo_schema.py",
+    "tinystories/import_gptneo.py",
     "tinystories/int_reference.py",
+    "tinystories/package_io.py",
+    "tinystories/rtl_memories.py",
     "tinystories/hardware_reference.py",
     "tinystories/write_rtl_fixture.py",
+    "fpga/rtl/async_fifo.sv",
+    "fpga/rtl/bscan_packet_endpoint.sv",
+    "fpga/rtl/gptneo_attention.sv",
+    "fpga/rtl/gptneo_gelu.sv",
     "fpga/rtl/gptneo_resident_gemv.sv",
     "fpga/rtl/gptneo_iterative_divider.sv",
+    "fpga/rtl/gptneo_layernorm.sv",
+    "fpga/rtl/gptneo_sequencer.sv",
+    "fpga/rtl/tinystories_interactive_top.sv",
+    "fpga/rtl/tinystories_packet_controller.sv",
     "host/kevin_jtag_cli.py",
 )
 FROZEN_PROMPT_IDS = [7454, 2402, 257, 640]
@@ -54,6 +69,12 @@ def _git(kev_root: Path, *args: str) -> str:
         capture_output=True,
     )
     return result.stdout.strip()
+
+
+def _git_bytes(kev_root: Path, *args: str) -> bytes:
+    return subprocess.run(
+        ["git", "-C", str(kev_root), *args], check=True, capture_output=True
+    ).stdout
 
 
 def _canonical_sha256(value: dict[str, Any]) -> str:
@@ -110,23 +131,73 @@ def _validate_finite_package_values(package_path: Path, manifest: dict[str, Any]
             _require(math.isfinite(value), f"package tensor contains a non-finite value: {name}")
 
 
-def _run_fixed_reference(kev_root: Path, package_path: Path) -> list[int]:
-    """Run the content-authenticated deployed fixed-point reference once."""
+def _pinned_source_closure(kev_root: Path, deployed: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Authenticate every semantic source as a blob in the selected commit."""
 
+    revision = deployed["revision"]
+    _git(kev_root, "cat-file", "-e", f"{revision}^{{commit}}")
+    expected = deployed["sources"]
+    closure: dict[str, dict[str, str]] = {}
+    for name in REFERENCE_SOURCES:
+        blob = _git(kev_root, "rev-parse", f"{revision}:{name}")
+        payload = _git_bytes(kev_root, "cat-file", "blob", blob)
+        identity = {"git_blob_sha1": blob, "sha256": hashlib.sha256(payload).hexdigest()}
+        _require(expected.get(name) == identity, f"pinned semantic source identity mismatch: {name}")
+        closure[name] = identity
+    return closure
+
+
+def _worktree_observability(kev_root: Path) -> dict[str, Any]:
+    all_status = _git(kev_root, "status", "--short", "--untracked-files=all")
+    relevant_status = _git(kev_root, "status", "--short", "--", *REFERENCE_SOURCES)
+    relevant_diff = _git_bytes(
+        kev_root, "diff", "--binary", "HEAD", "--", *REFERENCE_SOURCES
+    )
+    return {
+        "reference_source_worktree_clean": not bool(all_status),
+        "worktree_status": all_status.splitlines(),
+        "relevant_dirty_paths": [line.split(maxsplit=1)[1] for line in relevant_status.splitlines()],
+        "relevant_worktree_diff_sha256": (
+            hashlib.sha256(relevant_diff).hexdigest() if relevant_diff else None
+        ),
+    }
+
+
+def _run_fixed_reference(
+    kev_root: Path, package_path: Path, prompt_ids: list[int], manifest: dict[str, Any] | None = None
+) -> list[int]:
+    """Run a pinned-source fixed reference after call-boundary finite checks."""
+
+    if manifest is None:
+        manifest = _load_json(package_path / "manifest.json")
     program = """\
 import json
 import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 from tinystories.hardware_reference import FixedGPTNeo
-print(json.dumps(FixedGPTNeo(Path(sys.argv[2])).generate([7454, 2402, 257, 640], 16)))
+print(json.dumps(FixedGPTNeo(Path(sys.argv[2])).generate(json.loads(sys.argv[3]), 16)))
 """
-    result = subprocess.run(
-        [sys.executable, "-c", program, str(kev_root), str(package_path)],
-        check=True,
-        text=True,
-        capture_output=True,
-    )
+    revision = _git(kev_root, "rev-parse", "HEAD")
+    with tempfile.TemporaryDirectory() as temporary:
+        source_root = Path(temporary)
+        package_root = source_root / "tinystories"
+        package_root.mkdir()
+        for name in (
+            "tinystories/__init__.py",
+            "tinystories/int_reference.py",
+            "tinystories/hardware_reference.py",
+        ):
+            (source_root / name).write_bytes(_git_bytes(kev_root, "show", f"{revision}:{name}"))
+        # These checks are deliberately adjacent to the only FixedGPTNeo call.
+        _validate_finite_package_values(package_path, manifest)
+        validate_finite_adapter_input(prompt_ids)
+        result = subprocess.run(
+            [sys.executable, "-c", program, str(source_root), str(package_path), json.dumps(prompt_ids)],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
     tokens = json.loads(result.stdout)
     _require(
         isinstance(tokens, list)
@@ -256,9 +327,6 @@ def audit_exact_input(
         ):
             raise ValueError(f"activation scale vector is invalid: {name}")
         widths.add(len(values))
-    _validate_finite_package_values(package_path, manifest)
-    validate_finite_adapter_input(FROZEN_PROMPT_IDS)
-
     quantization = contract.get("quantization")
     if not isinstance(quantization, dict):
         raise ValueError("contract quantization is missing")
@@ -275,33 +343,34 @@ def audit_exact_input(
                 "reason": "contract activation label disagrees with 97 package scale vectors",
             }
         )
-    source_files = {
-        name: _sha256(kev_root / name) for name in REFERENCE_SOURCES
-    }
-    if source_files != deployed["sources"]:
-        raise ValueError("deployed reference-source identity mismatch")
-    relevant_status = _git(kev_root, "status", "--short", "--", *REFERENCE_SOURCES)
-    if relevant_status:
-        raise ValueError("deployed reference sources have uncommitted changes")
-    if _git(kev_root, "rev-parse", "HEAD") != deployed.get("revision"):
-        raise ValueError("deployed reference revision mismatch")
-    if fixed_profile.get("profile") != deployed["name"]:
-        raise ValueError("fixed hardware profile selection mismatch")
-    if fixed_profile.get("semantics", {}).get("execution_domain") != "integers_only_after_materialization":
-        raise ValueError("fixed hardware profile is not an integer/fixed-point domain")
-    if fixed_profile.get("semantics", {}).get("accumulation", {}).get("synthesizable_rtl", {}).get("logical_width_bits") != 64:
-        raise ValueError("fixed hardware profile does not use signed 64-bit GEMV accumulation")
-    generated_tokens = _run_fixed_reference(kev_root, package_path)
-    if generated_tokens != FROZEN_EXPECTED_TOKENS:
-        raise ValueError("deployed fixed reference token fixture mismatch")
+    worktree_observability = _worktree_observability(kev_root)
+    pinned_closure: dict[str, dict[str, str]] = {}
+    generated_tokens: list[int] | None = None
+    try:
+        pinned_closure = _pinned_source_closure(kev_root, deployed)
+        _require(_git(kev_root, "rev-parse", "HEAD") == deployed.get("revision"),
+                 "deployed reference revision mismatch")
+        _require(fixed_profile.get("profile") == deployed["name"],
+                 "fixed hardware profile selection mismatch")
+        _require(fixed_profile.get("semantics", {}).get("execution_domain") == "integers_only_after_materialization",
+                 "fixed hardware profile is not an integer/fixed-point domain")
+        _require(fixed_profile.get("semantics", {}).get("accumulation", {}).get("synthesizable_rtl", {}).get("logical_width_bits") == 64,
+                 "fixed hardware profile does not use signed 64-bit GEMV accumulation")
+        generated_tokens = _run_fixed_reference(kev_root, package_path, FROZEN_PROMPT_IDS, manifest)
+        _require(generated_tokens == FROZEN_EXPECTED_TOKENS,
+                 "deployed fixed reference token fixture mismatch")
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        conflicts.append({
+            "code": "pinned_commit_unavailable",
+            "reason": f"pinned deployed source authority could not be authenticated: {type(error).__name__}",
+        })
     source = {
         "head_revision": _git(kev_root, "rev-parse", "HEAD"),
         "package_revision": _git(
             kev_root, "log", "-1", "--format=%H", "--", "model_packages/tinystories-1m"
         ),
-        "reference_sources": source_files,
-        "reference_source_worktree_clean": not bool(relevant_status),
-        "reference_source_status": relevant_status.splitlines(),
+        "pinned_semantic_source_closure": pinned_closure,
+        **worktree_observability,
     }
 
     result: dict[str, Any] = {
