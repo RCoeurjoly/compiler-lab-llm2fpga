@@ -50,10 +50,17 @@ nix build .#tinystories-1m-authenticated-package-lowering --no-link -L
 nix run .#tinystories-1m-authenticated-package-lowering -- ...
 ```
 
-The focused suite passes three tests: receipt/QDQ preservation and honest
-unsupported status, tampered exported-program rejection, and the Nix entry
-point's non-RC/non-transport scope.  The final command materialized the full
-authenticated export and generated the verified unsupported receipt.
+The hardened focused suite passes four package-independent tests: receipt/QDQ
+preservation and honest unsupported status; rejection of re-hashed unrelated
+verifier receipts and Q/DQ content; rejection of a bad canonical adapter
+receipt hash plus atomic refusal to overwrite a nonempty output directory; and
+the Nix entry point's non-RC/non-transport scope.  The gate validates the
+adapter's canonical self-hash/schema/status/exact identity, delegates
+`verified_input` validation to the shared Task 3f strict validator, verifies
+the frozen package receipt hash, and re-derives all 97 boundary names, widths,
+values, and content hashes from the package manifest before staging output.
+The final command materialized the full authenticated export and generated the
+verified unsupported receipt.
 
 ## Scope
 
