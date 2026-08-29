@@ -290,9 +290,19 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
 
     def defined_before(value: str, line_number: int) -> bool:
         name = value.lstrip("%")
+        active_ivs: set[str] = set()
+        loop_decl = re.compile(r"scf\.(?:for|parallel)\s+%([^ ]+)\s*=")
+        for prior in lines[function_start:line_number + 1]:
+            declaration = loop_decl.search(prior)
+            if declaration:
+                active_ivs.add(declaration.group(1))
+            # A closing region ends the innermost loop declaration.  This is
+            # intentionally lexical and conservative for the textual IR.
+            if prior.strip() == "}" and active_ivs:
+                active_ivs.pop()
         for line in lines[function_start:line_number]:
             if re.search(rf"scf\.(?:for|parallel)\s+%{re.escape(name)}\s*=", line):
-                return True
+                return name in active_ivs
             if re.match(rf"%{re.escape(name)}\s*=", line):
                 return bool(re.search(r":\s*index(?:\s|$)", line))
         return False
