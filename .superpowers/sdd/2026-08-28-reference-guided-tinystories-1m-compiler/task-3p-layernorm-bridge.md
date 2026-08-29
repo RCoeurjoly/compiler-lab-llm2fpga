@@ -18,6 +18,15 @@ the fixed Q/DQ profile, package adapter, and all twelve ordered checkpoint
 hashes.  Re-executing the Task 3o vector through the bridge primitive produces
 the exact recorded result hash.
 
+Each public stage independently revalidates those identities.  The bridge
+rejects non-canonical graph indices/names, missing adapter/export hashes,
+boolean or otherwise non-integer shapes, forged profile/QDQ/adapter hashes,
+changed or reordered checkpoint hashes, and altered numeric trace hashes.  The
+lowering hook repeats source, evidence, descriptor, and checkpoint validation;
+the report additionally requires byte-exact MLIR regeneration.  The MLIR
+module manifest carries the source/export identities, arithmetic and numeric
+trace identities, and every ordered checkpoint name/hash.
+
 The precise next unsupported boundary is
 `fixed_layer_norm_backend_lowering_not_implemented`: the existing
 Linalg/Calyx backend does not legalize the new custom op.  The checked-in
@@ -51,7 +60,7 @@ nix develop -c python -m unittest \
   tests/test_tinystories_1m_rtl_layernorm.py \
   tests/test_tinystories_1m_rtl_layernorm_bridge.py -v
 
-Ran 34 tests ... OK
+Ran 37 tests ... OK
 
 nix develop -c circt-opt --allow-unregistered-dialect \
   artifacts/comparison/tinystories-1m-fixed-layernorm-bridge.mlir

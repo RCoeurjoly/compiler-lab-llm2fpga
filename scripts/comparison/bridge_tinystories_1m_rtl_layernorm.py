@@ -39,6 +39,10 @@ SOURCE_SHAPE = [1, 4, WIDTH]
 TOKEN_INDEX = 3
 EPSILON = 1e-5
 EPSILON_Q32 = 42950
+CHECKPOINT_TRACE_SHA256 = "ac0118fe0068aea3790c3fc7414f75cd56abd5690f0d7f4bc13b143d05249d1d"
+ARITHMETIC_PROFILE_SHA256 = "6f3218b10e5460926c15f5ba27efc42f93240acc7f02a8ceb6809def34ad43f6"
+NUMERIC_INPUT_SHA256 = "e7125f4b339f3ddce65a5f71c99b82f43eb107f581da1e4697aa3ecf7645dfba"
+NUMERIC_RESULT_SHA256 = "4ddab4aecb186dce77618426b3cf008e7d7ea085f637f26e81747ced27a5c465"
 CHECKPOINT_SHAPES: dict[str, tuple[int, ...]] = {
     "block.input": (64,),
     "block.ln_1.output": (64,),
@@ -52,6 +56,20 @@ CHECKPOINT_SHAPES: dict[str, tuple[int, ...]] = {
     "block.mlp.activation": (256,),
     "block.mlp.fc_out": (64,),
     "block.output": (64,),
+}
+CHECKPOINT_IDENTITIES: dict[str, str] = {
+    "block.input": "c310f302cfb5fd58e2f0b00e6d6a9d36fc23121e7e04eb6b09c7aa630c00e12e",
+    "block.ln_1.output": "233de767e3744ac70d9d074f9d0174e5e973fda4a11c20efd392061b4c0e7eee",
+    "block.attention.q": "caa771925998871b7431570e7f7c6c6ac4b163c6ab3bd67ca3d5c7703a288f3f",
+    "block.attention.k": "434b82f2e692836381355fbc9400d8e597a9ea9768734c13109e32870efb92a5",
+    "block.attention.v": "ac5c3f5ff49e52260f6cee72c39d59ff990d1242e76faf3e052632ec53a3a922",
+    "block.attention.output": "b8a362876c047fcec8c14286c9c64df0930e8519e0fa8c60970094be6a7f9eeb",
+    "block.residual.attention": "41a33e2b0933e0fb8846766e78b8edd2c661431340e295b32497b3eed34eecf5",
+    "block.ln_2.output": "220e940d35a173b443992377dd47195606ee1e9aed448d13e24bcc64019341c1",
+    "block.mlp.fc_in": "f40eb2c071374cb265c3795e09697efab06477caac34da12614e6ce7170e052b",
+    "block.mlp.activation": "31fecd6626fb19dd762374022aa485e5b45e4dc140ffae34eaae48206ae32a3d",
+    "block.mlp.fc_out": "b1e511d393cc2a84de8781ae642838a167da568156c98336428d89125600a200",
+    "block.output": "116356f5887b36c3d1c7bfb57ce247a2013000699cfaee6c4fee056175cca7ea",
 }
 
 
@@ -102,6 +120,129 @@ def _load_module(path: Path, name: str) -> Any:
 def _strict_int_tree(value: Any) -> bool:
     return (isinstance(value, int) and not isinstance(value, bool)) or (
         isinstance(value, list) and all(_strict_int_tree(item) for item in value)
+    )
+
+
+def _strict_shape(value: Any, expected: Sequence[int]) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) == len(expected)
+        and all(isinstance(item, int) and not isinstance(item, bool) for item in value)
+        and value == list(expected)
+    )
+
+
+def validate_source_op(source_op: Mapping[str, Any]) -> None:
+    required_keys = {
+        "graph_index", "name", "target", "input_shape", "input_dtype", "normalized_shape",
+        "weight_shape", "weight_dtype", "weight_parameter", "bias_shape", "bias_dtype",
+        "bias_parameter", "epsilon", "cudnn_enable", "exported_program_sha256",
+        "adapter_receipt_sha256",
+    }
+    require(isinstance(source_op, Mapping) and set(source_op) == required_keys, "source_schema_mismatch", "source operation keys")
+    require(
+        isinstance(source_op.get("graph_index"), int)
+        and not isinstance(source_op.get("graph_index"), bool)
+        and source_op.get("graph_index") == 149
+        and source_op.get("name") == "layer_norm"
+        and source_op.get("exported_program_sha256") == EXPORTED_PROGRAM_SHA256
+        and source_op.get("adapter_receipt_sha256") == ADAPTER_RECEIPT_FILE_SHA256,
+        "source_identity_mismatch",
+        "canonical graph index/name/export/adapter identity",
+    )
+    require(source_op.get("target") == "aten.layer_norm.default", "unsupported_source_operation", str(source_op.get("target")))
+    require(_strict_shape(source_op.get("input_shape"), SOURCE_SHAPE), "unsupported_source_shape", str(source_op.get("input_shape")))
+    require(_strict_shape(source_op.get("normalized_shape"), [WIDTH]), "unsupported_normalized_shape", str(source_op.get("normalized_shape")))
+    require(source_op.get("input_dtype") == "torch.float32", "unsupported_source_dtype", str(source_op.get("input_dtype")))
+    require(
+        _strict_shape(source_op.get("weight_shape"), [WIDTH])
+        and _strict_shape(source_op.get("bias_shape"), [WIDTH]),
+        "unsupported_parameter_shape",
+        "gamma/beta",
+    )
+    require(
+        source_op.get("weight_dtype") == "torch.float32" and source_op.get("bias_dtype") == "torch.float32",
+        "unsupported_parameter_dtype",
+        "gamma/beta",
+    )
+    epsilon = source_op.get("epsilon")
+    require(isinstance(epsilon, float) and math.isfinite(epsilon) and epsilon == EPSILON, "unsupported_epsilon", str(epsilon))
+    require(source_op.get("cudnn_enable") is True, "unsupported_layernorm_parameter", "cudnn_enable")
+    require(
+        source_op.get("weight_parameter") == "model.transformer.h.0.ln_1.weight"
+        and source_op.get("bias_parameter") == "model.transformer.h.0.ln_1.bias",
+        "parameter_binding_mismatch",
+        "expected block-0 ln_1 gamma/beta",
+    )
+
+
+def validate_evidence(evidence: Mapping[str, Any]) -> None:
+    required_keys = {
+        "profile", "format", "width", "profile_sha256", "profile_receipt_sha256",
+        "vector_file_sha256", "vector_sha256", "primitive_sha256", "qdq_profile_sha256",
+        "package_adapter_sha256", "checkpoint_identities", "checkpoint_trace_sha256",
+        "arithmetic_profile", "arithmetic_profile_sha256", "numeric_trace", "sha256",
+    }
+    require(isinstance(evidence, Mapping) and set(evidence) == required_keys, "bridge_evidence_schema_mismatch", "evidence keys")
+    require(
+        evidence.get("profile") == "synthesizable_rtl"
+        and evidence.get("format") == "signed_q16.16_int32"
+        and isinstance(evidence.get("width"), int)
+        and not isinstance(evidence.get("width"), bool)
+        and evidence.get("width") == WIDTH,
+        "bridge_evidence_mismatch",
+        "profile/format/width",
+    )
+    expected_hashes = {
+        "profile_sha256": LAYER_NORM_PROFILE_SHA256,
+        "profile_receipt_sha256": LAYER_NORM_RECEIPT_SHA256,
+        "vector_file_sha256": LAYER_NORM_VECTOR_FILE_SHA256,
+        "vector_sha256": LAYER_NORM_VECTOR_SHA256,
+        "primitive_sha256": LAYER_NORM_PRIMITIVE_SHA256,
+        "qdq_profile_sha256": QDQ_PROFILE_SHA256,
+        "package_adapter_sha256": ADAPTER_SHA256,
+        "checkpoint_trace_sha256": CHECKPOINT_TRACE_SHA256,
+        "arithmetic_profile_sha256": ARITHMETIC_PROFILE_SHA256,
+    }
+    require(all(evidence.get(key) == value for key, value in expected_hashes.items()), "bridge_evidence_identity_mismatch", "canonical artifact hashes")
+    checkpoints = evidence.get("checkpoint_identities")
+    require(
+        isinstance(checkpoints, dict)
+        and list(checkpoints) == list(CHECKPOINT_IDENTITIES)
+        and checkpoints == CHECKPOINT_IDENTITIES,
+        "checkpoint_identity_mismatch",
+        "exact ordered twelve checkpoint hashes",
+    )
+    arithmetic = evidence.get("arithmetic_profile")
+    require(isinstance(arithmetic, dict) and canonical_sha256(arithmetic) == ARITHMETIC_PROFILE_SHA256, "arithmetic_profile_mismatch", "RTL arithmetic profile")
+    trace = evidence.get("numeric_trace")
+    require(
+        isinstance(trace, dict)
+        and set(trace) == {"status", "input_sha256", "software_result_sha256", "bridge_result_sha256", "result"}
+        and trace.get("status") == "matched"
+        and trace.get("input_sha256") == NUMERIC_INPUT_SHA256
+        and trace.get("software_result_sha256") == NUMERIC_RESULT_SHA256
+        and trace.get("bridge_result_sha256") == NUMERIC_RESULT_SHA256,
+        "numeric_trace_identity_mismatch",
+        "fixed vector/result hashes",
+    )
+    result = trace.get("result") if isinstance(trace, dict) else None
+    require(
+        isinstance(result, dict)
+        and set(result) == {"mean_q16_16", "square_sum_72", "variance_u64", "deviation_floor_sqrt", "normalized_q16_16", "output_q16_16"}
+        and all(_strict_int_tree(value) for value in result.values())
+        and isinstance(result.get("normalized_q16_16"), list)
+        and len(result["normalized_q16_16"]) == WIDTH
+        and isinstance(result.get("output_q16_16"), list)
+        and len(result["output_q16_16"]) == WIDTH
+        and canonical_sha256(result) == NUMERIC_RESULT_SHA256,
+        "numeric_trace_content_mismatch",
+        "exact fixed-width result",
+    )
+    require(
+        evidence.get("sha256") == canonical_sha256({key: value for key, value in evidence.items() if key != "sha256"}),
+        "bridge_evidence_hash_mismatch",
+        "evidence self hash",
     )
 
 
@@ -198,7 +339,7 @@ def load_evidence(
     software_hash = canonical_sha256(software_result)
     bridge_hash = canonical_sha256(bridge_result)
     require(bridge_result == software_result, "layernorm_numeric_trace_mismatch", f"{bridge_hash} != {software_hash}")
-    return {
+    evidence: dict[str, Any] = {
         "profile": "synthesizable_rtl",
         "format": "signed_q16.16_int32",
         "width": WIDTH,
@@ -212,6 +353,7 @@ def load_evidence(
         "checkpoint_identities": identities,
         "checkpoint_trace_sha256": qdq_profile["software_trace"]["sha256"],
         "arithmetic_profile": rtl_profile,
+        "arithmetic_profile_sha256": canonical_sha256(rtl_profile),
         "numeric_trace": {
             "status": "matched",
             "input_sha256": canonical_sha256({
@@ -224,6 +366,9 @@ def load_evidence(
             "result": bridge_result,
         },
     }
+    evidence["sha256"] = canonical_sha256(evidence)
+    validate_evidence(evidence)
+    return evidence
 
 
 def _target_name(target: Any) -> str:
@@ -322,53 +467,10 @@ def inspect_exported_layernorm(exported_program: Path, adapter_receipt_path: Pat
 def bridge_source_op(source_op: Mapping[str, Any], evidence: Mapping[str, Any], *, token_index: int) -> dict[str, Any]:
     """Validate an aten LayerNorm and construct the fixed compiler custom op."""
 
-    require(source_op.get("target") == "aten.layer_norm.default", "unsupported_source_operation", str(source_op.get("target")))
-    require(source_op.get("input_shape") == SOURCE_SHAPE, "unsupported_source_shape", str(source_op.get("input_shape")))
-    require(source_op.get("normalized_shape") == [WIDTH], "unsupported_normalized_shape", str(source_op.get("normalized_shape")))
-    require(source_op.get("input_dtype") == "torch.float32", "unsupported_source_dtype", str(source_op.get("input_dtype")))
-    require(source_op.get("weight_shape") == [WIDTH] and source_op.get("bias_shape") == [WIDTH], "unsupported_parameter_shape", "gamma/beta")
-    require(
-        source_op.get("weight_dtype") == "torch.float32" and source_op.get("bias_dtype") == "torch.float32",
-        "unsupported_parameter_dtype",
-        "gamma/beta",
-    )
-    require(math.isclose(source_op.get("epsilon", math.nan), EPSILON, rel_tol=0.0, abs_tol=0.0), "unsupported_epsilon", str(source_op.get("epsilon")))
-    require(source_op.get("cudnn_enable") is True, "unsupported_layernorm_parameter", "cudnn_enable")
-    require(
-        source_op.get("weight_parameter") == "model.transformer.h.0.ln_1.weight"
-        and source_op.get("bias_parameter") == "model.transformer.h.0.ln_1.bias",
-        "parameter_binding_mismatch",
-        "expected block-0 ln_1 gamma/beta",
-    )
-    require(token_index == TOKEN_INDEX, "unsupported_token_index", str(token_index))
-    require(
-        evidence.get("profile") == "synthesizable_rtl"
-        and evidence.get("format") == "signed_q16.16_int32"
-        and evidence.get("width") == WIDTH
-        and evidence.get("numeric_trace", {}).get("status") == "matched",
-        "bridge_evidence_mismatch",
-        "Task 3o evidence",
-    )
-    attributes = {
-        "normalized_width": WIDTH,
-        "token_index": TOKEN_INDEX,
-        "input_fraction_bits": 16,
-        "input_width": 32,
-        "parameter_fraction_bits": 16,
-        "parameter_width": 32,
-        "mean_accumulator_width": 64,
-        "delta_width": 33,
-        "square_width": 66,
-        "variance_sum_width": 72,
-        "variance_width": 64,
-        "epsilon_q32": EPSILON_Q32,
-        "reduction_order": "ascending_index_0_to_63",
-        "sqrt": "floor_integer_restoring",
-        "division": "signed_truncation_toward_zero",
-        "affine_shift": 16,
-        "output_width": 32,
-        "output_overflow": "twos_complement_wrap",
-    }
+    validate_source_op(source_op)
+    validate_evidence(evidence)
+    require(isinstance(token_index, int) and not isinstance(token_index, bool) and token_index == TOKEN_INDEX, "unsupported_token_index", str(token_index))
+    attributes = _required_attributes()
     descriptor: dict[str, Any] = {
         "schema": "llm2fpga-fixed-layer-norm-op-v1",
         "op": CUSTOM_OP,
@@ -377,8 +479,9 @@ def bridge_source_op(source_op: Mapping[str, Any], evidence: Mapping[str, Any], 
         "attributes": attributes,
         "source": dict(source_op),
         "evidence": {
-            key: evidence[key]
-            for key in (
+            **{
+                key: evidence[key]
+                for key in (
                 "profile_sha256",
                 "profile_receipt_sha256",
                 "vector_file_sha256",
@@ -387,27 +490,23 @@ def bridge_source_op(source_op: Mapping[str, Any], evidence: Mapping[str, Any], 
                 "qdq_profile_sha256",
                 "package_adapter_sha256",
                 "checkpoint_trace_sha256",
-            )
+                "arithmetic_profile_sha256",
+                "sha256",
+                )
+            },
+            "numeric_input_sha256": evidence["numeric_trace"]["input_sha256"],
+            "numeric_software_result_sha256": evidence["numeric_trace"]["software_result_sha256"],
+            "numeric_bridge_result_sha256": evidence["numeric_trace"]["bridge_result_sha256"],
         },
         "checkpoint_identities": dict(evidence["checkpoint_identities"]),
     }
     descriptor["sha256"] = canonical_sha256(descriptor)
+    validate_descriptor(descriptor)
     return descriptor
 
 
-def lower_custom_op_to_mlir(descriptor: Mapping[str, Any]) -> str:
-    """Deterministic inspectable lowering hook to an unregistered MLIR op."""
-
-    require(descriptor.get("schema") == "llm2fpga-fixed-layer-norm-op-v1", "bridge_descriptor_mismatch", "schema")
-    require(descriptor.get("op") == CUSTOM_OP, "bridge_descriptor_mismatch", "op")
-    require(
-        descriptor.get("sha256") == canonical_sha256({key: value for key, value in descriptor.items() if key != "sha256"}),
-        "bridge_descriptor_hash_mismatch",
-        "custom op",
-    )
-    attrs = descriptor.get("attributes")
-    require(isinstance(attrs, dict), "bridge_descriptor_mismatch", "attributes")
-    required = {
+def _required_attributes() -> dict[str, Any]:
+    return {
         "normalized_width": WIDTH,
         "token_index": TOKEN_INDEX,
         "input_fraction_bits": 16,
@@ -427,9 +526,80 @@ def lower_custom_op_to_mlir(descriptor: Mapping[str, Any]) -> str:
         "output_width": 32,
         "output_overflow": "twos_complement_wrap",
     }
-    require(attrs == required, "bridge_descriptor_mismatch", "arithmetic attributes")
+
+
+def validate_descriptor(descriptor: Mapping[str, Any]) -> None:
+    require(
+        isinstance(descriptor, Mapping)
+        and set(descriptor) == {"schema", "op", "operand_types", "result_types", "attributes", "source", "evidence", "checkpoint_identities", "sha256"},
+        "bridge_descriptor_mismatch",
+        "descriptor keys",
+    )
+    require(descriptor.get("schema") == "llm2fpga-fixed-layer-norm-op-v1" and descriptor.get("op") == CUSTOM_OP, "bridge_descriptor_mismatch", "schema/op")
+    require(descriptor.get("operand_types") == ["tensor<64xi32>"] * 3 and descriptor.get("result_types") == ["tensor<64xi32>"], "bridge_descriptor_mismatch", "types")
+    attrs = descriptor.get("attributes")
+    required = _required_attributes()
+    require(isinstance(attrs, dict) and attrs == required, "bridge_descriptor_mismatch", "arithmetic attributes")
+    for key, value in required.items():
+        if isinstance(value, int):
+            require(isinstance(attrs[key], int) and not isinstance(attrs[key], bool), "bridge_descriptor_mismatch", key)
+    validate_source_op(descriptor.get("source", {}))
+    expected_evidence = {
+        "profile_sha256": LAYER_NORM_PROFILE_SHA256,
+        "profile_receipt_sha256": LAYER_NORM_RECEIPT_SHA256,
+        "vector_file_sha256": LAYER_NORM_VECTOR_FILE_SHA256,
+        "vector_sha256": LAYER_NORM_VECTOR_SHA256,
+        "primitive_sha256": LAYER_NORM_PRIMITIVE_SHA256,
+        "qdq_profile_sha256": QDQ_PROFILE_SHA256,
+        "package_adapter_sha256": ADAPTER_SHA256,
+        "checkpoint_trace_sha256": CHECKPOINT_TRACE_SHA256,
+        "arithmetic_profile_sha256": ARITHMETIC_PROFILE_SHA256,
+        "numeric_input_sha256": NUMERIC_INPUT_SHA256,
+        "numeric_software_result_sha256": NUMERIC_RESULT_SHA256,
+        "numeric_bridge_result_sha256": NUMERIC_RESULT_SHA256,
+        "sha256": descriptor.get("evidence", {}).get("sha256") if isinstance(descriptor.get("evidence"), Mapping) else None,
+    }
+    evidence = descriptor.get("evidence")
+    require(isinstance(evidence, dict) and set(evidence) == set(expected_evidence), "bridge_descriptor_evidence_mismatch", "evidence keys")
+    evidence_without_self = {key: value for key, value in expected_evidence.items() if key != "sha256"}
+    require(all(evidence.get(key) == value for key, value in evidence_without_self.items()), "bridge_descriptor_evidence_mismatch", "artifact identities")
+    require(isinstance(evidence.get("sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", evidence["sha256"]) is not None, "bridge_descriptor_evidence_mismatch", "evidence receipt hash")
+    checkpoints = descriptor.get("checkpoint_identities")
+    require(isinstance(checkpoints, dict) and list(checkpoints) == list(CHECKPOINT_IDENTITIES) and checkpoints == CHECKPOINT_IDENTITIES, "checkpoint_identity_mismatch", "descriptor checkpoints")
+    require(
+        descriptor.get("sha256") == canonical_sha256({key: value for key, value in descriptor.items() if key != "sha256"}),
+        "bridge_descriptor_hash_mismatch",
+        "custom op",
+    )
+
+
+def _manifest_attributes(descriptor: Mapping[str, Any]) -> list[tuple[str, str]]:
+    source = descriptor["source"]
+    evidence = descriptor["evidence"]
+    values = [
+        ("descriptor_sha256", descriptor["sha256"]),
+        ("exported_program_sha256", source["exported_program_sha256"]),
+        ("adapter_receipt_sha256", source["adapter_receipt_sha256"]),
+        *[(key, evidence[key]) for key in (
+            "profile_sha256", "profile_receipt_sha256", "vector_file_sha256", "vector_sha256",
+            "primitive_sha256", "qdq_profile_sha256", "package_adapter_sha256",
+            "checkpoint_trace_sha256", "arithmetic_profile_sha256", "sha256",
+            "numeric_input_sha256", "numeric_software_result_sha256", "numeric_bridge_result_sha256",
+        )],
+    ]
+    for index, (name, digest) in enumerate(descriptor["checkpoint_identities"].items()):
+        values.append((f"checkpoint_{index:02d}_name", name))
+        values.append((f"checkpoint_{index:02d}_sha256", digest))
+    return values
+
+
+def lower_custom_op_to_mlir(descriptor: Mapping[str, Any]) -> str:
+    """Deterministic inspectable lowering hook to an unregistered MLIR op."""
+
+    validate_descriptor(descriptor)
+    manifest = ", ".join(f'{key} = "{value}"' for key, value in _manifest_attributes(descriptor))
     return (
-        "module {\n"
+        f"module attributes {{llm2fpga.bridge_manifest = {{{manifest}}}}} {{\n"
         "  func.func @tinystories_1m_block0_ln1_token3("
         "%input: tensor<64xi32>, %gamma: tensor<64xi32>, %beta: tensor<64xi32>) "
         "-> tensor<64xi32> {\n"
@@ -450,7 +620,19 @@ def lower_custom_op_to_mlir(descriptor: Mapping[str, Any]) -> str:
 def make_report(
     *, source_op: Mapping[str, Any], descriptor: Mapping[str, Any], mlir: str, evidence: Mapping[str, Any]
 ) -> dict[str, Any]:
-    require(descriptor.get("op") == CUSTOM_OP, "bridge_descriptor_mismatch", "report op")
+    validate_source_op(source_op)
+    validate_evidence(evidence)
+    validate_descriptor(descriptor)
+    require(descriptor.get("source") == dict(source_op), "report_input_mismatch", "descriptor source differs")
+    require(descriptor.get("checkpoint_identities") == evidence.get("checkpoint_identities"), "report_input_mismatch", "descriptor checkpoints differ")
+    descriptor_evidence = descriptor.get("evidence")
+    require(
+        isinstance(descriptor_evidence, dict) and descriptor_evidence.get("sha256") == evidence.get("sha256"),
+        "report_input_mismatch",
+        "descriptor evidence receipt differs",
+    )
+    expected_mlir = lower_custom_op_to_mlir(descriptor)
+    require(mlir == expected_mlir, "rendered_mlir_mismatch", "MLIR does not exactly match descriptor")
     return {
         "schema": "tinystories-1m-layernorm-compiler-bridge-v1",
         "model": "TinyStories-1M",

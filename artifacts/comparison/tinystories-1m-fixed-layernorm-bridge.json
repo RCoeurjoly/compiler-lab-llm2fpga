@@ -20,7 +20,7 @@
     "mlir": {
       "kind": "custom_op_ir",
       "path": "artifacts/comparison/tinystories-1m-fixed-layernorm-bridge.mlir",
-      "sha256": "5e18cefdc991c8a3ddcd2e9fcf01d82c7c72f8f95215ec068cdd0c066dac9d9d"
+      "sha256": "92c532626a81c974f85414c052a51b84ca55c0b230af3c03f177c8adb5c8f5c8"
     },
     "rtlil": null,
     "systemverilog": null
@@ -65,12 +65,17 @@
       "block.residual.attention": "41a33e2b0933e0fb8846766e78b8edd2c661431340e295b32497b3eed34eecf5"
     },
     "evidence": {
+      "arithmetic_profile_sha256": "6f3218b10e5460926c15f5ba27efc42f93240acc7f02a8ceb6809def34ad43f6",
       "checkpoint_trace_sha256": "ac0118fe0068aea3790c3fc7414f75cd56abd5690f0d7f4bc13b143d05249d1d",
+      "numeric_bridge_result_sha256": "4ddab4aecb186dce77618426b3cf008e7d7ea085f637f26e81747ced27a5c465",
+      "numeric_input_sha256": "e7125f4b339f3ddce65a5f71c99b82f43eb107f581da1e4697aa3ecf7645dfba",
+      "numeric_software_result_sha256": "4ddab4aecb186dce77618426b3cf008e7d7ea085f637f26e81747ced27a5c465",
       "package_adapter_sha256": "a8f24571cfabb99aea5fe92a8521a06aa6d71691e8acf5bc9c89adf2b6af3cff",
       "primitive_sha256": "600a9ad83b2b5651dcf5666bbee6f36f0b3b5941ee7fafb9cc4538794f2e8eb5",
       "profile_receipt_sha256": "44bdd11a2e52831006c1eca6345916f248b94797d9fd2020c7b1f150530a0278",
       "profile_sha256": "e035dc5835a3908fa687281089e75d1a9dac0f846f84950211ba2681f1259006",
       "qdq_profile_sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6",
+      "sha256": "83ee250e39f65e2484c4bf918bccf60d3de7c38e8c74b786766ad5c33cac5bda",
       "vector_file_sha256": "750007e58f6303cbb0fe3b67c7a424d3d28ebd4c8bf4fc0428c3181c356c4c5e",
       "vector_sha256": "1b84d6194874f1f9e6074a99f06527aa01e633ecc6daf92340136a86806d6304"
     },
@@ -84,7 +89,7 @@
       "tensor<64xi32>"
     ],
     "schema": "llm2fpga-fixed-layer-norm-op-v1",
-    "sha256": "c9612185ff1c25393f9332089b4046f3924913212fe9a3bd4bd8d9994e0affe8",
+    "sha256": "376828a73c137a191190fb7dba25b8afb99ab2be38adf55b745841797d0ad347",
     "source": {
       "adapter_receipt_sha256": "276915df4d14d8934e642851ce560cae0bf59d6785ec2ccf776c576a98d2b229",
       "bias_dtype": "torch.float32",
@@ -272,7 +277,7 @@
     "reference_source_or_rtl_copied": false
   },
   "schema": "tinystories-1m-layernorm-compiler-bridge-v1",
-  "sha256": "c7bf5a38c975471f83c3987ec6c563eee785506ddfced46d11d615cdbe5f8f74",
+  "sha256": "5f8d17c3d3ad209e52b1460a677f49d21c42a4f3a674a51b5e4896a93511311d",
   "slice": {
     "block_index": 0,
     "kind": "one_transformer_block_token_step",

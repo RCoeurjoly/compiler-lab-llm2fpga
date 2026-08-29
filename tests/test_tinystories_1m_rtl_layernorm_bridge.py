@@ -50,6 +50,8 @@ class RtlLayerNormBridgeTest(unittest.TestCase):
             "bias_parameter": "model.transformer.h.0.ln_1.bias",
             "epsilon": 1e-5,
             "cudnn_enable": True,
+            "exported_program_sha256": self.module.EXPORTED_PROGRAM_SHA256,
+            "adapter_receipt_sha256": self.module.ADAPTER_RECEIPT_FILE_SHA256,
         }
         value.update(updates)
         return value
@@ -64,6 +66,7 @@ class RtlLayerNormBridgeTest(unittest.TestCase):
             list(self.module.CHECKPOINT_SHAPES),
         )
         self.assertEqual(self.evidence["numeric_trace"]["status"], "matched")
+        self.module.validate_evidence(self.evidence)
         self.assertEqual(
             self.evidence["numeric_trace"]["software_result_sha256"],
             self.evidence["numeric_trace"]["bridge_result_sha256"],
@@ -83,10 +86,20 @@ class RtlLayerNormBridgeTest(unittest.TestCase):
         second = self.module.lower_custom_op_to_mlir(copy.deepcopy(descriptor))
         self.assertEqual(first, second)
         self.assertIn('"llm2fpga.fixed_layer_norm_q16_16"', first)
+        self.assertIn("llm2fpga.bridge_manifest", first)
         self.assertIn("tensor<64xi32>", first)
         self.assertIn("}> :", first)
         self.assertNotIn("}}>", first)
         self.assertNotIn("gptneo_layernorm", first)
+        for identity in (
+            self.module.LAYER_NORM_PROFILE_SHA256,
+            self.module.QDQ_PROFILE_SHA256,
+            self.module.ADAPTER_SHA256,
+            self.module.ADAPTER_RECEIPT_FILE_SHA256,
+            self.module.EXPORTED_PROGRAM_SHA256,
+            *self.evidence["checkpoint_identities"].values(),
+        ):
+            self.assertIn(identity, first)
 
     def test_bridge_fails_closed_on_dimension_dtype_and_parameter_changes(self) -> None:
         cases = [
@@ -98,6 +111,12 @@ class RtlLayerNormBridgeTest(unittest.TestCase):
             ("unsupported_epsilon", {"epsilon": 1e-6}),
             ("unsupported_layernorm_parameter", {"cudnn_enable": False}),
             ("parameter_binding_mismatch", {"weight_parameter": "model.transformer.h.1.ln_1.weight"}),
+            ("source_identity_mismatch", {"graph_index": True}),
+            ("source_identity_mismatch", {"name": "layer_norm_1"}),
+            ("source_identity_mismatch", {"exported_program_sha256": "0" * 64}),
+            ("source_identity_mismatch", {"adapter_receipt_sha256": "0" * 64}),
+            ("unsupported_source_shape", {"input_shape": [True, 4, 64]}),
+            ("unsupported_normalized_shape", {"normalized_shape": [True]}),
         ]
         for code, update in cases:
             with self.subTest(code=code), self.assertRaisesRegex(self.module.LayerNormBridgeError, code):
@@ -114,6 +133,54 @@ class RtlLayerNormBridgeTest(unittest.TestCase):
             candidate.write_text(json.dumps(vector, sort_keys=True), encoding="utf-8")
             with self.assertRaisesRegex(self.module.LayerNormBridgeError, "layernorm_vector_identity_mismatch"):
                 self.module.load_evidence(PROFILE, candidate, PRIMITIVE, QDQ_PROFILE)
+
+    def test_forged_evidence_is_rejected_by_every_consumer(self) -> None:
+        cases = []
+        for path, value in (
+            (("profile_sha256",), "0" * 64),
+            (("qdq_profile_sha256",), "0" * 64),
+            (("package_adapter_sha256",), "0" * 64),
+            (("checkpoint_identities", "block.input"), "0" * 64),
+            (("numeric_trace", "software_result_sha256"), "0" * 64),
+            (("numeric_trace", "result", "mean_q16_16"), True),
+        ):
+            candidate = copy.deepcopy(self.evidence)
+            target = candidate
+            for key in path[:-1]:
+                target = target[key]
+            target[path[-1]] = value
+            candidate["sha256"] = self.module.canonical_sha256(
+                {key: item for key, item in candidate.items() if key != "sha256"}
+            )
+            cases.append(candidate)
+        for candidate in cases:
+            with self.subTest(candidate=candidate), self.assertRaises(self.module.LayerNormBridgeError):
+                self.module.bridge_source_op(self.source_op(), candidate, token_index=3)
+
+    def test_lowering_revalidates_source_evidence_and_checkpoints_after_rehash(self) -> None:
+        descriptor = self.module.bridge_source_op(self.source_op(), self.evidence, token_index=3)
+        mutations = [
+            ("source", "exported_program_sha256"),
+            ("evidence", "qdq_profile_sha256"),
+            ("checkpoint_identities", "block.ln_1.output"),
+        ]
+        for section, key in mutations:
+            candidate = copy.deepcopy(descriptor)
+            candidate[section][key] = "0" * 64
+            candidate["sha256"] = self.module.canonical_sha256(
+                {name: value for name, value in candidate.items() if name != "sha256"}
+            )
+            with self.subTest(section=section, key=key), self.assertRaises(self.module.LayerNormBridgeError):
+                self.module.lower_custom_op_to_mlir(candidate)
+
+    def test_report_revalidates_all_inputs_and_exact_rendering(self) -> None:
+        descriptor = self.module.bridge_source_op(self.source_op(), self.evidence, token_index=3)
+        mlir = self.module.lower_custom_op_to_mlir(descriptor)
+        bad_source = self.source_op(exported_program_sha256="0" * 64)
+        with self.assertRaisesRegex(self.module.LayerNormBridgeError, "source_identity_mismatch"):
+            self.module.make_report(source_op=bad_source, descriptor=descriptor, mlir=mlir, evidence=self.evidence)
+        with self.assertRaisesRegex(self.module.LayerNormBridgeError, "rendered_mlir_mismatch"):
+            self.module.make_report(source_op=self.source_op(), descriptor=descriptor, mlir=mlir + "// forged\n", evidence=self.evidence)
 
     def test_report_moves_boundary_to_backend_legalization_without_rtl_claim(self) -> None:
         descriptor = self.module.bridge_source_op(self.source_op(), self.evidence, token_index=3)
