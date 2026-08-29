@@ -1,0 +1,57 @@
+{
+  "schema": "tinystories-1m-softmax-real-graph-bridge-boundary-v1",
+  "model": "TinyStories-1M",
+  "status": "unsupported",
+  "bridge_status": "real_graph_pattern_mismatch",
+  "bridge_script": "scripts/comparison/bridge_tinystories_1m_softmax.py",
+  "bridge_revision": "861862d",
+  "contract_sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
+  "package": {
+    "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+    "scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+    "calibration_ids_sha256": "2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075"
+  },
+  "stages": {
+    "torch_mlir": {
+      "sha256": "dd1d864f940fa513b4262e0914ab97ce3c03bfdcde1e2bcac092924bc1bf865f",
+      "bytes": 29060435
+    },
+    "linalg": {
+      "sha256": "82119011db5f0296701b088f728b1e7c18de8210af69b5ec5bfc96be4c1b5354",
+      "bytes": 29142081
+    },
+    "scf": {
+      "sha256": "98dc99264388ad836b98fade83c71abb4d194a6840371e26cdb98465916c0c33",
+      "bytes": 29221149
+    },
+    "flat_scf": {
+      "sha256": "52382658fed8629d5e6757c6e9d7cb400d30dc1e05453c371c23d8ea8785ab9c",
+      "bytes": 29375724
+    }
+  },
+  "attempt": {
+    "expected_exp_sites": 8,
+    "observed_exp_sites": 8,
+    "pattern_parser": "_pattern_evidence",
+    "first_mismatch": {
+      "code": "dataflow_not_proven",
+      "site": 1,
+      "message": "site 1 lhs is not score",
+      "flat_scf_line": 836,
+      "context": [
+        "%114 = memref.load %alloc_37[%113] : memref<256xf32, strided<[1]>>",
+        "%115 = math.exp %114 : f32",
+        "memref.store %115, %alloc_37[%113] : memref<256xf32, strided<[1]>>"
+      ]
+    }
+  },
+  "claims": {
+    "authenticated_bridge_emitted": false,
+    "functional_equivalence": false,
+    "backend_lowering": false,
+    "rtl": false,
+    "hardware_inference": false
+  },
+  "next_action": "Adapt the bridge to prove tensor-level score/row-max provenance through linalg.generic lowering, while retaining all eight-site and same-function dataflow checks."
+}
