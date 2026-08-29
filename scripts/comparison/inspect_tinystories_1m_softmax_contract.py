@@ -38,6 +38,14 @@ def sha256(path: pathlib.Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def canonical_sha256(payload: dict[str, Any]) -> str:
+    """Hash report content without the self-hash field."""
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def _require(text: str, pattern: str, label: str) -> None:
     if re.search(pattern, text, flags=re.MULTILINE) is None:
         raise ValueError(f"reference pattern unavailable: {label}")
@@ -96,17 +104,18 @@ def _reference_contract(reference_root: pathlib.Path) -> tuple[dict[str, Any], d
             "scaling": "unscaled GPT-Neo dot product",
             "accumulator_bits": 96,
             "post_shift": 24,
-            "rounding": "truncate arithmetic right shift",
+            "output_encoding": "signed 32-bit fixed point with 8 fractional bits",
+            "rounding": "truncate arithmetic right shift; score code is not saturated",
             "saturation": "none at score register",
             "causal_mask": "implicit prefix time_index <= position; no mask port",
         },
         "exponential": {
-            "input": "score_code - score_max in signed score-code units",
+            "input": "signed 32-bit score/delta code with 8 fractional bits",
             "clamp": "delta < -4096 maps to LUT index 0; delta >= 0 maps to special one",
-            "domain": "[-16, 0] in Q8.8 score units",
+            "domain": "[-16, 0] represented by 8-fractional-bit score/delta codes",
             "lut_entries": 4096,
             "lut_indices": "0..4095 represent exp(-16)..exp(-1/256)",
-            "output_encoding": "unsigned Q1.20",
+            "output_encoding": "unsigned 21-bit fixed point with 20 fractional bits (Q1.20)",
             "zero_delta_value": 1048576,
             "generation": "round(exp((index-4096)/256) * 2^20)",
         },
@@ -120,16 +129,16 @@ def _reference_contract(reference_root: pathlib.Path) -> tuple[dict[str, Any], d
     }
     vectors = {
         "exp_lut": [
-            {"index": i, "delta_q8_8": i - 4096, "output_q1_20": _round_exp(i)}
+            {"index": i, "delta_code": i - 4096, "output_q1_20": _round_exp(i)}
             for i in (0, 1, 256, 2048, 4094, 4095)
         ],
         "special_zero_delta": {"delta": 0, "output_q1_20": 1 << 20},
         "clamp": [
-            {"delta_q8_8": -4097, "effective_index": 0},
-            {"delta_q8_8": -4096, "effective_index": 0},
-            {"delta_q8_8": -1, "effective_index": 4095},
-            {"delta_q8_8": 0, "effective_index": "special_one"},
-            {"delta_q8_8": 1, "effective_index": "special_one"},
+            {"delta_code": -4097, "effective_index": 0},
+            {"delta_code": -4096, "effective_index": 0},
+            {"delta_code": -1, "effective_index": 4095},
+            {"delta_code": 0, "effective_index": "special_one"},
+            {"delta_code": 1, "effective_index": "special_one"},
         ],
         "causal_prefix": {
             "position": 1,
@@ -195,7 +204,7 @@ def build_report(reference_root: pathlib.Path) -> dict[str, Any]:
         "vectors": vectors,
         "compiler_boundary": compiler,
         "comparison": {
-            "reference_input_encoding": "integer Q16.16/Q8.8/Q1.20 datapath",
+            "reference_input_encoding": "integer Q16.16 inputs, 32-bit score/delta codes with 8 fractional bits, and unsigned 21-bit Q1.20 exp outputs",
             "compiler_input_encoding": "f32 stabilized score to math.exp",
             "same_contract": False,
             "equivalence_claim": False,
@@ -214,8 +223,7 @@ def build_report(reference_root: pathlib.Path) -> dict[str, Any]:
     }
     if failure is not None:
         report["failure"] = failure
-    payload = json.dumps(report, indent=2, sort_keys=True).encode() + b"\n"
-    report["sha256"] = hashlib.sha256(payload).hexdigest()
+    report["sha256"] = canonical_sha256(report)
     return report
 
 

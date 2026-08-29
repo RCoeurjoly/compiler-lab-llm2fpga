@@ -24,6 +24,14 @@ class TinyStoriesSoftmaxContractTests(unittest.TestCase):
         self.assertFalse(report["authority"]["functional_equivalence"])
         self.assertEqual(report["reference"]["contract"]["exponential"]["lut_entries"], 4096)
         self.assertEqual(report["reference"]["contract"]["score"]["post_shift"], 24)
+        self.assertEqual(
+            report["reference"]["contract"]["score"]["output_encoding"],
+            "signed 32-bit fixed point with 8 fractional bits",
+        )
+        self.assertEqual(
+            report["reference"]["contract"]["exponential"]["output_encoding"],
+            "unsigned 21-bit fixed point with 20 fractional bits (Q1.20)",
+        )
         self.assertEqual(report["vectors"]["special_zero_delta"]["output_q1_20"], 1 << 20)
         self.assertGreater(report["compiler_boundary"]["boundary_report_sha256"].__len__(), 0)
 
@@ -45,6 +53,7 @@ class TinyStoriesSoftmaxContractTests(unittest.TestCase):
         data = json.loads(artifact.read_text(encoding="utf-8"))
         current = module.build_report(module.DEFAULT_REFERENCE_ROOT)
         self.assertEqual(data, current)
+        self.assertEqual(data["sha256"], module.canonical_sha256({k: v for k, v in data.items() if k != "sha256"}))
 
 
 if __name__ == "__main__":

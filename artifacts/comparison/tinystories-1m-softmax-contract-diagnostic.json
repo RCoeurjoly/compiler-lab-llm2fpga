@@ -13,7 +13,7 @@
       "run both implementations on identical score rows",
       "bind an exhaustive or accepted full-model output gate before approximation"
     ],
-    "reference_input_encoding": "integer Q16.16/Q8.8/Q1.20 datapath",
+    "reference_input_encoding": "integer Q16.16 inputs, 32-bit score/delta codes with 8 fractional bits, and unsigned 21-bit Q1.20 exp outputs",
     "same_contract": false
   },
   "compiler_boundary": {
@@ -48,12 +48,12 @@
       },
       "exponential": {
         "clamp": "delta < -4096 maps to LUT index 0; delta >= 0 maps to special one",
-        "domain": "[-16, 0] in Q8.8 score units",
+        "domain": "[-16, 0] represented by 8-fractional-bit score/delta codes",
         "generation": "round(exp((index-4096)/256) * 2^20)",
-        "input": "score_code - score_max in signed score-code units",
+        "input": "signed 32-bit score/delta code with 8 fractional bits",
         "lut_entries": 4096,
         "lut_indices": "0..4095 represent exp(-16)..exp(-1/256)",
-        "output_encoding": "unsigned Q1.20",
+        "output_encoding": "unsigned 21-bit fixed point with 20 fractional bits (Q1.20)",
         "zero_delta_value": 1048576
       },
       "normalization": {
@@ -67,8 +67,9 @@
         "accumulator_bits": 96,
         "causal_mask": "implicit prefix time_index <= position; no mask port",
         "input_encoding": "signed Q16.16 q and k",
+        "output_encoding": "signed 32-bit fixed point with 8 fractional bits",
         "post_shift": 24,
-        "rounding": "truncate arithmetic right shift",
+        "rounding": "truncate arithmetic right shift; score code is not saturated",
         "saturation": "none at score register",
         "scaling": "unscaled GPT-Neo dot product"
       }
@@ -98,7 +99,7 @@
   },
   "reference_root": "/home/roland/kev-gpt/.worktrees/kintex-selftest",
   "schema": "tinystories-1m-softmax-contract-diagnostic-v1",
-  "sha256": "8a10b3570a2c5d64aeab9c13a03c5ba3dfe39adef10a98d77213dbc8abb1d709",
+  "sha256": "1936efc42b84b153c3401448586c76116de8e2d40e54bfc561c43a7aa5ab51b9",
   "status": "reference_contract_recovered_compiler_boundary_unaligned",
   "vectors": {
     "causal_prefix": {
@@ -115,23 +116,23 @@
     },
     "clamp": [
       {
-        "delta_q8_8": -4097,
+        "delta_code": -4097,
         "effective_index": 0
       },
       {
-        "delta_q8_8": -4096,
+        "delta_code": -4096,
         "effective_index": 0
       },
       {
-        "delta_q8_8": -1,
+        "delta_code": -1,
         "effective_index": 4095
       },
       {
-        "delta_q8_8": 0,
+        "delta_code": 0,
         "effective_index": "special_one"
       },
       {
-        "delta_q8_8": 1,
+        "delta_code": 1,
         "effective_index": "special_one"
       }
     ],
@@ -157,32 +158,32 @@
     },
     "exp_lut": [
       {
-        "delta_q8_8": -4096,
+        "delta_code": -4096,
         "index": 0,
         "output_q1_20": 0
       },
       {
-        "delta_q8_8": -4095,
+        "delta_code": -4095,
         "index": 1,
         "output_q1_20": 0
       },
       {
-        "delta_q8_8": -3840,
+        "delta_code": -3840,
         "index": 256,
         "output_q1_20": 0
       },
       {
-        "delta_q8_8": -2048,
+        "delta_code": -2048,
         "index": 2048,
         "output_q1_20": 352
       },
       {
-        "delta_q8_8": -2,
+        "delta_code": -2,
         "index": 4094,
         "output_q1_20": 1040416
       },
       {
-        "delta_q8_8": -1,
+        "delta_code": -1,
         "index": 4095,
         "output_q1_20": 1044488
       }
