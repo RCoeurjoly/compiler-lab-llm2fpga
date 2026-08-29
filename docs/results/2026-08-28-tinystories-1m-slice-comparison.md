@@ -8,16 +8,21 @@ The comparison result is **`contract_mismatch`**, not a functional or
 efficiency claim.  The checked-in metadata records a realized full
 TinyStories-1M compiler SV artifact: 310,344,726 bytes with SHA-256
 `04b090f78c358757dfca4b56f2d45ee1d05281a8ed9d803ee267ac3000fe9d06`.
-The historical build that produced this artifact (source commit
-`cc8d7e69edd6e7296be976d84f15b4fc5e4d90ac`) used HuggingFace revision
-`77f1b168e219585646439073245fe87e56b3023e`; the frozen kev-gpt contract
-requires `ac533fb8b4f69c71894bf96badfe11e6294d9fcf` and its quantized-package
-hashes.  This historical receipt is therefore a `contract_mismatch`, and the
-strict extractor deliberately made no slice artifact.  The current registry
-was subsequently repinned to `ac533…9fcf`; it still requires a fresh full SV
-materialization and extraction before it can replace this historical receipt.
-Consequently no reference/compiler checkpoint pair, final token pair, Yosys
-resource receipt, or nextpnr timing receipt exists for the selected slice.
+The current metadata observes the frozen HuggingFace revision
+`ac533fb8b4f69c71894bf96badfe11e6294d9fcf` and the corresponding Nix store
+candidate.  An independent rebuild of that current-pin output has not been
+performed, so freshness is not claimed.  More importantly, the compiler
+sidecar still records `null` for both the frozen quantized package hash and
+manifest hash.  The current failure is therefore the precise
+`compiler_package_identity` gate: the SV artifact is not authenticated as
+having been generated from the frozen package.  The strict extractor makes no
+slice artifact, and consequently no reference/compiler checkpoint pair, final
+token pair, Yosys resource receipt, or nextpnr timing receipt exists for the
+selected slice.
+
+The prior materialization history, including the older source revision, is
+preserved in the full-materialization result document; it is not used as
+current evidence here.
 
 The machine-readable receipt is
 [`tinystories-1m-slice-comparison.json`](../../artifacts/comparison/tinystories-1m-slice-comparison.json).
