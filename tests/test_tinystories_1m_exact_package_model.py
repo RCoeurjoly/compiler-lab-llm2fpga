@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import importlib.util
 import json
 import math
 import tempfile
@@ -14,6 +15,7 @@ import torch
 
 from TinyStories.model_adapter_exact_package import (
     ExactModelError,
+    _validate_reachable_certificate,
     activation_qdq,
     export_exact_program,
     exported_program_identity,
@@ -34,6 +36,12 @@ MODEL = Path(
 ARTIFACT = ROOT / "artifacts/reference/tinystories-1m-exact-package-model.json"
 CERTIFICATE = ROOT / "artifacts/reference/tinystories-1m-exact-reachable-domain.json"
 ORACLE = ROOT / "artifacts/reference/tinystories-1m-fixed-logits-oracle.json"
+GENERATOR = ROOT / "scripts/comparison/build_tinystories_1m_exact_package_model_artifact.py"
+CERTIFIER = ROOT / "scripts/comparison/certify_tinystories_1m_exact_reachable_domain.py"
+CAPTURE = ROOT / "scripts/comparison/capture_tinystories_1m_fixed_logits.py"
+REACHABLE_TEST = ROOT / "tests/test_tinystories_1m_exact_reachable_domain.py"
+REFERENCE_ADAPTER = ROOT / "TinyStories/model_adapter_reference_package.py"
+FINITE_VALIDATOR = ROOT / "scripts/comparison/audit_tinystories_1m_exact_input.py"
 FROZEN_TRACE_SHA256 = "ac0118fe0068aea3790c3fc7414f75cd56abd5690f0d7f4bc13b143d05249d1d"
 FROZEN_CHECKPOINT_SHA256 = {
     "block.input": "c310f302cfb5fd58e2f0b00e6d6a9d36fc23121e7e04eb6b09c7aa630c00e12e",
@@ -56,6 +64,14 @@ def canonical_sha256(value: object) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def load_script(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def write_contract_and_audit(directory: Path, contract: dict, audit: dict) -> Path:
     contract_path = directory / "tinystories-1m-exact-input-contract.json"
     audit_path = directory / "tinystories-1m-exact-input-audit.json"
@@ -71,6 +87,7 @@ def write_contract_and_audit(directory: Path, contract: dict, audit: dict) -> Pa
 class TinyStories1MExactPackageModelTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        cls.generator = load_script(GENERATOR, "exact_model_artifact_generator")
         cls.bundle = load_exact_model(CONTRACT, PACKAGE, MODEL)
         cls.prompt = torch.tensor([[7454, 2402, 257, 640]], dtype=torch.int64)
         cls.trace = cls.bundle.trace(cls.prompt)
@@ -235,41 +252,157 @@ class TinyStories1MExactPackageModelTest(unittest.TestCase):
                          oracle["logits"]["canonical_sha256"])
         self.assertEqual(self.trace, self.bundle.trace(self.prompt))
 
-    def test_exact_package_model_artifact_is_content_bound(self) -> None:
+    def test_adapter_rejects_self_rehashed_incomplete_semantic_and_gemv_certificates(self) -> None:
+        mutations = (
+            ("source_authentication", lambda value: value["source_authentication"].__setitem__(
+                "status", "copied_not_materialized"
+            )),
+            ("gelu", lambda value: value["nonlinear"]["gelu"]["semantic_equivalence"].__setitem__(
+                "status", "identity_frontier"
+            )),
+            ("exp", lambda value: value["nonlinear"]["attention_softmax"]["exp_equivalence"]
+             ["comparison"].__setitem__("mismatch_witness", {"delta": -4096})),
+            ("divider", lambda value: value["nonlinear"]["attention_softmax"]
+             ["operator_equivalence"]["divider"].__setitem__("status", "identity_frontier")),
+            ("gemv", lambda value: value["gemv"]["calls"][48]["proof"]["inequalities"]
+             .__setitem__("pre_output_q16_fits_signed_int32", False)),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label):
+                certificate = copy.deepcopy(self.bundle.certificate)
+                mutate(certificate)
+                certificate["certificate_sha256"] = canonical_sha256({
+                    key: value for key, value in certificate.items()
+                    if key != "certificate_sha256"
+                })
+                with self.assertRaisesRegex(ExactModelError, "identity_frontier"):
+                    _validate_reachable_certificate(
+                        certificate, self.bundle.contract, self.bundle.audit
+                    )
+
+    def _expected_artifact_sections(self) -> dict:
+        certificate = json.loads(CERTIFICATE.read_text(encoding="utf-8"))
+        oracle = json.loads(ORACLE.read_text(encoding="utf-8"))
+        contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        audit_path = CONTRACT.with_name("tinystories-1m-exact-input-audit.json")
+        source_paths = (
+            ROOT / "TinyStories/model_adapter_exact_package.py",
+            REFERENCE_ADAPTER,
+            FINITE_VALIDATOR,
+            Path(__file__),
+            REACHABLE_TEST,
+            GENERATOR,
+            CERTIFIER,
+            CAPTURE,
+        )
+        identity = {
+            "contract": {"sha256": hashlib.sha256(CONTRACT.read_bytes()).hexdigest()},
+            "audit": {
+                "file_sha256": hashlib.sha256(audit_path.read_bytes()).hexdigest(),
+                "payload_sha256": self.bundle.audit["sha256"],
+            },
+            "fixed_profile": {
+                "sha256": hashlib.sha256(
+                    (ROOT / "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json").read_bytes()
+                ).hexdigest(),
+            },
+            "package": {"files": contract["package"]["files"]},
+            "source_files": {
+                str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in source_paths
+            },
+            "model_receipt_sha256": self.bundle.receipt["receipt_sha256"],
+            "reachable_certificate": {
+                "file_sha256": hashlib.sha256(CERTIFICATE.read_bytes()).hexdigest(),
+                "certificate_sha256": certificate["certificate_sha256"],
+            },
+            "fixed_logits_oracle": {
+                "file_sha256": hashlib.sha256(ORACLE.read_bytes()).hexdigest(),
+                "oracle_sha256": oracle["oracle_sha256"],
+            },
+        }
+        trace = {
+            "prompt_tokens": self.bundle.contract["reference"]["prompt_tokens"],
+            "sha256": self.trace["trace_sha256"],
+            "checkpoint_sha256": {
+                name: checkpoint["sha256"]
+                for name, checkpoint in self.trace["checkpoints"].items()
+            },
+            "qdq_boundary_sha256": {
+                item["name"]: {
+                    "codes": item["codes_sha256"],
+                    "scales": item["scales_sha256"],
+                    "dequantized": item["dequantized_sha256"],
+                }
+                for item in self.trace["qdq_boundaries"]
+            },
+            "gemv_accumulator_sha256": {
+                name: item["sha256"] for name, item in self.trace["gemv_accumulators"].items()
+            },
+            "nonlinear_boundary_sha256": {
+                name: item["sha256"] for name, item in self.trace["nonlinear_boundaries"].items()
+            },
+        }
+        export = {
+            "shape": [1, 4, 50257],
+            "dtype": "torch.int64",
+            "checkpoint_replay": "matched",
+            "qdq_boundary_replay": "matched",
+            "gemv_accumulator_replay": "matched",
+            "nonlinear_boundary_replay": "matched",
+            "final_logits_replay": "matched",
+            "independent_oracle": "full_logits_bit_exact",
+            "final_logits_sha256": self.bundle.export_verification["final_logits_sha256"],
+            "final_logits_canonical_sha256": self.bundle.export_verification[
+                "final_logits_canonical_sha256"
+            ],
+        }
+        return {
+            "identity": identity,
+            "execution": self.bundle.receipt["execution"],
+            "trace": trace,
+            "export": export,
+            "exported_program": exported_program_identity(self.exported),
+        }
+
+    def test_exact_package_model_artifact_validates_every_recorded_identity_and_execution_field(self) -> None:
         artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+        expected = self._expected_artifact_sections()
 
         self.assertEqual(artifact["schema"], "tinystories-1m-exact-package-model-v1")
         self.assertEqual(
             artifact["status"], "exact_eager_export_and_independent_oracle_matched"
         )
-        self.assertEqual(artifact["trace"]["sha256"], FROZEN_TRACE_SHA256)
-        self.assertEqual(artifact["trace"]["checkpoint_sha256"], FROZEN_CHECKPOINT_SHA256)
-        self.assertEqual(artifact["execution"]["domain"], "integers_only_after_materialization")
-        self.assertEqual(
-            artifact["identity"]["adapter_sha256"],
-            hashlib.sha256((ROOT / "TinyStories/model_adapter_exact_package.py").read_bytes()).hexdigest(),
-        )
-        self.assertEqual(
-            artifact["identity"]["test_sha256"],
-            hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-        )
-        self.assertEqual(
-            artifact["identity"]["reachable_certificate_sha256"],
-            hashlib.sha256(CERTIFICATE.read_bytes()).hexdigest(),
-        )
-        self.assertEqual(
-            artifact["identity"]["fixed_logits_oracle_sha256"],
-            hashlib.sha256(ORACLE.read_bytes()).hexdigest(),
-        )
-        self.assertEqual(artifact["exported_program"], exported_program_identity(self.exported))
-        self.assertEqual(
-            artifact["export"]["final_logits_canonical_sha256"],
-            json.loads(ORACLE.read_text(encoding="utf-8"))["logits"]["canonical_sha256"],
-        )
+        self.assertEqual({key: artifact[key] for key in expected}, expected)
+        self.generator.validate_artifact(artifact, expected)
         self.assertEqual(
             artifact["artifact_sha256"],
             canonical_sha256({key: value for key, value in artifact.items() if key != "artifact_sha256"}),
         )
+
+    def test_consistently_self_rehashed_artifact_mutations_are_rejected(self) -> None:
+        artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+        expected = self._expected_artifact_sections()
+        mutations = (
+            ("contract", lambda value: value["identity"]["contract"].__setitem__("sha256", "0" * 64)),
+            ("package", lambda value: value["identity"]["package"]["files"]["weights.bin"].__setitem__("sha256", "0" * 64)),
+            ("certifier", lambda value: value["identity"]["source_files"].__setitem__(
+                "scripts/comparison/certify_tinystories_1m_exact_reachable_domain.py", "0" * 64
+            )),
+            ("certificate", lambda value: value["identity"]["reachable_certificate"].__setitem__("certificate_sha256", "0" * 64)),
+            ("oracle", lambda value: value["identity"]["fixed_logits_oracle"].__setitem__("oracle_sha256", "0" * 64)),
+            ("program", lambda value: value["exported_program"].__setitem__("program_sha256", "0" * 64)),
+            ("logits", lambda value: value["export"].__setitem__("final_logits_sha256", "0" * 64)),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label):
+                changed = copy.deepcopy(artifact)
+                mutate(changed)
+                changed["artifact_sha256"] = canonical_sha256({
+                    key: value for key, value in changed.items() if key != "artifact_sha256"
+                })
+                with self.assertRaisesRegex(ValueError, "artifact_evidence_mismatch"):
+                    self.generator.validate_artifact(changed, expected)
 
 
 if __name__ == "__main__":

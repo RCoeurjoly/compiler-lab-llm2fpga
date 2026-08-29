@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import copy
 import unittest
 from pathlib import Path
 
@@ -73,23 +74,123 @@ class ExactReachableDomainCertificateTest(unittest.TestCase):
         self.assertEqual(result["status"], "identity_frontier")
         self.assertEqual(result["failing_inequality"], "runtime_square_sum_fits_signed_int64")
 
-    def test_gelu_and_attention_are_source_bound_for_every_layer(self) -> None:
+    def test_gelu_exhaustively_matches_independent_runtime_and_rtl_evaluators(self) -> None:
         nonlinear = self.certificate["nonlinear"]
+        proof = nonlinear["gelu"]["semantic_equivalence"]
 
         self.assertEqual(len(nonlinear["gelu"]["calls"]), 8)
-        self.assertEqual(len(nonlinear["attention_softmax"]["calls"]), 8)
         self.assertEqual(nonlinear["gelu"]["calls"][-1]["name"], "transformer.h.7.mlp.gelu")
+        self.assertEqual(proof["status"], "exhaustive_runtime_rtl_equivalent")
+        self.assertEqual(proof["input_domain"], {
+            "format": "signed_q4.12_int16",
+            "minimum": -32768,
+            "maximum": 32767,
+            "count": 65536,
+        })
+        self.assertEqual(proof["comparison"]["pass_count"], 65536)
+        self.assertIsNone(proof["comparison"]["mismatch_witness"])
+        self.assertEqual(proof["runtime_lut"]["entry_count"], 8192)
+        self.assertEqual(proof["runtime_lut"]["values_sha256"],
+                         proof["rtl_lut"]["values_sha256"])
+        self.assertRegex(proof["rtl_lut"]["mem_sha256"], r"^[0-9a-f]{64}$")
+
+        sources = self.certifier.materialize_semantic_sources(CONTRACT, AUDIT, REFERENCE)
+        runtime_lut, rtl_gelu_lut, _ = self.certifier.materialize_luts(sources)
+        corrupted = copy.deepcopy(rtl_gelu_lut)
+        corrupted[0] += 1
+        failed = self.certifier.prove_gelu_semantics(runtime_lut, corrupted)
+        self.assertEqual(failed["status"], "identity_frontier")
+        self.assertEqual(failed["comparison"]["mismatch_witness"]["input_q4_12"], -32768)
+
+    def test_attention_operators_exp_and_divider_have_executable_source_bound_proofs(self) -> None:
+        attention = self.certificate["nonlinear"]["attention_softmax"]
+        exp = attention["exp_equivalence"]
+        operators = attention["operator_equivalence"]
+
+        self.assertEqual(len(attention["calls"]), 8)
         self.assertEqual(
-            nonlinear["attention_softmax"]["calls"][-1]["name"],
+            attention["calls"][-1]["name"],
             "transformer.h.7.attn.attention",
         )
-        self.assertTrue(all(call["proof"]["all"] for call in nonlinear["gelu"]["calls"]))
-        self.assertTrue(all(call["proof"]["all"] for call in nonlinear["attention_softmax"]["calls"]))
+        self.assertEqual(exp["status"], "exhaustive_effective_domain_equivalent")
+        self.assertEqual(exp["effective_delta_domain"], [-4096, 0])
+        self.assertEqual(exp["comparison"]["pass_count"], 4101)
+        self.assertEqual(exp["comparison"]["outside_clamp_representatives"],
+                         [-2147483648, -4097, 1, 2147483647])
+        self.assertIsNone(exp["comparison"]["mismatch_witness"])
+        self.assertEqual(exp["runtime_lut"]["values_sha256"],
+                         exp["rtl_lut"]["values_sha256"])
+        self.assertEqual(operators["status"], "source_derived_equivalent_on_certified_intervals")
+        self.assertEqual(set(operators["equations"]), {
+            "score_sum", "score_shift", "score_max", "delta", "probability_sum",
+            "context_numerator", "rounding_correction", "restoring_division",
+        })
+        self.assertEqual(operators["divider"]["status"], "representatives_and_invariant_proven")
+        self.assertGreaterEqual(operators["divider"]["comparison"]["pass_count"], 100)
+        self.assertIsNone(operators["divider"]["comparison"]["mismatch_witness"])
+        self.assertEqual(operators["divider"]["zero_denominator_policy"], "quotient_zero")
+        self.assertTrue(all(call["proof"]["all"] for call in attention["calls"]))
+
+        sources = self.certifier.materialize_semantic_sources(CONTRACT, AUDIT, REFERENCE)
+        runtime_exp, rtl_exp = self.certifier.materialize_luts(sources)[2]
+        corrupted = copy.deepcopy(rtl_exp)
+        corrupted[0] += 1
+        failed = self.certifier.prove_exp_semantics(runtime_exp, corrupted)
+        self.assertEqual(failed["status"], "identity_frontier")
+        self.assertEqual(failed["comparison"]["mismatch_witness"]["delta"], -4096)
+
+    def test_every_semantic_authority_is_materialized_from_the_pinned_git_blobs(self) -> None:
+        authentication = self.certificate["source_authentication"]
+
+        self.assertEqual(authentication["status"],
+                         "materialized_git_blobs_match_authenticated_closure")
+        self.assertEqual(authentication["revision"],
+                         "df1fc45b2ffcb26fddc19cfd57621e7eedf6153f")
+        self.assertEqual(authentication["source_count"], 6)
+        self.assertEqual(set(authentication["materialized_sources"]), {
+            "tinystories/hardware_reference.py",
+            "tinystories/rtl_memories.py",
+            "fpga/rtl/gptneo_layernorm.sv",
+            "fpga/rtl/gptneo_gelu.sv",
+            "fpga/rtl/gptneo_attention.sv",
+            "fpga/rtl/gptneo_iterative_divider.sv",
+        })
         source_paths = set(self.certificate["identity"]["semantic_sources"])
-        self.assertIn("fpga/rtl/gptneo_layernorm.sv", source_paths)
-        self.assertIn("fpga/rtl/gptneo_gelu.sv", source_paths)
-        self.assertIn("fpga/rtl/gptneo_attention.sv", source_paths)
-        self.assertIn("fpga/rtl/gptneo_iterative_divider.sv", source_paths)
+        self.assertEqual(source_paths, set(authentication["materialized_sources"]))
+
+    def test_all_49_gemvs_prove_serial_accumulator_product_and_preoutput_ranges(self) -> None:
+        gemv = self.certificate["gemv"]
+        calls = gemv["calls"]
+
+        self.assertEqual(gemv["status"], "all_preoutput_q16_ranges_proven")
+        self.assertEqual(len(calls), 49)
+        self.assertEqual(calls[0]["name"], "transformer.h.0.attn.attention.q_proj")
+        self.assertEqual(calls[-1]["name"], "lm_head")
+        for call in calls:
+            with self.subTest(call=call["name"]):
+                output_count = call["output_count"]
+                bounds = call["per_output_bounds"]
+                self.assertEqual(len(bounds["accumulator_min"]), output_count)
+                self.assertEqual(len(bounds["accumulator_max"]), output_count)
+                self.assertEqual(len(bounds["pre_output_q16_min"]), output_count)
+                self.assertEqual(len(bounds["pre_output_q16_max"]), output_count)
+                self.assertTrue(all(call["proof"]["inequalities"].values()))
+                self.assertLess(call["proof"]["pre_output_q16_abs_bound"], 2**31)
+                self.assertIsNone(call["first_failing_output"])
+                self.assertIsNone(call["failing_inequality"])
+        self.assertEqual(max(call["proof"]["pre_output_q16_abs_bound"] for call in calls),
+                         6848534)
+
+    def test_expanded_gemv_input_box_fails_at_the_first_module_output_inequality(self) -> None:
+        result = self.certifier.derive_gemv_certificate(
+            PACKAGE, input_code_min=-(2**40), input_code_max=2**40,
+        )
+
+        self.assertEqual(result["status"], "identity_frontier")
+        self.assertEqual(result["failing_call"], "transformer.h.0.attn.attention.q_proj")
+        self.assertEqual(result["failing_output"], 0)
+        self.assertEqual(result["failing_inequality"],
+                         "gemv_term_fits_signed_int64")
 
 
 @unittest.skipUnless(PACKAGE.is_dir() and REFERENCE.is_dir(), "canonical inputs unavailable")

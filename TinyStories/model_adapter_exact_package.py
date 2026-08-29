@@ -48,7 +48,7 @@ FROZEN_PROFILE_SELF_SHA256 = "7d54acda88f1d1a6979fd0ca8a3b0445e20ef127a399e5124a
 FROZEN_CONTRACT_SHA256 = "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c"
 FROZEN_AUDIT_FILE_SHA256 = "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd"
 REACHABLE_CERTIFICATE_RELATIVE = Path("artifacts/reference/tinystories-1m-exact-reachable-domain.json")
-REACHABLE_CERTIFICATE_SHA256 = "e09b790c952c24c63050ad348485d429d5c0ad9e87b33654af06366f2e68e659"
+REACHABLE_CERTIFICATE_SHA256 = "9c0ae7b65960b42422ef03137c383b2126fc7d9395a39f600b45b3fcee6449ba"
 FIXED_LOGITS_ORACLE_RELATIVE = Path("artifacts/reference/tinystories-1m-fixed-logits-oracle.json")
 FIXED_LOGITS_ORACLE_SHA256 = "258bbcc081a5166b8f302ff6d736730f1743d7fa448413bae6c3774b9f5ff533"
 
@@ -311,12 +311,25 @@ def _validate_reachable_certificate(certificate: Mapping[str, Any], contract: Ma
              and identity.get("package_weights_sha256") == contract["package"]["sha256"]
              and identity.get("package_scales_sha256") == contract["package"]["files"]["scales.bin"]["sha256"],
              "identity_frontier", "reachable-domain certificate identity differs")
-    expected_sources = {
-        name: contract["deployed_profile"]["sources"][name]
-        for name in identity.get("semantic_sources", {})
+    expected_source_names = {
+        "tinystories/hardware_reference.py", "tinystories/rtl_memories.py",
+        "fpga/rtl/gptneo_layernorm.sv", "fpga/rtl/gptneo_gelu.sv",
+        "fpga/rtl/gptneo_attention.sv", "fpga/rtl/gptneo_iterative_divider.sv",
     }
-    _require(identity.get("semantic_sources") == expected_sources,
+    expected_sources = {
+        name: contract["deployed_profile"]["sources"][name] for name in expected_source_names
+    }
+    _require(set(identity.get("semantic_sources", {})) == expected_source_names
+             and identity.get("semantic_sources") == expected_sources,
              "identity_frontier", "reachable-domain semantic source identity differs")
+    source_authentication = certificate.get("source_authentication", {})
+    _require(source_authentication.get("status")
+             == "materialized_git_blobs_match_authenticated_closure"
+             and source_authentication.get("revision") == contract["deployed_profile"]["revision"]
+             and source_authentication.get("source_count") == len(expected_sources)
+             and source_authentication.get("materialized_sources") == expected_sources
+             and source_authentication.get("closure_sha256") == canonical_sha256(expected_sources),
+             "identity_frontier", "semantic sources were not authenticated from pinned Git blobs")
     certifier = _repo_root() / "scripts/comparison/certify_tinystories_1m_exact_reachable_domain.py"
     _require(certifier.is_file() and identity.get("certifier_sha256") == _sha256(certifier),
              "identity_frontier", "reachable-domain certifier identity differs")
@@ -334,14 +347,81 @@ def _validate_reachable_certificate(certificate: Mapping[str, Any], contract: Ma
              == "runtime_and_synthesizable_rtl_identical_on_reachable_domain",
              "identity_frontier", "LayerNorm reachable-domain proof is incomplete")
     nonlinear = certificate.get("nonlinear", {})
-    gelu_calls = nonlinear.get("gelu", {}).get("calls", [])
-    attention_calls = nonlinear.get("attention_softmax", {}).get("calls", [])
+    gelu = nonlinear.get("gelu", {})
+    attention = nonlinear.get("attention_softmax", {})
+    gelu_calls = gelu.get("calls", [])
+    attention_calls = attention.get("calls", [])
     _require(tuple(call.get("name") for call in gelu_calls)
              == tuple(f"transformer.h.{layer}.mlp.gelu" for layer in range(8))
              and tuple(call.get("name") for call in attention_calls)
              == tuple(f"transformer.h.{layer}.attn.attention" for layer in range(8))
              and all(call.get("proof", {}).get("all") for call in gelu_calls + attention_calls),
              "identity_frontier", "nonlinear reachable-domain proof is incomplete")
+    gelu_semantics = gelu.get("semantic_equivalence", {})
+    gelu_comparison = gelu_semantics.get("comparison", {})
+    _require(gelu_semantics.get("status") == "exhaustive_runtime_rtl_equivalent"
+             and gelu_semantics.get("input_domain") == {
+                 "format": "signed_q4.12_int16", "minimum": -32768,
+                 "maximum": 32767, "count": 65536,
+             }
+             and gelu_comparison.get("pass_count") == 65536
+             and gelu_comparison.get("mismatch_witness") is None
+             and gelu_semantics.get("runtime_lut", {}).get("values_sha256")
+             == gelu_semantics.get("rtl_lut", {}).get("values_sha256"),
+             "identity_frontier", "GELU exhaustive semantic proof is incomplete")
+    exp_semantics = attention.get("exp_equivalence", {})
+    exp_comparison = exp_semantics.get("comparison", {})
+    _require(exp_semantics.get("status") == "exhaustive_effective_domain_equivalent"
+             and exp_semantics.get("effective_delta_domain") == [-4096, 0]
+             and exp_comparison.get("pass_count") == 4101
+             and exp_comparison.get("outside_clamp_representatives")
+             == [-2147483648, -4097, 1, 2147483647]
+             and exp_comparison.get("mismatch_witness") is None
+             and exp_semantics.get("runtime_lut", {}).get("values_sha256")
+             == exp_semantics.get("rtl_lut", {}).get("values_sha256"),
+             "identity_frontier", "attention exp semantic proof is incomplete")
+    operators = attention.get("operator_equivalence", {})
+    differential = operators.get("differential_checks", {})
+    divider = operators.get("divider", {})
+    _require(operators.get("status") == "source_derived_equivalent_on_certified_intervals"
+             and set(operators.get("equations", {})) == {
+                 "score_sum", "score_shift", "score_max", "delta", "probability_sum",
+                 "context_numerator", "rounding_correction", "restoring_division",
+             }
+             and set(differential) == {
+                 "score_sum_shift", "score_max_delta", "probability_sum", "context_numerator",
+             }
+             and all(item.get("pass_count", 0) > 0
+                     and item.get("mismatch_witness") is None for item in differential.values())
+             and divider.get("status") == "representatives_and_invariant_proven"
+             and divider.get("zero_denominator_policy") == "quotient_zero"
+             and divider.get("comparison", {}).get("pass_count", 0) >= 100
+             and divider.get("comparison", {}).get("mismatch_witness") is None
+             and divider.get("algebraic_invariant", {}).get("quotient_fits_signed_int32") is True,
+             "identity_frontier", "attention operator/divider proof is incomplete")
+    gemv = certificate.get("gemv", {})
+    gemv_calls = gemv.get("calls", [])
+    _require(gemv.get("status") == "all_preoutput_q16_ranges_proven"
+             and tuple(call.get("name") for call in gemv_calls) == GEMV_NAMES
+             and gemv.get("failing_call") is None
+             and gemv.get("failing_output") is None
+             and gemv.get("failing_inequality") is None,
+             "identity_frontier", "GEMV reachable-domain call coverage is incomplete")
+    for call in gemv_calls:
+        output_count = call.get("output_count")
+        bounds = call.get("per_output_bounds", {})
+        _require(call.get("status") == "proven"
+                 and call.get("first_failing_output") is None
+                 and call.get("failing_inequality") is None
+                 and isinstance(output_count, int) and output_count > 0
+                 and all(isinstance(bounds.get(name), list)
+                         and len(bounds[name]) == output_count for name in (
+                             "accumulator_min", "accumulator_max",
+                             "pre_output_q16_min", "pre_output_q16_max",
+                         ))
+                 and all(call.get("proof", {}).get("inequalities", {}).values())
+                 and call.get("proof", {}).get("pre_output_q16_abs_bound", 1 << 31) < (1 << 31),
+                 "identity_frontier", f"GEMV proof is incomplete: {call.get('name')}")
 
 
 def _validate_fixed_logits_oracle(oracle: Mapping[str, Any], contract: Mapping[str, Any],

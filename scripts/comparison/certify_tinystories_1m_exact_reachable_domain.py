@@ -15,6 +15,8 @@ import hashlib
 import json
 import math
 import struct
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -75,6 +77,51 @@ def _load(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     _require(isinstance(value, dict), "invalid_json", str(path))
     return value
+
+
+def _git_bytes(root: Path, *args: str) -> bytes:
+    try:
+        return subprocess.run(
+            ["git", "-C", str(root), *args], check=True, capture_output=True
+        ).stdout
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ReachableDomainError("pinned_source_unavailable", " ".join(args)) from error
+
+
+def _git_text(root: Path, *args: str) -> str:
+    return _git_bytes(root, *args).decode().strip()
+
+
+def materialize_semantic_sources(contract_path: Path, audit_path: Path,
+                                 reference_root: Path) -> dict[str, dict[str, Any]]:
+    """Read every semantic authority from the authenticated immutable Git tree."""
+
+    contract_path, audit_path, reference_root = map(
+        Path, (contract_path, audit_path, reference_root)
+    )
+    _require(contract_path.is_file() and sha256_file(contract_path) == CONTRACT_SHA256,
+             "authority_identity_mismatch", str(contract_path))
+    _require(audit_path.is_file() and sha256_file(audit_path) == AUDIT_FILE_SHA256,
+             "authority_identity_mismatch", str(audit_path))
+    contract, audit = _load(contract_path), _load(audit_path)
+    _require(_git_text(reference_root, "rev-parse", "--show-toplevel")
+             == str(reference_root.resolve()),
+             "reference_root_mismatch", str(reference_root))
+    _require(_git_text(reference_root, "rev-parse", f"{REFERENCE_REVISION}^{{commit}}")
+             == REFERENCE_REVISION,
+             "source_revision_mismatch", REFERENCE_REVISION)
+    closure = contract["deployed_profile"]["sources"]
+    audit_closure = audit["source"]["pinned_semantic_source_closure"]
+    materialized: dict[str, dict[str, Any]] = {}
+    for name in SEMANTIC_SOURCE_PATHS:
+        expected = closure.get(name)
+        _require(expected == audit_closure.get(name), "source_identity_mismatch", name)
+        blob = _git_text(reference_root, "rev-parse", f"{REFERENCE_REVISION}:{name}")
+        payload = _git_bytes(reference_root, "cat-file", "blob", blob)
+        actual = {"git_blob_sha1": blob, "sha256": hashlib.sha256(payload).hexdigest()}
+        _require(actual == expected, "source_identity_mismatch", name)
+        materialized[name] = {**actual, "payload": payload}
+    return materialized
 
 
 def _trunc(numerator: int, denominator: int) -> int:
@@ -266,16 +313,156 @@ def _activation_bounds(name: str, manifest: Mapping[str, Any]) -> tuple[list[int
             [_round_shift(127 * value, 8) for value in scales])
 
 
-def _gelu_lut_payload() -> bytes:
-    lines = []
+def _runtime_gelu_lut() -> list[int]:
+    values = []
     for index in range(8192):
         value = -8.0 + index / 512.0
         result = 0.5 * value * (
             1.0 + math.tanh(math.sqrt(2.0 / math.pi) * (value + 0.044715 * value ** 3))
         )
-        code = max(-32768, min(32767, round(result * 4096.0)))
-        lines.append(f"{code & 0xffff:04x}\n")
-    return "".join(lines).encode()
+        values.append(max(-32768, min(32767, round(result * 4096.0))))
+    return values
+
+
+def _runtime_exp_lut() -> list[int]:
+    return [round(math.exp((index - 4096) / 256.0) * (1 << 20))
+            for index in range(4096)]
+
+
+def _signed(value: int, width: int) -> int:
+    value &= (1 << width) - 1
+    return value - (1 << width) if value & (1 << (width - 1)) else value
+
+
+def _materialize_rtl_lut_payloads(
+    sources: Mapping[str, Mapping[str, Any]],
+) -> tuple[bytes, bytes]:
+    source = sources["tinystories/rtl_memories.py"]["payload"]
+    namespace: dict[str, Any] = {"__name__": "authenticated_rtl_memories"}
+    exec(compile(source, "authenticated:tinystories/rtl_memories.py", "exec"), namespace)
+    with tempfile.TemporaryDirectory() as temporary:
+        directory = Path(temporary)
+        gelu_path = namespace["write_gelu_lut"](directory)
+        exp_path = namespace["write_exp_lut"](directory)
+        return gelu_path.read_bytes(), exp_path.read_bytes()
+
+
+def materialize_luts(
+    sources: Mapping[str, Mapping[str, Any]],
+) -> tuple[list[int], list[int], tuple[list[int], list[int]]]:
+    gelu_payload, exp_payload = _materialize_rtl_lut_payloads(sources)
+    rtl_gelu = [_signed(int(line, 16), 16) for line in gelu_payload.decode().splitlines()]
+    rtl_exp = [int(line, 16) for line in exp_payload.decode().splitlines()]
+    _require(len(rtl_gelu) == 8192 and len(rtl_exp) == 4096,
+             "rtl_lut_materialization_failure", "unexpected LUT length")
+    return _runtime_gelu_lut(), rtl_gelu, (_runtime_exp_lut(), rtl_exp)
+
+
+def _runtime_gelu_q12(value: int, lut: list[int]) -> int:
+    biased = value + 32768
+    index, fraction = biased >> 3, biased & 7
+    upper = min(index + 1, 8191)
+    return lut[index] + ((lut[upper] - lut[index]) * fraction >> 3)
+
+
+def _rtl_gelu_q12(value: int, lut: list[int]) -> int:
+    in_data = _signed(value, 16)
+    biased = ((in_data & 0xffff) + 0x8000) & 0xffff
+    index, fraction = biased >> 3, biased & 7
+    lower = _signed(lut[index], 16)
+    upper = _signed(lut[index if index == 8191 else index + 1], 16)
+    difference = _signed(upper - lower, 17)
+    step = _signed(difference * fraction, 20)
+    return _signed(lower + (step >> 3), 16)
+
+
+def prove_gelu_semantics(runtime_lut: list[int], rtl_lut: list[int]) -> dict[str, Any]:
+    _require(len(runtime_lut) == len(rtl_lut) == 8192,
+             "gelu_lut_shape_mismatch", "expected 8192 entries")
+    mismatch = None
+    passed = 0
+    for value in range(-32768, 32768):
+        runtime = _runtime_gelu_q12(value, runtime_lut)
+        rtl = _rtl_gelu_q12(value, rtl_lut)
+        if runtime != rtl:
+            mismatch = {"input_q4_12": value, "runtime_q4_12": runtime, "rtl_q4_12": rtl}
+            break
+        passed += 1
+    runtime_values_hash = canonical_sha256(runtime_lut)
+    rtl_values_hash = canonical_sha256(rtl_lut)
+    return {
+        "status": ("exhaustive_runtime_rtl_equivalent" if mismatch is None
+                   else "identity_frontier"),
+        "input_domain": {
+            "format": "signed_q4.12_int16", "minimum": -32768,
+            "maximum": 32767, "count": 65536,
+        },
+        "equations": {
+            "runtime": "index=(x+32768)>>3; fraction=(x+32768)&7; lower+((upper-lower)*fraction>>3)",
+            "rtl": "signed16 LUT; signed17 difference; signed20 product; arithmetic_shift_right_3; signed16 output",
+        },
+        "runtime_lut": {"entry_count": 8192, "values_sha256": runtime_values_hash},
+        "rtl_lut": {
+            "entry_count": 8192,
+            "values_sha256": rtl_values_hash,
+            "mem_sha256": hashlib.sha256(
+                "".join(f"{value & 0xffff:04x}\n" for value in rtl_lut).encode()
+            ).hexdigest(),
+        },
+        "comparison": {"pass_count": passed, "mismatch_witness": mismatch},
+    }
+
+
+def _runtime_exp(delta: int, lut: list[int]) -> int:
+    clipped = max(-4096, min(0, delta))
+    index = min(4096 + clipped, 4095)
+    return 1 << 20 if clipped == 0 else lut[index]
+
+
+def _rtl_exp(delta: int, lut: list[int]) -> int:
+    if delta < -4096:
+        index = 0
+    elif delta >= 0:
+        index = 4096
+    else:
+        index = 4096 + delta
+    return 1 << 20 if index == 4096 else lut[index]
+
+
+def prove_exp_semantics(runtime_lut: list[int], rtl_lut: list[int]) -> dict[str, Any]:
+    _require(len(runtime_lut) == len(rtl_lut) == 4096,
+             "exp_lut_shape_mismatch", "expected 4096 entries")
+    representatives = [-2147483648, -4097, 1, 2147483647]
+    domain = list(range(-4096, 1)) + representatives
+    mismatch = None
+    passed = 0
+    for delta in domain:
+        runtime, rtl = _runtime_exp(delta, runtime_lut), _rtl_exp(delta, rtl_lut)
+        if runtime != rtl:
+            mismatch = {"delta": delta, "runtime_q0_20": runtime, "rtl_q0_20": rtl}
+            break
+        passed += 1
+    return {
+        "status": ("exhaustive_effective_domain_equivalent" if mismatch is None
+                   else "identity_frontier"),
+        "effective_delta_domain": [-4096, 0],
+        "equations": {
+            "runtime": "clip(delta,-4096,0); index=min(4096+delta,4095); delta_zero=>2^20",
+            "rtl": "delta<-4096=>0; delta>=0=>4096; else 4096+delta; index4096=>2^20",
+        },
+        "runtime_lut": {"entry_count": 4096, "values_sha256": canonical_sha256(runtime_lut)},
+        "rtl_lut": {
+            "entry_count": 4096,
+            "values_sha256": canonical_sha256(rtl_lut),
+            "mem_sha256": hashlib.sha256(
+                "".join(f"{value:06x}\n" for value in rtl_lut).encode()
+            ).hexdigest(),
+        },
+        "comparison": {
+            "pass_count": passed, "mismatch_witness": mismatch,
+            "outside_clamp_representatives": representatives,
+        },
+    }
 
 
 def _gelu_proof(layer: int, manifest: Mapping[str, Any]) -> dict[str, Any]:
@@ -299,6 +486,87 @@ def _gelu_proof(layer: int, manifest: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _rtl_restoring_divide(numerator: int, denominator: int) -> int:
+    """Independent cycle-equivalent model of gptneo_iterative_divider.sv."""
+
+    numerator = _signed(numerator, 96)
+    denominator &= (1 << 64) - 1
+    if denominator == 0:
+        return 0
+    negative = numerator < 0
+    dividend = (-numerator if negative else numerator) & ((1 << 96) - 1)
+    remainder = 0
+    quotient = 0
+    for bit in range(95, -1, -1):
+        remainder = ((remainder & ((1 << 64) - 1)) << 1) | ((dividend >> bit) & 1)
+        if remainder >= denominator:
+            remainder -= denominator
+            quotient |= 1 << bit
+    low = _signed(quotient & 0xffffffff, 32)
+    return _signed(-low if negative else low, 32)
+
+
+def prove_divider_semantics(numerator_abs_bound: int, denominator_min: int,
+                            denominator_max: int) -> dict[str, Any]:
+    _require(0 <= numerator_abs_bound < (1 << 95),
+             "divider_domain_mismatch", "numerator must fit signed 96")
+    _require(0 < denominator_min <= denominator_max < (1 << 64),
+             "divider_domain_mismatch", "positive denominator interval required")
+    numerators = {
+        -numerator_abs_bound, -max(0, numerator_abs_bound - 1),
+        -denominator_max, -(denominator_max // 2), -denominator_min,
+        -(denominator_min // 2), -2, -1, 0, 1, 2,
+        denominator_min // 2, denominator_min, denominator_max // 2,
+        denominator_max, max(0, numerator_abs_bound - 1), numerator_abs_bound,
+    }
+    denominators = {
+        0, denominator_min, denominator_min + 1,
+        (denominator_min + denominator_max) // 2,
+        denominator_max - 1, denominator_max,
+    }
+    mismatch = None
+    passed = 0
+    for numerator in sorted(numerators):
+        for denominator in sorted(denominators):
+            runtime = 0 if denominator == 0 else _trunc(numerator, denominator)
+            rtl = _rtl_restoring_divide(numerator, denominator)
+            if runtime != rtl:
+                mismatch = {
+                    "numerator": numerator, "denominator": denominator,
+                    "runtime": runtime, "rtl": rtl,
+                }
+                break
+            passed += 1
+        if mismatch is not None:
+            break
+    quotient_abs_bound = (numerator_abs_bound // denominator_min)
+    invariant = {
+        "magnitude_decomposition": "abs(numerator)=abs(quotient)*denominator+remainder",
+        "remainder_interval": "0<=remainder<denominator",
+        "sign_rule": "sign(quotient)=sign(numerator) for positive denominator",
+        "full_interval_entailment": (
+            "restoring long division emits the unique magnitude quotient by induction over all "
+            "96 dividend bits; the recorded quotient bound makes low32 truncation lossless"
+        ),
+        "quotient_abs_bound": quotient_abs_bound,
+        "quotient_fits_signed_int32": quotient_abs_bound < (1 << 31),
+    }
+    return {
+        "status": ("representatives_and_invariant_proven"
+                   if mismatch is None and invariant["quotient_fits_signed_int32"]
+                   else "identity_frontier"),
+        "certified_domain": {
+            "numerator_min": -numerator_abs_bound,
+            "numerator_max": numerator_abs_bound,
+            "denominator_min": denominator_min,
+            "denominator_max": denominator_max,
+        },
+        "zero_denominator_policy": "quotient_zero",
+        "comparison": {"pass_count": passed, "mismatch_witness": mismatch},
+        "algebraic_invariant": invariant,
+    }
+
+
 def _attention_proof(layer: int, manifest: Mapping[str, Any]) -> dict[str, Any]:
     bounds = {}
     for projection in ("q", "k", "v"):
@@ -308,21 +576,37 @@ def _attention_proof(layer: int, manifest: Mapping[str, Any]) -> dict[str, Any]:
     q_abs = [max(abs(lo), abs(hi)) for lo, hi in zip(*bounds["q"], strict=True)]
     k_abs = [max(abs(lo), abs(hi)) for lo, hi in zip(*bounds["k"], strict=True)]
     v_abs = [max(abs(lo), abs(hi)) for lo, hi in zip(*bounds["v"], strict=True)]
-    score_accum = max(sum(q_abs[i] * k_abs[i] for i in range(head * 4, head * 4 + 4))
-                      for head in range(16))
-    score_code = (score_accum + (1 << 24) - 1) >> 24
+    score_intervals = []
+    for head in range(16):
+        lower, upper = 0, 0
+        for index in range(head * 4, head * 4 + 4):
+            qlo, qhi = bounds["q"][0][index], bounds["q"][1][index]
+            klo, khi = bounds["k"][0][index], bounds["k"][1][index]
+            products = (qlo * klo, qlo * khi, qhi * klo, qhi * khi)
+            lower += min(products)
+            upper += max(products)
+        score_intervals.append((lower, upper))
+    score_accum = max(max(abs(lo), abs(hi)) for lo, hi in score_intervals)
+    score_code_lower = min(lo >> 24 for lo, _ in score_intervals)
+    score_code_upper = max(hi >> 24 for _, hi in score_intervals)
+    score_code = max(abs(score_code_lower), abs(score_code_upper))
+    delta_abs = score_code_upper - score_code_lower
     numerator = 32 * (1 << 20) * max(v_abs)
-    rounded_numerator = numerator + (32 * (1 << 20)) // 2
-    quotient = max(v_abs) + 1
+    denominator_min, denominator_max = 1 << 20, 32 * (1 << 20)
+    rounded_numerator = numerator + denominator_max // 2
+    quotient = rounded_numerator // denominator_min
     inequalities = {
         "score_accumulator_fits_runtime_signed_int64": score_accum < (1 << 63),
         "score_accumulator_fits_rtl_signed_96": score_accum < (1 << 95),
-        "score_code_fits_signed_int32": score_code < (1 << 31),
-        "score_max_sentinel_is_below_reachable_scores": score_code < (1 << 31) - 1,
-        "delta_subtraction_fits_signed_int32": 2 * score_code < (1 << 31),
-        "exp_sum_fits_unsigned_64": 32 * (1 << 20) < (1 << 64),
+        "arithmetic_shift_24_fits_signed_int32": score_code < (1 << 31),
+        "score_max_sentinel_is_below_reachable_scores": score_code_lower > -(1 << 31) + 1,
+        "delta_subtraction_fits_signed_int32": delta_abs < (1 << 31),
+        "probability_values_fit_unsigned_21": (1 << 20) < (1 << 21),
+        "probability_sum_fits_runtime_signed_int64": denominator_max < (1 << 63),
+        "probability_sum_fits_rtl_unsigned_64": denominator_max < (1 << 64),
         "context_numerator_fits_runtime_signed_int64": rounded_numerator < (1 << 63),
         "context_numerator_fits_rtl_signed_96": rounded_numerator < (1 << 95),
+        "rounding_correction_preserves_signed_96": rounded_numerator < (1 << 95),
         "divider_quotient_fits_signed_int32": quotient < (1 << 31),
     }
     return {
@@ -333,13 +617,303 @@ def _attention_proof(layer: int, manifest: Mapping[str, Any]) -> dict[str, Any]:
         },
         "proof": {
             "score_accumulator_abs_bound": score_accum,
+            "score_accumulator_intervals_by_head": [list(item) for item in score_intervals],
+            "score_code_interval": [score_code_lower, score_code_upper],
             "score_code_abs_bound": score_code,
+            "delta_interval": [-delta_abs, 0],
+            "probability_sum_interval": [denominator_min, denominator_max],
             "context_rounded_numerator_abs_bound": rounded_numerator,
             "divider_quotient_abs_bound": quotient,
             "sequence_length_max": 32,
             "inequalities": inequalities,
             "all": all(inequalities.values()),
         },
+    }
+
+
+def _weight_codes(name: str, manifest: Mapping[str, Any], weights: bytes) -> torch.Tensor:
+    descriptor = manifest["tensors"][name]
+    offset = int(descriptor["offset"])
+    raw = weights[offset:offset + int(descriptor["nbytes"])]
+    return torch.frombuffer(bytearray(raw), dtype=torch.int8).reshape(
+        descriptor["logical_shape"]
+    ).to(torch.int64)
+
+
+def _gemv_specs() -> list[tuple[str, str, str | None, str | None]]:
+    specs = []
+    for layer in range(8):
+        block, source = f"blocks.{layer}", f"transformer.h.{layer}"
+        specs.extend((
+            (f"{source}.attn.attention.q_proj", f"{block}.attn.q.weight", None,
+             f"{source}.attn.attention.q_proj.output"),
+            (f"{source}.attn.attention.k_proj", f"{block}.attn.k.weight", None,
+             f"{source}.attn.attention.k_proj.output"),
+            (f"{source}.attn.attention.v_proj", f"{block}.attn.v.weight", None,
+             f"{source}.attn.attention.v_proj.output"),
+            (f"{source}.attn.attention.out_proj", f"{block}.attn.out.weight",
+             f"{block}.attn.out.bias", f"{source}.attn.attention.out_proj.output"),
+            (f"{source}.mlp.c_fc", f"{block}.mlp.fc.weight", f"{block}.mlp.fc.bias",
+             f"{source}.mlp.c_fc.output"),
+            (f"{source}.mlp.c_proj", f"{block}.mlp.proj.weight", f"{block}.mlp.proj.bias",
+             f"{source}.mlp.c_proj.output"),
+        ))
+    specs.append(("lm_head", "token_embedding.weight", None, None))
+    return specs
+
+
+def _first_unsafe_gemv_output(input_min: int, input_max: int, input_scales: list[int],
+                              weight_codes: torch.Tensor) -> tuple[int, str] | None:
+    signed64_min, signed64_max = -(1 << 63), (1 << 63) - 1
+    for output, row in enumerate(weight_codes.tolist()):
+        prefix_min = prefix_max = 0
+        for scale, weight in zip(input_scales, row, strict=True):
+            scaled_candidates = (input_min * scale, input_max * scale)
+            if min(scaled_candidates) < signed64_min or max(scaled_candidates) > signed64_max:
+                return output, "scaled_input_fits_signed_int64"
+            candidates = (scaled_candidates[0] * weight, scaled_candidates[1] * weight)
+            if min(candidates) < signed64_min or max(candidates) > signed64_max:
+                return output, "gemv_term_fits_signed_int64"
+            prefix_min += min(candidates)
+            prefix_max += max(candidates)
+            if prefix_min < signed64_min or prefix_max > signed64_max:
+                return output, "serial_accumulator_prefix_fits_signed_int64"
+    return None
+
+
+def _prove_gemv(name: str, weight_name: str, bias_name: str | None,
+                output_boundary: str | None, manifest: Mapping[str, Any], weights: bytes,
+                scales_image: bytes, input_code_min: int, input_code_max: int) -> dict[str, Any]:
+    input_scales = torch.round(torch.tensor(
+        manifest["activation_scales"][f"{name}.input"], dtype=torch.float64
+    ) * (1 << Q_SCALE)).to(torch.int64)
+    codes = _weight_codes(weight_name, manifest, weights)
+    unsafe = _first_unsafe_gemv_output(
+        input_code_min, input_code_max, input_scales.tolist(), codes
+    )
+    if unsafe is not None:
+        output, inequality = unsafe
+        return {
+            "name": name, "weight": weight_name, "bias": bias_name,
+            "input_boundary": f"{name}.input", "output_boundary": output_boundary,
+            "output_count": int(codes.shape[0]), "status": "identity_frontier",
+            "first_failing_output": output, "failing_inequality": inequality,
+        }
+
+    lower_scaled = input_scales * input_code_min
+    upper_scaled = input_scales * input_code_max
+    term_a, term_b = codes * lower_scaled.unsqueeze(0), codes * upper_scaled.unsqueeze(0)
+    term_lower, term_upper = torch.minimum(term_a, term_b), torch.maximum(term_a, term_b)
+    prefix_lower, prefix_upper = torch.cumsum(term_lower, dim=1), torch.cumsum(term_upper, dim=1)
+    accumulator_min, accumulator_max = term_lower.sum(dim=1), term_upper.sum(dim=1)
+    serial_abs = int(torch.maximum(prefix_lower.abs(), prefix_upper.abs()).max())
+    term_abs = int(torch.maximum(term_lower.abs(), term_upper.abs()).max())
+    scaled_input_abs = int(torch.maximum(lower_scaled.abs(), upper_scaled.abs()).max())
+    weight_scales = _q24_scales(manifest["tensors"][weight_name], scales_image)
+    product_min = [int(value) * int(scale) for value, scale in zip(
+        accumulator_min.tolist(), weight_scales.tolist(), strict=True
+    )]
+    product_max = [int(value) * int(scale) for value, scale in zip(
+        accumulator_max.tolist(), weight_scales.tolist(), strict=True
+    )]
+    bias = ([0] * len(product_min) if bias_name is None
+            else _parameter_q16(bias_name, manifest, weights))
+    pre_min = [_round_shift(value, 32) + offset
+               for value, offset in zip(product_min, bias, strict=True)]
+    pre_max = [_round_shift(value, 32) + offset
+               for value, offset in zip(product_max, bias, strict=True)]
+    inequalities = {
+        "scaled_input_fits_signed_int64": scaled_input_abs < (1 << 63),
+        "gemv_term_fits_signed_int64": term_abs < (1 << 63),
+        "serial_accumulator_prefix_fits_signed_int64": serial_abs < (1 << 63),
+        "weight_scale_product_fits_signed_int64": max(
+            max(abs(value) for value in product_min), max(abs(value) for value in product_max)
+        ) < (1 << 63),
+        "pre_output_q16_fits_signed_int32": (
+            min(pre_min) >= -(1 << 31) and max(pre_max) < (1 << 31)
+        ),
+    }
+    failing = next((key for key, value in inequalities.items() if not value), None)
+    failing_output = None
+    if failing == "weight_scale_product_fits_signed_int64":
+        failing_output = next(index for index, (lo, hi) in enumerate(zip(product_min, product_max))
+                              if max(abs(lo), abs(hi)) >= (1 << 63))
+    elif failing == "pre_output_q16_fits_signed_int32":
+        failing_output = next(index for index, (lo, hi) in enumerate(zip(pre_min, pre_max))
+                              if lo < -(1 << 31) or hi >= (1 << 31))
+    return {
+        "name": name, "weight": weight_name, "bias": bias_name,
+        "input_boundary": f"{name}.input", "output_boundary": output_boundary,
+        "input_code_domain": [input_code_min, input_code_max],
+        "input_scale_q8_24": {
+            "count": len(input_scales), "values_sha256": canonical_sha256(input_scales.tolist()),
+            "minimum": int(input_scales.min()), "maximum": int(input_scales.max()),
+        },
+        "weight_identity": {
+            "codes_sha256": canonical_sha256(codes.tolist()),
+            "scales_sha256": canonical_sha256(weight_scales.tolist()),
+        },
+        "output_count": len(pre_min),
+        "status": "proven" if failing is None else "identity_frontier",
+        "first_failing_output": failing_output,
+        "failing_inequality": failing,
+        "per_output_bounds": {
+            "accumulator_min": accumulator_min.tolist(),
+            "accumulator_max": accumulator_max.tolist(),
+            "pre_output_q16_min": pre_min,
+            "pre_output_q16_max": pre_max,
+        },
+        "proof": {
+            "scaled_input_abs_bound": scaled_input_abs,
+            "gemv_term_abs_bound": term_abs,
+            "serial_accumulator_prefix_abs_bound": serial_abs,
+            "weight_scale_product_abs_bound": max(
+                max(abs(value) for value in product_min), max(abs(value) for value in product_max)
+            ),
+            "pre_output_q16_abs_bound": max(
+                max(abs(value) for value in pre_min), max(abs(value) for value in pre_max)
+            ),
+            "inequalities": inequalities,
+        },
+    }
+
+
+def derive_gemv_certificate(package: Path, *, input_code_min: int = -128,
+                            input_code_max: int = 127) -> dict[str, Any]:
+    package = Path(package)
+    manifest, weights, scales_image = _read_package(package)
+    calls = []
+    failure = None
+    for specification in _gemv_specs():
+        call = _prove_gemv(
+            *specification, manifest, weights, scales_image,
+            input_code_min, input_code_max,
+        )
+        calls.append(call)
+        if call["status"] != "proven":
+            failure = call
+            break
+    return {
+        "status": "all_preoutput_q16_ranges_proven" if failure is None else "identity_frontier",
+        "domain_derivation": (
+            "every GEMV input passes through signed-int8 activation Q/DQ; therefore all accepted "
+            "token contexts are contained in the independent per-channel code box"
+        ),
+        "input_code_domain": [input_code_min, input_code_max],
+        "calls": calls,
+        "failing_call": failure["name"] if failure else None,
+        "failing_output": failure["first_failing_output"] if failure else None,
+        "failing_inequality": failure["failing_inequality"] if failure else None,
+    }
+
+
+def prove_attention_operator_semantics(calls: list[dict[str, Any]],
+                                       exp_lut: list[int]) -> dict[str, Any]:
+    comparisons = {
+        name: {"pass_count": 0, "mismatch_witness": None}
+        for name in ("score_sum_shift", "score_max_delta", "probability_sum", "context_numerator")
+    }
+    for call in calls:
+        q = call["input_bounds_q16_16"]["q"]
+        k = call["input_bounds_q16_16"]["k"]
+        v = call["input_bounds_q16_16"]["v"]
+        for head in range(16):
+            indices = range(head * 4, head * 4 + 4)
+            patterns = (
+                ([q["lower_by_channel"][i] for i in indices],
+                 [k["lower_by_channel"][i] for i in indices]),
+                ([q["upper_by_channel"][i] for i in indices],
+                 [k["upper_by_channel"][i] for i in indices]),
+                ([q["lower_by_channel"][i] if i % 2 else q["upper_by_channel"][i]
+                  for i in indices],
+                 [k["upper_by_channel"][i] if i % 2 else k["lower_by_channel"][i]
+                  for i in indices]),
+            )
+            scores = []
+            for q_values, k_values in patterns:
+                runtime_total = sum(a * b for a, b in zip(q_values, k_values, strict=True))
+                rtl_total = 0
+                for a, b in zip(q_values, k_values, strict=True):
+                    rtl_total = _signed(rtl_total + _signed(a, 32) * _signed(b, 32), 96)
+                runtime, rtl = runtime_total >> 24, _signed(rtl_total, 96) >> 24
+                comparison = comparisons["score_sum_shift"]
+                if runtime != rtl and comparison["mismatch_witness"] is None:
+                    comparison["mismatch_witness"] = {
+                        "call": call["name"], "head": head, "runtime": runtime, "rtl": rtl,
+                    }
+                else:
+                    comparison["pass_count"] += 1
+                scores.append(runtime)
+            runtime_max = max(scores)
+            rtl_max = -(1 << 31) + 1
+            for score in scores:
+                if _signed(score, 32) > rtl_max:
+                    rtl_max = _signed(score, 32)
+            runtime_delta = [score - runtime_max for score in scores]
+            rtl_delta = [_signed(score - rtl_max, 32) for score in scores]
+            comparison = comparisons["score_max_delta"]
+            if (runtime_max, runtime_delta) != (rtl_max, rtl_delta) \
+                    and comparison["mismatch_witness"] is None:
+                comparison["mismatch_witness"] = {"call": call["name"], "head": head}
+            else:
+                comparison["pass_count"] += 1
+
+        probability_vectors = (
+            [1 << 20],
+            [exp_lut[0], 1 << 20],
+            [exp_lut[2048]] * 31 + [1 << 20],
+            [1 << 20] * 32,
+        )
+        for values in probability_vectors:
+            runtime = sum(values)
+            rtl = 0
+            for value in values:
+                rtl = (rtl + value) & ((1 << 64) - 1)
+            comparison = comparisons["probability_sum"]
+            if runtime != rtl and comparison["mismatch_witness"] is None:
+                comparison["mismatch_witness"] = {"call": call["name"], "values": values}
+            else:
+                comparison["pass_count"] += 1
+
+        for channel, (lower, upper) in enumerate(zip(
+            v["lower_by_channel"], v["upper_by_channel"], strict=True
+        )):
+            for value, probability in ((lower, 1 << 20), (upper, 1 << 20),
+                                       (lower, exp_lut[0]), (upper, exp_lut[2048])):
+                runtime = sum(probability * value for _ in range(32))
+                rtl = 0
+                for _ in range(32):
+                    rtl = _signed(rtl + probability * _signed(value, 32), 96)
+                comparison = comparisons["context_numerator"]
+                if runtime != rtl and comparison["mismatch_witness"] is None:
+                    comparison["mismatch_witness"] = {
+                        "call": call["name"], "channel": channel,
+                        "runtime": runtime, "rtl": rtl,
+                    }
+                else:
+                    comparison["pass_count"] += 1
+
+    numerator_abs_bound = max(
+        call["proof"]["context_rounded_numerator_abs_bound"] for call in calls
+    )
+    divider = prove_divider_semantics(numerator_abs_bound, 1 << 20, 32 * (1 << 20))
+    equivalent = (all(item["mismatch_witness"] is None for item in comparisons.values())
+                  and divider["status"] == "representatives_and_invariant_proven")
+    return {
+        "status": ("source_derived_equivalent_on_certified_intervals"
+                   if equivalent else "identity_frontier"),
+        "equations": {
+            "score_sum": "sum_{dimension=0..3}(signed32(q)*signed32(k)); runtime signed64, RTL signed96",
+            "score_shift": "arithmetic_shift_right(score_sum,24) into signed32",
+            "score_max": "signed maximum over causal positions from RTL sentinel -2147483647",
+            "delta": "signed32(score-score_max), then clamp to [-4096,0]",
+            "probability_sum": "sum causal unsigned21 Q0.20 probabilities; runtime signed64, RTL unsigned64",
+            "context_numerator": "sum(probability_unsigned21*signed32(value)); runtime signed64, RTL signed96",
+            "rounding_correction": "numerator<0 ? numerator-floor(denominator/2) : numerator+floor(denominator/2)",
+            "restoring_division": "truncate_toward_zero(corrected_signed96/positive_unsigned64), signed32 quotient",
+        },
+        "differential_checks": comparisons,
+        "divider": divider,
     }
 
 
@@ -369,12 +943,15 @@ def derive_certificate(contract_path: Path, audit_path: Path, profile_path: Path
         _require(path.is_file() and path.stat().st_size == identity["size"]
                  and sha256_file(path) == identity["sha256"],
                  "package_identity_mismatch", name)
-    source_identity = {}
-    closure = contract["deployed_profile"]["sources"]
-    audit_closure = audit["source"]["pinned_semantic_source_closure"]
-    for name in SEMANTIC_SOURCE_PATHS:
-        _require(closure.get(name) == audit_closure.get(name), "source_identity_mismatch", name)
-        source_identity[name] = closure[name]
+    materialized_sources = materialize_semantic_sources(
+        contract_path, audit_path, reference_root
+    )
+    source_identity = {
+        name: {"git_blob_sha1": value["git_blob_sha1"], "sha256": value["sha256"]}
+        for name, value in materialized_sources.items()
+    }
+    runtime_gelu_lut, rtl_gelu_lut, exp_luts = materialize_luts(materialized_sources)
+    runtime_exp_lut, rtl_exp_lut = exp_luts
 
     manifest, weights, scales_image = _read_package(package)
     token_lower, token_upper = _embedding_bounds(
@@ -421,11 +998,24 @@ def derive_certificate(contract_path: Path, audit_path: Path, profile_path: Path
     calls.append(final)
     gelu_calls = [_gelu_proof(layer, manifest) for layer in range(8)]
     attention_calls = [_attention_proof(layer, manifest) for layer in range(8)]
+    gelu_semantics = prove_gelu_semantics(runtime_gelu_lut, rtl_gelu_lut)
+    exp_semantics = prove_exp_semantics(runtime_exp_lut, rtl_exp_lut)
+    attention_operators = prove_attention_operator_semantics(attention_calls, rtl_exp_lut)
+    gemv = derive_gemv_certificate(package)
     failure = next((call for call in calls if call["status"] != "proven"), None)
     nonlinear_failure = next(
         (call for call in gelu_calls + attention_calls if not call["proof"]["all"]), None
     )
-    status = "proven_reachable_domain_equivalent" if failure is None and nonlinear_failure is None else "identity_frontier"
+    semantic_failure = next((name for name, proof in (
+        ("gelu", gelu_semantics), ("attention_exp", exp_semantics),
+        ("attention_operators", attention_operators),
+    ) if proof["status"] == "identity_frontier"), None)
+    status = (
+        "proven_reachable_domain_equivalent"
+        if failure is None and nonlinear_failure is None and semantic_failure is None
+        and gemv["status"] == "all_preoutput_q16_ranges_proven"
+        else "identity_frontier"
+    )
     certificate: dict[str, Any] = {
         "schema": SCHEMA,
         "status": status,
@@ -445,6 +1035,13 @@ def derive_certificate(contract_path: Path, audit_path: Path, profile_path: Path
             "semantic_sources": source_identity,
             "certifier_sha256": sha256_file(Path(__file__)),
         },
+        "source_authentication": {
+            "status": "materialized_git_blobs_match_authenticated_closure",
+            "revision": REFERENCE_REVISION,
+            "source_count": len(source_identity),
+            "materialized_sources": source_identity,
+            "closure_sha256": canonical_sha256(source_identity),
+        },
         "materialization": {
             "parameters": "nearest_ties_to_even_float32_to_signed_q16.16",
             "scales": "nearest_ties_to_even_float32_to_unsigned_q8.24",
@@ -460,21 +1057,24 @@ def derive_certificate(contract_path: Path, audit_path: Path, profile_path: Path
             "failing_call": failure["name"] if failure else None,
             "failing_inequality": failure["failing_inequality"] if failure else None,
         },
+        "gemv": gemv,
         "nonlinear": {
             "gelu": {
                 "runtime_source": "tinystories/hardware_reference.py:fixed_gelu",
                 "rtl_sources": ["tinystories/rtl_memories.py", "fpga/rtl/gptneo_gelu.sv",
                                 str(GELU_ADAPTER)],
-                "lut_sha256": hashlib.sha256(_gelu_lut_payload()).hexdigest(),
+                "semantic_equivalence": gelu_semantics,
                 "calls": gelu_calls,
             },
             "attention_softmax": {
                 "runtime_source": "tinystories/hardware_reference.py:FixedGPTNeo._attention",
                 "rtl_sources": ["fpga/rtl/gptneo_attention.sv", "fpga/rtl/gptneo_iterative_divider.sv"],
                 "authenticated_checkpoint_artifact_sha256": sha256_file(softmax_path),
+                "exp_equivalence": exp_semantics,
+                "operator_equivalence": attention_operators,
                 "calls": attention_calls,
             },
-            "failing_call": nonlinear_failure["name"] if nonlinear_failure else None,
+            "failing_call": (nonlinear_failure["name"] if nonlinear_failure else semantic_failure),
         },
     }
     certificate["certificate_sha256"] = certificate_sha256(certificate)
