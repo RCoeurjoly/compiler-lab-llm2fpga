@@ -53,7 +53,48 @@ def repeated_graph(site_count: int = 8) -> str:
     return "module {\n  func.func @main() {\n" + "\n".join(body) + "\n  }\n}\n"
 
 
+def lowered_separate_loop_graph(site_count: int = 8) -> str:
+    """Opaque linalg/SCF-like shape: phases are separate, edges are memory based."""
+    body = []
+    for head in range(site_count):
+        body.extend([
+            f"  scf.for %r{head} = %c0 to %c4 step %c1 {{",
+            f"    %s{head} = memref.load %score_mem{head}[%i{head}] : memref<4xf32>",
+            f"    %m{head} = arith.maximumf %s{head}, %old{head} : f32",
+            f"    memref.store %m{head}, %max_mem{head}[%i{head}] : memref<4xf32>",
+            "  }",
+            f"  scf.for %d{head} = %c0 to %c4 step %c1 {{",
+            f"    %a{head} = memref.load %score_mem{head}[%i{head}] : memref<4xf32>",
+            f"    %b{head} = memref.load %max_mem{head}[%i{head}] : memref<4xf32>",
+            f"    %delta{head} = arith.subf %a{head}, %b{head} : f32",
+            f"    memref.store %delta{head}, %delta_mem{head}[%i{head}] : memref<4xf32>",
+            "  }",
+            f"  scf.for %e{head} = %c0 to %c4 step %c1 {{",
+            f"    %dl{head} = memref.load %delta_mem{head}[%i{head}] : memref<4xf32>",
+            f"    %exp{head} = math.exp %dl{head} : f32",
+            f"    memref.store %exp{head}, %exp_mem{head}[%i{head}] : memref<4xf32>",
+            "  }",
+            f"  scf.for %q{head} = %c0 to %c4 step %c1 {{",
+            f"    %el{head} = memref.load %exp_mem{head}[%i{head}] : memref<4xf32>",
+            f"    %sum{head} = arith.addf %oldsum{head}, %el{head} : f32",
+            f"    %prob{head} = arith.divf %el{head}, %sum{head} : f32",
+            f"    %causal{head} = arith.cmpi sle, %time_index{head}, %position{head} : i32",
+            "  }",
+        ])
+    return "module {\n  func.func @main() {\n" + "\n".join(body) + "\n  }\n}\n"
+
+
 class SoftmaxBridgeTest(unittest.TestCase):
+    def test_lowered_separate_loops_are_bound_by_memref_and_index_identity(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = lowered_separate_loop_graph()
+        descriptor = module.bridge_graph(graph, evidence, source_name="lowered.mlir")
+        self.assertEqual(descriptor["source"]["exp_site_count"], 8)
+        self.assertEqual(descriptor["source"]["binding_mode"], "lowered_memref_loop_structure")
+
     def test_exact_stabilized_attention_pattern_emits_authenticated_custom_op(self):
         evidence = module.load_evidence(
             ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",

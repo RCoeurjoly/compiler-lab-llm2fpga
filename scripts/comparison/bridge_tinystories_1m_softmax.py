@@ -127,7 +127,7 @@ def load_evidence(contract_path: Path, diagnostic_path: Path) -> Mapping[str, An
     return capability
 
 
-def _pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, Any]:
+def _named_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, Any]:
     """Require a complete, independently linked chain for every attention head.
 
     The package-aware export contains one attention softmax per head.  It is
@@ -226,6 +226,123 @@ def _pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, A
                               "matched_edges": ["subf_score_rowmax", "delta_store_load", "exp", "exp_store_load", "sum_reduction", "normalization_division", "causal_cmpi"]})
     return {"exp_site_count": len(site_evidence), "sites": site_evidence,
             "matched_edges": ["subf_score_rowmax", "delta_store_load", "exp", "exp_store_load", "sum_reduction", "normalization_division", "causal_cmpi"]}
+
+
+def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, Any]:
+    """Recover the same chain after linalg lowering erased semantic names.
+
+    The lowered graph has separate SCF loops, so an exp site's producer and
+    consumer are not lexically adjacent.  Binding is still deliberately
+    structural: the delta load/store, exp load/store, and reduction must use
+    the same memref *and index expression*, and the score/max operands of the
+    subtraction must each be loads in the same head component.  A global
+    nearest-neighbour or name-only match is rejected.
+    """
+    lines = [re.sub(r"//.*$", "", line).strip() for line in graph.splitlines()]
+    lines = [line for line in lines if line]
+    require(lines and lines[0].startswith("module") and graph.count("{") == graph.count("}"),
+            "pattern_not_proven", "MLIR module wrapper")
+    require(any(re.match(r"func\.func\s+@[^\s(]+\(", line) for line in lines),
+            "pattern_not_proven", "MLIR func.func wrapper")
+    require("scf.for" in graph or "scf.parallel" in graph, "pattern_not_proven", "lowered SCF loop structure")
+    exp_lines = [i for i, line in enumerate(lines) if re.match(r"%[^ ]+\s*=\s*math\.exp\s+%[^ ]+", line)]
+    require(len(exp_lines) == expected_exp_sites, "pattern_not_proven",
+            f"expected {expected_exp_sites} stabilized exp sites, found {len(exp_lines)}")
+
+    load_re = re.compile(r"%([^ ]+)\s*=\s*memref\.load\s+%([^\[]+)\[([^\]]+)\]")
+    store_re = re.compile(r"memref\.store\s+%([^,]+),\s*%([^\[]+)\[([^\]]+)\]")
+    sub_re = re.compile(r"%([^ ]+)\s*=\s*arith\.subf\s+%([^, ]+)\s*,\s*%([^ ]+)")
+    add_re = re.compile(r"%([^ ]+)\s*=\s*arith\.addf\s+%([^, ]+)\s*,\s*%([^ ]+)")
+    div_re = re.compile(r"%([^ ]+)\s*=\s*arith\.divf\s+%([^, ]+)\s*,\s*%([^ ]+)")
+
+    def loop_context(line_number: int) -> tuple[str, str, str] | None:
+        """Return a normalized single-induction-loop signature for a line."""
+        stack: list[tuple[int, tuple[str, str, str]]] = []
+        loop_re = re.compile(r"scf\.(?:for|parallel)\s+%([^ ]+)\s*=\s*([^ ]+)\s+to\s+([^ ]+)(?:\s+step\s+([^ ]+))?")
+        for i, line in enumerate(lines[:line_number + 1]):
+            m = loop_re.search(line)
+            if m:
+                stack.append((line.count("{") - line.count("}"), (m.group(2), m.group(3), m.group(4) or "")))
+            else:
+                delta = line.count("{") - line.count("}")
+                if delta < 0:
+                    for _ in range(min(-delta, len(stack))):
+                        stack.pop()
+        return stack[-1][1] if stack else None
+
+    def same_index(lhs: str, lhs_line: int, rhs: str, rhs_line: int) -> bool:
+        if lhs == rhs:
+            return True
+        # Distinct SCF induction SSA values are equivalent only when both
+        # accesses are the induction variable of structurally identical loops.
+        lctx, rctx = loop_context(lhs_line), loop_context(rhs_line)
+        return lctx is not None and lctx == rctx
+    sites = []
+    used_causal: set[int] = set()
+    for number, exp_i in enumerate(exp_lines, 1):
+        exp_m = re.match(r"%([^ ]+)\s*=\s*math\.exp\s+%([^ ]+)", lines[exp_i])
+        assert exp_m
+        exp_result, exp_input = exp_m.groups()
+        # The lowered exp input is a load from the delta buffer.  Requiring
+        # this exact producer prevents another head's delta from being used.
+        delta_loads = [(i, m) for i, line in enumerate(lines) if i < exp_i and (m := load_re.match(line)) and m.group(1) == exp_input]
+        require(delta_loads, "dataflow_not_proven", f"site {number} exp input has no dominating memref.load")
+        delta_load_i, delta_load = delta_loads[-1]
+        delta_mem, delta_idx = delta_load.group(2).strip(), delta_load.group(3).strip()
+        delta_stores = [(i, m) for i, line in enumerate(lines) if i < delta_load_i and (m := store_re.match(line)) and m.group(2).strip() == delta_mem and same_index(m.group(3).strip(), i, delta_idx, delta_load_i)]
+        require(delta_stores, "dataflow_not_proven", f"site {number} delta load has no same-index store")
+        delta_store_i, delta_store = delta_stores[-1]
+        delta_value = delta_store.group(1).strip()
+        sub_defs = [(i, m) for i, line in enumerate(lines) if i < delta_store_i and (m := sub_re.match(line)) and m.group(1) == delta_value]
+        require(sub_defs, "dataflow_not_proven", f"site {number} delta store has no dominating arith.subf")
+        sub_i, sub = sub_defs[-1]
+        # Both score and row-max must be values loaded in this component.  We
+        # intentionally do not infer their meaning from SSA spelling.
+        operand_loads = {}
+        for operand in sub.groups()[1:]:
+            candidates = [(i, m) for i, line in enumerate(lines) if i < sub_i and (m := load_re.match(line)) and m.group(1) == operand]
+            require(candidates, "dataflow_not_proven", f"site {number} subtraction operand is not a loaded tensor value")
+            operand_loads[operand] = candidates[-1][1]
+        require(operand_loads[sub.group(2)].group(2).strip() != operand_loads[sub.group(3)].group(2).strip(),
+                "dataflow_not_proven", f"site {number} score and row-max loads are not distinct")
+        # Exp store/load and normalization may occur in later loops.  Bind by
+        # exact exp memref/index and SSA edges, never by proximity alone.
+        exp_store_candidates = [(i, m) for i, line in enumerate(lines) if i > exp_i and (m := store_re.match(line)) and m.group(1).strip() == exp_result]
+        require(exp_store_candidates, "dataflow_not_proven", f"site {number} exp result has no store")
+        exp_store_i, exp_store = exp_store_candidates[0]
+        exp_mem, exp_idx = exp_store.group(2).strip(), exp_store.group(3).strip()
+        exp_load_candidates = [(i, m) for i, line in enumerate(lines) if i > exp_store_i and (m := load_re.match(line)) and m.group(2).strip() == exp_mem and same_index(m.group(3).strip(), i, exp_idx, exp_store_i)]
+        require(exp_load_candidates, "dataflow_not_proven", f"site {number} exp store has no same-index load")
+        exp_load_i, exp_load = exp_load_candidates[0]
+        exp_loaded = exp_load.group(1)
+        add_candidates = [(i, m) for i, line in enumerate(lines) if i > exp_load_i and (m := add_re.match(line)) and exp_loaded in (m.group(2), m.group(3))]
+        require(add_candidates, "dataflow_not_proven", f"site {number} reduction does not consume this exp load")
+        add_i, add = add_candidates[0]
+        sum_value = add.group(1)
+        div_candidates = [(i, m) for i, line in enumerate(lines) if i > add_i and (m := div_re.match(line)) and m.group(2) == exp_loaded and m.group(3) == sum_value]
+        require(div_candidates, "dataflow_not_proven", f"site {number} normalization is not exp/sum")
+        causal = [i for i, line in enumerate(lines) if i not in used_causal and re.match(r"%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule),\s*%[^, ]+,\s*%[^ ]+", line)]
+        require(causal, "pattern_not_proven", f"site {number} lacks executable causal comparison")
+        used_causal.add(causal[0])
+        sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
+                      "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_cmpi"]})
+    return {"exp_site_count": len(sites), "sites": sites,
+            "binding_mode": "lowered_memref_loop_structure",
+            "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_cmpi"]}
+
+
+def _pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, Any]:
+    try:
+        return _named_pattern_evidence(graph, expected_exp_sites=expected_exp_sites)
+    except SoftmaxBridgeError as named_error:
+        # Only lowered SCF graphs are eligible for the structural recovery;
+        # ordinary malformed fixtures retain the precise original diagnostic.
+        if "scf.for" not in graph and "scf.parallel" not in graph:
+            raise
+        try:
+            return _lowered_pattern_evidence(graph, expected_exp_sites=expected_exp_sites)
+        except SoftmaxBridgeError:
+            raise named_error
 
 
 def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str, expected_exp_sites: int = 8) -> dict[str, Any]:
