@@ -864,9 +864,16 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                 if not same_affine_index(true_entry[1].group(3), true_entry[0],
                                          store.group(3), store_i):
                     continue
+                if (loop_contexts(true_entry[0]) != loop_contexts(i) or
+                        loop_contexts(store_i) != loop_contexts(i)):
+                    continue
                 pred_entry = next(((k, m) for k, candidate in reversed(list(enumerate(lines[:i])))
                                    if (m := load_re.match(candidate)) and m.group(1) == select.group(2)), None)
                 if pred_entry is None or not re.search(r":\s*memref<[^>]*i1", lines[pred_entry[0]]):
+                    continue
+                pred_deps = index_dependencies(pred_entry[1].group(3), pred_entry[0])
+                true_deps = index_dependencies(true_entry[1].group(3), true_entry[0])
+                if not pred_deps or not pred_deps.issubset(true_deps):
                     continue
                 fallback = select.group(4).lstrip("%")
                 fallback_load = next((m for candidate in reversed(lines[:i])
@@ -875,10 +882,11 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                 if fallback_load is not None:
                     global_name = next((m.group(1) for candidate in reversed(lines[:i])
                                         if (m := re.match(rf"%{re.escape(fallback_load.group(1).lstrip('%'))}\s*=\s*memref\.get_global\s+@([^ ]+)", candidate))), None)
-                    fallback_zero = global_name is not None and any(
-                        re.search(rf"memref\.global .*@{re.escape(global_name)}\b", decl) and
-                        ("dense<-3.40282347E+38>" in decl or "dense<0.000000e+00>" in decl)
-                        for decl in lines[:function_start])
+                    declarations = [decl for decl in lines[:function_start]
+                                    if re.search(rf"memref\.global .*@{re.escape(global_name or '')}\b", decl)]
+                    fallback_zero = (global_name is not None and len(declarations) == 1 and
+                                     ("dense<-3.40282347E+38>" in declarations[0] or
+                                      "dense<0.000000e+00>" in declarations[0]))
                 if fallback_zero:
                     causal.append(i)
                     break
