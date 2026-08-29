@@ -140,11 +140,12 @@ def _score_row_oracle(bundle: Any, block_index: int) -> dict[str, Any]:
         shifted = torch.where(causal_mask, masked_scores - row_max, torch.zeros_like(scores))
         exp_shifted = torch.where(causal_mask, torch.exp(shifted), torch.zeros_like(scores))
         probabilities = torch.softmax(masked_scores, dim=-1)
+        shifted_valid = shifted[causal_mask]
         exp_valid = exp_shifted[causal_mask]
         # Exercise the existing RTL candidate on exactly the score domain fed
         # to a numerically stable softmax.  This remains a software comparison.
         qexp = _load_qexp()
-        qexp_values = [qexp.q_exp_approx(float(value))[0] for value in exp_valid]
+        qexp_values = [qexp.q_exp_approx(float(value))[0] for value in shifted_valid]
         qexp_tensor = torch.tensor(qexp_values, dtype=torch.float64)
         reference_exp = exp_valid.to(torch.float64)
         error = (qexp_tensor - reference_exp).abs()
@@ -181,7 +182,13 @@ def _score_row_oracle(bundle: Any, block_index: int) -> dict[str, Any]:
                 "max_relative_error": float(relative.max().item()),
                 "worst_case_index": int(error.argmax().item()),
                 "sample_count": int(error.numel()),
-                "comparison": "software-only against exp(score - row_max); not QDQ/RTL/hardware equivalence",
+                "zero_shift_check": {
+                    "input": 0.0,
+                    "candidate": float(qexp.q_exp_approx(0.0)[0]),
+                    "reference": 1.0,
+                    "absolute_error": abs(float(qexp.q_exp_approx(0.0)[0]) - 1.0),
+                },
+                "comparison": "software-only q_exp(score - row_max) against exp(score - row_max); not QDQ/RTL/hardware equivalence",
             },
             "final_prompt_token_index": sequence - 1,
             "frozen_next_token": contract.get("reference", {}).get("tokens", [None])[0],

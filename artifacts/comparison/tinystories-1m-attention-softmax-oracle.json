@@ -24,7 +24,7 @@
     "sequence": "frozen contract prompt only; final prompt row is the next-token step",
     "trace": "complete causal score and softmax rows for block 0 prompt token-step"
   },
-  "sha256": "728723964662129809dbda56a61e7a7626c0635f3cd5ed6e8cefc19e39a7b640",
+  "sha256": "0fd4b60df44989c4603f508ce6481a279d87336d6cb37cf27a3eda419bf2a7f6",
   "status": "supplementary_non_authoritative",
   "trace": {
     "block_index": 0,
@@ -64,13 +64,19 @@
     ],
     "q_exp_candidate": {
       "candidate_implementation_sha256": "0caa9d132fd9f73684dc0879cbf3271e760ccc15afa0ce4d8b7e2a0bccf9f052",
-      "comparison": "software-only against exp(score - row_max); not QDQ/RTL/hardware equivalence",
-      "max_absolute_error": 1.70831298828125,
-      "max_relative_error": 23.179048894195432,
+      "comparison": "software-only q_exp(score - row_max) against exp(score - row_max); not QDQ/RTL/hardware equivalence",
+      "max_absolute_error": 1.6427311599254608,
+      "max_relative_error": 38.042100286760366,
       "rtl_path": "task3-main/rtl/fp/circt_fp_primitives.sv",
       "rtl_sha256": "e125c75bebf5c7afc83d74618ef99cf559e8054faa767a1b79060f9092dacb75",
       "sample_count": 160,
-      "worst_case_index": 0
+      "worst_case_index": 113,
+      "zero_shift_check": {
+        "absolute_error": 0.0,
+        "candidate": 1.0,
+        "input": 0.0,
+        "reference": 1.0
+      }
     },
     "rows": [
       {

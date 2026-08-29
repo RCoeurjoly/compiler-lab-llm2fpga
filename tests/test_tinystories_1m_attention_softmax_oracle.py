@@ -84,6 +84,12 @@ class AttentionOracleArtifactTest(unittest.TestCase):
         self.assertEqual(candidate["sample_count"], domains["exp_shifted"]["count"])
         self.assertGreaterEqual(candidate["max_absolute_error"], 0.0)
         self.assertIn("software-only", candidate["comparison"])
+        # At least one legal score is exactly the row maximum.  The candidate
+        # must receive the shifted score (zero), not an already exponentiated
+        # value, and therefore agree with exp(0) exactly.
+        self.assertEqual(candidate["zero_shift_check"], {
+            "input": 0.0, "candidate": 1.0, "reference": 1.0, "absolute_error": 0.0,
+        })
 
     @unittest.skipUnless(PACKAGE.is_dir() and MODEL.is_dir(), "authenticated package/model unavailable")
     def test_rebuilding_is_deterministic(self):
