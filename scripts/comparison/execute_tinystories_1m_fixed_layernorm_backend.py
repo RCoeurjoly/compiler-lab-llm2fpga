@@ -16,13 +16,20 @@ import importlib.util
 import os
 import json
 import shutil
+import re
 from pathlib import Path
 from typing import Any, Mapping
 
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_SCRIPT = ROOT / "scripts/comparison/lower_tinystories_1m_fixed_layernorm_backend.py"
-BACKEND_SCRIPT_SHA256 = ""  # filled by the generator below; checked by tests when pinned
+BACKEND_REPORT = ROOT / "artifacts/comparison/tinystories-1m-fixed-layernorm-backend.json"
+CALYX_ARTIFACT = ROOT / "artifacts/comparison/tinystories-1m-fixed-layernorm-backend.calyx.mlir"
+VECTOR_ARTIFACT = ROOT / "artifacts/reference/tinystories-1m-rtl-layernorm-vector.json"
+BACKEND_SCRIPT_SHA256 = "b6b6cb9e75dcac5167dd2d62183370358825619968fc7e27ac6750abd26a975f"
+BACKEND_REPORT_SHA256 = "4b08c452633eea583edcf2426d5525e2176ff75563f6d312dc4e6df92487ce85"
+CALYX_ARTIFACT_SHA256 = "0f2d1097b59f45d6de948eac5e888900bb9eded2fd0697b8416c918e9bb74d53"
+VECTOR_ARTIFACT_SHA256 = "750007e58f6303cbb0fe3b67c7a424d3d28ebd4c8bf4fc0428c3181c356c4c5e"
 
 
 class ExecutionProbeError(ValueError):
@@ -56,23 +63,44 @@ def _load_backend_module() -> Any:
 def load_inputs(backend_report_path: Path, calyx_path: Path, vector_path: Path) -> dict[str, Any]:
     """Authenticate the exact Task 3q artifact and Task 3o vector."""
 
-    backend = json.loads(backend_report_path.read_text(encoding="utf-8"))
+    paths = {
+        "backend_report": (Path(backend_report_path), BACKEND_REPORT, BACKEND_REPORT_SHA256),
+        "calyx": (Path(calyx_path), CALYX_ARTIFACT, CALYX_ARTIFACT_SHA256),
+        "vector": (Path(vector_path), VECTOR_ARTIFACT, VECTOR_ARTIFACT_SHA256),
+    }
+    for label, (actual, canonical, expected_hash) in paths.items():
+        if actual.resolve() != canonical.resolve():
+            raise ExecutionProbeError(f"{label}_path_not_canonical: {actual}")
+        if sha256_file(actual) != expected_hash:
+            raise ExecutionProbeError(f"{label}_identity_mismatch")
+    if sha256_file(BACKEND_SCRIPT) != BACKEND_SCRIPT_SHA256:
+        raise ExecutionProbeError("backend_script_identity_mismatch")
+    try:
+        backend = json.loads(backend_report_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ExecutionProbeError(f"backend_report_invalid: {error}") from error
     if not isinstance(backend, dict):
         raise ExecutionProbeError("backend_report_invalid: expected object")
     if backend.get("sha256") != canonical_sha256({k: v for k, v in backend.items() if k != "sha256"}):
         raise ExecutionProbeError("backend_report_hash_mismatch")
-    try:
-        calyx_bytes = calyx_path.read_bytes()
-    except OSError as error:
-        raise ExecutionProbeError(f"missing_artifact: {calyx_path}: {error}") from error
+    calyx_bytes = calyx_path.read_bytes()
     expected_calyx = backend.get("compiler_artifacts", {}).get("calyx", {}).get("sha256")
     if expected_calyx != sha256_bytes(calyx_bytes):
         raise ExecutionProbeError("calyx_artifact_hash_mismatch")
-    vector = json.loads(vector_path.read_text(encoding="utf-8"))
+    try:
+        vector = json.loads(vector_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ExecutionProbeError(f"vector_report_invalid: {error}") from error
     if not isinstance(vector, dict) or vector.get("sha256") != canonical_sha256({k: v for k, v in vector.items() if k != "sha256"}):
         raise ExecutionProbeError("vector_report_hash_mismatch")
     if backend.get("model") != "TinyStories-1M":
         raise ExecutionProbeError("backend_model_mismatch")
+    if backend.get("schema") != "tinystories-1m-fixed-layernorm-backend-v1":
+        raise ExecutionProbeError("backend_schema_mismatch")
+    if backend.get("compiler_artifacts", {}).get("calyx", {}).get("path") != "artifacts/comparison/tinystories-1m-fixed-layernorm-backend.calyx.mlir":
+        raise ExecutionProbeError("backend_calyx_path_binding_mismatch")
+    if vector.get("schema") != "tinystories-1m-rtl-layernorm-vector-v1":
+        raise ExecutionProbeError("vector_schema_mismatch")
     if "llm2fpga.fixed_layer_norm_q16_16" in calyx_bytes.decode("utf-8"):
         raise ExecutionProbeError("calyx_custom_op_not_eliminated")
     return {"backend": backend, "calyx": calyx_bytes.decode("utf-8"), "vector": vector}
@@ -85,9 +113,13 @@ def _tool(path_or_name: str | None, names: tuple[str, ...]) -> dict[str, Any]:
 
 
 def external_memory_inventory(calyx_mlir: str) -> dict[str, int]:
+    declarations = re.findall(
+        r"calyx\.seq_mem\s+@[^\s]+\s+<\[(\d+)\]\s+x\s+(\d+)>\s+\[\d+\]\s+\{external = true\}",
+        calyx_mlir,
+    )
     return {
-        "external_memories": calyx_mlir.count("{external = true}"),
-        "external_64x32_memories": calyx_mlir.count("<[64] x 32>"),
+        "external_memories": len(declarations),
+        "external_64x32_memories": sum(depth == "64" and width == "32" for depth, width in declarations),
     }
 
 
@@ -112,7 +144,7 @@ def build_report(inputs: Mapping[str, Any], *, calyx_bin: str | None = None, fud
             "target": "calyx_execution",
             "reason": "no Calyx executable was available to execute or emit a simulator for the authenticated Calyx MLIR",
         }
-    elif memories["external_memories"] != 4 or memories["external_64x32_memories"] < 8:
+    elif memories["external_memories"] != 4 or memories["external_64x32_memories"] != 4:
         boundary = {
             "code": "calyx_artifact_memory_interface_unrecognized",
             "target": "external_memory_harness",
@@ -145,12 +177,18 @@ def build_report(inputs: Mapping[str, Any], *, calyx_bin: str | None = None, fud
             "calyx_sha256": sha256_bytes(calyx.encode()),
             "vector_sha256": sha256_file(Path(inputs["vector_path"])),
             "backend_calyx_sha256": backend["compiler_artifacts"]["calyx"]["sha256"],
+            "backend_script_sha256": BACKEND_SCRIPT_SHA256,
+            "canonical_paths": True,
         },
         "provenance": {
             "reference_role": "content_authenticated_behavioral_oracle_only",
             "reference_source_or_rtl_copied": False,
             "compiler_source": "LLM2FPGA",
             "llm_assistance_disclosure_required": True,
+        },
+        "runtime_environment": {
+            "kind": "nix_develop" if os.environ.get("IN_NIX_SHELL") else "unspecified",
+            "tool_paths_recorded": True,
         },
     }
 

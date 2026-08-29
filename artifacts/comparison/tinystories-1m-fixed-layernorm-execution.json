@@ -2,12 +2,14 @@
   "evidence": {
     "backend_calyx_sha256": "0f2d1097b59f45d6de948eac5e888900bb9eded2fd0697b8416c918e9bb74d53",
     "backend_report_sha256": "4b08c452633eea583edcf2426d5525e2176ff75563f6d312dc4e6df92487ce85",
+    "backend_script_sha256": "b6b6cb9e75dcac5167dd2d62183370358825619968fc7e27ac6750abd26a975f",
     "calyx_sha256": "0f2d1097b59f45d6de948eac5e888900bb9eded2fd0697b8416c918e9bb74d53",
+    "canonical_paths": true,
     "vector_sha256": "750007e58f6303cbb0fe3b67c7a424d3d28ebd4c8bf4fc0428c3181c356c4c5e"
   },
   "execution": {
     "external_memory_inventory": {
-      "external_64x32_memories": 8,
+      "external_64x32_memories": 4,
       "external_memories": 4
     },
     "first_unsupported_operation": {
@@ -26,8 +28,8 @@
         "path": null
       },
       "verilator": {
-        "available": false,
-        "path": null
+        "available": true,
+        "path": "/nix/store/7mil9l34vfbvmh0cm6wvbdapwv77bz9v-verilator-5.022/bin/verilator"
       }
     }
   },
@@ -181,7 +183,11 @@
     "reference_role": "content_authenticated_behavioral_oracle_only",
     "reference_source_or_rtl_copied": false
   },
+  "runtime_environment": {
+    "kind": "nix_develop",
+    "tool_paths_recorded": true
+  },
   "schema": "tinystories-1m-fixed-layernorm-backend-execution-v1",
-  "sha256": "b4d92625cb98c95d182d04fbf42c2371b3d22956da8b03fa6bfe56dd1cafad25",
+  "sha256": "7b9f15352edfa5e1112819a4c61c663eb09ade5ec4bf4401fabfe3d203d269e3",
   "status": "unsupported"
 }
