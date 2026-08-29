@@ -32,7 +32,9 @@ class LayerNormSemanticsTest(unittest.TestCase):
         self.assertEqual(receipt["status"], "incomplete")
         self.assertIsNone(receipt["selected_profile"])
         self.assertEqual(receipt["receipt_sha256"], self.module.receipt_sha256(receipt))
-        self.assertIn("layernorm_overflow_domain_conflict", {item["code"] for item in receipt["conflicts"]})
+        codes = {item["code"] for item in receipt["conflicts"]}
+        self.assertIn("layernorm_overflow_domain_conflict", codes)
+        self.assertIn("layernorm_affine_output_width_conflict", codes)
 
     def test_rederive_matches_checked_in_receipt(self):
         expected = json.loads(RECEIPT.read_text())
@@ -61,6 +63,21 @@ class LayerNormSemanticsTest(unittest.TestCase):
         self.assertEqual(probe["input_pattern"], "alternating_plus_minus_one_q16.16")
         self.assertEqual(probe["sha256"], self.module.canonical_sha256(probe["output"]))
         self.assertEqual(receipt["checkpoint_trace"]["authority"], "content_authenticated_fixed_runtime_not_board_authenticated")
+
+    def test_executable_reduction_overflow_witness_runs_runtime_and_independent_rtl_model(self):
+        witness = self.module.overflow_witness(REFERENCE)
+        self.assertEqual(witness["input_q16_16"], [-2**31, 2**31 - 1] * 32)
+        self.assertEqual(witness["runtime"], {"status": "raised", "exception": "ValueError: isqrt() argument must be nonnegative"})
+        rtl = witness["independent_rtl_width_model"]
+        self.assertEqual(rtl["variance_64"], 4611686016279947206)
+        self.assertEqual(rtl["normalized_first_two"], [-65536, 65536])
+
+    def test_affine_output_width_witness_cannot_be_promoted_to_equivalence(self):
+        witness = self.module.affine_overflow_witness()
+        self.assertEqual(witness["normalized_q16_16"], [-370727, 370727])
+        self.assertEqual(witness["gamma_q16_16"], 2**31 - 1)
+        self.assertEqual(witness["runtime_int64_affine_output"], [-12147982331, 12147982330])
+        self.assertEqual(witness["rtl_signed_int32_out_y"], [736919557, -736919558])
 
 
 if __name__ == "__main__":

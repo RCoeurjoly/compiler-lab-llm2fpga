@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import importlib
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -93,6 +94,70 @@ def _runtime_probe(reference_root: Path) -> dict[str, Any]:
     return {"input_pattern": "alternating_plus_minus_one_q16.16", "output": payload, "sha256": canonical_sha256(payload)}
 
 
+def _trunc_toward_zero(numerator: int, denominator: int) -> int:
+    quotient = abs(numerator) // abs(denominator)
+    return -quotient if (numerator < 0) != (denominator < 0) else quotient
+
+
+def _wrap_signed(value: int, width: int) -> int:
+    unsigned = value & ((1 << width) - 1)
+    return unsigned - (1 << width) if unsigned & (1 << (width - 1)) else unsigned
+
+
+def overflow_witness(reference_root: Path) -> dict[str, Any]:
+    """Run the oracle and an independently written model of declared RTL widths."""
+    path = reference_root / "tinystories/hardware_reference.py"
+    root = str(reference_root.resolve())
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    sys.modules.pop("tinystories.hardware_reference", None)
+    runtime = importlib.import_module("tinystories.hardware_reference")
+    if Path(runtime.__file__).resolve() != path.resolve():
+        raise LayerNormEvidenceError("module_origin_mismatch", str(runtime.__file__))
+    values = [-2**31, 2**31 - 1] * 32
+    array = np.asarray(values, dtype=np.int64)
+    try:
+        runtime.fixed_layer_norm(array, np.full(64, 65536, dtype=np.int64), np.zeros(64, dtype=np.int64))
+    except Exception as error:  # Exact runtime exception is evidence, not a replacement model.
+        runtime_result: dict[str, Any] = {"status": "raised", "exception": f"{type(error).__name__}: {error}"}
+    else:
+        runtime_result = {"status": "accepted_unexpectedly"}
+
+    # Independent arithmetic model of the RTL declarations: 33-bit deltas,
+    # 66-bit squares, a 72-bit serial sum, then assignment to unsigned 64-bit
+    # variance.  It intentionally does not reuse the reference implementation.
+    mean = _trunc_toward_zero(sum(values), 64)
+    deltas = [value - mean for value in values]
+    square_sum_72 = sum(abs(delta) * abs(delta) for delta in deltas) & ((1 << 72) - 1)
+    variance_64 = ((square_sum_72 // 64) + 42950) & ((1 << 64) - 1)
+    deviation = math.isqrt(variance_64)
+    normalized = [_trunc_toward_zero(delta << 16, deviation) for delta in deltas]
+    rtl_result = {
+        "mean": mean,
+        "square_sum_72": square_sum_72,
+        "variance_64": variance_64,
+        "deviation_floor_sqrt": deviation,
+        "normalized_first_two": normalized[:2],
+    }
+    return {"input_q16_16": values, "runtime": runtime_result, "independent_rtl_width_model": rtl_result}
+
+
+def affine_overflow_witness() -> dict[str, Any]:
+    """Show the output-width conflict after legal normalized values reach affine."""
+    normalized = [-370727, 370727]
+    gamma = 2**31 - 1
+    beta = 0
+    runtime = [((value * gamma) >> 16) + beta for value in normalized]
+    rtl = [_wrap_signed(value, 32) for value in runtime]
+    return {
+        "normalized_q16_16": normalized,
+        "gamma_q16_16": gamma,
+        "beta_q16_16": beta,
+        "runtime_int64_affine_output": runtime,
+        "rtl_signed_int32_out_y": rtl,
+    }
+
+
 def derive_receipt(reference_root: Path, qdq_profile: Path) -> dict[str, Any]:
     sources = authenticate_sources(reference_root)
     if not qdq_profile.is_file() or _sha256(qdq_profile) != QDQ_PROFILE_SHA256:
@@ -114,6 +179,8 @@ def derive_receipt(reference_root: Path, qdq_profile: Path) -> dict[str, Any]:
 
     candidate_trace = json.loads(qdq_profile.read_text(encoding="utf-8"))["software_trace"]
     runtime_probe = _runtime_probe(reference_root)
+    reduction_overflow = overflow_witness(reference_root)
+    affine_overflow = affine_overflow_witness()
     return {
         "schema": SCHEMA,
         "version": 1,
@@ -158,7 +225,15 @@ def derive_receipt(reference_root: Path, qdq_profile: Path) -> dict[str, Any]:
                 "runtime": "variance products and reduction are NumPy signed int64 and can wrap for legal int32 Q16.16 inputs",
                 "rtl": "delta squares and their serial sum retain 66/72 bits before a distinct 64-bit variance truncation",
                 "witness_domain": "a row containing both -2147483648 and 2147483647 is legal at the declared ports and exercises different intermediate widths",
+                "executable_witness": reduction_overflow,
                 "effect": "no one full-domain bit-exact LayerNorm lowering may be selected from these two authorities",
+            },
+            {
+                "code": "layernorm_affine_output_width_conflict",
+                "runtime": "the fixed runtime retains its affine result as NumPy signed int64",
+                "rtl": "out_y is signed 32-bit and assignment truncates/wraps without saturation",
+                "executable_witness": affine_overflow,
+                "effect": "the authorities differ even after normalized Q16.16 values are supplied directly to gamma/beta affine",
             },
             {
                 "code": "board_checkpoint_authority_missing",
@@ -167,6 +242,7 @@ def derive_receipt(reference_root: Path, qdq_profile: Path) -> dict[str, Any]:
         ],
         "incomplete_reasons": [
             "A board-bound LayerNorm trace and an approved resolution of the runtime/RTL overflow-domain conflict are required before selecting a compiler profile.",
+            "The affine output-width conflict must also be resolved or constrained by an approved input-domain proof.",
             "This receipt does not authorize copying reference source or RTL into compiler output.",
         ],
     }

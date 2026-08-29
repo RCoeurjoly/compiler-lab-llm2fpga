@@ -220,9 +220,113 @@
     {
       "code": "layernorm_overflow_domain_conflict",
       "effect": "no one full-domain bit-exact LayerNorm lowering may be selected from these two authorities",
+      "executable_witness": {
+        "independent_rtl_width_model": {
+          "deviation_floor_sqrt": 2147483647,
+          "mean": 0,
+          "normalized_first_two": [
+            -65536,
+            65536
+          ],
+          "square_sum_72": 295147905041913872416,
+          "variance_64": 4611686016279947206
+        },
+        "input_q16_16": [
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647,
+          -2147483648,
+          2147483647
+        ],
+        "runtime": {
+          "exception": "ValueError: isqrt() argument must be nonnegative",
+          "status": "raised"
+        }
+      },
       "rtl": "delta squares and their serial sum retain 66/72 bits before a distinct 64-bit variance truncation",
       "runtime": "variance products and reduction are NumPy signed int64 and can wrap for legal int32 Q16.16 inputs",
       "witness_domain": "a row containing both -2147483648 and 2147483647 is legal at the declared ports and exercises different intermediate widths"
+    },
+    {
+      "code": "layernorm_affine_output_width_conflict",
+      "effect": "the authorities differ even after normalized Q16.16 values are supplied directly to gamma/beta affine",
+      "executable_witness": {
+        "beta_q16_16": 0,
+        "gamma_q16_16": 2147483647,
+        "normalized_q16_16": [
+          -370727,
+          370727
+        ],
+        "rtl_signed_int32_out_y": [
+          736919557,
+          -736919558
+        ],
+        "runtime_int64_affine_output": [
+          -12147982331,
+          12147982330
+        ]
+      },
+      "rtl": "out_y is signed 32-bit and assignment truncates/wraps without saturation",
+      "runtime": "the fixed runtime retains its affine result as NumPy signed int64"
     },
     {
       "code": "board_checkpoint_authority_missing",
@@ -250,9 +354,10 @@
   },
   "incomplete_reasons": [
     "A board-bound LayerNorm trace and an approved resolution of the runtime/RTL overflow-domain conflict are required before selecting a compiler profile.",
+    "The affine output-width conflict must also be resolved or constrained by an approved input-domain proof.",
     "This receipt does not authorize copying reference source or RTL into compiler output."
   ],
-  "receipt_sha256": "8e982d1009e16d6d27f5d3ed920395bb30a5f0e43e3094038b118f60fa562d89",
+  "receipt_sha256": "44bdd11a2e52831006c1eca6345916f248b94797d9fd2020c7b1f150530a0278",
   "runtime_probe": {
     "input_pattern": "alternating_plus_minus_one_q16.16",
     "output": {
