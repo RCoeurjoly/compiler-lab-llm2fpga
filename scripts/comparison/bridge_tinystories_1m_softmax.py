@@ -381,6 +381,27 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
             require(function_start <= candidates[-1][0] <= function_end, "dataflow_not_proven", f"site {number} operand load is outside function")
             require(same_index(candidates[-1][1].group(3).strip(), candidates[-1][0], delta_idx, delta_load_i),
                     "dataflow_not_proven", f"site {number} subtraction operand index does not match delta index")
+        # The row-max operand must come from a full-domain loop-carried max,
+        # not a constant or an unrelated buffer.
+        max_operand = sub.group(3)
+        max_load_candidates = [(i, m) for i, line in enumerate(lines) if i < sub_i and (m := load_re.match(line)) and m.group(1) == max_operand]
+        require(max_load_candidates, "dataflow_not_proven", f"site {number} row-max operand is not loaded")
+        max_mem = max_load_candidates[-1][1].group(2).strip()
+        max_stores = [(i, m) for i, line in enumerate(lines) if i < max_load_candidates[-1][0] and (m := store_re.match(line)) and m.group(2).strip() == max_mem]
+        require(max_stores, "dataflow_not_proven", f"site {number} row-max buffer has no producer")
+        max_value = max_stores[-1][1].group(1).strip()
+        max_header_i = next((i for i, line in enumerate(lines[:max_stores[-1][0]])
+                             if re.match(rf"%{re.escape(max_value.lstrip('%'))}\s*=\s*scf\.for\b", line)), None)
+        require(max_header_i is not None, "dataflow_not_proven", f"site {number} row-max has no matching loop result")
+        max_header_info = reduction_loop_header(max_header_i)
+        max_header = max_header_info[0] if max_header_info else None
+        require(max_header is not None and "iter_args" in max_header,
+                "dataflow_not_proven", f"site {number} row-max is not loop-carried")
+        max_end = max_header_info[2]
+        score_mem = operand_loads[sub.group(2)].group(2).strip()
+        max_body = lines[max_header_i:max_end]
+        require(any("arith.maximumf" in line and score_mem in "\n".join(max_body) for line in max_body),
+                "dataflow_not_proven", f"site {number} row-max is not a loop-carried reduction")
         require(operand_loads[sub.group(2)].group(2).strip() != operand_loads[sub.group(3)].group(2).strip(),
                 "dataflow_not_proven", f"site {number} score and row-max loads are not distinct")
         for operand in sub.groups()[1:]:
@@ -484,6 +505,11 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
                     (not head_digits or head_digits in line)):
                 causal.append(i)
         require(causal, "pattern_not_proven", f"site {number} lacks executable causal comparison")
+        causal_result = re.match(r"%([^ ]+)", lines[causal[0]]).group(1)
+        require(any(re.search(rf"arith\.select\s+%{re.escape(causal_result)}\b", line)
+                    and ("exp" in line or "prob" in line)
+                    for line in lines[causal[0] + 1:function_end + 1]),
+                "dataflow_not_proven", f"site {number} causal comparison result is unused")
         used_causal.add(causal[0])
         sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
                       "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_cmpi"]})

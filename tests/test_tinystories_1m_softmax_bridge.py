@@ -72,11 +72,12 @@ def lowered_separate_loop_graph(site_count: int = 8) -> str:
     for head in range(site_count):
         body.extend([
             f"  %idx{head} = arith.constant 0 : index",
-            f"  scf.for %r{head} = %c0 to %c4 step %c1 {{",
+            f"  %maxred{head} = scf.for %r{head} = %c0 to %c4 step %c1 iter_args(%oldmax{head} = %fzero) -> (f32) {{",
             f"    %s{head} = memref.load %score_mem{head}[%r{head}] : memref<4xf32>",
-            f"    %m{head} = arith.maximumf %s{head}, %fzero : f32",
-            f"    memref.store %m{head}, %max_mem{head}[%r{head}] : memref<4xf32>",
+            f"    %m{head} = arith.maximumf %oldmax{head}, %s{head} : f32",
+            f"    scf.yield %m{head} : f32",
             "  }",
+            f"  memref.store %maxred{head}, %max_mem{head}[%idx{head}] : memref<4xf32>",
             f"  scf.for %d{head} = %c0 to %c4 step %c1 {{",
             f"    %a{head} = memref.load %score_mem{head}[%d{head}] : memref<4xf32>",
             f"    %b{head} = memref.load %max_mem{head}[%d{head}] : memref<4xf32>",
@@ -98,11 +99,12 @@ def lowered_separate_loop_graph(site_count: int = 8) -> str:
             f"    memref.store %red{head}, %sum_mem{head}[%n{head}] : memref<4xf32>",
             f"    %sum_loaded{head} = memref.load %sum_mem{head}[%n{head}] : memref<4xf32>",
             f"    %elpost{head} = memref.load %exp_mem{head}[%n{head}] : memref<4xf32>",
-            f"    %prob{head} = arith.divf %elpost{head}, %sum_loaded{head} : f32",
+            f"    %prob_raw{head} = arith.divf %elpost{head}, %sum_loaded{head} : f32",
             f"    %causal{head} = arith.cmpi sle, %time_index{head}, %position{head} : i32",
+            f"    %prob{head} = arith.select %causal{head}, %prob_raw{head}, %fzero : f32",
             "  }",
         ])
-    return "module {\n  func.func @main(" + ", ".join(args) + ") {\n" + "\n".join(body) + "\n  return\n  }\n}\n"
+    return "module {\n  func.func @main(" + ", ".join(args) + ") {\n" + "\n".join(body) + "\n  func.return\n  }\n}\n"
 
 
 class SoftmaxBridgeTest(unittest.TestCase):
@@ -215,6 +217,26 @@ class SoftmaxBridgeTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-prior-sibling-exp.mlir")
+
+    def test_lowered_constant_row_max_fails_closed(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = lowered_separate_loop_graph().replace("%maxred0, %max_mem0", "%fzero, %max_mem0", 1)
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module.bridge_graph(graph, evidence, source_name="lowered-constant-max.mlir")
+
+    def test_lowered_unused_causal_mask_fails_closed(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = lowered_separate_loop_graph().replace(
+            "    %prob0 = arith.select %causal0, %prob_raw0, %fzero : f32\n", "", 1
+        )
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module.bridge_graph(graph, evidence, source_name="lowered-unused-mask.mlir")
 
     def test_lowered_in_loop_sum_store_cannot_bypass_loop_result(self):
         evidence = module.load_evidence(
