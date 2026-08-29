@@ -130,13 +130,17 @@ def _score_row_oracle(bundle: Any, block_index: int) -> dict[str, Any]:
         # GPT-Neo's attention implementation has no 1/sqrt(d) score scale.
         scores = torch.matmul(q, k.transpose(-1, -2))[0]
         causal = torch.ones((sequence, sequence), dtype=torch.bool).tril()
-        valid_scores = scores[causal.unsqueeze(0).expand(heads, -1, -1)]
-        probabilities = torch.softmax(
-            torch.where(causal.unsqueeze(0), scores, torch.finfo(scores.dtype).min), dim=-1
-        )
-        shifted = scores - scores.max(dim=-1, keepdim=True).values
-        exp_shifted = torch.exp(shifted)
-        exp_valid = exp_shifted[causal.unsqueeze(0).expand(heads, -1, -1)]
+        causal_mask = causal.unsqueeze(0).expand(heads, -1, -1)
+        valid_scores = scores[causal_mask]
+        # Mask *before* the row reduction.  Using a finite sentinel here can
+        # accidentally make a future position the row maximum, so use -inf
+        # and restore masked payload positions to zero for compact JSON.
+        masked_scores = torch.where(causal_mask, scores, torch.full_like(scores, -torch.inf))
+        row_max = masked_scores.max(dim=-1, keepdim=True).values
+        shifted = torch.where(causal_mask, masked_scores - row_max, torch.zeros_like(scores))
+        exp_shifted = torch.where(causal_mask, torch.exp(shifted), torch.zeros_like(scores))
+        probabilities = torch.softmax(masked_scores, dim=-1)
+        exp_valid = exp_shifted[causal_mask]
         # Exercise the existing RTL candidate on exactly the score domain fed
         # to a numerically stable softmax.  This remains a software comparison.
         qexp = _load_qexp()
@@ -153,6 +157,7 @@ def _score_row_oracle(bundle: Any, block_index: int) -> dict[str, Any]:
                 "softmax_rows": _payload(probabilities[head]),
                 "shifted_score_rows": _payload(shifted[head]),
                 "exp_shifted_rows": _payload(exp_shifted[head]),
+                "causal_row_max": _payload(row_max[head, :, 0]),
             })
         return {
             "sequence_length": sequence,
@@ -165,7 +170,7 @@ def _score_row_oracle(bundle: Any, block_index: int) -> dict[str, Any]:
             "rows": rows,
             "domains": {
                 "causal_scores": _flat_stats(valid_scores),
-                "shifted_scores": _flat_stats(shifted[causal.unsqueeze(0).expand(heads, -1, -1)]),
+                "shifted_scores": _flat_stats(shifted[causal_mask]),
                 "exp_shifted": _flat_stats(exp_valid),
             },
             "q_exp_candidate": {

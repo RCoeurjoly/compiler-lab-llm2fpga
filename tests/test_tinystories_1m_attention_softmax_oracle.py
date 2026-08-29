@@ -49,6 +49,8 @@ class AttentionOracleArtifactTest(unittest.TestCase):
         for row in trace["rows"]:
             scores = row["score_rows"]
             probs = row["softmax_rows"]
+            shifted = row["shifted_score_rows"]
+            exponentials = row["exp_shifted_rows"]
             self.assertEqual(len(scores), 4)
             self.assertEqual(len(probs), 4)
             for query_index in range(4):
@@ -56,6 +58,12 @@ class AttentionOracleArtifactTest(unittest.TestCase):
                 self.assertEqual(len(probs[query_index]), 4)
                 self.assertAlmostEqual(sum(probs[query_index][: query_index + 1]), 1.0, places=6)
                 self.assertTrue(all(value == 0.0 for value in probs[query_index][query_index + 1 :]))
+                self.assertAlmostEqual(max(shifted[query_index][: query_index + 1]), 0.0, places=6)
+                self.assertAlmostEqual(max(exponentials[query_index][: query_index + 1]), 1.0, places=6)
+        # The first query has exactly one legal key; this catches reductions
+        # that accidentally include future (masked) score columns.
+        self.assertTrue(all(row["shifted_score_rows"][0] == [0.0, 0.0, 0.0, 0.0] for row in trace["rows"]))
+        self.assertTrue(all(row["exp_shifted_rows"][0] == [1.0, 0.0, 0.0, 0.0] for row in trace["rows"]))
 
     def test_identity_binds_authenticated_inputs(self):
         identity = self.report["identity"]
