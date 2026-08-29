@@ -17,7 +17,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,6 +35,30 @@ class SoftmaxBridgeError(ValueError):
 def require(condition: bool, code: str, message: str) -> None:
     if not condition:
         raise SoftmaxBridgeError(code, message)
+
+
+_EVIDENCE_TOKEN = object()
+
+
+class _EvidenceCapability(Mapping[str, Any]):
+    """Opaque, mutation-detecting capability returned by ``load_evidence``."""
+
+    def __init__(self, payload: Mapping[str, Any]) -> None:
+        self._payload = dict(payload)
+        self._fingerprint = canonical_sha256(self._payload)
+        self._token = _EVIDENCE_TOKEN
+
+    def __getitem__(self, key: str) -> Any:
+        return self._payload[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._payload)
+
+    def __len__(self) -> int:
+        return len(self._payload)
+
+    def valid(self) -> bool:
+        return self._token is _EVIDENCE_TOKEN and canonical_sha256(self._payload) == self._fingerprint
 
 
 def sha256_file(path: Path) -> str:
@@ -61,7 +85,7 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def load_evidence(contract_path: Path, diagnostic_path: Path) -> dict[str, Any]:
+def load_evidence(contract_path: Path, diagnostic_path: Path) -> Mapping[str, Any]:
     """Authenticate the frozen model/package identity and recovered contract."""
 
     require(sha256_file(contract_path) == CONTRACT_SHA256, "contract_identity_mismatch", str(contract_path))
@@ -87,7 +111,7 @@ def load_evidence(contract_path: Path, diagnostic_path: Path) -> dict[str, Any]:
         require(isinstance(actual, dict), "softmax_contract_mismatch", section)
         for key, value in fields.items():
             require(actual.get(key) == value, "softmax_contract_mismatch", f"{section}.{key}")
-    return {
+    return _EvidenceCapability({
         "contract_sha256": CONTRACT_SHA256,
         "diagnostic_sha256": SOFTMAX_DIAGNOSTIC_SHA256,
         "package_manifest_sha256": package["manifest_sha256"],
@@ -96,30 +120,62 @@ def load_evidence(contract_path: Path, diagnostic_path: Path) -> dict[str, Any]:
         "package_calibration_ids_sha256": package.get("files", {}).get("calibration_ids.bin"),
         "model_revision": contract["model"]["source_revision"],
         "contract": recovered,
-    }
+    })
 
 
 def _pattern_evidence(graph: str) -> dict[str, Any]:
     """Require all semantic edges around the exact stabilized softmax site."""
 
-    checks = {
-        "stabilization": r"(?:subf|subi|sub)\b[^\n]*(?:score|scores)[^\n]*(?:max|row_max)|score\s*-\s*row_max",
-        "exp": r"math\.exp",
-        "exp_store": r"(?:store|memref\.store)[^\n]*exp",
-        "sum": r"(?:addf|addi|add)\b[^\n]*(?:sum|old_sum|exp_sum)",
-        "division": r"(?:divf|divi|div|division)[^\n]*(?:exp|sum|prob)",
-        "causal": r"(?:time_index|position)[^\n]*(?:<=|le|prefix)|causal",
-    }
-    missing = [label for label, pattern in checks.items() if re.search(pattern, graph, re.IGNORECASE) is None]
-    require(not missing, "pattern_not_proven", "missing semantic edges: " + ", ".join(missing))
-    exp_sites = list(re.finditer(r"math\.exp", graph))
+    # MLIR comments and attribute strings are not operation dataflow.  Match
+    # only operation-shaped lines after removing comments; every SSA value is
+    # then checked against the producer/consumer immediately below.
+    lines = [re.sub(r"//.*$", "", line).strip() for line in graph.splitlines()]
+    lines = [line for line in lines if line]
+    executable = "\n".join(lines)
+    exp_sites = list(re.finditer(r"^\s*%[A-Za-z0-9_.$-]+\s*=\s*math\.exp\b", executable, re.MULTILINE))
+    require(exp_sites, "pattern_not_proven", "no executable math.exp operation")
     require(len(exp_sites) == 1, "pattern_not_proven", f"expected one stabilized exp site, found {len(exp_sites)}")
-    line = graph[: exp_sites[0].start()].count("\n") + 1
-    return {"exp_site_line": line, "matched_edges": list(checks)}
+    exp_line = executable[: exp_sites[0].start()].count("\n")
+    exp_line_text = lines[exp_line]
+    exp_match = re.match(r"%([^ ]+)\s*=\s*math\.exp\s+%([^ ]+)", exp_line_text)
+    require(exp_match is not None, "pattern_not_proven", "malformed math.exp operation")
+    exp_result, exp_input = exp_match.groups()
+
+    def find(pattern: str, start: int = 0) -> tuple[int, re.Match[str]]:
+        for index in range(start, len(lines)):
+            match = re.match(pattern, lines[index], re.IGNORECASE)
+            if match:
+                return index, match
+        raise SoftmaxBridgeError("dataflow_not_proven", pattern)
+
+    require(any("arith.subf" in line for line in lines), "pattern_not_proven", "no executable score-minus-row-max operation")
+    sub_index, sub = find(r"%([^ ]+)\s*=\s*arith\.subf\s+%([^, ]+)\s*,\s*%([^ ]+)")
+    delta = sub.group(1)
+    require(sub.group(2).lower().startswith("score"), "dataflow_not_proven", "subf lhs is not score")
+    require("max" in sub.group(3).lower(), "dataflow_not_proven", "subf rhs is not row max")
+    store_delta_index, store_delta = find(r"memref\.store\s+%([^,]+),\s*%([^\[]+)\[([^\]]+)\]", sub_index + 1)
+    require(store_delta.group(1) == delta, "dataflow_not_proven", "stabilized delta is not stored")
+    delta_load_index, delta_load = find(r"%([^ ]+)\s*=\s*memref\.load\s+%([^\[]+)\[([^\]]+)\]", store_delta_index + 1)
+    require(delta_load.group(2) == store_delta.group(2) and delta_load.group(3) == store_delta.group(3), "dataflow_not_proven", "delta load does not read delta store")
+    require(delta_load.group(1) == exp_input, "dataflow_not_proven", "math.exp does not consume loaded delta")
+    exp_store_index, exp_store = find(r"memref\.store\s+%([^,]+),\s*%([^\[]+)\[([^\]]+)\]", exp_line + 1)
+    require(exp_store.group(1) == exp_result, "dataflow_not_proven", "exp result is not stored")
+    exp_load_index, exp_load = find(r"%([^ ]+)\s*=\s*memref\.load\s+%([^\[]+)\[([^\]]+)\]", exp_store_index + 1)
+    require(exp_load.group(2) == exp_store.group(2) and exp_load.group(3) == exp_store.group(3), "dataflow_not_proven", "exp load does not read exp store")
+    sum_index, sum_match = find(r"%([^ ]+)\s*=\s*arith\.addf\s+%([^, ]+)\s*,\s*%([^ ]+)", exp_load_index + 1)
+    require(sum_match.group(3) == exp_load.group(1), "dataflow_not_proven", "reduction does not consume loaded exp")
+    sum_result = sum_match.group(1)
+    div_index, div_match = find(r"%([^ ]+)\s*=\s*arith\.divf\s+%([^, ]+)\s*,\s*%([^ ]+)", sum_index + 1)
+    require(div_match.group(2) == exp_load.group(1) and div_match.group(3) == sum_result, "dataflow_not_proven", "normalization division is not exp/sum")
+    causal = re.compile(r"^%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule).*%[^ ]*time[^ ]*.*%[^ ]*position|^%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule).*%[^ ]*position[^ ]*.*%[^ ]*time", re.IGNORECASE)
+    require(any(causal.match(line) for line in lines), "pattern_not_proven", "executable causal time_index <= position comparison")
+    return {"exp_site_line": exp_line + 1, "matched_edges": ["subf_score_rowmax", "delta_store_load", "exp", "exp_store_load", "sum_reduction", "normalization_division", "causal_cmpi"]}
 
 
 def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str) -> dict[str, Any]:
     require(isinstance(graph, str) and graph, "graph_missing", source_name)
+    require(isinstance(evidence, _EvidenceCapability), "evidence_capability_required", "use load_evidence result")
+    require(evidence.valid(), "evidence_capability_invalidated", "evidence changed after authentication")
     require(set(evidence) >= {"contract_sha256", "diagnostic_sha256", "package_manifest_sha256", "package_weights_sha256"}, "evidence_missing", "package/contract hashes")
     pattern = _pattern_evidence(graph)
     attributes = {
