@@ -1,0 +1,336 @@
+{
+  "candidate_profiles": {
+    "fixed_hardware_runtime": {
+      "affine": {
+        "gamma_beta_format": "signed_q16.16_int32",
+        "output_dtype": "numpy_int64",
+        "rounding": "arithmetic_right_shift_by_16",
+        "saturation": "none"
+      },
+      "epsilon": {
+        "q32": 42950,
+        "real": "round(1e-5 * 2^32)"
+      },
+      "input_and_parameters": {
+        "byte_order": "little_endian_package_materialization",
+        "format": "signed_q16.16_int32"
+      },
+      "inverse_sqrt": {
+        "algorithm": "integer_floor_square_root_then_signed_truncation_toward_zero_division",
+        "implementation": "math.isqrt"
+      },
+      "non_finite": {
+        "status": "not_applicable_after_integer_materialization"
+      },
+      "reduction": {
+        "mean": "signed_int64_numpy_sum_then_truncation_toward_zero_divide_by_D",
+        "order": "NumPy API does not promise reduction order",
+        "overflow": "signed_int64_NumPy_wrap",
+        "variance": "signed_int64_numpy_product_and_sum_then_floor_divide_by_D"
+      }
+    },
+    "synthesizable_rtl": {
+      "affine": {
+        "gamma_beta_format": "signed_q16.16_int32",
+        "output_dtype": "signed_32_bit",
+        "rounding": "arithmetic_right_shift_by_16",
+        "saturation": "none; assignment truncates/wraps"
+      },
+      "epsilon": {
+        "q32": 42950,
+        "real": "round(1e-5 * 2^32)"
+      },
+      "input_and_parameters": {
+        "byte_order": "bit_vectors_no_external_byte_stream",
+        "format": "signed_q16.16_int32"
+      },
+      "inverse_sqrt": {
+        "algorithm": "restoring_integer_square_root; iterative_signed_divider",
+        "rounding": "floor_sqrt_then_truncation_toward_zero_quotient"
+      },
+      "non_finite": {
+        "status": "impossible_at_integer_ports"
+      },
+      "reduction": {
+        "mean": "signed_64_bit_accumulator_then_signed_divide_by_D_truncation_toward_zero",
+        "order": "ascending_index_0_to_D_minus_1",
+        "overflow": "two_complement_truncation_at_declared_register_widths",
+        "variance": "33_bit_delta; 66_bit_square; 72_bit_serial_ascending_index_square_sum; unsigned_64_bit_variance_assignment"
+      }
+    }
+  },
+  "checkpoint_trace": {
+    "authority": "content_authenticated_fixed_runtime_not_board_authenticated",
+    "block_index": 0,
+    "ln_1": {
+      "dtype": "signed_q16.16",
+      "sha256": "233de767e3744ac70d9d074f9d0174e5e973fda4a11c20efd392061b4c0e7eee",
+      "shape": [
+        64
+      ],
+      "values": [
+        140797,
+        -9292,
+        51712,
+        -3437,
+        71089,
+        22038,
+        29192,
+        5249,
+        -43714,
+        87782,
+        -15673,
+        67514,
+        -100598,
+        -59138,
+        91,
+        -124379,
+        -108839,
+        -29695,
+        119873,
+        51641,
+        -96334,
+        42449,
+        -27902,
+        184161,
+        -95173,
+        48538,
+        -150970,
+        7448,
+        -33313,
+        -45255,
+        32595,
+        -147645,
+        -21246,
+        122235,
+        -73001,
+        37951,
+        16163,
+        -3043,
+        -80853,
+        38617,
+        46367,
+        -61231,
+        -36066,
+        33819,
+        60440,
+        -141553,
+        33291,
+        -19321,
+        125565,
+        23881,
+        -41227,
+        -2309,
+        -72329,
+        81737,
+        -51815,
+        -43097,
+        15205,
+        2660,
+        122433,
+        -42731,
+        -46674,
+        137606,
+        -86816,
+        21536
+      ]
+    },
+    "ln_2": {
+      "dtype": "signed_q16.16",
+      "sha256": "220e940d35a173b443992377dd47195606ee1e9aed448d13e24bcc64019341c1",
+      "shape": [
+        64
+      ],
+      "values": [
+        169407,
+        -6489,
+        44742,
+        -18944,
+        70880,
+        39565,
+        11325,
+        3261,
+        -22067,
+        100140,
+        -30937,
+        76118,
+        -121880,
+        -53330,
+        -12791,
+        -126704,
+        -103197,
+        -47252,
+        127295,
+        29724,
+        -100605,
+        25755,
+        -5625,
+        190669,
+        -62537,
+        31796,
+        -143806,
+        1629,
+        -18589,
+        -23016,
+        21693,
+        -143810,
+        13358,
+        113824,
+        -61737,
+        36253,
+        8837,
+        -14911,
+        -87019,
+        36754,
+        29612,
+        -60547,
+        -21162,
+        31733,
+        50543,
+        -141803,
+        24194,
+        -35406,
+        143342,
+        11914,
+        -32081,
+        -2650,
+        -48320,
+        111730,
+        -32978,
+        -44737,
+        19112,
+        18653,
+        137523,
+        -27549,
+        -36637,
+        108191,
+        -112941,
+        9310
+      ]
+    },
+    "prompt_tokens": [
+      7454,
+      2402,
+      257,
+      640
+    ],
+    "token_index": 3
+  },
+  "conflicts": [
+    {
+      "code": "layernorm_overflow_domain_conflict",
+      "effect": "no one full-domain bit-exact LayerNorm lowering may be selected from these two authorities",
+      "rtl": "delta squares and their serial sum retain 66/72 bits before a distinct 64-bit variance truncation",
+      "runtime": "variance products and reduction are NumPy signed int64 and can wrap for legal int32 Q16.16 inputs",
+      "witness_domain": "a row containing both -2147483648 and 2147483647 is legal at the declared ports and exercises different intermediate widths"
+    },
+    {
+      "code": "board_checkpoint_authority_missing",
+      "effect": "the deterministic Q16.16 LN checkpoint hashes are fixed-runtime evidence, not FPGA board evidence"
+    }
+  ],
+  "identity": {
+    "fixed_hardware_qdq_profile_sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6",
+    "frozen_contract_sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
+    "reference_git_revision": "df1fc45b2ffcb26fddc19cfd57621e7eedf6153f",
+    "sources": [
+      {
+        "path": "tinystories/hardware_reference.py",
+        "sha256": "3780015d7f4be69cae3952fb630af971a37490a17cf8519fd6ac81a7bb080371"
+      },
+      {
+        "path": "fpga/rtl/gptneo_layernorm.sv",
+        "sha256": "354104a1d2b57552bdca54f291764d90d6b9f7d6f8a2ecc2cb0d95a396430e1b"
+      },
+      {
+        "path": "fpga/rtl/gptneo_iterative_divider.sv",
+        "sha256": "8665cc99e7bf98e0415775a36c78aa4ff242d30c976dce0719e6d465686a1540"
+      }
+    ]
+  },
+  "incomplete_reasons": [
+    "A board-bound LayerNorm trace and an approved resolution of the runtime/RTL overflow-domain conflict are required before selecting a compiler profile.",
+    "This receipt does not authorize copying reference source or RTL into compiler output."
+  ],
+  "receipt_sha256": "8e982d1009e16d6d27f5d3ed920395bb30a5f0e43e3094038b118f60fa562d89",
+  "runtime_probe": {
+    "input_pattern": "alternating_plus_minus_one_q16.16",
+    "output": {
+      "dtype": "signed_q16.16_int64_runtime",
+      "shape": [
+        64
+      ],
+      "values": [
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536,
+        65536,
+        -65536
+      ]
+    },
+    "sha256": "f0c0d56cecba0898863eb8db882eee71d7a361e5846574219fe54a253265cadc"
+  },
+  "schema": "tinystories-1m-layernorm-semantics-v1",
+  "selected_profile": null,
+  "status": "incomplete",
+  "version": 1
+}
