@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import re
 from pathlib import Path
@@ -24,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_SHA256 = "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
 SOFTMAX_DIAGNOSTIC_SHA256 = "ef052961445168cc8e05b2522ce3cd05e11cd21235ab876907d6a4c6344a05ca"
 CUSTOM_OP = "llm2fpga.attention_softmax_fixed"
+PROVENANCE_MANIFEST_SCRIPT = ROOT / "scripts/comparison/create_tinystories_1m_softmax_provenance_manifest.py"
 
 
 class SoftmaxBridgeError(ValueError):
@@ -125,6 +127,26 @@ def load_evidence(contract_path: Path, diagnostic_path: Path) -> Mapping[str, An
     })
     _ISSUED_CAPABILITIES.add(id(capability))
     return capability
+
+
+def load_provenance_manifest(path: Path) -> Mapping[str, Any]:
+    """Load the authenticated pre-lowering semantic receipt.
+
+    The manifest is an explicit capability boundary: its eight head-local
+    identities are not reconstructed from lowered text.  This keeps the
+    structural matcher fail-closed while preserving the semantic names lost
+    by linalg/SCF conversion.
+    """
+    spec = importlib.util.spec_from_file_location("tinystories_softmax_manifest", PROVENANCE_MANIFEST_SCRIPT)
+    require(spec is not None and spec.loader is not None, "manifest_loader", str(PROVENANCE_MANIFEST_SCRIPT))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        value = module.load_authenticated(path)
+    except (OSError, ValueError) as error:
+        raise SoftmaxBridgeError("provenance_manifest_invalid", str(error)) from error
+    require(value.get("sha256") == sha256_file(path), "provenance_manifest_invalid", "file hash")
+    return value
 
 
 def _named_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, Any]:
@@ -583,7 +605,8 @@ def _pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, A
             raise named_error
 
 
-def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str, expected_exp_sites: int = 8) -> dict[str, Any]:
+def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str, expected_exp_sites: int = 8,
+                 provenance_manifest: Mapping[str, Any] | None = None) -> dict[str, Any]:
     require(isinstance(graph, str) and graph, "graph_missing", source_name)
     require(isinstance(evidence, _EvidenceCapability), "evidence_capability_required", "use load_evidence result")
     require(id(evidence) in _ISSUED_CAPABILITIES, "evidence_capability_unissued", "capability was not issued by load_evidence")
@@ -599,6 +622,18 @@ def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str, e
         "contract": evidence["contract"],
     }
     require(dict(evidence) == canonical, "evidence_payload_mismatch", "canonical contract/package evidence")
+    if provenance_manifest is not None:
+        require(isinstance(provenance_manifest, Mapping), "provenance_manifest_invalid", "manifest object")
+        require(provenance_manifest.get("sha256") == canonical_sha256({key: value for key, value in provenance_manifest.items() if key != "sha256"}),
+                "provenance_manifest_invalid", "manifest self hash")
+        require(provenance_manifest.get("contract_sha256") == CONTRACT_SHA256, "provenance_manifest_invalid", "contract identity")
+        require(provenance_manifest.get("package") == {
+            "manifest_sha256": canonical["package_manifest_sha256"],
+            "weights_sha256": canonical["package_weights_sha256"],
+            "scales_sha256": canonical["package_scales_sha256"],
+            "calibration_ids_sha256": canonical["package_calibration_ids_sha256"],
+        },
+                "provenance_manifest_invalid", "package identity")
     pattern = _pattern_evidence(graph, expected_exp_sites=expected_exp_sites)
     attributes = {
         "score_width": 32,
@@ -622,6 +657,9 @@ def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str, e
         "source": {"artifact": source_name, "sha256": hashlib.sha256(graph.encode()).hexdigest(), **pattern},
         "evidence": {key: evidence[key] for key in ("contract_sha256", "diagnostic_sha256", "package_manifest_sha256", "package_weights_sha256", "package_scales_sha256", "package_calibration_ids_sha256", "model_revision")},
     }
+    if provenance_manifest is not None:
+        descriptor["source"]["pre_lowering_provenance_manifest_sha256"] = provenance_manifest["sha256"]
+        descriptor["evidence"]["pre_lowering_provenance_manifest_sha256"] = provenance_manifest["sha256"]
     descriptor["sha256"] = canonical_sha256({key: value for key, value in descriptor.items() if key != "sha256"})
     return descriptor
 
@@ -665,12 +703,14 @@ def main() -> None:
     parser.add_argument("--graph", required=True, type=Path)
     parser.add_argument("--contract", required=True, type=Path)
     parser.add_argument("--diagnostic", required=True, type=Path)
+    parser.add_argument("--provenance-manifest", type=Path)
     parser.add_argument("--mlir-out", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
     graph = args.graph.read_text(encoding="utf-8")
     evidence = load_evidence(args.contract, args.diagnostic)
-    descriptor = bridge_graph(graph, evidence, source_name=str(args.graph))
+    manifest = load_provenance_manifest(args.provenance_manifest) if args.provenance_manifest else None
+    descriptor = bridge_graph(graph, evidence, source_name=str(args.graph), provenance_manifest=manifest)
     mlir = render_custom_op(descriptor)
     report = make_report(descriptor, graph, mlir)
     report["sha256"] = canonical_sha256({key: value for key, value in report.items() if key != "sha256"})
