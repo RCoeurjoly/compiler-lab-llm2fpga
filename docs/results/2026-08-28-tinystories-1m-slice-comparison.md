@@ -93,3 +93,18 @@ resources remain `null`.
 The parser also recognizes standard Yosys `stat -json` module counts at
 `modules.<top>.num_cells_by_type`, while keeping structural counts distinct
 from a technology-mapped resource report.
+
+## Task 4 optimization gate
+
+Task 4 is currently **`blocked_missing_evidence`**.  The comparison receipt is
+`contract_mismatch`, its functional checkpoints are unavailable, and its
+`waste_map` is empty.  There is therefore no ranked, provenance-linked
+compiler candidate with measured before/after resource and timing cost.
+
+The fail-closed result is
+[`tinystories-1m-optimization-result.json`](../../artifacts/comparison/tinystories-1m-optimization-result.json).
+No lowering, scheduling, or template source was modified, and no optimization
+claim is made.  The next valid Task 4 attempt requires a fresh aligned slice
+comparison, exact functional evidence, and technology-mapped resource and
+timing receipts for both sides; structural guesses or an unmeasured change do
+not satisfy this gate.

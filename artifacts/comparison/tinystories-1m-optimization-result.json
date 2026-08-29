@@ -1,0 +1,46 @@
+{
+  "schema": "tinystories-1m-optimization-result-v1",
+  "model": "TinyStories-1M",
+  "task": "Task 4: apply one evidence-backed compiler optimization",
+  "status": "blocked_missing_evidence",
+  "candidate_status": "none_ranked",
+  "selected_candidate": null,
+  "structural_property": null,
+  "source_change": null,
+  "modified_paths": [],
+  "before": null,
+  "after": null,
+  "acceptance": {
+    "functional_equivalence": false,
+    "resource_improvement": false,
+    "timing_preserved": false,
+    "accepted": false
+  },
+  "inputs": {
+    "comparison": {
+      "path": "artifacts/comparison/tinystories-1m-slice-comparison.json",
+      "sha256": "5b711b3f2ddc2b5c125dbe91b48b28f326de8d06fc38cde39e94a8fd96a0400c"
+    },
+    "required_evidence": [
+      "aligned one-transformer-block token-step comparison",
+      "ranked provenance-linked waste-map candidate",
+      "compiler before/after functional checkpoint evidence",
+      "technology-mapped resource receipts",
+      "constrained timing receipts"
+    ]
+  },
+  "blocking_reasons": [
+    "Task 3 comparison status is contract_mismatch, not aligned.",
+    "Task 3 emitted no ranked provenance-linked waste candidate.",
+    "No compiler or reference resource receipt is available for this slice.",
+    "No compiler or reference timing receipt is available for this slice.",
+    "No exact reference/compiler checkpoint pair is available for this slice."
+  ],
+  "decision": "Do not modify a lowering, scheduling, or template path and do not claim an optimization until the required Task 3 evidence exists.",
+  "provenance": {
+    "compiler_source_modified": false,
+    "pcie_ddr3_transport_modified": false,
+    "llm_assistance_disclosed": true
+  },
+  "sha256": "c95e1405252fc7d86d56ca587f4466f77b59c32be7671f4e26ccdfc4f5e3bf7a"
+}
