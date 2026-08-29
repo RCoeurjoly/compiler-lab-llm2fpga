@@ -313,8 +313,13 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
                 definition_scope = scope_paths[definition_line]
                 # An induction variable is visible only in its loop body,
                 # never in a sibling or after the loop closes.
-                return (len(use_scope) > len(definition_scope) and
-                        definition_scope == use_scope[:len(definition_scope)])
+                body_scope = (scope_paths[definition_line + 1][len(definition_scope)]
+                              if definition_line + 1 < len(scope_paths) and
+                              len(scope_paths[definition_line + 1]) > len(definition_scope)
+                              else None)
+                return (body_scope is not None and len(use_scope) > len(definition_scope) and
+                        definition_scope == use_scope[:len(definition_scope)] and
+                        use_scope[len(definition_scope)] == body_scope)
             if re.match(rf"%{re.escape(name)}\s*=", line):
                 definition_scope = scope_paths[definition_line]
                 return (definition_scope == use_scope[:len(definition_scope)] and
