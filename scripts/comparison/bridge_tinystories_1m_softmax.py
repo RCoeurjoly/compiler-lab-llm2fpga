@@ -361,13 +361,22 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                               if definition_line + 1 < len(scope_paths) and
                               len(scope_paths[definition_line + 1]) > len(definition_scope)
                               else None)
-                return (body_scope is not None and len(use_scope) > len(definition_scope) and
+                # SSA spellings are routinely reused by MLIR in sibling
+                # regions.  A non-dominating earlier definition must not
+                # shadow a later definition whose loop body actually contains
+                # the use; keep searching for that exact lexical definition.
+                if (body_scope is not None and len(use_scope) > len(definition_scope) and
                         definition_scope == use_scope[:len(definition_scope)] and
-                        use_scope[len(definition_scope)] == body_scope)
+                        use_scope[len(definition_scope)] == body_scope):
+                    return True
+                continue
             if re.match(rf"%{re.escape(name)}\s*=", line):
                 definition_scope = scope_paths[definition_line]
-                return (definition_scope == use_scope[:len(definition_scope)] and
-                        bool(re.search(r":\s*index(?:\s|$)", line)))
+                # As above, do not reject a valid local definition merely
+                # because a repeated name appeared in an earlier sibling.
+                if (definition_scope == use_scope[:len(definition_scope)] and
+                        bool(re.search(r":\s*index(?:\s|$)", line))):
+                    return True
         return False
 
     def reduction_loop_header(line_number: int) -> tuple[str, int, int] | None:

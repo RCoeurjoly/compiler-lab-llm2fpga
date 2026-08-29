@@ -171,6 +171,29 @@ class SoftmaxBridgeTest(unittest.TestCase):
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-non-index.mlir")
 
+    def test_lowered_repeated_index_name_uses_later_dominating_definition(self):
+        """A sibling decoy must not shadow the valid definition that follows it.
+
+        MLIR normally guarantees unique SSA names, but textual diagnostics can
+        encounter name-reused malformed candidates.  The matcher must remain
+        fail-closed for the decoy while still accepting the exact lexical
+        definition used by the real loop.
+        """
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = lowered_separate_loop_graph().replace(
+            "  %idx0 = arith.constant 0 : index\n",
+            "  scf.for %decoy0 = %c0 to %c1 step %c1 {\n"
+            "    %idx0 = arith.constant 0 : index\n"
+            "  }\n"
+            "  %idx0 = arith.constant 0 : index\n",
+            1,
+        )
+        descriptor = module.bridge_graph(graph, evidence, source_name="lowered-repeated-index-name.mlir")
+        self.assertEqual(descriptor["source"]["exp_site_count"], 8)
+
     def test_lowered_closed_loop_induction_value_is_not_dominating(self):
         evidence = module.load_evidence(
             ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
