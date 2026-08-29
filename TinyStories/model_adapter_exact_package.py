@@ -13,6 +13,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import struct
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -44,6 +45,48 @@ FINITE_VALIDATOR_RELATIVE = Path("scripts/comparison/audit_tinystories_1m_exact_
 FINITE_VALIDATOR_SHA256 = "93b51d87dbb0a61911abdb951573c37018c90358dfed2f27b67832a6c1eea92d"
 FROZEN_FIXED_PROFILE_SHA256 = "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6"
 FROZEN_PROFILE_SELF_SHA256 = "7d54acda88f1d1a6979fd0ca8a3b0445e20ef127a399e5124a994427565caad0"
+FROZEN_CONTRACT_SHA256 = "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c"
+FROZEN_AUDIT_FILE_SHA256 = "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd"
+REACHABLE_CERTIFICATE_RELATIVE = Path("artifacts/reference/tinystories-1m-exact-reachable-domain.json")
+REACHABLE_CERTIFICATE_SHA256 = "e09b790c952c24c63050ad348485d429d5c0ad9e87b33654af06366f2e68e659"
+FIXED_LOGITS_ORACLE_RELATIVE = Path("artifacts/reference/tinystories-1m-fixed-logits-oracle.json")
+FIXED_LOGITS_ORACLE_SHA256 = "258bbcc081a5166b8f302ff6d736730f1743d7fa448413bae6c3774b9f5ff533"
+
+QDQ_BOUNDARY_NAMES: tuple[str, ...] = tuple(
+    name
+    for layer in range(8)
+    for module in (
+        f"transformer.h.{layer}.attn.attention.q_proj",
+        f"transformer.h.{layer}.attn.attention.k_proj",
+        f"transformer.h.{layer}.attn.attention.v_proj",
+        f"transformer.h.{layer}.attn.attention.out_proj",
+        f"transformer.h.{layer}.mlp.c_fc",
+        f"transformer.h.{layer}.mlp.c_proj",
+    )
+    for name in (f"{module}.input", f"{module}.output")
+) + ("lm_head.input",)
+GEMV_NAMES: tuple[str, ...] = tuple(
+    module
+    for layer in range(8)
+    for module in (
+        f"transformer.h.{layer}.attn.attention.q_proj",
+        f"transformer.h.{layer}.attn.attention.k_proj",
+        f"transformer.h.{layer}.attn.attention.v_proj",
+        f"transformer.h.{layer}.attn.attention.out_proj",
+        f"transformer.h.{layer}.mlp.c_fc",
+        f"transformer.h.{layer}.mlp.c_proj",
+    )
+) + ("lm_head",)
+NONLINEAR_BOUNDARY_NAMES: tuple[str, ...] = tuple(
+    name
+    for layer in range(8)
+    for name in (
+        f"transformer.h.{layer}.ln_1.output",
+        f"transformer.h.{layer}.attn.attention.context",
+        f"transformer.h.{layer}.ln_2.output",
+        f"transformer.h.{layer}.mlp.gelu.output",
+    )
+) + ("transformer.ln_f.output",)
 
 
 class ExactModelError(ValueError):
@@ -84,12 +127,21 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
 def round_shift_signed(values: torch.Tensor, shift: int) -> torch.Tensor:
     """Signed nearest rounding, with ties away from zero, then right shift."""
 
-    _require(isinstance(shift, int) and shift >= 0, "invalid_shift", str(shift))
+    _require(isinstance(shift, int) and 0 <= shift < 63, "invalid_shift", str(shift))
     values = values.to(torch.int64)
     if shift == 0:
         return values.clone()
-    magnitude = torch.abs(values)
-    rounded = torch.bitwise_right_shift(magnitude + (1 << (shift - 1)), shift)
+    divisor = 1 << shift
+    floor_quotient = torch.div(values, divisor, rounding_mode="floor")
+    floor_remainder = torch.remainder(values, divisor)
+    negative = values < 0
+    negative_quotient = -floor_quotient - (floor_remainder != 0).to(torch.int64)
+    negative_remainder = torch.where(
+        floor_remainder == 0, torch.zeros_like(floor_remainder), divisor - floor_remainder
+    )
+    quotient = torch.where(negative, negative_quotient, floor_quotient)
+    remainder = torch.where(negative, negative_remainder, floor_remainder)
+    rounded = quotient + (remainder >= (divisor >> 1)).to(torch.int64)
     return torch.where(values < 0, -rounded, rounded)
 
 
@@ -98,6 +150,11 @@ def activation_qdq(values_q16: torch.Tensor, scales_q24: torch.Tensor) -> tuple[
 
     values_q16 = values_q16.to(torch.int64)
     scales_q24 = scales_q24.to(torch.int64)
+    if not torch.compiler.is_compiling():
+        _require(bool(((values_q16 >= -(1 << 31)) & (values_q16 < (1 << 31))).all()),
+                 "q16_range_violation", "activation input is outside signed Q16.16 int32")
+        _require(bool(((scales_q24 > 0) & (scales_q24 < (1 << 24))).all()),
+                 "q24_range_violation", "activation scale is outside unsigned Q8.24 u24")
     numerator = torch.bitwise_left_shift(values_q16, Q_SCALE - Q_VALUE)
     magnitude = torch.div(
         torch.abs(numerator) + torch.div(scales_q24, 2, rounding_mode="floor"),
@@ -237,7 +294,99 @@ def _validate_arithmetic_identity(contract: Mapping[str, Any], audit: Mapping[st
              "arithmetic_identity_mismatch", "activation Q/DQ semantics differ")
 
 
-def _authenticate_inputs(contract_path: Path, package_path: Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+def _validate_reachable_certificate(certificate: Mapping[str, Any], contract: Mapping[str, Any],
+                                    audit: Mapping[str, Any]) -> None:
+    _require(certificate.get("certificate_sha256") == canonical_sha256(
+        {key: value for key, value in certificate.items() if key != "certificate_sha256"}
+    ), "identity_frontier", "reachable-domain certificate self-hash differs")
+    _require(certificate.get("schema") == "tinystories-1m-exact-reachable-domain-v1"
+             and certificate.get("status") == "proven_reachable_domain_equivalent",
+             "identity_frontier", "reachable-domain equivalence was not proven")
+    identity = certificate.get("identity", {})
+    _require(identity.get("contract_sha256") == FROZEN_CONTRACT_SHA256
+             and identity.get("audit_file_sha256") == FROZEN_AUDIT_FILE_SHA256
+             and identity.get("audit_payload_sha256") == audit.get("sha256")
+             and identity.get("profile_sha256") == FROZEN_FIXED_PROFILE_SHA256
+             and identity.get("package_manifest_sha256") == contract["package"]["manifest_sha256"]
+             and identity.get("package_weights_sha256") == contract["package"]["sha256"]
+             and identity.get("package_scales_sha256") == contract["package"]["files"]["scales.bin"]["sha256"],
+             "identity_frontier", "reachable-domain certificate identity differs")
+    expected_sources = {
+        name: contract["deployed_profile"]["sources"][name]
+        for name in identity.get("semantic_sources", {})
+    }
+    _require(identity.get("semantic_sources") == expected_sources,
+             "identity_frontier", "reachable-domain semantic source identity differs")
+    certifier = _repo_root() / "scripts/comparison/certify_tinystories_1m_exact_reachable_domain.py"
+    _require(certifier.is_file() and identity.get("certifier_sha256") == _sha256(certifier),
+             "identity_frontier", "reachable-domain certifier identity differs")
+    layer_norm = certificate.get("layer_norm", {})
+    calls = layer_norm.get("calls")
+    expected_layernorm = tuple(
+        name for layer in range(8)
+        for name in (f"transformer.h.{layer}.ln_1", f"transformer.h.{layer}.ln_2")
+    ) + ("transformer.ln_f",)
+    _require(isinstance(calls, list) and tuple(call.get("name") for call in calls) == expected_layernorm
+             and all(call.get("status") == "proven"
+                     and all(call.get("proof", {}).get("inequalities", {}).values())
+                     for call in calls)
+             and layer_norm.get("conclusion")
+             == "runtime_and_synthesizable_rtl_identical_on_reachable_domain",
+             "identity_frontier", "LayerNorm reachable-domain proof is incomplete")
+    nonlinear = certificate.get("nonlinear", {})
+    gelu_calls = nonlinear.get("gelu", {}).get("calls", [])
+    attention_calls = nonlinear.get("attention_softmax", {}).get("calls", [])
+    _require(tuple(call.get("name") for call in gelu_calls)
+             == tuple(f"transformer.h.{layer}.mlp.gelu" for layer in range(8))
+             and tuple(call.get("name") for call in attention_calls)
+             == tuple(f"transformer.h.{layer}.attn.attention" for layer in range(8))
+             and all(call.get("proof", {}).get("all") for call in gelu_calls + attention_calls),
+             "identity_frontier", "nonlinear reachable-domain proof is incomplete")
+
+
+def _validate_fixed_logits_oracle(oracle: Mapping[str, Any], contract: Mapping[str, Any],
+                                  audit: Mapping[str, Any]) -> torch.Tensor:
+    _require(oracle.get("oracle_sha256") == canonical_sha256(
+        {key: value for key, value in oracle.items() if key != "oracle_sha256"}
+    ), "independent_logits_identity_mismatch", "oracle self-hash differs")
+    _require(oracle.get("schema") == "tinystories-1m-fixed-logits-oracle-v1"
+             and oracle.get("status") == "independent_pinned_fixed_reference"
+             and oracle.get("prompt_tokens") == contract["reference"]["prompt_tokens"]
+             and oracle.get("next_token") == contract["reference"]["tokens"][0],
+             "independent_logits_identity_mismatch", "oracle fixture differs")
+    identity = oracle.get("identity", {})
+    _require(identity.get("contract_sha256") == FROZEN_CONTRACT_SHA256
+             and identity.get("audit_file_sha256") == FROZEN_AUDIT_FILE_SHA256
+             and identity.get("audit_payload_sha256") == audit.get("sha256")
+             and identity.get("package_manifest_sha256") == contract["package"]["manifest_sha256"]
+             and identity.get("package_weights_sha256") == contract["package"]["sha256"]
+             and identity.get("package_scales_sha256") == contract["package"]["files"]["scales.bin"]["sha256"]
+             and identity.get("reference_revision") == contract["deployed_profile"]["revision"],
+             "independent_logits_identity_mismatch", "oracle provenance differs")
+    expected_sources = {
+        name: contract["deployed_profile"]["sources"][name]
+        for name in identity.get("pinned_sources", {})
+    }
+    capture = _repo_root() / "scripts/comparison/capture_tinystories_1m_fixed_logits.py"
+    _require(identity.get("pinned_sources") == expected_sources
+             and capture.is_file() and identity.get("capture_script_sha256") == _sha256(capture),
+             "independent_logits_identity_mismatch", "oracle source closure differs")
+    logits = oracle.get("logits", {})
+    values = logits.get("values")
+    _require(logits.get("shape") == [50257] and logits.get("dtype") == "signed_q16.16_int64"
+             and isinstance(values, list) and len(values) == 50257
+             and all(isinstance(value, int) and not isinstance(value, bool) for value in values),
+             "independent_logits_identity_mismatch", "oracle vector is malformed")
+    packed = b"".join(struct.pack("<q", value) for value in values)
+    _require(logits.get("canonical_sha256") == canonical_sha256(values)
+             and logits.get("little_endian_int64_sha256") == hashlib.sha256(packed).hexdigest(),
+             "independent_logits_identity_mismatch", "oracle vector hash differs")
+    return torch.tensor(values, dtype=torch.int64)
+
+
+def _authenticate_inputs(contract_path: Path, package_path: Path) -> tuple[
+    dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], torch.Tensor
+]:
     contract = _load_json(contract_path, "exact-input contract")
     audit_path = contract_path.with_name(AUDIT_NAME)
     audit = _load_json(audit_path, "exact-input audit")
@@ -247,6 +396,9 @@ def _authenticate_inputs(contract_path: Path, package_path: Path) -> tuple[dict[
              "identity_frontier", "audit self-hash differs")
     _require(audit.get("status") == "authenticated" and audit.get("conflicts") == [],
              "identity_frontier", "canonical audit is not authenticated")
+    _require(_sha256(contract_path) == FROZEN_CONTRACT_SHA256
+             and _sha256(audit_path) == FROZEN_AUDIT_FILE_SHA256,
+             "contract_identity_mismatch", "complete v2 contract/audit bytes differ")
     _require(audit.get("next_gate") == "exact_quantized_pytorch_model",
              "identity_frontier", "audit does not authorize the exact model gate")
     _require(contract.get("schema") == "tinystories-1m-exact-input-contract-v2"
@@ -328,7 +480,17 @@ def _authenticate_inputs(contract_path: Path, package_path: Path) -> tuple[dict[
     _require(package_contract.get("manifest_sha256") == expected_files["manifest.json"]["sha256"]
              and package_contract.get("sha256") == expected_files["weights.bin"]["sha256"],
              "package_identity_mismatch", "package aliases differ")
-    return contract, audit, profile
+    certificate_path = _repo_root() / REACHABLE_CERTIFICATE_RELATIVE
+    oracle_path = _repo_root() / FIXED_LOGITS_ORACLE_RELATIVE
+    _require(certificate_path.is_file() and _sha256(certificate_path) == REACHABLE_CERTIFICATE_SHA256,
+             "identity_frontier", "reachable-domain certificate artifact differs")
+    _require(oracle_path.is_file() and _sha256(oracle_path) == FIXED_LOGITS_ORACLE_SHA256,
+             "independent_logits_identity_mismatch", "fixed-logits oracle artifact differs")
+    certificate = _load_json(certificate_path, "reachable-domain certificate")
+    oracle = _load_json(oracle_path, "fixed-logits oracle")
+    _validate_reachable_certificate(certificate, contract, audit)
+    oracle_logits = _validate_fixed_logits_oracle(oracle, contract, audit)
+    return contract, audit, profile, certificate, oracle, oracle_logits
 
 
 def _tensor_images(manifest: Mapping[str, Any], weight_image: bytes, scale_image: bytes,
@@ -349,16 +511,24 @@ def _tensor_images(manifest: Mapping[str, Any], weight_image: bytes, scale_image
             scale_offset = int(descriptor["scale_offset"])
             scale_raw = scale_image[scale_offset:scale_offset + int(descriptor["scale_nbytes"])]
             float_scales = torch.frombuffer(bytearray(scale_raw), dtype=torch.float32).clone().to(torch.float64)
-            materialized = torch.round(float_scales * (1 << Q_SCALE)).to(torch.int64)
-            _require(bool(((materialized > 0) & (materialized < (1 << 24))).all()),
+            rounded = torch.round(float_scales * (1 << Q_SCALE))
+            _require(bool(torch.isfinite(rounded).all())
+                     and bool(((rounded > 0) & (rounded < (1 << 24))).all()),
                      "arithmetic_identity_mismatch", f"{name}: Q8.24 scale range")
+            materialized = rounded.to(torch.int64)
             scales[name] = materialized
         else:
-            parameters[name] = torch.round(state_dict[target].to(torch.float64) * (1 << Q_VALUE)).to(torch.int64)
+            rounded = torch.round(state_dict[target].to(torch.float64) * (1 << Q_VALUE))
+            _require(bool(torch.isfinite(rounded).all())
+                     and bool(((rounded >= -(1 << 31)) & (rounded < (1 << 31))).all()),
+                     "q16_range_violation", f"{name}: parameter does not fit signed Q16.16 int32")
+            parameters[name] = rounded.to(torch.int64)
     for name, values in manifest["activation_scales"].items():
-        materialized = torch.round(torch.tensor(values, dtype=torch.float64) * (1 << Q_SCALE)).to(torch.int64)
-        _require(bool(((materialized > 0) & (materialized < (1 << 24))).all()),
+        rounded = torch.round(torch.tensor(values, dtype=torch.float64) * (1 << Q_SCALE))
+        _require(bool(torch.isfinite(rounded).all())
+                 and bool(((rounded > 0) & (rounded < (1 << 24))).all()),
                  "arithmetic_identity_mismatch", f"{name}: activation scale range")
+        materialized = rounded.to(torch.int64)
         scales[f"activation::{name}"] = materialized
     return codes, scales, parameters
 
@@ -404,11 +574,11 @@ class _ExactFixedPointModel(torch.nn.Module):
         return round_shift_signed(codes * scales.unsqueeze(-1), Q_SCALE - Q_VALUE)
 
     def _gemv(self, values: torch.Tensor, weight: str, bias: str | None,
-              module: str, output_quantized: bool = True) -> torch.Tensor:
+              module: str) -> tuple[torch.Tensor, tuple[torch.Tensor, ...], torch.Tensor]:
         original_shape = values.shape[:-1]
         flattened = values.reshape(-1, values.shape[-1])
         input_scale = self._activation_scale(f"{module}.input")
-        input_codes, _ = activation_qdq(flattened, input_scale)
+        input_codes, input_dequantized = activation_qdq(flattened, input_scale)
         scaled_input = input_codes * input_scale
         accumulator = serial_gemv_accumulate(scaled_input, self._buffer("code", weight))
         real_q16 = round_shift_signed(
@@ -416,9 +586,14 @@ class _ExactFixedPointModel(torch.nn.Module):
         )
         if bias is not None:
             real_q16 = real_q16 + self._buffer("parameter", bias)
-        if output_quantized:
-            _, real_q16 = activation_qdq(real_q16, self._activation_scale(f"{module}.output"))
-        return real_q16.reshape(original_shape + (real_q16.shape[-1],))
+        output_scale = self._activation_scale(f"{module}.output")
+        output_codes, output_dequantized = activation_qdq(real_q16, output_scale)
+        result = output_dequantized.reshape(original_shape + (output_dequantized.shape[-1],))
+        observations = (
+            input_codes, input_scale, input_dequantized,
+            output_codes, output_scale, output_dequantized,
+        )
+        return result, observations, accumulator
 
     def _fixed_gelu(self, values_q16: torch.Tensor) -> torch.Tensor:
         q12 = torch.clamp(round_shift_signed(values_q16, 4), -32768, 32767)
@@ -457,13 +632,18 @@ class _ExactFixedPointModel(torch.nn.Module):
             heads.append(torch.stack(positions, dim=1))
         return torch.cat(heads, dim=-1)
 
-    def _execute(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, tuple[torch.Tensor, ...], torch.Tensor]:
+    def _execute(self, input_ids: torch.Tensor) -> tuple[
+        torch.Tensor, tuple[torch.Tensor, ...], tuple[torch.Tensor, ...],
+        tuple[torch.Tensor, ...], tuple[torch.Tensor, ...]
+    ]:
         length = input_ids.shape[1]
         positions = torch.arange(length, dtype=torch.int64, device=input_ids.device).unsqueeze(0)
         x = self._embedding("token_embedding.weight", input_ids)
         x = x + self._embedding("position_embedding.weight", positions)
         block_zero: tuple[torch.Tensor, ...] | None = None
-        q_input_codes = torch.empty(0, dtype=torch.int64, device=input_ids.device)
+        qdq_observations: list[torch.Tensor] = []
+        gemv_accumulators: list[torch.Tensor] = []
+        nonlinear_observations: list[torch.Tensor] = []
         for layer in range(8):
             block = f"blocks.{layer}"
             source = f"transformer.h.{layer}"
@@ -472,31 +652,56 @@ class _ExactFixedPointModel(torch.nn.Module):
                 x, self._buffer("parameter", f"{block}.ln1.weight"),
                 self._buffer("parameter", f"{block}.ln1.bias"),
             )
-            query = self._gemv(normalized, f"{block}.attn.q.weight", None,
-                               f"{source}.attn.attention.q_proj")
-            key = self._gemv(normalized, f"{block}.attn.k.weight", None,
-                             f"{source}.attn.attention.k_proj")
-            value = self._gemv(normalized, f"{block}.attn.v.weight", None,
-                               f"{source}.attn.attention.v_proj")
+            nonlinear_observations.append(normalized)
+            query, observed, accumulator = self._gemv(
+                normalized, f"{block}.attn.q.weight", None,
+                f"{source}.attn.attention.q_proj"
+            )
+            qdq_observations.extend(observed)
+            gemv_accumulators.append(accumulator)
+            key, observed, accumulator = self._gemv(
+                normalized, f"{block}.attn.k.weight", None,
+                f"{source}.attn.attention.k_proj"
+            )
+            qdq_observations.extend(observed)
+            gemv_accumulators.append(accumulator)
+            value, observed, accumulator = self._gemv(
+                normalized, f"{block}.attn.v.weight", None,
+                f"{source}.attn.attention.v_proj"
+            )
+            qdq_observations.extend(observed)
+            gemv_accumulators.append(accumulator)
             context = self._attention(query, key, value)
-            attention = self._gemv(context, f"{block}.attn.out.weight", f"{block}.attn.out.bias",
-                                   f"{source}.attn.attention.out_proj")
+            nonlinear_observations.append(context)
+            attention, observed, accumulator = self._gemv(
+                context, f"{block}.attn.out.weight", f"{block}.attn.out.bias",
+                f"{source}.attn.attention.out_proj"
+            )
+            qdq_observations.extend(observed)
+            gemv_accumulators.append(accumulator)
             residual_attention = x + attention
             normalized_2 = _fixed_layer_norm(
                 residual_attention, self._buffer("parameter", f"{block}.ln2.weight"),
                 self._buffer("parameter", f"{block}.ln2.bias"),
             )
-            hidden = self._gemv(normalized_2, f"{block}.mlp.fc.weight", f"{block}.mlp.fc.bias",
-                                f"{source}.mlp.c_fc")
+            nonlinear_observations.append(normalized_2)
+            hidden, observed, accumulator = self._gemv(
+                normalized_2, f"{block}.mlp.fc.weight", f"{block}.mlp.fc.bias",
+                f"{source}.mlp.c_fc"
+            )
+            qdq_observations.extend(observed)
+            gemv_accumulators.append(accumulator)
             activated = self._fixed_gelu(hidden)
-            projected = self._gemv(activated, f"{block}.mlp.proj.weight", f"{block}.mlp.proj.bias",
-                                   f"{source}.mlp.c_proj")
+            nonlinear_observations.append(activated)
+            projected, observed, accumulator = self._gemv(
+                activated, f"{block}.mlp.proj.weight", f"{block}.mlp.proj.bias",
+                f"{source}.mlp.c_proj"
+            )
+            qdq_observations.extend(observed)
+            gemv_accumulators.append(accumulator)
             x = residual_attention + projected
             if layer == 0:
                 last = length - 1
-                q_input_codes, _ = activation_qdq(
-                    normalized[:, last, :], self._activation_scale(f"{source}.attn.attention.q_proj.input")
-                )
                 block_zero = (
                     block_input[0, last], normalized[0, last], query[0, last].reshape(16, 4),
                     key[0, last].reshape(16, 4), value[0, last].reshape(16, 4),
@@ -506,16 +711,22 @@ class _ExactFixedPointModel(torch.nn.Module):
         normalized = _fixed_layer_norm(
             x, self._buffer("parameter", "final_ln.weight"), self._buffer("parameter", "final_ln.bias")
         )
+        nonlinear_observations.append(normalized)
         input_scale = self._activation_scale("lm_head.input")
-        input_codes, _ = activation_qdq(normalized.reshape(-1, 64), input_scale)
+        input_codes, input_dequantized = activation_qdq(normalized.reshape(-1, 64), input_scale)
+        qdq_observations.extend((input_codes, input_scale, input_dequantized))
         accumulator = serial_gemv_accumulate(
             input_codes * input_scale, self._buffer("code", "token_embedding.weight")
         )
+        gemv_accumulators.append(accumulator)
         logits = round_shift_signed(
             accumulator * self._buffer("scale", "token_embedding.weight"), 2 * Q_SCALE - Q_VALUE
         ).reshape(1, length, 50257)
         assert block_zero is not None
-        return logits, block_zero, q_input_codes
+        return (
+            logits, block_zero, tuple(qdq_observations),
+            tuple(gemv_accumulators), tuple(nonlinear_observations),
+        )
 
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         if not torch.compiler.is_compiling():
@@ -529,16 +740,29 @@ class _TraceOutputs(torch.nn.Module):
         self.model = model
 
     def forward(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, ...]:
-        logits, checkpoints, _ = self.model._execute(input_ids)
-        return (logits,) + checkpoints
+        logits, checkpoints, qdq, accumulators, nonlinear = self.model._execute(input_ids)
+        return (logits,) + checkpoints + qdq + accumulators + nonlinear
+
+
+def _tensor_observation(tensor: torch.Tensor, semantic_dtype: str) -> dict[str, Any]:
+    payload = {
+        "shape": list(tensor.shape),
+        "dtype": semantic_dtype,
+        "values": tensor.detach().cpu().tolist(),
+    }
+    return {"shape": payload["shape"], "sha256": canonical_sha256(payload)}
 
 
 class ExactModelBundle:
     def __init__(self, *, contract: dict[str, Any], audit: dict[str, Any], profile: dict[str, Any],
+                 certificate: dict[str, Any], oracle: dict[str, Any], oracle_logits: torch.Tensor,
                  manifest: dict[str, Any], model: _ExactFixedPointModel, receipt: dict[str, Any]) -> None:
         self.contract = contract
         self.audit = audit
         self.profile = profile
+        self.certificate = certificate
+        self.oracle = oracle
+        self.oracle_logits = oracle_logits
         self.manifest = manifest
         self.model = model
         self.receipt = receipt
@@ -547,7 +771,7 @@ class ExactModelBundle:
     def trace(self, input_ids: torch.Tensor) -> dict[str, Any]:
         self.model._validate_input(input_ids)
         with torch.no_grad():
-            logits, tensors, q_input_codes = self.model._execute(input_ids)
+            logits, tensors, qdq_tensors, accumulators, nonlinear_tensors = self.model._execute(input_ids)
         checkpoints: dict[str, dict[str, Any]] = {}
         for (name, shape), tensor in zip(CHECKPOINT_SHAPES.items(), tensors, strict=True):
             _require(tuple(tensor.shape) == shape, "trace_schema_mismatch", name)
@@ -564,33 +788,57 @@ class ExactModelBundle:
             "checkpoints": checkpoints,
         }
         oracle["sha256"] = canonical_sha256(oracle)
-        q_module = "transformer.h.0.attn.attention.q_proj"
-        q_input_scale = self.model._activation_scale(f"{q_module}.input")
-        q_input_codes, _ = activation_qdq(tensors[1].reshape(1, 64), q_input_scale)
-        q_accumulator = serial_gemv_accumulate(
-            q_input_codes * q_input_scale, self.model._buffer("code", "blocks.0.attn.q.weight")
-        )
+        _require(len(qdq_tensors) == len(QDQ_BOUNDARY_NAMES) * 3,
+                 "trace_schema_mismatch", "97 Q/DQ observations are required")
+        _require(len(accumulators) == len(GEMV_NAMES),
+                 "trace_schema_mismatch", "49 GEMV accumulators are required")
+        _require(len(nonlinear_tensors) == len(NONLINEAR_BOUNDARY_NAMES),
+                 "trace_schema_mismatch", "33 nonlinear observations are required")
+        qdq_boundaries = []
+        for index, name in enumerate(QDQ_BOUNDARY_NAMES):
+            codes, scales, dequantized = qdq_tensors[index * 3:index * 3 + 3]
+            qdq_boundaries.append({
+                "name": name,
+                "execution_index": index,
+                "codes_shape": list(codes.shape),
+                "codes_sha256": _tensor_observation(codes, "signed_int8_codes")["sha256"],
+                "scales_shape": list(scales.shape),
+                "scales_sha256": _tensor_observation(scales, "unsigned_q8.24")["sha256"],
+                "dequantized_shape": list(dequantized.shape),
+                "dequantized_sha256": _tensor_observation(dequantized, "signed_q16.16")["sha256"],
+            })
+        accumulator_observations = {
+            name: _tensor_observation(tensor, "signed_int64_serial_accumulator")
+            for name, tensor in zip(GEMV_NAMES, accumulators, strict=True)
+        }
+        nonlinear_observations = {
+            name: _tensor_observation(tensor, "signed_q16.16")
+            for name, tensor in zip(NONLINEAR_BOUNDARY_NAMES, nonlinear_tensors, strict=True)
+        }
+        q_input_codes, q_input_scale, _ = qdq_tensors[0:3]
+        q_output_codes, q_output_scale, q_output = qdq_tensors[3:6]
+        q_accumulator = accumulators[0]
         q_weight_scale = self.model._buffer("scale", "blocks.0.attn.q.weight")
-        q_before_output = round_shift_signed(q_accumulator * q_weight_scale, 2 * Q_SCALE - Q_VALUE)
-        q_output_scale = self.model._activation_scale(f"{q_module}.output")
-        q_output_codes, q_output = activation_qdq(q_before_output, q_output_scale)
-        _require(torch.equal(q_output.reshape(16, 4), tensors[2]),
+        _require(torch.equal(q_output[-1].reshape(16, 4), tensors[2]),
                  "trace_arithmetic_mismatch", "observable q projection differs")
         return {
             **oracle,
             "trace_sha256": oracle["sha256"],
+            "qdq_boundaries": qdq_boundaries,
+            "gemv_accumulators": accumulator_observations,
+            "nonlinear_boundaries": nonlinear_observations,
             "arithmetic": {
                 "value_format": "signed Q16.16",
                 "accumulator": "signed_int64_serial_wrap",
                 "rounding": "nearest_ties_away_from_zero",
                 "saturation": [-128, 127],
                 "q_proj.input": {
-                    "codes": q_input_codes[0].cpu().tolist(),
+                    "codes": q_input_codes[-1].cpu().tolist(),
                     "scales": q_input_scale.cpu().tolist(),
                     "scale_format": "unsigned Q8.24",
                 },
                 "q_proj.accumulator": {
-                    "values": q_accumulator[0].cpu().tolist(),
+                    "values": q_accumulator[-1].cpu().tolist(),
                     "order": "ascending_input_index",
                     "width_bits": 64,
                     "overflow": "twos_complement_wrap",
@@ -600,9 +848,9 @@ class ExactModelBundle:
                     "round_shift": 32,
                 },
                 "q_proj.output": {
-                    "codes": q_output_codes[0].cpu().tolist(),
+                    "codes": q_output_codes[-1].cpu().tolist(),
                     "scales": q_output_scale.cpu().tolist(),
-                    "dequantized": q_output[0].cpu().tolist(),
+                    "dequantized": q_output[-1].cpu().tolist(),
                     "scale_format": "unsigned Q8.24",
                 },
             },
@@ -615,7 +863,9 @@ def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) 
     contract_path = Path(contract_path)
     package_path = Path(package_path)
     model_path = Path(model_path)
-    contract, audit, profile = _authenticate_inputs(contract_path, package_path)
+    contract, audit, profile, certificate, oracle, oracle_logits = _authenticate_inputs(
+        contract_path, package_path
+    )
     manifest = _load_json(package_path / "manifest.json", "package manifest")
     reference_adapter._validate_config(model_path, manifest)
     target_shapes = {
@@ -630,6 +880,11 @@ def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) 
     )
     codes, scales, parameters = _tensor_images(manifest, weight_image, scale_image, state_dict)
     model = _ExactFixedPointModel(codes, scales, parameters, _load_finite_validator()).eval()
+    prompt = torch.tensor([contract["reference"]["prompt_tokens"]], dtype=torch.int64)
+    with torch.no_grad():
+        authenticated_logits = model(prompt)[0, -1]
+    _require(torch.equal(authenticated_logits, oracle_logits),
+             "independent_logits_mismatch", "adapter logits differ from pinned fixed reference")
     receipt: dict[str, Any] = {
         "schema": "tinystories-1m-exact-package-model-v1",
         "status": "authenticated_fixed_point_model",
@@ -637,6 +892,8 @@ def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) 
             "contract_sha256": _sha256(contract_path),
             "audit_sha256": audit["sha256"],
             "fixed_profile_sha256": FROZEN_FIXED_PROFILE_SHA256,
+            "reachable_certificate_sha256": REACHABLE_CERTIFICATE_SHA256,
+            "fixed_logits_oracle_sha256": FIXED_LOGITS_ORACLE_SHA256,
             "package_manifest_sha256": contract["package"]["manifest_sha256"],
             "package_weights_sha256": contract["package"]["sha256"],
         },
@@ -650,11 +907,56 @@ def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) 
         },
         "tensor_mapping": mapping,
         "activation_boundary_count": len(manifest["activation_scales"]),
+        "independent_logits_oracle": {
+            "status": "full_logits_bit_exact",
+            "canonical_sha256": oracle["logits"]["canonical_sha256"],
+            "little_endian_int64_sha256": oracle["logits"]["little_endian_int64_sha256"],
+            "reference_revision": oracle["identity"]["reference_revision"],
+        },
     }
     receipt["receipt_sha256"] = canonical_sha256(receipt)
     return ExactModelBundle(
-        contract=contract, audit=audit, profile=profile, manifest=manifest, model=model, receipt=receipt
+        contract=contract, audit=audit, profile=profile, certificate=certificate,
+        oracle=oracle, oracle_logits=oracle_logits, manifest=manifest, model=model, receipt=receipt
     )
+
+
+def _named_tensor_state_sha256(values: Mapping[str, torch.Tensor]) -> str:
+    digest = hashlib.sha256()
+    for name, tensor in sorted(values.items()):
+        value = tensor.detach().cpu().contiguous()
+        digest.update(name.encode())
+        digest.update(str(value.dtype).encode())
+        digest.update(json.dumps(list(value.shape), separators=(",", ":")).encode())
+        digest.update(value.numpy().tobytes())
+    return digest.hexdigest()
+
+
+def exported_program_identity(exported: torch.export.ExportedProgram) -> dict[str, Any]:
+    """Canonical graph/signature/state identity independent of zip timestamps."""
+
+    graph_code = exported.graph_module.code
+    signature = str(exported.graph_signature)
+    constraints = sorted((str(key), str(value)) for key, value in exported.range_constraints.items())
+    tensor_constants = {
+        name: value for name, value in exported.constants.items()
+        if isinstance(value, torch.Tensor)
+    }
+    non_tensor_constants = {
+        name: repr(value) for name, value in exported.constants.items()
+        if not isinstance(value, torch.Tensor)
+    }
+    identity: dict[str, Any] = {
+        "schema": "torch-exported-program-canonical-identity-v1",
+        "graph_code_sha256": hashlib.sha256(graph_code.encode()).hexdigest(),
+        "graph_signature_sha256": hashlib.sha256(signature.encode()).hexdigest(),
+        "range_constraints_sha256": canonical_sha256(constraints),
+        "state_dict_sha256": _named_tensor_state_sha256(exported.state_dict),
+        "tensor_constants_sha256": _named_tensor_state_sha256(tensor_constants),
+        "non_tensor_constants_sha256": canonical_sha256(non_tensor_constants),
+    }
+    identity["program_sha256"] = canonical_sha256(identity)
+    return identity
 
 
 def export_exact_program(bundle: ExactModelBundle) -> torch.export.ExportedProgram:
@@ -662,11 +964,24 @@ def export_exact_program(bundle: ExactModelBundle) -> torch.export.ExportedProgr
 
     prompt = torch.tensor([bundle.contract["reference"]["prompt_tokens"]], dtype=torch.int64)
     with torch.no_grad():
-        eager_logits, eager_checkpoints, _ = bundle.model._execute(prompt)
+        eager_logits, eager_checkpoints, eager_qdq, eager_accumulators, eager_nonlinear = (
+            bundle.model._execute(prompt)
+        )
+    _require(torch.equal(eager_logits[0, -1], bundle.oracle_logits),
+             "independent_logits_mismatch", "eager logits differ from pinned oracle")
     trace_export = torch.export.export(_TraceOutputs(bundle.model).eval(), (prompt,), strict=False)
     with torch.no_grad():
         replay = trace_export.module()(prompt)
-    replay_logits, replay_checkpoints = replay[0], replay[1:]
+    replay_logits = replay[0]
+    checkpoint_end = 1 + len(CHECKPOINT_SHAPES)
+    qdq_end = checkpoint_end + len(QDQ_BOUNDARY_NAMES) * 3
+    accumulator_end = qdq_end + len(GEMV_NAMES)
+    nonlinear_end = accumulator_end + len(NONLINEAR_BOUNDARY_NAMES)
+    _require(len(replay) == nonlinear_end, "export_trace_schema_mismatch", str(len(replay)))
+    replay_checkpoints = replay[1:checkpoint_end]
+    replay_qdq = replay[checkpoint_end:qdq_end]
+    replay_accumulators = replay[qdq_end:accumulator_end]
+    replay_nonlinear = replay[accumulator_end:nonlinear_end]
     checkpoint_hashes: dict[str, str] = {}
     for (name, shape), eager, exported in zip(
         CHECKPOINT_SHAPES.items(), eager_checkpoints, replay_checkpoints, strict=True
@@ -675,6 +990,34 @@ def export_exact_program(bundle: ExactModelBundle) -> torch.export.ExportedProgr
         payload = {"shape": list(shape), "dtype": "signed_q16.16", "values": eager.cpu().tolist()}
         checkpoint_hashes[name] = canonical_sha256(payload)
     _require(torch.equal(eager_logits, replay_logits), "export_logits_mismatch", "trace export logits")
+    qdq_hashes: dict[str, dict[str, str]] = {}
+    for index, name in enumerate(QDQ_BOUNDARY_NAMES):
+        eager_group = eager_qdq[index * 3:index * 3 + 3]
+        replay_group = replay_qdq[index * 3:index * 3 + 3]
+        _require(all(torch.equal(eager, actual)
+                     for eager, actual in zip(eager_group, replay_group, strict=True)),
+                 "export_qdq_mismatch", name)
+        qdq_hashes[name] = {
+            semantic: _tensor_observation(tensor, dtype)["sha256"]
+            for semantic, tensor, dtype in zip(
+                ("codes", "scales", "dequantized"), eager_group,
+                ("signed_int8_codes", "unsigned_q8.24", "signed_q16.16"), strict=True,
+            )
+        }
+    accumulator_hashes = {}
+    for name, eager, actual in zip(
+        GEMV_NAMES, eager_accumulators, replay_accumulators, strict=True
+    ):
+        _require(torch.equal(eager, actual), "export_accumulator_mismatch", name)
+        accumulator_hashes[name] = _tensor_observation(
+            eager, "signed_int64_serial_accumulator"
+        )["sha256"]
+    nonlinear_hashes = {}
+    for name, eager, actual in zip(
+        NONLINEAR_BOUNDARY_NAMES, eager_nonlinear, replay_nonlinear, strict=True
+    ):
+        _require(torch.equal(eager, actual), "export_nonlinear_mismatch", name)
+        nonlinear_hashes[name] = _tensor_observation(eager, "signed_q16.16")["sha256"]
     logits_export = torch.export.export(bundle.model.eval(), (prompt,), strict=False)
     with torch.no_grad():
         logits_replay = logits_export.module()(prompt)
@@ -682,7 +1025,13 @@ def export_exact_program(bundle: ExactModelBundle) -> torch.export.ExportedProgr
     bundle.export_verification = {
         "status": "matched",
         "checkpoint_sha256": checkpoint_hashes,
+        "qdq_boundary_sha256": qdq_hashes,
+        "gemv_accumulator_sha256": accumulator_hashes,
+        "nonlinear_boundary_sha256": nonlinear_hashes,
         "final_logits_status": "matched",
         "final_logits_sha256": hashlib.sha256(eager_logits.cpu().numpy().astype("<i8").tobytes()).hexdigest(),
+        "final_logits_canonical_sha256": canonical_sha256(eager_logits[0, -1].cpu().tolist()),
+        "independent_oracle_status": "full_logits_bit_exact",
+        "exported_program": exported_program_identity(logits_export),
     }
     return logits_export
