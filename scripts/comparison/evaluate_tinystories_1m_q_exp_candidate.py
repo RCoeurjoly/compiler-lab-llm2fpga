@@ -38,7 +38,8 @@ def sha256_file(path: Path) -> str:
 
 
 def canonical_sha256(value: Any) -> str:
-    return sha256_bytes((json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode())
+    # Match the authenticated Q/DQ receipt's canonical JSON (no trailing LF).
+    return sha256_bytes(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode())
 
 
 def f32(value: float) -> float:
@@ -47,6 +48,29 @@ def f32(value: float) -> float:
 
 def f32_bits(value: float) -> str:
     return f"0x{struct.unpack('<I', struct.pack('<f', f32(value)))[0]:08x}"
+
+
+def q16_16_to_f32_bits(q: int) -> int:
+    """Match the RTL's normalized, truncating ``q16_16_to_f32`` function."""
+    q = int(q)
+    if q == 0:
+        return 0
+    sign = 1 if q < 0 else 0
+    magnitude = abs(q)
+    msb = magnitude.bit_length() - 1
+    exponent = msb - 16
+    if exponent > 127:
+        return (sign << 31) | (0xFE << 23) | 0x7FFFFF
+    if exponent < -126:
+        return sign << 31
+    # RTL shifts right when the significand has more than 24 bits, dropping
+    # (not rounding) the low bits, then takes norm[22:0] as the fraction.
+    norm = magnitude >> (msb - 23) if msb >= 23 else magnitude << (23 - msb)
+    return (sign << 31) | ((exponent + 127) << 23) | (norm & 0x7FFFFF)
+
+
+def q16_16_to_f32(q: int) -> float:
+    return struct.unpack("<f", struct.pack("<I", q16_16_to_f32_bits(q)))[0]
 
 
 def trunc_div(numerator: int, denominator: int) -> int:
@@ -93,9 +117,7 @@ def q_exp_approx(value: float) -> tuple[float, int]:
         term = q_mul(term, x); total = sat32(total + trunc_div(term, 6))
         term = q_mul(term, x); total = sat32(total + trunc_div(term, 24))
         result = total
-    # q16_16_to_f32 is exact enough for this bounded range; round through f32
-    # so comparisons use the same externally visible representation.
-    return f32(result / Q), result
+    return q16_16_to_f32(result), result
 
 
 def _summarize(points: list[float]) -> dict[str, Any]:
@@ -143,21 +165,45 @@ def evaluate_grid() -> dict[str, Any]:
 
 
 def package_evidence(package: Path) -> dict[str, Any]:
-    required = ("manifest.json", "weights.bin", "scales.bin")
+    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    expected = contract.get("package", {}).get("files", {})
+    required = tuple(expected) if expected else ("manifest.json", "weights.bin", "scales.bin", "calibration_ids.bin", "receipt.json")
     if not all((package / name).is_file() for name in required):
         return {"available": False, "path": str(package), "missing": [name for name in required if not (package / name).is_file()]}
+    mismatches = {name: {"expected": digest, "actual": sha256_file(package / name)}
+                  for name, digest in expected.items() if sha256_file(package / name) != digest}
+    if mismatches:
+        raise ValueError(f"package hash mismatch: {mismatches}")
     manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
     return {
         "available": True,
+        "path": str(package),
         "manifest_sha256": sha256_file(package / "manifest.json"),
         "weights_sha256": sha256_file(package / "weights.bin"),
         "scales_sha256": sha256_file(package / "scales.bin"),
+        "calibration_ids_sha256": sha256_file(package / "calibration_ids.bin"),
+        "receipt_sha256": sha256_file(package / "receipt.json"),
         "manifest_model": manifest.get("model"),
     }
 
 
 def assess_checkpoint_boundary() -> dict[str, Any]:
     receipt = json.loads(QDQ.read_text(encoding="utf-8"))
+    if receipt.get("schema") != "tinystories-1m-qdq-semantics-v1":
+        raise ValueError("Q/DQ receipt schema mismatch")
+    receipt_digest = receipt.get("receipt_sha256")
+    if receipt_digest != canonical_sha256({k: v for k, v in receipt.items() if k != "receipt_sha256"}):
+        raise ValueError("Q/DQ receipt self-hash mismatch")
+    identity = receipt.get("identity", {})
+    if identity.get("contract_sha256") != sha256_file(CONTRACT):
+        raise ValueError("Q/DQ receipt contract identity mismatch")
+    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    expected_package = contract.get("package", {}).get("files", {})
+    for key, identity_key in (("manifest.json", "package_manifest_sha256"),
+                              ("weights.bin", "package_weights_sha256"),
+                              ("scales.bin", "package_scales_sha256")):
+        if identity.get(identity_key) != expected_package.get(key):
+            raise ValueError(f"Q/DQ receipt package identity mismatch: {key}")
     checkpoints = receipt.get("candidate_oracle", {}).get("checkpoints", {})
     q = checkpoints.get("block.attention.q", {})
     k = checkpoints.get("block.attention.k", {})
@@ -166,7 +212,11 @@ def assess_checkpoint_boundary() -> dict[str, Any]:
     q_shape, k_shape = q.get("shape"), k.get("shape")
     complete_rows = bool(q_shape and k_shape and len(q_shape) == 3 and len(k_shape) == 3)
     return {
-        "qdq_receipt_sha256": sha256_file(QDQ),
+        "qdq_receipt_path": str(QDQ.relative_to(ROOT)),
+        "qdq_receipt_file_sha256": sha256_file(QDQ),
+        "qdq_receipt_self_sha256": receipt_digest,
+        "qdq_receipt_schema": receipt["schema"],
+        "qdq_identity": identity,
         "q_checkpoint_shape": q_shape,
         "k_checkpoint_shape": k_shape,
         "complete_causal_score_rows_available": complete_rows,

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -40,11 +42,29 @@ class QExpCandidateTest(unittest.TestCase):
         self.assertEqual(self.module.q_exp_approx(-8.0)[1], 0)
         self.assertEqual(self.module.q_exp_approx(8.0)[1], self.module.I32_MAX)
         self.assertEqual(self.module.q_exp_approx(0.0)[1], self.module.Q)
+        self.assertEqual(self.module.q16_16_to_f32_bits(self.module.I32_MAX), 0x46FFFFFF)
+        self.assertEqual(self.module.q16_16_to_f32_bits(-self.module.I32_MAX), 0xC6FFFFFF)
+
+    def test_package_tamper_is_rejected(self):
+        package = Path("/tmp/kev-gpt-startinit/model_packages/tinystories-1m")
+        with tempfile.TemporaryDirectory() as directory:
+            copy = Path(directory) / "package"
+            shutil.copytree(package, copy)
+            (copy / "weights.bin").write_bytes((copy / "weights.bin").read_bytes()[:1] + b"tampered")
+            with self.assertRaisesRegex(ValueError, "package hash mismatch"):
+                self.module.package_evidence(copy)
+
+    def test_q_exp_conversion_truncates_not_rounds(self):
+        # INT32_MAX is the high saturation result in RTL; IEEE conversion of
+        # q/Q would round to 32768.0, while RTL emits the truncated 32767.999...
+        self.assertEqual(self.module.q16_16_to_f32_bits(self.module.I32_MAX), 0x46FFFFFF)
 
     def test_qdq_receipt_does_not_claim_complete_score_rows(self):
         boundary = self.report["qdq_boundary"]
         self.assertEqual(boundary["q_checkpoint_shape"], [16, 4])
         self.assertEqual(boundary["k_checkpoint_shape"], [16, 4])
+        self.assertEqual(boundary["qdq_receipt_schema"], "tinystories-1m-qdq-semantics-v1")
+        self.assertEqual(boundary["qdq_receipt_self_sha256"], "c025c8e89ba71dca2437b89f90105d9cc5fd44366e5b51ef089288d15fde730f")
         self.assertFalse(boundary["complete_causal_score_rows_available"])
         self.assertEqual(boundary["comparison_status"], "unsupported")
 

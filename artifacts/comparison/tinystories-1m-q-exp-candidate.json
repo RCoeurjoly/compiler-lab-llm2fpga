@@ -53,7 +53,7 @@
         {
           "input": 8.0,
           "input_bits": "0x41000000",
-          "observed": 32768.0,
+          "observed": 32767.998046875,
           "q16_16": 2147483647,
           "reference": 2980.9580078125
         }
@@ -62,15 +62,15 @@
         "max": 8.5,
         "min": -8.5
       },
-      "max_absolute_error": 29787.0419921875,
+      "max_absolute_error": 29787.0400390625,
       "max_relative_error": 328835.9552273349,
       "sample_count": 65540,
       "worst_case": {
-        "absolute_error": 29787.0419921875,
+        "absolute_error": 29787.0400390625,
         "input": 8.0,
         "input_bits": "0x41000000",
-        "observed": 32768.0,
-        "observed_bits": "0x47000000",
+        "observed": 32767.998046875,
+        "observed_bits": "0x46ffffff",
         "q16_16": 2147483647,
         "reference": 2980.9580078125,
         "reference_bits": "0x453a4f54"
@@ -116,7 +116,7 @@
         {
           "input": 8.0,
           "input_bits": "0x41000000",
-          "observed": 32768.0,
+          "observed": 32767.998046875,
           "q16_16": 2147483647,
           "reference": 2980.9580078125
         }
@@ -158,6 +158,7 @@
   "model": "TinyStories-1M",
   "package": {
     "available": true,
+    "calibration_ids_sha256": "2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075",
     "manifest_model": {
       "activation_function": "gelu_new",
       "head_dim": 4,
@@ -173,6 +174,8 @@
       "vocab_size": 50257
     },
     "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "path": "/tmp/kev-gpt-startinit/model_packages/tinystories-1m",
+    "receipt_sha256": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
     "scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
     "weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
   },
@@ -187,10 +190,19 @@
       16,
       4
     ],
-    "qdq_receipt_sha256": "a274d61ec5f634fac8fb501339ddfe7ae4bf774d950840498d54c32b90d79e77",
+    "qdq_identity": {
+      "contract_sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf",
+      "package_manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+      "package_scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+      "package_weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+    },
+    "qdq_receipt_file_sha256": "a274d61ec5f634fac8fb501339ddfe7ae4bf774d950840498d54c32b90d79e77",
+    "qdq_receipt_path": "artifacts/reference/tinystories-1m-qdq-semantics.json",
+    "qdq_receipt_schema": "tinystories-1m-qdq-semantics-v1",
+    "qdq_receipt_self_sha256": "c025c8e89ba71dca2437b89f90105d9cc5fd44366e5b51ef089288d15fde730f",
     "reason": "authenticated trace stores final-token Q/K vectors, not complete causal attention score rows"
   },
   "schema": "tinystories-1m-q-exp-candidate-evaluation-v1",
-  "sha256": "0f89a583a734a4d87b22f38538fc1ebb5ef5f0044d6cdaf1d9aa2166c0a1993d",
+  "sha256": "f3c5e14d251b72e516e5e8560c0add92c35dd85bd16c086239066248da87f8cc",
   "status": "unsupported"
 }
