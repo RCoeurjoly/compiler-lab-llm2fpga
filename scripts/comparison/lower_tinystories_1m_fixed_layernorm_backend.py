@@ -22,6 +22,7 @@ import hashlib
 import importlib.util
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -384,6 +385,145 @@ def render_flat_scf(bundle: Mapping[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def validate_calyx_structure(bundle: Mapping[str, Any], calyx_mlir: str) -> None:
+    """Reject partial, stale-looking, or unrelated Calyx text."""
+
+    validate_bundle(bundle)
+    require(isinstance(calyx_mlir, str) and calyx_mlir.strip(), "calyx_artifact_invalid", "empty conversion output")
+    require(
+        'calyx.entrypoint = "main"' in calyx_mlir
+        and "llm2fpga.backend_manifest" in calyx_mlir
+        and "calyx.component @main(" in calyx_mlir
+        and "calyx.component @main_1(" in calyx_mlir,
+        "calyx_artifact_invalid",
+        "entrypoint/component structure",
+    )
+    require(
+        calyx_mlir.count("{external = true}") == 4
+        and calyx_mlir.count("<[64] x 32>") >= 8,
+        "calyx_artifact_invalid",
+        "expected four external 64xi32 memories and their internal bindings",
+    )
+    require(
+        "llm2fpga.fixed_layer_norm_q16_16" not in calyx_mlir
+        and "func.func" not in calyx_mlir
+        and "memref." not in calyx_mlir,
+        "calyx_artifact_invalid",
+        "unlowered operation residue",
+    )
+    for identity in (
+        bundle["bridge_file_sha256"],
+        bundle["bridge"]["sha256"],
+        bundle["descriptor"]["sha256"],
+        bundle["bridge_mlir_sha256"],
+        bundle["vector_file_sha256"],
+        bundle["vector"]["sha256"],
+        *bundle["checkpoint_identities"].values(),
+    ):
+        require(identity in calyx_mlir, "calyx_artifact_invalid", f"missing provenance identity {identity}")
+
+
+def _failed_conversion(command: Sequence[str], diagnostic: str) -> dict[str, Any]:
+    return {
+        "calyx_mlir": None,
+        "command": list(command),
+        "diagnostic": diagnostic,
+        "validation": None,
+    }
+
+
+def run_calyx_conversion(
+    circt_opt: Path, flat_scf_path: Path, calyx_out: Path, bundle: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Convert and independently reparse Calyx, never trusting prior output."""
+
+    validate_bundle(bundle)
+    require(Path(flat_scf_path).is_file(), "flat_scf_missing", str(flat_scf_path))
+    require(
+        sha256_file(flat_scf_path) == sha256_bytes(render_flat_scf(bundle).encode()),
+        "flat_scf_identity_mismatch",
+        str(flat_scf_path),
+    )
+    calyx_out = Path(calyx_out)
+    calyx_out.unlink(missing_ok=True)
+    command = [
+        str(circt_opt),
+        str(flat_scf_path),
+        "--lower-scf-to-calyx=top-level-function=main",
+        "-o",
+        str(calyx_out),
+    ]
+    completed = subprocess.run(command, check=False, capture_output=True, text=True)
+    conversion_diagnostic = (completed.stdout + completed.stderr).strip()
+    if completed.returncode != 0:
+        calyx_out.unlink(missing_ok=True)
+        return _failed_conversion(command, f"calyx_conversion_failed(exit={completed.returncode}): {conversion_diagnostic}")
+    if not calyx_out.is_file():
+        return _failed_conversion(command, "conversion_output_missing: circt-opt exited zero without creating --calyx-out")
+    try:
+        calyx_mlir = calyx_out.read_text(encoding="utf-8")
+        validate_calyx_structure(bundle, calyx_mlir)
+    except (OSError, UnicodeError, BackendLoweringError) as error:
+        calyx_out.unlink(missing_ok=True)
+        return _failed_conversion(command, f"calyx_artifact_invalid: {error}")
+
+    with tempfile.NamedTemporaryFile(
+        prefix=".task3q-calyx-reparse-",
+        suffix=".mlir",
+        dir=calyx_out.parent,
+        delete=False,
+    ) as temporary:
+        reparsed_path = Path(temporary.name)
+    # Presence must prove the parser invocation, not NamedTemporaryFile.
+    reparsed_path.unlink()
+    reparse_command = [str(circt_opt), str(calyx_out), "--verify-each", "-o", str(reparsed_path)]
+    try:
+        reparsed = subprocess.run(reparse_command, check=False, capture_output=True, text=True)
+        reparse_diagnostic = (reparsed.stdout + reparsed.stderr).strip()
+        if reparsed.returncode != 0:
+            calyx_out.unlink(missing_ok=True)
+            return _failed_conversion(
+                command,
+                f"calyx_reparse_failed(exit={reparsed.returncode}): {reparse_diagnostic}",
+            )
+        if not reparsed_path.is_file():
+            calyx_out.unlink(missing_ok=True)
+            return _failed_conversion(
+                command,
+                "calyx_reparse_output_missing: verifier exited zero without creating output",
+            )
+        reparsed_mlir = reparsed_path.read_text(encoding="utf-8")
+        validate_calyx_structure(bundle, reparsed_mlir)
+        validation = {
+            "schema": "tinystories-1m-calyx-validation-v1",
+            "status": "converted_and_reparsed",
+            "flat_scf_sha256": sha256_file(flat_scf_path),
+            "calyx_sha256": sha256_bytes(calyx_mlir.encode()),
+            "reparsed_calyx_sha256": sha256_bytes(reparsed_mlir.encode()),
+            "conversion_command": command,
+            "reparse_command": [
+                str(circt_opt),
+                str(calyx_out),
+                "--verify-each",
+                "-o",
+                "<temporary-reparse-output>",
+            ],
+        }
+        validation["sha256"] = canonical_sha256(validation)
+        diagnostic = "\n".join(item for item in (conversion_diagnostic, reparse_diagnostic) if item)
+        return {
+            "calyx_mlir": calyx_mlir,
+            "command": command,
+            "diagnostic": diagnostic,
+            "validation": validation,
+        }
+    except (OSError, UnicodeError, BackendLoweringError) as error:
+        calyx_out.unlink(missing_ok=True)
+        return _failed_conversion(command, f"calyx_reparse_invalid: {error}")
+    finally:
+        reparsed_path.unlink(missing_ok=True)
+
+
 def make_report(
     bundle: Mapping[str, Any],
     flat_scf: str,
@@ -391,6 +531,7 @@ def make_report(
     calyx_mlir: str | None,
     calyx_command: Sequence[str] | None,
     calyx_diagnostic: str,
+    calyx_validation: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     require(flat_scf == render_flat_scf(bundle), "rendered_backend_ir_mismatch", "flat SCF")
     algorithm_result = execute_lowered_algorithm(bundle["vector"])
@@ -399,9 +540,34 @@ def make_report(
     calyx_artifact = None
     backend_status = "flat_scf_emitted"
     if calyx_mlir is not None:
-        require("calyx.entrypoint" in calyx_mlir and "llm2fpga.fixed_layer_norm_q16_16" not in calyx_mlir, "calyx_artifact_invalid", "conversion output")
+        validate_calyx_structure(bundle, calyx_mlir)
+        require(isinstance(calyx_validation, Mapping), "calyx_validation_missing", "converted output must be independently reparsed")
+        required_validation_keys = {
+            "schema",
+            "status",
+            "flat_scf_sha256",
+            "calyx_sha256",
+            "reparsed_calyx_sha256",
+            "conversion_command",
+            "reparse_command",
+            "sha256",
+        }
+        require(set(calyx_validation) == required_validation_keys, "calyx_validation_mismatch", "receipt keys")
+        require(
+            calyx_validation.get("schema") == "tinystories-1m-calyx-validation-v1"
+            and calyx_validation.get("status") == "converted_and_reparsed"
+            and calyx_validation.get("flat_scf_sha256") == sha256_bytes(flat_scf.encode())
+            and calyx_validation.get("calyx_sha256") == sha256_bytes(calyx_mlir.encode())
+            and calyx_validation.get("conversion_command") == list(calyx_command or ())
+            and calyx_validation.get("sha256")
+            == canonical_sha256({key: value for key, value in calyx_validation.items() if key != "sha256"}),
+            "calyx_validation_mismatch",
+            "conversion/reparse receipt",
+        )
         calyx_artifact = {"kind": "calyx_mlir", "sha256": sha256_bytes(calyx_mlir.encode())}
         backend_status = "calyx_emitted_not_executed"
+    else:
+        require(calyx_validation is None, "calyx_validation_mismatch", "validation without Calyx artifact")
     return {
         "schema": "tinystories-1m-fixed-layernorm-backend-v1",
         "model": "TinyStories-1M",
@@ -416,6 +582,7 @@ def make_report(
             "max_integer_width": 64,
             "calyx_command": list(calyx_command) if calyx_command is not None else None,
             "calyx_diagnostic": calyx_diagnostic,
+            "calyx_validation": dict(calyx_validation) if calyx_validation is not None else None,
         },
         "numeric_trace": {
             "status": "algorithm_matched_backend_execution_not_run",
@@ -467,19 +634,27 @@ def main() -> int:
     calyx_mlir = None
     command = None
     diagnostic = "backend conversion not requested"
+    validation = None
     args.flat_scf_out.parent.mkdir(parents=True, exist_ok=True)
     args.calyx_out.parent.mkdir(parents=True, exist_ok=True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.flat_scf_out.write_text(flat_scf, encoding="utf-8")
     if args.circt_opt is not None:
-        command = [str(args.circt_opt), str(args.flat_scf_out), "--lower-scf-to-calyx=top-level-function=main", "-o", str(args.calyx_out)]
-        completed = subprocess.run(command, check=False, capture_output=True, text=True)
-        diagnostic = (completed.stdout + completed.stderr).strip()
-        if completed.returncode == 0 and args.calyx_out.is_file():
-            calyx_mlir = args.calyx_out.read_text(encoding="utf-8")
-        else:
-            args.calyx_out.unlink(missing_ok=True)
-    report = make_report(bundle, flat_scf, calyx_mlir=calyx_mlir, calyx_command=command, calyx_diagnostic=diagnostic)
+        conversion = run_calyx_conversion(args.circt_opt, args.flat_scf_out, args.calyx_out, bundle)
+        calyx_mlir = conversion["calyx_mlir"]
+        command = conversion["command"]
+        diagnostic = conversion["diagnostic"]
+        validation = conversion["validation"]
+    else:
+        args.calyx_out.unlink(missing_ok=True)
+    report = make_report(
+        bundle,
+        flat_scf,
+        calyx_mlir=calyx_mlir,
+        calyx_command=command,
+        calyx_diagnostic=diagnostic,
+        calyx_validation=validation,
+    )
     report["compiler_artifacts"]["flat_scf"]["path"] = str(args.flat_scf_out)
     if calyx_mlir is not None:
         report["compiler_artifacts"]["calyx"]["path"] = str(args.calyx_out)

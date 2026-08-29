@@ -15,6 +15,7 @@ SCRIPT = ROOT / "scripts/comparison/lower_tinystories_1m_fixed_layernorm_backend
 BRIDGE = ROOT / "artifacts/comparison/tinystories-1m-fixed-layernorm-bridge.json"
 BRIDGE_MLIR = ROOT / "artifacts/comparison/tinystories-1m-fixed-layernorm-bridge.mlir"
 VECTOR = ROOT / "artifacts/reference/tinystories-1m-rtl-layernorm-vector.json"
+CALYX = ROOT / "artifacts/comparison/tinystories-1m-fixed-layernorm-backend.calyx.mlir"
 
 
 def load_module():
@@ -73,6 +74,7 @@ class FixedLayerNormBackendTest(unittest.TestCase):
             calyx_mlir=None,
             calyx_command=None,
             calyx_diagnostic="backend conversion not run",
+            calyx_validation=None,
         )
         self.assertEqual(report["status"], "unsupported")
         self.assertEqual(report["backend_ir"]["status"], "flat_scf_emitted")
@@ -82,18 +84,77 @@ class FixedLayerNormBackendTest(unittest.TestCase):
         self.assertIsNone(report["compiler_artifacts"]["rtlil"])
         self.assertFalse(report["provenance"]["reference_source_or_rtl_copied"])
 
-    def test_report_accepts_only_exact_calyx_conversion_output(self) -> None:
+    def test_report_rejects_unvalidated_calyx_output(self) -> None:
         mlir = self.module.render_flat_scf(self.bundle)
-        calyx = "module attributes {calyx.entrypoint = \"main\"} {\n  calyx.component @main() {}\n}\n"
-        report = self.module.make_report(
-            self.bundle,
-            mlir,
-            calyx_mlir=calyx,
-            calyx_command=["circt-opt", "--lower-scf-to-calyx=top-level-function=main"],
-            calyx_diagnostic="",
-        )
-        self.assertEqual(report["backend_ir"]["status"], "calyx_emitted_not_executed")
-        self.assertEqual(report["compiler_artifacts"]["calyx"]["sha256"], self.module.sha256_bytes(calyx.encode()))
+        calyx = CALYX.read_text(encoding="utf-8")
+        with self.assertRaisesRegex(self.module.BackendLoweringError, "calyx_validation_missing"):
+            self.module.make_report(
+                self.bundle,
+                mlir,
+                calyx_mlir=calyx,
+                calyx_command=["circt-opt", "--lower-scf-to-calyx=top-level-function=main"],
+                calyx_diagnostic="",
+                calyx_validation=None,
+            )
+
+    def write_fake_circt(self, directory: Path, body: str) -> Path:
+        tool = directory / "fake-circt-opt"
+        tool.write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + body, encoding="utf-8")
+        tool.chmod(0o755)
+        return tool
+
+    def test_conversion_removes_stale_output_and_requires_current_creation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            flat = root / "input.mlir"
+            flat.write_text(self.module.render_flat_scf(self.bundle), encoding="utf-8")
+            output = root / "stale.calyx.mlir"
+            output.write_text(CALYX.read_text(encoding="utf-8"), encoding="utf-8")
+            tool = self.write_fake_circt(root, "exit 0\n")
+
+            result = self.module.run_calyx_conversion(tool, flat, output, self.bundle)
+
+            self.assertIsNone(result["calyx_mlir"])
+            self.assertIsNone(result["validation"])
+            self.assertFalse(output.exists())
+            self.assertIn("conversion_output_missing", result["diagnostic"])
+
+    def test_conversion_rejects_fabricated_unparseable_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            flat = root / "input.mlir"
+            flat.write_text(self.module.render_flat_scf(self.bundle), encoding="utf-8")
+            output = root / "fabricated.calyx.mlir"
+            tool = self.write_fake_circt(
+                root,
+                'for ((i=1; i<=$#; i++)); do if [[ "${!i}" == "-o" ]]; then j=$((i+1)); printf "fabricated\\n" > "${!j}"; fi; done\n',
+            )
+
+            result = self.module.run_calyx_conversion(tool, flat, output, self.bundle)
+
+            self.assertIsNone(result["calyx_mlir"])
+            self.assertIsNone(result["validation"])
+            self.assertFalse(output.exists())
+            self.assertIn("calyx_artifact_invalid", result["diagnostic"])
+
+    def test_conversion_requires_reparse_output_from_current_invocation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            flat = root / "input.mlir"
+            flat.write_text(self.module.render_flat_scf(self.bundle), encoding="utf-8")
+            output = root / "candidate.calyx.mlir"
+            marker = root / "first"
+            tool = self.write_fake_circt(
+                root,
+                f'if [[ ! -e "{marker}" ]]; then touch "{marker}"; cp "{CALYX}" "$4"; exit 0; fi\nexit 0\n',
+            )
+
+            result = self.module.run_calyx_conversion(tool, flat, output, self.bundle)
+
+            self.assertIsNone(result["calyx_mlir"])
+            self.assertIsNone(result["validation"])
+            self.assertFalse(output.exists())
+            self.assertIn("calyx_reparse_output_missing", result["diagnostic"])
 
 
 if __name__ == "__main__":

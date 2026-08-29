@@ -9,6 +9,28 @@
       "artifacts/comparison/tinystories-1m-fixed-layernorm-backend.calyx.mlir"
     ],
     "calyx_diagnostic": "",
+    "calyx_validation": {
+      "calyx_sha256": "0f2d1097b59f45d6de948eac5e888900bb9eded2fd0697b8416c918e9bb74d53",
+      "conversion_command": [
+        "/nix/store/b9p48l2nrw1c6zncc6f86jd9nr611x7z-circt-1.144.0g20260331_5dc62fe/bin/circt-opt",
+        "artifacts/comparison/tinystories-1m-fixed-layernorm-backend.scf.mlir",
+        "--lower-scf-to-calyx=top-level-function=main",
+        "-o",
+        "artifacts/comparison/tinystories-1m-fixed-layernorm-backend.calyx.mlir"
+      ],
+      "flat_scf_sha256": "db5c0b79ad28b1947f62f5289ed695b063642094746420d8b44c0a930649f85c",
+      "reparse_command": [
+        "/nix/store/b9p48l2nrw1c6zncc6f86jd9nr611x7z-circt-1.144.0g20260331_5dc62fe/bin/circt-opt",
+        "artifacts/comparison/tinystories-1m-fixed-layernorm-backend.calyx.mlir",
+        "--verify-each",
+        "-o",
+        "<temporary-reparse-output>"
+      ],
+      "reparsed_calyx_sha256": "0f2d1097b59f45d6de948eac5e888900bb9eded2fd0697b8416c918e9bb74d53",
+      "schema": "tinystories-1m-calyx-validation-v1",
+      "sha256": "73ba1f4cb41e99329cc60bd71264ed1ca045fa256ecc29ca5fc2c8f161c87887",
+      "status": "converted_and_reparsed"
+    },
     "custom_op_eliminated": true,
     "max_integer_width": 64,
     "representation": "unrolled_flat_scf_with_unsigned_high8_low64_variance_sum",
@@ -207,7 +229,7 @@
     "task3p_custom_op_sha256": "376828a73c137a191190fb7dba25b8afb99ab2be38adf55b745841797d0ad347"
   },
   "schema": "tinystories-1m-fixed-layernorm-backend-v1",
-  "sha256": "1bbc05ce0f2f9c0853e1cd27b72cbc76a06b5c547791dcb71ea84a0b4b8dcdca",
+  "sha256": "45bbbfa4ba8280d3531cd7d42b5f310eda5733bf7a8e9da837b43c67d2e48083",
   "slice": {
     "block_index": 0,
     "kind": "one_transformer_block_token_step",
