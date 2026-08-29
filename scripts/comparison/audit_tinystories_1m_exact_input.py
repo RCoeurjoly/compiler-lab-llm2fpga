@@ -50,6 +50,15 @@ FROZEN_EXPECTED_TOKENS = [
 ]
 
 
+class IdentityFrontierError(ValueError):
+    """A named reason why the audit cannot authenticate the exact input."""
+
+    def __init__(self, code: str, reason: str) -> None:
+        super().__init__(reason)
+        self.code = code
+        self.reason = reason
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
@@ -135,14 +144,30 @@ def _pinned_source_closure(kev_root: Path, deployed: dict[str, Any]) -> dict[str
     """Authenticate every semantic source as a blob in the selected commit."""
 
     revision = deployed["revision"]
-    _git(kev_root, "cat-file", "-e", f"{revision}^{{commit}}")
+    try:
+        _git(kev_root, "cat-file", "-e", f"{revision}^{{commit}}")
+    except (OSError, subprocess.SubprocessError) as error:
+        raise IdentityFrontierError(
+            "pinned_commit_unavailable",
+            f"pinned deployed commit is unavailable: {revision}",
+        ) from error
     expected = deployed["sources"]
     closure: dict[str, dict[str, str]] = {}
     for name in REFERENCE_SOURCES:
-        blob = _git(kev_root, "rev-parse", f"{revision}:{name}")
-        payload = _git_bytes(kev_root, "cat-file", "blob", blob)
+        try:
+            blob = _git(kev_root, "rev-parse", f"{revision}:{name}")
+            payload = _git_bytes(kev_root, "cat-file", "blob", blob)
+        except (OSError, subprocess.SubprocessError) as error:
+            raise IdentityFrontierError(
+                "pinned_source_identity_mismatch",
+                f"pinned semantic source is unavailable: {name}",
+            ) from error
         identity = {"git_blob_sha1": blob, "sha256": hashlib.sha256(payload).hexdigest()}
-        _require(expected.get(name) == identity, f"pinned semantic source identity mismatch: {name}")
+        if expected.get(name) != identity:
+            raise IdentityFrontierError(
+                "pinned_source_identity_mismatch",
+                f"pinned semantic source identity mismatch: {name}",
+            )
         closure[name] = identity
     return closure
 
@@ -164,9 +189,13 @@ def _worktree_observability(kev_root: Path) -> dict[str, Any]:
 
 
 def _run_fixed_reference(
-    kev_root: Path, package_path: Path, prompt_ids: list[int], manifest: dict[str, Any] | None = None
+    kev_root: Path,
+    revision: str,
+    package_path: Path,
+    prompt_ids: list[int],
+    manifest: dict[str, Any] | None = None,
 ) -> list[int]:
-    """Run a pinned-source fixed reference after call-boundary finite checks."""
+    """Run the already-authenticated revision after call-boundary finite checks."""
 
     if manifest is None:
         manifest = _load_json(package_path / "manifest.json")
@@ -178,7 +207,6 @@ sys.path.insert(0, sys.argv[1])
 from tinystories.hardware_reference import FixedGPTNeo
 print(json.dumps(FixedGPTNeo(Path(sys.argv[2])).generate(json.loads(sys.argv[3]), 16)))
 """
-    revision = _git(kev_root, "rev-parse", "HEAD")
     with tempfile.TemporaryDirectory() as temporary:
         source_root = Path(temporary)
         package_root = source_root / "tinystories"
@@ -190,20 +218,41 @@ print(json.dumps(FixedGPTNeo(Path(sys.argv[2])).generate(json.loads(sys.argv[3])
         ):
             (source_root / name).write_bytes(_git_bytes(kev_root, "show", f"{revision}:{name}"))
         # These checks are deliberately adjacent to the only FixedGPTNeo call.
-        _validate_finite_package_values(package_path, manifest)
-        validate_finite_adapter_input(prompt_ids)
-        result = subprocess.run(
-            [sys.executable, "-c", program, str(source_root), str(package_path), json.dumps(prompt_ids)],
-            check=True,
-            text=True,
-            capture_output=True,
-        )
-    tokens = json.loads(result.stdout)
-    _require(
+        try:
+            _validate_finite_package_values(package_path, manifest)
+        except ValueError as error:
+            raise IdentityFrontierError("nonfinite_package_value", str(error)) from error
+        try:
+            validate_finite_adapter_input(prompt_ids)
+        except ValueError as error:
+            raise IdentityFrontierError("nonfinite_adapter_input", str(error)) from error
+        try:
+            result = subprocess.run(
+                [sys.executable, "-c", program, str(source_root), str(package_path), json.dumps(prompt_ids)],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            raise IdentityFrontierError(
+                "reference_execution_failure",
+                f"fixed reference execution failed: {type(error).__name__}",
+            ) from error
+    try:
+        tokens = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise IdentityFrontierError(
+            "reference_execution_failure",
+            "fixed reference returned invalid JSON",
+        ) from error
+    if not (
         isinstance(tokens, list)
-        and all(isinstance(token, int) and not isinstance(token, bool) for token in tokens),
-        "fixed reference returned malformed tokens",
-    )
+        and all(isinstance(token, int) and not isinstance(token, bool) for token in tokens)
+    ):
+        raise IdentityFrontierError(
+            "reference_execution_failure",
+            "fixed reference returned malformed tokens",
+        )
     return tokens
 
 
@@ -348,21 +397,45 @@ def audit_exact_input(
     generated_tokens: list[int] | None = None
     try:
         pinned_closure = _pinned_source_closure(kev_root, deployed)
-        _require(_git(kev_root, "rev-parse", "HEAD") == deployed.get("revision"),
-                 "deployed reference revision mismatch")
-        _require(fixed_profile.get("profile") == deployed["name"],
-                 "fixed hardware profile selection mismatch")
-        _require(fixed_profile.get("semantics", {}).get("execution_domain") == "integers_only_after_materialization",
-                 "fixed hardware profile is not an integer/fixed-point domain")
-        _require(fixed_profile.get("semantics", {}).get("accumulation", {}).get("synthesizable_rtl", {}).get("logical_width_bits") == 64,
-                 "fixed hardware profile does not use signed 64-bit GEMV accumulation")
-        generated_tokens = _run_fixed_reference(kev_root, package_path, FROZEN_PROMPT_IDS, manifest)
-        _require(generated_tokens == FROZEN_EXPECTED_TOKENS,
-                 "deployed fixed reference token fixture mismatch")
-    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        if fixed_profile.get("profile") != deployed["name"]:
+            raise IdentityFrontierError(
+                "fixed_profile_mismatch", "fixed hardware profile selection mismatch"
+            )
+        if (
+            fixed_profile.get("semantics", {}).get("execution_domain")
+            != "integers_only_after_materialization"
+        ):
+            raise IdentityFrontierError(
+                "fixed_profile_mismatch",
+                "fixed hardware profile is not an integer/fixed-point domain",
+            )
+        if (
+            fixed_profile.get("semantics", {})
+            .get("accumulation", {})
+            .get("synthesizable_rtl", {})
+            .get("logical_width_bits")
+            != 64
+        ):
+            raise IdentityFrontierError(
+                "fixed_profile_mismatch",
+                "fixed hardware profile does not use signed 64-bit GEMV accumulation",
+            )
+        generated_tokens = _run_fixed_reference(
+            kev_root, deployed["revision"], package_path, FROZEN_PROMPT_IDS, manifest
+        )
+        if generated_tokens != FROZEN_EXPECTED_TOKENS:
+            raise IdentityFrontierError(
+                "reference_token_mismatch", "deployed fixed reference token fixture mismatch"
+            )
+    except IdentityFrontierError as error:
         conflicts.append({
-            "code": "pinned_commit_unavailable",
-            "reason": f"pinned deployed source authority could not be authenticated: {type(error).__name__}",
+            "code": error.code,
+            "reason": error.reason,
+        })
+    except (OSError, subprocess.SubprocessError) as error:
+        conflicts.append({
+            "code": "reference_execution_failure",
+            "reason": f"fixed reference execution failed: {type(error).__name__}",
         })
     source = {
         "head_revision": _git(kev_root, "rev-parse", "HEAD"),

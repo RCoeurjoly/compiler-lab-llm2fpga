@@ -96,8 +96,8 @@ datapath.
 
 ## Commit
 
-Pre-fix commit: `fead7b2e651dd217f272b0cdb8cf37c0c76fc0b5`.
-The following fix-round commit contains this report; its final object hash is
+Prior fix-round commit: `c8eb2011ee09c368accdf8efd67c50dfc5564679`.
+The current fix-round commit contains this report; its final object hash is
 reported in the task handoff because a Git object cannot truthfully embed its
 own content hash.
 
@@ -143,6 +143,61 @@ Fix-round green command:
 nix develop -c python -m unittest tests/test_tinystories_1m_exact_input_audit.py -v
 5 tests passed
 ```
+
+## Fix round 2: immutable invocation revision and classified frontiers
+
+The fixed-reference runner now receives the already authenticated deployed Git
+revision as an explicit argument.  It materializes each Python source through
+`git show <that-revision>:<path>` and never resolves `HEAD` while executing the
+reference.  Thus a live-`HEAD` movement after source authentication cannot
+switch the source bytes that feed `FixedGPTNeo.generate`.
+
+The audit uses named `identity_frontier` outcomes instead of collapsing every
+failure into `pinned_commit_unavailable`: `pinned_commit_unavailable`,
+`pinned_source_identity_mismatch`, `fixed_profile_mismatch`,
+`nonfinite_package_value`, `nonfinite_adapter_input`,
+`reference_execution_failure`, and `reference_token_mismatch`.  Package and
+prompt finite-domain checks remain immediately before the sole audited
+`FixedGPTNeo.generate` subprocess call.  The reusable prompt validator still
+does not claim that Task 2's not-yet-existing adapter is enforced; that adapter
+boundary remains the next gate.
+
+Second-round red evidence was recorded before the production change:
+
+```text
+nix develop -c python -m unittest -v tests.test_tinystories_1m_exact_input_audit
+FAILED (failures=5, errors=1)
+```
+
+The failures proved that a supplied revision was ignored in favour of live
+`HEAD`, and that blob mismatch, fixed-profile mismatch, reference execution,
+and token mismatch were all reported as `pinned_commit_unavailable`.  A
+separate pre-change adversarial package-value test also failed because it was
+misclassified as `pinned_commit_unavailable`.
+
+Second-round focused green evidence:
+
+```text
+nix develop -c python -m unittest -v tests.test_tinystories_1m_exact_input_audit
+11 tests passed
+```
+
+Second-round affected-suite verification:
+
+```text
+nix develop -c python -m unittest -v \
+  tests.test_tinystories_1m_exact_input_audit \
+  tests.test_tinystories_1m_reference_input \
+  tests.test_tinystories_1m_reference_contract \
+  tests.test_tinystories_1m_qdq_semantics \
+  tests.test_tinystories_1m_fixed_hardware_qdq_profile \
+  tests.test_tinystories_1m_implementation_profile
+49 tests passed
+```
+
+The deterministic audit artifact was regenerated with the command recorded
+above and again reported `authenticated`; it had no content diff because the
+successful canonical result is unchanged by the hardening.
 
 ## Concerns
 

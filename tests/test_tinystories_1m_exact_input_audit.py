@@ -3,9 +3,11 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +29,11 @@ def load_auditor():
 
 @unittest.skipUnless(PACKAGE.is_dir() and KEV_ROOT.is_dir(), "canonical kev-gpt input unavailable")
 class TinyStories1MExactInputAuditTest(unittest.TestCase):
+    @staticmethod
+    def deployed_revision() -> str:
+        contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        return contract["deployed_profile"]["revision"]
+
     def test_missing_pinned_commit_is_an_identity_frontier(self):
         contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
         contract["deployed_profile"]["revision"] = "0" * 40
@@ -56,7 +63,88 @@ class TinyStories1MExactInputAuditTest(unittest.TestCase):
         auditor = load_auditor()
 
         with self.assertRaisesRegex(ValueError, "non-finite"):
-            auditor._run_fixed_reference(KEV_ROOT, PACKAGE, [7454, math.nan])
+            auditor._run_fixed_reference(
+                KEV_ROOT, self.deployed_revision(), PACKAGE, [7454, math.nan]
+            )
+
+    def test_fixed_reference_uses_authenticated_revision_without_reresolving_head(self):
+        auditor = load_auditor()
+
+        with mock.patch.object(
+            auditor,
+            "_git",
+            side_effect=AssertionError("reference execution must not resolve live HEAD"),
+        ):
+            tokens = auditor._run_fixed_reference(
+                KEV_ROOT,
+                self.deployed_revision(),
+                PACKAGE,
+                auditor.FROZEN_PROMPT_IDS,
+            )
+
+        self.assertEqual(tokens, auditor.FROZEN_EXPECTED_TOKENS)
+
+    def test_blob_identity_mismatch_has_a_precise_frontier_code(self):
+        contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        contract["deployed_profile"]["sources"]["fpga/rtl/gptneo_sequencer.sv"]["sha256"] = "0" * 64
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "contract.json"
+            path.write_text(json.dumps(contract), encoding="utf-8")
+            result = load_auditor().audit_exact_input(path, PACKAGE, KEV_ROOT)
+
+        self.assertEqual(result["status"], "identity_frontier")
+        self.assertEqual(result["conflicts"][0]["code"], "pinned_source_identity_mismatch")
+
+    def test_fixed_profile_mismatch_has_a_precise_frontier_code(self):
+        auditor = load_auditor()
+        original_load_json = auditor._load_json
+
+        def mismatched_fixed_profile(path):
+            value = original_load_json(path)
+            if path == auditor.FIXED_PROFILE:
+                value["profile"] = "unexpected_profile"
+            return value
+
+        with mock.patch.object(auditor, "_load_json", side_effect=mismatched_fixed_profile):
+            result = auditor.audit_exact_input(CONTRACT, PACKAGE, KEV_ROOT)
+
+        self.assertEqual(result["status"], "identity_frontier")
+        self.assertEqual(result["conflicts"][0]["code"], "fixed_profile_mismatch")
+
+    def test_nonfinite_package_failure_has_a_precise_frontier_code(self):
+        auditor = load_auditor()
+
+        with mock.patch.object(
+            auditor,
+            "_validate_finite_package_values",
+            side_effect=ValueError("package scales.bin contains a non-finite value"),
+        ):
+            result = auditor.audit_exact_input(CONTRACT, PACKAGE, KEV_ROOT)
+
+        self.assertEqual(result["status"], "identity_frontier")
+        self.assertEqual(result["conflicts"][0]["code"], "nonfinite_package_value")
+
+    def test_reference_execution_failure_has_a_precise_frontier_code(self):
+        auditor = load_auditor()
+
+        with mock.patch.object(
+            auditor,
+            "_run_fixed_reference",
+            side_effect=subprocess.CalledProcessError(1, ["fixed-reference"]),
+        ):
+            result = auditor.audit_exact_input(CONTRACT, PACKAGE, KEV_ROOT)
+
+        self.assertEqual(result["status"], "identity_frontier")
+        self.assertEqual(result["conflicts"][0]["code"], "reference_execution_failure")
+
+    def test_reference_token_mismatch_has_a_precise_frontier_code(self):
+        auditor = load_auditor()
+
+        with mock.patch.object(auditor, "_run_fixed_reference", return_value=[0]):
+            result = auditor.audit_exact_input(CONTRACT, PACKAGE, KEV_ROOT)
+
+        self.assertEqual(result["status"], "identity_frontier")
+        self.assertEqual(result["conflicts"][0]["code"], "reference_token_mismatch")
 
     def test_adapter_input_policy_rejects_nonfinite_values(self):
         auditor = load_auditor()
