@@ -864,6 +864,16 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                 if not same_affine_index(true_entry[1].group(3), true_entry[0],
                                          store.group(3), store_i):
                     continue
+                pre_score_mem = true_entry[1].group(2).strip()
+                if canonical_memref(pre_score_mem, true_entry[0]) == canonical_memref(score_mem, store_i):
+                    continue
+                # Authenticate the true arm as a produced pre-mask score
+                # buffer, rather than accepting an unrelated load with a
+                # coincidentally matching index.
+                if not any((producer := store_re.match(candidate)) is not None and
+                           canonical_memref(producer.group(2), k) == canonical_memref(pre_score_mem, true_entry[0])
+                           for k, candidate in enumerate(lines[function_start:true_entry[0]], function_start)):
+                    continue
                 if (loop_contexts(true_entry[0]) != loop_contexts(i) or
                         loop_contexts(store_i) != loop_contexts(i)):
                     continue
@@ -874,6 +884,10 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                 pred_deps = index_dependencies(pred_entry[1].group(3), pred_entry[0])
                 true_deps = index_dependencies(true_entry[1].group(3), true_entry[0])
                 if not pred_deps or not pred_deps.issubset(true_deps):
+                    continue
+                # The predicate must be lexically available in the same
+                # enclosing loop domain; this rejects cross-region stitching.
+                if loop_contexts(pred_entry[0]) != loop_contexts(i):
                     continue
                 fallback = select.group(4).lstrip("%")
                 fallback_load = next((m for candidate in reversed(lines[:i])
