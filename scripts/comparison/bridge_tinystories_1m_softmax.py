@@ -854,18 +854,31 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
                           m.group(2).strip() == score_mem]
                 if not stores:
                     continue
+                store_i, store = stores[0]
+                true_entry = next(((k, m) for k, candidate in reversed(list(enumerate(lines[:i])))
+                                   if (m := load_re.match(candidate)) and m.group(1) == select.group(3)), None)
+                if true_entry is None:
+                    continue
+                # The true arm must be the score load that feeds this exact
+                # masked store, with an identical affine/head-local index.
+                if not same_affine_index(true_entry[1].group(3), true_entry[0],
+                                         store.group(3), store_i):
+                    continue
                 pred_entry = next(((k, m) for k, candidate in reversed(list(enumerate(lines[:i])))
                                    if (m := load_re.match(candidate)) and m.group(1) == select.group(2)), None)
                 if pred_entry is None or not re.search(r":\s*memref<[^>]*i1", lines[pred_entry[0]]):
                     continue
                 fallback = select.group(4).lstrip("%")
-                fallback_zero = fallback == zero_identity.lstrip("%") or any(
-                    re.match(rf"%{re.escape(fallback)}\s*=\s*memref\.load\s+%([^\[]+)\[\]", candidate) and
-                    # Lowering often uses the global -inf mask sentinel;
-                    # exponentiation turns it into the required zero.
-                    any("__constant_xf32" in decl and ("dense<0.000000e+00>" in decl or "-3.40282347E+38" in decl)
+                fallback_load = next((m for candidate in reversed(lines[:i])
+                                      if (m := re.match(rf"%{re.escape(fallback)}\s*=\s*memref\.load\s+%([^\[]+)\[\]", candidate))), None)
+                fallback_zero = fallback == zero_identity.lstrip("%")
+                if fallback_load is not None:
+                    global_name = next((m.group(1) for candidate in reversed(lines[:i])
+                                        if (m := re.match(rf"%{re.escape(fallback_load.group(1).lstrip('%'))}\s*=\s*memref\.get_global\s+@([^ ]+)", candidate))), None)
+                    fallback_zero = global_name is not None and any(
+                        re.search(rf"memref\.global .*@{re.escape(global_name)}\b", decl) and
+                        ("dense<-3.40282347E+38>" in decl or "dense<0.000000e+00>" in decl)
                         for decl in lines[:function_start])
-                    for candidate in lines[:i])
                 if fallback_zero:
                     causal.append(i)
                     break
