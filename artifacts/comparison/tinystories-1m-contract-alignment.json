@@ -13,7 +13,15 @@
   "first_boundary": {
     "code": "compiler_package_identity",
     "component": "compiler_artifact_metadata",
-    "reason": "the realized compiler sidecar omits the frozen TinyStories-1M package and manifest hashes"
+    "reason": "the realized compiler sidecar omits the frozen TinyStories-1M package and manifest hashes",
+    "source_api_blocker": {
+      "authenticated_package_path": "scripts/comparison/materialize_tinystories_1m_package_export.py",
+      "export_adapter": "TinyStories/model_adapter.py",
+      "export_input": "HuggingFace snapshot -> FP32 torch.export.ExportedProgram",
+      "package_transport": "runtime --package argument; not a Nix input",
+      "pipeline_registration": "nix/models.nix:tiny-stories-1m-baseline-float",
+      "reason": "the registered compiler model consumes the HF FP32 snapshot, while the authenticated INT8/per-output-QDQ package is consumed only by the separate runtime package adapter; no ordinary pipeline API currently accepts its package manifest, weight image, and Q/DQ vectors"
+    }
   },
   "inputs": {
     "compiler_metadata": {
@@ -65,6 +73,6 @@
     "reference_source_or_rtl_copied": false
   },
   "schema": "tinystories-1m-contract-alignment-v1",
-  "sha256": "1a9bd5acd97c6e13be0de1a6684f9d11a1cfb5ba556adb8c58cb06fa45e9a565",
+  "sha256": "6e8668e1e1b4573d42431558d3023eb954c37da5184c26a7b1e971e4b50286cd",
   "status": "contract_mismatch"
 }

@@ -37,6 +37,10 @@ class TinyStories1MContractAlignmentTest(unittest.TestCase):
         self.assertIn("package.sha256", paths)
         self.assertIn("package.manifest_sha256", paths)
         self.assertIn("compiler_quantization", result["next_boundary"]["required_evidence"])
+        blocker = result["first_boundary"]["source_api_blocker"]
+        self.assertEqual(blocker["export_adapter"], "TinyStories/model_adapter.py")
+        self.assertEqual(blocker["package_transport"], "runtime --package argument; not a Nix input")
+        self.assertIn("FP32 torch.export.ExportedProgram", blocker["export_input"])
 
     def test_matching_identity_is_not_promoted_to_quantization_alignment(self) -> None:
         contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
@@ -63,6 +67,7 @@ class TinyStories1MContractAlignmentTest(unittest.TestCase):
         self.assertEqual(result["status"], "compiler_quantization_unverified")
         self.assertEqual(result["mismatches"], [])
         self.assertIn("compiler_quantization", result["next_boundary"]["required_evidence"])
+        self.assertIn("identity metadata alone", result["first_boundary"]["source_api_blocker"]["reason"])
 
     def test_copied_contract_is_rejected_even_when_content_is_unchanged(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -84,6 +89,7 @@ class TinyStories1MContractAlignmentTest(unittest.TestCase):
         result = json.loads(REPORT.read_text(encoding="utf-8"))
         self.assertEqual(result["status"], "contract_mismatch")
         self.assertEqual(result["first_boundary"]["code"], "compiler_package_identity")
+        self.assertIn("source_api_blocker", result["first_boundary"])
         self.assertEqual(
             result["sha256"],
             alignment.canonical_sha256({key: value for key, value in result.items() if key != "sha256"}),

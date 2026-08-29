@@ -121,6 +121,19 @@ def _diagnose_documents(contract: dict[str, Any], metadata: dict[str, Any], *,
                 if boundary_code == "compiler_artifact_identity"
                 else "the realized compiler sidecar omits the frozen TinyStories-1M package and manifest hashes"
             ),
+            "source_api_blocker": {
+                "pipeline_registration": "nix/models.nix:tiny-stories-1m-baseline-float",
+                "export_adapter": "TinyStories/model_adapter.py",
+                "export_input": "HuggingFace snapshot -> FP32 torch.export.ExportedProgram",
+                "authenticated_package_path": "scripts/comparison/materialize_tinystories_1m_package_export.py",
+                "package_transport": "runtime --package argument; not a Nix input",
+                "reason": (
+                    "the registered compiler model consumes the HF FP32 snapshot, while "
+                    "the authenticated INT8/per-output-QDQ package is consumed only by "
+                    "the separate runtime package adapter; no ordinary pipeline API "
+                    "currently accepts its package manifest, weight image, and Q/DQ vectors"
+                ),
+            },
         }
     else:
         status = "compiler_quantization_unverified"
@@ -128,6 +141,14 @@ def _diagnose_documents(contract: dict[str, Any], metadata: dict[str, Any], *,
             "code": "compiler_quantization",
             "component": "compiler_artifact_metadata",
             "reason": "identity matches, but the sidecar does not prove INT8/per-output weights and 97 activation Q/DQ boundaries",
+            "source_api_blocker": {
+                "pipeline_registration": "nix/models.nix:tiny-stories-1m-baseline-float",
+                "export_adapter": "TinyStories/model_adapter.py",
+                "export_input": "HuggingFace snapshot -> FP32 torch.export.ExportedProgram",
+                "authenticated_package_path": "scripts/comparison/materialize_tinystories_1m_package_export.py",
+                "package_transport": "runtime --package argument; not a Nix input",
+                "reason": "identity metadata alone cannot change the FP32 export or introduce package Q/DQ operations",
+            },
         }
     return {
         "schema": SCHEMA,
