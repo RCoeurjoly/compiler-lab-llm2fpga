@@ -254,8 +254,6 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
             break
     require(function_end is not None, "pattern_not_proven", "unterminated func.func region")
     require("scf.for" in graph or "scf.parallel" in graph, "pattern_not_proven", "lowered SCF loop structure")
-    require(any(re.match(r"%fzero\s*=\s*arith\.constant\s+0\.0\s*:\s*f32", line) for line in lines),
-            "pattern_not_proven", "authenticated floating zero constant")
     # Record lexical region ownership for every line.  This prevents a typed
     # value defined in a completed loop from being treated as a dominating
     # definition merely because its spelling is reused later.
@@ -273,6 +271,19 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         for _ in range(opens):
             next_scope += 1
             scope_stack.append(next_scope)
+
+    def dominates_typed_definition(value: str, use_line: int, type_name: str) -> bool:
+        name = value.lstrip("%")
+        use_scope = scope_paths[use_line]
+        for definition_line in range(function_start, use_line):
+            if (re.match(rf"%{re.escape(name)}\s*=", lines[definition_line]) and
+                    scope_paths[definition_line] == use_scope[:len(scope_paths[definition_line])] and
+                    re.search(rf":\s*{re.escape(type_name)}(?:\s|$)", lines[definition_line])):
+                return True
+        return False
+
+    require(any(re.match(r"%fzero\s*=\s*arith\.constant\s+0\.0\s*:\s*f32", line) for line in lines),
+            "pattern_not_proven", "authenticated floating zero constant")
     exp_lines = [i for i, line in enumerate(lines) if re.match(r"%[^ ]+\s*=\s*math\.exp\s+%[^ ]+", line)]
     require(len(exp_lines) == expected_exp_sites, "pattern_not_proven",
             f"expected {expected_exp_sites} stabilized exp sites, found {len(exp_lines)}")
@@ -395,6 +406,8 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         max_header_i = next((i for i, line in enumerate(lines[:max_stores[-1][0]])
                              if re.match(rf"%{re.escape(max_value.lstrip('%'))}\s*=\s*scf\.for\b", line)), None)
         require(max_header_i is not None, "dataflow_not_proven", f"site {number} row-max has no matching loop result")
+        require(dominates_typed_definition("%fzero", max_header_i, "f32"),
+                "dataflow_not_proven", f"site {number} zero constant does not dominate row max")
         max_header_info = reduction_loop_header(max_header_i)
         max_header = max_header_info[0] if max_header_info else None
         require(max_header is not None and "iter_args" in max_header,
@@ -481,6 +494,8 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
                 "dataflow_not_proven", f"site {number} reduction is not loop-carried")
         result_match = re.match(r"%([^ ]+)\s*=\s*scf\.for\b", reduction_header)
         require(result_match is not None, "dataflow_not_proven", f"site {number} reduction has no SSA loop result")
+        require(dominates_typed_definition("%fzero", reduction_info[1], "f32"),
+                "dataflow_not_proven", f"site {number} zero constant does not dominate reduction")
         carried_match = re.search(r"iter_args\(\s*%([^ ]+)\s*=", reduction_header)
         require(carried_match is not None, "dataflow_not_proven", f"site {number} reduction carried value is malformed")
         carried = carried_match.group(1)
@@ -527,6 +542,8 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         div_result = div_entry[1].group(1)
         require(select_match is not None and select_match.group(1) == div_result and select_match.group(2) == "fzero",
                 "dataflow_not_proven", f"site {number} causal select has no observable alternative")
+        require(dominates_typed_definition("%fzero", causal[0], "f32"),
+                "dataflow_not_proven", f"site {number} zero constant does not dominate mask")
         select_result = re.match(r"%([^ ]+)", select_line).group(1)
         require(any(re.search(rf"memref\.store\s+%{re.escape(select_result)}\b", line)
                     for line in lines[causal[0] + 1:function_end + 1]),
