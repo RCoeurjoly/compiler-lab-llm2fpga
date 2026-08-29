@@ -400,8 +400,15 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         max_end = max_header_info[2]
         score_mem = operand_loads[sub.group(2)].group(2).strip()
         max_body = lines[max_header_i:max_end]
-        require(any("arith.maximumf" in line and score_mem in "\n".join(max_body) for line in max_body),
+        carried_match = re.search(r"iter_args\(\s*%([^ ]+)\s*=", max_header)
+        max_op = next((re.match(r"%([^ ]+)\s*=\s*arith\.maximumf\s+%([^, ]+)\s*,\s*%([^ ]+)", line)
+                       for line in max_body if "arith.maximumf" in line), None)
+        require(carried_match is not None and max_op is not None and
+                carried_match.group(1) in max_op.groups()[1:] and
+                any(score_mem in line and re.match(r"%([^ ]+)\s*=\s*memref\.load", line) for line in max_body),
                 "dataflow_not_proven", f"site {number} row-max is not a loop-carried reduction")
+        require(any(re.match(rf"scf\.yield\s+%{re.escape(max_op.group(1))}", line) for line in max_body),
+                "dataflow_not_proven", f"site {number} row-max result is not yielded")
         require(operand_loads[sub.group(2)].group(2).strip() != operand_loads[sub.group(3)].group(2).strip(),
                 "dataflow_not_proven", f"site {number} score and row-max loads are not distinct")
         for operand in sub.groups()[1:]:
@@ -510,6 +517,11 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
                     and ("exp" in line or "prob" in line)
                     for line in lines[causal[0] + 1:function_end + 1]),
                 "dataflow_not_proven", f"site {number} causal comparison result is unused")
+        select_line = next(line for line in lines[causal[0] + 1:function_end + 1]
+                           if re.search(rf"arith\.select\s+%{re.escape(causal_result)}\b", line))
+        select_match = re.search(r"arith\.select\s+%[^, ]+,\s*%([^, ]+),\s*%([^ ]+)", select_line)
+        require(select_match is not None and select_match.group(1) != select_match.group(2),
+                "dataflow_not_proven", f"site {number} causal select has no observable alternative")
         used_causal.add(causal[0])
         sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
                       "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_cmpi"]})
