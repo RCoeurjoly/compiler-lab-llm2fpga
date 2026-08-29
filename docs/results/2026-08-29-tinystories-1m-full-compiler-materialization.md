@@ -22,3 +22,21 @@ The next required decision is to authenticate a single common model revision
 and package identity before extracting or comparing a transformer-block
 token-step slice.  No Representative Core, PCIe, DDR3, transport, weights, or
 optimization stage was changed for this materialization.
+
+## Current-pin follow-up
+
+The current flake pins the model source to
+`ac533fb8b4f69c71894bf96badfe11e6294d9fcf`. An existing Nix output at
+`/nix/store/29kyjiv04x0bq7xbf9nwqq025kkcyn5f-tiny-stories-1m-baseline-float-sv`
+contains the same 310,344,726-byte `main.sv` (the same SHA-256 shown above).
+The metadata receipt records that output and the current source pin.
+
+An independent rebuild could not be rerun in this environment: `nix build`
+failed before evaluation with
+`cannot connect to socket at /nix/var/nix/daemon-socket/socket: Operation not permitted`;
+`NIX_REMOTE=local` likewise failed because `/nix/var/nix/db/big-lock` is not
+writable. Therefore the existing store path is recorded as an observed
+candidate, not as independently rebuilt current-pin evidence. The strict
+extractor still fails closed (`contract_mismatch`) because compiler metadata
+does not carry the authenticated package and manifest hashes; no slice or
+functional comparison is claimed.
