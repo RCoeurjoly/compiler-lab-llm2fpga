@@ -62,7 +62,7 @@ def lowered_separate_loop_graph(site_count: int = 8) -> str:
     for head in range(site_count):
         for name in ("score_mem", "max_mem", "delta_mem", "exp_mem", "sum_mem"):
             args.append(f"%{name}{head}: memref<4xf32>")
-        args.extend([f"%time_index{head}: i32", f"%position{head}: i32"])
+        args.extend([f"%time_index{head}: i32", f"%position{head}: index"])
     body.extend([
         "  %c0 = arith.constant 0 : index",
         "  %c1 = arith.constant 1 : index",
@@ -100,7 +100,7 @@ def lowered_separate_loop_graph(site_count: int = 8) -> str:
             f"    %sum_loaded{head} = memref.load %sum_mem{head}[%n{head}] : memref<4xf32>",
             f"    %elpost{head} = memref.load %exp_mem{head}[%n{head}] : memref<4xf32>",
             f"    %prob_raw{head} = arith.divf %elpost{head}, %sum_loaded{head} : f32",
-            f"    %causal{head} = arith.cmpi sle, %time_index{head}, %position{head} : i32",
+            f"    %causal{head} = arith.cmpi sle, %n{head}, %position{head} : index",
             f"    %prob{head} = arith.select %causal{head}, %prob_raw{head}, %fzero : f32",
             f"    memref.store %prob{head}, %score_mem{head}[%n{head}] : memref<4xf32>",
             "  }",
@@ -135,7 +135,7 @@ class SoftmaxBridgeTest(unittest.TestCase):
             ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
         )
         graph = lowered_separate_loop_graph().replace(
-            "%time_index0, %position0", "%position0, %time_index0"
+            "%n0, %position0", "%position0, %n0"
         )
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-inverse.mlir")

@@ -254,6 +254,8 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
             break
     require(function_end is not None, "pattern_not_proven", "unterminated func.func region")
     require("scf.for" in graph or "scf.parallel" in graph, "pattern_not_proven", "lowered SCF loop structure")
+    require(any(re.match(r"%fzero\s*=\s*arith\.constant\s+0\.0\s*:\s*f32", line) for line in lines),
+            "pattern_not_proven", "authenticated floating zero constant")
     # Record lexical region ownership for every line.  This prevents a typed
     # value defined in a completed loop from being treated as a dominating
     # definition merely because its spelling is reused later.
@@ -509,7 +511,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         for i, line in enumerate(lines):
             match = causal_re.match(line)
             if (i not in used_causal and function_start <= i <= function_end and match and
-                    match.group(1).lower().startswith("%time_index") and
+                    (loop_context(i) is not None and match.group(1).lstrip("%") == loop_context(i)[0]) and
                     match.group(2).lower().startswith("%position") and
                     (not head_digits or head_digits in line)):
                 causal.append(i)
@@ -529,6 +531,12 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         require(any(re.search(rf"memref\.store\s+%{re.escape(select_result)}\b", line)
                     for line in lines[causal[0] + 1:function_end + 1]),
                 "dataflow_not_proven", f"site {number} masked probability is not observable")
+        output_store = next(line for line in lines[causal[0] + 1:function_end + 1]
+                            if re.search(rf"memref\.store\s+%{re.escape(select_result)}\b", line))
+        output_match = store_re.match(output_store)
+        require(output_match is not None and output_match.group(2).strip() == score_mem and
+                output_match.group(3).strip().lstrip("%") == loop_context(causal[0])[0],
+                "dataflow_not_proven", f"site {number} masked output is not head-local")
         used_causal.add(causal[0])
         sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
                       "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_cmpi"]})
