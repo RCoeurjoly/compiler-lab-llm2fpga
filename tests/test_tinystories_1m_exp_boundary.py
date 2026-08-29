@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import unittest
+import tempfile
 from pathlib import Path
 
 
@@ -56,6 +57,31 @@ class TinyStoriesExpBoundaryTest(unittest.TestCase):
             expected = self.module.exact_f32_exp(vector["input"])
             self.assertEqual(vector["reference_output_bits"], self.module.bits(expected))
             self.assertEqual(vector["input_bits"], self.module.bits(vector["input"]))
+
+    def test_context_parser_requires_max_subtract_and_reduction(self):
+        text = "\n".join([
+            "%score = arith.subf %raw, %row_max : f32",
+            "%exp = math.exp %score : f32",
+            "%sum = arith.addf %acc, %exp : f32",
+        ])
+        context = self.module.discover_softmax_exp_context(text)
+        self.assertEqual(context["source_line"], 2)
+        self.assertEqual(context["exp_operand"], "%score")
+        self.assertIn("arith.subf", context["max_subtract"])
+        with self.assertRaisesRegex(ValueError, "max-subtract"):
+            self.module.discover_softmax_exp_context("%exp = math.exp %x : f32")
+
+    def test_frontier_substitution_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "artifacts/comparison"
+            target.mkdir(parents=True)
+            source = ROOT / "artifacts/comparison/tinystories-1m-package-aware-lowering-frontier.json"
+            altered = json.loads(source.read_text(encoding="utf-8"))
+            altered["model"] = "substitute"
+            (target / source.name).write_text(json.dumps(altered), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "file hash mismatch"):
+                self.module.load_frontier(root)
 
 
 if __name__ == "__main__":

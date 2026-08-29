@@ -88,7 +88,7 @@
     ]
   },
   "schema": "tinystories-1m-exp-lowering-boundary-v1",
-  "sha256": "dc9ab61931a2acb06a829355e89314d178b8e07718d8273bf2c2a35057d4c803",
+  "sha256": "8daec0fb4576bc3d9c5984b88b27d050f516641a993b61ce11d1fbea23209d51",
   "source": {
     "input_type": "f32",
     "operation": "math.exp",
@@ -96,6 +96,15 @@
     "semantic_role": "attention softmax",
     "source_line": 830,
     "stabilization": "score - row_max"
+  },
+  "source_evidence": {
+    "context_validation": "not_materialized",
+    "frontier_report": "artifacts/comparison/tinystories-1m-package-aware-lowering-frontier.json",
+    "frontier_report_file_sha256": "ee9162f7ed6990c351ff35f15738e32844342527570a1b8b12671eca6542d95a",
+    "frontier_report_sha256": "81a8ea6b29ceb5a362c70dc7f5adf6b469e41a6f79d6067fc378280abe8b447e",
+    "pre_calyx_artifact": "authenticated-stage:pre_calyx",
+    "pre_calyx_bytes": 29336775,
+    "pre_calyx_sha256": "e33e8015440dc89e2c3812daa07e5ac85991752729656d1950f6ddef4875e090"
   },
   "status": "unsupported"
 }
