@@ -30,6 +30,28 @@ def load_materializer():
 
 
 class PackageAwareFrontendTest(unittest.TestCase):
+    def test_nix_exposes_explicit_package_aware_export_target(self) -> None:
+        flake = (ROOT / "flake.nix").read_text(encoding="utf-8")
+        self.assertIn('name = "tinystories-1m-package-aware-export"', flake)
+        self.assertIn('apps."tinystories-1m-package-aware-export"', flake)
+        self.assertIn("model_adapter_reference_package.py", flake)
+        self.assertIn("--contract ${sourceRoot}/artifacts/reference/tinystories-1m-kev-gpt-contract.json", flake)
+
+    def test_package_export_manifest_records_content_provenance(self) -> None:
+        materializer = load_materializer()
+        with __import__("tempfile").TemporaryDirectory() as directory:
+            package = Path(directory) / "package"
+            package.mkdir()
+            for name in ("manifest.json", "weights.bin", "scales.bin", "calibration_ids.bin", "receipt.json"):
+                (package / name).write_bytes(name.encode("ascii"))
+            contract = Path(directory) / "contract.json"
+            contract.write_text("{}", encoding="utf-8")
+            provenance = materializer.package_provenance(str(package), str(contract))
+            self.assertEqual(provenance["contract"]["sha256"], __import__("hashlib").sha256(b"{}").hexdigest())
+            self.assertEqual(set(provenance["package"]["files"]), {
+                "manifest.json", "weights.bin", "scales.bin", "calibration_ids.bin", "receipt.json"
+            })
+
     def test_reference_adapter_exposes_explicit_package_frontend(self) -> None:
         source = ADAPTER.read_text(encoding="utf-8")
         self.assertIn("def export_program_with_package", source)

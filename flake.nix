@@ -448,7 +448,42 @@
                 --contract ${sourceRoot}/artifacts/reference/tinystories-1m-kev-gpt-contract.json \
                 --package-export "$tmp_dir/package-export" --package "$package" --out-dir "$out_dir" \
                 --fixed-qdq-profile ${sourceRoot}/artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json \
-                --qdq-receipt ${sourceRoot}/artifacts/reference/tinystories-1m-qdq-semantics.json
+              --qdq-receipt ${sourceRoot}/artifacts/reference/tinystories-1m-qdq-semantics.json
+            '';
+          };
+
+        # Explicit package-aware export entry point.  The authenticated
+        # package remains a runtime input (it is not silently replaced by the
+        # HuggingFace/FP32 adapter and is not copied into the flake).
+        packageAwareExport =
+          let sourceRoot = builtins.path { path = ./.; name = "llm2fpga-source"; };
+          in pkgs.writeShellApplication {
+            name = "tinystories-1m-package-aware-export";
+            runtimeInputs = [ pythonWithTinyStories pkgs.coreutils ];
+            text = ''
+              set -euo pipefail
+              package=""
+              model_path="${tinyStories1m.snapshot}"
+              out_dir=""
+              while [ "$#" -gt 0 ]; do
+                case "$1" in
+                  --package) package="$2"; shift 2 ;;
+                  --model-path) model_path="$2"; shift 2 ;;
+                  --out-dir) out_dir="$2"; shift 2 ;;
+                  -h|--help)
+                    echo "usage: tinystories-1m-package-aware-export --package PATH [--model-path PATH] --out-dir PATH"
+                    exit 0
+                    ;;
+                  *) echo "unknown argument: $1" >&2; exit 2 ;;
+                esac
+              done
+              [ -n "$package" ] || { echo "--package is required" >&2; exit 2; }
+              [ -n "$out_dir" ] || { echo "--out-dir is required" >&2; exit 2; }
+              ${pythonWithTinyStories}/bin/python ${sourceRoot}/scripts/materialize-pytorch-exported.py \
+                --adapter ${sourceRoot}/TinyStories/model_adapter_reference_package.py \
+                --model-path "$model_path" --package "$package" \
+                --contract ${sourceRoot}/artifacts/reference/tinystories-1m-kev-gpt-contract.json \
+                --out-dir "$out_dir"
             '';
           };
 
@@ -2616,6 +2651,7 @@ PY
         } // pipelineStagePackages // pipelineMetadataPackages // {
           "tinystories-1m-authenticated-package-lowering" =
             authenticatedPackageLowering;
+          "tinystories-1m-package-aware-export" = packageAwareExport;
         }
           // quantizedLinalgDiagnosticPackages // pipelineAliasPackages
           // quantizedRepresentativeCoreStudyStagePackages;
@@ -2627,6 +2663,10 @@ PY
         apps."tinystories-1m-authenticated-package-lowering" = {
           type = "app";
           program = "${authenticatedPackageLowering}/bin/tinystories-1m-authenticated-package-lowering";
+        };
+        apps."tinystories-1m-package-aware-export" = {
+          type = "app";
+          program = "${packageAwareExport}/bin/tinystories-1m-package-aware-export";
         };
 
         checks = {

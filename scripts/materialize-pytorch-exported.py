@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -50,6 +51,37 @@ def relevant_environment() -> dict[str, str]:
 
 def write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def package_provenance(package_path: str, contract_path: str) -> dict[str, object]:
+    """Return content identities for explicit package-aware exports.
+
+    The adapter authenticates these inputs before export.  The materializer
+    records the same identities in its generic stage manifest so downstream
+    stages cannot mistake this artifact for an ordinary FP32 export.
+    """
+
+    package = Path(package_path)
+    contract = Path(contract_path)
+    names = ("manifest.json", "weights.bin", "scales.bin", "calibration_ids.bin", "receipt.json")
+    missing = [name for name in names if not (package / name).is_file()]
+    if missing:
+        raise SystemExit(f"authenticated package is missing required files: {', '.join(missing)}")
+    return {
+        "contract": {"path": str(contract), "sha256": sha256_file(contract)},
+        "package": {
+            "path": str(package),
+            "files": {name: sha256_file(package / name) for name in names},
+        },
+    }
 
 
 def write_common_files(out_dir: Path, adapter_path: Path) -> None:
@@ -123,28 +155,28 @@ def materialize_exported(args: argparse.Namespace, adapter: ModuleType) -> None:
     (args.out_dir / "graph-signature.txt").write_text(
         str(exported.graph_signature) + "\n", encoding="utf-8"
     )
-    write_json(
-        args.out_dir / "manifest.json",
-        {
-            "stage": "pytorch-exported",
-            "adapter": str(args.adapter),
-            "adapter_copy": "adapter.py",
-            "model_path": args.model_path,
-            "package_path": args.package,
-            "contract_path": args.contract,
-            "export_source": export_source,
-            "exported_program_type": type(exported).__name__,
-            "example_inputs": flattened_input_summaries(inputs),
-            "environment": relevant_environment(),
-            "files": {
-                "serialized_exported_program": "exported.pt2",
-                "exported_program": "exported-program.txt",
-                "graph": "graph.txt",
-                "graph_module": "graph-module.py",
-                "graph_signature": "graph-signature.txt",
-            },
-        },
-    )
+    manifest: dict[str, object] = {
+        "stage": "pytorch-exported",
+        "adapter": str(args.adapter),
+        "adapter_copy": "adapter.py",
+        "model_path": args.model_path,
+        "package_path": args.package,
+        "contract_path": args.contract,
+        "export_source": export_source,
+        "exported_program_type": type(exported).__name__,
+        "example_inputs": flattened_input_summaries(inputs),
+        "environment": relevant_environment(),
+        "files": {
+            "serialized_exported_program": "exported.pt2",
+            "exported_program": "exported-program.txt",
+            "graph": "graph.txt",
+            "graph_module": "graph-module.py",
+            "graph_signature": "graph-signature.txt",
+        }
+    }
+    if args.package is not None:
+        manifest["input_provenance"] = package_provenance(args.package, args.contract)
+    write_json(args.out_dir / "manifest.json", manifest)
 
 
 def main() -> None:
