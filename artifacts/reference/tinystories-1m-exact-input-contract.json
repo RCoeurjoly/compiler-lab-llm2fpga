@@ -1,0 +1,42 @@
+{
+  "schema": "tinystories-1m-exact-input-contract-v1",
+  "status": "identity_frontier",
+  "historical_contract": {
+    "path": "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+    "sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
+  },
+  "model": {
+    "name": "TinyStories-1M",
+    "source_model_id": "roneneldan/TinyStories-1M",
+    "source_revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf",
+    "architecture": "gpt_neo",
+    "n_layer": 8,
+    "hidden_size": 64,
+    "n_head": 16,
+    "head_dim": 4,
+    "vocab_size": 50257,
+    "max_context": 32
+  },
+  "package": {
+    "origin": "/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m",
+    "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+  },
+  "quantization": {
+    "weights": "symmetric per-output INT8",
+    "activations": "symmetric per-channel INT8",
+    "activation_boundary_count": 97,
+    "activation_vector_widths": [64, 256],
+    "scale_format": "little-endian float32"
+  },
+  "semantic_authorities": {
+    "qdq": "artifacts/reference/tinystories-1m-qdq-semantics.json",
+    "implementation_profile": "artifacts/reference/tinystories-1m-implementation-profile.json",
+    "fixed_profile": "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json"
+  },
+  "unresolved": [
+    "implementation_profile_unresolved",
+    "board_checkpoint_trace_unavailable",
+    "nonfinite_policy_unresolved"
+  ]
+}

@@ -29,7 +29,7 @@
 - Create: `scripts/comparison/audit_tinystories_1m_exact_input.py`
 - Create: `tests/test_tinystories_1m_exact_input_audit.py`
 - Create: `artifacts/reference/tinystories-1m-exact-input-audit.json`
-- Modify: `artifacts/reference/tinystories-1m-kev-gpt-contract.json`
+- Create: `artifacts/reference/tinystories-1m-exact-input-contract.json`
 - Modify: `scripts/comparison/verify_tinystories_1m_reference_input.py`
 - Inspect: `scripts/comparison/authenticate_tinystories_1m_qdq_semantics.py`
 - Inspect: `/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m/{manifest.json,receipt.json,weights.bin,scales.bin,calibration_ids.bin}`
@@ -38,7 +38,7 @@
 - Consumes: `audit_exact_input(contract_path: Path, package_path: Path, kev_root: Path) -> dict[str, object]`.
 - Produces: schema `tinystories-1m-exact-input-audit-v1` with `status` equal to `authenticated` or `identity_frontier`, exact hashes, source revision/patch identity, resolved semantics, and `conflicts`.
 
-- [ ] **Step 1: Write a failing audit test for the known activation-granularity contradiction**
+- [x] **Step 1: Write a failing audit test for the known activation-granularity contradiction**
 
 ```python
 def test_audit_rejects_the_old_per_tensor_contract():
@@ -48,32 +48,32 @@ def test_audit_rejects_the_old_per_tensor_contract():
     assert result["conflicts"] == []
 ```
 
-- [ ] **Step 2: Verify the test fails for the current contract**
+- [x] **Step 2: Verify the test fails for the current contract**
 
 Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_input_audit.py -v`
 
 Expected: FAIL because the current contract says `per-tensor` and lacks a complete executable-semantics authority.
 
-- [ ] **Step 3: Implement the fail-closed audit**
+- [x] **Step 3: Implement the fail-closed audit**
 
 Parse and hash every package file, validate tensor offset ranges and overlaps, count and shape all activation-scale vectors, record the Hugging Face revision, record `git rev-parse HEAD` plus the relevant kev-gpt working-tree diff hash, and compare the package generator/reference semantics with the contract. Emit `identity_frontier` with named conflicts when two authorities disagree.
 
-- [ ] **Step 4: Correct only fields established by authoritative evidence**
+- [x] **Step 4: Correct only fields established by authoritative evidence**
 
-Change the contract activation description to the package-observed granularity and add explicit fields for scale application, accumulator width, rounding, saturation, overflow, LayerNorm, Softmax, GELU, and token selection only when the audit can cite their source path and SHA-256. Leave unresolved fields absent and report them as conflicts; do not choose values heuristically.
+Create a versioned exact-input contract with the package-observed granularity and explicit fields for scale application, accumulator width, rounding, saturation, overflow, LayerNorm, Softmax, GELU, and token selection only when the audit can cite their source path and SHA-256. Preserve the historical contract and its SHA-bound receipts unchanged. Leave unresolved fields absent and report them as conflicts; do not choose values heuristically.
 
-- [ ] **Step 5: Run the audit tests and canonical audit**
+- [x] **Step 5: Run the audit tests and canonical audit**
 
 Run: `nix develop -c python -m unittest tests/test_tinystories_1m_exact_input_audit.py tests/test_tinystories_1m_reference_input.py tests/test_tinystories_1m_reference_contract.py -v`
 
-Run: `nix develop -c python scripts/comparison/audit_tinystories_1m_exact_input.py --contract artifacts/reference/tinystories-1m-kev-gpt-contract.json --package /home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m --kev-root /home/roland/kev-gpt/.worktrees/kintex-selftest --output artifacts/reference/tinystories-1m-exact-input-audit.json`
+Run: `nix develop -c python scripts/comparison/audit_tinystories_1m_exact_input.py --contract artifacts/reference/tinystories-1m-exact-input-contract.json --package /home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m --kev-root /home/roland/kev-gpt/.worktrees/kintex-selftest --output artifacts/reference/tinystories-1m-exact-input-audit.json`
 
 Expected: either `authenticated` with no conflicts or a precise `identity_frontier`. Task 2 is forbidden unless status is `authenticated`.
 
-- [ ] **Step 6: Commit the identity gate**
+- [x] **Step 6: Commit the identity gate**
 
 ```bash
-git add scripts/comparison/audit_tinystories_1m_exact_input.py tests/test_tinystories_1m_exact_input_audit.py artifacts/reference/tinystories-1m-exact-input-audit.json artifacts/reference/tinystories-1m-kev-gpt-contract.json scripts/comparison/verify_tinystories_1m_reference_input.py
+git add scripts/comparison/audit_tinystories_1m_exact_input.py tests/test_tinystories_1m_exact_input_audit.py artifacts/reference/tinystories-1m-exact-input-audit.json artifacts/reference/tinystories-1m-exact-input-contract.json
 git commit -m "authenticate exact TinyStories compiler input"
 ```
 
