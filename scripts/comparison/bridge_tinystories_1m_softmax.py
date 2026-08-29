@@ -361,12 +361,17 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
                 # The reduction result is materialized and reloaded before
                 # division in the lowered graph.  Bind that reload to the
                 # exact sum store/index, rather than trusting its SSA name.
-                sum_stores = [(i, m) for i, line in enumerate(lines) if i > add_i_candidate and (m := store_re.match(line)) and m.group(1).strip() == sum_candidate]
+                candidate_header = reduction_loop_header(add_i_candidate)
+                result_match = re.match(r"%([^ ]+)\s*=\s*scf\.for\b", candidate_header or "")
+                candidate_result = result_match.group(1) if result_match else sum_candidate
+                sum_stores = [(i, m) for i, line in enumerate(lines) if i > add_i_candidate and (m := store_re.match(line)) and m.group(1).strip() in (sum_candidate, candidate_result)]
                 for sum_store_i, sum_store in sum_stores:
                     sum_mem, sum_idx = sum_store.group(2).strip(), sum_store.group(3).strip()
                     sum_loads = [(i, m) for i, line in enumerate(lines) if i > sum_store_i and (m := load_re.match(line)) and m.group(2).strip() == sum_mem and same_index(m.group(3).strip(), i, sum_idx, sum_store_i)]
                     for sum_load_i, sum_load in sum_loads:
-                        divs = [(i, m) for i, line in enumerate(lines) if i > sum_load_i and (m := div_re.match(line)) and m.group(2) == candidate_value and m.group(3) == sum_load.group(1)]
+                        exp_reload_values = {candidate_value}
+                        exp_reload_values.update(m.group(1) for i, line in enumerate(lines) if i > sum_load_i and (m := load_re.match(line)) and m.group(2).strip() == exp_mem and same_index(m.group(3).strip(), i, exp_idx, exp_store_i))
+                        divs = [(i, m) for i, line in enumerate(lines) if i > sum_load_i and (m := div_re.match(line)) and m.group(2) in exp_reload_values and m.group(3) == sum_load.group(1)]
                         if divs:
                             complete.append((candidate_i, candidate, add_i_candidate, add_candidate, divs[0]))
                             break
@@ -386,9 +391,20 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         reduction_header = reduction_loop_header(add_i)
         require(reduction_header is not None and "iter_args" in reduction_header,
                 "dataflow_not_proven", f"site {number} reduction is not loop-carried")
+        carried_match = re.search(r"iter_args\(\s*%([^ ]+)\s*=", reduction_header)
+        require(carried_match is not None, "dataflow_not_proven", f"site {number} reduction carried value is malformed")
+        carried = carried_match.group(1)
+        add_operands = add.groups()[1:]
+        require(any(operand.lstrip("%") == carried for operand in add_operands),
+                "dataflow_not_proven", f"site {number} reduction add does not consume carried accumulator")
+        yield_found = any(re.match(rf"scf\.yield\s+%{re.escape(sum_value)}(?:\s|:|$)", line)
+                          for line in lines[add_i + 1:min(function_end + 1, add_i + 80)])
+        require(yield_found, "dataflow_not_proven", f"site {number} reduction has no matching scf.yield")
         # A reduction is complete only when its accumulator is materialized
         # into a unique sum buffer and subsequently reloaded for division.
-        sum_store_matches = [(i, m) for i, line in enumerate(lines) if i > add_i and (m := store_re.match(line)) and m.group(1).strip() == sum_value]
+        result_match = re.match(r"%([^ ]+)\s*=\s*scf\.for\b", reduction_header)
+        reduction_result = result_match.group(1) if result_match else sum_value
+        sum_store_matches = [(i, m) for i, line in enumerate(lines) if i > add_i and (m := store_re.match(line)) and m.group(1).strip() in (sum_value, reduction_result)]
         require(sum_store_matches, "dataflow_not_proven", f"site {number} reduction result is not materialized")
         sum_mem_for_site = sum_store_matches[0][1].group(2).strip()
         require(function_start <= sum_store_matches[0][0] <= function_end, "dataflow_not_proven", f"site {number} sum store is outside function")
