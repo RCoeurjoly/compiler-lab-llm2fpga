@@ -220,6 +220,33 @@ class SoftmaxBridgeTest(unittest.TestCase):
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-constant-exp-store.mlir")
 
+    def test_real_causal_unrelated_true_arm_fails_closed(self):
+        graph_path = Path("/tmp/task3x-flat/flat.scf.mlir")
+        if not graph_path.is_file():
+            self.skipTest("real flat-SCF artifact is not present")
+        graph = graph_path.read_text()
+        graph = graph.replace("arith.select %112, %117, %118", "arith.select %112, %120, %118", 1)
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module._lowered_pattern_evidence(graph, zero_identity="cst_6")
+
+    def test_real_causal_wrong_mask_input_fails_closed(self):
+        graph_path = Path("/tmp/task3x-flat/flat.scf.mlir")
+        if not graph_path.is_file():
+            self.skipTest("real flat-SCF artifact is not present")
+        graph = graph_path.read_text()
+        graph = graph.replace("memref.reinterpret_cast %arg0 to offset: [0], sizes: [1024]", "memref.reinterpret_cast %arg2 to offset: [0], sizes: [1024]", 1)
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module._lowered_pattern_evidence(graph, zero_identity="cst_6")
+
+    def test_real_causal_inverted_select_direction_fails_closed(self):
+        graph_path = Path("/tmp/task3x-flat/flat.scf.mlir")
+        if not graph_path.is_file():
+            self.skipTest("real flat-SCF artifact is not present")
+        graph = graph_path.read_text()
+        graph = graph.replace("arith.select %112, %117, %118", "arith.select %112, %118, %117", 1)
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module._lowered_pattern_evidence(graph, zero_identity="cst_6")
+
     def test_lowered_closed_loop_induction_value_is_not_dominating(self):
         evidence = module.load_evidence(
             ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
