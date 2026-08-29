@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -56,14 +58,23 @@ def repeated_graph(site_count: int = 8) -> str:
 def lowered_separate_loop_graph(site_count: int = 8) -> str:
     """Opaque linalg/SCF-like shape: phases are separate, edges are memory based."""
     body = []
+    args = []
+    for head in range(site_count):
+        for name in ("score_mem", "max_mem", "delta_mem", "exp_mem", "sum_mem"):
+            args.append(f"%{name}{head}: memref<4xf32>")
+        args.extend([f"%time_index{head}: i32", f"%position{head}: i32"])
+    body.extend([
+        "  %c0 = arith.constant 0 : index",
+        "  %c1 = arith.constant 1 : index",
+        "  %c4 = arith.constant 4 : index",
+        "  %fzero = arith.constant 0.0 : f32",
+    ])
     for head in range(site_count):
         body.extend([
             f"  %idx{head} = arith.constant 0 : index",
-            f"  %time_index{head} = arith.constant 0 : i32",
-            f"  %position{head} = arith.constant 0 : i32",
             f"  scf.for %r{head} = %c0 to %c4 step %c1 {{",
             f"    %s{head} = memref.load %score_mem{head}[%r{head}] : memref<4xf32>",
-            f"    %m{head} = arith.maximumf %s{head}, %old{head} : f32",
+            f"    %m{head} = arith.maximumf %s{head}, %fzero : f32",
             f"    memref.store %m{head}, %max_mem{head}[%r{head}] : memref<4xf32>",
             "  }",
             f"  scf.for %d{head} = %c0 to %c4 step %c1 {{",
@@ -77,7 +88,7 @@ def lowered_separate_loop_graph(site_count: int = 8) -> str:
             f"    %exp{head} = math.exp %dl{head} : f32",
             f"    memref.store %exp{head}, %exp_mem{head}[%idx{head}] : memref<4xf32>",
             "  }",
-            f"  %red{head} = scf.for %q{head} = %c0 to %c4 step %c1 iter_args(%oldsum{head} = %zero) -> (f32) {{",
+            f"  %red{head} = scf.for %q{head} = %c0 to %c4 step %c1 iter_args(%oldsum{head} = %fzero) -> (f32) {{",
             f"    %elpre{head} = memref.load %exp_mem{head}[%idx{head}] : memref<4xf32>",
             f"    %el{head} = memref.load %exp_mem{head}[%idx{head}] : memref<4xf32>",
             f"    %sum{head} = arith.addf %oldsum{head}, %el{head} : f32",
@@ -89,7 +100,7 @@ def lowered_separate_loop_graph(site_count: int = 8) -> str:
             f"  %prob{head} = arith.divf %elpost{head}, %sum_loaded{head} : f32",
             f"    %causal{head} = arith.cmpi sle, %time_index{head}, %position{head} : i32",
         ])
-    return "module {\n  func.func @main() {\n" + "\n".join(body) + "\n  }\n}\n"
+    return "module {\n  func.func @main(" + ", ".join(args) + ") {\n" + "\n".join(body) + "\n  return\n  }\n}\n"
 
 
 class SoftmaxBridgeTest(unittest.TestCase):
@@ -102,6 +113,16 @@ class SoftmaxBridgeTest(unittest.TestCase):
         descriptor = module.bridge_graph(graph, evidence, source_name="lowered.mlir")
         self.assertEqual(descriptor["source"]["exp_site_count"], 8)
         self.assertEqual(descriptor["source"]["binding_mode"], "lowered_memref_loop_structure")
+
+    def test_lowered_fixture_parses_when_circt_opt_is_available(self):
+        tool = shutil.which("circt-opt") or shutil.which("mlir-opt")
+        if tool is None:
+            self.skipTest("circt-opt/mlir-opt is not in the Nix test environment")
+        with tempfile.NamedTemporaryFile("w", suffix=".mlir") as fixture:
+            fixture.write(lowered_separate_loop_graph(1))
+            fixture.flush()
+            result = subprocess.run([tool, fixture.name, "-o", "/dev/null"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_lowered_inverse_causal_direction_fails_closed(self):
         evidence = module.load_evidence(
@@ -120,7 +141,7 @@ class SoftmaxBridgeTest(unittest.TestCase):
             ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
         )
         graph = lowered_separate_loop_graph().replace(
-            " step %c1 iter_args(%oldsum0 = %zero)", " step %c1", 1
+            " step %c1 iter_args(%oldsum0 = %fzero)", " step %c1", 1
         )
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-fake-reduction.mlir")
