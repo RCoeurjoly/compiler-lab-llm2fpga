@@ -66,8 +66,13 @@ def extract_pre_lowering_identities(source: str, source_path: str) -> dict[str, 
     summation = result("sum", r"^(\s*%\w+)\s*=\s*torch\.aten\.sum\.dim_IntList\s+%\w+.*->\s*!torch\.vtensor<\[1,16,4,1\],f32>")
     normalization = result("normalization", r"^(\s*%\w+)\s*=\s*torch\.aten\.div\.Tensor\s+%\w+,\s*%\w+.*->\s*!torch\.vtensor<\[1,16,4,4\],f32>")
     causal = result("causal", r"^(\s*%\w+)\s*=\s*torch\.aten\.where\.self\s+%\w+,\s*%\w+,\s*%\w+.*->\s*!torch\.vtensor<\[1,16,4,4\],f32>")
-    output = normalization
-    identities = {"score": score.strip(), "row_max": row_max.strip(), "delta": delta.strip(), "exp": exp.strip(), "sum": summation.strip(), "normalization": normalization.strip(), "causal": causal.strip(), "output": output.strip()}
+    # The div result is the softmax probability tensor itself.  The following
+    # matmul is attention context, not a softmax output, so do not bind the
+    # latter as this role.  Qualify the same SSA value by role to keep the
+    # manifest's identities unique while documenting that normalization and
+    # output intentionally share one tensor.
+    output = f"softmax_output:{normalization.strip()}"
+    identities = {"score": score.strip(), "row_max": row_max.strip(), "delta": delta.strip(), "exp": exp.strip(), "sum": summation.strip(), "normalization": normalization.strip(), "causal": causal.strip(), "output": output}
     return {"kind": "torch-mlir-ssa", "path": source_path, "sha256": hashlib.sha256(source.encode()).hexdigest(), "identities": identities}
 
 

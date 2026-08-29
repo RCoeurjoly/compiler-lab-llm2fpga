@@ -39,6 +39,21 @@ def payload() -> dict:
 
 
 class SoftmaxManifestTest(unittest.TestCase):
+    def test_pre_lowering_extractor_qualifies_softmax_output(self):
+        source = "\n".join([
+            "%172 = torch.aten.add.Tensor %168, %171, %int1 : !torch.vtensor<[1,16,4,4],f32>, !torch.vtensor<[1,1,4,4],f32>, !torch.int -> !torch.vtensor<[1,16,4,4],f32>",
+            "%values, %indices = torch.aten.max.dim %172, %int-1, %true : !torch.vtensor<[1,16,4,4],f32>, !torch.int, !torch.bool -> !torch.vtensor<[1,16,4,1],f32>, !torch.vtensor<[1,16,4,1],si64>",
+            "%173 = torch.aten.sub.Tensor %172, %values, %float1.000000e00 : !torch.vtensor<[1,16,4,4],f32>, !torch.vtensor<[1,16,4,1],f32>, !torch.float -> !torch.vtensor<[1,16,4,4],f32>",
+            "%174 = torch.aten.exp %173 : !torch.vtensor<[1,16,4,4],f32> -> !torch.vtensor<[1,16,4,4],f32>",
+            "%176 = torch.aten.sum.dim_IntList %174, %dims, %true, %none : !torch.vtensor<[1,16,4,4],f32>, !torch.list<int>, !torch.bool, !torch.none -> !torch.vtensor<[1,16,4,1],f32>",
+            "%177 = torch.aten.div.Tensor %174, %176 : !torch.vtensor<[1,16,4,4],f32>, !torch.vtensor<[1,16,4,1],f32> -> !torch.vtensor<[1,16,4,4],f32>",
+            "%168 = torch.aten.where.self %mask, %165, %zero : !torch.vtensor<[1,1,4,4],i1>, !torch.vtensor<[1,16,4,4],f32>, !torch.vtensor<[],f32> -> !torch.vtensor<[1,16,4,4],f32>",
+        ])
+        extracted = manifest.extract_pre_lowering_identities(source, "fixture.mlir")
+        self.assertEqual(extracted["identities"]["normalization"], "%177")
+        self.assertEqual(extracted["identities"]["output"], "softmax_output:%177")
+        self.assertNotEqual(extracted["identities"]["normalization"], extracted["identities"]["output"])
+
     def test_seal_and_reload_authenticate_exact_eight_head_roles(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "manifest.json"
