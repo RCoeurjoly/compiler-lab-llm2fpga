@@ -282,6 +282,13 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
                 return True
         return False
 
+    def dominates_exact_zero(use_line: int) -> bool:
+        name = "fzero"
+        use_scope = scope_paths[use_line]
+        return any(re.match(rf"%{name}\s*=\s*arith\.constant\s+0\.0\s*:\s*f32", lines[i]) and
+                   scope_paths[i] == use_scope[:len(scope_paths[i])]
+                   for i in range(function_start, use_line))
+
     require(any(re.match(r"%fzero\s*=\s*arith\.constant\s+0\.0\s*:\s*f32", line) for line in lines),
             "pattern_not_proven", "authenticated floating zero constant")
     exp_lines = [i for i, line in enumerate(lines) if re.match(r"%[^ ]+\s*=\s*math\.exp\s+%[^ ]+", line)]
@@ -406,7 +413,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         max_header_i = next((i for i, line in enumerate(lines[:max_stores[-1][0]])
                              if re.match(rf"%{re.escape(max_value.lstrip('%'))}\s*=\s*scf\.for\b", line)), None)
         require(max_header_i is not None, "dataflow_not_proven", f"site {number} row-max has no matching loop result")
-        require(dominates_typed_definition("%fzero", max_header_i, "f32"),
+        require(dominates_exact_zero(max_header_i),
                 "dataflow_not_proven", f"site {number} zero constant does not dominate row max")
         max_header_info = reduction_loop_header(max_header_i)
         max_header = max_header_info[0] if max_header_info else None
@@ -494,7 +501,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
                 "dataflow_not_proven", f"site {number} reduction is not loop-carried")
         result_match = re.match(r"%([^ ]+)\s*=\s*scf\.for\b", reduction_header)
         require(result_match is not None, "dataflow_not_proven", f"site {number} reduction has no SSA loop result")
-        require(dominates_typed_definition("%fzero", reduction_info[1], "f32"),
+        require(dominates_exact_zero(reduction_info[1]),
                 "dataflow_not_proven", f"site {number} zero constant does not dominate reduction")
         carried_match = re.search(r"iter_args\(\s*%([^ ]+)\s*=", reduction_header)
         require(carried_match is not None, "dataflow_not_proven", f"site {number} reduction carried value is malformed")
@@ -542,7 +549,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         div_result = div_entry[1].group(1)
         require(select_match is not None and select_match.group(1) == div_result and select_match.group(2) == "fzero",
                 "dataflow_not_proven", f"site {number} causal select has no observable alternative")
-        require(dominates_typed_definition("%fzero", causal[0], "f32"),
+        require(dominates_exact_zero(causal[0]),
                 "dataflow_not_proven", f"site {number} zero constant does not dominate mask")
         select_result = re.match(r"%([^ ]+)", select_line).group(1)
         require(any(re.search(rf"memref\.store\s+%{re.escape(select_result)}\b", line)

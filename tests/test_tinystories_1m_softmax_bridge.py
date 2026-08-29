@@ -252,6 +252,19 @@ class SoftmaxBridgeTest(unittest.TestCase):
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-closed-zero.mlir")
 
+    def test_lowered_zero_decoy_cannot_shadow_nonzero_dominating_definition(self):
+        evidence = module.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = lowered_separate_loop_graph().replace(
+            "  %fzero = arith.constant 0.0 : f32",
+            "  %fzero = arith.constant 1.0 : f32\n  scf.if %cond0 {\n    %fzero = arith.constant 0.0 : f32\n  } else {\n    %otherf = arith.constant 0.0 : f32\n  }",
+            1,
+        )
+        with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+            module.bridge_graph(graph, evidence, source_name="lowered-zero-decoy.mlir")
+
     def test_lowered_in_loop_sum_store_cannot_bypass_loop_result(self):
         evidence = module.load_evidence(
             ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
