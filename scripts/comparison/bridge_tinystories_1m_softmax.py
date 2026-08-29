@@ -254,6 +254,21 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
             break
     require(function_end is not None, "pattern_not_proven", "unterminated func.func region")
     require("scf.for" in graph or "scf.parallel" in graph, "pattern_not_proven", "lowered SCF loop structure")
+    # Record lexical region ownership for every line.  This prevents a typed
+    # value defined in a completed loop from being treated as a dominating
+    # definition merely because its spelling is reused later.
+    scope_paths: list[tuple[int, ...]] = []
+    scope_stack: list[int] = []
+    next_scope = 0
+    for line in lines:
+        scope_paths.append(tuple(scope_stack))
+        opens, closes = line.count("{"), line.count("}")
+        for _ in range(opens):
+            next_scope += 1
+            scope_stack.append(next_scope)
+        for _ in range(closes):
+            if scope_stack:
+                scope_stack.pop()
     exp_lines = [i for i, line in enumerate(lines) if re.match(r"%[^ ]+\s*=\s*math\.exp\s+%[^ ]+", line)]
     require(len(exp_lines) == expected_exp_sites, "pattern_not_proven",
             f"expected {expected_exp_sites} stabilized exp sites, found {len(exp_lines)}")
@@ -300,11 +315,14 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
             # intentionally lexical and conservative for the textual IR.
             if prior.strip() == "}" and active_ivs:
                 active_ivs.pop()
-        for line in lines[function_start:line_number]:
+        use_scope = scope_paths[line_number]
+        for definition_line, line in enumerate(lines[function_start:line_number], function_start):
             if re.search(rf"scf\.(?:for|parallel)\s+%{re.escape(name)}\s*=", line):
                 return name in active_ivs
             if re.match(rf"%{re.escape(name)}\s*=", line):
-                return bool(re.search(r":\s*index(?:\s|$)", line))
+                definition_scope = scope_paths[definition_line]
+                return (definition_scope == use_scope[:len(definition_scope)] and
+                        bool(re.search(r":\s*index(?:\s|$)", line)))
         return False
 
     def reduction_loop_header(line_number: int) -> tuple[str, int, int] | None:
