@@ -58,8 +58,25 @@ def write_common_files(out_dir: Path, adapter_path: Path) -> None:
 
 
 def adapter_exported_program(
-    adapter: ModuleType, model_path: str | None
+    adapter: ModuleType,
+    model_path: str | None,
+    package_path: str | None = None,
+    contract_path: str | None = None,
 ) -> tuple[torch.export.ExportedProgram, str, object]:
+    if (package_path is None) != (contract_path is None):
+        raise ValueError("package and contract paths must be supplied together")
+    if package_path is not None:
+        export_with_package = getattr(adapter, "export_program_with_package", None)
+        if export_with_package is None:
+            raise SystemExit(
+                "package input requested, but adapter does not expose "
+                "export_program_with_package(model, package, contract)"
+            )
+        exported = export_with_package(model_path, package_path, contract_path)
+        return exported, "adapter.export_program_with_package", getattr(
+            exported, "example_inputs", None
+        )
+
     export_program = getattr(adapter, "export_program", None)
     build_model = getattr(adapter, "build_model", None)
     example_inputs = getattr(adapter, "example_inputs", None)
@@ -92,7 +109,9 @@ def flattened_input_summaries(inputs: object) -> list[dict[str, object]]:
 
 
 def materialize_exported(args: argparse.Namespace, adapter: ModuleType) -> None:
-    exported, export_source, inputs = adapter_exported_program(adapter, args.model_path)
+    exported, export_source, inputs = adapter_exported_program(
+        adapter, args.model_path, args.package, args.contract
+    )
     torch.export.save(exported, args.out_dir / "exported.pt2")
     (args.out_dir / "exported-program.txt").write_text(
         str(exported) + "\n", encoding="utf-8"
@@ -111,6 +130,8 @@ def materialize_exported(args: argparse.Namespace, adapter: ModuleType) -> None:
             "adapter": str(args.adapter),
             "adapter_copy": "adapter.py",
             "model_path": args.model_path,
+            "package_path": args.package,
+            "contract_path": args.contract,
             "export_source": export_source,
             "exported_program_type": type(exported).__name__,
             "example_inputs": flattened_input_summaries(inputs),
@@ -133,7 +154,18 @@ def main() -> None:
     parser.add_argument("--adapter", required=True, type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--model-path")
+    parser.add_argument(
+        "--package",
+        help="authenticated model package; requires --contract and a package-aware adapter",
+    )
+    parser.add_argument(
+        "--contract",
+        help="frozen contract for --package; required together with --package",
+    )
     args = parser.parse_args()
+
+    if (args.package is None) != (args.contract is None):
+        parser.error("--package and --contract must be supplied together")
 
     write_common_files(args.out_dir, args.adapter)
     adapter = load_adapter(args.adapter)

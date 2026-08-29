@@ -649,3 +649,27 @@ def export_program(model_path: str | None) -> torch.export.ExportedProgram:
     contract = _default_contract()
     bundle = load_authenticated_package(contract, _default_package(contract), Path(model_path))
     return export_bundle_program(bundle)
+
+
+def export_program_with_package(
+    model_path: str | Path,
+    package_path: str | Path,
+    contract_path: str | Path,
+) -> torch.export.ExportedProgram:
+    """Export only after authenticating the explicit compiler package inputs.
+
+    This is the package-aware frontend entry point used by the generic
+    materializer.  Keeping all three paths explicit prevents the compiler
+    pipeline from silently falling back to the ordinary FP32 HuggingFace
+    adapter when a package build is requested.
+    """
+
+    if not model_path or not package_path or not contract_path:
+        raise PackageAdapterError(
+            "package_frontend_inputs_missing",
+            "model, package, and frozen contract paths are required",
+        )
+    bundle = load_authenticated_package(
+        Path(contract_path), Path(package_path), Path(model_path)
+    )
+    return export_bundle_program(bundle)
