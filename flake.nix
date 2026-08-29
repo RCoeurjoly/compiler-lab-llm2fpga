@@ -410,6 +410,46 @@
           adapterPy = ./TinyStories/model_adapter.py;
         };
 
+        # The package is deliberately supplied at runtime.  It is an
+        # authenticated local reference input, not a flake input and not a
+        # compiler-generated model.  The command runs entirely with the Nix
+        # Python environment and records an explicit unsupported result when
+        # the package's Q/DQ execution semantics cannot be lowered.
+        authenticatedPackageLowering =
+          let sourceRoot = builtins.path { path = ./.; name = "llm2fpga-source"; };
+          in pkgs.writeShellApplication {
+            name = "tinystories-1m-authenticated-package-lowering";
+            runtimeInputs = [ pythonWithTinyStories pkgs.coreutils ];
+            text = ''
+              set -euo pipefail
+              package=""
+              model_path="${tinyStories1m.snapshot}"
+              out_dir=""
+              while [ "$#" -gt 0 ]; do
+                case "$1" in
+                  --package) package="$2"; shift 2 ;;
+                  --model-path) model_path="$2"; shift 2 ;;
+                  --out-dir) out_dir="$2"; shift 2 ;;
+                  -h|--help)
+                    echo "usage: tinystories-1m-authenticated-package-lowering --package PATH [--model-path PATH] --out-dir PATH"
+                    exit 0
+                    ;;
+                  *) echo "unknown argument: $1" >&2; exit 2 ;;
+                esac
+              done
+              [ -n "$package" ] || { echo "--package is required" >&2; exit 2; }
+              [ -n "$out_dir" ] || { echo "--out-dir is required" >&2; exit 2; }
+              tmp_dir="$(mktemp -d)"
+              trap 'rm -rf "$tmp_dir"' EXIT
+              ${pythonWithTinyStories}/bin/python ${sourceRoot}/scripts/comparison/materialize_tinystories_1m_package_export.py \
+                --contract ${sourceRoot}/artifacts/reference/tinystories-1m-kev-gpt-contract.json \
+                --package "$package" --model-path "$model_path" --out-dir "$tmp_dir/package-export"
+              ${pythonWithTinyStories}/bin/python ${sourceRoot}/scripts/comparison/lower_tinystories_1m_authenticated_package.py \
+                --contract ${sourceRoot}/artifacts/reference/tinystories-1m-kev-gpt-contract.json \
+                --package-export "$tmp_dir/package-export" --package "$package" --out-dir "$out_dir"
+            '';
+          };
+
         pipelineLib = import ./nix/pipeline.nix {
           inherit pkgs mlir circt yosysPkg yosysSlang torchMlir python;
           calyxTool = calyx;
@@ -2571,13 +2611,20 @@ PY
             task3MainPackages."tinystories-representative-core-task3-baseline-float-selftest-all-memory-parity";
           model-registry = modelRegistryJson;
           default = modelRegistryJson;
-        } // pipelineStagePackages // pipelineMetadataPackages
+        } // pipelineStagePackages // pipelineMetadataPackages // {
+          "tinystories-1m-authenticated-package-lowering" =
+            authenticatedPackageLowering;
+        }
           // quantizedLinalgDiagnosticPackages // pipelineAliasPackages
           // quantizedRepresentativeCoreStudyStagePackages;
 
         apps."rc-math-exp-paper-screen" = {
           type = "app";
           program = "${rcMathExpPaperScreen}/bin/rc-math-exp-paper-screen";
+        };
+        apps."tinystories-1m-authenticated-package-lowering" = {
+          type = "app";
+          program = "${authenticatedPackageLowering}/bin/tinystories-1m-authenticated-package-lowering";
         };
 
         checks = {
