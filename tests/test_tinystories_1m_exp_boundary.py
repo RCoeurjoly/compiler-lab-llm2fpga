@@ -60,15 +60,21 @@ class TinyStoriesExpBoundaryTest(unittest.TestCase):
 
     def test_context_parser_requires_max_subtract_and_reduction(self):
         text = "\n".join([
-            "%score = arith.subf %raw, %row_max : f32",
+            "%score_delta = arith.subf %raw, %row_max : f32",
+            "memref.store %score_delta, %scores[%i] : memref<8xf32>",
+            "%padding = arith.addi %i, %one : index",
+            "%score = memref.load %scores[%i] : memref<8xf32>",
             "%exp = math.exp %score : f32",
+            "memref.store %exp, %scores[%i] : memref<8xf32>",
             "%sum = arith.addf %acc, %exp : f32",
         ])
         context = self.module.discover_softmax_exp_context(text)
-        self.assertEqual(context["source_line"], 2)
+        self.assertEqual(context["source_line"], 5)
         self.assertEqual(context["exp_operand"], "%score")
         self.assertIn("arith.subf", context["max_subtract"])
-        with self.assertRaisesRegex(ValueError, "max-subtract"):
+        self.assertEqual(context["max_subtract_line"], 1)
+        self.assertEqual(context["reduction_line"], 7)
+        with self.assertRaisesRegex(ValueError, "score memref reload"):
             self.module.discover_softmax_exp_context("%exp = math.exp %x : f32")
 
     def test_frontier_substitution_is_rejected(self):
@@ -82,6 +88,11 @@ class TinyStoriesExpBoundaryTest(unittest.TestCase):
             (target / source.name).write_text(json.dumps(altered), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "file hash mismatch"):
                 self.module.load_frontier(root)
+
+    def test_dense_non_exp_line_is_ignored(self):
+        dense = "resource " + ("x" * 1_000_000)
+        with self.assertRaisesRegex(ValueError, "no f32 math.exp"):
+            self.module.discover_softmax_exp_context(dense)
 
 
 if __name__ == "__main__":

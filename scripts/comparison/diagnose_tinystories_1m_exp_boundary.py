@@ -50,25 +50,70 @@ def exact_f32_exp(value: float) -> float:
 
 
 def discover_softmax_exp_context(text: str) -> dict[str, Any]:
-    """Derive the first exp context from flat-SCF text, rejecting loose exp calls."""
+    """Derive the first exp context from flat-SCF text, rejecting loose exp calls.
+
+    Flat-SCF materializes the stabilized score in a memref before the exp
+    loop, then loads it for ``math.exp`` and stores the result back.  This
+    parser follows that value/memref/index chain instead of assuming the
+    subtraction is adjacent to the exp.  The cheap substring check is
+    intentional: generated artifacts contain very long resource lines.
+    """
     lines = text.splitlines()
+    load_re = re.compile(r"^\s*(%\w+)\s*=\s*memref\.load\s+(%\w+)\[([^\]]+)\]")
+    store_re = re.compile(r"^\s*memref\.store\s+(%\w+),\s*(%\w+)\[([^\]]+)\]")
+    sub_re = re.compile(r"^\s*(%\w+)\s*=\s*arith\.subf\b")
     for index, line in enumerate(lines):
+        if "math.exp" not in line:
+            continue
         match = re.search(r"(\S+)\s*=\s*math\.exp\s+(\S+)\s*:\s*f32", line)
         if not match:
             continue
         result, operand = match.groups()
+        operand_load = None
+        operand_load_line = None
+        for prior in range(max(0, index - 16), index):
+            loaded = load_re.match(lines[prior])
+            if loaded and loaded.group(1) == operand:
+                operand_load, operand_load_line = loaded, prior
+        if operand_load is None:
+            raise ValueError(f"math.exp at line {index + 1} lacks score memref reload")
+        memref, indices = operand_load.group(2), operand_load.group(3)
         subtract = None
-        for prior in range(max(0, index - 12), index):
-            if re.search(rf"{re.escape(operand)}\s*=\s*arith\.subf\b", lines[prior]):
-                subtract = lines[prior].strip()
+        subtract_store = None
+        subtract_index = None
+        # Find the store that produced this exact score cell, then its subf.
+        for prior in range(operand_load_line - 1, max(-1, operand_load_line - 257), -1):
+            stored = store_re.match(lines[prior])
+            if stored and stored.group(2) == memref and stored.group(3) == indices:
+                sub_name = stored.group(1)
+                for sub_line in range(prior - 1, max(-1, prior - 257), -1):
+                    defined = sub_re.match(lines[sub_line])
+                    if defined and defined.group(1) == sub_name:
+                        subtract = lines[sub_line].strip()
+                        subtract_store = lines[prior].strip()
+                        subtract_index = sub_line
+                        break
+                if subtract is not None:
+                    break
         if subtract is None:
-            raise ValueError(f"math.exp at line {index + 1} lacks max-subtract predecessor")
+            raise ValueError(f"math.exp at line {index + 1} lacks stored max-subtract predecessor")
+        exp_store = None
+        exp_store_index = None
+        for following_index in range(index + 1, min(len(lines), index + 16)):
+            stored = store_re.match(lines[following_index])
+            if stored and stored.group(1) == result:
+                exp_store = lines[following_index].strip()
+                exp_store_index = following_index
+                break
+        if exp_store is None:
+            raise ValueError(f"math.exp at line {index + 1} lacks result memref store")
         reduction = None
-        for following in lines[index + 1:index + 80]:
-            if (re.search(r"arith\.addf|\b(sum|reduce|reduction)\b", following, re.IGNORECASE)
-                    and (result in following or "reduction" in following.lower()
-                         or "sum" in following.lower())):
+        reduction_index = None
+        for following_index in range(exp_store_index + 1, min(len(lines), exp_store_index + 256)):
+            following = lines[following_index]
+            if "arith.addf" in following or "arith.divf" in following:
                 reduction = following.strip()
+                reduction_index = following_index
                 break
         if reduction is None:
             raise ValueError(f"math.exp at line {index + 1} lacks downstream reduction")
@@ -82,7 +127,12 @@ def discover_softmax_exp_context(text: str) -> dict[str, Any]:
             "exp_result": result,
             "exp_operand": operand,
             "max_subtract": subtract,
+            "max_subtract_line": subtract_index + 1,
+            "max_subtract_store": subtract_store,
+            "score_reload": lines[operand_load_line].strip(),
+            "exp_result_store": exp_store,
             "reduction": reduction,
+            "reduction_line": reduction_index + 1,
         }
     raise ValueError("no f32 math.exp operation found")
 
