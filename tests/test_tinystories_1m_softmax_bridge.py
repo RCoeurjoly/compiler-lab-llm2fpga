@@ -247,6 +247,21 @@ class SoftmaxBridgeTest(unittest.TestCase):
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module._lowered_pattern_evidence(graph, zero_identity="cst_6")
 
+    def test_bounded_causal_site_mutations_fail_closed(self):
+        site = """%p = memref.load %mask[%q] : memref<4xi1>
+%s = memref.load %pre[%q] : memref<4xf32>
+%mask_neg_inf = arith.constant 0 : f32
+%out = arith.select %p, %s, %mask_neg_inf : f32
+memref.store %out, %post[%q] : memref<4xf32>"""
+        kwargs = {"score_input": "%pre", "score_output": "%post", "mask_input": "%mask", "position_index": "%q"}
+        self.assertEqual(module.causal_pre_mask_site_evidence(site, **kwargs)["score"], "s")
+        for mutation in (site.replace("%pre[%q]", "%other[%q]"),
+                         site.replace("%mask[%q]", "%wrong_mask[%q]"),
+                         site.replace("%q]", "%head]"),
+                         site.replace("%s, %mask_neg_inf", "%mask_neg_inf, %s")):
+            with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
+                module.causal_pre_mask_site_evidence(mutation, **kwargs)
+
     def test_lowered_closed_loop_induction_value_is_not_dominating(self):
         evidence = module.load_evidence(
             ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",

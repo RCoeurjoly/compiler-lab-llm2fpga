@@ -39,6 +39,32 @@ def require(condition: bool, code: str, message: str) -> None:
         raise SoftmaxBridgeError(code, message)
 
 
+def causal_pre_mask_site_evidence(graph: str, *, score_input: str,
+                                  score_output: str, mask_input: str,
+                                  position_index: str | None = None) -> dict[str, str]:
+    """Authenticate one lowered pre-softmax causal-mask site.
+
+    This bounded helper is intentionally independent of the eight-site
+    matcher so adversarial provenance mutations can be tested non-vacuously.
+    """
+    lines = [line.strip() for line in graph.splitlines() if line.strip()]
+    for i, line in enumerate(lines):
+        m = re.match(r"%([^ ]+)\s*=\s*arith\.select\s+%([^, ]+),\s*%([^, ]+),\s*%([^ ]+)", line)
+        if not m:
+            continue
+        stores = [x for x in lines[i + 1:] if re.match(rf"memref\.store\s+%{re.escape(m.group(1))}\b,\s*{re.escape(score_output)}\[", x)]
+        pred = next((x for x in reversed(lines[:i]) if re.match(rf"%{re.escape(m.group(2))}\s*=\s*memref\.load\s+{re.escape(mask_input)}\[", x)), None)
+        true = next((x for x in reversed(lines[:i]) if re.match(rf"%{re.escape(m.group(3))}\s*=\s*memref\.load\s+{re.escape(score_input)}\[", x)), None)
+        require(stores and pred and true, "dataflow_not_proven", "causal site provenance")
+        if position_index is not None:
+            require(f"[{position_index}]" in pred and f"[{position_index}]" in true,
+                    "dataflow_not_proven", "causal position index")
+        require(m.group(4) in {"mask_neg_inf", "zero"},
+                "dataflow_not_proven", "causal fallback direction")
+        return {"select": m.group(1), "predicate": m.group(2), "score": m.group(3), "fallback": m.group(4)}
+    raise SoftmaxBridgeError("pattern_not_proven", "causal site select")
+
+
 _EVIDENCE_TOKEN = object()
 _ISSUED_CAPABILITIES: set[int] = set()
 
