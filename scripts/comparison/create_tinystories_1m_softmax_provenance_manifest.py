@@ -124,6 +124,17 @@ def validate_manifest(payload: dict[str, Any]) -> dict[str, Any]:
             _require(isinstance(identity, str) and identity, "head_identity", f"{expected}.{role}")
             _require(identity not in seen, "head_identity_duplicate", identity)
             seen.add(identity)
+    constants = payload.get("constants")
+    if constants is not None:
+        _require(isinstance(constants, dict) and set(constants) == {"zero_f32"}, "constants", "exact zero constant set")
+        zero = constants["zero_f32"]
+        _require(isinstance(zero, dict), "constants", "zero_f32")
+        _require(zero.get("value") == "0.0" and zero.get("type") == "f32", "constants", "zero_f32 value/type")
+        _require(isinstance(zero.get("pre_lowering_identity"), str) and zero["pre_lowering_identity"], "constants", "zero_f32 pre-lowering identity")
+        lowered = zero.get("lowered_identities")
+        _require(isinstance(lowered, dict) and set(lowered) == set(required_stages), "constants", "zero_f32 lowered identities")
+        for stage, identity in lowered.items():
+            _require(isinstance(identity, str) and identity.startswith("%"), "constants", f"zero_f32.{stage}")
     return payload
 
 

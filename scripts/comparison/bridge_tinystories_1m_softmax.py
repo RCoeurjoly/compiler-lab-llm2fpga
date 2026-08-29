@@ -252,7 +252,7 @@ def _named_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[
             "matched_edges": ["subf_score_rowmax", "delta_store_load", "exp", "exp_store_load", "sum_reduction", "normalization_division", "causal_cmpi"]}
 
 
-def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, Any]:
+def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_identity: str = "fzero") -> dict[str, Any]:
     """Recover the same chain after linalg lowering erased semantic names.
 
     The lowered graph has separate SCF loops, so an exp site's producer and
@@ -307,13 +307,13 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         return False
 
     def dominates_exact_zero(use_line: int) -> bool:
-        name = "fzero"
+        name = zero_identity.lstrip("%")
         use_scope = scope_paths[use_line]
-        return any(re.match(rf"%{name}\s*=\s*arith\.constant\s+0\.0\s*:\s*f32", lines[i]) and
+        return any(re.match(rf"%{re.escape(name)}\s*=\s*arith\.constant\s+0(?:\.0+)?(?:e[+\-]?0+)?\s*:\s*f32", lines[i], re.IGNORECASE) and
                    scope_paths[i] == use_scope[:len(scope_paths[i])]
                    for i in range(function_start, use_line))
 
-    require(any(re.match(r"%fzero\s*=\s*arith\.constant\s+0\.0\s*:\s*f32", line) for line in lines),
+    require(any(re.match(rf"%{re.escape(zero_identity.lstrip('%'))}\s*=\s*arith\.constant\s+0(?:\.0+)?(?:e[+\-]?0+)?\s*:\s*f32", line, re.IGNORECASE) for line in lines),
             "pattern_not_proven", "authenticated floating zero constant")
     exp_lines = [i for i, line in enumerate(lines) if re.match(r"%[^ ]+\s*=\s*math\.exp\s+%[^ ]+", line)]
     require(len(exp_lines) == expected_exp_sites, "pattern_not_proven",
@@ -571,7 +571,8 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
                            if re.search(rf"arith\.select\s+%{re.escape(causal_result)}\b", line))
         select_match = re.search(r"arith\.select\s+%[^, ]+,\s*%([^, ]+),\s*%([^ ]+)", select_line)
         div_result = div_entry[1].group(1)
-        require(select_match is not None and select_match.group(1) == div_result and select_match.group(2) == "fzero",
+        require(select_match is not None and select_match.group(1) == div_result and
+                select_match.group(2) == zero_identity.lstrip("%"),
                 "dataflow_not_proven", f"site {number} causal select has no observable alternative")
         require(dominates_exact_zero(causal[0]),
                 "dataflow_not_proven", f"site {number} zero constant does not dominate mask")
@@ -593,7 +594,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
             "matched_edges": ["subf_operand_loads", "delta_store_load_same_index", "exp", "exp_store_load_same_index", "sum_reduction", "normalization_division", "causal_cmpi"]}
 
 
-def _pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, Any]:
+def _pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_identity: str = "fzero") -> dict[str, Any]:
     try:
         return _named_pattern_evidence(graph, expected_exp_sites=expected_exp_sites)
     except SoftmaxBridgeError as named_error:
@@ -602,7 +603,7 @@ def _pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, A
         if "scf.for" not in graph and "scf.parallel" not in graph:
             raise
         try:
-            return _lowered_pattern_evidence(graph, expected_exp_sites=expected_exp_sites)
+            return _lowered_pattern_evidence(graph, expected_exp_sites=expected_exp_sites, zero_identity=zero_identity)
         except SoftmaxBridgeError:
             raise named_error
 
@@ -636,7 +637,14 @@ def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str, e
             "calibration_ids_sha256": canonical["package_calibration_ids_sha256"],
         },
                 "provenance_manifest_invalid", "package identity")
-    pattern = _pattern_evidence(graph, expected_exp_sites=expected_exp_sites)
+    zero_identity = "fzero"
+    if provenance_manifest is not None:
+        constants = provenance_manifest.get("constants")
+        if isinstance(constants, Mapping) and isinstance(constants.get("zero_f32"), Mapping):
+            lowered = constants["zero_f32"].get("lowered_identities")
+            if isinstance(lowered, Mapping) and isinstance(lowered.get("flat_scf"), str):
+                zero_identity = lowered["flat_scf"]
+    pattern = _pattern_evidence(graph, expected_exp_sites=expected_exp_sites, zero_identity=zero_identity)
     attributes = {
         "score_width": 32,
         "score_fraction_bits": 8,

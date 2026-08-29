@@ -74,6 +74,31 @@ class SoftmaxManifestTest(unittest.TestCase):
             loaded = bridge.load_provenance_manifest(path)
             self.assertEqual(loaded["sha256"], manifest.canonical_sha256({k: v for k, v in loaded.items() if k != "sha256"}))
 
+    def test_bridge_uses_authenticated_lowered_zero_identity(self):
+        fixture_spec = importlib.util.spec_from_file_location("softmax_bridge_tests", ROOT / "tests/test_tinystories_1m_softmax_bridge.py")
+        assert fixture_spec and fixture_spec.loader
+        fixtures = importlib.util.module_from_spec(fixture_spec)
+        fixture_spec.loader.exec_module(fixtures)
+        value = payload()
+        value["constants"] = {
+            "zero_f32": {
+                "value": "0.0",
+                "type": "f32",
+                "pre_lowering_identity": "%0",
+                "lowered_identities": {
+                    name: "%cst_6" for name in ("torch_mlir", "linalg", "scf", "flat_scf")
+                },
+            }
+        }
+        sealed = manifest.seal(value)
+        evidence = bridge.load_evidence(
+            ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
+            ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
+        )
+        graph = fixtures.lowered_separate_loop_graph().replace("%fzero", "%cst_6")
+        descriptor = bridge.bridge_graph(graph, evidence, source_name="lowered-with-cst6.mlir", provenance_manifest=sealed)
+        self.assertEqual(descriptor["source"]["pre_lowering_provenance_manifest_sha256"], sealed["sha256"])
+
     def test_duplicate_role_identity_fails_closed(self):
         value = payload()
         value["heads"][1]["identities"]["exp"] = value["heads"][0]["identities"]["exp"]
