@@ -29,8 +29,6 @@ class BackendExecutionProbeTest(unittest.TestCase):
     def setUpClass(cls):
         cls.module = load_module()
         cls.inputs = cls.module.load_inputs(BACKEND, CALYX, VECTOR)
-        cls.inputs["backend_path"] = str(BACKEND)
-        cls.inputs["vector_path"] = str(VECTOR)
 
     def test_authenticated_artifacts_and_vector_are_required(self):
         with self.assertRaisesRegex(self.module.ExecutionProbeError, "calyx_path_not_canonical"):
@@ -69,6 +67,19 @@ class BackendExecutionProbeTest(unittest.TestCase):
         self.assertEqual(report["execution"]["status"], "not_executed")
         self.assertEqual(report["execution"]["first_unsupported_operation"]["code"], "calyx_runtime_unavailable")
         self.assertEqual(report["numeric_trace"]["status"], "algorithm_matched_backend_execution_not_run")
+        self.assertEqual(report["numeric_trace"]["result"], self.inputs["vector"]["result"])
+
+    def test_plain_or_mutated_mapping_cannot_bypass_authentication(self):
+        forged = dict(self.inputs)
+        forged["vector"] = dict(forged["vector"])
+        forged["vector"]["result"] = {"forged": True}
+        with self.assertRaisesRegex(self.module.ExecutionProbeError, "authenticated_inputs_required"):
+            self.module.build_report(forged, calyx_bin="/does/not/exist")
+
+    def test_authenticated_values_are_defensively_copied(self):
+        observed = self.inputs["vector"]
+        observed["result"] = {"forged": True}
+        report = self.module.build_report(self.inputs, calyx_bin="/does/not/exist")
         self.assertEqual(report["numeric_trace"]["result"], self.inputs["vector"]["result"])
 
     def test_available_calyx_still_requires_memory_harness(self):

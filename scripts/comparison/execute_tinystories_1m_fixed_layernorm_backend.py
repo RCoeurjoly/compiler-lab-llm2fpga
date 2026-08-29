@@ -17,6 +17,8 @@ import os
 import json
 import shutil
 import re
+from collections.abc import Iterator, Mapping as ABCMapping
+import copy
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -34,6 +36,29 @@ VECTOR_ARTIFACT_SHA256 = "750007e58f6303cbb0fe3b67c7a424d3d28ebd4c8bf4fc0428c318
 
 class ExecutionProbeError(ValueError):
     pass
+
+
+_INPUT_CAPABILITY = object()
+
+
+class AuthenticatedInputs(ABCMapping[str, Any]):
+    """Read-only capability issued only after canonical input authentication."""
+
+    __slots__ = ("_values",)
+
+    def __init__(self, capability: object, values: Mapping[str, Any]) -> None:
+        if capability is not _INPUT_CAPABILITY:
+            raise ExecutionProbeError("authenticated_inputs_capability_invalid")
+        self._values = copy.deepcopy(dict(values))
+
+    def __getitem__(self, key: str) -> Any:
+        return copy.deepcopy(self._values[key])
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._values)
+
+    def __len__(self) -> int:
+        return len(self._values)
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -103,7 +128,10 @@ def load_inputs(backend_report_path: Path, calyx_path: Path, vector_path: Path) 
         raise ExecutionProbeError("vector_schema_mismatch")
     if "llm2fpga.fixed_layer_norm_q16_16" in calyx_bytes.decode("utf-8"):
         raise ExecutionProbeError("calyx_custom_op_not_eliminated")
-    return {"backend": backend, "calyx": calyx_bytes.decode("utf-8"), "vector": vector}
+    return AuthenticatedInputs(
+        _INPUT_CAPABILITY,
+        {"backend": backend, "calyx": calyx_bytes.decode("utf-8"), "vector": vector},
+    )
 
 
 def _tool(path_or_name: str | None, names: tuple[str, ...]) -> dict[str, Any]:
@@ -124,6 +152,8 @@ def external_memory_inventory(calyx_mlir: str) -> dict[str, int]:
 
 
 def build_report(inputs: Mapping[str, Any], *, calyx_bin: str | None = None, fud: str | None = None, verilator: str | None = None) -> dict[str, Any]:
+    if not isinstance(inputs, AuthenticatedInputs):
+        raise ExecutionProbeError("authenticated_inputs_required")
     backend = inputs["backend"]
     calyx = inputs["calyx"]
     vector = inputs["vector"]
@@ -173,9 +203,9 @@ def build_report(inputs: Mapping[str, Any], *, calyx_bin: str | None = None, fud
             "result": algorithm,
         },
         "evidence": {
-            "backend_report_sha256": sha256_file(Path(inputs["backend_path"])),
+            "backend_report_sha256": BACKEND_REPORT_SHA256,
             "calyx_sha256": sha256_bytes(calyx.encode()),
-            "vector_sha256": sha256_file(Path(inputs["vector_path"])),
+            "vector_sha256": VECTOR_ARTIFACT_SHA256,
             "backend_calyx_sha256": backend["compiler_artifacts"]["calyx"]["sha256"],
             "backend_script_sha256": BACKEND_SCRIPT_SHA256,
             "canonical_paths": True,
@@ -204,8 +234,6 @@ def main() -> int:
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
     inputs = load_inputs(args.backend_report, args.calyx, args.vector)
-    inputs["backend_path"] = str(args.backend_report)
-    inputs["vector_path"] = str(args.vector)
     report = build_report(inputs, calyx_bin=args.calyx_bin, fud=args.fud, verilator=args.verilator)
     report["sha256"] = canonical_sha256(report)
     args.out.parent.mkdir(parents=True, exist_ok=True)
