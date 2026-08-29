@@ -127,8 +127,22 @@ def load_evidence(contract_path: Path, diagnostic_path: Path) -> Mapping[str, An
     return capability
 
 
-def _pattern_evidence(graph: str) -> dict[str, Any]:
-    """Require all semantic edges around the exact stabilized softmax site."""
+def _pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dict[str, Any]:
+    """Require a complete, independently linked chain for every attention head.
+
+    The package-aware export contains one attention softmax per head.  It is
+    important that this check does not find the producer for one ``exp`` and
+    the reduction for another: a textual graph-wide search would make such a
+    malformed graph appear valid.  Each site is therefore bounded by its
+    neighbouring ``math.exp`` operations and all of its SSA/memref edges are
+    checked inside that interval.
+
+    ``expected_exp_sites`` is explicit primarily for the small one-site unit
+    fixture.  Production callers use the default eight-head contract; a
+    single site is not silently accepted.
+    """
+    require(isinstance(expected_exp_sites, int) and not isinstance(expected_exp_sites, bool) and expected_exp_sites > 0,
+            "pattern_not_proven", "expected_exp_sites must be a positive integer")
 
     # MLIR comments and attribute strings are not operation dataflow.  Match
     # only operation-shaped lines after removing comments; every SSA value is
@@ -157,50 +171,64 @@ def _pattern_evidence(graph: str) -> dict[str, Any]:
     executable = "\n".join(lines)
     exp_sites = list(re.finditer(r"^\s*%[A-Za-z0-9_.$-]+\s*=\s*math\.exp\b", executable, re.MULTILINE))
     require(exp_sites, "pattern_not_proven", "no executable math.exp operation")
-    require(len(exp_sites) == 1, "pattern_not_proven", f"expected one stabilized exp site, found {len(exp_sites)}")
-    exp_line = executable[: exp_sites[0].start()].count("\n")
-    containing = [span for span in function_spans if span[0] <= exp_line <= span[1]]
-    require(len(containing) == 1, "pattern_not_proven", "math.exp is not in one function region")
-    region_start, region_end = containing[0]
-    exp_line_text = lines[exp_line]
-    exp_match = re.match(r"%([^ ]+)\s*=\s*math\.exp\s+%([^ ]+)", exp_line_text)
-    require(exp_match is not None, "pattern_not_proven", "malformed math.exp operation")
-    exp_result, exp_input = exp_match.groups()
+    require(len(exp_sites) == expected_exp_sites, "pattern_not_proven",
+            f"expected {expected_exp_sites} stabilized exp sites, found {len(exp_sites)}")
+    exp_lines = [executable[:match.start()].count("\n") for match in exp_sites]
+    site_evidence: list[dict[str, Any]] = []
+    used_causal_lines: set[int] = set()
+    for site_number, (exp_line, exp_match_obj) in enumerate(zip(exp_lines, exp_sites), start=1):
+        containing = [span for span in function_spans if span[0] <= exp_line <= span[1]]
+        require(len(containing) == 1, "pattern_not_proven", "math.exp is not in one function region")
+        region_start, region_end = containing[0]
+        previous_exp = exp_lines[site_number - 2] + 1 if site_number > 1 else region_start
+        next_exp = exp_lines[site_number] if site_number < len(exp_lines) else region_end + 1
+        # A chain may not borrow operations across another executable exp.
+        chain_start, chain_end = max(previous_exp, region_start), min(next_exp, region_end + 1)
+        require(chain_start < exp_line < chain_end, "pattern_not_proven", f"site {site_number} crosses function regions")
+        exp_line_text = lines[exp_line]
+        exp_match = re.match(r"%([^ ]+)\s*=\s*math\.exp\s+%([^ ]+)", exp_line_text)
+        require(exp_match is not None, "pattern_not_proven", "malformed math.exp operation")
+        exp_result, exp_input = exp_match.groups()
 
-    def find(pattern: str, start: int = region_start, end: int = region_end + 1) -> tuple[int, re.Match[str]]:
-        for index in range(start, end):
-            match = re.match(pattern, lines[index], re.IGNORECASE)
-            if match:
-                return index, match
-        raise SoftmaxBridgeError("dataflow_not_proven", pattern)
+        def find(pattern: str, start: int = chain_start, end: int = chain_end) -> tuple[int, re.Match[str]]:
+            for index in range(start, end):
+                match = re.match(pattern, lines[index], re.IGNORECASE)
+                if match:
+                    return index, match
+            raise SoftmaxBridgeError("dataflow_not_proven", pattern)
 
-    require(any("arith.subf" in line for line in lines[region_start:region_end + 1]), "pattern_not_proven", "no executable score-minus-row-max operation")
-    sub_index, sub = find(r"%([^ ]+)\s*=\s*arith\.subf\s+%([^, ]+)\s*,\s*%([^ ]+)")
-    delta = sub.group(1)
-    require(sub.group(2).lower().startswith("score"), "dataflow_not_proven", "subf lhs is not score")
-    require("max" in sub.group(3).lower(), "dataflow_not_proven", "subf rhs is not row max")
-    store_delta_index, store_delta = find(r"memref\.store\s+%([^,]+),\s*%([^\[]+)\[([^\]]+)\]", sub_index + 1)
-    require(store_delta.group(1) == delta, "dataflow_not_proven", "stabilized delta is not stored")
-    delta_load_index, delta_load = find(r"%([^ ]+)\s*=\s*memref\.load\s+%([^\[]+)\[([^\]]+)\]", store_delta_index + 1)
-    require(delta_load.group(2) == store_delta.group(2) and delta_load.group(3) == store_delta.group(3), "dataflow_not_proven", "delta load does not read delta store")
-    require(delta_load.group(1) == exp_input, "dataflow_not_proven", "math.exp does not consume loaded delta")
-    require(store_delta_index < delta_load_index < exp_line, "dataflow_not_proven", "delta producer/use ordering")
-    exp_store_index, exp_store = find(r"memref\.store\s+%([^,]+),\s*%([^\[]+)\[([^\]]+)\]", exp_line + 1)
-    require(exp_store.group(1) == exp_result, "dataflow_not_proven", "exp result is not stored")
-    exp_load_index, exp_load = find(r"%([^ ]+)\s*=\s*memref\.load\s+%([^\[]+)\[([^\]]+)\]", exp_store_index + 1)
-    require(exp_load.group(2) == exp_store.group(2) and exp_load.group(3) == exp_store.group(3), "dataflow_not_proven", "exp load does not read exp store")
-    sum_index, sum_match = find(r"%([^ ]+)\s*=\s*arith\.addf\s+%([^, ]+)\s*,\s*%([^ ]+)", exp_load_index + 1)
-    require(sum_match.group(3) == exp_load.group(1), "dataflow_not_proven", "reduction does not consume loaded exp")
-    sum_result = sum_match.group(1)
-    div_index, div_match = find(r"%([^ ]+)\s*=\s*arith\.divf\s+%([^, ]+)\s*,\s*%([^ ]+)", sum_index + 1)
-    require(div_match.group(2) == exp_load.group(1) and div_match.group(3) == sum_result, "dataflow_not_proven", "normalization division is not exp/sum")
-    require(exp_line < exp_store_index < exp_load_index < sum_index < div_index, "dataflow_not_proven", "softmax SSA producer/use ordering")
-    causal = re.compile(r"^%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule),\s*%time_index,\s*%position(?:\s|:|$)", re.IGNORECASE)
-    require(any(causal.match(line) for line in lines[region_start:region_end + 1]), "pattern_not_proven", "executable causal time_index <= position comparison")
-    return {"exp_site_line": exp_line + 1, "matched_edges": ["subf_score_rowmax", "delta_store_load", "exp", "exp_store_load", "sum_reduction", "normalization_division", "causal_cmpi"]}
+        sub_index, sub = find(r"%([^ ]+)\s*=\s*arith\.subf\s+%([^, ]+)\s*,\s*%([^ ]+)")
+        delta = sub.group(1)
+        require(sub.group(2).lower().startswith("score"), "dataflow_not_proven", f"site {site_number} lhs is not score")
+        require("max" in sub.group(3).lower(), "dataflow_not_proven", f"site {site_number} rhs is not row max")
+        store_delta_index, store_delta = find(r"memref\.store\s+%([^,]+),\s*%([^\[]+)\[([^\]]+)\]", sub_index + 1)
+        require(store_delta.group(1) == delta, "dataflow_not_proven", f"site {site_number} stabilized delta is not stored")
+        delta_load_index, delta_load = find(r"%([^ ]+)\s*=\s*memref\.load\s+%([^\[]+)\[([^\]]+)\]", store_delta_index + 1)
+        require(delta_load.group(2) == store_delta.group(2) and delta_load.group(3) == store_delta.group(3), "dataflow_not_proven", f"site {site_number} delta load does not read delta store")
+        require(delta_load.group(1) == exp_input, "dataflow_not_proven", f"site {site_number} math.exp does not consume loaded delta")
+        require(store_delta_index < delta_load_index < exp_line, "dataflow_not_proven", f"site {site_number} delta producer/use ordering")
+        exp_store_index, exp_store = find(r"memref\.store\s+%([^,]+),\s*%([^\[]+)\[([^\]]+)\]", exp_line + 1)
+        require(exp_store.group(1) == exp_result, "dataflow_not_proven", f"site {site_number} exp result is not stored")
+        exp_load_index, exp_load = find(r"%([^ ]+)\s*=\s*memref\.load\s+%([^\[]+)\[([^\]]+)\]", exp_store_index + 1)
+        require(exp_load.group(2) == exp_store.group(2) and exp_load.group(3) == exp_store.group(3), "dataflow_not_proven", f"site {site_number} exp load does not read exp store")
+        sum_index, sum_match = find(r"%([^ ]+)\s*=\s*arith\.addf\s+%([^, ]+)\s*,\s*%([^ ]+)", exp_load_index + 1)
+        require(sum_match.group(3) == exp_load.group(1), "dataflow_not_proven", f"site {site_number} reduction does not consume loaded exp")
+        sum_result = sum_match.group(1)
+        div_index, div_match = find(r"%([^ ]+)\s*=\s*arith\.divf\s+%([^, ]+)\s*,\s*%([^ ]+)", sum_index + 1)
+        require(div_match.group(2) == exp_load.group(1) and div_match.group(3) == sum_result, "dataflow_not_proven", f"site {site_number} normalization is not exp/sum")
+        require(exp_line < exp_store_index < exp_load_index < sum_index < div_index, "dataflow_not_proven", f"site {site_number} producer/use ordering")
+        causal = re.compile(r"^%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule),\s*%time_index(?:[_.$A-Za-z0-9-]*)?,\s*%position(?:[_.$A-Za-z0-9-]*)?(?:\s|:|$)", re.IGNORECASE)
+        causal_candidates = [index for index in range(chain_start, chain_end) if causal.match(lines[index]) and index not in used_causal_lines]
+        require(causal_candidates, "pattern_not_proven", f"site {site_number} lacks executable causal time_index <= position comparison")
+        causal_index = causal_candidates[0]
+        used_causal_lines.add(causal_index)
+        site_evidence.append({"site": site_number, "exp_site_line": exp_line + 1, "causal_cmpi_line": causal_index + 1,
+                              "matched_edges": ["subf_score_rowmax", "delta_store_load", "exp", "exp_store_load", "sum_reduction", "normalization_division", "causal_cmpi"]})
+    return {"exp_site_count": len(site_evidence), "sites": site_evidence,
+            "matched_edges": ["subf_score_rowmax", "delta_store_load", "exp", "exp_store_load", "sum_reduction", "normalization_division", "causal_cmpi"]}
 
 
-def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str) -> dict[str, Any]:
+def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str, expected_exp_sites: int = 8) -> dict[str, Any]:
     require(isinstance(graph, str) and graph, "graph_missing", source_name)
     require(isinstance(evidence, _EvidenceCapability), "evidence_capability_required", "use load_evidence result")
     require(id(evidence) in _ISSUED_CAPABILITIES, "evidence_capability_unissued", "capability was not issued by load_evidence")
@@ -216,7 +244,7 @@ def bridge_graph(graph: str, evidence: Mapping[str, Any], *, source_name: str) -
         "contract": evidence["contract"],
     }
     require(dict(evidence) == canonical, "evidence_payload_mismatch", "canonical contract/package evidence")
-    pattern = _pattern_evidence(graph)
+    pattern = _pattern_evidence(graph, expected_exp_sites=expected_exp_sites)
     attributes = {
         "score_width": 32,
         "score_fraction_bits": 8,
