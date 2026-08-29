@@ -244,6 +244,15 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
             "pattern_not_proven", "MLIR module wrapper")
     require(sum(bool(re.match(r"func\.func\s+@[^\s(]+\(", line)) for line in lines) == 1,
             "pattern_not_proven", "MLIR func.func wrapper")
+    function_start = next(i for i, line in enumerate(lines) if re.match(r"func\.func\s+@[^\s(]+\(", line))
+    function_depth = 0
+    function_end = None
+    for i in range(function_start, len(lines)):
+        function_depth += lines[i].count("{") - lines[i].count("}")
+        if i > function_start and function_depth == 0:
+            function_end = i
+            break
+    require(function_end is not None, "pattern_not_proven", "unterminated func.func region")
     require("scf.for" in graph or "scf.parallel" in graph, "pattern_not_proven", "lowered SCF loop structure")
     exp_lines = [i for i, line in enumerate(lines) if re.match(r"%[^ ]+\s*=\s*math\.exp\s+%[^ ]+", line)]
     require(len(exp_lines) == expected_exp_sites, "pattern_not_proven",
@@ -281,6 +290,8 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
     sites = []
     used_causal: set[int] = set()
     used_exp_memrefs: set[str] = set()
+    used_delta_memrefs: set[str] = set()
+    used_sum_memrefs: set[str] = set()
     for number, exp_i in enumerate(exp_lines, 1):
         exp_m = re.match(r"%([^ ]+)\s*=\s*math\.exp\s+%([^ ]+)", lines[exp_i])
         assert exp_m
@@ -291,6 +302,9 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         require(delta_loads, "dataflow_not_proven", f"site {number} exp input has no dominating memref.load")
         delta_load_i, delta_load = delta_loads[-1]
         delta_mem, delta_idx = delta_load.group(2).strip(), delta_load.group(3).strip()
+        require(function_start <= delta_load_i <= function_end, "dataflow_not_proven", f"site {number} delta load is outside function")
+        require(delta_mem not in used_delta_memrefs, "dataflow_not_proven", f"site {number} reuses another head's delta memref")
+        used_delta_memrefs.add(delta_mem)
         delta_stores = [(i, m) for i, line in enumerate(lines) if i < delta_load_i and (m := store_re.match(line)) and m.group(2).strip() == delta_mem and same_index(m.group(3).strip(), i, delta_idx, delta_load_i)]
         require(delta_stores, "dataflow_not_proven", f"site {number} delta load has no same-index store")
         delta_store_i, delta_store = delta_stores[-1]
@@ -313,6 +327,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         require(exp_store_candidates, "dataflow_not_proven", f"site {number} exp result has no store")
         exp_store_i, exp_store = exp_store_candidates[0]
         exp_mem, exp_idx = exp_store.group(2).strip(), exp_store.group(3).strip()
+        require(function_start <= exp_store_i <= function_end, "dataflow_not_proven", f"site {number} exp store is outside function")
         require(exp_mem not in used_exp_memrefs, "dataflow_not_proven", f"site {number} reuses another head's exp memref")
         used_exp_memrefs.add(exp_mem)
         exp_load_candidates = [(i, m) for i, line in enumerate(lines) if i > exp_store_i and (m := load_re.match(line)) and m.group(2).strip() == exp_mem and same_index(m.group(3).strip(), i, exp_idx, exp_store_i)]
@@ -346,6 +361,13 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         exp_load_i, exp_load, add_i, add, div_entry = complete[0]
         exp_loaded = exp_load.group(1)
         sum_value = add.group(1)
+        # A reduction is complete only when its accumulator is materialized
+        # into a unique sum buffer and subsequently reloaded for division.
+        sum_store_matches = [(i, m) for i, line in enumerate(lines) if i > add_i and (m := store_re.match(line)) and m.group(1).strip() == sum_value]
+        require(sum_store_matches, "dataflow_not_proven", f"site {number} reduction result is not materialized")
+        sum_mem_for_site = sum_store_matches[0][1].group(2).strip()
+        require(sum_mem_for_site not in used_sum_memrefs, "dataflow_not_proven", f"site {number} reuses another head's sum memref")
+        used_sum_memrefs.add(sum_mem_for_site)
         div_candidates = [div_entry]
         head_digits = "".join(re.findall(r"\d+", exp_mem))
         causal = []
