@@ -58,6 +58,9 @@ def lowered_separate_loop_graph(site_count: int = 8) -> str:
     body = []
     for head in range(site_count):
         body.extend([
+            f"  %idx{head} = arith.constant 0 : index",
+            f"  %time_index{head} = arith.constant 0 : i32",
+            f"  %position{head} = arith.constant 0 : i32",
             f"  scf.for %r{head} = %c0 to %c4 step %c1 {{",
             f"    %s{head} = memref.load %score_mem{head}[%r{head}] : memref<4xf32>",
             f"    %m{head} = arith.maximumf %s{head}, %old{head} : f32",

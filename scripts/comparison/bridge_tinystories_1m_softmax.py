@@ -288,13 +288,21 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         return (lctx is not None and rctx is not None and
                 lhs.lstrip("%") == lctx[0] and rhs.lstrip("%") == rctx[0] and lctx[1:] == rctx[1:])
 
-    def reduction_loop_header(line_number: int) -> str | None:
+    def reduction_loop_header(line_number: int) -> tuple[str, int, int] | None:
         """Find the enclosing reduction loop header, without crossing a region."""
         depth = 0
         for i in range(line_number, -1, -1):
             depth += lines[i].count("}") - lines[i].count("{")
             if re.search(r"scf\.for\s+%[^ ]+\s*=", lines[i]) and depth <= 0:
-                return lines[i]
+                header = lines[i]
+                region_depth = 0
+                end = None
+                for j in range(i, len(lines)):
+                    region_depth += lines[j].count("{") - lines[j].count("}")
+                    if j > i and region_depth == 0:
+                        end = j
+                        break
+                return (header, i, end if end is not None else len(lines))
         return None
     sites = []
     used_causal: set[int] = set()
@@ -361,9 +369,11 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
                 # The reduction result is materialized and reloaded before
                 # division in the lowered graph.  Bind that reload to the
                 # exact sum store/index, rather than trusting its SSA name.
-                candidate_header = reduction_loop_header(add_i_candidate)
+                candidate_info = reduction_loop_header(add_i_candidate)
+                candidate_header = candidate_info[0] if candidate_info else None
                 result_match = re.match(r"%([^ ]+)\s*=\s*scf\.for\b", candidate_header or "")
-                candidate_result = result_match.group(1) if result_match else sum_candidate
+                require(result_match is not None, "dataflow_not_proven", f"site {number} reduction has no SSA loop result")
+                candidate_result = result_match.group(1)
                 sum_stores = [(i, m) for i, line in enumerate(lines) if i > add_i_candidate and (m := store_re.match(line)) and m.group(1).strip() in (sum_candidate, candidate_result)]
                 for sum_store_i, sum_store in sum_stores:
                     sum_mem, sum_idx = sum_store.group(2).strip(), sum_store.group(3).strip()
@@ -388,22 +398,25 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         # A single add followed by a store is not evidence of a row
         # reduction.  Require an explicit loop-carried accumulator; otherwise
         # fail closed rather than accepting a fake one-element reduction.
-        reduction_header = reduction_loop_header(add_i)
-        require(reduction_header is not None and "iter_args" in reduction_header,
+        reduction_info = reduction_loop_header(add_i)
+        reduction_header = reduction_info[0] if reduction_info else None
+        require(reduction_info is not None and "iter_args" in reduction_header,
                 "dataflow_not_proven", f"site {number} reduction is not loop-carried")
+        result_match = re.match(r"%([^ ]+)\s*=\s*scf\.for\b", reduction_header)
+        require(result_match is not None, "dataflow_not_proven", f"site {number} reduction has no SSA loop result")
         carried_match = re.search(r"iter_args\(\s*%([^ ]+)\s*=", reduction_header)
         require(carried_match is not None, "dataflow_not_proven", f"site {number} reduction carried value is malformed")
         carried = carried_match.group(1)
         add_operands = add.groups()[1:]
         require(any(operand.lstrip("%") == carried for operand in add_operands),
                 "dataflow_not_proven", f"site {number} reduction add does not consume carried accumulator")
+        _, reduction_start, reduction_end = reduction_info
         yield_found = any(re.match(rf"scf\.yield\s+%{re.escape(sum_value)}(?:\s|:|$)", line)
-                          for line in lines[add_i + 1:min(function_end + 1, add_i + 80)])
+                          for line in lines[add_i + 1:reduction_end])
         require(yield_found, "dataflow_not_proven", f"site {number} reduction has no matching scf.yield")
         # A reduction is complete only when its accumulator is materialized
         # into a unique sum buffer and subsequently reloaded for division.
-        result_match = re.match(r"%([^ ]+)\s*=\s*scf\.for\b", reduction_header)
-        reduction_result = result_match.group(1) if result_match else sum_value
+        reduction_result = result_match.group(1)
         sum_store_matches = [(i, m) for i, line in enumerate(lines) if i > add_i and (m := store_re.match(line)) and m.group(1).strip() in (sum_value, reduction_result)]
         require(sum_store_matches, "dataflow_not_proven", f"site {number} reduction result is not materialized")
         sum_mem_for_site = sum_store_matches[0][1].group(2).strip()
