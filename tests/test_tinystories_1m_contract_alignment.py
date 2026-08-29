@@ -53,13 +53,33 @@ class TinyStories1MContractAlignmentTest(unittest.TestCase):
                 "manifest_sha256": contract["package"]["manifest_sha256"],
             },
         }
-        with tempfile.TemporaryDirectory() as directory:
-            candidate = Path(directory) / "metadata.json"
-            candidate.write_text(json.dumps(metadata), encoding="utf-8")
-            result = alignment.diagnose(CONTRACT, candidate)
+        result = alignment._diagnose_documents(
+            contract,
+            metadata,
+            contract_path=Path("contract.json"),
+            metadata_path=Path("metadata.json"),
+            contract_sha256=alignment.CANONICAL_CONTRACT_SHA256,
+            metadata_sha256=alignment.CANONICAL_METADATA_SHA256,
+        )
         self.assertEqual(result["status"], "compiler_quantization_unverified")
         self.assertEqual(result["mismatches"], [])
         self.assertIn("compiler_quantization", result["next_boundary"]["required_evidence"])
+
+    def test_copied_contract_is_rejected_even_when_content_is_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            candidate = Path(directory) / "contract.json"
+            candidate.write_bytes(CONTRACT.read_bytes())
+            with self.assertRaisesRegex(alignment.AlignmentEvidenceError, "contract_path_not_canonical"):
+                alignment.diagnose(candidate, METADATA)
+
+    def test_modified_copied_metadata_is_rejected_before_semantic_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            candidate = Path(directory) / "metadata.json"
+            document = json.loads(METADATA.read_text(encoding="utf-8"))
+            document["contract_identity"]["model"]["source_revision"] = "0" * 40
+            candidate.write_text(json.dumps(document), encoding="utf-8")
+            with self.assertRaisesRegex(alignment.AlignmentEvidenceError, "compiler_metadata_path_not_canonical"):
+                alignment.diagnose(CONTRACT, candidate)
 
     def test_checked_in_report_is_self_consistent_and_fail_closed(self) -> None:
         result = json.loads(REPORT.read_text(encoding="utf-8"))

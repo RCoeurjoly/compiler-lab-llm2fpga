@@ -18,6 +18,16 @@ from typing import Any
 
 
 SCHEMA = "tinystories-1m-contract-alignment-v1"
+CANONICAL_CONTRACT = Path(__file__).resolve().parents[2] / "artifacts/reference/tinystories-1m-kev-gpt-contract.json"
+CANONICAL_METADATA = Path(__file__).resolve().parents[2] / "artifacts/comparison/tinystories-1m-baseline-float-sv-metadata.json"
+CANONICAL_CONTRACT_SHA256 = "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
+CANONICAL_METADATA_SHA256 = "158ef76497aa0e0f1509a260059ca28880389d6c1234acee7a81f41ee609a3a1"
+CONTRACT_SCHEMA_VERSION = 1
+METADATA_SCHEMA = "tinystories-1m-compiler-artifact-metadata-v1"
+
+
+class AlignmentEvidenceError(ValueError):
+    """Raised when the diagnostic inputs are not the authenticated artifacts."""
 
 
 def canonical_sha256(value: Any) -> str:
@@ -30,6 +40,32 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{path} must contain a JSON object")
     return value
+
+
+def _authenticate_inputs(contract_path: Path, metadata_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Authenticate immutable inputs before reading their semantic fields."""
+    contract_path = Path(contract_path).resolve()
+    metadata_path = Path(metadata_path).resolve()
+    if contract_path != CANONICAL_CONTRACT.resolve():
+        raise AlignmentEvidenceError("contract_path_not_canonical")
+    if metadata_path != CANONICAL_METADATA.resolve():
+        raise AlignmentEvidenceError("compiler_metadata_path_not_canonical")
+    try:
+        contract_bytes = contract_path.read_bytes()
+        metadata_bytes = metadata_path.read_bytes()
+    except OSError as error:
+        raise AlignmentEvidenceError(f"authenticated_input_unreadable: {error}") from error
+    if hashlib.sha256(contract_bytes).hexdigest() != CANONICAL_CONTRACT_SHA256:
+        raise AlignmentEvidenceError("contract_sha256_mismatch")
+    if hashlib.sha256(metadata_bytes).hexdigest() != CANONICAL_METADATA_SHA256:
+        raise AlignmentEvidenceError("compiler_metadata_sha256_mismatch")
+    contract = load_json(contract_path)
+    metadata = load_json(metadata_path)
+    if contract.get("schema_version") != CONTRACT_SCHEMA_VERSION:
+        raise AlignmentEvidenceError("contract_schema_mismatch")
+    if metadata.get("schema") != METADATA_SCHEMA:
+        raise AlignmentEvidenceError("compiler_metadata_schema_mismatch")
+    return contract, metadata
 
 
 def _contract_identity(contract: dict[str, Any]) -> dict[str, Any]:
@@ -50,9 +86,9 @@ def _metadata_identity(metadata: dict[str, Any]) -> dict[str, Any]:
     return identity
 
 
-def diagnose(contract_path: Path, metadata_path: Path) -> dict[str, Any]:
-    contract = load_json(Path(contract_path))
-    metadata = load_json(Path(metadata_path))
+def _diagnose_documents(contract: dict[str, Any], metadata: dict[str, Any], *,
+                        contract_path: Path, metadata_path: Path,
+                        contract_sha256: str, metadata_sha256: str) -> dict[str, Any]:
     expected = _contract_identity(contract)
     observed = _metadata_identity(metadata)
     mismatches: list[dict[str, Any]] = []
@@ -89,8 +125,8 @@ def diagnose(contract_path: Path, metadata_path: Path) -> dict[str, Any]:
         "model": "TinyStories-1M",
         "status": status,
         "inputs": {
-            "contract": {"path": str(contract_path), "sha256": hashlib.sha256(Path(contract_path).read_bytes()).hexdigest()},
-            "compiler_metadata": {"path": str(metadata_path), "sha256": hashlib.sha256(Path(metadata_path).read_bytes()).hexdigest()},
+            "contract": {"path": str(contract_path), "sha256": contract_sha256},
+            "compiler_metadata": {"path": str(metadata_path), "sha256": metadata_sha256},
         },
         "expected_identity": expected,
         "observed_identity": observed,
@@ -112,6 +148,18 @@ def diagnose(contract_path: Path, metadata_path: Path) -> dict[str, Any]:
             "llm_assistance_disclosure_required": True,
         },
     }
+
+
+def diagnose(contract_path: Path, metadata_path: Path) -> dict[str, Any]:
+    contract, metadata = _authenticate_inputs(contract_path, metadata_path)
+    return _diagnose_documents(
+        contract,
+        metadata,
+        contract_path=Path("artifacts/reference/tinystories-1m-kev-gpt-contract.json"),
+        metadata_path=Path("artifacts/comparison/tinystories-1m-baseline-float-sv-metadata.json"),
+        contract_sha256=CANONICAL_CONTRACT_SHA256,
+        metadata_sha256=CANONICAL_METADATA_SHA256,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
