@@ -1,0 +1,101 @@
+{
+  "boundary": {
+    "first_unsupported_operation": "math.exp",
+    "location": "pre-Calyx flat-SCF artifact line 830",
+    "numeric_domain": "stabilized attention scores; full-model domain receipt unavailable",
+    "required_contract": {
+      "finite_input_domain": null,
+      "input_encoding": null,
+      "maximum_absolute_error": null,
+      "output_encoding": null,
+      "proof_or_exhaustive_corpus": null,
+      "rounding_mode": null,
+      "softmax_output_tolerance": null,
+      "special_value_behavior": null,
+      "underflow_and_overflow": null
+    }
+  },
+  "candidate_inventory": [
+    {
+      "implementation": "rtl/rc-working/rc_exp_table_lookup.sv",
+      "name": "rc_exp_table_lookup",
+      "notes": "RC-specific table; no authenticated TinyStories-1M f32 error/special-value contract",
+      "reason_code": "scope_and_contract_missing",
+      "status": "rejected"
+    },
+    {
+      "implementation": "scripts/pipeline/evaluate_softmax_candidates.py",
+      "name": "polynomial_exp_order_5",
+      "notes": "numerical candidate harness only; not a standard math.exp lowering",
+      "reason_code": "approximation_not_exact",
+      "status": "rejected"
+    },
+    {
+      "implementation": "circt-opt --lower-scf-to-calyx",
+      "name": "upstream_circt_math_exp",
+      "notes": "BuildOpGroups reports unhandled math.exp",
+      "reason_code": "calyx_backend_unhandled_operation",
+      "status": "unsupported"
+    }
+  ],
+  "claims": {
+    "functional_equivalence": false,
+    "hardware_inference": false,
+    "rtlil": false,
+    "systemverilog": false,
+    "timing_closure": false
+  },
+  "decision": {
+    "equivalence_claim": false,
+    "lowering_applied": false,
+    "message": "Do not replace canonical f32 math.exp with an approximation until an explicit contract is authenticated and passes the TinyStories-1M oracle.",
+    "reason_code": "math_exp_semantics_contract_unavailable"
+  },
+  "model": "TinyStories-1M",
+  "reference_vectors": {
+    "description": "f32 boundary probes; diagnostic vectors, not full-model coverage",
+    "vectors": [
+      {
+        "input": 0.0,
+        "input_bits": "0x00000000",
+        "reference_output": 1.0,
+        "reference_output_bits": "0x3f800000"
+      },
+      {
+        "input": -0.0,
+        "input_bits": "0x80000000",
+        "reference_output": 1.0,
+        "reference_output_bits": "0x3f800000"
+      },
+      {
+        "input": -0.5,
+        "input_bits": "0xbf000000",
+        "reference_output": 0.6065306663513184,
+        "reference_output_bits": "0x3f1b4598"
+      },
+      {
+        "input": -1.0,
+        "input_bits": "0xbf800000",
+        "reference_output": 0.3678794503211975,
+        "reference_output_bits": "0x3ebc5ab2"
+      },
+      {
+        "input": -8.0,
+        "input_bits": "0xc1000000",
+        "reference_output": 0.000335462624207139,
+        "reference_output_bits": "0x39afe108"
+      }
+    ]
+  },
+  "schema": "tinystories-1m-exp-lowering-boundary-v1",
+  "sha256": "dc9ab61931a2acb06a829355e89314d178b8e07718d8273bf2c2a35057d4c803",
+  "source": {
+    "input_type": "f32",
+    "operation": "math.exp",
+    "output_type": "f32",
+    "semantic_role": "attention softmax",
+    "source_line": 830,
+    "stabilization": "score - row_max"
+  },
+  "status": "unsupported"
+}
