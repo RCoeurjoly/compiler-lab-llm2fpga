@@ -86,19 +86,21 @@ def lowered_separate_loop_graph(site_count: int = 8) -> str:
             f"  scf.for %e{head} = %c0 to %c4 step %c1 {{",
             f"    %dl{head} = memref.load %delta_mem{head}[%e{head}] : memref<4xf32>",
             f"    %exp{head} = math.exp %dl{head} : f32",
-            f"    memref.store %exp{head}, %exp_mem{head}[%idx{head}] : memref<4xf32>",
+            f"    memref.store %exp{head}, %exp_mem{head}[%e{head}] : memref<4xf32>",
             "  }",
             f"  %red{head} = scf.for %q{head} = %c0 to %c4 step %c1 iter_args(%oldsum{head} = %fzero) -> (f32) {{",
-            f"    %elpre{head} = memref.load %exp_mem{head}[%idx{head}] : memref<4xf32>",
-            f"    %el{head} = memref.load %exp_mem{head}[%idx{head}] : memref<4xf32>",
+            f"    %elpre{head} = memref.load %exp_mem{head}[%q{head}] : memref<4xf32>",
+            f"    %el{head} = memref.load %exp_mem{head}[%q{head}] : memref<4xf32>",
             f"    %sum{head} = arith.addf %oldsum{head}, %el{head} : f32",
             f"    scf.yield %sum{head} : f32",
             "  }",
-            f"  memref.store %red{head}, %sum_mem{head}[%idx{head}] : memref<4xf32>",
-            f"  %sum_loaded{head} = memref.load %sum_mem{head}[%idx{head}] : memref<4xf32>",
-            f"  %elpost{head} = memref.load %exp_mem{head}[%idx{head}] : memref<4xf32>",
-            f"  %prob{head} = arith.divf %elpost{head}, %sum_loaded{head} : f32",
+            f"  scf.for %n{head} = %c0 to %c4 step %c1 {{",
+            f"    memref.store %red{head}, %sum_mem{head}[%n{head}] : memref<4xf32>",
+            f"    %sum_loaded{head} = memref.load %sum_mem{head}[%n{head}] : memref<4xf32>",
+            f"    %elpost{head} = memref.load %exp_mem{head}[%n{head}] : memref<4xf32>",
+            f"    %prob{head} = arith.divf %elpost{head}, %sum_loaded{head} : f32",
             f"    %causal{head} = arith.cmpi sle, %time_index{head}, %position{head} : i32",
+            "  }",
         ])
     return "module {\n  func.func @main(" + ", ".join(args) + ") {\n" + "\n".join(body) + "\n  return\n  }\n}\n"
 
@@ -151,7 +153,7 @@ class SoftmaxBridgeTest(unittest.TestCase):
             ROOT / "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
             ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
         )
-        graph = lowered_separate_loop_graph().replace("  %idx0 = arith.constant 0 : index\n", "", 1)
+        graph = lowered_separate_loop_graph().replace("%exp_mem0[%e0]", "%exp_mem0[%idx0]", 1).replace("  %idx0 = arith.constant 0 : index\n", "", 1)
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-undefined-index.mlir")
 
@@ -161,7 +163,7 @@ class SoftmaxBridgeTest(unittest.TestCase):
             ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
         )
         graph = lowered_separate_loop_graph().replace(
-            "%idx0 = arith.constant 0 : index", "%idx0 = arith.constant 0 : i32", 1
+            "%exp_mem0[%e0]", "%exp_mem0[%idx0]", 1
         )
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-non-index.mlir")
@@ -199,7 +201,7 @@ class SoftmaxBridgeTest(unittest.TestCase):
             "  %idx0 = arith.constant 0 : index",
             "  scf.if %cond0 {\n    %idx0 = arith.constant 0 : index\n  } else {\n    %other0 = arith.constant 0 : index\n  }",
             1,
-        )
+        ).replace("%exp_mem0[%e0]", "%exp_mem0[%idx0]", 1)
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-then-else-index.mlir")
 
@@ -209,7 +211,7 @@ class SoftmaxBridgeTest(unittest.TestCase):
             ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
         )
         graph = lowered_separate_loop_graph().replace(
-            "%exp_mem0[%idx0]", "%exp_mem0[%r0]", 1
+            "%exp_mem0[%e0]", "%exp_mem0[%r0]", 1
         )
         with self.assertRaisesRegex(module.SoftmaxBridgeError, r"(?:pattern|dataflow)_not_proven"):
             module.bridge_graph(graph, evidence, source_name="lowered-prior-sibling-exp.mlir")
@@ -220,7 +222,7 @@ class SoftmaxBridgeTest(unittest.TestCase):
             ROOT / "artifacts/comparison/tinystories-1m-softmax-contract-diagnostic.json",
         )
         graph = lowered_separate_loop_graph().replace(
-            "  memref.store %red0, %sum_mem0[%idx0] : memref<4xf32>",
+            "  memref.store %red0, %sum_mem0[%n0] : memref<4xf32>",
             "",
             1,
         )

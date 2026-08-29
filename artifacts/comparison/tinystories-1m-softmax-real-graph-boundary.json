@@ -5,7 +5,7 @@
   "bridge_status": "real_graph_pattern_mismatch",
   "bridge_script": "scripts/comparison/bridge_tinystories_1m_softmax.py",
   "bridge_revision": "861862d",
-  "bridge_script_sha256": "3c11ca12533d0c62acbba5f5abe9f3e3f400c9f7e13d55b230c8222c94c851ac",
+  "bridge_script_sha256": "931eb057228ee2c6566427b41a0dc5a915d35d5995624d3a6c3119f700286d92",
   "frontier_report": {
     "path": "artifacts/comparison/tinystories-1m-package-aware-lowering-frontier.json",
     "sha256": "81a8ea6b29ceb5a362c70dc7f5adf6b469e41a6f79d6067fc378280abe8b447e"
@@ -61,5 +61,5 @@
     "hardware_inference": false
   },
   "next_action": "Adapt the bridge to prove tensor-level score/row-max provenance through linalg.generic lowering, while retaining all eight-site and same-function dataflow checks.",
-  "sha256": "dac49d8aae310d9865511caa2aa5890d1162a6e324205a0c971df1f8b5314333"
+  "sha256": "1f30bd84b50241343d49c4b5d030fc64c8939795842f709134a4f13c4b8bcd56"
 }

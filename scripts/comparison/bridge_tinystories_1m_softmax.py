@@ -394,6 +394,9 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         exp_store_i, exp_store = exp_store_candidates[0]
         exp_mem, exp_idx = exp_store.group(2).strip(), exp_store.group(3).strip()
         require(defined_before(exp_idx, exp_store_i), "dataflow_not_proven", f"site {number} exp index is undefined")
+        exp_loop = loop_context(exp_store_i)
+        require(exp_loop is not None and exp_idx.lstrip("%") == exp_loop[0],
+                "dataflow_not_proven", f"site {number} exponential store is not indexed by its loop IV")
         require(function_start <= exp_store_i <= function_end, "dataflow_not_proven", f"site {number} exp store is outside function")
         require(exp_mem not in used_exp_memrefs, "dataflow_not_proven", f"site {number} reuses another head's exp memref")
         used_exp_memrefs.add(exp_mem)
@@ -463,6 +466,9 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         require(sum_store_matches, "dataflow_not_proven", f"site {number} reduction result is not materialized")
         sum_mem_for_site = sum_store_matches[0][1].group(2).strip()
         require(defined_before(sum_store_matches[0][1].group(3).strip(), sum_store_matches[0][0]), "dataflow_not_proven", f"site {number} sum index is undefined")
+        sum_loop = loop_context(sum_store_matches[0][0])
+        require(sum_loop is not None and sum_store_matches[0][1].group(3).strip().lstrip("%") == sum_loop[0],
+                "dataflow_not_proven", f"site {number} sum store is not indexed by its loop IV")
         require(function_start <= sum_store_matches[0][0] <= function_end, "dataflow_not_proven", f"site {number} sum store is outside function")
         require(sum_mem_for_site not in used_sum_memrefs, "dataflow_not_proven", f"site {number} reuses another head's sum memref")
         used_sum_memrefs.add(sum_mem_for_site)
