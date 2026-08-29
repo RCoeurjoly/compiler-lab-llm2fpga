@@ -62,10 +62,12 @@ class TinyStories1MExactInputAuditTest(unittest.TestCase):
     def test_fixed_reference_rejects_nonfinite_prompt_at_its_call_boundary(self):
         auditor = load_auditor()
 
-        with self.assertRaisesRegex(ValueError, "non-finite"):
+        with self.assertRaisesRegex(auditor.IdentityFrontierError, "non-finite") as raised:
             auditor._run_fixed_reference(
                 KEV_ROOT, self.deployed_revision(), PACKAGE, [7454, math.nan]
             )
+
+        self.assertEqual(raised.exception.code, "nonfinite_adapter_input")
 
     def test_fixed_reference_uses_authenticated_revision_without_reresolving_head(self):
         auditor = load_auditor()

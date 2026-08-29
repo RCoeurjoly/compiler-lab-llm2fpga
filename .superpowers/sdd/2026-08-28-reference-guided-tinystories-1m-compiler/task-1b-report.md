@@ -96,9 +96,9 @@ datapath.
 
 ## Commit
 
-Prior fix-round commit: `c8eb2011ee09c368accdf8efd67c50dfc5564679`.
-The current fix-round commit contains this report; its final object hash is
-reported in the task handoff because a Git object cannot truthfully embed its
+Reviewed implementation commit: `db8c379c50fe54231d2be2a7d6e8f8143a319115`.
+The final cleanup commit contains this report; its hash is necessarily reported
+in the external task handoff because a Git object cannot truthfully embed its
 own content hash.
 
 ## Fix round 1: pinned source closure and invocation boundary
