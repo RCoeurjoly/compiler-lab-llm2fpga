@@ -349,6 +349,92 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
         return (lctx is not None and rctx is not None and
                 lhs.lstrip("%") == lctx[0] and rhs.lstrip("%") == rctx[0] and lctx[1:] == rctx[1:])
 
+    def _definition_line(value: str, use_line: int) -> int | None:
+        """Return the nearest lexically dominating definition of ``value``.
+
+        The lowered textual graph reuses SSA spellings in sibling loop
+        regions.  Resolving the definition before recursively inspecting an
+        affine index prevents a sibling's arithmetic expression from being
+        mistaken for the current loop's expression.
+        """
+        name = value.lstrip("%")
+        use_scope = scope_paths[use_line]
+        for definition_line in range(use_line - 1, function_start - 1, -1):
+            if not re.match(rf"%{re.escape(name)}\s*=", lines[definition_line]):
+                continue
+            definition_scope = scope_paths[definition_line]
+            if definition_scope == use_scope[:len(definition_scope)]:
+                return definition_line
+        return None
+
+    def loop_contexts(line_number: int) -> list[tuple[str, str, str, str]]:
+        """Return all enclosing loops, outermost first, for one operation."""
+        stack: list[tuple[int, tuple[str, str, str, str]]] = []
+        loop_re = re.compile(r"scf\.(?:for|parallel)\s+%([^ ]+)\s*=\s*([^ ]+)\s+to\s+([^ ]+)(?:\s+step\s+([^ ]+))?")
+        for i, line in enumerate(lines[:line_number + 1]):
+            match = loop_re.search(line)
+            delta = line.count("{") - line.count("}")
+            if match:
+                stack.append((delta, (match.group(1), match.group(2), match.group(3), match.group(4) or "")))
+            elif delta < 0:
+                for _ in range(min(-delta, len(stack))):
+                    stack.pop()
+        return [signature for _, signature in stack]
+
+    def index_dependencies(value: str, use_line: int, seen: set[tuple[str, int]] | None = None) -> set[str]:
+        """Collect induction variables contributing to a lowered index SSA value."""
+        seen = set() if seen is None else seen
+        key = (value.lstrip("%"), use_line)
+        if key in seen:
+            return set()
+        seen.add(key)
+        name = value.lstrip("%")
+        definition_line = _definition_line(value, use_line)
+        if definition_line is None:
+            return {name} if name.startswith("arg") else set()
+        line = lines[definition_line]
+        add = re.match(r"%[^ ]+\s*=\s*arith\.addi\s+%([^, ]+)\s*,\s*%([^ ]+)", line)
+        if add:
+            return (index_dependencies(add.group(1), definition_line, seen) |
+                    index_dependencies(add.group(2), definition_line, seen))
+        mul = re.match(r"%[^ ]+\s*=\s*arith\.muli\s+%([^, ]+)\s*,\s*%([^ ]+)", line)
+        if mul:
+            return (index_dependencies(mul.group(1), definition_line, seen) |
+                    index_dependencies(mul.group(2), definition_line, seen))
+        cast = re.match(r"%[^ ]+\s*=\s*arith\.index_cast\s+%([^ ]+)", line)
+        if cast:
+            return index_dependencies(cast.group(1), definition_line, seen)
+        return set()
+
+    def same_row_index(score: str, score_line: int, row_max: str, row_max_line: int) -> bool:
+        """Prove a flattened score index and row-max index share row coordinates.
+
+        Linalg-to-loops intentionally flattens ``[head, query, key]`` and
+        ``[head, query]`` with different strides.  They are therefore not
+        textually equal.  The safe equivalence is structural: both must
+        depend on the same outer loop IVs/bounds, while the score may also
+        depend on exactly the innermost key IV and the row-max may not.
+        """
+        # The compact authenticated fixture uses one-dimensional score and
+        # max buffers, where literal index identity is the strongest proof.
+        if same_index(score, score_line, row_max, row_max_line):
+            return True
+        score_loops, max_loops = loop_contexts(score_line), loop_contexts(row_max_line)
+        if len(score_loops) < 2 or len(max_loops) < 2:
+            return False
+        if score_loops[:2] != max_loops[:2]:
+            return False
+        score_deps = index_dependencies(score, score_line)
+        max_deps = index_dependencies(row_max, row_max_line)
+        outer = {signature[0] for signature in score_loops[:2]}
+        if not outer.issubset(score_deps) or not outer.issubset(max_deps):
+            return False
+        score_extra = score_deps - outer
+        max_extra = max_deps - outer
+        if len(score_extra) != 1 or max_extra:
+            return False
+        return score_extra == {score_loops[2][0]} if len(score_loops) == 3 else False
+
     def defined_before(value: str, line_number: int) -> bool:
         name = value.lstrip("%")
         use_scope = scope_paths[line_number]
@@ -427,13 +513,22 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8, zero_i
         # Both score and row-max must be values loaded in this component.  We
         # intentionally do not infer their meaning from SSA spelling.
         operand_loads = {}
+        operand_load_lines = {}
         for operand in sub.groups()[1:]:
             candidates = [(i, m) for i, line in enumerate(lines) if i < sub_i and (m := load_re.match(line)) and m.group(1) == operand]
             require(candidates, "dataflow_not_proven", f"site {number} subtraction operand is not a loaded tensor value")
             operand_loads[operand] = candidates[-1][1]
+            operand_load_lines[operand] = candidates[-1][0]
             require(function_start <= candidates[-1][0] <= function_end, "dataflow_not_proven", f"site {number} operand load is outside function")
-            require(same_index(candidates[-1][1].group(3).strip(), candidates[-1][0], delta_idx, delta_load_i),
-                    "dataflow_not_proven", f"site {number} subtraction operand index does not match delta index")
+            operand_index = candidates[-1][1].group(3).strip()
+            if operand == sub.group(2):
+                require(same_index(operand_index, candidates[-1][0], delta_idx, delta_load_i),
+                        "dataflow_not_proven", f"site {number} score operand index does not match delta index")
+            else:
+                score_load = operand_loads[sub.group(2)]
+                require(same_row_index(score_load.group(3).strip(), operand_load_lines[sub.group(2)],
+                                        operand_index, candidates[-1][0]),
+                        "dataflow_not_proven", f"site {number} row-max index is not the score row projection")
         # The row-max operand must come from a full-domain loop-carried max,
         # not a constant or an unrelated buffer.
         max_operand = sub.group(3)
