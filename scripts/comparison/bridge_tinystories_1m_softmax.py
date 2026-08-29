@@ -242,7 +242,7 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
     lines = [line for line in lines if line]
     require(lines and lines[0].startswith("module") and graph.count("{") == graph.count("}"),
             "pattern_not_proven", "MLIR module wrapper")
-    require(any(re.match(r"func\.func\s+@[^\s(]+\(", line) for line in lines),
+    require(sum(bool(re.match(r"func\.func\s+@[^\s(]+\(", line)) for line in lines) == 1,
             "pattern_not_proven", "MLIR func.func wrapper")
     require("scf.for" in graph or "scf.parallel" in graph, "pattern_not_proven", "lowered SCF loop structure")
     exp_lines = [i for i, line in enumerate(lines) if re.match(r"%[^ ]+\s*=\s*math\.exp\s+%[^ ]+", line)]
@@ -255,14 +255,14 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
     add_re = re.compile(r"%([^ ]+)\s*=\s*arith\.addf\s+%([^, ]+)\s*,\s*%([^ ]+)")
     div_re = re.compile(r"%([^ ]+)\s*=\s*arith\.divf\s+%([^, ]+)\s*,\s*%([^ ]+)")
 
-    def loop_context(line_number: int) -> tuple[str, str, str] | None:
+    def loop_context(line_number: int) -> tuple[str, str, str, str] | None:
         """Return a normalized single-induction-loop signature for a line."""
-        stack: list[tuple[int, tuple[str, str, str]]] = []
+        stack: list[tuple[int, tuple[str, str, str, str]]] = []
         loop_re = re.compile(r"scf\.(?:for|parallel)\s+%([^ ]+)\s*=\s*([^ ]+)\s+to\s+([^ ]+)(?:\s+step\s+([^ ]+))?")
         for i, line in enumerate(lines[:line_number + 1]):
             m = loop_re.search(line)
             if m:
-                stack.append((line.count("{") - line.count("}"), (m.group(2), m.group(3), m.group(4) or "")))
+                stack.append((line.count("{") - line.count("}"), (m.group(1), m.group(2), m.group(3), m.group(4) or "")))
             else:
                 delta = line.count("{") - line.count("}")
                 if delta < 0:
@@ -276,9 +276,11 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         # Distinct SCF induction SSA values are equivalent only when both
         # accesses are the induction variable of structurally identical loops.
         lctx, rctx = loop_context(lhs_line), loop_context(rhs_line)
-        return lctx is not None and lctx == rctx
+        return (lctx is not None and rctx is not None and
+                lhs.lstrip("%") == lctx[0] and rhs.lstrip("%") == rctx[0] and lctx[1:] == rctx[1:])
     sites = []
     used_causal: set[int] = set()
+    used_exp_memrefs: set[str] = set()
     for number, exp_i in enumerate(exp_lines, 1):
         exp_m = re.match(r"%([^ ]+)\s*=\s*math\.exp\s+%([^ ]+)", lines[exp_i])
         assert exp_m
@@ -311,17 +313,32 @@ def _lowered_pattern_evidence(graph: str, *, expected_exp_sites: int = 8) -> dic
         require(exp_store_candidates, "dataflow_not_proven", f"site {number} exp result has no store")
         exp_store_i, exp_store = exp_store_candidates[0]
         exp_mem, exp_idx = exp_store.group(2).strip(), exp_store.group(3).strip()
+        require(exp_mem not in used_exp_memrefs, "dataflow_not_proven", f"site {number} reuses another head's exp memref")
+        used_exp_memrefs.add(exp_mem)
         exp_load_candidates = [(i, m) for i, line in enumerate(lines) if i > exp_store_i and (m := load_re.match(line)) and m.group(2).strip() == exp_mem and same_index(m.group(3).strip(), i, exp_idx, exp_store_i)]
         require(exp_load_candidates, "dataflow_not_proven", f"site {number} exp store has no same-index load")
-        exp_load_i, exp_load = exp_load_candidates[0]
+        # A later loop can reload the same exp element more than once.  Pick
+        # only a complete load -> reduction -> division chain; never assume
+        # that the first reload is the one consumed by normalization.
+        complete = []
+        for candidate_i, candidate in exp_load_candidates:
+            candidate_value = candidate.group(1)
+            adds = [(i, m) for i, line in enumerate(lines) if i > candidate_i and (m := add_re.match(line)) and candidate_value in (m.group(2), m.group(3))]
+            for add_i_candidate, add_candidate in adds:
+                sum_candidate = add_candidate.group(1)
+                divs = [(i, m) for i, line in enumerate(lines) if i > add_i_candidate and (m := div_re.match(line)) and m.group(2) == candidate_value and m.group(3) == sum_candidate]
+                if divs:
+                    complete.append((candidate_i, candidate, add_i_candidate, add_candidate, divs[0]))
+                    break
+        require(complete, "dataflow_not_proven", f"site {number} reduction/division does not consume a same-memref exp reload")
+        exp_load_i, exp_load, add_i, add, div_entry = complete[0]
         exp_loaded = exp_load.group(1)
-        add_candidates = [(i, m) for i, line in enumerate(lines) if i > exp_load_i and (m := add_re.match(line)) and exp_loaded in (m.group(2), m.group(3))]
-        require(add_candidates, "dataflow_not_proven", f"site {number} reduction does not consume this exp load")
-        add_i, add = add_candidates[0]
         sum_value = add.group(1)
-        div_candidates = [(i, m) for i, line in enumerate(lines) if i > add_i and (m := div_re.match(line)) and m.group(2) == exp_loaded and m.group(3) == sum_value]
-        require(div_candidates, "dataflow_not_proven", f"site {number} normalization is not exp/sum")
-        causal = [i for i, line in enumerate(lines) if i not in used_causal and re.match(r"%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule),\s*%[^, ]+,\s*%[^ ]+", line)]
+        div_candidates = [div_entry]
+        head_digits = "".join(re.findall(r"\d+", exp_mem))
+        causal = [i for i, line in enumerate(lines) if i not in used_causal and
+                  re.match(r"%[^ ]+\s*=\s*arith\.cmpi\s+(?:sle|ule),\s*%[^, ]+,\s*%[^ ]+", line) and
+                  (not head_digits or head_digits in line)]
         require(causal, "pattern_not_proven", f"site {number} lacks executable causal comparison")
         used_causal.add(causal[0])
         sites.append({"site": number, "exp_site_line": exp_i + 1, "causal_cmpi_line": causal[0] + 1,
