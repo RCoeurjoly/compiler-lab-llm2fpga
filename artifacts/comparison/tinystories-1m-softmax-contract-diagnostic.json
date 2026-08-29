@@ -1,0 +1,195 @@
+{
+  "authority": {
+    "functional_equivalence": false,
+    "hardware_equivalence": false,
+    "optimization_acceptance": false,
+    "rtl_equivalence": false
+  },
+  "comparison": {
+    "compiler_input_encoding": "f32 stabilized score to math.exp",
+    "equivalence_claim": false,
+    "next_required_evidence": [
+      "derive compiler score quantization and causal mask from the package-aware graph",
+      "run both implementations on identical score rows",
+      "bind an exhaustive or accepted full-model output gate before approximation"
+    ],
+    "reference_input_encoding": "integer Q16.16/Q8.8/Q1.20 datapath",
+    "same_contract": false
+  },
+  "compiler_boundary": {
+    "boundary_report_sha256": "e2631b99f079e37507764bc0141b500e09f9feed7097f1740331fbc553f4816e",
+    "contract_fields": {
+      "finite_input_domain": null,
+      "input_encoding": null,
+      "maximum_absolute_error": null,
+      "output_encoding": null,
+      "proof_or_exhaustive_corpus": null,
+      "rounding_mode": null,
+      "softmax_output_tolerance": null,
+      "special_value_behavior": null,
+      "underflow_and_overflow": null
+    },
+    "frontier_report_sha256": "ee9162f7ed6990c351ff35f15738e32844342527570a1b8b12671eca6542d95a",
+    "frontier_status": "unsupported",
+    "input_type": "f32",
+    "location": "pre-Calyx flat-SCF artifact line 830",
+    "operation": "math.exp",
+    "output_type": "f32",
+    "stabilization": "score - row_max"
+  },
+  "model": "TinyStories-1M",
+  "reference": {
+    "contract": {
+      "dimensions": {
+        "context_max": 32,
+        "head_dim": 4,
+        "heads": 16,
+        "hidden": 64
+      },
+      "exponential": {
+        "clamp": "delta < -4096 maps to LUT index 0; delta >= 0 maps to special one",
+        "domain": "[-16, 0] in Q8.8 score units",
+        "generation": "round(exp((index-4096)/256) * 2^20)",
+        "input": "score_code - score_max in signed score-code units",
+        "lut_entries": 4096,
+        "lut_indices": "0..4095 represent exp(-16)..exp(-1/256)",
+        "output_encoding": "unsigned Q1.20",
+        "zero_delta_value": 1048576
+      },
+      "normalization": {
+        "context_product": "Q1.20 probability times signed Q16.16 value",
+        "division": "unsigned restoring magnitude, sign reapplied; truncates toward zero",
+        "rounding": "add floor(sum/2) for non-negative numerator; subtract for negative",
+        "sum_bits": 64,
+        "zero_denominator": "quotient zero"
+      },
+      "score": {
+        "accumulator_bits": 96,
+        "causal_mask": "implicit prefix time_index <= position; no mask port",
+        "input_encoding": "signed Q16.16 q and k",
+        "post_shift": 24,
+        "rounding": "truncate arithmetic right shift",
+        "saturation": "none at score register",
+        "scaling": "unscaled GPT-Neo dot product"
+      }
+    },
+    "files": {
+      "fpga/rtl/gptneo_attention.sv": {
+        "bytes": 6478,
+        "sha256": "b42c1ed824198e49b685d827a49036bfb41ce6218e6a391a69208fbf48ef1ba9"
+      },
+      "fpga/rtl/gptneo_iterative_divider.sv": {
+        "bytes": 2288,
+        "sha256": "8665cc99e7bf98e0415775a36c78aa4ff242d30c976dce0719e6d465686a1540"
+      },
+      "fpga/tb/tb_gptneo_attention.sv": {
+        "bytes": 1821,
+        "sha256": "7696743031f5468e93e62030df2879c0e10351cd710abe138c2d57c9eff80023"
+      },
+      "tinystories/hardware_reference.py": {
+        "bytes": 8887,
+        "sha256": "3780015d7f4be69cae3952fb630af971a37490a17cf8519fd6ac81a7bb080371"
+      },
+      "tinystories/rtl_memories.py": {
+        "bytes": 1287,
+        "sha256": "1b8bd74d09139ca6acd9bd26b8ad0dbc8326960d7a9997d003c5d99ad26e6fd6"
+      }
+    }
+  },
+  "reference_root": "/home/roland/kev-gpt/.worktrees/kintex-selftest",
+  "schema": "tinystories-1m-softmax-contract-diagnostic-v1",
+  "sha256": "8a10b3570a2c5d64aeab9c13a03c5ba3dfe39adef10a98d77213dbc8abb1d709",
+  "status": "reference_contract_recovered_compiler_boundary_unaligned",
+  "vectors": {
+    "causal_prefix": {
+      "exp_values_q1_20": [
+        1048576,
+        385750
+      ],
+      "mask": "only time indices 0 and 1 are visited; future entries are not read",
+      "position": 1,
+      "score_codes": [
+        0,
+        -256
+      ]
+    },
+    "clamp": [
+      {
+        "delta_q8_8": -4097,
+        "effective_index": 0
+      },
+      {
+        "delta_q8_8": -4096,
+        "effective_index": 0
+      },
+      {
+        "delta_q8_8": -1,
+        "effective_index": 4095
+      },
+      {
+        "delta_q8_8": 0,
+        "effective_index": "special_one"
+      },
+      {
+        "delta_q8_8": 1,
+        "effective_index": "special_one"
+      }
+    ],
+    "context_rounding": [
+      {
+        "denominator": 4,
+        "numerator": 3,
+        "quotient": 1,
+        "rounded_numerator": 5
+      },
+      {
+        "denominator": 4,
+        "numerator": -3,
+        "quotient": -1,
+        "rounded_numerator": -5
+      }
+    ],
+    "existing_testbench": {
+      "position_0_expected_context_q16_16": 65536,
+      "position_0_value_q16_16": 65536,
+      "position_1_expected_context_q16_16": 131072,
+      "position_1_value_q16_16": 196608
+    },
+    "exp_lut": [
+      {
+        "delta_q8_8": -4096,
+        "index": 0,
+        "output_q1_20": 0
+      },
+      {
+        "delta_q8_8": -4095,
+        "index": 1,
+        "output_q1_20": 0
+      },
+      {
+        "delta_q8_8": -3840,
+        "index": 256,
+        "output_q1_20": 0
+      },
+      {
+        "delta_q8_8": -2048,
+        "index": 2048,
+        "output_q1_20": 352
+      },
+      {
+        "delta_q8_8": -2,
+        "index": 4094,
+        "output_q1_20": 1040416
+      },
+      {
+        "delta_q8_8": -1,
+        "index": 4095,
+        "output_q1_20": 1044488
+      }
+    ],
+    "special_zero_delta": {
+      "delta": 0,
+      "output_q1_20": 1048576
+    }
+  }
+}
