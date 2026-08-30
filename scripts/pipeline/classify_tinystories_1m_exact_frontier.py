@@ -60,6 +60,10 @@ _TERMINAL_DIAGNOSTIC_RE = re.compile(
     r"(?:\berror:\s|failed to legalize operation|unhandled operation|LLVM ERROR)",
     re.IGNORECASE,
 )
+_CLASSIFIER = "scripts/pipeline/classify_tinystories_1m_exact_frontier.py"
+_DETERMINISM_VERIFIER = (
+    "scripts/pipeline/verify_tinystories_1m_exact_frontier_determinism.py"
+)
 
 
 @dataclass(frozen=True)
@@ -282,6 +286,7 @@ def _derivation(repo_root: Path, attribute: str) -> dict[str, object]:
         "path": str(drv_path),
         "file_sha256": _sha256(drv_path),
         "json_sha256": _sha256_bytes(canonical),
+        "canonical_json": canonical.decode("utf-8"),
         "output": f"/nix/store/{output}",
         "build_command": str(derivation.get("env", {}).get("buildCommand", "")),
         "build_command_sha256": _sha256_bytes(
@@ -294,6 +299,37 @@ def _derivation(repo_root: Path, attribute: str) -> dict[str, object]:
         "input_sources": sorted(
             f"/nix/store/{name}" for name in input_data.get("srcs", [])
         ),
+    }
+
+
+def _build_command_file_bindings(build_command: str) -> list[dict[str, object]]:
+    """Bind every existing regular /nix/store file named by a build command."""
+
+    candidates = re.findall(r"/nix/store/[A-Za-z0-9+._?=-]+(?:/[A-Za-z0-9+._?=/:-]+)?", build_command)
+    bindings: list[dict[str, object]] = []
+    for value in sorted(set(candidates)):
+        path = Path(value.rstrip("'\"),;"))
+        if path.is_file():
+            bindings.append(
+                {"path": str(path), "bytes": path.stat().st_size, "sha256": _sha256(path)}
+            )
+    return bindings
+
+
+def _capture_derivation_evidence(
+    evidence_dir: Path, stage: str, derivation: dict[str, object]
+) -> dict[str, object]:
+    drv_destination = evidence_dir / f"{stage}.drv"
+    json_destination = evidence_dir / f"{stage}.derivation.json"
+    shutil.copyfile(Path(str(derivation["path"])), drv_destination)
+    json_destination.write_text(str(derivation["canonical_json"]), encoding="utf-8")
+    return {
+        "captured_derivation": f"reproducers/{stage}/{stage}.drv",
+        "captured_derivation_bytes": drv_destination.stat().st_size,
+        "captured_derivation_sha256": _sha256(drv_destination),
+        "captured_derivation_json": f"reproducers/{stage}/{stage}.derivation.json",
+        "captured_derivation_json_bytes": json_destination.stat().st_size,
+        "captured_derivation_json_sha256": _sha256(json_destination),
     }
 
 
@@ -1137,6 +1173,11 @@ def _run_registered_stage(
 ) -> tuple[StageRecord, dict[str, object], dict[str, object]]:
     attribute = f"{model}-{stage}"
     derivation = _derivation(repo_root, attribute)
+    derivation_capture = (
+        _capture_derivation_evidence(evidence_dir, stage, derivation)
+        if stage in {"linalg", "scf"}
+        else {}
+    )
     command = [
         "nix",
         "build",
@@ -1224,6 +1265,12 @@ def _run_registered_stage(
         "derivation": derivation["path"],
         "derivation_file_sha256": derivation["file_sha256"],
         "derivation_json_sha256": derivation["json_sha256"],
+        "derivation_build_command": derivation["build_command"],
+        "derivation_build_command_sha256": derivation["build_command_sha256"],
+        "derivation_tool_bindings": _build_command_file_bindings(
+            str(derivation["build_command"])
+        ),
+        **derivation_capture,
     }
     auxiliary = {
         "output": output,
@@ -1281,6 +1328,13 @@ def build_current_frontier_receipt(
     for stage, record in zip(_FRONTIERS, stage_records):
         canonical_log = f"{canonical_root}/{stage}.log"
         executions[stage]["log"] = canonical_log
+        if stage in {"linalg", "scf"}:
+            executions[stage]["captured_derivation"] = (
+                f"{canonical_root}/{stage}.drv"
+            )
+            executions[stage]["captured_derivation_json"] = (
+                f"{canonical_root}/{stage}.derivation.json"
+            )
 
     full_input: dict[str, object] | None = None
     minimal: dict[str, object] | None = None
@@ -1328,13 +1382,23 @@ def build_current_frontier_receipt(
     )
     not_run = list(_FRONTIERS)[len(stage_records) :]
     receipt: dict[str, object] = {
-        "schema": "tinystories-1m-exact-current-pipeline-frontier-v3",
+        "schema": "tinystories-1m-exact-current-pipeline-frontier-v4",
         "model": model,
         "status": classification.status,
         "frontier": classification.frontier,
         "stage": classification.stage,
         "diagnostic": classification.diagnostic,
         "source_commit": source_commit,
+        "capture_tools": {
+            "classifier": {
+                "path": _CLASSIFIER,
+                "sha256": _sha256(repo_root / _CLASSIFIER),
+            },
+            "determinism_verifier": {
+                "path": _DETERMINISM_VERIFIER,
+                "sha256": _sha256(repo_root / _DETERMINISM_VERIFIER),
+            },
+        },
         "semantic_gate": semantic_gate,
         "pipeline_source_identity": source_identity,
         "predecessor_receipt": {
