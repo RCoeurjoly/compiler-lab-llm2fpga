@@ -1,0 +1,5 @@
+$ nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-torch'
+exit_code: 0
+--- stdout ---
+/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir
+--- stderr ---

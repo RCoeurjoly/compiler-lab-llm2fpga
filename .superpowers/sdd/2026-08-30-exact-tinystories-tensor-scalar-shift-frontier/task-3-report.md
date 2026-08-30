@@ -296,3 +296,70 @@ frozen code commit showed no post-capture modification under `scripts/pipeline`,
 `flake.nix`, `nix`, `patches`, or `TinyStories`; therefore the receipt-bound
 classifier/verifier bytes and compiler/pipeline implementation remain exactly
 those from `b6f54a4`.
+
+## Review fix round 2: exact executed-prefix enforcement
+
+The remaining review finding was reproduced before implementation. With a
+recomputed receipt self-hash, the prior verifier accepted an SCF execution
+marked `artifact_accepted: true`, an SCF execution marked `invoked: false`,
+and an extra invoked `flat-scf` execution/canonical log despite the SCF stop
+claim. The red focused class reported six failures covering those gaps and
+explicit missing/order diagnostics.
+
+Commit `9da0a178375268008f34438e7d128ea70ec7d3eb` now requires:
+
+- the exact execution key set `pytorch-exported`, `torch`, `linalg`, `scf`;
+- `invoked: true` for all four execution records;
+- execution and stage-record acceptance to agree, with the first three true
+  and SCF false;
+- zero exit for all four registered builds, successful stage status for the
+  valid prefix, and compiler-failure/unavailable semantics for SCF;
+- the stage-record sequence to be the exact executed prefix of
+  `registered_order`, ending at `first_invalid_stage`;
+- `stopped_after_first_invalid_stage: true` and `not_run` equal to the exact
+  registered-order suffix; and
+- exactly eleven canonical evidence files, so no later-stage execution log or
+  artifact can be introduced through a recomputed manifest/receipt hash.
+
+Adversarial tests now independently cover SCF accepted, SCF not invoked,
+extra invoked `flat-scf`, a missing execution, reordered stage sequence,
+valid-prefix execution rejection, and an extra later-stage canonical log. All
+mutations recompute the receipt self-hash and are rejected.
+
+The verifier also resolves and realizes Linalg/SCF derivations from the
+receipt's exact `source_commit` flake reference. This was required because an
+otherwise valid historical capture can outlive an unrooted Nix output and the
+live worktree can advance to a different derivation identity. Classifier and
+verifier hashes are checked against `git show source_commit:path`, preserving
+historical verification without pretending old receipts bind later live tool
+bytes.
+
+The code/tests were committed before evidence capture. Two new strictly
+sequential classifier runs then stopped at SCF and were byte-identical across
+all eleven files:
+
+- source/code commit:
+  `9da0a178375268008f34438e7d128ea70ec7d3eb`
+- determinism-verifier SHA-256:
+  `3026fef8bb9021259e2b6255ed47cbc50b922bd1d2159db3004677dca168b67f`
+- receipt file SHA-256:
+  `14cdc3056ba981bfa36a84558ff019d76d00424eef29bfee89b2d67372b3d734`
+- receipt self-hash:
+  `942031d17e1ecf1cc028f505c518f12c01ec0cbcc31228a97a2e1a78f36d2a35`
+- Linalg `.drv` SHA-256:
+  `39f1622c7b81607fa840e5cc865ff6ca01f309faf25ada96a822093ac0c4975b`
+- canonical Linalg derivation JSON SHA-256:
+  `9b5e0720b8b1b3521b1687adb5cee4b27ae1ce071b993ad1590a4b89ba819165`
+
+The round-1 eleven-file capture is preserved byte-for-byte at
+`artifacts/comparison/tinystories-1m-exact-frontier-determinism-scf-v2`;
+the earlier seven-file capture remains at the `-v1` path. No SCF registration,
+compiler fix, or later pipeline stage was executed in this review round.
+
+Round-2 final verification ran the combined focused classifier/determinism
+suite with 50 tests and `OK`. The live semantic verifier again accepted both
+the compiler-backed probe and registered Torch stage. The historical v1,
+archived round-1 v2, and current round-2 v4 bundle verifiers all returned
+`byte_identical: true`; the current verifier reported canonical file count 11
+and first invalid stage SCF. Explicit bundle comparison and `git diff --check`
+also passed before the evidence commit.
