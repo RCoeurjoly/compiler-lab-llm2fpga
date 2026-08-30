@@ -55,15 +55,15 @@
       "command": "nix build --no-link --print-out-paths -L '.#torchMlir'",
       "exit_code": 0,
       "log": "tool-build.log",
-      "log_bytes": 197,
-      "log_sha256": "71110a65fd24a9b479170e32233052a2aa49ad0b89784329f081fbbca1ccd653"
+      "log_bytes": 95,
+      "log_sha256": "9e33eb691549f8f2cd2e4428a50c7dc15d723820d148c061be2ffd1e22f48e3d"
     },
     "registered-torch-stage": {
       "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-torch'",
       "exit_code": 0,
       "log": "stage-build.log",
-      "log_bytes": 205,
-      "log_sha256": "926c0feaa04499fd1cca17847a32c6d9b225f129a1340dbf64fe376e313ff70b"
+      "log_bytes": 103,
+      "log_sha256": "5edb0b37b2b66910bd7a2808b7d8dd312d107eb9ccc98aa4d51ed13b4ea31d0a"
     },
     "right-shift-lowering": {
       "command": "/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/bin/torch-mlir-opt '-pass-pipeline=builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=}, torch-backend-to-linalg-on-tensors-backend-pipeline)' /home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/reproducers/tinystories-1m-exact-torch-mlir/bitwise-right-shift-tensor-scalar.mlir",
@@ -128,8 +128,8 @@
     "path": "artifacts/comparison/tinystories-1m-exact-left-shift-semantics.json",
     "self_sha256": "672d34819f93db399e7e8faac4747f9bb88b690491c2683912fee9490ffca19c"
   },
-  "sha256": "353227e665f0d4d2f49cf668811d7403a028744cb544f4e336521cc77fb15282",
-  "source_commit": "638cd34a8c651841ab90a9e78d1b250a849dfa67",
+  "sha256": "c6a7aee9bd614ce1aa4609debc7b2d9925522b156bc1fc567aa868a11a316f45",
+  "source_commit": "e95133e396b4bbbeddb4a5412b771d0128baf0b8",
   "stage": "torch-mlir",
   "stage_derivation": {
     "captured_file": "stage-derivation.drv",
