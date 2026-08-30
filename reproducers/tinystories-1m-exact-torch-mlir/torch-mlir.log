@@ -23,14 +23,14 @@ tiny-stories>     run_pipeline_with_repro_report(
 tiny-stories>   File "/nix/store/swlkp7wlw75vv2i3l2f1dh8phnd33jqv-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages/torch_mlir/torch_mlir/compiler_utils.py", line 136, in run_pipeline_with_repro_report
 tiny-stories>     raise TorchMlirCompilerError(trimmed_message) from None
 tiny-stories> torch_mlir.compiler_utils.TorchMlirCompilerError: Lowering TorchFX IR -> Torch Backend IR failed with the following diagnostics:
-tiny-stories> 
-tiny-stories> 
+tiny-stories>
+tiny-stories>
 tiny-stories> python exception: Failure while executing pass pipeline
-tiny-stories> 
+tiny-stories>
 tiny-stories> For Torch-MLIR developers, the error can be reproduced with:
 tiny-stories> $ torch-mlir-opt -pass-pipeline='builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=})' /build/UnnammedModule.mlir
 tiny-stories> Add '-mlir-print-ir-after-all -mlir-disable-threading' to get the IR dump for debugging purpose.
-tiny-stories> 
+tiny-stories>
 error: Cannot build '/nix/store/a05fmi26dd7bivddbc8qmjmj8mdgcsry-tiny-stories-1m-kev-gpt-exact-torch.mlir.drv'.
        Reason: builder failed with exit code 1.
        Output paths:

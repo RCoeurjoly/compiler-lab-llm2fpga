@@ -3,79 +3,89 @@
 ## Result
 
 The unchanged registered pipeline reaches its first causal invalid stage at
-`torch-mlir`. The classification is `torch_mlir_frontier`:
+`torch-mlir`, classified as `torch_mlir_frontier`:
 
 ```text
-failed to legalize operation 'torch.operator' that was explicitly marked illegal
+loc("/build/exact-adapter-root/TinyStories/model_adapter_exact_package.py":879:0): error: failed to legalize operation 'torch.operator' that was explicitly marked illegal
 ```
 
-The preserved TorchFX-to-Torch-MLIR input contains illegal generic
-`torch.operator` nodes for integer tensor shifts. A one-operation reduction
-retains the diagnostic with
-`torch.aten.bitwise_right_shift.Tensor_Scalar`. The current Torch-MLIR pass
-pipeline therefore cannot legalize an operation required by the authenticated
-exact integer/fixed-point program.
+The registered `pytorch-exported` command exited 0. The immediately following
+registered `torch` command exited 1 with the compiler diagnostic above. No
+Linalg, SCF, flat-SCF, Calyx, or SystemVerilog target was invoked.
 
-No Linalg, SCF, flat-SCF, Calyx, or SystemVerilog command was run after this
-failure. This report makes no claim about those later stages.
+## Source and derivation identity
 
-## Stage evidence
+The accepted pipeline base is Task 4 commit
+`7eed3592a661c0cb3c417dc59b29839266446b2d`. The evidence run was executed from
+distinct descendant commit `0090a8558b93919651bed63c0bfe81f3107340c0`.
 
-| Stage | Status | Bound artifact | SHA-256 | Terminal result |
-| --- | --- | --- | --- | --- |
-| `pytorch-exported` | succeeded | `exported.pt2`, 69,510,766 bytes | `6c9d2931a18811560f6565e9d313390fb5e0b7b167af39ddc094e19b949ce085` | exit 0; zero error diagnostics |
-| `torch-mlir` | compiler failure | rejected full failing IR capture, 12,121,418 bytes uncompressed | `a9a663989a35f3d9e2984486db81a82c2aa7bfff421ec56a8558f99a22f52eb0` | exit 1; illegal `torch.operator` |
+Before executing a stage, the generator rejected dirty critical inputs and
+compared every critical workspace file to all of:
 
-Each receipt record also binds its exact Nix builder command, derivation and
-input derivations, source/tool revisions, log identity, exit code, parsed
-terminal diagnostics, and upstream identity. The full receipt is
-[`tinystories-1m-exact-current-pipeline-frontier.json`](../../artifacts/comparison/tinystories-1m-exact-current-pipeline-frontier.json).
+- its Task 4 Git blob and SHA-256;
+- the evidence commit's Git blob;
+- the file in the archived Nix flake source
+  (`sha256-F2Ogrc4TE2JVjse8rsTGdyZ4Ymzg3ABxu8htFhZFMMw=`);
+- its explicit derivation store source when the file is embedded in the export
+  or Torch derivation.
 
-The failed stage did not produce an accepted Torch-MLIR output. The full
-failure input is retained only as a rejected diagnostic artifact; it is not a
-successful stage output and cannot be used to justify a downstream build.
+This covers `flake.nix`, `flake.lock`, `nix/models.nix`, `nix/pipeline.nix`, the
+exact adapter, export/import commands, Task 1--3 receipts, and the exact design
+input. The receipt records every file/blob/store hash plus both derivation-file,
+canonical derivation-JSON, and build-command hashes.
 
-## Minimal reproducer
+## Executed registered builds
 
-The full emitted input was 12,121,418 bytes and contained 1,755 generic
-`torch.operator` nodes. The accepted reduction is 334 bytes:
+```text
+nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-pytorch-exported
+exit 0
+result /nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported
 
-- full input content SHA-256:
-  `a9a663989a35f3d9e2984486db81a82c2aa7bfff421ec56a8558f99a22f52eb0`;
-- deterministic gzip archive SHA-256:
-  `4f378cf9d66c46396ee7744c4c360d5bb29bf06a8ac3cdf6527b249aef41ee67`;
-- reduced IR SHA-256:
-  `285a40e0ba9dd999fb4155c465889e1b3fa2dc0768716328bc7e4c8898bc4b37`.
-
-Run the exact interestingness check with:
-
-```bash
-nix develop -c reproducers/tinystories-1m-exact-torch-mlir/interesting.sh \
-  reproducers/tinystories-1m-exact-torch-mlir/bitwise-right-shift-tensor-scalar.mlir
+nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-torch
+exit 1
 ```
 
-The packaged `mlir-reduce` is LLVM/MLIR 21 while Torch-MLIR is built against
-LLVM 23. `mlir-reduce` could not register or permit the Torch dialect, so an
-automated reduction was unsupported. The manual delta reduction copied one
-original failing operation with its original name and types, removed unrelated
-operations, and was accepted only after the exact pass pipeline reproduced the
-same terminal diagnostic.
+The export is 69,510,766 bytes with SHA-256
+`6c9d2931a18811560f6565e9d313390fb5e0b7b167af39ddc094e19b949ce085`.
+The export and Torch derivation JSON hashes are respectively
+`2fb13b6f6c3d89598dc1ab00939818524beada3af1cb5fa416dc632d4699eba9`
+and `391fc17a7a0236d3939b9207b7a688f8f9c8a1223cba915a888eba332c3c8110`.
+The actual invocation logs, exit codes, and hashes are bound in the receipt;
+they are not substituted with reads of prior daemon logs.
 
-## Command resolution and failure classification
+## Content-bound failure capture and reduction
 
-The task brief names the first target
-`tiny-stories-1m-kev-gpt-exact-torch-mlir`, but the model registry exports the
-logical Torch-MLIR artifact as `tiny-stories-1m-kev-gpt-exact-torch`. The first
-spelling fails at flake attribute resolution. That diagnostic is preserved in
-the receipt, then the actual registered `-torch` stage was executed. Because
-that registered derivation entered Torch-MLIR and produced a deterministic
-compiler legalization error, the final result is a compiler frontier, not a
-Nix/environment failure.
+After the registered Torch failure, a diagnostic capture used the exact
+export store output and the exact Torch derivation's Python environment,
+Torch-MLIR `PYTHONPATH`, and `/nix/store/...-compile-pytorch.py`. It exited 1
+with the same diagnostic and emitted `UnnammedModule.mlir`. Those emitted bytes
+were immediately archived with deterministic gzip settings.
 
-## Scope
+| Evidence | SHA-256 |
+| --- | --- |
+| exported program | `6c9d2931a18811560f6565e9d313390fb5e0b7b167af39ddc094e19b949ce085` |
+| compile script | `c668341ae81c944a9f4e092465e47619824532c6397a9f8797a01914747223d8` |
+| exact `torch-mlir-opt` | `fde6c18913b26465da9766c9fd2a51e9dc3835491b344ea4ab220735a0f70e6b` |
+| emitted IR, 12,121,418 bytes | `a9a663989a35f3d9e2984486db81a82c2aa7bfff421ec56a8558f99a22f52eb0` |
+| deterministic gzip archive | `d56ff38d4ec482297adbc19b81e350b14d703bf5d1424b9ede9200d01e23852e` |
+| 334-byte reduced IR | `285a40e0ba9dd999fb4155c465889e1b3fa2dc0768716328bc7e4c8898bc4b37` |
 
-The run consumed accepted exact-export commit
-`7eed3592a661c0cb3c417dc59b29839266446b2d`. It made no backend, model,
-quantization, DDR, PCIe, lowering, scheduling, or RTL change. Partial output is
-not accepted. Downstream functional, resource, timing, and board claims remain
-false.
+The emitted IR contains 1,755 generic `torch.operator` nodes. The minimal
+reproducer retains an original
+`torch.aten.bitwise_right_shift.Tensor_Scalar` operation with its original
+operand/result types. Both full and reduced IR reproduce the diagnostic with
+the exact Torch-MLIR binary and pass pipeline. The available `mlir-reduce` is
+LLVM/MLIR 21 and cannot register this LLVM 23 Torch dialect, so the reduction
+remains a manually minimized, exact-interestingness-verified operation.
+
+## Command resolution and scope
+
+The brief's `...-torch-mlir` attribute is absent; the model registry names that
+logical artifact stage `...-torch`. The missing-alias diagnostic and resolution
+are preserved in the machine receipt. This does not change the causal stage:
+the registered `...-torch` derivation entered Torch-MLIR and failed in its pass
+pipeline.
+
+No partial Torch output was accepted. No backend, model, quantization, DDR,
+PCIe, lowering, scheduling, or RTL change was made. No downstream functional,
+resource, timing, or board claim is made.

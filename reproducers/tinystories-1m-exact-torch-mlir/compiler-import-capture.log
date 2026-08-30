@@ -1,4 +1,4 @@
-$ /nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py --exported-program-dir /nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported --out /tmp/nix-shell.lA4jJs/tinystories-exact-import-capture-658igwbk/requested-torch.mlir
+$ /nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py --exported-program-dir /nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported --out /tmp/nix-shell.ybr7oQ/tinystories-exact-import-capture-6rrlnlpm/requested-torch.mlir
 exit_code: 1
 --- stdout ---
 --- stderr ---
@@ -24,6 +24,6 @@ torch_mlir.compiler_utils.TorchMlirCompilerError: Lowering TorchFX IR -> Torch B
 python exception: Failure while executing pass pipeline
 
 For Torch-MLIR developers, the error can be reproduced with:
-$ torch-mlir-opt -pass-pipeline='builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=})' /tmp/nix-shell.lA4jJs/tinystories-exact-import-capture-658igwbk/UnnammedModule.mlir
+$ torch-mlir-opt -pass-pipeline='builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=})' /tmp/nix-shell.ybr7oQ/tinystories-exact-import-capture-6rrlnlpm/UnnammedModule.mlir
 Add '-mlir-print-ir-after-all -mlir-disable-threading' to get the IR dump for debugging purpose.
 
