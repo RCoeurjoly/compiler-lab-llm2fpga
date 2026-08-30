@@ -15,7 +15,9 @@ in stdenv.mkDerivation {
   pname = "torch-mlir";
   version = "0-unstable-2026-02-12";
   src = torchMlirSrc;
-  patches = [ ];
+  patches = [
+    ./patches/torch-mlir/legalize-bitwise-right-shift-tensor-scalar.patch
+  ];
 
   nativeBuildInputs =
     [ cmake ninja pkg-config gitMinimal python pybind11 nanobind tblgen ];
