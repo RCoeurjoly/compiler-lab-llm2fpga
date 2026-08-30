@@ -363,3 +363,59 @@ archived round-1 v2, and current round-2 v4 bundle verifiers all returned
 `byte_identical: true`; the current verifier reported canonical file count 11
 and first invalid stage SCF. Explicit bundle comparison and `git diff --check`
 also passed before the evidence commit.
+
+## Review fix round 3: public run-directory closure
+
+The residual filesystem-boundary finding was reproduced through the public
+`verify_determinism_bundles` entry point before implementation. Adding an
+unlisted `flat-scf.log` to both current runs, an unlisted artifact, a symlinked
+canonical receipt, or an unexpected hidden directory was accepted. Removing a
+canonical file was rejected only later during manifest-driven loading, not by
+an authoritative directory-set check.
+
+Commit `9c70616e324be2be49e96de8aabf962c2050456f` adds a pre-read directory
+closure gate. Each `run-1`/`run-2` root is checked with `lstat`; entries are
+enumerated without following symlinks; and every entry must be a regular file.
+The observed filename set must exactly equal the schema-defined canonical set
+plus the explicitly permitted metadata set, which is empty for both supported
+bundle schemas. Missing, extra, hidden, symlink, directory, socket, FIFO, and
+device entries therefore fail before receipt or evidence bytes are consumed.
+
+The canonical sets are no longer learned solely from the attacker-controlled
+manifest. Historical bundle v1 is fixed to its four-file schema. Bundle v2 is
+fixed to either the seven-file historical receipt-v3 schema bound to its known
+source commit, or the eleven-file receipt-v4 schema. A v4 manifest cannot add a
+later-stage log/artifact to `canonical_files` to legitimize it.
+
+Five public end-to-end tests copy real bundles and cover: unlisted
+`flat-scf.log` in both v4 runs, an unlisted MLIR artifact, a symlink replacing a
+canonical receipt, a missing canonical log, and an unexpected hidden
+subdirectory. The red run failed all five; the green public-boundary class
+passed all five.
+
+Because verifier bytes are receipt-bound, code/tests were committed first and
+both captures were rerun strictly sequentially. They again stopped at SCF and
+were byte-identical across exactly eleven files:
+
+- source/code commit:
+  `9c70616e324be2be49e96de8aabf962c2050456f`
+- determinism-verifier SHA-256:
+  `3fa8ac5fc7b406e0186587a9d8577d67d0e48a5a4e23be30ffabb3958ede6d3f`
+- receipt file SHA-256:
+  `3fc642f55482fe88da58a725b44cc1f9c822786701a5187456a36190f13fb9f2`
+- receipt self-hash:
+  `3181afd4bc1c6d72c2ecc64985f3fa949f7e87bbcedccabb6d6157dab47af441`
+- Linalg `.drv` SHA-256:
+  `0651758665581517360aee0d6e137ccbb932fdab99946b5d43ef2fc85fa2f442`
+- canonical Linalg derivation JSON SHA-256:
+  `e042b4a49c46bacae9294a8d3d1a7f87fa797312cea98a40799c569f0e9f3f46`
+
+The round-2 capture is preserved byte-for-byte at
+`artifacts/comparison/tinystories-1m-exact-frontier-determinism-scf-v3`.
+No compiler behavior, SCF registration, or later pipeline execution changed.
+
+Round-3 final verification ran 55 focused tests with `OK`. The public
+historical v1 verifier, archived round-2 v4 verifier, and current v4 verifier
+all returned `byte_identical: true`; the current receipt reported exactly 11
+canonical files and first invalid stage SCF. Directory diff, `git diff
+--check`, and the scoped source-diff also passed before the evidence commit.

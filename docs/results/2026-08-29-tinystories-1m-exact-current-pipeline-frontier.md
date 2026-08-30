@@ -65,19 +65,19 @@ reproducer.
 ## Deterministic capture
 
 Two independent classifier executions from code commit
-`9da0a178375268008f34438e7d128ea70ec7d3eb` produced byte-identical copies
+`9c70616e324be2be49e96de8aabf962c2050456f` produced byte-identical copies
 of all eleven canonical files:
 
 | Canonical evidence | SHA-256 |
 | --- | --- |
-| serialized receipt | `14cdc3056ba981bfa36a84558ff019d76d00424eef29bfee89b2d67372b3d734` |
-| receipt self-hash | `942031d17e1ecf1cc028f505c518f12c01ec0cbcc31228a97a2e1a78f36d2a35` |
+| serialized receipt | `3fc642f55482fe88da58a725b44cc1f9c822786701a5187456a36190f13fb9f2` |
+| receipt self-hash | `3181afd4bc1c6d72c2ecc64985f3fa949f7e87bbcedccabb6d6157dab47af441` |
 | export log | `993972ee373fbef7b0d334fc180f1277dc9b61698df7c3ed4aaa17a8c63b74e2` |
 | Torch log | `e7cf82e57bc7c28ec8a188c184528e2f9a54892d3154ab3de729ad7b9f0d04e0` |
-| Linalg log | `e77084639f9a7af565a99dedadbad07ee36c78d21cee43dd267a820926488a5e` |
+| Linalg log | `076495c2b23b66fd2a20c8e4bec550c9f24304422cbb8b3c2ab3837938f5806f` |
 | SCF log | `f1c3e00460f680c0186a9b275e30c1db560d6b75ab7968c8f092fd8f7a548de1` |
-| Linalg `.drv` | `39f1622c7b81607fa840e5cc865ff6ca01f309faf25ada96a822093ac0c4975b` |
-| canonical Linalg derivation JSON | `9b5e0720b8b1b3521b1687adb5cee4b27ae1ce071b993ad1590a4b89ba819165` |
+| Linalg `.drv` | `0651758665581517360aee0d6e137ccbb932fdab99946b5d43ef2fc85fa2f442` |
+| canonical Linalg derivation JSON | `e042b4a49c46bacae9294a8d3d1a7f87fa797312cea98a40799c569f0e9f3f46` |
 | SCF `.drv` | `103aaba38b6df8b4b28fe93781c095efa75e26c06ea586530f573b9f31127b7c` |
 | canonical SCF derivation JSON | `feaf6061090a89f85cf030bb86dc163342c11370cc023dc322a7f50e3e7c5da3` |
 
@@ -88,7 +88,7 @@ bytes, canonical derivation JSON, and hashes remain bound. The receipt also
 binds the exact classifier SHA-256
 `966541ca4d548a9f1f6820819c87add91aa401d025d3946ab5db69c39f3bf9e7`
 and determinism-verifier SHA-256
-`3026fef8bb9021259e2b6255ed47cbc50b922bd1d2159db3004677dca168b67f`.
+`3fa8ac5fc7b406e0186587a9d8577d67d0e48a5a4e23be30ffabb3958ede6d3f`.
 Verify both bundles with:
 
 ```text
@@ -105,6 +105,8 @@ The superseded seven-file SCF capture remains preserved unchanged under
 `artifacts/comparison/tinystories-1m-exact-frontier-determinism-scf-v1`.
 The superseded round-1 eleven-file capture remains preserved unchanged under
 `artifacts/comparison/tinystories-1m-exact-frontier-determinism-scf-v2`.
+The superseded round-2 eleven-file capture remains preserved unchanged under
+`artifacts/comparison/tinystories-1m-exact-frontier-determinism-scf-v3`.
 The bounded successor plan is
 `docs/superpowers/plans/2026-08-30-exact-tinystories-scf-registration-frontier.md`;
 it selects only the existing direct Linalg-to-SCF no-handshake registration
