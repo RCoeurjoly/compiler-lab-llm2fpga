@@ -2,43 +2,29 @@
 
 ## Result
 
-Registered `tiny-stories-1m-kev-gpt-exact` with the existing `registerModel` stage graph and no backend overrides. Its export command invokes `TinyStories/model_adapter_exact_package.py` with explicit contract, package, and model paths.
+Registered `tiny-stories-1m-kev-gpt-exact` through the unchanged `registerModel` stage graph with no backend overrides. The package is a pinned non-flake `kev-gpt-src` input at `df1fc45b2ffcb26fddc19cfd57621e7eedf6153f`; the derivation uses its Nix-store `model_packages/tinystories-1m` content alias. There is no `extra-sandbox-paths` configuration or `/home` build input.
 
-A Nix-generated Python preflight verifies Task 1 contract/audit, canonical package manifest, Task 2 artifact/receipt, and Task 3 generation artifact/result hashes before the generic materializer can create `exported.pt2`. It then writes `exact-provenance-manifest.json`, including all bound identities and the exported-program digest.
+The adapter authenticates any content alias by full file set, size, SHA-256, manifest, and receipt equality, and records canonical origin, materialized store path, and `complete_authenticated_package_file_identity`. The export verifies Tasks 1--3 before materialization and writes provenance afterwards; materializer receives no unsupported `--audit`.
 
-No backend pass, model semantics, DDR3, PCIe, or stage graph was changed.
+## TDD and staging closure
 
-## TDD record
+Registration, alias/mutation, materializer CLI, isolated adapter load, and staged selection-authority tests were first made red. The staged selection test exposed an omitted authority. Preserved-sandbox inspection then showed that copying Nix-store paths retained hash-prefixed basenames. Explicit destinations now preserve the authenticated repository-relative layout for the selection document, reference artifacts, and comparison authorities. This is derivation-only staging, outside the Task 2 authenticated source closure; no Task 2/3 regeneration was needed for it.
 
-The focused registration test was added before the registration and failed with the expected missing-key error:
+## Final identities and verification
+
+- Task 2 file/artifact: `173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a` / `af1901917b52876a9b3343712b89928b272e5dd237cd491ddd9d462c56a52838`
+- Task 3 file/artifact/result: `e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3` / `9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3` / `c18106f25030ec58dfd3abc5d75d774506aca65b655fc34b284076b1294f8644`
+- `exported.pt2`: `6c9d2931a18811560f6565e9d313390fb5e0b7b167af39ddc094e19b949ce085`
+- provenance manifest: `5119729faeeac04bb2504ac7134bbd32164af09459171fd44bc67a542572e27b`
+
+Task 2 final regeneration took about two minutes. The final 3×16 Task 3 proof took about 34 minutes; highest sampled RSS was 3,502,228 KiB (not a measured peak).
 
 ```text
-KeyError: 'tiny-stories-1m-kev-gpt-exact'
-```
+nix develop -c python -m unittest -v tests.test_tinystories_1m_exact_reachable_domain tests.test_tinystories_1m_exact_package_model tests.test_tinystories_1m_exact_pipeline_registration
+Ran 33 tests in 126.243s — OK
 
-After registration it checks the canonical manifest hash, all Task 1--3 receipt identities, empty `backend_overrides`, and the unchanged public pipeline stage set.
-
-## Verification
-
-```text
-nix eval .#packages.x86_64-linux.tiny-stories-1m-kev-gpt-exact-pytorch-exported.name
-"tiny-stories-1m-kev-gpt-exact-pytorch-exported"
-
-nix develop -c python -m unittest tests/test_tinystories_1m_exact_pipeline_registration.py -v
-Ran 1 test — OK
-
-git diff --check
+nix build .#tiny-stories-1m-kev-gpt-exact-pytorch-exported -L
 exit 0
 ```
 
-The requested export-only build correctly failed closed before `exported.pt2` could be written. Its remaining blocker is environmental, not an identity mismatch: the authenticated package is frozen at `/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m`, but the Nix build user cannot traverse `/home/roland` (mode `750`). Without trust, Nix ignores the deliberately narrow `extra-sandbox-paths` declaration; with `nix build --accept-flake-config .#tiny-stories-1m-kev-gpt-exact-pytorch-exported -L`, sandbox setup fails with:
-
-```text
-getting status of '/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m': Permission denied
-```
-
-Nix Python independently verified the frozen manifest SHA-256 `374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35`. Changing home-directory permissions was not authorized and was not performed.
-
-## Concern
-
-Completing the export derivation needs a secure, read-only way to expose only the canonical package path to the Nix build user (and trust the flake's scoped sandbox path). Until then, the preflight correctly prevents a provenance-bearing exported artifact from being produced.
+The final manifest’s `exported_pt2_sha256` equals the actual export, records the canonical `/home/...` origin as provenance only, and records the Nix-store package as `materialized_path`.

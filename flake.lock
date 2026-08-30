@@ -242,6 +242,23 @@
         "type": "github"
       }
     },
+    "kev-gpt-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786979102,
+        "narHash": "sha256-QJjz85zruYzzqBLQzwZldVAOTWk1eUFvKiurCzyoHjU=",
+        "owner": "RCoeurjoly",
+        "repo": "kev-gpt",
+        "rev": "df1fc45b2ffcb26fddc19cfd57621e7eedf6153f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "RCoeurjoly",
+        "repo": "kev-gpt",
+        "rev": "df1fc45b2ffcb26fddc19cfd57621e7eedf6153f",
+        "type": "github"
+      }
+    },
     "llvm-submodule-src": {
       "flake": false,
       "locked": {
@@ -516,6 +533,7 @@
         "calyx-src": "calyx-src",
         "circt-nix": "circt-nix",
         "flake-utils": "flake-utils_2",
+        "kev-gpt-src": "kev-gpt-src",
         "nix-eda": "nix-eda",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-llvm21": "nixpkgs-llvm21",

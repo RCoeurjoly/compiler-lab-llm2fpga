@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "8f74d35cc90d534fb385608c9cdf1f6f5bb0a5aad83eb6c34133e4b7b6f1e938",
+  "artifact_sha256": "af1901917b52876a9b3343712b89928b272e5dd237cd491ddd9d462c56a52838",
   "execution": {
     "activation_codes": "signed_int8_saturated",
     "activation_rounding": "nearest_ties_away_from_zero",
@@ -49,7 +49,7 @@
     "fixed_profile": {
       "sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6"
     },
-    "model_receipt_sha256": "f061dbf4f91bf5389acb0f27ce4b9e672f6f3831478907e01900e60e8869235b",
+    "model_receipt_sha256": "5e56907e60c83c5d98b3c3fe88772b7dfba71e53a9435de548a9d54ea7497834",
     "package": {
       "files": {
         "calibration_ids.bin": {
@@ -98,18 +98,23 @@
         }
       }
     },
+    "package_location": {
+      "canonical_origin": "/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m",
+      "content_alias_policy": "complete_authenticated_package_file_identity",
+      "materialized_path": "/nix/store/p05mqrwgczbd1zpww75f97xvnp109cl4-source/model_packages/tinystories-1m"
+    },
     "reachable_certificate": {
       "certificate_sha256": "4c7a55d9673f2b42dcf0f0ec676b63f4094b161f860962b7d430643769a7e9c9",
       "file_sha256": "35c64f4aacecca9e6a0df3635f16ba8f5cc3af770f683cb19781c62b1b456464"
     },
     "source_files": {
-      "TinyStories/model_adapter_exact_package.py": "ee2af98f4f2dfcae20dbe43432bc4bcf6e8ea9340308ec735bd2c1549c16b92c",
+      "TinyStories/model_adapter_exact_package.py": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e",
       "TinyStories/model_adapter_reference_package.py": "190f334868557614719c394961fe676a13b6fd865d443973917f87424be3c367",
       "scripts/comparison/audit_tinystories_1m_exact_input.py": "93b51d87dbb0a61911abdb951573c37018c90358dfed2f27b67832a6c1eea92d",
-      "scripts/comparison/build_tinystories_1m_exact_package_model_artifact.py": "38245c5defb023c3420feab4e16479e63b739fdfc8a492a4c3904c6df9030b2a",
+      "scripts/comparison/build_tinystories_1m_exact_package_model_artifact.py": "d6a18534113765cd04935d7597b3a1700b8fb18a24e676643fb877848e1326a4",
       "scripts/comparison/capture_tinystories_1m_fixed_logits.py": "fb455d4e977407cb886b1522872b44fe829133465e81e2c5e7d13f1c92f3744e",
       "scripts/comparison/certify_tinystories_1m_exact_reachable_domain.py": "4d71f3006400d90bc2d17d114e805810b3137d6b8c52cbf0d7951e03505a5359",
-      "tests/test_tinystories_1m_exact_package_model.py": "68c931907d49857c699e71b1ef86a7cf464daadbf56bc0cee438c29573efed8d",
+      "tests/test_tinystories_1m_exact_package_model.py": "3697db9b8d4558e64d6ed47437d65626ca0f148b0197b25f8a3d5a9af3b5a566",
       "tests/test_tinystories_1m_exact_reachable_domain.py": "634e4f06a646d055be0e9682b035d0e79481b4aa164ff98b1b89a7a072307f06"
     }
   },

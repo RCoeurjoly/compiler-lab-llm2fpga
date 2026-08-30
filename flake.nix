@@ -1,13 +1,6 @@
 {
   description = "LLM2FPGA MLIR pipeline bring-up lab";
 
-  # The exact package adapter authenticates the immutable local package at the
-  # path frozen in the Task 1 contract.  Make only that package visible to the
-  # export derivation; it is never substituted with a copied or FP32 package.
-  nixConfig.extra-sandbox-paths = [
-    "/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m"
-  ];
-
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     nixpkgs-llvm21.url =
@@ -23,11 +16,15 @@
       url = "github:calyxir/calyx/5a4303847392609cad83dda6f4bdffc8cc0e5c89";
       flake = false;
     };
+    kev-gpt-src = {
+      url = "github:RCoeurjoly/kev-gpt/df1fc45b2ffcb26fddc19cfd57621e7eedf6153f";
+      flake = false;
+    };
     task3-main-pipeline.url = "path:./task3-main";
   };
 
   outputs = inputs@{ nixpkgs, nixpkgs-llvm21, nixpkgs-nix-eda, flake-utils
-    , circt-nix, nix-eda, ... }:
+    , circt-nix, nix-eda, kev-gpt-src, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
@@ -416,6 +413,7 @@
           sourceDir = ./TinyStories;
           adapterPy = ./TinyStories/model_adapter.py;
         };
+        exactTinyStoriesPackage = "${kev-gpt-src}/model_packages/tinystories-1m";
 
         # This is deliberately a Nix-generated Python helper rather than a
         # pipeline/backend change.  It closes the Task 1--3 provenance before
@@ -432,17 +430,18 @@
 
 
             EXPECTED = {
-                "adapter": "ee2af98f4f2dfcae20dbe43432bc4bcf6e8ea9340308ec735bd2c1549c16b92c",
+                "adapter": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e",
                 "contract": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
                 "audit_file": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
                 "audit_payload": "7d7a37d08df7e63bdb95063674fe5dc306058e51af8a11bbcd97a4cb2972a766",
                 "package_manifest": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
-                "task_2_file": "3bc578d7f13263f438d8e7d3f4d3b80386afa89accb859da74d1a4404606eae7",
-                "task_2_artifact": "8f74d35cc90d534fb385608c9cdf1f6f5bb0a5aad83eb6c34133e4b7b6f1e938",
-                "task_2_receipt": "f061dbf4f91bf5389acb0f27ce4b9e672f6f3831478907e01900e60e8869235b",
-                "task_3_file": "b15fe696a21b8fa9ddf0ae17c6cc264c8cac0dbbdd51880b924452de5d388762",
-                "task_3_artifact": "2e4f35b2875127bff7d74bcdc404edd3afad1c8fc6693dca05cd7a1636b22b69",
-                "task_3_result": "3113e57cc016292804beb2e35e6443ca8fc7cd1439272abde0cb62edc1c77524",
+                "package_receipt": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
+                "task_2_file": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+                "task_2_artifact": "af1901917b52876a9b3343712b89928b272e5dd237cd491ddd9d462c56a52838",
+                "task_2_receipt": "5e56907e60c83c5d98b3c3fe88772b7dfba71e53a9435de548a9d54ea7497834",
+                "task_3_file": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+                "task_3_artifact": "9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3",
+                "task_3_result": "c18106f25030ec58dfd3abc5d75d774506aca65b655fc34b284076b1294f8644",
             }
 
 
@@ -479,20 +478,32 @@
                 require(adapter.is_file() and sha256(adapter) == EXPECTED["adapter"], "exact adapter")
                 require(contract_path.is_file() and sha256(contract_path) == EXPECTED["contract"], "Task 1 contract")
                 require(audit_path.is_file() and sha256(audit_path) == EXPECTED["audit_file"], "Task 1 audit")
-                require((package / "manifest.json").is_file()
-                        and sha256(package / "manifest.json") == EXPECTED["package_manifest"],
-                        "canonical package manifest")
                 require((model_path / "config.json").is_file()
                         and (model_path / "pytorch_model.bin").is_file(), "model snapshot")
 
                 contract = load_json(contract_path)
                 audit = load_json(audit_path)
                 require(contract.get("status") == "authenticated"
-                        and contract.get("package", {}).get("manifest_sha256") == EXPECTED["package_manifest"]
-                        and Path(str(contract.get("package", {}).get("origin", ""))).resolve() == package.resolve(),
+                        and contract.get("package", {}).get("manifest_sha256") == EXPECTED["package_manifest"],
                         "Task 1 contract/package binding")
                 require(audit.get("status") == "authenticated" and audit.get("conflicts") == []
                         and audit.get("sha256") == EXPECTED["audit_payload"], "Task 1 audit receipt")
+                expected_files = contract.get("package", {}).get("files")
+                require(isinstance(expected_files, dict)
+                        and audit.get("package", {}).get("files") == expected_files
+                        and package.is_dir()
+                        and {path.name for path in package.iterdir() if path.is_file()}
+                        == set(expected_files) | {"receipt.json"}, "canonical package file set")
+                for name, identity in expected_files.items():
+                    path = package / name
+                    require(isinstance(identity, dict) and path.is_file()
+                            and path.stat().st_size == identity.get("size")
+                            and sha256(path) == identity.get("sha256"), f"canonical package {name}")
+                receipt = load_json(package / "receipt.json")
+                require(sha256(package / "receipt.json") == EXPECTED["package_receipt"]
+                        and receipt.get("files") == expected_files
+                        and receipt.get("manifest_sha256") == EXPECTED["package_manifest"],
+                        "canonical package receipt")
 
                 require(task_2_path.is_file() and sha256(task_2_path) == EXPECTED["task_2_file"], "Task 2 artifact file")
                 task_2 = load_json(task_2_path)
@@ -516,6 +527,7 @@
                     "audit_file_sha256": EXPECTED["audit_file"],
                     "audit_payload_sha256": EXPECTED["audit_payload"],
                     "package_manifest_sha256": EXPECTED["package_manifest"],
+                    "package_receipt_sha256": EXPECTED["package_receipt"],
                     "task_2_artifact_file_sha256": EXPECTED["task_2_file"],
                     "task_2_artifact_sha256": EXPECTED["task_2_artifact"],
                     "task_2_model_receipt_sha256": EXPECTED["task_2_receipt"],
@@ -547,7 +559,9 @@
                         "schema": "tinystories-1m-exact-pytorch-export-provenance-v1",
                         "adapter": str(Path(args.adapter)),
                         "contract": str(Path(args.contract)),
-                        "package": str(Path(args.package)),
+                        "canonical_origin": str(load_json(Path(args.contract))["package"]["origin"]),
+                        "materialized_path": str(Path(args.package)),
+                        "content_alias_policy": "complete_authenticated_package_file_identity",
                         "model_path": str(Path(args.model_path)),
                         "exported_pt2_sha256": sha256(exported),
                     })
@@ -653,7 +667,7 @@
         modelRegistry = import ./nix/models.nix {
           inherit (pipelineLib) registerModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
-            tinyStories1m fpPrimsSv;
+            tinyStories1m fpPrimsSv exactTinyStoriesPackage;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
           inherit exactPackageExportProvenance;
@@ -670,7 +684,7 @@
         modelRegistryNoHandshake = import ./nix/models.nix {
           registerModel = pipelineLib.registerNoHandshakeModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
-            tinyStories1m fpPrimsSv;
+            tinyStories1m fpPrimsSv exactTinyStoriesPackage;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
           inherit exactPackageExportProvenance;
@@ -694,7 +708,7 @@
         modelRegistryTosa = import ./nix/models.nix {
           registerModel = pipelineLibTosa.registerTosaModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO
-            tinyStories1m fpPrimsSv;
+            tinyStories1m fpPrimsSv exactTinyStoriesPackage;
           inherit torchMlir;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
@@ -705,7 +719,7 @@
         modelRegistryTosaNoHandshake = import ./nix/models.nix {
           registerModel = pipelineLibTosa.registerTosaNoHandshakeModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO
-            tinyStories1m fpPrimsSv;
+            tinyStories1m fpPrimsSv exactTinyStoriesPackage;
           inherit torchMlir;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;

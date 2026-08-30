@@ -19,7 +19,18 @@ from typing import Any, Callable, Mapping
 
 import torch
 
-from TinyStories import model_adapter_reference_package as reference_adapter
+
+def _load_reference_adapter() -> Any:
+    path = Path(__file__).with_name("model_adapter_reference_package.py")
+    spec = importlib.util.spec_from_file_location("tinystories_reference_package_adapter", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"unable to load package mapping adapter: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+reference_adapter = _load_reference_adapter()
 
 
 Q_VALUE = 16
@@ -47,6 +58,7 @@ FROZEN_FIXED_PROFILE_SHA256 = "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab
 FROZEN_PROFILE_SELF_SHA256 = "7d54acda88f1d1a6979fd0ca8a3b0445e20ef127a399e5124a994427565caad0"
 FROZEN_CONTRACT_SHA256 = "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c"
 FROZEN_AUDIT_FILE_SHA256 = "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd"
+FROZEN_PACKAGE_RECEIPT_SHA256 = "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2"
 REACHABLE_CERTIFICATE_RELATIVE = Path("artifacts/reference/tinystories-1m-exact-reachable-domain.json")
 REACHABLE_CERTIFICATE_SHA256 = "35c64f4aacecca9e6a0df3635f16ba8f5cc3af770f683cb19781c62b1b456464"
 FIXED_LOGITS_ORACLE_RELATIVE = Path("artifacts/reference/tinystories-1m-fixed-logits-oracle.json")
@@ -502,7 +514,8 @@ def _validate_fixed_logits_oracle(oracle: Mapping[str, Any], contract: Mapping[s
 
 
 def _authenticate_inputs(contract_path: Path, package_path: Path) -> tuple[
-    dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], torch.Tensor
+    dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], torch.Tensor,
+    dict[str, str],
 ]:
     contract = _load_json(contract_path, "exact-input contract")
     audit_path = contract_path.with_name(AUDIT_NAME)
@@ -582,12 +595,17 @@ def _authenticate_inputs(contract_path: Path, package_path: Path) -> tuple[
     audit_package = audit.get("package")
     _require(isinstance(package_contract, dict) and isinstance(audit_package, dict),
              "package_identity_mismatch", "package identity missing")
-    _require(Path(package_contract.get("origin", "")).resolve() == package_path.resolve()
-             and Path(audit_package.get("path", "")).resolve() == package_path.resolve(),
-             "package_identity_mismatch", "package path differs")
+    canonical_origin = package_contract.get("origin")
+    _require(isinstance(canonical_origin, str) and canonical_origin
+             and audit_package.get("path") == canonical_origin,
+             "package_identity_mismatch", "canonical package provenance differs")
     expected_files = package_contract.get("files")
     _require(isinstance(expected_files, dict) and audit_package.get("files") == expected_files,
              "package_identity_mismatch", "audit and contract package files differ")
+    _require(package_path.is_dir()
+             and {path.name for path in package_path.iterdir() if path.is_file()}
+             == set(expected_files) | {"receipt.json"},
+             "package_identity_mismatch", "package file set differs")
     for name, identity in expected_files.items():
         path = package_path / name
         _require(isinstance(identity, dict) and path.is_file()
@@ -597,6 +615,12 @@ def _authenticate_inputs(contract_path: Path, package_path: Path) -> tuple[
     _require(package_contract.get("manifest_sha256") == expected_files["manifest.json"]["sha256"]
              and package_contract.get("sha256") == expected_files["weights.bin"]["sha256"],
              "package_identity_mismatch", "package aliases differ")
+    receipt_path = package_path / "receipt.json"
+    receipt = _load_json(receipt_path, "package receipt")
+    _require(_sha256(receipt_path) == FROZEN_PACKAGE_RECEIPT_SHA256
+             and receipt.get("files") == expected_files
+             and receipt.get("manifest_sha256") == package_contract.get("manifest_sha256"),
+             "package_identity_mismatch", "package receipt differs")
     certificate_path = _repo_root() / REACHABLE_CERTIFICATE_RELATIVE
     oracle_path = _repo_root() / FIXED_LOGITS_ORACLE_RELATIVE
     _require(certificate_path.is_file() and _sha256(certificate_path) == REACHABLE_CERTIFICATE_SHA256,
@@ -607,7 +631,11 @@ def _authenticate_inputs(contract_path: Path, package_path: Path) -> tuple[
     oracle = _load_json(oracle_path, "fixed-logits oracle")
     _validate_reachable_certificate(certificate, contract, audit)
     oracle_logits = _validate_fixed_logits_oracle(oracle, contract, audit)
-    return contract, audit, profile, certificate, oracle, oracle_logits
+    return contract, audit, profile, certificate, oracle, oracle_logits, {
+        "canonical_origin": canonical_origin,
+        "materialized_path": str(package_path),
+        "content_alias_policy": "complete_authenticated_package_file_identity",
+    }
 
 
 def _tensor_images(manifest: Mapping[str, Any], weight_image: bytes, scale_image: bytes,
@@ -980,7 +1008,7 @@ def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) 
     contract_path = Path(contract_path)
     package_path = Path(package_path)
     model_path = Path(model_path)
-    contract, audit, profile, certificate, oracle, oracle_logits = _authenticate_inputs(
+    contract, audit, profile, certificate, oracle, oracle_logits, package_location = _authenticate_inputs(
         contract_path, package_path
     )
     manifest = _load_json(package_path / "manifest.json", "package manifest")
@@ -1022,6 +1050,7 @@ def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) 
             "gemv_accumulation": "ascending_input_index_signed_int64_twos_complement_wrap",
             "activation_rounding": "nearest_ties_away_from_zero",
         },
+        "package_location": package_location,
         "tensor_mapping": mapping,
         "activation_boundary_count": len(manifest["activation_scales"]),
         "independent_logits_oracle": {
@@ -1152,3 +1181,20 @@ def export_exact_program(bundle: ExactModelBundle) -> torch.export.ExportedProgr
         "exported_program": exported_program_identity(logits_export),
     }
     return logits_export
+
+
+def export_program_with_package(
+    model_path: str | Path,
+    package_path: str | Path,
+    contract_path: str | Path,
+) -> torch.export.ExportedProgram:
+    """Authenticate explicit package inputs before exposing the exact export."""
+
+    if not model_path or not package_path or not contract_path:
+        raise ExactModelError(
+            "package_frontend_inputs_missing",
+            "model, package, and frozen contract paths are required",
+        )
+    return export_exact_program(
+        load_exact_model(Path(contract_path), Path(package_path), Path(model_path))
+    )

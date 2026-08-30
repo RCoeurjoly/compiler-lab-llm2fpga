@@ -78,6 +78,7 @@ def build_artifact(repo_root: Path, contract: Path, package: Path, model_path: P
             },
             "fixed_profile": {"sha256": _sha256(profile)},
             "package": {"files": bundle.contract["package"]["files"]},
+            "package_location": bundle.receipt["package_location"],
             "source_files": {
                 str(path.relative_to(repo_root)): _sha256(path) for path in source_files
             },

@@ -8,6 +8,7 @@ import importlib.util
 import json
 import math
 import tempfile
+import shutil
 import unittest
 from pathlib import Path
 
@@ -16,6 +17,7 @@ import torch
 from TinyStories.model_adapter_exact_package import (
     ExactModelError,
     _validate_reachable_certificate,
+    _authenticate_inputs,
     activation_qdq,
     export_exact_program,
     exported_program_identity,
@@ -81,6 +83,24 @@ def write_contract_and_audit(directory: Path, contract: dict, audit: dict) -> Pa
     audit["sha256"] = canonical_sha256({key: value for key, value in audit.items() if key != "sha256"})
     audit_path.write_text(json.dumps(audit), encoding="utf-8")
     return contract_path
+
+
+@unittest.skipUnless(PACKAGE.is_dir(), "frozen package input unavailable")
+class TinyStories1MExactPackageAliasPolicyTest(unittest.TestCase):
+    def test_content_identical_alias_authenticates_without_canonical_path_equality(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            alias = Path(temporary) / "tinystories-1m"
+            shutil.copytree(PACKAGE, alias)
+            _authenticate_inputs(CONTRACT, alias)
+
+    def test_mutated_content_alias_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            alias = Path(temporary) / "tinystories-1m"
+            shutil.copytree(PACKAGE, alias)
+            weights = alias / "weights.bin"
+            weights.write_bytes(weights.read_bytes() + b"mutation")
+            with self.assertRaisesRegex(ExactModelError, "package_identity_mismatch"):
+                _authenticate_inputs(CONTRACT, alias)
 
 
 @unittest.skipUnless(PACKAGE.is_dir() and MODEL.is_dir(), "frozen package/model inputs unavailable")
@@ -211,6 +231,26 @@ class TinyStories1MExactPackageModelTest(unittest.TestCase):
             conflicting = write_contract_and_audit(Path(temporary), contract, audit)
             with self.assertRaisesRegex(ExactModelError, "contract_identity_mismatch"):
                 load_exact_model(conflicting, PACKAGE, MODEL)
+
+    def test_content_identical_package_alias_is_accepted_and_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            alias = Path(temporary) / "tinystories-1m"
+            shutil.copytree(PACKAGE, alias)
+            bundle = load_exact_model(CONTRACT, alias, MODEL)
+            self.assertEqual(bundle.receipt["package_location"]["canonical_origin"],
+                             json.loads(CONTRACT.read_text())["package"]["origin"])
+            self.assertEqual(bundle.receipt["package_location"]["materialized_path"], str(alias))
+            self.assertEqual(bundle.receipt["package_location"]["content_alias_policy"],
+                             "complete_authenticated_package_file_identity")
+
+    def test_mutated_content_alias_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            alias = Path(temporary) / "tinystories-1m"
+            shutil.copytree(PACKAGE, alias)
+            weights = alias / "weights.bin"
+            weights.write_bytes(weights.read_bytes() + b"mutation")
+            with self.assertRaisesRegex(ExactModelError, "package_identity_mismatch"):
+                load_exact_model(CONTRACT, alias, MODEL)
 
     def test_real_model_boundary_reuses_finite_integer_policy(self) -> None:
         for value in (math.nan, math.inf, -math.inf):
@@ -383,6 +423,10 @@ class TinyStories1MExactPackageModelTest(unittest.TestCase):
     def test_exact_package_model_artifact_validates_every_recorded_identity_and_execution_field(self) -> None:
         artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
         expected = self._expected_artifact_sections()
+        materialized_package = Path(artifact["identity"]["package_location"]["materialized_path"])
+        materialized_bundle = load_exact_model(CONTRACT, materialized_package, MODEL)
+        expected["identity"]["package_location"] = materialized_bundle.receipt["package_location"]
+        expected["identity"]["model_receipt_sha256"] = materialized_bundle.receipt["receipt_sha256"]
 
         self.assertEqual(artifact["schema"], "tinystories-1m-exact-package-model-v1")
         self.assertEqual(
