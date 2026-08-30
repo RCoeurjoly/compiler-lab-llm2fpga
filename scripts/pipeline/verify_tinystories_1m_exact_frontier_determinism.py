@@ -109,10 +109,15 @@ def _build_command_file_bindings(build_command: str) -> list[dict[str, Any]]:
     return result
 
 
-def _live_derivation(repo_root: Path, stage: str) -> dict[str, Any]:
+def _live_derivation(
+    repo_root: Path, stage: str, flake_reference: str = "."
+) -> dict[str, Any]:
     attribute = f"{_MODEL}-{stage}"
     document = json.loads(
-        _run(["nix", "derivation", "show", f".#{attribute}"], repo_root)
+        _run(
+            ["nix", "derivation", "show", f"{flake_reference}#{attribute}"],
+            repo_root,
+        )
     )
     derivations = document.get("derivations", {})
     _require(len(derivations) == 1, f"{stage}: live derivation count mismatch")
@@ -137,7 +142,7 @@ def _live_derivation(repo_root: Path, stage: str) -> dict[str, Any]:
     }
 
 
-def _independent_trust(repo_root: Path) -> dict[str, Any]:
+def _independent_trust(repo_root: Path, source_commit: str) -> dict[str, Any]:
     decision = _load_json(repo_root / _DECISION)
     _require(decision.get("identity_hashes") == _FROZEN_IDENTITIES, "live frozen Task 1-3 identities changed")
     _require(decision.get("sha256") == _DECISION_SELF_SHA256, "live Task 2 decision identity changed")
@@ -150,8 +155,18 @@ def _independent_trust(repo_root: Path) -> dict[str, Any]:
         "--probe-report", _SEMANTIC_REPORT,
     ]
     semantic_evidence = json.loads(_run(semantic_command, repo_root))
+    source_flake = f"git+file://{repo_root}?rev={source_commit}"
+    _run(
+        [
+            "nix", "build", "--no-link", "--print-out-paths",
+            f"{source_flake}#{_MODEL}-linalg",
+            f"{source_flake}#{_MODEL}-scf",
+        ],
+        repo_root,
+    )
     derivations = {
-        stage: _live_derivation(repo_root, stage) for stage in ("linalg", "scf")
+        stage: _live_derivation(repo_root, stage, source_flake)
+        for stage in ("linalg", "scf")
     }
     linalg_artifact = Path(derivations["linalg"]["output"])
     scf_artifact = Path(derivations["scf"]["output"]) / "manifest.json"
@@ -207,16 +222,20 @@ def _verify_v4_receipt(
     for name, path_string in trust["capture_tool_paths"].items():
         expected = tools.get(name)
         _require(isinstance(expected, dict) and expected.get("path") == path_string, f"{run_name}: {name} path mismatch")
-        live = (repo_root / path_string).read_bytes() if isinstance(repo_root, Path) else trust["capture_tool_bytes"][name]
-        live_hash = _sha256_bytes(live)
-        _require(expected.get("sha256") == live_hash, f"{run_name}: {name} live-byte hash mismatch")
         if isinstance(repo_root, Path):
             committed = subprocess.run(
                 ["git", "show", f"{source_commit}:{path_string}"],
                 cwd=repo_root,
                 capture_output=True,
             )
-            _require(committed.returncode == 0 and committed.stdout == live, f"{run_name}: {name} differs from source commit")
+            _require(committed.returncode == 0, f"{run_name}: {name} is absent from source commit")
+            tool_bytes = committed.stdout
+        else:
+            tool_bytes = trust["capture_tool_bytes"][name]
+        _require(
+            expected.get("sha256") == _sha256_bytes(tool_bytes),
+            f"{run_name}: {name} source-commit-byte hash mismatch",
+        )
 
     _require(receipt.get("status") == "compiler_frontier", f"{run_name}: frontier status mismatch")
     _require(receipt.get("frontier") == "pre_calyx_frontier", f"{run_name}: frontier class mismatch")
@@ -235,7 +254,25 @@ def _verify_v4_receipt(
     stages = receipt.get("stages")
     execution = receipt.get("registered_build_execution")
     _require(isinstance(stages, list) and isinstance(execution, dict), f"{run_name}: stage evidence missing")
-    _require([stage.get("stage") for stage in stages if isinstance(stage, dict)] == _STAGES, f"{run_name}: stage order mismatch")
+    stage_sequence = [stage.get("stage") for stage in stages if isinstance(stage, dict)]
+    _require(stage_sequence == _STAGES, f"{run_name}: stage sequence mismatch")
+    _require(set(execution) == set(stage_sequence), f"{run_name}: execution stage set mismatch")
+    registered_order = pipeline.get("registered_order")
+    first_invalid = pipeline.get("first_invalid_stage")
+    _require(
+        isinstance(registered_order, list)
+        and registered_order[: len(stage_sequence)] == stage_sequence
+        and first_invalid == stage_sequence[-1]
+        and pipeline.get("stopped_after_first_invalid_stage") is True
+        and pipeline.get("not_run") == registered_order[len(stage_sequence) :],
+        f"{run_name}: execution sequence/stop contract mismatch",
+    )
+    expected_files = {
+        "receipt.json", "pytorch-exported.log", "torch.log", "linalg.log",
+        "scf.log", "full-input.gz", "minimal-reproducer.json", "linalg.drv",
+        "linalg.derivation.json", "scf.drv", "scf.derivation.json",
+    }
+    _require(set(files) == expected_files, f"{run_name}: canonical evidence file set mismatch")
     for index, stage in enumerate(_STAGES):
         record = stages[index]
         run = execution.get(stage)
@@ -246,8 +283,14 @@ def _verify_v4_receipt(
         expected_status = "compiler_failure" if stage == "scf" else "succeeded"
         expected_accepted = stage != "scf"
         expected_diagnostics = [_DIAGNOSTIC] if stage == "scf" else []
+        _require(run.get("invoked") is True, f"{run_name}: {stage.upper()} execution was not invoked")
         _require(record.get("status") == expected_status, f"{run_name}: {stage} status mismatch")
         _require(record.get("artifact_accepted") is expected_accepted, f"{run_name}: {stage} acceptance mismatch")
+        _require(
+            run.get("artifact_accepted") is expected_accepted
+            and run.get("artifact_accepted") is record.get("artifact_accepted"),
+            f"{run_name}: {stage} execution acceptance mismatch",
+        )
         _require(record.get("exit_code") == 0 and run.get("exit_code") == 0, f"{run_name}: {stage} exit mismatch")
         _require(record.get("terminal_diagnostics") == expected_diagnostics, f"{run_name}: {stage} terminal diagnostic mismatch")
         _require(record.get("log_bytes") == len(log) and run.get("log_bytes") == len(log), f"{run_name}: {stage} log byte mismatch")
@@ -608,7 +651,7 @@ def _verify_v2_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     _require(run_names == ["run-1", "run-2"], "exactly run-1 and run-2 are required")
     first_receipt = _load_json(bundle_root / "run-1" / "receipt.json")
     trust = (
-        _independent_trust(Path(__file__).resolve().parents[2])
+        _independent_trust(Path(__file__).resolve().parents[2], str(source_commit))
         if first_receipt.get("schema")
         == "tinystories-1m-exact-current-pipeline-frontier-v4"
         else None

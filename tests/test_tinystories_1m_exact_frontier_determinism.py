@@ -227,7 +227,7 @@ class StrongCurrentReceiptValidationTest(unittest.TestCase):
             with self.subTest(name=name):
                 original = self.receipt["capture_tools"][name]["sha256"]
                 self.receipt["capture_tools"][name]["sha256"] = "0" * 64
-                self._reject(f"{name} live-byte hash")
+                self._reject(f"{name} source-commit-byte hash")
                 self.receipt["capture_tools"][name]["sha256"] = original
 
     def test_recomputed_self_hash_does_not_rescue_derivation_tool_or_command_mutation(self) -> None:
@@ -248,6 +248,38 @@ class StrongCurrentReceiptValidationTest(unittest.TestCase):
                 scf[key] = value
                 self._reject("exit mismatch|status mismatch|log hash mismatch|terminal diagnostic")
                 scf[key] = original
+
+    def test_recomputed_self_hash_does_not_rescue_execution_acceptance_mutation(self) -> None:
+        execution = self.receipt["registered_build_execution"]
+        for stage, value in (("pytorch-exported", False), ("scf", True)):
+            with self.subTest(stage=stage):
+                original = execution[stage]["artifact_accepted"]
+                execution[stage]["artifact_accepted"] = value
+                self._reject("execution acceptance mismatch")
+                execution[stage]["artifact_accepted"] = original
+
+    def test_recomputed_self_hash_does_not_rescue_not_invoked_execution(self) -> None:
+        self.receipt["registered_build_execution"]["scf"]["invoked"] = False
+        self._reject("SCF execution was not invoked")
+
+    def test_recomputed_self_hash_does_not_rescue_missing_or_extra_execution(self) -> None:
+        execution = self.receipt["registered_build_execution"]
+        removed = execution.pop("torch")
+        self._reject("execution stage set mismatch")
+        execution["torch"] = removed
+        execution["flat-scf"] = copy.deepcopy(execution["scf"])
+        self._reject("execution stage set mismatch")
+
+    def test_recomputed_self_hash_does_not_rescue_execution_sequence_inconsistency(self) -> None:
+        self.receipt["stages"][1], self.receipt["stages"][2] = (
+            self.receipt["stages"][2],
+            self.receipt["stages"][1],
+        )
+        self._reject("stage sequence mismatch")
+
+    def test_recomputed_self_hash_does_not_rescue_later_canonical_evidence(self) -> None:
+        self.files["flat-scf.log"] = b"later stage must not exist\n"
+        self._reject("canonical evidence file set mismatch")
 
     def test_recomputed_self_hash_does_not_rescue_changed_linalg_content(self) -> None:
         content = gzip.decompress(self.files["full-input.gz"]) + b"\nmutated"
