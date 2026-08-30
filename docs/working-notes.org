@@ -186,3 +186,17 @@ fixture, then mechanically verify the current Task 1 audit, Task 2 artifact,
 and Task 3 generation file/payload/result hashes against the decision receipt.
 Successful compilation or absence of =torch.operator= alone is not evidence of
 semantic correctness.
+
+** Fix round 2 — semantic result provenance
+
+The semantic gate no longer accepts an arbitrary lowered-result JSON. A future
+green run must invoke =run_tinystories_1m_exact_shift_semantic_probe.py=, which
+builds the exact registered Torch stage, resolves its derivation and
+=torch-mlir-opt= binary, invokes the declared executor route with the fixture
+and pinned pipeline, and produces a canonical self-hashed probe report. The
+verifier recomputes the decision and Task 5 receipt/self/reproducer bindings,
+the actual stage artifact and derivation bytes, producer script/command, tool
+binary/pipeline, fixture, report self-hash, and the exact case ID/count set
+before accepting semantics. Duplicated, extra, missing, stale, or detached
+records fail closed. The executor is deliberately a later compiler-pass
+deliverable; no compiler implementation is added at this decision checkpoint.

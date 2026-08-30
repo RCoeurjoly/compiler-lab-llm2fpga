@@ -57,8 +57,8 @@
   ],
   "regressions": {
     "full_registered_stage": {
-      "green_command": "nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-torch",
-      "green_expected": "exit 0; emits a nonempty Torch-MLIR artifact; no failed-to-legalize diagnostic; Task 1--3 identity hashes above remain unchanged before accepting the new artifact.",
+      "green_command": "nix develop -c python scripts/pipeline/run_tinystories_1m_exact_shift_semantic_probe.py --executor scripts/pipeline/execute_tinystories_1m_exact_shift_semantic_probe.py --out artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json && nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py --probe-report artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json",
+      "green_expected": "The producer builds the registered Torch stage, executes the exact fixture through the declared executor route, and emits a self-hashed report bound to actual stage/derivation/tool/pipeline bytes. The verifier recomputes those bindings, current Task 1--3 identities, and every semantic case before accepting the nonempty stage artifact.",
       "red_command": "nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-torch",
       "red_expected": "exit 1 with the recorded failed-to-legalize torch.operator diagnostic."
     },
@@ -73,13 +73,29 @@
     "fixture_file_sha256": "2aadecfedbbf93a617890d21586d17456f945028d866c368c15af754471f3064",
     "fixture_path": "artifacts/comparison/tinystories-1m-exact-shift-semantics.json",
     "fixture_self_hash": "4490ddcf0e6f59eed32ecfe31482dc142c9907f4e74efe32154a99d5651ef17f",
-    "full_stage_green_command": "stage=\"$(nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-torch)\" && nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py --lowered-result artifacts/comparison/tinystories-1m-exact-shift-lowered-results.json --stage-artifact \"$stage\"",
-    "full_stage_green_expected": "The verifier accepts a nonempty stage artifact, current Task 1 audit file/payload hashes, Task 2 artifact file/payload/model-receipt hashes, Task 3 generation file/artifact/result hashes, and evaluated lowered outputs/statuses that exactly match the fixture.",
-    "lowered_result_path": "artifacts/comparison/tinystories-1m-exact-shift-lowered-results.json",
-    "lowered_result_schema": "tinystories-1m-exact-shift-lowered-results-v1",
+    "full_stage_green_command": "nix develop -c python scripts/pipeline/run_tinystories_1m_exact_shift_semantic_probe.py --executor scripts/pipeline/execute_tinystories_1m_exact_shift_semantic_probe.py --out artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json && nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py --probe-report artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json",
+    "full_stage_green_expected": "The producer must compile the fixture through the exact registered/patched Torch stage and execute or interpret it through its declared executor route. The verifier rejects detached JSON and accepts only a self-hashed report whose decision, Task 5, fixture, stage artifact, derivation, producer, tool, pipeline, record IDs/count, outputs, and statuses all match this receipt; it also accepts the nonempty stage artifact only after Task 1--3 hashes match.",
+    "probe_executor_contract_path": "scripts/pipeline/execute_tinystories_1m_exact_shift_semantic_probe.py",
+    "probe_producer_script_path": "scripts/pipeline/run_tinystories_1m_exact_shift_semantic_probe.py",
+    "probe_producer_script_sha256": "6b8d2bb3fa91966c87acbf788f0f68434042d89dfdc86dbd01e52743107edd36",
+    "probe_report_path": "artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json",
+    "probe_report_schema": "tinystories-1m-exact-shift-semantic-probe-v1",
+    "registered_stage_attribute": ".#tiny-stories-1m-kev-gpt-exact-torch",
+    "registered_stage_build_command": [
+      "nix",
+      "build",
+      "--no-link",
+      "--print-out-paths",
+      "-L",
+      ".#tiny-stories-1m-kev-gpt-exact-torch"
+    ],
+    "registered_stage_build_command_sha256": "d33a21e9b4564e0e4ed14ec50bf08b7ccc3ed9c99b01b5ead0d5c792356354",
     "semantic_contract_command": "nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py",
-    "semantic_contract_expected": "The independent Python signed-integer interpreter accepts shift_one, shift_zero, and shift_sixty_two and rejects negative_shift and shift_greater_than_sixty_two with their named statuses and diagnostics."
+    "semantic_contract_expected": "The independent Python signed-integer interpreter accepts shift_one, shift_zero, and shift_sixty_two and rejects negative_shift and shift_greater_than_sixty_two with their named statuses and diagnostics.",
+    "torch_mlir_pipeline": "builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=})",
+    "torch_mlir_pipeline_sha256": "03459ef9e78b01af6c357de490b75ef37c1a73adea21346cf610b1cccce529c9",
+    "torch_mlir_tool_name": "torch-mlir-opt"
   },
   "schema": "tinystories-1m-exact-frontier-decision-v1",
-  "sha256": "a4b52d62c9a452204b403f59cf0750555f593e22f112916d7a2675ed8fbfb254"
+  "sha256": "40cd1d2f452d34fc17b76786fdfffc0f9e0201e7cab843c08aafc7105155cb46"
 }

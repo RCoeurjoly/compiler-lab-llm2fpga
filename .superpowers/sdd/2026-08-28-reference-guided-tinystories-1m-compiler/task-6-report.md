@@ -50,4 +50,26 @@ nix develop -c python -m unittest tests/test_tinystories_1m_exact_frontier_seman
 nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py
 ```
 
+## Fix round 2: provenance-bound semantic probe
+
+The decision no longer accepts a detached lowered-result JSON. Its prospective
+green gate uses the checked-in
+`scripts/pipeline/run_tinystories_1m_exact_shift_semantic_probe.py` producer,
+which builds the registered exact Torch stage, captures the concrete Nix stage
+artifact and derivation, resolves `torch-mlir-opt`, and invokes the declared
+future executor contract with the fixture and exact pipeline. The producer
+writes only a canonical, self-hashed probe report. The report carries hashes
+for the stage artifact, derivation, producer script/command, tool binary and
+pipeline, executor command, fixture, and decision.
+
+The verifier recomputes the decision canonical self-hash and Task 5
+receipt/self/reproducer bindings before semantic acceptance. It then rejects a
+report unless its on-disk stage artifact, resolved derivation, producer script,
+tool binary, pipeline, report hash, and fixture all match the decision. It also
+requires the record count and ID set to exactly equal the fixture, rejecting
+duplicates, extras, and missing cases. Adversarial unit coverage verifies wrong
+stage, producer, tool, pipeline, decision hash, stale report hash, and each
+record-set failure. The executor remains a follow-up compiler-pass deliverable;
+Task 6 supplies no compiler implementation.
+
 No compiler or model implementation is included in Task 6.

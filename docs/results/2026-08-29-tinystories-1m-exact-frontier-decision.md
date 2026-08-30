@@ -92,13 +92,13 @@ Red, registered stage (observed now; exit 1 with the same diagnostic):
 nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-torch
 ```
 
-Green uses the same registered command after the compiler change. It must exit
-0 with a nonempty Torch-MLIR artifact, no matching legalization diagnostic,
-and unchanged Task 1--3 identity hashes. It is not sufficient to inspect the
-MLIR or assert that a generic operator disappeared: the green gate must also
-evaluate the lowered shift implementation and compare its exact results to the
-semantic fixture below. The later Linalg/SCF/Calyx stages are intentionally not
-green criteria for this task.
+Green is the provenance-bound producer and verifier command recorded below.
+It must build the registered stage, execute or interpret the exact fixture
+through the selected stage's executor route, and exit 0 only after the verifier
+recomputes the resulting artifact, derivation, tool, pipeline, fixture, and
+Task 1--3 identity bindings. It is not sufficient to inspect the MLIR, assert
+that a generic operator disappeared, or hand-author a result JSON. The later
+Linalg/SCF/Calyx stages are intentionally not green criteria for this task.
 
 The retained identities are the Task 1 audit file/payload
 `3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd` /
@@ -138,21 +138,38 @@ produce exactly status `rejected_shift_greater_than_sixty_two` and diagnostic
 `shift_contract:greater_than_sixty_two`. Neither invalid case may compile,
 produce output, or mask its count.
 
-The compiler follow-up must emit
-`artifacts/comparison/tinystories-1m-exact-shift-lowered-results.json` using
-schema `tinystories-1m-exact-shift-lowered-results-v1`, with one record per
-fixture case. Valid records have `status: "ok"` and exact `dtype`, `shape`, and
-`values`; invalid records have the exact status/diagnostic above and no output.
+The compiler follow-up must provide the declared executable route
+`scripts/pipeline/execute_tinystories_1m_exact_shift_semantic_probe.py` and
+use the checked-in producer
+`scripts/pipeline/run_tinystories_1m_exact_shift_semantic_probe.py`. The
+producer is not a JSON importer: it builds the exact registered stage, resolves
+its Nix derivation and `torch-mlir-opt`, invokes the executor with the exact
+fixture and pinned pipeline, and writes only a canonical self-hashed
+`tinystories-1m-exact-shift-semantic-probe-v1` report. That report contains the
+actual artifact and derivation file SHA-256 values, tool binary/path hash,
+pipeline/hash, producer script/path hash and command/hash, executor path/hash
+and command/hash, and one record for every fixture case. Valid records have
+`status: "ok"` and exact `dtype`, `shape`, and `values`; invalid records have
+the exact status/diagnostic above and no output. Before the producer copies any
+case record, it requires the executor's own result to bind the same stage
+artifact, fixture, tool binary, and pipeline hashes; an executor may not
+evaluate a detached substitute.
+
 Its mechanical full-stage green gate is:
 
 ```text
-stage="$(nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-torch)" && nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py --lowered-result artifacts/comparison/tinystories-1m-exact-shift-lowered-results.json --stage-artifact "$stage"
+nix develop -c python scripts/pipeline/run_tinystories_1m_exact_shift_semantic_probe.py --executor scripts/pipeline/execute_tinystories_1m_exact_shift_semantic_probe.py --out artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json && nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py --probe-report artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json
 ```
 
-The verifier checks the successful nonempty registered artifact and reloads the
-current Task 1 audit, Task 2 model artifact, and Task 3 generation receipt. It
-compares their file and embedded payload/result hashes mechanically against the
-decision receipt before accepting evaluated lowering results.
+The verifier first rechecks its decision canonical self-hash, the Task 5
+receipt file/self hash, and the reproducer hash. It then recomputes the stage
+artifact bytes, derivation path/bytes, producer script bytes, tool bytes,
+pipeline and command hashes, fixture bindings, report self-hash, and exact case
+ID set/count (duplicates, extras, and missing cases fail). Finally it reloads
+the current Task 1 audit, Task 2 model artifact, and Task 3 generation receipt,
+comparing their file and embedded payload/result hashes mechanically against
+the decision before accepting the nonempty stage artifact. Detached reports
+cannot pass this gate.
 
 ## Binding checks
 
