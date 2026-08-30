@@ -7,6 +7,7 @@ import copy
 import gzip
 import hashlib
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -438,6 +439,98 @@ class LeftShiftSuccessDeterminismBundleTest(unittest.TestCase):
 
             with self.assertRaisesRegex(verifier.VerificationError, "SHA-256"):
                 verifier.verify_success_bundles(mutated)
+
+
+class NestedHistoricalBundleFilesystemBoundaryTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.verifier = SuccessorFrontierDeterminismBundleTest._load_verifier()
+
+    def test_successor_public_verifier_rejects_unlisted_later_stage_logs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-successor-extra-log-") as temporary:
+            mutated = Path(temporary) / "bundles"
+            shutil.copytree(SUCCESSOR_BUNDLES, mutated)
+            for run_name in ("run-1", "run-2"):
+                (mutated / run_name / "flat-scf.log").write_text(
+                    "later stage must not exist\n", encoding="utf-8"
+                )
+
+            with self.assertRaisesRegex(self.verifier.VerificationError, "run directory contents"):
+                self.verifier.verify_successor_bundles(mutated)
+
+    def test_success_public_verifier_rejects_unlisted_later_stage_logs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-success-extra-log-") as temporary:
+            mutated = Path(temporary) / "bundles"
+            shutil.copytree(LEFT_SHIFT_SUCCESS_BUNDLES, mutated)
+            for run_name in ("run-1", "run-2"):
+                (mutated / run_name / "flat-scf.log").write_text(
+                    "later stage must not exist\n", encoding="utf-8"
+                )
+
+            with self.assertRaisesRegex(self.verifier.VerificationError, "run directory contents"):
+                self.verifier.verify_success_bundles(mutated)
+
+    def test_both_public_verifiers_reject_unlisted_hidden_files(self) -> None:
+        cases = (
+            (SUCCESSOR_BUNDLES, self.verifier.verify_successor_bundles),
+            (LEFT_SHIFT_SUCCESS_BUNDLES, self.verifier.verify_success_bundles),
+        )
+        for source, verify in cases:
+            with self.subTest(bundle=source.name), tempfile.TemporaryDirectory(
+                prefix="exact-historical-hidden-"
+            ) as temporary:
+                mutated = Path(temporary) / "bundles"
+                shutil.copytree(source, mutated)
+                (mutated / "run-1" / ".flat-scf.mlir").write_text(
+                    "module {}\n", encoding="utf-8"
+                )
+
+                with self.assertRaisesRegex(self.verifier.VerificationError, "run directory contents"):
+                    verify(mutated)
+
+    def test_nested_verifiers_reject_missing_files_and_symlink_substitution(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-successor-missing-") as temporary:
+            mutated = Path(temporary) / "bundles"
+            shutil.copytree(SUCCESSOR_BUNDLES, mutated)
+            (mutated / "run-2" / "torch-mlir.log").unlink()
+            with self.assertRaisesRegex(self.verifier.VerificationError, "run directory contents"):
+                self.verifier.verify_successor_bundles(mutated)
+
+        with tempfile.TemporaryDirectory(prefix="exact-success-symlink-") as temporary:
+            mutated = Path(temporary) / "bundles"
+            shutil.copytree(LEFT_SHIFT_SUCCESS_BUNDLES, mutated)
+            target = mutated / "receipt-target.json"
+            receipt = mutated / "run-1" / "receipt.json"
+            target.write_bytes(receipt.read_bytes())
+            receipt.unlink()
+            receipt.symlink_to(target)
+            with self.assertRaisesRegex(self.verifier.VerificationError, "regular file"):
+                self.verifier.verify_success_bundles(mutated)
+
+    def test_both_public_verifiers_reject_unexpected_subdirectories(self) -> None:
+        cases = (
+            (SUCCESSOR_BUNDLES, self.verifier.verify_successor_bundles),
+            (LEFT_SHIFT_SUCCESS_BUNDLES, self.verifier.verify_success_bundles),
+        )
+        for source, verify in cases:
+            with self.subTest(bundle=source.name), tempfile.TemporaryDirectory(
+                prefix="exact-historical-subdir-"
+            ) as temporary:
+                mutated = Path(temporary) / "bundles"
+                shutil.copytree(source, mutated)
+                (mutated / "run-2" / ".later-stage").mkdir()
+
+                with self.assertRaisesRegex(self.verifier.VerificationError, "run directory contents"):
+                    verify(mutated)
+
+    def test_public_verifier_rejects_nonregular_special_entries(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-historical-fifo-") as temporary:
+            mutated = Path(temporary) / "bundles"
+            shutil.copytree(SUCCESSOR_BUNDLES, mutated)
+            os.mkfifo(mutated / "run-1" / ".later-stage.fifo")
+
+            with self.assertRaisesRegex(self.verifier.VerificationError, "regular files"):
+                self.verifier.verify_successor_bundles(mutated)
 
 
 if __name__ == "__main__":

@@ -16,8 +16,8 @@
 - Select only the existing `pipelineStagePackagesNoHandshake` direct Linalg route; do not modify `nix/pipeline.nix`, a compiler patch, a lowering pass, the adapter, the model package, or backend semantics.
 - Use the alias `tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake` and the stage order `pytorch-exported`, `torch`, `linalg`, `scf`, `flat-scf`, `calyx`, `calyx-native-sv`.
 - Run the live compiler-backed semantic verifier before any registered build.
-- Stop immediately after the first invalid stage; a zero-exit manifest is valid only when its schema and `status` establish a usable artifact.
-- Preserve full failing input, exact logs, exact derivation bytes/JSON/build commands, minimal reproducer, classifier/verifier identities, and two byte-identical self-hashed bundles.
+- Stop immediately after the first invalid stage. A zero-exit control manifest is rejected when its exact stage/status/reason contract does not establish a usable artifact; a nonzero compiler exit is a validly captured frontier even when no manifest was produced.
+- Preserve full failing input, exact logs, exact derivation bytes/JSON/build commands, operation/types when present, exact interestingness and a minimal reproducer when practical, classifier/verifier identities, and two byte-identical self-hashed bundles. Never fabricate a manifest for the nonzero compiler-failure branch.
 - If `calyx-native-sv` succeeds, validate its emitted SystemVerilog with the registered syntax/synthesis route and hash it; do not claim board inference.
 - This plan ends at the newly captured frontier or synthesizable SystemVerilog evidence. Any compiler fix requires another bounded plan.
 
@@ -129,6 +129,33 @@ git commit -m "feat: register exact Linalg to SCF route"
 **Interfaces:**
 - Consumes: alias prefix `tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake`, Task 2 semantic verifier output, and the Task 3 SCF availability receipt.
 - Produces: `_registered_attribute(model: str, stage: str) -> str`, returning the direct `${model}-pytorch-exported` attribute for export and the alias `${alias}-${stage}` for `torch` through `calyx-native-sv`.
+- Produces: `_classify_registered_result(stage: str, exit_code: int, output: Path, upstream_input: Path | None, log: Path) -> RegisteredStageResult`; this function returns exactly one of the three result variants below, and `_run_registered_stage(...) -> tuple[StageRecord, dict[str, object], RegisteredStageResult]` carries it without converting compiler failures into manifest failures.
+
+```python
+@dataclass(frozen=True)
+class AcceptedStageResult:
+    kind: Literal["accepted"]
+    artifact: Path
+    output: Path
+
+@dataclass(frozen=True)
+class ControlManifestFailure:
+    kind: Literal["control_manifest"]
+    manifest: Path
+    upstream_input: Path
+    diagnostic: str
+
+@dataclass(frozen=True)
+class CompilerFailure:
+    kind: Literal["compiler_failure"]
+    upstream_input: Path
+    log: Path
+    diagnostic: str
+    operation: str | None
+    types: str | None
+
+RegisteredStageResult = AcceptedStageResult | ControlManifestFailure | CompilerFailure
+```
 
 - [ ] **Step 1: Write the failing route-selection test**
 
@@ -174,11 +201,87 @@ def _registered_attribute(model: str, stage: str) -> str:
 
 Use this function in `_run_registered_stage` and in independent derivation verification. Record the alias, frontend `linalg`, backend `calyx-native-sv`, and exact attribute in every stage execution record.
 
-- [ ] **Step 4: Add a fail-closed identity test**
+- [ ] **Step 4: Write red tests for both invalid-result branches**
+
+Add these tests to `AuthenticatedPipelineRunnerTest` using temporary real files and the classifier result helper:
+
+```python
+def setUp(self) -> None:
+    self.temporary = tempfile.TemporaryDirectory(prefix="exact-scf-result-union-")
+    self.addCleanup(self.temporary.cleanup)
+    root = Path(self.temporary.name)
+    self.linalg_input = root / "input.linalg.mlir"
+    self.linalg_input.write_text("module {}\n", encoding="utf-8")
+    self.unavailable_scf_output = root / "scf-output"
+    self.unavailable_scf_output.mkdir()
+    (self.unavailable_scf_output / "manifest.json").write_text(
+        '{"reason":"no direct SCF route","stage":"scf","status":"unavailable"}\n',
+        encoding="utf-8",
+    )
+    self.scf_log = root / "scf-control.log"
+    self.scf_log.write_text("registered control output\n", encoding="utf-8")
+    self.nonzero_scf_log = root / "scf-compiler.log"
+    self.nonzero_scf_log.write_text(
+        "error: failed to legalize operation 'scf.for' : (index) -> ()\n",
+        encoding="utf-8",
+    )
+    self.no_output_path = root / "no-output"
+
+def test_zero_exit_unavailable_manifest_returns_control_manifest_failure(self) -> None:
+    result = MODULE._classify_registered_result(
+        stage="scf", exit_code=0, output=self.unavailable_scf_output,
+        upstream_input=self.linalg_input, log=self.scf_log,
+    )
+    self.assertIsInstance(result, MODULE.ControlManifestFailure)
+    self.assertEqual(result.kind, "control_manifest")
+    self.assertEqual(result.manifest, self.unavailable_scf_output / "manifest.json")
+    self.assertEqual(result.upstream_input, self.linalg_input)
+
+def test_nonzero_scf_failure_returns_compiler_failure_without_manifest(self) -> None:
+    result = MODULE._classify_registered_result(
+        stage="scf", exit_code=1, output=self.no_output_path,
+        upstream_input=self.linalg_input, log=self.nonzero_scf_log,
+    )
+    self.assertIsInstance(result, MODULE.CompilerFailure)
+    self.assertEqual(result.kind, "compiler_failure")
+    self.assertEqual(result.upstream_input, self.linalg_input)
+    self.assertEqual(result.log, self.nonzero_scf_log)
+    self.assertFalse(hasattr(result, "manifest"))
+
+def test_nonzero_scf_failure_preserves_full_diagnostic_and_optional_operation_types(self) -> None:
+    identified = MODULE._classify_registered_result(
+        stage="scf", exit_code=1, output=self.no_output_path,
+        upstream_input=self.linalg_input, log=self.nonzero_scf_log,
+    )
+    self.assertEqual(identified.operation, "scf.for")
+    self.assertEqual(identified.types, "(index) -> ()")
+    anonymous_log = Path(self.temporary.name) / "anonymous.log"
+    anonymous_log.write_text("error: compiler terminated\n", encoding="utf-8")
+    anonymous = MODULE._classify_registered_result(
+        stage="scf", exit_code=2, output=self.no_output_path,
+        upstream_input=self.linalg_input, log=anonymous_log,
+    )
+    self.assertIsNone(anonymous.operation)
+    self.assertIsNone(anonymous.types)
+```
+
+Run all three named tests red before implementation.
+
+- [ ] **Step 5: Implement the result union and fail closed**
+
+Add the dataclasses and `RegisteredStageResult` union exactly as declared above. `_classify_registered_result` must apply these rules in order:
+
+1. `exit_code != 0`: require the preserved log to contain a terminal compiler diagnostic; return `CompilerFailure` with the authenticated upstream Linalg artifact as `upstream_input`, parse operation/types only when present, and do not search for or synthesize `manifest.json`.
+2. `exit_code == 0` and a manifest exists: parse it. Return `AcceptedStageResult` only when its exact stage/status/reason contract establishes `status == "ok"` and a nonempty primary artifact. Otherwise return `ControlManifestFailure`, retaining the exact manifest and normalized classifier diagnostic.
+3. `exit_code == 0` without a valid manifest where that stage requires one, or without a nonempty primary artifact: raise `RuntimeError`; this is invalid evidence, not a compiler frontier.
+
+Record both invalid variants as `status == "compiler_failure"`, `artifact_accepted == false`, and stop the registered sequence. A `ControlManifestFailure` has exit zero and binds the manifest as its reproducer. A `CompilerFailure` has the actual nonzero exit, binds the upstream Linalg input separately, and has no manifest field.
+
+- [ ] **Step 6: Add a fail-closed identity test**
 
 Build only the alias `torch` and `linalg` attributes and assert their artifact SHA-256 values equal the current authenticated direct-stage hashes before permitting SCF. Mutate either trusted hash in the test fixture and require classifier rejection before `_run_registered_pipeline` can call `scf`.
 
-- [ ] **Step 5: Run classifier and semantic suites green**
+- [ ] **Step 7: Run classifier and semantic suites green**
 
 ```bash
 nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py \
@@ -190,7 +293,7 @@ nix develop -c python -m unittest \
 
 Expected: semantic replay accepts current bytes and all route/stop tests pass.
 
-- [ ] **Step 6: Commit the routed classifier**
+- [ ] **Step 8: Commit the routed classifier**
 
 ```bash
 git add scripts/pipeline/classify_tinystories_1m_exact_frontier.py tests/test_tinystories_1m_exact_frontier.py
@@ -212,6 +315,7 @@ git commit -m "test: route exact classifier through registered SCF"
 **Interfaces:**
 - Consumes: the committed alias/runner code, live semantic proof, and exact registered stage attributes from Tasks 1--2.
 - Produces: two byte-identical self-hashed bundles and one successor receipt for exactly the earliest invalid registered alias stage, or validated synthesizable SystemVerilog evidence.
+- Produces: a `frontier_evidence` receipt union. Its discriminator is `kind == "control_manifest"` for a zero-exit unavailable/rejected control manifest or `kind == "compiler_failure"` for a nonzero compiler failure without a manifest.
 
 - [ ] **Step 1: Commit all capture code before evidence generation**
 
@@ -239,7 +343,9 @@ python3 scripts/pipeline/classify_tinystories_1m_exact_frontier.py \
 
 - [ ] **Step 4: Require byte identity before promotion**
 
-Use `cmp` for `receipt.json`, every executed-stage log, the full failing-input archive, minimal reproducer, and every captured derivation `.drv`/canonical JSON file. Any mismatch aborts promotion and requires a classifier normalization test/fix in a separate code commit before rerunning both captures.
+Use `cmp` for `receipt.json`, every executed-stage log, the full failing-input archive, and every captured derivation `.drv`/canonical JSON file. For `control_manifest`, also compare `minimal-reproducer.json`. For `compiler_failure`, compare `interestingness-test.sh`, `interesting-full.log`, `reduction.log`, and—when reduction is verified—`minimal-reproducer.mlir` plus `interesting-reproducer.log`. Any mismatch aborts promotion and requires a classifier normalization test/fix in a separate code commit before rerunning both captures.
+
+The bundle verifier, not the receipt manifest, derives the exact regular-file set from the fixed stage order, the executed prefix, `frontier_evidence.kind`, and `frontier_evidence.minimization.status`. No other file, hidden entry, symlink, directory, or device is permitted.
 
 - [ ] **Step 5: Validate the observed frontier independently**
 
@@ -257,7 +363,16 @@ nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_dete
   --bundle-dir "artifacts/comparison/tinystories-1m-exact-frontier-determinism-${first_invalid_stage}"
 ```
 
-The verifier must independently replay the semantic gate; recompute frozen Task 1--3 and predecessor identities; resolve every registered alias derivation; compare exact build commands, `.drv` bytes, canonical derivation JSON, outputs, logs, exits, status, and diagnostics; decompress and hash the full failing input; and validate the minimal reproducer's exact schema/stage/status/reason.
+The classifier and verifier must implement these deterministic receipt rules:
+
+- `frontier_evidence.kind == "control_manifest"` requires stage exit zero, `artifact_accepted == false`, the exact rejected/unavailable manifest bytes, exact stage/status/reason validation, `operation == null`, `types == null`, and `minimization == {"status": "not_applicable", "reason": "control_manifest_is_minimal"}`. `minimal-reproducer.json` is the copied manifest and is the only permitted minimal-reproducer file.
+- `frontier_evidence.kind == "compiler_failure"` requires a nonzero stage exit, `artifact_accepted == false`, `manifest == null`, the full diagnostic/log, the preserved upstream Linalg input, and exact tool/derivation/build-command bindings. `operation` and `types` are exact strings when the diagnostic or failing MLIR identifies them and literal `null` otherwise. No `manifest.json` or `minimal-reproducer.json` may exist in this branch.
+- For a compiler failure, generate `interestingness-test.sh` from the captured derivation build command: it accepts one candidate path, substitutes that path for the bound Linalg input, writes output under a temporary directory, and succeeds only when the compiler returns the same nonzero exit and normalized terminal diagnostic, plus the same operation/types when non-null. Bind the script bytes/hash and prove the full Linalg input with `interesting-full.log`.
+- If the full input passes interestingness and a bound `mlir-reduce` is available, decompress the bound `full-input.gz` to the noncanonical working file `full-input.mlir`, run `mlir-reduce --test=./interestingness-test.sh full-input.mlir -o minimal-reproducer.mlir`, preserve `reduction.log`, rerun the interestingness script on the result into `interesting-reproducer.log`, and require `minimization.status == "verified"` with exact minimal bytes/hash. Otherwise preserve the attempted `reduction.log` and use `minimization.status == "not_practical"` with exactly one reason from `mlir_reduce_unavailable`, `full_input_not_interesting`, or `reduction_failed`; in that status no minimal-reproducer file or binding is permitted.
+
+The verifier must independently replay the semantic gate; recompute frozen Task 1--3 and predecessor identities; resolve every registered alias derivation; compare exact build commands, `.drv` bytes, canonical derivation JSON, outputs, logs, exits, status, and diagnostics; decompress and hash the full failing input; dispatch on the `frontier_evidence` union; validate the exact branch file set above; and reject recomputed-self-hash mutations that cross or mix branches.
+
+Add public adversarial tests named `test_control_manifest_branch_rejects_nonzero_exit_or_missing_manifest`, `test_compiler_failure_branch_rejects_zero_exit_or_any_manifest`, `test_compiler_failure_branch_preserves_linalg_input_log_tool_and_command`, `test_compiler_failure_branch_rejects_unbound_operation_or_types`, and `test_branch_specific_directory_sets_reject_cross_branch_files`. Each test copies a real bundle fixture, makes the named mutation, recomputes the receipt self-hash, and still requires verifier rejection.
 
 - [ ] **Step 6: Validate SystemVerilog only if the final stage succeeds**
 
@@ -292,5 +407,6 @@ git commit -m "test: capture registered exact SCF successor frontier"
 - No task changes compiler behavior, adapter/model semantics, or frozen Task 1--3 identities.
 - Every implementation change begins with a named failing test and includes its exact red/green command.
 - The classifier cannot run SCF before proving alias Torch/Linalg identity and cannot run a stage after the first invalid artifact.
+- The classifier and verifier cover both legal first-invalid outcomes: a zero-exit control-manifest rejection and a nonzero compiler failure with no fabricated manifest.
 - Evidence generation occurs only from a committed code state, avoiding self-referential commit claims.
 - The plan contains no `TBD`, `TODO`, deferred error handling, or unnamed tests.

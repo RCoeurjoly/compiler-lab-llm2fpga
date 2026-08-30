@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import stat
 import subprocess
 from typing import Any
 
@@ -51,6 +52,7 @@ SUCCESS_CANONICAL_FILES = [
     "tool-derivation.drv",
     "torch-artifact.mlir.gz",
 ]
+RUN_METADATA_FILES = frozenset({"noncanonical-metadata.json"})
 
 
 class VerificationError(RuntimeError):
@@ -81,6 +83,61 @@ def load_json(path: Path) -> dict[str, Any]:
         raise VerificationError(f"cannot load JSON evidence {path}: {error}") from error
     require(isinstance(value, dict), f"JSON evidence must be an object: {path}")
     return value
+
+
+def enumerate_run_files(run_root: Path, run_name: str) -> set[str]:
+    """Enumerate one run without following links and reject non-regular entries."""
+
+    try:
+        root_mode = run_root.lstat().st_mode
+    except OSError as error:
+        raise VerificationError(f"missing preserved run directory: {run_name}") from error
+    require(
+        stat.S_ISDIR(root_mode) and not run_root.is_symlink(),
+        f"{run_name}: run root must be a real directory",
+    )
+    actual_files: set[str] = set()
+    try:
+        entries = list(run_root.iterdir())
+    except OSError as error:
+        raise VerificationError(f"{run_name}: cannot enumerate run directory: {error}") from error
+    for entry in entries:
+        try:
+            mode = entry.lstat().st_mode
+        except OSError as error:
+            raise VerificationError(f"{run_name}: cannot inspect {entry.name}: {error}") from error
+        require(
+            not stat.S_ISLNK(mode) and stat.S_ISREG(mode),
+            f"{run_name}: run directory contents must be regular files: {entry.name}",
+        )
+        actual_files.add(entry.name)
+    return actual_files
+
+
+def verify_run_directory(
+    run_root: Path, run_name: str, canonical_files: list[str]
+) -> None:
+    """Require the exact schema-defined canonical and metadata file set."""
+
+    actual_files = enumerate_run_files(run_root, run_name)
+    expected_files = set(canonical_files) | RUN_METADATA_FILES
+    require(
+        actual_files == expected_files,
+        f"{run_name}: run directory contents mismatch: "
+        f"expected {sorted(expected_files)}, found {sorted(actual_files)}",
+    )
+
+
+def verify_run_metadata(
+    run_root: Path, run_name: str, run_manifest: dict[str, Any]
+) -> None:
+    metadata = run_manifest.get("noncanonical_metadata")
+    require(isinstance(metadata, dict), f"{run_name}: noncanonical metadata missing")
+    require(metadata.get("canonical") is False, f"{run_name}: metadata marked canonical")
+    require(
+        load_json(run_root / "noncanonical-metadata.json") == metadata,
+        f"{run_name}: noncanonical metadata file mismatch",
+    )
 
 
 def receipt_self_hash(receipt: dict[str, Any]) -> str:
@@ -366,7 +423,7 @@ def verify_successor_bundles(bundle_root: Path) -> dict[str, Any]:
     verified: dict[str, tuple[dict[str, Any], dict[str, bytes]]] = {}
     for run_name in run_names:
         run_root = bundle_root / run_name
-        require(run_root.is_dir(), f"missing successor run directory: {run_name}")
+        verify_run_directory(run_root, run_name, EXPECTED_CANONICAL_FILES)
         run_manifest = runs[run_name]
         require(isinstance(run_manifest, dict), f"{run_name}: invalid run manifest")
         files = run_manifest.get("files")
@@ -394,9 +451,7 @@ def verify_successor_bundles(bundle_root: Path) -> dict[str, Any]:
             run_manifest.get("receipt_self_hash") == receipt.get("sha256"),
             f"{run_name}: receipt self-hash manifest mismatch",
         )
-        metadata = run_manifest.get("noncanonical_metadata")
-        require(isinstance(metadata, dict), f"{run_name}: noncanonical metadata missing")
-        require(metadata.get("canonical") is False, f"{run_name}: metadata marked canonical")
+        verify_run_metadata(run_root, run_name, run_manifest)
         verify_receipt(run_root, receipt, file_bytes)
         verified[run_name] = (receipt, file_bytes)
 
@@ -620,7 +675,9 @@ def verify_success_bundles(bundle_root: Path) -> dict[str, Any]:
     verified: dict[str, tuple[dict[str, Any], dict[str, bytes]]] = {}
     for run_name in ("run-1", "run-2"):
         run_root = bundle_root / run_name
+        verify_run_directory(run_root, run_name, SUCCESS_CANONICAL_FILES)
         run_manifest = runs[run_name]
+        require(isinstance(run_manifest, dict), f"{run_name}: invalid run manifest")
         files = run_manifest.get("files")
         require(isinstance(files, dict) and sorted(files) == sorted(SUCCESS_CANONICAL_FILES), f"{run_name}: file set mismatch")
         file_bytes: dict[str, bytes] = {}
@@ -632,8 +689,7 @@ def verify_success_bundles(bundle_root: Path) -> dict[str, Any]:
         receipt = load_json(run_root / "receipt.json")
         require(run_manifest.get("source_commit") == receipt.get("source_commit") == manifest.get("source_commit"), f"{run_name}: source commit mismatch")
         require(run_manifest.get("receipt_self_hash") == receipt.get("sha256"), f"{run_name}: self-hash manifest mismatch")
-        metadata = run_manifest.get("noncanonical_metadata")
-        require(isinstance(metadata, dict) and metadata.get("canonical") is False, f"{run_name}: metadata classification mismatch")
+        verify_run_metadata(run_root, run_name, run_manifest)
         _verify_success_receipt(run_root, receipt, file_bytes)
         verified[run_name] = (receipt, file_bytes)
     first, first_files = verified["run-1"]

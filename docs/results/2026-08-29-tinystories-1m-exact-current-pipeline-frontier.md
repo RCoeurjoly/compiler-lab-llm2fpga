@@ -28,7 +28,9 @@ nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_sema
 
 The live verifier independently rebuilt and accepted the registered Torch
 artifact (`e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674`)
-and replayed the compiler-backed right/left shift semantic proof. The receipt
+and JIT-executed the compiler-emitted right-shift cases. For left shift, it used
+live PyTorch plus the independent signed-si64 oracle and proved the generated
+`arith.shli` lowering. The receipt
 binds the verifier bytes and semantic probe file SHA-256
 `645a87cdc4292ea584a04d4268187c612dd070b068036f9fa13b71865b36cbe6`.
 

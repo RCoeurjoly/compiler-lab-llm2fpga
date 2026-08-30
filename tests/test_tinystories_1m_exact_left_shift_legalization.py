@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import shutil
 import subprocess
 import tempfile
@@ -46,6 +47,16 @@ def module_text(
 """
 
 
+@dataclass(frozen=True)
+class CompilerRun:
+    args: list[str]
+    returncode: int
+    stdout: str
+    stderr: str
+    output_created: bool
+    output_text: str
+
+
 class TinyStories1mExactLeftShiftLegalizationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -53,7 +64,7 @@ class TinyStories1mExactLeftShiftLegalizationTest(unittest.TestCase):
         if cls.tool is None:
             raise AssertionError("test must run inside the pinned Nix environment")
 
-    def run_module(self, text: str, pipeline: str = BACKEND_PIPELINE) -> subprocess.CompletedProcess[str]:
+    def run_module(self, text: str, pipeline: str = BACKEND_PIPELINE) -> CompilerRun:
         with tempfile.TemporaryDirectory(prefix="exact-left-shift-runtime-") as temporary:
             source = Path(temporary) / "input.mlir"
             output = Path(temporary) / "output.mlir"
@@ -70,9 +81,21 @@ class TinyStories1mExactLeftShiftLegalizationTest(unittest.TestCase):
                 text=True,
                 capture_output=True,
             )
-            if result.returncode == 0:
-                result.stdout = output.read_text(encoding="utf-8")
-            return result
+            output_created = output.is_file()
+            return CompilerRun(
+                args=result.args,
+                returncode=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                output_created=output_created,
+                output_text=output.read_text(encoding="utf-8") if output_created else "",
+            )
+
+    def assert_rejected_without_output(self, result: CompilerRun, diagnostic: str) -> None:
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(diagnostic, result.stderr)
+        self.assertFalse(result.output_created, "rejected input unexpectedly created its -o file")
+        self.assertEqual(result.stdout, "", "rejected input unexpectedly wrote compiler IR to stdout")
 
     def test_source_has_distinct_exact_left_shift_matcher(self) -> None:
         source = implementation_source()
@@ -95,25 +118,27 @@ class TinyStories1mExactLeftShiftLegalizationTest(unittest.TestCase):
                     module_text(count_definition=f"%count = torch.constant.int {count}")
                 )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("torch.aten.bitwise_left_shift.Tensor", result.stdout)
-                self.assertNotIn("torch.aten.bitwise_left_shift.Tensor_Scalar", result.stdout)
+                self.assertTrue(result.output_created)
+                self.assertTrue(result.output_text)
+                self.assertIn("torch.aten.bitwise_left_shift.Tensor", result.output_text)
+                self.assertNotIn("torch.aten.bitwise_left_shift.Tensor_Scalar", result.output_text)
 
     def test_generated_linalg_uses_integer_left_shift(self) -> None:
         result = self.run_module(REPRODUCER.read_text(encoding="utf-8"), LINALG_PIPELINE)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("arith.shli", result.stdout)
-        self.assertNotIn("torch.aten.bitwise_left_shift.Tensor_Scalar", result.stdout)
-        self.assertNotIn("arith.shrsi", result.stdout)
+        self.assertTrue(result.output_created)
+        self.assertTrue(result.output_text)
+        self.assertIn("arith.shli", result.output_text)
+        self.assertNotIn("torch.aten.bitwise_left_shift.Tensor_Scalar", result.output_text)
+        self.assertNotIn("arith.shrsi", result.output_text)
 
     def test_negative_count_is_rejected_with_exact_diagnostic(self) -> None:
         result = self.run_module(module_text(count_definition="%count = torch.constant.int -1"))
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("shift_contract:negative_shift", result.stderr)
+        self.assert_rejected_without_output(result, "shift_contract:negative_shift")
 
     def test_count_sixty_three_is_rejected_with_exact_diagnostic(self) -> None:
         result = self.run_module(module_text(count_definition="%count = torch.constant.int 63"))
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("shift_contract:greater_than_sixty_two", result.stderr)
+        self.assert_rejected_without_output(result, "shift_contract:greater_than_sixty_two")
 
     def test_dynamic_count_is_rejected_with_exact_diagnostic(self) -> None:
         dynamic = """module {
@@ -124,8 +149,7 @@ class TinyStories1mExactLeftShiftLegalizationTest(unittest.TestCase):
 }
 """
         result = self.run_module(dynamic)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("shift_contract:dynamic_shift", result.stderr)
+        self.assert_rejected_without_output(result, "shift_contract:dynamic_shift")
 
     def test_si32_input_is_rejected_with_exact_diagnostic(self) -> None:
         result = self.run_module(
@@ -135,8 +159,7 @@ class TinyStories1mExactLeftShiftLegalizationTest(unittest.TestCase):
                 count_definition="%count = torch.constant.int 1",
             )
         )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("shift_contract:unsupported_dtype", result.stderr)
+        self.assert_rejected_without_output(result, "shift_contract:unsupported_dtype")
 
     def test_mismatched_signed_si64_types_are_rejected(self) -> None:
         result = self.run_module(
@@ -146,8 +169,7 @@ class TinyStories1mExactLeftShiftLegalizationTest(unittest.TestCase):
                 count_definition="%count = torch.constant.int 1",
             )
         )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("shift_contract:unsupported_dtype", result.stderr)
+        self.assert_rejected_without_output(result, "shift_contract:unsupported_dtype")
 
 
 if __name__ == "__main__":

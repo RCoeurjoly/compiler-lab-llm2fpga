@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import shutil
 import subprocess
@@ -39,7 +40,62 @@ def implementation_source() -> str:
     return implementations[0].read_text(encoding="utf-8")
 
 
+def right_shift_module_text(
+    *,
+    input_type: str = "!torch.vtensor<[4,1],si64>",
+    result_type: str = "!torch.vtensor<[4,1],si64>",
+    count_definition: str = "%count = torch.constant.int 1",
+) -> str:
+    return f"""module {{
+  func.func @main(%arg0: {input_type}) -> {result_type} {{
+    {count_definition}
+    %0 = torch.operator "torch.aten.bitwise_right_shift.Tensor_Scalar"(%arg0, %count) : ({input_type}, !torch.int) -> {result_type}
+    return %0 : {result_type}
+  }}
+}}
+"""
+
+
+@dataclass(frozen=True)
+class CompilerRun:
+    args: list[str]
+    returncode: int
+    stdout: str
+    stderr: str
+    output_created: bool
+    output_text: str
+
+
 class TinyStories1mExactShiftLegalizationTest(unittest.TestCase):
+    def run_module(self, text: str, pipeline: str) -> CompilerRun:
+        tool = shutil.which("torch-mlir-opt")
+        self.assertIsNotNone(tool, "test must run inside the pinned Nix environment")
+        with tempfile.TemporaryDirectory(prefix="exact-right-shift-runtime-") as temporary:
+            source = Path(temporary) / "input.mlir"
+            output = Path(temporary) / "output.mlir"
+            source.write_text(text, encoding="utf-8")
+            result = subprocess.run(
+                [str(tool), f"-pass-pipeline={pipeline}", str(source), "-o", str(output)],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+            output_created = output.is_file()
+            return CompilerRun(
+                args=result.args,
+                returncode=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                output_created=output_created,
+                output_text=output.read_text(encoding="utf-8") if output_created else "",
+            )
+
+    def assert_rejected_without_output(self, result: CompilerRun, diagnostic: str) -> None:
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(diagnostic, result.stderr)
+        self.assertFalse(result.output_created, "rejected input unexpectedly created its -o file")
+        self.assertEqual(result.stdout, "", "rejected input unexpectedly wrote compiler IR to stdout")
+
     def test_exact_adapter_identity_is_unchanged(self) -> None:
         self.assertEqual(hashlib.sha256(ADAPTER.read_bytes()).hexdigest(), EXPECTED_ADAPTER_SHA256)
 
@@ -119,31 +175,51 @@ class TinyStories1mExactShiftLegalizationTest(unittest.TestCase):
         self.assertIn("signalPassFailure", source)
 
     def test_packaged_pipeline_generates_arithmetic_right_shift_ir(self) -> None:
-        tool = shutil.which("torch-mlir-opt")
-        self.assertIsNotNone(tool, "test must run inside the pinned Nix environment")
         pipeline = (
             "builtin.module(func.func(torch-match-quantized-custom-ops), "
             "torchdynamo-export-to-torch-backend-pipeline{ extra-library=}, "
             "torch-backend-to-linalg-on-tensors-backend-pipeline)"
         )
-        with tempfile.TemporaryDirectory(prefix="exact-right-shift-runtime-") as temporary:
-            output = Path(temporary) / "lowered.mlir"
-            result = subprocess.run(
-                [
-                    str(tool),
-                    f"-pass-pipeline={pipeline}",
-                    str(RIGHT_SHIFT_REPRODUCER),
-                    "-o",
-                    str(output),
-                ],
-                cwd=ROOT,
-                text=True,
-                capture_output=True,
-            )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            generated = output.read_text(encoding="utf-8")
-        self.assertIn("arith.shrsi", generated)
-        self.assertNotIn("torch.aten.bitwise_right_shift.Tensor_Scalar", generated)
+        result = self.run_module(RIGHT_SHIFT_REPRODUCER.read_text(encoding="utf-8"), pipeline)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(result.output_created)
+        self.assertTrue(result.output_text)
+        self.assertIn("arith.shrsi", result.output_text)
+        self.assertNotIn("torch.aten.bitwise_right_shift.Tensor_Scalar", result.output_text)
+
+    def test_invalid_right_shift_inputs_emit_no_output(self) -> None:
+        pipeline = (
+            "builtin.module(func.func(torch-match-quantized-custom-ops), "
+            "torchdynamo-export-to-torch-backend-pipeline{ extra-library=})"
+        )
+        dynamic = """module {
+  func.func @main(%arg0: !torch.vtensor<[1],si64>, %count: !torch.int) -> !torch.vtensor<[1],si64> {
+    %0 = torch.operator "torch.aten.bitwise_right_shift.Tensor_Scalar"(%arg0, %count) : (!torch.vtensor<[1],si64>, !torch.int) -> !torch.vtensor<[1],si64>
+    return %0 : !torch.vtensor<[1],si64>
+  }
+}
+"""
+        cases = (
+            (
+                right_shift_module_text(count_definition="%count = torch.constant.int -1"),
+                "shift_contract:negative_shift",
+            ),
+            (
+                right_shift_module_text(count_definition="%count = torch.constant.int 63"),
+                "shift_contract:greater_than_sixty_two",
+            ),
+            (dynamic, "shift_contract:dynamic_shift"),
+            (
+                right_shift_module_text(
+                    input_type="!torch.vtensor<[1],si32>",
+                    result_type="!torch.vtensor<[1],si32>",
+                ),
+                "shift_contract:unsupported_dtype",
+            ),
+        )
+        for text, diagnostic in cases:
+            with self.subTest(diagnostic=diagnostic):
+                self.assert_rejected_without_output(self.run_module(text, pipeline), diagnostic)
 
     def test_successor_reproducer_preserves_exact_left_shift_operation_and_types(self) -> None:
         self.assertTrue(LEFT_SHIFT_REPRODUCER.is_file())
