@@ -324,6 +324,63 @@ class PipelineSourceAuthenticationTest(unittest.TestCase):
                     )
 
 
+class CanonicalCaptureNormalizationTest(unittest.TestCase):
+    @staticmethod
+    def _evidence(
+        capture_root: str, diagnostic: str
+    ) -> tuple[str, bytes]:
+        command = [
+            "/nix/store/python-env/bin/python",
+            "/nix/store/compile-pytorch.py",
+            "--exported-program-dir",
+            "/nix/store/exact-export",
+            "--out",
+            f"{capture_root}/requested-torch.mlir",
+        ]
+        result = subprocess.CompletedProcess(
+            command,
+            1,
+            "",
+            (
+                'loc("/build/exact-adapter/model.py":879:0): error: '
+                f"{diagnostic}\n"
+                "For Torch-MLIR developers, reproduce with:\n"
+                f"$ /nix/store/torch-mlir-opt {capture_root}/UnnammedModule.mlir\n"
+            ),
+        )
+        return MODULE._canonical_execution_evidence(
+            command, result, {capture_root: "<capture-tmp>"}
+        )
+
+    def test_two_capture_roots_have_identical_canonical_inputs_and_hash(self) -> None:
+        first_command, first_log = self._evidence(
+            "/tmp/nix-shell.first/capture-a", "failed to legalize torch.operator"
+        )
+        second_command, second_log = self._evidence(
+            "/tmp/nix-shell.second/capture-b", "failed to legalize torch.operator"
+        )
+
+        self.assertEqual(first_command, second_command)
+        self.assertEqual(first_log, second_log)
+        self.assertEqual(hashlib.sha256(first_log).hexdigest(), hashlib.sha256(second_log).hexdigest())
+        self.assertIn("<capture-tmp>/requested-torch.mlir", first_command)
+        self.assertIn('/build/exact-adapter/model.py', first_log.decode())
+        self.assertIn('/nix/store/torch-mlir-opt', first_log.decode())
+
+    def test_substantive_diagnostic_mutation_changes_canonical_log_hash(self) -> None:
+        _, original = self._evidence(
+            "/tmp/nix-shell.first/capture-a", "failed to legalize torch.operator"
+        )
+        _, mutated = self._evidence(
+            "/tmp/nix-shell.second/capture-b", "failed to legalize torch.fake_operator"
+        )
+
+        self.assertNotEqual(original, mutated)
+        self.assertNotEqual(
+            hashlib.sha256(original).hexdigest(), hashlib.sha256(mutated).hexdigest()
+        )
+
+
 class ExactFrontierReceiptTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -437,6 +494,13 @@ class ExactFrontierReceiptTest(unittest.TestCase):
         self.assertRegex(capture["compile_script_sha256"], r"^[0-9a-f]{64}$")
         self.assertRegex(capture["torch_mlir_opt_sha256"], r"^[0-9a-f]{64}$")
         self.assertIn("torchdynamo-export-to-torch-backend-pipeline", capture["pass_pipeline"])
+        self.assertIn("<capture-tmp>", capture["command"])
+        self.assertNotRegex(capture["command"], r"/tmp/(?:nix-shell\.|tinystories-exact)")
+        self.assertIn("<capture-tmp>", capture_log.read_text(encoding="utf-8"))
+        self.assertNotRegex(
+            capture_log.read_text(encoding="utf-8"),
+            r"/tmp/(?:nix-shell\.|tinystories-exact)",
+        )
 
     def test_receipt_claims_no_downstream_success_or_pipeline_change(self) -> None:
         self.assertTrue(all(value is False for value in self.report["claims"].values()))

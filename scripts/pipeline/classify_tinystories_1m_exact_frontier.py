@@ -441,8 +441,59 @@ def _stable_nix_diagnostic(stderr: str, repo_root: Path) -> str:
     return "\n".join(lines).replace(str(repo_root), "<repo>").strip()
 
 
+def _canonicalize_execution_text(
+    value: str,
+    ephemeral_paths: dict[str, str] | None = None,
+    *,
+    drop_git_dirty_warning: bool = False,
+) -> str:
+    canonical = value
+    for actual, placeholder in sorted(
+        (ephemeral_paths or {}).items(), key=lambda item: len(item[0]), reverse=True
+    ):
+        if not actual or not placeholder:
+            raise ValueError("ephemeral path and placeholder must be nonempty")
+        canonical = canonical.replace(actual, placeholder)
+    lines = [line.rstrip() for line in canonical.splitlines()]
+    if drop_git_dirty_warning:
+        lines = [line for line in lines if not line.startswith("warning: Git tree ")]
+    return "\n".join(lines)
+
+
+def _canonical_execution_evidence(
+    command: list[str],
+    result: subprocess.CompletedProcess[str],
+    ephemeral_paths: dict[str, str] | None = None,
+) -> tuple[str, bytes]:
+    canonical_command = _canonicalize_execution_text(
+        shlex.join(command), ephemeral_paths
+    )
+    canonical_stdout = _canonicalize_execution_text(
+        result.stdout, ephemeral_paths, drop_git_dirty_warning=True
+    )
+    canonical_stderr = _canonicalize_execution_text(
+        result.stderr, ephemeral_paths, drop_git_dirty_warning=True
+    )
+    payload_text = (
+        f"$ {canonical_command}\n"
+        f"exit_code: {result.returncode}\n"
+        "--- stdout ---\n"
+    )
+    if canonical_stdout:
+        payload_text += canonical_stdout + "\n"
+    payload_text += "--- stderr ---\n"
+    if canonical_stderr:
+        payload_text += canonical_stderr + "\n"
+    return canonical_command, payload_text.encode("utf-8")
+
+
 def _run_and_log(
-    command: list[str], *, cwd: Path, log: Path, environment: dict[str, str] | None = None
+    command: list[str],
+    *,
+    cwd: Path,
+    log: Path,
+    environment: dict[str, str] | None = None,
+    ephemeral_paths: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         command,
@@ -451,16 +502,7 @@ def _run_and_log(
         text=True,
         capture_output=True,
     )
-    normalized_stdout = "\n".join(line.rstrip() for line in result.stdout.split("\n"))
-    normalized_stderr = "\n".join(line.rstrip() for line in result.stderr.split("\n"))
-    payload = (
-        f"$ {shlex.join(command)}\n"
-        f"exit_code: {result.returncode}\n"
-        "--- stdout ---\n"
-        f"{normalized_stdout}"
-        "--- stderr ---\n"
-        f"{normalized_stderr}"
-    ).encode("utf-8")
+    _, payload = _canonical_execution_evidence(command, result, ephemeral_paths)
     log.parent.mkdir(parents=True, exist_ok=True)
     log.write_bytes(payload)
     return result
@@ -535,7 +577,14 @@ def _capture_compiler_failure(
             "PYTHONPATH": pythonpath,
         }
         result = _run_and_log(
-            command, cwd=repo_root, log=capture_log, environment=environment
+            command,
+            cwd=repo_root,
+            log=capture_log,
+            environment=environment,
+            ephemeral_paths={str(temporary_path): "<capture-tmp>"},
+        )
+        canonical_program_command, _ = _canonical_execution_evidence(
+            command, result, {str(temporary_path): "<capture-tmp>"}
         )
         if result.returncode == 0:
             raise RuntimeError("exact compiler/import capture unexpectedly succeeded")
@@ -565,9 +614,9 @@ def _capture_compiler_failure(
         "executed": True,
         "command": " ".join(
             [
-                f"TMPDIR={shlex.quote(str(temporary_path))}",
+                "TMPDIR=<capture-tmp>",
                 f"PYTHONPATH={shlex.quote(pythonpath)}",
-                shlex.join(command),
+                canonical_program_command,
             ]
         ),
         "exit_code": result.returncode,
