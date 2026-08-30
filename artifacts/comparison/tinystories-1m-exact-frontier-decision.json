@@ -69,6 +69,17 @@
       "red_expected": "exit 1 with the recorded failed-to-legalize torch.operator diagnostic."
     }
   },
+  "semantic_regression": {
+    "fixture_file_sha256": "2aadecfedbbf93a617890d21586d17456f945028d866c368c15af754471f3064",
+    "fixture_path": "artifacts/comparison/tinystories-1m-exact-shift-semantics.json",
+    "fixture_self_hash": "4490ddcf0e6f59eed32ecfe31482dc142c9907f4e74efe32154a99d5651ef17f",
+    "full_stage_green_command": "stage=\"$(nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-torch)\" && nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py --lowered-result artifacts/comparison/tinystories-1m-exact-shift-lowered-results.json --stage-artifact \"$stage\"",
+    "full_stage_green_expected": "The verifier accepts a nonempty stage artifact, current Task 1 audit file/payload hashes, Task 2 artifact file/payload/model-receipt hashes, Task 3 generation file/artifact/result hashes, and evaluated lowered outputs/statuses that exactly match the fixture.",
+    "lowered_result_path": "artifacts/comparison/tinystories-1m-exact-shift-lowered-results.json",
+    "lowered_result_schema": "tinystories-1m-exact-shift-lowered-results-v1",
+    "semantic_contract_command": "nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py",
+    "semantic_contract_expected": "The independent Python signed-integer interpreter accepts shift_one, shift_zero, and shift_sixty_two and rejects negative_shift and shift_greater_than_sixty_two with their named statuses and diagnostics."
+  },
   "schema": "tinystories-1m-exact-frontier-decision-v1",
-  "sha256": "167ce323a25ca4e624dd36464a503507872c0342e2ef1c8a8a6e829ee4624179"
+  "sha256": "a4b52d62c9a452204b403f59cf0750555f593e22f112916d7a2675ed8fbfb254"
 }

@@ -30,11 +30,24 @@ They retain all Task 1--3 identity/generation hashes, the minimal reproducer
 hash, Task 5 receipt/self hashes, precise red commands, and prospective green
 criteria for both the reproducer and registered stage.
 
+Fix round 1 adds the hash-bound signed-si64 semantic fixture
+`artifacts/comparison/tinystories-1m-exact-shift-semantics.json` (file hash
+`2aadecfedbbf93a617890d21586d17456f945028d866c368c15af754471f3064`). It
+requires scalar-broadcast arithmetic shifts for `[-5, -1, 0, 1, 5] >> 1`,
+shift-zero identity, and a valid shift of 62; it rejects `-1` and `63` with
+named statuses and diagnostics. The decision now requires an evaluated lowered
+result file, exact dtype/shape/value hashes, and a full-stage verifier that
+checks all current Task 1--3 file/payload/result hashes against the decision
+before accepting a nonempty Torch stage artifact. Compilation-only success is
+not a green result.
+
 Validation run for this checkpoint must include:
 
 ```text
 nix develop -c python -m json.tool artifacts/comparison/tinystories-1m-exact-frontier-decision.json
 nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_determinism.py
+nix develop -c python -m unittest tests/test_tinystories_1m_exact_frontier_semantics.py -v
+nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py
 ```
 
 No compiler or model implementation is included in Task 6.

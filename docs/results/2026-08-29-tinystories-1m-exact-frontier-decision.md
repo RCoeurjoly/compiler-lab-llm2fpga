@@ -94,8 +94,11 @@ nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-torch
 
 Green uses the same registered command after the compiler change. It must exit
 0 with a nonempty Torch-MLIR artifact, no matching legalization diagnostic,
-and unchanged Task 1--3 identity hashes. The later Linalg/SCF/Calyx stages are
-intentionally not green criteria for this task.
+and unchanged Task 1--3 identity hashes. It is not sufficient to inspect the
+MLIR or assert that a generic operator disappeared: the green gate must also
+evaluate the lowered shift implementation and compare its exact results to the
+semantic fixture below. The later Linalg/SCF/Calyx stages are intentionally not
+green criteria for this task.
 
 The retained identities are the Task 1 audit file/payload
 `3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd` /
@@ -109,15 +112,61 @@ and Task 3 generation file/artifact/result
 `9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3` /
 `c18106f25030ec58dfd3abc5d75d774506aca65b655fc34b284076b1294f8644`.
 
+## Executable signed-shift semantic contract
+
+[`tinystories-1m-exact-shift-semantics.json`](../../artifacts/comparison/tinystories-1m-exact-shift-semantics.json)
+is a deterministic fixture with file SHA-256
+`2aadecfedbbf93a617890d21586d17456f945028d866c368c15af754471f3064`
+and canonical self-hash
+`4490ddcf0e6f59eed32ecfe31482dc142c9907f4e74efe32154a99d5651ef17f`.
+Its independent Python interpreter is the semantic oracle; it deliberately
+does not accept mere lowering success as proof of arithmetic behavior.
+
+The required valid tensor/scalar broadcast cases are all one-dimensional
+signed `si64` tensors with exact output dtype and shape preserved:
+
+| Case | Input | Scalar shift | Expected output | Expected output SHA-256 |
+| --- | --- | ---: | --- | --- |
+| `shift_one` | `[-5, -1, 0, 1, 5]` | 1 | `[-3, -1, 0, 0, 2]` | `f949ee74a7ad05711fbb6565bf80cebe207070bc9dc95c87dedfaac63c5988eb` |
+| `shift_zero` | `[-5, -1, 0, 1, 5]` | 0 | identical input | `b197b99b9f460091bbe36cd35870dfdb83e53fdd3cc547ac25e43e34c7f72fce` |
+| `shift_sixty_two` | `[-4611686018427387904, -1, 0, 4611686018427387904]` | 62 | `[-1, -1, 0, 1]` | `5e7024c18da1979c0b25c41fd058d533df916005f9ffa6e3d31a449d1c89d605` |
+
+The scalar shift is broadcast to every element. `negative_shift` (`-1`) must
+produce exactly status `rejected_negative_shift` and diagnostic
+`shift_contract:negative_shift`; `shift_greater_than_sixty_two` (`63`) must
+produce exactly status `rejected_shift_greater_than_sixty_two` and diagnostic
+`shift_contract:greater_than_sixty_two`. Neither invalid case may compile,
+produce output, or mask its count.
+
+The compiler follow-up must emit
+`artifacts/comparison/tinystories-1m-exact-shift-lowered-results.json` using
+schema `tinystories-1m-exact-shift-lowered-results-v1`, with one record per
+fixture case. Valid records have `status: "ok"` and exact `dtype`, `shape`, and
+`values`; invalid records have the exact status/diagnostic above and no output.
+Its mechanical full-stage green gate is:
+
+```text
+stage="$(nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-torch)" && nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py --lowered-result artifacts/comparison/tinystories-1m-exact-shift-lowered-results.json --stage-artifact "$stage"
+```
+
+The verifier checks the successful nonempty registered artifact and reloads the
+current Task 1 audit, Task 2 model artifact, and Task 3 generation receipt. It
+compares their file and embedded payload/result hashes mechanically against the
+decision receipt before accepting evaluated lowering results.
+
 ## Binding checks
 
 ```text
 nix develop -c python -m json.tool artifacts/comparison/tinystories-1m-exact-frontier-decision.json
 nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_determinism.py
+nix develop -c python -m unittest tests/test_tinystories_1m_exact_frontier_semantics.py -v
+nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py
 ```
 
 The first command checks JSON syntax; the second independently verifies the
 Task 5 bundles from which `frontier_hash` was taken. The decision JSON has a
 canonical self-hash over all fields except `sha256`; its one-item `selection`
 array and `selected_response_class_count: 1` make the one-class decision
-machine-checkable without introducing a new implementation artifact.
+machine-checkable. The semantic fixture and its exact expected output hashes
+are also bound into that decision self-hash without introducing a compiler
+implementation artifact.

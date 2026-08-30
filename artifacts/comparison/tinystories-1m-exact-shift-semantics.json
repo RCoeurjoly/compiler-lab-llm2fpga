@@ -1,0 +1,75 @@
+{
+  "invalid_cases": [
+    {
+      "diagnostic": "shift_contract:negative_shift",
+      "id": "negative_shift",
+      "input": {
+        "dtype": "si64",
+        "shape": [5],
+        "values": [-5, -1, 0, 1, 5]
+      },
+      "shift": -1,
+      "status": "rejected_negative_shift"
+    },
+    {
+      "diagnostic": "shift_contract:greater_than_sixty_two",
+      "id": "shift_greater_than_sixty_two",
+      "input": {
+        "dtype": "si64",
+        "shape": [5],
+        "values": [-5, -1, 0, 1, 5]
+      },
+      "shift": 63,
+      "status": "rejected_shift_greater_than_sixty_two"
+    }
+  ],
+  "schema": "tinystories-1m-exact-shift-semantics-v1",
+  "sha256": "4490ddcf0e6f59eed32ecfe31482dc142c9907f4e74efe32154a99d5651ef17f",
+  "valid_cases": [
+    {
+      "expected": {
+        "dtype": "si64",
+        "shape": [5],
+        "values": [-3, -1, 0, 0, 2]
+      },
+      "expected_sha256": "f949ee74a7ad05711fbb6565bf80cebe207070bc9dc95c87dedfaac63c5988eb",
+      "id": "shift_one",
+      "input": {
+        "dtype": "si64",
+        "shape": [5],
+        "values": [-5, -1, 0, 1, 5]
+      },
+      "shift": 1
+    },
+    {
+      "expected": {
+        "dtype": "si64",
+        "shape": [5],
+        "values": [-5, -1, 0, 1, 5]
+      },
+      "expected_sha256": "b197b99b9f460091bbe36cd35870dfdb83e53fdd3cc547ac25e43e34c7f72fce",
+      "id": "shift_zero",
+      "input": {
+        "dtype": "si64",
+        "shape": [5],
+        "values": [-5, -1, 0, 1, 5]
+      },
+      "shift": 0
+    },
+    {
+      "expected": {
+        "dtype": "si64",
+        "shape": [4],
+        "values": [-1, -1, 0, 1]
+      },
+      "expected_sha256": "5e7024c18da1979c0b25c41fd058d533df916005f9ffa6e3d31a449d1c89d605",
+      "id": "shift_sixty_two",
+      "input": {
+        "dtype": "si64",
+        "shape": [4],
+        "values": [-4611686018427387904, -1, 0, 4611686018427387904]
+      },
+      "shift": 62
+    }
+  ]
+}

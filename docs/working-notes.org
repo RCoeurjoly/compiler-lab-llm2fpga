@@ -173,3 +173,16 @@ RTL change is authorized by this checkpoint. The full evidence, retained Task
 1--3 hashes, causal rejections, and red/green regressions are in
 =docs/results/2026-08-29-tinystories-1m-exact-frontier-decision.md= and its
 hash-bound JSON receipt.
+
+** Fix round 1 — semantic (not compilation-only) regression
+
+The selected compiler-pass follow-up is constrained by a deterministic signed
+=si64= tensor/scalar-shift fixture. It proves arithmetic (not logical) shift
+for negative values, scalar broadcast, shift-zero identity, and valid shift
+count 62, with exact output hashes; it also requires named rejection statuses
+and diagnostics for negative and greater-than-62 shifts. A future green stage
+must execute or independently interpret its lowered result against this
+fixture, then mechanically verify the current Task 1 audit, Task 2 artifact,
+and Task 3 generation file/payload/result hashes against the decision receipt.
+Successful compilation or absence of =torch.operator= alone is not evidence of
+semantic correctness.
