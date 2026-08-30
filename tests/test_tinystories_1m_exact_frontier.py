@@ -319,10 +319,58 @@ class PipelineSourceAuthenticationTest(unittest.TestCase):
             with mock.patch.object(MODULE, "_CRITICAL_PIPELINE_INPUTS", ("flake.nix",)), mock.patch.object(
                 MODULE, "_run", side_effect=fake_run
             ), mock.patch.object(MODULE, "_git_bytes", return_value=b"accepted"):
-                with self.assertRaisesRegex(RuntimeError, "mutated since Task 4"):
+                with self.assertRaisesRegex(RuntimeError, "mutated since"):
                     MODULE._authenticate_pipeline_source(
                         repo, {"input_sources": []}, {"input_sources": []}
                     )
+
+    def test_only_committed_registration_flake_is_allowed_since_task4(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-source-registration-") as temporary:
+            repo = Path(temporary) / "repo"
+            archive = Path(temporary) / "archive"
+            repo.mkdir()
+            archive.mkdir()
+            registration = b"task4 flake plus exact alias registration\n"
+            for root in (repo, archive):
+                (root / "flake.nix").write_bytes(registration)
+
+            def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+                if command[:3] == ["git", "rev-parse", "HEAD"]:
+                    return self._result(command, stdout="evidence\n")
+                if command[:3] == ["git", "merge-base", "--is-ancestor"]:
+                    return self._result(command)
+                if command[:3] == ["git", "status", "--porcelain"]:
+                    return self._result(command)
+                if command[:3] == ["nix", "flake", "archive"]:
+                    return self._result(command, stdout=json.dumps({"path": str(archive)}))
+                if command[:3] == ["nix", "hash", "path"]:
+                    return self._result(command, stdout="sha256-example=\n")
+                if command[:2] == ["git", "rev-parse"]:
+                    return self._result(command, stdout="a" * 40 + "\n")
+                raise AssertionError(f"unexpected command: {command}")
+
+            def git_bytes(_: Path, revision: str, path: str) -> bytes:
+                self.assertEqual(path, "flake.nix")
+                if revision == MODULE._SCF_REGISTRATION_COMMIT:
+                    return registration
+                if revision == MODULE._ACCEPTED_PIPELINE_COMMIT:
+                    return b"task4 flake\n"
+                raise AssertionError(f"unexpected revision: {revision}")
+
+            with mock.patch.object(
+                MODULE, "_CRITICAL_PIPELINE_INPUTS", ("flake.nix",)
+            ), mock.patch.object(MODULE, "_run", side_effect=fake_run), mock.patch.object(
+                MODULE, "_git_bytes", side_effect=git_bytes
+            ):
+                result = MODULE._authenticate_pipeline_source(
+                    repo, {"input_sources": []}, {"input_sources": []}
+                )
+
+            binding = result["critical_inputs"]["flake.nix"]
+            self.assertEqual(
+                binding["authenticated_commit"], MODULE._SCF_REGISTRATION_COMMIT
+            )
+            self.assertNotEqual(binding["task4_sha256"], binding["authenticated_sha256"])
 
 
 class AuthenticatedPipelineRunnerTest(unittest.TestCase):

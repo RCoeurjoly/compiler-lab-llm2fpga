@@ -21,6 +21,7 @@ from typing import Callable, Literal
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _ACCEPTED_PIPELINE_COMMIT = "7eed3592a661c0cb3c417dc59b29839266446b2d"
+_SCF_REGISTRATION_COMMIT = "3314a70ac1cfe0e998f445162d1a2b5ae8398a20"
 _PASS_PIPELINE = (
     "builtin.module(func.func(torch-match-quantized-custom-ops), "
     "torchdynamo-export-to-torch-backend-pipeline{ extra-library=})"
@@ -567,6 +568,13 @@ def _authenticate_pipeline_source(
     )
     if ancestry.returncode != 0:
         raise RuntimeError("HEAD does not descend from the accepted Task 4 commit")
+    registration_ancestry = _run(
+        ["git", "merge-base", "--is-ancestor", _SCF_REGISTRATION_COMMIT, "HEAD"],
+        cwd=repo_root,
+        check=False,
+    )
+    if registration_ancestry.returncode != 0:
+        raise RuntimeError("HEAD does not descend from the exact SCF registration commit")
 
     dirty = _run(
         ["git", "status", "--porcelain", "--", *_CRITICAL_PIPELINE_INPUTS],
@@ -634,10 +642,15 @@ def _authenticate_pipeline_source(
         workspace_sha = _sha256(workspace)
         task4_bytes = _git_bytes(repo_root, _ACCEPTED_PIPELINE_COMMIT, path)
         task4_sha = _sha256_bytes(task4_bytes)
+        authenticated_commit = (
+            _SCF_REGISTRATION_COMMIT if path == "flake.nix" else _ACCEPTED_PIPELINE_COMMIT
+        )
+        authenticated_bytes = _git_bytes(repo_root, authenticated_commit, path)
+        authenticated_sha = _sha256_bytes(authenticated_bytes)
         archive_sha = _sha256(archived)
-        if not (workspace_sha == task4_sha == archive_sha):
+        if not (workspace_sha == authenticated_sha == archive_sha):
             raise RuntimeError(
-                f"critical pipeline input mutated since Task 4 or differs from "
+                f"critical pipeline input mutated since its authenticated commit or differs from "
                 f"the evaluated flake archive: {path}"
             )
         task4_blob = _run(
@@ -647,6 +660,11 @@ def _authenticate_pipeline_source(
             "workspace_sha256": workspace_sha,
             "task4_sha256": task4_sha,
             "task4_blob": task4_blob,
+            "authenticated_commit": authenticated_commit,
+            "authenticated_sha256": authenticated_sha,
+            "authenticated_blob": _run(
+                ["git", "rev-parse", f"{authenticated_commit}:{path}"], cwd=repo_root
+            ).stdout.strip(),
             "evidence_blob": _run(
                 ["git", "rev-parse", f"HEAD:{path}"], cwd=repo_root
             ).stdout.strip(),
