@@ -41,6 +41,12 @@ SUCCESSOR_BUNDLES = (
     / "comparison"
     / "tinystories-1m-exact-successor-frontier-determinism"
 )
+LEFT_SHIFT_SUCCESS_BUNDLES = (
+    ROOT
+    / "artifacts"
+    / "comparison"
+    / "tinystories-1m-exact-left-shift-success-determinism"
+)
 
 
 class PreservedDeterminismBundleTest(unittest.TestCase):
@@ -122,6 +128,32 @@ class SuccessorFrontierDeterminismBundleTest(unittest.TestCase):
 
             with self.assertRaisesRegex(verifier.VerificationError, "SHA-256"):
                 verifier.verify_successor_bundles(mutated)
+
+
+class LeftShiftSuccessDeterminismBundleTest(unittest.TestCase):
+    def test_two_registered_torch_success_captures_are_byte_identical_and_bound(self) -> None:
+        verifier = SuccessorFrontierDeterminismBundleTest._load_verifier()
+
+        result = verifier.verify_success_bundles(LEFT_SHIFT_SUCCESS_BUNDLES)
+
+        self.assertEqual(result["runs"], ["run-1", "run-2"])
+        self.assertTrue(result["byte_identical"])
+        self.assertEqual(result["status"], "registered_torch_valid")
+        self.assertGreater(result["artifact_bytes"], 0)
+        self.assertEqual(result["task_identity_count"], 3)
+
+    def test_success_verifier_rejects_a_mutated_registered_torch_artifact(self) -> None:
+        verifier = SuccessorFrontierDeterminismBundleTest._load_verifier()
+        with tempfile.TemporaryDirectory(prefix="exact-left-success-mutation-") as temporary:
+            mutated = Path(temporary) / "bundles"
+            shutil.copytree(LEFT_SHIFT_SUCCESS_BUNDLES, mutated)
+            archive = mutated / "run-2" / "torch-artifact.mlir.gz"
+            changed = bytearray(archive.read_bytes())
+            changed[-1] ^= 1
+            archive.write_bytes(changed)
+
+            with self.assertRaisesRegex(verifier.VerificationError, "SHA-256"):
+                verifier.verify_success_bundles(mutated)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
 @@ -10,0 +11,2 @@
 +#include "mlir/IR/BuiltinTypes.h"
 +#include "mlir/IR/PatternMatch.h"
-@@ -13,0 +16,86 @@
+@@ -13,0 +16,163 @@
 +#include "torch-mlir/Dialect/Torch/IR/TorchDialect.h"
 +#include "torch-mlir/Dialect/Torch/IR/TorchOps.h"
 +#include "torch-mlir/Dialect/Torch/IR/TorchTypes.h"
@@ -89,7 +89,86 @@
 +    return success();
 +  }
 +};
++
++class LegalizeBitwiseLeftShiftTensorScalarPass
++    : public PassWrapper<LegalizeBitwiseLeftShiftTensorScalarPass,
++                         OperationPass<func::FuncOp>> {
++public:
++  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(
++      LegalizeBitwiseLeftShiftTensorScalarPass)
++  StringRef getArgument() const final {
++    return "torch-legalize-bitwise-left-shift-tensor-scalar";
++  }
++  StringRef getDescription() const final {
++    return "Legalize signed-si64 Tensor_Scalar left shift to the registered "
++           "tensor/tensor operation";
++  }
++  void getDependentDialects(DialectRegistry &registry) const final {
++    registry.insert<Torch::TorchDialect>();
++  }
++  void runOnOperation() final {
++    SmallVector<Torch::OperatorOp> candidates;
++    getOperation().walk([&](Torch::OperatorOp op) {
++      if (op.getName() == "torch.aten.bitwise_left_shift.Tensor_Scalar")
++        candidates.push_back(op);
++    });
++    PatternRewriter rewriter(&getContext());
++    for (Torch::OperatorOp op : candidates) {
++      if (failed(legalize(op, rewriter))) {
++        signalPassFailure();
++        return;
++      }
++    }
++  }
++private:
++  LogicalResult fail(Torch::OperatorOp op, StringRef diagnostic) {
++    op.emitError(diagnostic);
++    return failure();
++  }
++  LogicalResult legalize(Torch::OperatorOp op, PatternRewriter &rewriter) {
++    if (op->getNumOperands() != 2 || op->getNumResults() != 1)
++      return fail(op, "shift_contract:unsupported_signature");
++    auto inputType =
++        dyn_cast<Torch::ValueTensorType>(op->getOperand(0).getType());
++    auto resultType =
++        dyn_cast<Torch::ValueTensorType>(op->getResult(0).getType());
++    auto inputDtype = inputType && inputType.hasDtype()
++                          ? dyn_cast<IntegerType>(inputType.getDtype())
++                          : IntegerType{};
++    auto resultDtype = resultType && resultType.hasDtype()
++                           ? dyn_cast<IntegerType>(resultType.getDtype())
++                           : IntegerType{};
++    if (!inputDtype || !resultDtype || !inputDtype.isSigned() ||
++        !resultDtype.isSigned() || inputDtype.getWidth() != 64 ||
++        resultDtype.getWidth() != 64 || inputType != resultType)
++      return fail(op, "shift_contract:unsupported_dtype");
++    auto count = op->getOperand(1).getDefiningOp<Torch::ConstantIntOp>();
++    if (!count)
++      return fail(op, "shift_contract:dynamic_shift");
++    int64_t countValue = count.getValueAttr().getValue().getSExtValue();
++    if (countValue < 0)
++      return fail(op, "shift_contract:negative_shift");
++    if (countValue > 62)
++      return fail(op, "shift_contract:greater_than_sixty_two");
++    rewriter.setInsertionPoint(op);
++    auto sizeListType =
++        Torch::ListType::get(Torch::IntType::get(op.getContext()));
++    Value size = Torch::AtenSizeOp::create(
++        rewriter, op.getLoc(), sizeListType, op->getOperand(0));
++    Value rankZeroShift = Torch::createRank0Tensor(
++        rewriter, op.getLoc(), inputType, op->getOperand(1));
++    Value broadcastShift = Torch::AtenBroadcastToOp::create(
++        rewriter, op.getLoc(), inputType, rankZeroShift, size);
++    // TorchToLinalg lowers this registered signed tensor/tensor operation to
++    // arith::ShLIOp (arith.shli), discarding high bits in two's complement.
++    rewriter.replaceOpWithNewOp<Torch::AtenBitwiseLeftShiftTensorOp>(
++        op, resultType, op->getOperand(0), broadcastShift);
++    return success();
++  }
++};
 +} // namespace
-@@ -75,0 +163,2 @@
+@@ -75,0 +240,4 @@
 +  pm.addNestedPass<func::FuncOp>(
 +      std::make_unique<LegalizeBitwiseRightShiftTensorScalarPass>());
++  pm.addNestedPass<func::FuncOp>(
++      std::make_unique<LegalizeBitwiseLeftShiftTensorScalarPass>());

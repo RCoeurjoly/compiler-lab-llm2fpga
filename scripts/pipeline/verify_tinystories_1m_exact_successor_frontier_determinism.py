@@ -18,6 +18,12 @@ RECEIPT_SCHEMA = "tinystories-1m-exact-successor-frontier-receipt-v1"
 RIGHT_OPERATION = "torch.aten.bitwise_right_shift.Tensor_Scalar"
 LEFT_OPERATION = "torch.aten.bitwise_left_shift.Tensor_Scalar"
 DIAGNOSTIC = "failed to legalize operation 'torch.operator' that was explicitly marked illegal"
+HISTORICAL_RIGHT_SHIFT_PATCH_SHA256 = "1f3ab13eb4bcfb4bf87112cf8bb648424174f01a483aa38c0583a056ca7fab99"
+HISTORICAL_SUCCESSOR_INPUT_SHA256 = {
+    "patch": HISTORICAL_RIGHT_SHIFT_PATCH_SHA256,
+    "producer": "74c47ee7ac2df0b2d2b24f1f4b8a33e6196c09109a7c0c8cec014bd5e9fdc818",
+    "verifier": "12a33a34064437ef77f6a3f8ec5a9d83e169f6a037abd3f65d9b7674224fac06",
+}
 EXPECTED_CANONICAL_FILES = [
     "receipt.json",
     "pytorch-exported-build.log",
@@ -30,6 +36,20 @@ EXPECTED_CANONICAL_FILES = [
     "full-failing-ir.mlir.gz",
 ]
 EXPECTED_NOT_RUN = ["linalg", "scf", "flat-scf", "calyx", "calyx-native-sv"]
+SUCCESS_SCHEMA = "tinystories-1m-exact-left-shift-success-determinism-v1"
+SUCCESS_RECEIPT_SCHEMA = "tinystories-1m-exact-left-shift-success-receipt-v1"
+SUCCESS_CANONICAL_FILES = [
+    "receipt.json",
+    "stage-build.log",
+    "tool-build.log",
+    "left-shift-lowering.log",
+    "right-shift-lowering.log",
+    "left-shift-semantics.log",
+    "identity-checks.json",
+    "stage-derivation.drv",
+    "tool-derivation.drv",
+    "torch-artifact.mlir.gz",
+]
 
 
 class VerificationError(RuntimeError):
@@ -149,12 +169,24 @@ def verify_compiler(receipt: dict[str, Any]) -> None:
     ):
         path = ROOT / str(compiler.get(path_key, ""))
         require(path.is_file(), f"compiler input {path_key} is missing")
-        require(
-            compiler.get(hash_key) == sha256_file(path),
-            f"compiler input {path_key} SHA-256 mismatch",
-        )
+        current_hash = sha256_file(path)
+        if path_key in HISTORICAL_SUCCESSOR_INPUT_SHA256 and compiler.get(hash_key) != current_hash:
+            require(
+                compiler.get(hash_key) == HISTORICAL_SUCCESSOR_INPUT_SHA256[path_key],
+                f"compiler input {path_key} SHA-256 mismatch",
+            )
+            continue
+        require(compiler.get(hash_key) == current_hash, f"compiler input {path_key} SHA-256 mismatch")
     patch_text = (ROOT / compiler["patch"]).read_text(encoding="utf-8")
-    require(LEFT_OPERATION not in patch_text, "right-shift patch mentions left shift")
+    require("LegalizeBitwiseRightShiftTensorScalarPass" in patch_text, "right-shift pass is missing")
+    if "LegalizeBitwiseLeftShiftTensorScalarPass" in patch_text:
+        right_shift_text = patch_text[
+            patch_text.index("class LegalizeBitwiseRightShiftTensorScalarPass") :
+            patch_text.index("class LegalizeBitwiseLeftShiftTensorScalarPass")
+        ]
+    else:
+        right_shift_text = patch_text
+    require(LEFT_OPERATION not in right_shift_text, "right-shift matcher mentions left shift")
 
 
 def verify_receipt(
@@ -408,17 +440,220 @@ def verify_successor_bundles(bundle_root: Path) -> dict[str, Any]:
     }
 
 
+def _verify_success_receipt(
+    run_root: Path, receipt: dict[str, Any], file_bytes: dict[str, bytes]
+) -> None:
+    require(receipt.get("schema") == SUCCESS_RECEIPT_SCHEMA, "unsupported success receipt schema")
+    require(receipt.get("status") == "registered_torch_valid", "registered Torch status mismatch")
+    require(receipt.get("stage") == "torch-mlir", "registered Torch stage mismatch")
+    require(receipt.get("sha256") == receipt_self_hash(receipt), "success receipt self-hash mismatch")
+
+    artifact = receipt.get("artifact")
+    require(isinstance(artifact, dict), "registered Torch artifact binding is missing")
+    archive = file_bytes["torch-artifact.mlir.gz"]
+    require(artifact.get("archive") == "torch-artifact.mlir.gz", "artifact archive path mismatch")
+    require(artifact.get("archive_bytes") == len(archive), "artifact archive size mismatch")
+    require(artifact.get("archive_sha256") == sha256_bytes(archive), "artifact archive SHA-256 mismatch")
+    try:
+        content = gzip.decompress(archive)
+    except OSError as error:
+        raise VerificationError(f"registered Torch artifact is not valid gzip: {error}") from error
+    text = content.decode("utf-8")
+    require(artifact.get("bytes") == len(content) and len(content) > 0, "artifact content size mismatch")
+    require(artifact.get("sha256") == sha256_bytes(content), "artifact content SHA-256 mismatch")
+    require(artifact.get("generic_operator_count") == text.count("torch.operator") == 0, "generic operator remains")
+    require(
+        artifact.get("left_tensor_scalar_count")
+        == text.count("torch.aten.bitwise_left_shift.Tensor_Scalar")
+        == 0,
+        "tensor/scalar left shift remains",
+    )
+    require(
+        artifact.get("right_tensor_scalar_count")
+        == text.count("torch.aten.bitwise_right_shift.Tensor_Scalar")
+        == 0,
+        "tensor/scalar right shift remains",
+    )
+    require(
+        artifact.get("left_tensor_count") == text.count("torch.aten.bitwise_left_shift.Tensor") > 0,
+        "registered left shifts are missing",
+    )
+    require(
+        artifact.get("right_tensor_count") == text.count("torch.aten.bitwise_right_shift.Tensor") > 0,
+        "registered right shifts are missing",
+    )
+    output = Path(str(artifact.get("output", "")))
+    if output.is_file():
+        require(sha256_file(output) == artifact.get("sha256"), "live artifact SHA-256 mismatch")
+
+    for receipt_key, canonical_file in (
+        ("stage_derivation", "stage-derivation.drv"),
+        ("compiler", "tool-derivation.drv"),
+    ):
+        binding = receipt.get(receipt_key)
+        require(isinstance(binding, dict), f"{receipt_key} binding is missing")
+        expected_hash = (
+            binding.get("file_sha256")
+            if receipt_key == "stage_derivation"
+            else binding.get("derivation_file_sha256")
+        )
+        require(sha256_bytes(file_bytes[canonical_file]) == expected_hash, f"{receipt_key} captured SHA-256 mismatch")
+        store_key = "path" if receipt_key == "stage_derivation" else "derivation"
+        store_path = Path(str(binding.get(store_key, "")))
+        if store_path.is_file():
+            require(sha256_file(store_path) == expected_hash, f"{receipt_key} live SHA-256 mismatch")
+
+    compiler = receipt.get("compiler")
+    require(isinstance(compiler, dict), "compiler binding is missing")
+    require(
+        compiler.get("torch_mlir_source_revision")
+        == "59c249e5cc2025acca81bdcf1596b8dd36a5c0f9",
+        "pinned Torch-MLIR revision mismatch",
+    )
+    binary = Path(str(compiler.get("binary", "")))
+    require(binary.is_file() and sha256_file(binary) == compiler.get("binary_sha256"), "compiler binary mismatch")
+    for path_key, hash_key in (
+        ("patch", "patch_sha256"),
+        ("nix_expression", "nix_expression_sha256"),
+        ("producer", "producer_sha256"),
+        ("verifier", "verifier_sha256"),
+    ):
+        path = ROOT / str(compiler.get(path_key, ""))
+        require(path.is_file(), f"compiler {path_key} is missing")
+        require(sha256_file(path) == compiler.get(hash_key), f"compiler {path_key} SHA-256 mismatch")
+    patch_text = (ROOT / str(compiler["patch"])).read_text(encoding="utf-8")
+    require("LegalizeBitwiseLeftShiftTensorScalarPass" in patch_text, "left-shift compiler patch is missing")
+    require("AtenBitwiseLeftShiftTensorOp" in patch_text, "registered left-shift rewrite is missing")
+    require("arith.shli" in patch_text, "left-shift arithmetic binding is missing")
+
+    executions = receipt.get("executions")
+    require(isinstance(executions, dict), "success execution records are missing")
+    expected_logs = {
+        "registered-torch-stage": "stage-build.log",
+        "patched-tool": "tool-build.log",
+        "left-shift-lowering": "left-shift-lowering.log",
+        "right-shift-lowering": "right-shift-lowering.log",
+        "left-shift-semantics": "left-shift-semantics.log",
+    }
+    require(sorted(executions) == sorted(expected_logs), "success execution record set mismatch")
+    for name, filename in expected_logs.items():
+        record = executions[name]
+        data = file_bytes[filename]
+        require(record.get("command"), f"{name}: command is missing")
+        require(record.get("exit_code") == 0, f"{name}: command failed")
+        require(record.get("log") == filename, f"{name}: log path mismatch")
+        require(record.get("log_bytes") == len(data), f"{name}: log size mismatch")
+        require(record.get("log_sha256") == sha256_bytes(data), f"{name}: log SHA-256 mismatch")
+    require(b"arith.shli" in file_bytes["left-shift-lowering.log"], "left lowering lost arith.shli")
+    require(b"arith.shrsi" in file_bytes["right-shift-lowering.log"], "right lowering lost arith.shrsi")
+    require(b'"status": "accepted"' in file_bytes["left-shift-semantics.log"], "semantic proof is missing")
+
+    identities = receipt.get("identity_bindings")
+    require(isinstance(identities, dict) and sorted(identities) == ["task_1", "task_2", "task_3"], "Task 1-3 identities are incomplete")
+    synthetic = {"identity_bindings": {"adapter": {
+        "path": "TinyStories/model_adapter_exact_package.py",
+        "file_sha256": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e",
+    }, **identities}}
+    verify_identities(synthetic)
+    fixture = receipt.get("semantic_fixture")
+    require(isinstance(fixture, dict), "semantic fixture binding is missing")
+    verify_local_binding(fixture, "semantic fixture")
+    fixture_value = load_json(ROOT / fixture["path"])
+    require(fixture_value.get("sha256") == fixture.get("self_sha256"), "semantic fixture self-hash mismatch")
+    prior = receipt.get("prior_receipts")
+    require(isinstance(prior, list) and len(prior) == 2, "prior receipt set is incomplete")
+    for index, binding in enumerate(prior):
+        require(binding.get("preserved") is True, f"prior receipt {index} is not preserved")
+        verify_local_binding(binding, f"prior receipt {index}")
+        value = load_json(ROOT / binding["path"])
+        require(value.get("sha256") == binding.get("self_sha256"), f"prior receipt {index} self-hash mismatch")
+    identity_log = json.loads(file_bytes["identity-checks.json"].decode("utf-8"))
+    require(identity_log.get("task_identities") == identities, "identity log Task 1-3 mismatch")
+    require(identity_log.get("prior_receipts") == prior, "identity log prior receipt mismatch")
+    require(identity_log.get("semantic_fixture") == fixture, "identity log semantic fixture mismatch")
+
+    pipeline = receipt.get("pipeline_execution")
+    require(isinstance(pipeline, dict), "pipeline execution evidence is missing")
+    require(pipeline.get("registered_torch_stage_valid") is True, "registered Torch success is not asserted")
+    require(pipeline.get("full_later_stages_run") == [], "receipt overclaims later full stages")
+    require(pipeline.get("full_later_stages_not_run") == EXPECTED_NOT_RUN, "later-stage exclusion mismatch")
+    claims = receipt.get("claims")
+    require(isinstance(claims, dict), "success claims are missing")
+    require(claims.get("left_shift_implemented") is True, "left-shift success claim is missing")
+    require(claims.get("right_shift_preserved") is True, "right-shift preservation claim is missing")
+    require(claims.get("model_contract_changed") is False, "model contract change was claimed")
+    require(claims.get("adapter_changed") is False, "adapter change was claimed")
+
+
+def verify_success_bundles(bundle_root: Path) -> dict[str, Any]:
+    bundle_root = bundle_root.resolve()
+    manifest = load_json(bundle_root / "manifest.json")
+    require(manifest.get("schema") == SUCCESS_SCHEMA, "unsupported success manifest schema")
+    require(manifest.get("canonical_files") == SUCCESS_CANONICAL_FILES, "success canonical file set mismatch")
+    runs = manifest.get("runs")
+    require(isinstance(runs, dict) and sorted(runs) == ["run-1", "run-2"], "exactly two success runs are required")
+    verified: dict[str, tuple[dict[str, Any], dict[str, bytes]]] = {}
+    for run_name in ("run-1", "run-2"):
+        run_root = bundle_root / run_name
+        run_manifest = runs[run_name]
+        files = run_manifest.get("files")
+        require(isinstance(files, dict) and sorted(files) == sorted(SUCCESS_CANONICAL_FILES), f"{run_name}: file set mismatch")
+        file_bytes: dict[str, bytes] = {}
+        for filename in SUCCESS_CANONICAL_FILES:
+            data = (run_root / filename).read_bytes()
+            file_bytes[filename] = data
+            require(files[filename].get("bytes") == len(data), f"{run_name}: size mismatch for {filename}")
+            require(files[filename].get("sha256") == sha256_bytes(data), f"{run_name}: SHA-256 mismatch for {filename}")
+        receipt = load_json(run_root / "receipt.json")
+        require(run_manifest.get("source_commit") == receipt.get("source_commit") == manifest.get("source_commit"), f"{run_name}: source commit mismatch")
+        require(run_manifest.get("receipt_self_hash") == receipt.get("sha256"), f"{run_name}: self-hash manifest mismatch")
+        metadata = run_manifest.get("noncanonical_metadata")
+        require(isinstance(metadata, dict) and metadata.get("canonical") is False, f"{run_name}: metadata classification mismatch")
+        _verify_success_receipt(run_root, receipt, file_bytes)
+        verified[run_name] = (receipt, file_bytes)
+    first, first_files = verified["run-1"]
+    second, second_files = verified["run-2"]
+    require(first == second, "success receipts differ")
+    for filename in SUCCESS_CANONICAL_FILES:
+        require(first_files[filename] == second_files[filename], f"success runs differ at {filename}")
+    expected = manifest.get("expected_comparison")
+    require(isinstance(expected, dict) and expected.get("byte_identical") is True, "byte identity expectation is missing")
+    require(expected.get("receipt_file_sha256") == sha256_bytes(first_files["receipt.json"]), "success receipt file SHA-256 mismatch")
+    require(expected.get("receipt_self_hash") == first.get("sha256"), "success receipt self-hash mismatch")
+    require(expected.get("artifact_archive_sha256") == sha256_bytes(first_files["torch-artifact.mlir.gz"]), "success artifact archive SHA-256 mismatch")
+    top = manifest.get("success_receipt")
+    require(isinstance(top, dict), "top-level success receipt binding is missing")
+    top_path = ROOT / str(top.get("path", ""))
+    require(top_path.is_file(), "top-level success receipt is missing")
+    top_bytes = top_path.read_bytes()
+    require(top.get("bytes") == len(top_bytes), "top-level success receipt size mismatch")
+    require(top.get("file_sha256") == sha256_bytes(top_bytes) == sha256_bytes(first_files["receipt.json"]), "top-level success receipt SHA-256 mismatch")
+    require(top.get("self_sha256") == first.get("sha256"), "top-level success receipt self-hash mismatch")
+    require(top_bytes == first_files["receipt.json"], "top-level success receipt differs from captures")
+    return {
+        "source_commit": manifest["source_commit"],
+        "runs": ["run-1", "run-2"],
+        "byte_identical": True,
+        "status": first["status"],
+        "artifact_bytes": first["artifact"]["bytes"],
+        "artifact_sha256": first["artifact"]["sha256"],
+        "receipt_file_sha256": expected["receipt_file_sha256"],
+        "receipt_self_hash": expected["receipt_self_hash"],
+        "task_identity_count": len(first["identity_bindings"]),
+    }
+
+
 def main() -> None:
     default_bundle = (
         ROOT
-        / "artifacts/comparison/tinystories-1m-exact-successor-frontier-determinism"
+        / "artifacts/comparison/tinystories-1m-exact-left-shift-success-determinism"
     )
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle-dir", type=Path, default=default_bundle)
     args = parser.parse_args()
     print(
         json.dumps(
-            verify_successor_bundles(args.bundle_dir), indent=2, sort_keys=True
+            verify_success_bundles(args.bundle_dir), indent=2, sort_keys=True
         )
     )
 

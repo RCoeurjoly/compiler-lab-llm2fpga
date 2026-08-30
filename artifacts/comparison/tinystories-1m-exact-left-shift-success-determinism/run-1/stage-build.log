@@ -1,0 +1,4 @@
+[stdout]
+/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir
+[stderr]
+warning: Git tree '/home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler' is dirty

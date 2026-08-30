@@ -87,11 +87,15 @@ class TinyStories1mExactShiftLegalizationTest(unittest.TestCase):
 
     def test_source_matches_only_the_exact_operator_and_signed_si64_tensor(self) -> None:
         source = implementation_source()
-        self.assertIn("torch.aten.bitwise_right_shift.Tensor_Scalar", source)
-        self.assertNotIn("torch.aten.bitwise_left_shift.Tensor_Scalar", source)
-        self.assertIn("ValueTensorType", source)
-        self.assertIn("isSigned()", source)
-        self.assertIn("getWidth() != 64", source)
+        right_shift_source = source[
+            source.index("class LegalizeBitwiseRightShiftTensorScalarPass") :
+            source.index("class LegalizeBitwiseLeftShiftTensorScalarPass")
+        ]
+        self.assertIn("torch.aten.bitwise_right_shift.Tensor_Scalar", right_shift_source)
+        self.assertNotIn("torch.aten.bitwise_left_shift.Tensor_Scalar", right_shift_source)
+        self.assertIn("ValueTensorType", right_shift_source)
+        self.assertIn("isSigned()", right_shift_source)
+        self.assertIn("getWidth() != 64", right_shift_source)
 
     def test_source_requires_a_constant_count_in_the_closed_zero_to_sixty_two_range(self) -> None:
         source = implementation_source()
