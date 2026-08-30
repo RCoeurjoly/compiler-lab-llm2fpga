@@ -195,3 +195,104 @@ rather than hidden.
 
 The technical successor concern is the registered SCF availability frontier.
 A new bounded plan is required before changing compiler or pipeline wiring.
+
+## Review fix round 1: complete provenance bindings
+
+The review findings were addressed without registering SCF and without any
+compiler or lowering change. Provenance code, adversarial tests, and the
+bounded successor plan were committed first as
+`b6f54a4edec9d90a02c94ec79f8a9913f0a4cbdf`. Only then were both classifier
+captures rerun. Each v4 receipt names that code commit and binds the exact
+classifier and determinism-verifier bytes:
+
+- classifier SHA-256:
+  `966541ca4d548a9f1f6820819c87add91aa401d025d3946ab5db69c39f3bf9e7`
+- determinism-verifier SHA-256:
+  `b875ea3bab84bcefe2ca52c887205623b3169abc61183ddb843eb3021f4e4c46`
+
+The independent verifier now replays the live compiler-backed semantic gate,
+compares the exact semantic evidence and probe/verifier hashes, enforces the
+frozen Task 1--3 and predecessor constants, resolves the live Linalg and SCF
+derivations, and checks result/artifact paths, exits, statuses, acceptance,
+logs, diagnostics, and exact stop semantics. It also decompresses the Linalg
+archive and compares its bytes to the live derivation output, then validates
+the SCF manifest as exactly:
+
+```json
+{"reason":"baseline hardware pipeline lowers through CF and Handshake","stage":"scf","status":"unavailable"}
+```
+
+Both Linalg and SCF derivations are preserved as exact `.drv` bytes and
+canonical `nix derivation show` JSON. The receipt preserves the full build
+commands rather than only their hashes. Linalg's build command is:
+
+```text
+/nix/store/1jzhbwq5rjjaqa75z88ws2b424vh7m53-bash-5.2p32/bin/bash /nix/store/4zp4prlbv19xvzzf80f5cf2hxh7zzd38-pipeline/torch_to_linalg.sh \
+  /nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/bin/torch-mlir-opt /nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir "$out"
+```
+
+SCF's unavailable-stage build command is:
+
+```text
+mkdir -p "$out"
+cat >"$out/manifest.json" <<'JSON'
+{"reason":"baseline hardware pipeline lowers through CF and Handshake","stage":"scf","status":"unavailable"}
+JSON
+```
+
+The two new runs are byte-identical across eleven canonical files:
+
+- receipt file SHA-256:
+  `e1ccda9f6042671660ab753d99fe8af9b77dd362b9afc0bedae1fc17f055ae60`
+- receipt self-hash:
+  `d43c5adaf995c432ad31001cc86654025f5976e780d25951246aa5f4e5e14bf3`
+- Linalg `.drv` SHA-256:
+  `57c76eca7dbea3dc1058595f0524ac6fa0172b35c6266a9d989ebf29169700f7`
+- Linalg derivation JSON SHA-256:
+  `9b1fc76bbe17c1a871c1b5f9e1c8012a46339291ffff33726e5368fb650e6f40`
+- SCF `.drv` SHA-256:
+  `103aaba38b6df8b4b28fe93781c095efa75e26c06ea586530f573b9f31127b7c`
+- SCF derivation JSON SHA-256:
+  `feaf6061090a89f85cf030bb86dc163342c11370cc023dc322a7f50e3e7c5da3`
+
+Adversarial tests mutate semantic gate/probe evidence, frozen/predecessor
+identity, classifier/verifier bindings, derivation/tool/build-command facts,
+stage exit/status/log/diagnostic semantics, decompressed Linalg content, and
+each SCF manifest field. Each mutation recomputes the receipt self-hash and is
+still rejected against independent trust.
+
+The superseded seven-file capture is preserved byte-for-byte at
+`artifacts/comparison/tinystories-1m-exact-frontier-determinism-scf-v1` rather
+than overwritten as causal history. The current eleven-file capture remains at
+the canonical `...-determinism-scf` path.
+
+The required bounded follow-up plan is
+`docs/superpowers/plans/2026-08-30-exact-tinystories-scf-registration-frontier.md`.
+Its smallest evidenced next experiment registers the repository's existing
+direct `pipelineStagePackagesNoHandshake` Linalg-to-SCF route for this exact
+model, proves the authenticated prefix is unchanged, and captures the next
+frontier. The plan does not authorize or implement a compiler fix.
+
+### Review-fix verification evidence
+
+The focused combined classifier/determinism command completed 45 tests with
+`OK`:
+
+```text
+nix develop -c python -m unittest tests/test_tinystories_1m_exact_frontier.py tests/test_tinystories_1m_exact_frontier_determinism.py -v
+```
+
+The historical v1 verifier returned byte identity with receipt file SHA-256
+`b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55`.
+The preserved superseded seven-file SCF verifier returned byte identity with
+receipt file SHA-256
+`1d1fd8eeea5ad5114ec36a5aea13c5b84cec4a60cc25fa2aa5793ed9e46bf8ce`.
+The new default v4-backed verifier independently replayed the semantic gate and
+returned byte identity, canonical file count 11, and first invalid stage SCF.
+
+Explicit `cmp` checks passed for both receipts and all four Linalg/SCF
+derivation evidence files. `git diff --check` passed. A scoped diff from the
+frozen code commit showed no post-capture modification under `scripts/pipeline`,
+`flake.nix`, `nix`, `patches`, or `TinyStories`; therefore the receipt-bound
+classifier/verifier bytes and compiler/pipeline implementation remain exactly
+those from `b6f54a4`.

@@ -1,47 +1,47 @@
 {
-  "canonical_files": [
-    "receipt.json",
-    "pytorch-exported.log",
-    "torch.log",
-    "linalg.log",
-    "scf.log",
-    "full-input.gz",
-    "minimal-reproducer.json"
-  ],
+  "canonical_files": ["receipt.json", "pytorch-exported.log", "torch.log", "linalg.log", "scf.log", "full-input.gz", "minimal-reproducer.json", "linalg.drv", "linalg.derivation.json", "scf.drv", "scf.derivation.json"],
   "expected_comparison": {
     "byte_identical": true,
     "first_invalid_stage": "scf",
-    "receipt_file_sha256": "1d1fd8eeea5ad5114ec36a5aea13c5b84cec4a60cc25fa2aa5793ed9e46bf8ce",
-    "receipt_self_hash": "7451d19a9dd7d10ae61e7759422625de300e3a5e4ae5b1b44dbc56d8f3173425"
+    "receipt_file_sha256": "e1ccda9f6042671660ab753d99fe8af9b77dd362b9afc0bedae1fc17f055ae60",
+    "receipt_self_hash": "d43c5adaf995c432ad31001cc86654025f5976e780d25951246aa5f4e5e14bf3"
   },
   "runs": {
     "run-1": {
       "files": {
         "full-input.gz": {"bytes": 532330, "sha256": "1e6d47462458fed298353e97bfbc030af8c6b9e8f8a870e53fbd4d35ffe88594"},
-        "linalg.log": {"bytes": 213, "sha256": "93b47b1f952a4128c6cdd2cab11fe000d78152d1b39d598c1e275bf463051a0d"},
+        "linalg.derivation.json": {"bytes": 2323, "sha256": "9b1fc76bbe17c1a871c1b5f9e1c8012a46339291ffff33726e5368fb650e6f40"},
+        "linalg.drv": {"bytes": 2106, "sha256": "57c76eca7dbea3dc1058595f0524ac6fa0172b35c6266a9d989ebf29169700f7"},
+        "linalg.log": {"bytes": 213, "sha256": "dedbd34b50cd1d6026d49d272a76d1ab0623bfea9c9b2e35a5eeb2a45f2d0ccd"},
         "minimal-reproducer.json": {"bytes": 109, "sha256": "afc3d62b34d2eda0ec241556e04ce2c36642ca6520609df7a2a2ef87b8ce7c7c"},
         "pytorch-exported.log": {"bytes": 228, "sha256": "993972ee373fbef7b0d334fc180f1277dc9b61698df7c3ed4aaa17a8c63b74e2"},
-        "receipt.json": {"bytes": 31738, "sha256": "1d1fd8eeea5ad5114ec36a5aea13c5b84cec4a60cc25fa2aa5793ed9e46bf8ce"},
+        "receipt.json": {"bytes": 50567, "sha256": "e1ccda9f6042671660ab753d99fe8af9b77dd362b9afc0bedae1fc17f055ae60"},
+        "scf.derivation.json": {"bytes": 1782, "sha256": "feaf6061090a89f85cf030bb86dc163342c11370cc023dc322a7f50e3e7c5da3"},
+        "scf.drv": {"bytes": 1608, "sha256": "103aaba38b6df8b4b28fe93781c095efa75e26c06ea586530f573b9f31127b7c"},
         "scf.log": {"bytes": 344, "sha256": "f1c3e00460f680c0186a9b275e30c1db560d6b75ab7968c8f092fd8f7a548de1"},
         "torch.log": {"bytes": 211, "sha256": "e7cf82e57bc7c28ec8a188c184528e2f9a54892d3154ab3de729ad7b9f0d04e0"}
       },
-      "receipt_self_hash": "7451d19a9dd7d10ae61e7759422625de300e3a5e4ae5b1b44dbc56d8f3173425",
-      "source_commit": "aec02920481bf9fc4650062f74191fde4943ce3a"
+      "receipt_self_hash": "d43c5adaf995c432ad31001cc86654025f5976e780d25951246aa5f4e5e14bf3",
+      "source_commit": "b6f54a4edec9d90a02c94ec79f8a9913f0a4cbdf"
     },
     "run-2": {
       "files": {
         "full-input.gz": {"bytes": 532330, "sha256": "1e6d47462458fed298353e97bfbc030af8c6b9e8f8a870e53fbd4d35ffe88594"},
-        "linalg.log": {"bytes": 213, "sha256": "93b47b1f952a4128c6cdd2cab11fe000d78152d1b39d598c1e275bf463051a0d"},
+        "linalg.derivation.json": {"bytes": 2323, "sha256": "9b1fc76bbe17c1a871c1b5f9e1c8012a46339291ffff33726e5368fb650e6f40"},
+        "linalg.drv": {"bytes": 2106, "sha256": "57c76eca7dbea3dc1058595f0524ac6fa0172b35c6266a9d989ebf29169700f7"},
+        "linalg.log": {"bytes": 213, "sha256": "dedbd34b50cd1d6026d49d272a76d1ab0623bfea9c9b2e35a5eeb2a45f2d0ccd"},
         "minimal-reproducer.json": {"bytes": 109, "sha256": "afc3d62b34d2eda0ec241556e04ce2c36642ca6520609df7a2a2ef87b8ce7c7c"},
         "pytorch-exported.log": {"bytes": 228, "sha256": "993972ee373fbef7b0d334fc180f1277dc9b61698df7c3ed4aaa17a8c63b74e2"},
-        "receipt.json": {"bytes": 31738, "sha256": "1d1fd8eeea5ad5114ec36a5aea13c5b84cec4a60cc25fa2aa5793ed9e46bf8ce"},
+        "receipt.json": {"bytes": 50567, "sha256": "e1ccda9f6042671660ab753d99fe8af9b77dd362b9afc0bedae1fc17f055ae60"},
+        "scf.derivation.json": {"bytes": 1782, "sha256": "feaf6061090a89f85cf030bb86dc163342c11370cc023dc322a7f50e3e7c5da3"},
+        "scf.drv": {"bytes": 1608, "sha256": "103aaba38b6df8b4b28fe93781c095efa75e26c06ea586530f573b9f31127b7c"},
         "scf.log": {"bytes": 344, "sha256": "f1c3e00460f680c0186a9b275e30c1db560d6b75ab7968c8f092fd8f7a548de1"},
         "torch.log": {"bytes": 211, "sha256": "e7cf82e57bc7c28ec8a188c184528e2f9a54892d3154ab3de729ad7b9f0d04e0"}
       },
-      "receipt_self_hash": "7451d19a9dd7d10ae61e7759422625de300e3a5e4ae5b1b44dbc56d8f3173425",
-      "source_commit": "aec02920481bf9fc4650062f74191fde4943ce3a"
+      "receipt_self_hash": "d43c5adaf995c432ad31001cc86654025f5976e780d25951246aa5f4e5e14bf3",
+      "source_commit": "b6f54a4edec9d90a02c94ec79f8a9913f0a4cbdf"
     }
   },
   "schema": "tinystories-1m-exact-frontier-determinism-bundles-v2",
-  "source_commit": "aec02920481bf9fc4650062f74191fde4943ce3a"
+  "source_commit": "b6f54a4edec9d90a02c94ec79f8a9913f0a4cbdf"
 }
