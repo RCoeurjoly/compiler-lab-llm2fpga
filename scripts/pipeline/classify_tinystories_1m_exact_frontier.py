@@ -307,7 +307,10 @@ def _authenticate_pipeline_source(
     if dirty:
         raise RuntimeError(f"critical pipeline inputs are dirty:\n{dirty}")
 
-    archive_result = _run(["nix", "flake", "archive", "--json"], cwd=repo_root)
+    evidence_flake = f"git+file://{repo_root}?rev={evidence_commit}"
+    archive_result = _run(
+        ["nix", "flake", "archive", "--json", evidence_flake], cwd=repo_root
+    )
     archive = Path(json.loads(archive_result.stdout)["path"])
     archive_nar_hash = _run(["nix", "hash", "path", str(archive)], cwd=repo_root).stdout.strip()
 
@@ -400,6 +403,7 @@ def _authenticate_pipeline_source(
         "critical_inputs_clean": True,
         "flake_archive_path": str(archive),
         "flake_archive_nar_hash": archive_nar_hash,
+        "flake_archive_source": evidence_flake,
         "critical_inputs": critical,
         "export_derivation": export_derivation,
         "torch_derivation": torch_derivation,

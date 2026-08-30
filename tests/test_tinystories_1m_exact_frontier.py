@@ -428,6 +428,11 @@ class ExactFrontierReceiptTest(unittest.TestCase):
         self.assertTrue(source["task4_is_ancestor"])
         self.assertTrue(source["critical_inputs_clean"])
         self.assertRegex(source["flake_archive_nar_hash"], r"^sha256-")
+        self.assertTrue(
+            source["flake_archive_source"].endswith(
+                f"?rev={source['evidence_source_commit']}"
+            )
+        )
         required = {
             "flake.nix",
             "flake.lock",
