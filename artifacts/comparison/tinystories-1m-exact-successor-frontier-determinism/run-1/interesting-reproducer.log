@@ -1,0 +1,8 @@
+$ /home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/reproducers/tinystories-1m-exact-torch-mlir/interesting-left-shift.sh /home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/reproducers/tinystories-1m-exact-torch-mlir/bitwise-left-shift-tensor-scalar.mlir
+exit_code: 0
+--- stdout ---
+/home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/reproducers/tinystories-1m-exact-torch-mlir/bitwise-left-shift-tensor-scalar.mlir:4:10: error: failed to legalize operation 'torch.operator' that was explicitly marked illegal
+    %0 = torch.operator "torch.aten.bitwise_left_shift.Tensor_Scalar"(%arg0, %int16) : (!torch.vtensor<[4,64],si64>, !torch.int) -> !torch.vtensor<[4,64],si64>
+         ^
+/home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/reproducers/tinystories-1m-exact-torch-mlir/bitwise-left-shift-tensor-scalar.mlir:4:10: note: see current operation: %1 = "torch.operator"(%arg0, %0) <{name = "torch.aten.bitwise_left_shift.Tensor_Scalar"}> : (!torch.vtensor<[4,64],si64>, !torch.int) -> !torch.vtensor<[4,64],si64>
+--- stderr ---

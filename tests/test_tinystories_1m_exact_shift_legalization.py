@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -12,6 +15,18 @@ EXPECTED_ADAPTER_SHA256 = (
 )
 PATCH = ROOT / "patches/torch-mlir/legalize-bitwise-right-shift-tensor-scalar.patch"
 PLUGIN = ROOT / "tools/torch-mlir-passes/LegalizeBitwiseRightShiftTensorScalar.cpp"
+RIGHT_SHIFT_REPRODUCER = (
+    ROOT
+    / "reproducers"
+    / "tinystories-1m-exact-torch-mlir"
+    / "bitwise-right-shift-tensor-scalar.mlir"
+)
+LEFT_SHIFT_REPRODUCER = (
+    ROOT
+    / "reproducers"
+    / "tinystories-1m-exact-torch-mlir"
+    / "bitwise-left-shift-tensor-scalar.mlir"
+)
 
 
 def implementation_source() -> str:
@@ -73,6 +88,7 @@ class TinyStories1mExactShiftLegalizationTest(unittest.TestCase):
     def test_source_matches_only_the_exact_operator_and_signed_si64_tensor(self) -> None:
         source = implementation_source()
         self.assertIn("torch.aten.bitwise_right_shift.Tensor_Scalar", source)
+        self.assertNotIn("torch.aten.bitwise_left_shift.Tensor_Scalar", source)
         self.assertIn("ValueTensorType", source)
         self.assertIn("isSigned()", source)
         self.assertIn("getWidth() != 64", source)
@@ -97,6 +113,45 @@ class TinyStories1mExactShiftLegalizationTest(unittest.TestCase):
         self.assertIn("shift_contract:unsupported_dtype", source)
         self.assertIn("emitError", source)
         self.assertIn("signalPassFailure", source)
+
+    def test_packaged_pipeline_generates_arithmetic_right_shift_ir(self) -> None:
+        tool = shutil.which("torch-mlir-opt")
+        self.assertIsNotNone(tool, "test must run inside the pinned Nix environment")
+        pipeline = (
+            "builtin.module(func.func(torch-match-quantized-custom-ops), "
+            "torchdynamo-export-to-torch-backend-pipeline{ extra-library=}, "
+            "torch-backend-to-linalg-on-tensors-backend-pipeline)"
+        )
+        with tempfile.TemporaryDirectory(prefix="exact-right-shift-runtime-") as temporary:
+            output = Path(temporary) / "lowered.mlir"
+            result = subprocess.run(
+                [
+                    str(tool),
+                    f"-pass-pipeline={pipeline}",
+                    str(RIGHT_SHIFT_REPRODUCER),
+                    "-o",
+                    str(output),
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            generated = output.read_text(encoding="utf-8")
+        self.assertIn("arith.shrsi", generated)
+        self.assertNotIn("torch.aten.bitwise_right_shift.Tensor_Scalar", generated)
+
+    def test_successor_reproducer_preserves_exact_left_shift_operation_and_types(self) -> None:
+        self.assertTrue(LEFT_SHIFT_REPRODUCER.is_file())
+        text = LEFT_SHIFT_REPRODUCER.read_text(encoding="utf-8")
+
+        self.assertEqual(text.count("torch.operator"), 1)
+        self.assertIn('torch.aten.bitwise_left_shift.Tensor_Scalar', text)
+        self.assertIn(
+            "(!torch.vtensor<[4,64],si64>, !torch.int) -> "
+            "!torch.vtensor<[4,64],si64>",
+            text,
+        )
 
 
 if __name__ == "__main__":
