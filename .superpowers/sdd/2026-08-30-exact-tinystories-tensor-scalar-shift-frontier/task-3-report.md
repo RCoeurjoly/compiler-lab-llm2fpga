@@ -419,3 +419,62 @@ historical v1 verifier, archived round-2 v4 verifier, and current v4 verifier
 all returned `byte_identical: true`; the current receipt reported exactly 11
 canonical files and first invalid stage SCF. Directory diff, `git diff
 --check`, and the scoped source-diff also passed before the evidence commit.
+
+## Final whole-plan review fix: nested historical closure and two-branch SCF plan
+
+The final review reproduced the remaining nested-verifier gap through the
+public functions. Before implementation, adding `flat-scf.log` to both runs of
+either the successor-frontier or left-shift-success bundle was accepted. Hidden
+files and unexpected subdirectories were also accepted; the red public test
+class reported seven failures.
+
+Commit `8cb332dbf59ea92aa65af758c527e744c3a2479d` closes both nested schemas before
+any evidence file is read. Each run root and entry is inspected with `lstat`
+without following symlinks. Every entry must be a regular file, and its name
+must belong to the schema-defined canonical set plus exactly
+`noncanonical-metadata.json`. The permitted metadata file is parsed and must
+equal the corresponding manifest object. Public end-to-end tests cover the
+reviewer's two-run `flat-scf.log` attack in both schemas, hidden files in both
+schemas, missing canonical evidence, a symlinked canonical receipt, unexpected
+subdirectories, and a FIFO special entry. The focused historical class and
+both positive bundle tests passed all ten checks after the change.
+
+No canonical evidence was regenerated. The successor/left-success receipts
+already bind their historical verifier bytes through their source commits, and
+the verifier's existing current-or-historical source check accepted every
+preserved bundle unchanged. No artifact, reproducer, compiler patch, pipeline
+definition, or registered stage changed.
+
+The bounded SCF-registration plan now defines the classifier interface as the
+explicit union `AcceptedStageResult | ControlManifestFailure |
+CompilerFailure`. It separately specifies and tests (1) zero-exit unavailable
+or rejected control manifests and (2) nonzero compiler failures that produce
+no manifest. The compiler-failure branch preserves the Linalg input, complete
+log/diagnostic, tool/derivation/build command, operation/types when present,
+an exact interestingness script, reduction evidence, and a minimal reproducer
+when practical; it forbids fabricated or cross-branch manifest files. Receipt
+and directory-set rules are deterministic for both branches. This is planning
+only: SCF registration and compiler behavior remain unchanged.
+
+The result wording now distinguishes the evidence accurately: right shift is
+executed through the compiler-emitted JIT route, while left shift is checked by
+live PyTorch, an independent signed-si64 oracle, and generated `arith.shli`
+proof. The left/right legalization helpers now retain the real compiler stdout
+and whether the requested `-o` file existed. All rejected negative, excessive,
+dynamic, unsupported-dtype, and mismatched-type cases assert empty stdout and
+no output file.
+
+Final verification evidence:
+
+- the combined registration, semantic, classifier, determinism, and left/right
+  legalization suite ran 96 tests and returned `OK`;
+- the live semantic verifier accepted the stage artifact
+  `e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674`
+  and probe report
+  `645a87cdc4292ea584a04d4268187c612dd070b068036f9fa13b71865b36cbe6`;
+- the successor and left-shift-success public verifiers returned
+  `byte_identical: true`;
+- historical v1, archived SCF v1/v2/v3, and current v4 verifiers all returned
+  `byte_identical: true`; and
+- `python3 -m py_compile`, `git diff --check`, the no-evidence/no-compiler
+  scoped diff, and pre-final worktree checks passed.
