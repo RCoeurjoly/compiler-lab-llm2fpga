@@ -1,192 +1,189 @@
-# Task 3 report: exact frozen-generation equivalence
+# Task 3 report: authenticated exact frozen generation
 
 ## Status
 
-Implemented and verified. Three fresh `ExactModelBundle`/model instances each
-generate exactly the frozen sixteen-token sequence from prompt IDs
-`[7454, 2402, 257, 640]`:
+Implemented and verified. Three fresh `ExactModelBundle` instances each generate
+the exact frozen sixteen-token sequence from prompt IDs `[7454, 2402, 257, 640]`:
 
 ```text
 [11, 612, 373, 257, 1310, 2576, 3706, 20037,
  13, 1375, 6151, 284, 711, 2354, 287, 262]
 ```
 
-No model, arithmetic profile, backend, DDR3, PCIe, or board integration was
-changed. The compiler model is not registered by this task; the artifact opens
-the later lowering gate only after complete equality and leaves registration
-`performed: false`.
+Every eager and exported tensor is compared at every step for context lengths
+4 through 19. The proof performs 16 shape-specific exports and 48 exported
+replays. No model semantics, arithmetic profile, backend, DDR3, PCIe, board
+integration, or compiler-model registration was changed.
 
-## Authenticated inputs and fail-closed boundary
+## Fail-closed authority
 
-The verifier consumes the authenticated Task 2 bundle and rejects drift before
-export or candidate generation. It binds:
+Before any export or eager candidate execution, the verifier now authenticates
+complete canonical equality of every live bundle component against its on-disk
+and Task 2 authority:
 
-- Task 1 commit `c8eb2011ee09c368accdf8efd67c50dfc5564679`, contract file SHA-256
-  `859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c`,
-  and audit file/payload hashes;
-- Task 2 commit `a2eda783819bbfb35a833d1a45d3dd125a176973`, exact-model artifact file/self
-  hashes, model receipt, and independent fixed-logits oracle identity;
-- the complete current Task 2 source closure already authenticated by its
-  artifact;
-- the live model state SHA-256
-  `0c55aba9769d1cf836cb9fae7d39e9ea1ce8cef2e2e617acbe1cd465e2b16c66`,
-  compared against Task 2's authenticated exported-state digest;
-- this verifier source SHA-256
-  `ceac99c378108ca7589ff38f99d671c8254b25654e3235940d3897d95ba0e562`
-  and test source SHA-256
-  `13b7a5564ea558c745ed99a93010309960a8039d8de48c1dfad4afaf9c959fb9`.
+- Task 1 contract and audit, including audit self-hash;
+- Task 2 fixed Q/DQ profile and reachable-domain certificate, including their
+  self-hashes and file identities;
+- the package manifest at the origin authenticated by the contract and Task 2;
+- the independent fixed-logits oracle and the entire live `oracle_logits`
+  tensor;
+- the Task 2 receipt, including all nested execution/oracle fields and receipt
+  self-hash;
+- all 257 live model-state tensors by name, dtype, shape, raw bytes, canonical
+  tensor-manifest hash, and Task 2 named-state digest.
 
-The external fixed reference remains the Task 2 authority only. It is not
-called as the Task 3 candidate. A regression test mutates a live model buffer
-while preserving the receipt and confirms rejection as
-`task_2_model_state_mismatch` before any export.
+The accepted identities are Task 1 commit
+`c8eb2011ee09c368accdf8efd67c50dfc5564679` and Task 2 commit
+`a2eda783819bbfb35a833d1a45d3dd125a176973`. Authority data recorded in the
+Task 3 artifact is derived only from already validated disk objects; no
+unvalidated live identity is copied into the authority.
 
-## Complete eager/exported execution
+Adversarial tests consistently rehash nested mutations in the contract, audit,
+fixed profile, reachable certificate, manifest, independent oracle, oracle
+logits, and receipt. Each mutation fails before generation. A live model-buffer
+mutation with an unchanged receipt is rejected as `task_2_model_state_mismatch`.
 
-Task 2's export is correctly treated as static to its input shape. Task 3
-creates exactly one deterministic trace export for each context length 4
-through 19, replays that export once for each of the three fresh bundles, then
-releases the active program before exporting the next length. The artifact
-records 16 exports and 48 actual replays; it never compares only the first
-step.
+## Exported state and execution proof
 
-For every run and every step, eager and exported execution compare:
+`_TraceOutputs` adds exactly one proven wrapper prefix, `model.`, to exported
+state names. For every context-length export the verifier removes only that
+prefix, rejects any absent/unproven prefix or name collision, then derives the
+canonical name/dtype/shape/bytes manifest. Every export must match the complete
+authenticated Task 2 model state before it can be replayed.
 
-- the complete current 50,257-element fixed-point logits vector and the full
-  context logits tensor, with canonical and little-endian signed-int64 hashes;
-- all 12 block-0 checkpoint hashes;
-- all 97 Q/DQ boundary groups (codes, scales, and dequantized values);
-- all 49 serial GEMV accumulator hashes;
-- all 33 nonlinear observation hashes.
-
-This is 191 named checkpoint/observation groups and 385 observation tensor
-hashes per execution mode per step. A mismatch records its run, step, context
-length, exact nested field/checkpoint path, and eager/exported values, stops
-generation, and closes the registration gate.
-
-Greedy selection explicitly finds every ID equal to the maximum and selects
-the smallest ID. A focused tie test verifies IDs 1 and 2 tied at the maximum
-select ID 1.
-
-## Determinism and artifact
-
-All three fresh runs have identical authenticated transcript SHA-256:
+The normalized model-state tensor-manifest SHA-256 is:
 
 ```text
-9ab20b2b61ab58e7b1d6a1c89e4ccb070d0fe93b9bcd8d14f74bfe321ee9c6d7
+1f56e70699f45f702b6a765960b60246f13a5a8d74f53d318b1a1e9839f66403
 ```
 
-Their run hashes (which additionally bind each deterministic run index) are:
+The Task 2 named-state SHA-256 is:
 
 ```text
-cfd1ac8116ccd6baedc710a6df7bf26e7fbc7f3463cddfdc91760d537f207006
-07b85cab82bab9225ac5b45e9cc08f7df4b91695d82d59ed0412c3b3cce8410d
-ec8f8d622ade2dc11a8fb15c3b4f5afb3d6a33913f73150510596ba6eac732f3
+0c55aba9769d1cf836cb9fae7d39e9ea1ce8cef2e2e617acbe1cd465e2b16c66
 ```
 
-The combined three-run SHA-256 is
-`f621ed3d9133554d840adcdf5db2d7158dd8d5abe0d310a98c10556591321fce`.
-The per-length export cache identity is
-`024bb8a6356f556f6b0a820cfebaa79287a17e7e483fc6bfba9558efe38da613`.
+Sharing the shape-specific exports across the three fresh runs is permitted
+only after every fresh bundle independently passes the same complete authority
+and state proof. Each of the 48 replays directly compares all 386 returned
+tensors with `torch.equal`, including:
 
-The checked artifact is
-`artifacts/reference/tinystories-1m-exact-generation.json`:
+- full context logits and the current 50,257-element logits vector;
+- 12 block-0 checkpoints;
+- 97 Q/DQ groups, each with codes, scales, and dequantized values;
+- 49 serial GEMV accumulator tensors;
+- 33 nonlinear-boundary tensors.
 
-- canonical artifact self-hash:
-  `77fadf7d78008e171d05671e10f861770d94f5b113f6f23b0acf6e694c877a52`;
-- file SHA-256:
-  `44019cb3258d58ae8b8112aec43a8bf4b3fd052c4b341f06c1ba6400b8add902`;
-- generation result SHA-256:
-  `fede4cd11c6f914acfab7a24e4956e55c092cbff64d0b36b9dfc42c5b6e09b72`.
+The canonical named observation hashes are also compared. Greedy selection
+explicitly finds all IDs equal to the maximum and chooses the smallest ID.
 
-The artifact contains every step hash, per-step eager/exported evidence, all
-sixteen exported-program identities, three deterministic run hashes, Task 1/2
-identities, and verifier/test hashes. Consistently self-rehashed mutations of
-either Task identity, the test hash, a later-step logits hash, or the third-run
-transcript are rejected against freshly reconstructed evidence.
+## Compact authenticated artifact
+
+The v2 artifact stores one canonical named evidence set for each of the 16
+common trajectory steps. Successful per-mode/per-run records retain only step
+evidence digests, counters, references to the canonical evidence, transcript
+hashes, run hashes, and generated tokens. Full dual eager/exported evidence is
+stored only on a mismatch. The generator still computes and compares every
+tensor in every replay before producing this summary.
+
+The artifact shrank from 4,654,703 bytes to 954,676 bytes. Its final identities
+are:
+
+```text
+artifact self SHA-256: 2e4f35b2875127bff7d74bcdc404edd3afad1c8fc6693dca05cd7a1636b22b69
+artifact file SHA-256: b15fe696a21b8fa9ddf0ae17c6cc264c8cac0dbbdd51880b924452de5d388762
+generation result SHA-256: 3113e57cc016292804beb2e35e6443ca8fc7cd1439272abde0cb62edc1c77524
+export-cache SHA-256: 6e3fcc27e15b215ad3a7f7c4490003809f46fba6c69d2460dc271723f5112613
+```
+
+All three transcript hashes are identical:
+
+```text
+2a0a0bf878c3a3774e108b780f4ab38fb59695bdd59201489db4df6e4f3cbb38
+```
+
+The three-run aggregate is
+`8a1c001212d5922cbd6ede9bf532c316b6a63dde85f7ccd9576476bfba4e2b62`.
+The run hashes, which also bind deterministic run indices, are:
+
+```text
+d4051da20773937685bad41ee1aa24e3972f5f4fbf5bc846066f4ff84976e1ca
+6085530b3f1d95554f3eb9299005dca87ca35e6b16b7d93aecb6e1e8ab06b785
+9b954be2d24be2acdeb6a19d14424db548354925d8630b48dd45f42040b2025d
+```
+
+The verifier and test source hashes embedded in the artifact are:
+
+```text
+verifier: bc615fd47b7b224198be9ea7a4e88aff2797df993bf2979e5b1de19447722d2b
+tests:    92e129e2d216ac71ccb70c422975d858e5e286ecd0fbccc5727c20c32e72c2c0
+```
+
+Offline validation rederives the artifact self-hash, source hashes, schema,
+Task 1/2 identities, complete compact-evidence hashes, all per-mode aggregates,
+counters, transcripts, run hashes, and generation result root. A consistently
+rehashed later-step observation changes the aggregate digest and is rejected.
+Artifact tests do not require the external package or model snapshot; only the
+expensive reproduction is conditional on those paths.
+
+`completed_runs` counts a run only when it has all 16 expected tokens, exactly
+16 matched steps, and no mismatch. A cheap regression covers full-token but
+partial-step, partial-token, and early-mismatch cases.
 
 ## TDD record
 
-The required initial red was observed before the verifier existed:
+The review fixes were implemented through focused red/green cycles:
 
-```text
-nix develop -c python -m unittest tests/test_tinystories_1m_exact_generation.py -v
-ERROR: FileNotFoundError: scripts/comparison/verify_tinystories_1m_exact_generation.py
-FAILED (errors=1)
-```
+- complete live-component mutations initially passed for seven previously
+  ignored identities; the completed authority closure rejects all of them;
+- normalized export-state and mode-aggregate tests initially failed because
+  their helpers did not exist, then passed after canonical binding was added;
+- the partial-run regression initially failed because completed-run accounting
+  did not exist, then passed after exact completion criteria were added;
+- the offline compact-artifact suite failed against the old 4.65 MB v1 artifact
+  on size, schema, mode summaries, and normalized export binding, then passed
+  against the generated v2 artifact.
 
-The first complete implementation run proved the full generation core: all
-16 tokens in all three runs and every context 4 through 19 matched. Only the
-two artifact tests remained red because the artifact had not yet been
-generated:
-
-```text
-Ran 7 tests in 1975.159s
-FAILED (errors=2: missing tinystories-1m-exact-generation.json)
-```
-
-Local review then added two test-first hardening cycles. A mutated in-memory
-model initially entered the expensive export path instead of rejecting; the
-red run was interrupted after the failure mode was demonstrated. After the
-state binding was implemented, it passed in 0.255s. The first-checkpoint
-reporting test initially received only `checkpoint_sha256` rather than the
-exact `block.output` path; it passed after recursive mismatch reporting was
-implemented. Both focused hardening tests pass together in 0.259s.
+The final cheap/offline/authentication gate ran 11 tests in 0.935 seconds and
+passed. It includes independently rederived aggregate hashes and consistently
+self-rehashed drift tests.
 
 ## Verification and timing
 
-Final artifact generation:
+Single final artifact generation:
 
 ```text
-nix develop -c python scripts/comparison/verify_tinystories_1m_exact_generation.py \
-  --contract artifacts/reference/tinystories-1m-exact-input-contract.json \
-  --package /home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m \
-  --model-path /home/roland/.cache/huggingface/hub/models--roneneldan--TinyStories-1M/snapshots/77f1b168e219585646439073245fe87e56b3023e \
-  --output artifacts/reference/tinystories-1m-exact-generation.json
-77fadf7d78008e171d05671e10f861770d94f5b113f6f23b0acf6e694c877a52
-elapsed=1687.16s maxrss=4234476KB
+nix develop -c python scripts/comparison/verify_tinystories_1m_exact_generation.py ...
+elapsed=1690.30s maxrss=4234884KB
 ```
 
-Final focused suite on the exact commit candidate:
+The authenticated result root was then pinned and only the verifier source and
+artifact self-hashes were deterministically rebound; the three full model runs
+were not repeated for this mechanical rebind.
+
+Final full Task 3 reproduction suite:
 
 ```text
 nix develop -c python -m unittest tests/test_tinystories_1m_exact_generation.py -v
-Ran 9 tests in 1914.363s — OK
-elapsed=1920.77s maxrss=4302928KB
+Ran 16 tests in 1848.862s — OK
+elapsed=1857.93s maxrss=4352476KB
 ```
 
-Task 2 authority regressions on the same tree:
+Final Task 2 authority regressions:
 
 ```text
 nix develop -c python -m unittest -v \
   tests.test_tinystories_1m_exact_reachable_domain \
   tests.test_tinystories_1m_exact_package_model
-Ran 24 tests in 117.689s — OK
-elapsed=121.98s maxrss=1318244KB
+Ran 24 tests in 119.780s — OK
+elapsed=126.99s maxrss=1317992KB
 ```
-
-The static-export traversal was changed from retaining all sixteen programs
-to retaining only the active length after the first complete run. Peak RSS
-fell from 8,547,996KB to approximately 4.3GB without changing the required 16
-exports or 48 replays.
 
 ## Concerns
 
-- The proof is intentionally expensive: the final focused run takes about 32
-  minutes and peaks near 4.3GB RSS because each static shape must capture the
-  full logits and observation graph.
-- The authenticated package and Hugging Face snapshot are external immutable
-  inputs at the absolute paths used by Tasks 1/2; tests skip if they are not
-  present.
-- Fresh bundles are newly constructed bundle/model instances copied from the
-  already authenticated in-memory authority. Their complete state is checked
-  against Task 2 before generation; they do not re-read or call the external
-  oracle as candidates.
-- This task proves the exact software/export input to lowering. It makes no
-  board-authentication, timing, resource, DDR3, or PCIe claim.
-
-## Commit
-
-The implementation/report commit is recorded in the external task handoff;
-this report cannot truthfully contain the hash of the commit that contains
-itself.
+- The full proof remains intentionally expensive: approximately 31 minutes and
+  4.35 GB peak RSS for the final suite, because all 16 static shapes and all
+  observation tensors are recomputed.
+- The expensive reproduction depends on the immutable external package and
+  Hugging Face snapshot at the Task 1/2 paths. Offline artifact integrity and
+  mutation tests remain available when those external paths are absent.
