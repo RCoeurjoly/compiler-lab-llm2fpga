@@ -43,6 +43,10 @@ not run.
   command/log fields. Exact store/tool paths and diagnostic locations are
   retained. The flake archive is pinned to the evidence commit rather than the
   dirty worktree.
+- Both actual final run bundles are tracked with their receipt, three canonical
+  logs, and a manifest of source, command, exit, size, file-hash, self-hash, and
+  noncanonical timing metadata. The verifier recomputes all bindings, checks
+  diagnostics, and byte-compares corresponding files.
 
 ## Executed commands and results
 
@@ -59,13 +63,18 @@ exit 1
 ```
 
 The exact capture command, temporary path, output/error log, environment-bound
-tool paths, and hashes are recorded in the machine receipt. The focused suite
-passes 24 tests under `nix develop`.
+tool paths, and hashes are recorded in the machine receipt. The combined
+focused suite passes 27 tests under `nix develop`.
 
 Two final fresh executions from `f26177e` produced byte-identical receipt JSON
 and byte-identical export, Torch, and capture logs. Run 1 started clean; run 2
 started with run 1's evidence files dirty. The observed runtimes were about two
 and three minutes and are deliberately not canonicalized into the receipt.
+The retained evidence is independently checked with:
+
+```text
+nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_determinism.py
+```
 
 ## Principal identities
 

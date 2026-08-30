@@ -60,6 +60,17 @@ byte-identical:
 The observed wall times were approximately two and three minutes; runtime is
 not part of canonical evidence.
 
+Both actual run bundles are retained under
+[`tinystories-1m-exact-frontier-determinism`](../../artifacts/comparison/tinystories-1m-exact-frontier-determinism/manifest.json).
+Each contains its receipt and three canonical logs. The manifest binds source
+commit, commands, exits, file sizes, raw file SHA-256 values, receipt self-hash,
+and explicitly noncanonical timestamps/runtime. Independently verify all
+bindings and byte comparisons with:
+
+```text
+nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_determinism.py
+```
+
 ## Executed registered builds
 
 ```text

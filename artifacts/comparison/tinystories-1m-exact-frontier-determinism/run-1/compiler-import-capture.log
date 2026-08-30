@@ -1,0 +1,29 @@
+$ /nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py --exported-program-dir /nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported --out <capture-tmp>/requested-torch.mlir
+exit_code: 1
+--- stdout ---
+--- stderr ---
+/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/lib/python3.11/site-packages/torch/export/pt2_archive/_package.py:682: UserWarning: The given buffer is not writable, and PyTorch does not support non-writable tensors. This means you can write to the underlying (supposedly non-writable) buffer using the tensor. You may want to copy the buffer to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /build/pytorch/torch/csrc/utils/tensor_new.cpp:1581.)
+  tensor = torch.frombuffer(
+loc("/build/exact-adapter-root/TinyStories/model_adapter_exact_package.py":879:0): error: failed to legalize operation 'torch.operator' that was explicitly marked illegal
+Traceback (most recent call last):
+  File "/nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py", line 73, in <module>
+    main()
+  File "/nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py", line 46, in main
+    module = export_and_import(exported, output_type=args.output_type)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/swlkp7wlw75vv2i3l2f1dh8phnd33jqv-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages/torch_mlir/torch_mlir/fx.py", line 147, in export_and_import
+    return _module_lowering(
+           ^^^^^^^^^^^^^^^^^
+  File "/nix/store/swlkp7wlw75vv2i3l2f1dh8phnd33jqv-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages/torch_mlir/torch_mlir/fx.py", line 80, in _module_lowering
+    run_pipeline_with_repro_report(
+  File "/nix/store/swlkp7wlw75vv2i3l2f1dh8phnd33jqv-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages/torch_mlir/torch_mlir/compiler_utils.py", line 136, in run_pipeline_with_repro_report
+    raise TorchMlirCompilerError(trimmed_message) from None
+torch_mlir.compiler_utils.TorchMlirCompilerError: Lowering TorchFX IR -> Torch Backend IR failed with the following diagnostics:
+
+
+python exception: Failure while executing pass pipeline
+
+For Torch-MLIR developers, the error can be reproduced with:
+$ torch-mlir-opt -pass-pipeline='builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=})' <capture-tmp>/UnnammedModule.mlir
+Add '-mlir-print-ir-after-all -mlir-disable-threading' to get the IR dump for debugging purpose.
+
