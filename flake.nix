@@ -933,6 +933,14 @@
             packages = pipelineStagePackagesNoHandshake;
             stages = noHandshakeLinalgStages;
           }
+          {
+            alias = "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake";
+            model = "tiny-stories-1m-kev-gpt-exact";
+            frontend = "linalg";
+            backend = "calyx-native-sv";
+            packages = pipelineStagePackagesNoHandshake;
+            stages = noHandshakeLinalgStages;
+          }
         ];
         pipelineAliasPackages = mkPipelineAliases pipelineAliasSpecs;
         rcWorkingSystem = import ./nix/rc-working-system.nix {

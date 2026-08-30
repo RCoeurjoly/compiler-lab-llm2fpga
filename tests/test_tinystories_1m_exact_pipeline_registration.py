@@ -85,6 +85,57 @@ def load_exact_export_command() -> str:
 
 
 class TinyStories1mExactPipelineRegistrationTest(unittest.TestCase):
+    def test_exact_model_registers_existing_linalg_no_handshake_route(self) -> None:
+        alias = "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake"
+        flake = (ROOT / "flake.nix").read_text(encoding="utf-8")
+        self.assertIn(f'alias = "{alias}";', flake)
+        self.assertIn('model = "tiny-stories-1m-kev-gpt-exact";', flake)
+        for stage in ("torch", "linalg", "scf", "flat-scf", "calyx", "calyx-native-sv"):
+            result = subprocess.run(
+                ["nix", "eval", "--raw", f".#packages.x86_64-linux.{alias}-{stage}"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(result.stdout.startswith("/nix/store/"))
+
+    def test_exact_no_handshake_alias_reuses_authenticated_prefix(self) -> None:
+        alias = "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake"
+        for stage in ("torch", "linalg"):
+            direct = subprocess.run(
+                [
+                    "nix",
+                    "eval",
+                    "--raw",
+                    f".#packages.x86_64-linux.tiny-stories-1m-kev-gpt-exact-{stage}",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+            alias_result = subprocess.run(
+                [
+                    "nix",
+                    "eval",
+                    "--raw",
+                    f".#packages.x86_64-linux.{alias}-{stage}",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(direct.returncode, 0, direct.stderr)
+            self.assertEqual(alias_result.returncode, 0, alias_result.stderr)
+            self.assertEqual(alias_result.stdout, direct.stdout)
+        pipeline_diff = subprocess.run(
+            ["git", "diff", "--exit-code", "HEAD^", "--", "nix/pipeline.nix", "patches/torch-mlir"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(pipeline_diff.returncode, 0, pipeline_diff.stdout + pipeline_diff.stderr)
+
     def test_exact_adapter_loads_through_the_export_materializer(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             result = subprocess.run(
