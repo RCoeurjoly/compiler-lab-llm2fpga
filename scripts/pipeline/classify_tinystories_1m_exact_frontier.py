@@ -125,6 +125,139 @@ class FrontierReceipt:
     diagnostic: str | None
 
 
+def _serialize_frontier_evidence(
+    *,
+    stage: str,
+    result: ControlManifestFailure | CompilerFailure,
+    canonical_root: str,
+    manifest_binding: dict[str, object] | None = None,
+    interestingness: dict[str, object] | None = None,
+    minimization: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Serialize the fail-closed evidence union for one rejected stage."""
+
+    if isinstance(result, ControlManifestFailure):
+        if interestingness is not None or minimization is not None:
+            raise ValueError("control manifest cannot carry compiler minimization")
+        if manifest_binding is None:
+            raise ValueError("control manifest binding is required")
+        try:
+            manifest_value = json.loads(result.manifest.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError(f"cannot serialize control manifest: {error}") from error
+        if not isinstance(manifest_value, dict):
+            raise ValueError("control manifest must be a JSON object")
+        return {
+            "kind": "control_manifest",
+            "manifest": {
+                **manifest_binding,
+                "stage": manifest_value.get("stage"),
+                "status": manifest_value.get("status"),
+                "reason": manifest_value.get("reason"),
+            },
+            "operation": None,
+            "types": None,
+            "minimization": {
+                "status": "not_applicable",
+                "reason": "control_manifest_is_minimal",
+            },
+        }
+
+    if manifest_binding is not None:
+        raise ValueError("compiler failure cannot carry a manifest")
+    if interestingness is None or minimization is None:
+        raise ValueError("compiler failure requires interestingness and minimization evidence")
+    return {
+        "kind": "compiler_failure",
+        "manifest": None,
+        "diagnostic": result.diagnostic,
+        "operation": result.operation,
+        "types": result.types,
+        "interestingness": interestingness,
+        "minimization": minimization,
+    }
+
+
+def _write_interestingness_test(
+    path: Path,
+    *,
+    build_command: str,
+    upstream_input: Path,
+    expected_exit: int,
+    expected_diagnostic: str,
+    operation: str | None,
+    types: str | None,
+) -> None:
+    """Write an exact candidate-substituting compiler-failure predicate."""
+
+    source = str(upstream_input)
+    if build_command.count(source) != 1:
+        raise ValueError("build command must contain the bound upstream input exactly once")
+    candidate_command = build_command.replace(source, '"${candidate}"')
+    expected_operation = operation or ""
+    expected_types = types or ""
+    script = f"""#!/usr/bin/env bash
+set -uo pipefail
+if [[ $# -ne 1 || ! -f $1 ]]; then
+  echo "usage: $0 CANDIDATE" >&2
+  exit 2
+fi
+candidate=$1
+work=$(mktemp -d)
+trap 'rm -rf -- "$work"' EXIT
+out="$work/output"
+export out
+set +e
+{candidate_command} >"$work/stdout" 2>"$work/stderr"
+actual_exit=$?
+set -e
+while IFS= read -r line; do printf '%s\n' "$line"; done <"$work/stdout" >"$work/combined"
+while IFS= read -r line; do printf '%s\n' "$line"; done <"$work/stderr" >>"$work/combined"
+diagnostic=""
+while IFS= read -r line; do
+  lower=${{line,,}}
+  case "$lower" in
+    *"failed to legalize operation"*|*"unhandled operation"*|*"llvm error"*)
+      if [[ -n $diagnostic ]]; then diagnostic+=$'\\n'; fi
+      diagnostic+="$line"
+      ;;
+  esac
+done <"$work/combined"
+if [[ -z $diagnostic ]]; then
+  while IFS= read -r line; do
+    lower=${{line,,}}
+    case "$lower" in
+      *"error: builder for"*|*"dependencies of derivation"*|*"error: build of"*) ;;
+      *"error:"*)
+        if [[ -n $diagnostic ]]; then diagnostic+=$'\\n'; fi
+        diagnostic+="$line"
+        ;;
+    esac
+  done <"$work/combined"
+fi
+contains_bound_text() {{
+  local needle=$1
+  [[ -z $needle ]] && return 0
+  while IFS= read -r line; do [[ $line == *"$needle"* ]] && return 0; done <"$work/combined"
+  while IFS= read -r line; do [[ $line == *"$needle"* ]] && return 0; done <"$candidate"
+  return 1
+}}
+expected_exit={expected_exit}
+expected_diagnostic={shlex.quote(expected_diagnostic)}
+expected_operation={shlex.quote(expected_operation)}
+expected_types={shlex.quote(expected_types)}
+if [[ $actual_exit -ne $expected_exit || $diagnostic != "$expected_diagnostic" ]]; then
+  printf 'interestingness mismatch: exit=%s diagnostic=%q\n' "$actual_exit" "$diagnostic" >&2
+  exit 1
+fi
+contains_bound_text "$expected_operation" || {{ echo "operation mismatch" >&2; exit 1; }}
+contains_bound_text "$expected_types" || {{ echo "types mismatch" >&2; exit 1; }}
+printf 'interesting candidate: %s\n' "$candidate"
+"""
+    path.write_text(script, encoding="utf-8")
+    path.chmod(0o755)
+
+
 def _registered_attribute(model: str, stage: str) -> str:
     if model != "tiny-stories-1m-kev-gpt-exact":
         raise ValueError(f"unsupported exact model: {model}")
@@ -1201,6 +1334,32 @@ def _control_manifest_failure(
     )
 
 
+def _normalized_terminal_diagnostic(text: str) -> str:
+    lines = [line.strip() for line in text.splitlines()]
+    specific = [
+        line
+        for line in lines
+        if re.search(
+            r"failed to legalize operation|unhandled operation|LLVM ERROR",
+            line,
+            re.IGNORECASE,
+        )
+    ]
+    if specific:
+        return "\n".join(specific)
+    generic = [
+        line
+        for line in lines
+        if re.search(r"\berror:\s", line, re.IGNORECASE)
+        and not re.search(
+            r"error: (?:builder for|build of|\d+ dependencies of derivation)",
+            line,
+            re.IGNORECASE,
+        )
+    ]
+    return "\n".join(generic)
+
+
 def _classify_registered_result(
     stage: str,
     exit_code: int,
@@ -1213,16 +1372,13 @@ def _classify_registered_result(
             raise RuntimeError(f"{stage}: compiler failure has no preserved upstream input")
         if not log.is_file():
             raise RuntimeError(f"{stage}: compiler failure log does not exist: {log}")
-        diagnostic_lines = [
-            line.strip()
-            for line in log.read_text(encoding="utf-8", errors="replace").splitlines()
-            if _TERMINAL_DIAGNOSTIC_RE.search(line)
-        ]
-        if not diagnostic_lines:
+        diagnostic = _normalized_terminal_diagnostic(
+            log.read_text(encoding="utf-8", errors="replace")
+        )
+        if not diagnostic:
             raise RuntimeError(
                 f"{stage}: nonzero registered build had no classifiable compiler diagnostic"
             )
-        diagnostic = "\n".join(diagnostic_lines)
         operation_match = re.search(
             r"failed to legalize operation\s+['\"]([^'\"]+)['\"]"
             r"(?:\s*:\s*([^\n]+))?",
@@ -1332,6 +1488,183 @@ def _capture_full_input(source: Path, destination: Path) -> tuple[int, str]:
     return byte_count, digest.hexdigest()
 
 
+def _evidence_binding(path: Path, canonical_path: str) -> dict[str, object]:
+    return {
+        "path": canonical_path,
+        "bytes": path.stat().st_size,
+        "sha256": _sha256(path),
+    }
+
+
+def _mlir_reduce_for_build_command(build_command: str) -> Path | None:
+    optimizers = [
+        Path(value.rstrip("'\"),;"))
+        for value in re.findall(
+            r"/nix/store/[A-Za-z0-9+._?=-]+/bin/mlir-opt", build_command
+        )
+    ]
+    reducers = sorted({optimizer.with_name("mlir-reduce") for optimizer in optimizers})
+    available = [path for path in reducers if path.is_file()]
+    if len(available) > 1:
+        raise RuntimeError(f"multiple bound mlir-reduce candidates: {available}")
+    return available[0] if available else None
+
+
+def _run_interestingness(
+    script: Path,
+    candidate: Path,
+    log: Path,
+    *,
+    repo_root: Path,
+    ephemeral_paths: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    return _run_and_log(
+        [str(script), str(candidate)],
+        cwd=repo_root,
+        log=log,
+        ephemeral_paths=ephemeral_paths,
+    )
+
+
+def _capture_compiler_minimization(
+    *,
+    repo_root: Path,
+    evidence_dir: Path,
+    canonical_root: str,
+    result: CompilerFailure,
+    execution: dict[str, object],
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Capture exact interestingness and make one bounded reduction attempt."""
+
+    script = evidence_dir / "interestingness-test.sh"
+    _write_interestingness_test(
+        script,
+        build_command=str(execution["derivation_build_command"]),
+        upstream_input=result.upstream_input,
+        expected_exit=int(execution["exit_code"]),
+        expected_diagnostic=result.diagnostic,
+        operation=result.operation,
+        types=result.types,
+    )
+    full_log = evidence_dir / "interesting-full.log"
+    full_result = _run_interestingness(
+        script,
+        result.upstream_input,
+        full_log,
+        repo_root=repo_root,
+        ephemeral_paths={
+            str(evidence_dir): "<evidence-dir>",
+            str(result.upstream_input): "<full-input>",
+        },
+    )
+    interestingness = {
+        "test": _evidence_binding(
+            script, f"{canonical_root}/interestingness-test.sh"
+        ),
+        "full_log": _evidence_binding(
+            full_log, f"{canonical_root}/interesting-full.log"
+        ),
+        "expected_exit": int(execution["exit_code"]),
+        "normalized_terminal_diagnostic": result.diagnostic,
+    }
+    reduction_log = evidence_dir / "reduction.log"
+    if full_result.returncode != 0:
+        reduction_log.write_text(
+            "full input did not satisfy the exact interestingness predicate\n",
+            encoding="utf-8",
+        )
+        return interestingness, {
+            "status": "not_practical",
+            "reason": "full_input_not_interesting",
+            "reduction_log": _evidence_binding(
+                reduction_log, f"{canonical_root}/reduction.log"
+            ),
+        }
+
+    mlir_reduce = _mlir_reduce_for_build_command(
+        str(execution["derivation_build_command"])
+    )
+    if mlir_reduce is None:
+        reduction_log.write_text(
+            "mlir-reduce is unavailable beside the bound mlir-opt tool\n",
+            encoding="utf-8",
+        )
+        return interestingness, {
+            "status": "not_practical",
+            "reason": "mlir_reduce_unavailable",
+            "reduction_log": _evidence_binding(
+                reduction_log, f"{canonical_root}/reduction.log"
+            ),
+        }
+
+    full_working = evidence_dir / "full-input.mlir"
+    shutil.copyfile(result.upstream_input, full_working)
+    minimal = evidence_dir / "minimal-reproducer.mlir"
+    reduce_command = [
+        str(mlir_reduce),
+        f"--test={script}",
+        str(full_working),
+        "-o",
+        str(minimal),
+    ]
+    reduce_result = _run_and_log(
+        reduce_command,
+        cwd=repo_root,
+        log=reduction_log,
+        ephemeral_paths={str(evidence_dir): "<evidence-dir>"},
+    )
+    full_working.unlink()
+    reducer_binding = {
+        "path": str(mlir_reduce),
+        "bytes": mlir_reduce.stat().st_size,
+        "sha256": _sha256(mlir_reduce),
+    }
+    if reduce_result.returncode != 0 or not minimal.is_file():
+        if minimal.exists():
+            minimal.unlink()
+        return interestingness, {
+            "status": "not_practical",
+            "reason": "reduction_failed",
+            "mlir_reduce": reducer_binding,
+            "reduction_log": _evidence_binding(
+                reduction_log, f"{canonical_root}/reduction.log"
+            ),
+        }
+
+    reproducer_log = evidence_dir / "interesting-reproducer.log"
+    reproducer_result = _run_interestingness(
+        script,
+        minimal,
+        reproducer_log,
+        repo_root=repo_root,
+        ephemeral_paths={str(evidence_dir): "<evidence-dir>"},
+    )
+    if reproducer_result.returncode != 0:
+        minimal.unlink()
+        reproducer_log.unlink()
+        return interestingness, {
+            "status": "not_practical",
+            "reason": "reduction_failed",
+            "mlir_reduce": reducer_binding,
+            "reduction_log": _evidence_binding(
+                reduction_log, f"{canonical_root}/reduction.log"
+            ),
+        }
+    return interestingness, {
+        "status": "verified",
+        "mlir_reduce": reducer_binding,
+        "reduction_log": _evidence_binding(
+            reduction_log, f"{canonical_root}/reduction.log"
+        ),
+        "minimal_reproducer": _evidence_binding(
+            minimal, f"{canonical_root}/minimal-reproducer.mlir"
+        ),
+        "interesting_reproducer_log": _evidence_binding(
+            reproducer_log, f"{canonical_root}/interesting-reproducer.log"
+        ),
+    }
+
+
 def _run_registered_stage(
     repo_root: Path,
     evidence_dir: Path,
@@ -1342,11 +1675,7 @@ def _run_registered_stage(
 ) -> tuple[StageRecord, dict[str, object], RegisteredStageResult]:
     attribute = _registered_attribute(model, stage)
     derivation = _derivation(repo_root, attribute)
-    derivation_capture = (
-        _capture_derivation_evidence(evidence_dir, stage, derivation)
-        if stage in {"linalg", "scf"}
-        else {}
-    )
+    derivation_capture = _capture_derivation_evidence(evidence_dir, stage, derivation)
     command = [
         "nix",
         "build",
@@ -1489,16 +1818,15 @@ def build_current_frontier_receipt(
     for stage, record in zip(_FRONTIERS, stage_records):
         canonical_log = f"{canonical_root}/{stage}.log"
         executions[stage]["log"] = canonical_log
-        if stage in {"linalg", "scf"}:
-            executions[stage]["captured_derivation"] = (
-                f"{canonical_root}/{stage}.drv"
-            )
-            executions[stage]["captured_derivation_json"] = (
-                f"{canonical_root}/{stage}.derivation.json"
-            )
+        executions[stage]["captured_derivation"] = (
+            f"{canonical_root}/{stage}.drv"
+        )
+        executions[stage]["captured_derivation_json"] = (
+            f"{canonical_root}/{stage}.derivation.json"
+        )
 
     full_input: dict[str, object] | None = None
-    minimal: dict[str, object] | None = None
+    frontier_evidence: dict[str, object] | None = None
     if first_invalid is not None:
         failure_index = list(_FRONTIERS).index(first_invalid)
         if failure_index == 0:
@@ -1521,31 +1849,29 @@ def build_current_frontier_receipt(
         if isinstance(invalid_result, ControlManifestFailure):
             reproducer = evidence_dir / "minimal-reproducer.json"
             shutil.copyfile(invalid_result.manifest, reproducer)
-            minimal = {
-                "path": f"{canonical_root}/minimal-reproducer.json",
-                "bytes": reproducer.stat().st_size,
-                "sha256": _sha256(reproducer),
-                "diagnostic": invalid_result.diagnostic,
-                "stage": first_invalid,
-                "operation": None,
-                "types": None,
-                "operation_and_types_not_applicable": True,
-                "reduction": "The registered control manifest is the availability reproducer.",
-                "verified": True,
-            }
+            frontier_evidence = _serialize_frontier_evidence(
+                stage=first_invalid,
+                result=invalid_result,
+                canonical_root=canonical_root,
+                manifest_binding=_evidence_binding(
+                    reproducer, f"{canonical_root}/minimal-reproducer.json"
+                ),
+            )
         else:
-            minimal = {
-                "path": f"{canonical_root}/{first_invalid}.log",
-                "bytes": invalid_result.log.stat().st_size,
-                "sha256": _sha256(invalid_result.log),
-                "diagnostic": invalid_result.diagnostic,
-                "stage": first_invalid,
-                "operation": invalid_result.operation,
-                "types": invalid_result.types,
-                "operation_and_types_not_applicable": invalid_result.operation is None,
-                "reduction": "The preserved compiler log binds the nonzero terminal diagnostic.",
-                "verified": True,
-            }
+            interestingness, minimization = _capture_compiler_minimization(
+                repo_root=repo_root,
+                evidence_dir=evidence_dir,
+                canonical_root=canonical_root,
+                result=invalid_result,
+                execution=executions[first_invalid],
+            )
+            frontier_evidence = _serialize_frontier_evidence(
+                stage=first_invalid,
+                result=invalid_result,
+                canonical_root=canonical_root,
+                interestingness=interestingness,
+                minimization=minimization,
+            )
 
     decision = json.loads(
         (repo_root / "artifacts/comparison/tinystories-1m-exact-frontier-decision.json").read_text(
@@ -1554,7 +1880,7 @@ def build_current_frontier_receipt(
     )
     not_run = list(_FRONTIERS)[len(stage_records) :]
     receipt: dict[str, object] = {
-        "schema": "tinystories-1m-exact-current-pipeline-frontier-v4",
+        "schema": "tinystories-1m-exact-current-pipeline-frontier-v5",
         "model": model,
         "status": classification.status,
         "frontier": classification.frontier,
@@ -1595,7 +1921,7 @@ def build_current_frontier_receipt(
             "not_run": not_run,
         },
         "full_failing_input": full_input,
-        "minimal_reproducer": minimal,
+        "frontier_evidence": frontier_evidence,
         "claims": {
             "calyx_native_sv": classification.status == "complete",
             "syntax_validated": False,

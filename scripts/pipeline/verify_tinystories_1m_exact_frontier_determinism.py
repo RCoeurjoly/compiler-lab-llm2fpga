@@ -12,10 +12,21 @@ import re
 import shlex
 import stat
 import subprocess
+import tempfile
 from typing import Any
 
 
 _MODEL = "tiny-stories-1m-kev-gpt-exact"
+_ALIAS = "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake"
+_REGISTERED_ORDER = [
+    "pytorch-exported",
+    "torch",
+    "linalg",
+    "scf",
+    "flat-scf",
+    "calyx",
+    "calyx-native-sv",
+]
 _STAGES = ["pytorch-exported", "torch", "linalg", "scf"]
 _NOT_RUN = ["flat-scf", "calyx", "calyx-native-sv"]
 _DIAGNOSTIC = (
@@ -161,6 +172,72 @@ def _run(command: list[str], repo_root: Path) -> str:
     return result.stdout
 
 
+def _registered_attribute(stage: str) -> str:
+    return f"{_MODEL}-pytorch-exported" if stage == "pytorch-exported" else f"{_ALIAS}-{stage}"
+
+
+def _canonicalize_execution_text(
+    value: str,
+    ephemeral_paths: dict[str, str] | None = None,
+    *,
+    drop_git_dirty_warning: bool = False,
+    drop_nix_progress: bool = False,
+) -> str:
+    canonical = value
+    for actual, placeholder in sorted(
+        (ephemeral_paths or {}).items(), key=lambda item: len(item[0]), reverse=True
+    ):
+        canonical = canonical.replace(actual, placeholder)
+    lines = [line.rstrip() for line in canonical.splitlines()]
+    if drop_git_dirty_warning:
+        lines = [line for line in lines if not line.startswith("warning: Git tree ")]
+    if drop_nix_progress:
+        filtered: list[str] = []
+        in_store_path_list = False
+        for line in lines:
+            if re.fullmatch(
+                r"(?:this derivation|these \d+ derivations|these paths) will be (?:built|fetched):",
+                line,
+            ):
+                in_store_path_list = True
+                continue
+            if in_store_path_list and re.fullmatch(r"  /nix/store/\S+", line):
+                continue
+            in_store_path_list = False
+            if re.fullmatch(
+                r"(?:building|copying path) '/nix/store/[^']+'(?: from '\S+')?\.\.\.",
+                line,
+            ):
+                continue
+            filtered.append(line)
+        lines = filtered
+    return "\n".join(lines)
+
+
+def _canonical_execution_evidence(
+    receipt_command: list[str],
+    result: subprocess.CompletedProcess[str],
+    ephemeral_paths: dict[str, str] | None = None,
+) -> bytes:
+    command = _canonicalize_execution_text(shlex.join(receipt_command), ephemeral_paths)
+    stdout = _canonicalize_execution_text(
+        result.stdout, ephemeral_paths, drop_git_dirty_warning=True
+    )
+    stderr = _canonicalize_execution_text(
+        result.stderr,
+        ephemeral_paths,
+        drop_git_dirty_warning=True,
+        drop_nix_progress=True,
+    )
+    payload = f"$ {command}\nexit_code: {result.returncode}\n--- stdout ---\n"
+    if stdout:
+        payload += stdout + "\n"
+    payload += "--- stderr ---\n"
+    if stderr:
+        payload += stderr + "\n"
+    return payload.encode()
+
+
 def _build_command_file_bindings(build_command: str) -> list[dict[str, Any]]:
     candidates = re.findall(
         r"/nix/store/[A-Za-z0-9+._?=-]+(?:/[A-Za-z0-9+._?=/:-]+)?",
@@ -178,9 +255,12 @@ def _build_command_file_bindings(build_command: str) -> list[dict[str, Any]]:
 
 
 def _live_derivation(
-    repo_root: Path, stage: str, flake_reference: str = "."
+    repo_root: Path,
+    stage: str,
+    flake_reference: str = ".",
+    attribute: str | None = None,
 ) -> dict[str, Any]:
-    attribute = f"{_MODEL}-{stage}"
+    attribute = attribute or f"{_MODEL}-{stage}"
     document = json.loads(
         _run(
             ["nix", "derivation", "show", f"{flake_reference}#{attribute}"],
@@ -207,6 +287,140 @@ def _live_derivation(
         "build_command": build_command,
         "build_command_sha256": _sha256_bytes(build_command.encode()),
         "tool_bindings": _build_command_file_bindings(build_command),
+    }
+
+
+def _primary_artifact(stage: str, output: Path) -> Path:
+    if stage == "pytorch-exported":
+        return output / "exported.pt2"
+    if stage in {"torch", "linalg", "scf"}:
+        return output
+    if stage == "flat-scf":
+        return output / "flat.scf.mlir"
+    if stage == "calyx":
+        return output / "model.calyx.mlir"
+    if stage == "calyx-native-sv":
+        return output / "sv" / "main.sv"
+    raise VerificationError(f"unregistered stage: {stage}")
+
+
+def _git_source_bytes(repo_root: Path, source_commit: str, path: str) -> bytes:
+    result = subprocess.run(
+        ["git", "show", f"{source_commit}:{path}"], cwd=repo_root, capture_output=True
+    )
+    _require(result.returncode == 0, f"source commit lacks {path}")
+    return result.stdout
+
+
+def _independent_v5_trust(
+    repo_root: Path, source_commit: str, executed_stages: list[str]
+) -> dict[str, Any]:
+    """Replay the semantic gate first, then every registered alias derivation."""
+
+    semantic_command = [
+        "nix",
+        "develop",
+        "-c",
+        "python",
+        _SEMANTIC_VERIFIER,
+        "--probe-report",
+        _SEMANTIC_REPORT,
+    ]
+    semantic_evidence = json.loads(_run(semantic_command, repo_root))
+    decision = _load_json(repo_root / _DECISION)
+    _require(
+        decision.get("identity_hashes") == _FROZEN_IDENTITIES,
+        "live frozen Task 1-3 identities changed",
+    )
+    _require(
+        decision.get("sha256") == _DECISION_SELF_SHA256,
+        "live Task 2 decision identity changed",
+    )
+    predecessor_path = repo_root / _PREDECESSOR
+    predecessor = _load_json(predecessor_path)
+    _require(
+        _sha256_bytes(predecessor_path.read_bytes()) == _PREDECESSOR_FILE_SHA256,
+        "live predecessor file identity changed",
+    )
+    _require(
+        predecessor.get("sha256") == _PREDECESSOR_SELF_SHA256,
+        "live predecessor self identity changed",
+    )
+    source_flake = f"git+file://{repo_root}?rev={source_commit}"
+    derivations: dict[str, dict[str, Any]] = {}
+    for stage in executed_stages:
+        attribute = _registered_attribute(stage)
+        live = _live_derivation(
+            repo_root, stage, source_flake, attribute=attribute
+        )
+        actual_command = [
+            "nix",
+            "build",
+            "--no-link",
+            "--print-out-paths",
+            "-L",
+            f"{source_flake}#{attribute}",
+        ]
+        receipt_command = [
+            "nix",
+            "build",
+            "--no-link",
+            "--print-out-paths",
+            "-L",
+            f".#{attribute}",
+        ]
+        result = subprocess.run(
+            actual_command, cwd=repo_root, text=True, capture_output=True
+        )
+        live.update(
+            {
+                "exit_code": result.returncode,
+                "log_bytes": _canonical_execution_evidence(receipt_command, result),
+                "result": live["output"] if result.returncode == 0 else None,
+            }
+        )
+        output = Path(live["output"])
+        if result.returncode == 0:
+            manifest = output / "manifest.json" if output.is_dir() else None
+            artifact = (
+                manifest
+                if stage in {"scf", "flat-scf", "calyx", "calyx-native-sv"}
+                and manifest is not None
+                and manifest.is_file()
+                else _primary_artifact(stage, output)
+            )
+            live["artifact_bytes"] = artifact.read_bytes()
+            live["artifact_path"] = str(artifact)
+        derivations[stage] = live
+        if result.returncode != 0:
+            break
+    return {
+        "repo_root": repo_root,
+        "capture_tool_paths": {
+            "classifier": _CLASSIFIER,
+            "determinism_verifier": _VERIFIER,
+        },
+        "semantic_gate": {
+            "command": shlex.join(semantic_command),
+            "status": "accepted",
+            "verifier": _SEMANTIC_VERIFIER,
+            "verifier_sha256": _sha256_bytes(
+                _git_source_bytes(repo_root, source_commit, _SEMANTIC_VERIFIER)
+            ),
+            "probe_report": _SEMANTIC_REPORT,
+            "probe_report_sha256": _sha256_bytes(
+                (repo_root / _SEMANTIC_REPORT).read_bytes()
+            ),
+            "evidence": semantic_evidence,
+        },
+        "identities": _FROZEN_IDENTITIES,
+        "decision_self_sha256": _DECISION_SELF_SHA256,
+        "predecessor": {
+            "historical_bundle": "artifacts/comparison/tinystories-1m-exact-frontier-determinism",
+            "file_sha256": _PREDECESSOR_FILE_SHA256,
+            "self_sha256": _PREDECESSOR_SELF_SHA256,
+        },
+        "derivations": derivations,
     }
 
 
@@ -422,6 +636,439 @@ def _verify_v4_receipt(
     _require(minimal.get("path") == "reproducers/scf/minimal-reproducer.json", f"{run_name}: SCF reproducer path mismatch")
     _require(minimal.get("bytes") == len(manifest_bytes) and minimal.get("sha256") == _sha256_bytes(manifest_bytes), f"{run_name}: SCF manifest receipt mismatch")
     _require(stages[3].get("artifact_bytes") == len(manifest_bytes) and stages[3].get("artifact_sha256") == _sha256_bytes(manifest_bytes), f"{run_name}: SCF artifact/manifest mismatch")
+
+
+def _verify_file_binding(
+    binding: object,
+    files: dict[str, bytes],
+    filename: str,
+    canonical_root: str,
+    run_name: str,
+) -> bytes:
+    _require(isinstance(binding, dict), f"{run_name}: missing binding for {filename}")
+    data = files.get(filename)
+    _require(data is not None, f"{run_name}: missing {filename}")
+    _require(
+        binding.get("path") == f"{canonical_root}/{filename}",
+        f"{run_name}: path mismatch for {filename}",
+    )
+    _require(
+        binding.get("bytes") == len(data)
+        and binding.get("sha256") == _sha256_bytes(data),
+        f"{run_name}: binding mismatch for {filename}",
+    )
+    return data
+
+
+def _verify_v5_frontier_evidence(
+    receipt: dict[str, Any], files: dict[str, bytes], run_name: str
+) -> set[str]:
+    """Validate the v5 branch union and derive its exact regular-file set."""
+
+    pipeline = receipt.get("pipeline_execution")
+    stages = receipt.get("stages")
+    execution = receipt.get("registered_build_execution")
+    _require(isinstance(pipeline, dict), f"{run_name}: pipeline execution missing")
+    _require(isinstance(stages, list) and stages, f"{run_name}: stage evidence missing")
+    _require(isinstance(execution, dict), f"{run_name}: execution evidence missing")
+    registered = pipeline.get("registered_order")
+    sequence = [record.get("stage") for record in stages if isinstance(record, dict)]
+    first_invalid = pipeline.get("first_invalid_stage")
+    _require(
+        registered
+        == ["pytorch-exported", "torch", "linalg", "scf", "flat-scf", "calyx", "calyx-native-sv"]
+        and sequence == registered[: len(sequence)]
+        and first_invalid == sequence[-1]
+        and pipeline.get("stopped_after_first_invalid_stage") is True
+        and pipeline.get("not_run") == registered[len(sequence) :],
+        f"{run_name}: execution sequence/stop contract mismatch",
+    )
+    _require(set(execution) == set(sequence), f"{run_name}: execution stage set mismatch")
+    canonical_root = f"reproducers/{first_invalid}"
+    expected_files = {"receipt.json", "full-input.gz"}
+    for stage in sequence:
+        expected_files.update(
+            {f"{stage}.log", f"{stage}.drv", f"{stage}.derivation.json"}
+        )
+        record = next(item for item in stages if item.get("stage") == stage)
+        run = execution[stage]
+        log = files.get(f"{stage}.log")
+        _require(log is not None, f"{run_name}: missing {stage} log")
+        _require(
+            record.get("log_sha256") == _sha256_bytes(log)
+            and run.get("log_sha256") == _sha256_bytes(log),
+            f"{run_name}: failure log mismatch for {stage}",
+        )
+        for suffix, path_key, bytes_key, hash_key in (
+            ("drv", "captured_derivation", "captured_derivation_bytes", "captured_derivation_sha256"),
+            (
+                "derivation.json",
+                "captured_derivation_json",
+                "captured_derivation_json_bytes",
+                "captured_derivation_json_sha256",
+            ),
+        ):
+            filename = f"{stage}.{suffix}"
+            data = files.get(filename)
+            _require(data is not None, f"{run_name}: missing captured derivation {filename}")
+            _require(
+                run.get(path_key) == f"{canonical_root}/{filename}"
+                and run.get(bytes_key) == len(data)
+                and run.get(hash_key) == _sha256_bytes(data),
+                f"{run_name}: captured derivation binding mismatch for {stage}",
+            )
+
+    final_record = stages[-1]
+    final_run = execution[first_invalid]
+    _require(
+        final_record.get("artifact_accepted") is False
+        and final_run.get("artifact_accepted") is False,
+        f"{run_name}: invalid artifact was accepted",
+    )
+    _require(
+        isinstance(final_run.get("derivation_build_command"), str)
+        and bool(final_run["derivation_build_command"])
+        and final_run.get("derivation_build_command_sha256")
+        == _sha256_bytes(final_run["derivation_build_command"].encode()),
+        f"{run_name}: build command binding missing",
+    )
+    full = receipt.get("full_failing_input")
+    _require(isinstance(full, dict), f"{run_name}: full input binding missing")
+    archive = files.get("full-input.gz")
+    _require(
+        archive is not None
+        and full.get("path") == f"{canonical_root}/full-input.gz"
+        and full.get("archive_bytes") == len(archive)
+        and full.get("archive_sha256") == _sha256_bytes(archive),
+        f"{run_name}: full input archive mismatch",
+    )
+    try:
+        content = gzip.decompress(archive)
+    except (OSError, EOFError) as error:
+        raise VerificationError(f"{run_name}: invalid full input gzip: {error}") from error
+    _require(
+        full.get("content_bytes") == len(content)
+        and full.get("content_sha256") == _sha256_bytes(content),
+        f"{run_name}: full input content mismatch",
+    )
+
+    frontier = receipt.get("frontier_evidence")
+    _require(isinstance(frontier, dict), f"{run_name}: frontier evidence missing")
+    kind = frontier.get("kind")
+    if kind == "control_manifest":
+        _require(
+            final_record.get("exit_code") == 0 and final_run.get("exit_code") == 0,
+            f"{run_name}: control manifest requires zero exit",
+        )
+        _require(
+            frontier.get("operation") is None and frontier.get("types") is None,
+            f"{run_name}: control manifest operation/types must be null",
+        )
+        _require(
+            frontier.get("minimization")
+            == {"status": "not_applicable", "reason": "control_manifest_is_minimal"},
+            f"{run_name}: control manifest minimization mismatch",
+        )
+        manifest_binding = frontier.get("manifest")
+        _require(
+            "minimal-reproducer.json" in files,
+            f"{run_name}: control manifest is missing minimal-reproducer.json",
+        )
+        manifest_bytes = _verify_file_binding(
+            manifest_binding,
+            files,
+            "minimal-reproducer.json",
+            canonical_root,
+            run_name,
+        )
+        try:
+            manifest = json.loads(manifest_bytes)
+        except json.JSONDecodeError as error:
+            raise VerificationError(f"{run_name}: invalid control manifest: {error}") from error
+        _require(isinstance(manifest_binding, dict), f"{run_name}: control manifest binding missing")
+        _require(
+            isinstance(manifest, dict)
+            and manifest.get("stage") == first_invalid
+            and manifest.get("status") in {"unavailable", "rejected"}
+            and isinstance(manifest.get("reason"), str)
+            and bool(manifest["reason"])
+            and manifest_binding.get("stage") == manifest.get("stage")
+            and manifest_binding.get("status") == manifest.get("status")
+            and manifest_binding.get("reason") == manifest.get("reason"),
+            f"{run_name}: exact control manifest mismatch",
+        )
+        _require(
+            final_record.get("artifact_sha256") == _sha256_bytes(manifest_bytes)
+            and final_run.get("artifact_sha256") == _sha256_bytes(manifest_bytes),
+            f"{run_name}: control manifest artifact mismatch",
+        )
+        expected_files.add("minimal-reproducer.json")
+    elif kind == "compiler_failure":
+        _require(
+            isinstance(final_run.get("derivation_tool_bindings"), list)
+            and bool(final_run["derivation_tool_bindings"]),
+            f"{run_name}: tool binding missing",
+        )
+        _require(
+            final_record.get("exit_code") not in {None, 0}
+            and final_run.get("exit_code") == final_record.get("exit_code"),
+            f"{run_name}: compiler failure requires the same nonzero exit",
+        )
+        _require(frontier.get("manifest") is None, f"{run_name}: compiler failure cannot carry any manifest")
+        diagnostic = frontier.get("diagnostic")
+        _require(
+            isinstance(diagnostic, str)
+            and diagnostic == receipt.get("diagnostic")
+            and diagnostic.encode() in files[f"{first_invalid}.log"],
+            f"{run_name}: failure log lost normalized diagnostic",
+        )
+        _require(
+            final_record.get("artifact_sha256") == _sha256_bytes(content)
+            and final_run.get("artifact_sha256") == _sha256_bytes(content)
+            and final_record.get("artifact") == full.get("source_artifact")
+            and final_run.get("artifact") == full.get("source_artifact"),
+            f"{run_name}: compiler failure did not preserve full input artifact",
+        )
+        searchable = diagnostic + "\n" + content.decode("utf-8", errors="replace")
+        operation = frontier.get("operation")
+        types = frontier.get("types")
+        _require(
+            operation is None or (isinstance(operation, str) and operation in searchable),
+            f"{run_name}: operation is not bound by diagnostic or input",
+        )
+        _require(
+            types is None or (isinstance(types, str) and types in searchable),
+            f"{run_name}: types are not bound by diagnostic or input",
+        )
+        interestingness = frontier.get("interestingness")
+        _require(isinstance(interestingness, dict), f"{run_name}: interestingness evidence missing")
+        _verify_file_binding(
+            interestingness.get("test"), files, "interestingness-test.sh", canonical_root, run_name
+        )
+        _verify_file_binding(
+            interestingness.get("full_log"), files, "interesting-full.log", canonical_root, run_name
+        )
+        expected_files.update({"interestingness-test.sh", "interesting-full.log", "reduction.log"})
+        minimization = frontier.get("minimization")
+        _require(isinstance(minimization, dict), f"{run_name}: minimization evidence missing")
+        _verify_file_binding(
+            minimization.get("reduction_log"), files, "reduction.log", canonical_root, run_name
+        )
+        status_value = minimization.get("status")
+        if status_value == "verified":
+            _verify_file_binding(
+                minimization.get("minimal_reproducer"),
+                files,
+                "minimal-reproducer.mlir",
+                canonical_root,
+                run_name,
+            )
+            _verify_file_binding(
+                minimization.get("interesting_reproducer_log"),
+                files,
+                "interesting-reproducer.log",
+                canonical_root,
+                run_name,
+            )
+            _require("reason" not in minimization, f"{run_name}: verified minimization has a reason")
+            expected_files.update({"minimal-reproducer.mlir", "interesting-reproducer.log"})
+        else:
+            _require(
+                status_value == "not_practical"
+                and minimization.get("reason")
+                in {"mlir_reduce_unavailable", "full_input_not_interesting", "reduction_failed"}
+                and "minimal_reproducer" not in minimization
+                and "interesting_reproducer_log" not in minimization,
+                f"{run_name}: invalid not-practical minimization",
+            )
+    else:
+        raise VerificationError(f"{run_name}: unsupported frontier evidence kind")
+
+    _require(
+        set(files) == expected_files,
+        f"{run_name}: run directory contents mismatch: expected {sorted(expected_files)}, found {sorted(files)}",
+    )
+    return expected_files
+
+
+def _verify_v5_receipt(
+    receipt: dict[str, Any],
+    files: dict[str, bytes],
+    trust: dict[str, Any],
+    run_name: str,
+) -> set[str]:
+    _require(receipt.get("model") == _MODEL, f"{run_name}: model mismatch")
+    _require(
+        receipt.get("semantic_gate") == trust["semantic_gate"],
+        f"{run_name}: semantic gate/probe mismatch",
+    )
+    _require(
+        receipt.get("frozen_task_1_through_3_identities") == trust["identities"]
+        and receipt.get("task_2_decision_self_sha256")
+        == trust["decision_self_sha256"],
+        f"{run_name}: frozen Task 1-3 identity mismatch",
+    )
+    _require(
+        receipt.get("predecessor_receipt") == trust["predecessor"],
+        f"{run_name}: predecessor identity mismatch",
+    )
+    source_commit = receipt.get("source_commit")
+    _require(isinstance(source_commit, str) and bool(source_commit), f"{run_name}: source commit missing")
+    tools = receipt.get("capture_tools")
+    _require(isinstance(tools, dict), f"{run_name}: capture tool bindings missing")
+    repo_root = trust["repo_root"]
+    for name, path in trust["capture_tool_paths"].items():
+        binding = tools.get(name)
+        _require(
+            isinstance(binding, dict)
+            and binding.get("path") == path
+            and binding.get("sha256")
+            == _sha256_bytes(_git_source_bytes(repo_root, source_commit, path)),
+            f"{run_name}: {name} source-commit-byte hash mismatch",
+        )
+
+    pipeline = receipt.get("pipeline_execution")
+    stages = receipt.get("stages")
+    execution = receipt.get("registered_build_execution")
+    _require(isinstance(pipeline, dict), f"{run_name}: pipeline execution missing")
+    _require(isinstance(stages, list), f"{run_name}: stages missing")
+    _require(isinstance(execution, dict), f"{run_name}: execution missing")
+    sequence = [record.get("stage") for record in stages if isinstance(record, dict)]
+    first_invalid = pipeline.get("first_invalid_stage")
+    _require(
+        first_invalid in {"scf", "flat-scf", "calyx", "calyx-native-sv"},
+        f"{run_name}: invalid successor stage",
+    )
+    _require(
+        receipt.get("status") == "compiler_frontier"
+        and receipt.get("stage") == first_invalid,
+        f"{run_name}: frontier classification mismatch",
+    )
+    expected_frontier = (
+        "calyx_frontier"
+        if first_invalid == "calyx"
+        else "sv_frontier"
+        if first_invalid == "calyx-native-sv"
+        else "pre_calyx_frontier"
+    )
+    _require(
+        receipt.get("frontier") == expected_frontier,
+        f"{run_name}: frontier class mismatch",
+    )
+    expected_files = _verify_v5_frontier_evidence(receipt, files, run_name)
+    canonical_root = f"reproducers/{first_invalid}"
+
+    for index, stage in enumerate(sequence):
+        record = stages[index]
+        run = execution[stage]
+        live = trust["derivations"].get(stage)
+        _require(isinstance(live, dict), f"{run_name}: live derivation missing for {stage}")
+        attribute = _registered_attribute(stage)
+        expected_command = shlex.join(
+            ["nix", "build", "--no-link", "--print-out-paths", "-L", f".#{attribute}"]
+        )
+        _require(
+            record.get("command") == expected_command
+            and run.get("command") == expected_command
+            and run.get("attribute") == attribute,
+            f"{run_name}: registered command mismatch for {stage}",
+        )
+        _require(
+            record.get("exit_code") == live["exit_code"]
+            and run.get("exit_code") == live["exit_code"],
+            f"{run_name}: replay exit mismatch for {stage}",
+        )
+        _require(
+            files[f"{stage}.log"] == live["log_bytes"],
+            f"{run_name}: replay log mismatch for {stage}",
+        )
+        _require(
+            run.get("derivation") == live["path"]
+            and run.get("derivation_file_sha256") == live["file_sha256"]
+            and run.get("derivation_json_sha256") == live["json_sha256"]
+            and run.get("derivation_build_command") == live["build_command"]
+            and run.get("derivation_build_command_sha256")
+            == live["build_command_sha256"]
+            and run.get("derivation_tool_bindings") == live["tool_bindings"],
+            f"{run_name}: derivation/tool/build command mismatch for {stage}",
+        )
+        _require(
+            files[f"{stage}.drv"] == live["file_bytes"]
+            and files[f"{stage}.derivation.json"] == live["canonical_json"],
+            f"{run_name}: captured derivation bytes mismatch for {stage}",
+        )
+        expected_accepted = stage != first_invalid
+        _require(
+            record.get("artifact_accepted") is expected_accepted
+            and run.get("artifact_accepted") is expected_accepted,
+            f"{run_name}: replay acceptance mismatch for {stage}",
+        )
+        if expected_accepted:
+            artifact = live.get("artifact_bytes")
+            _require(isinstance(artifact, bytes), f"{run_name}: live artifact missing for {stage}")
+            _require(
+                record.get("artifact") == live.get("artifact_path")
+                and run.get("artifact") == live.get("artifact_path")
+                and record.get("artifact_sha256") == _sha256_bytes(artifact)
+                and run.get("artifact_sha256") == _sha256_bytes(artifact),
+                f"{run_name}: live artifact mismatch for {stage}",
+            )
+
+    full = receipt["full_failing_input"]
+    upstream_stage = sequence[-2]
+    upstream_live = trust["derivations"][upstream_stage]
+    upstream_bytes = upstream_live.get("artifact_bytes")
+    _require(isinstance(upstream_bytes, bytes), f"{run_name}: live upstream input missing")
+    _require(
+        gzip.decompress(files["full-input.gz"]) == upstream_bytes
+        and full.get("source_stage") == upstream_stage
+        and full.get("source_artifact") == upstream_live.get("artifact_path"),
+        f"{run_name}: full input differs from live upstream artifact",
+    )
+    frontier = receipt["frontier_evidence"]
+    if frontier["kind"] == "control_manifest":
+        live_manifest = trust["derivations"][first_invalid].get("artifact_bytes")
+        _require(
+            isinstance(live_manifest, bytes)
+            and files["minimal-reproducer.json"] == live_manifest,
+            f"{run_name}: control manifest differs from registered output",
+        )
+    else:
+        _require(
+            trust["derivations"][first_invalid]["exit_code"] != 0,
+            f"{run_name}: compiler failure did not replay",
+        )
+        script = Path(tempfile.mkdtemp(prefix="exact-frontier-verify-script-")) / "interestingness-test.sh"
+        try:
+            script.write_bytes(files["interestingness-test.sh"])
+            script.chmod(0o755)
+            candidate = script.parent / "full-input.mlir"
+            candidate.write_bytes(upstream_bytes)
+            result = subprocess.run([str(script), str(candidate)], text=True, capture_output=True)
+            replay_log = _canonical_execution_evidence(
+                [str(script), str(candidate)],
+                result,
+                {str(script.parent): "<evidence-dir>", str(candidate): "<full-input>"},
+            )
+            _require(result.returncode == 0, f"{run_name}: full input interestingness replay failed")
+            _require(
+                replay_log == files["interesting-full.log"],
+                f"{run_name}: full input interestingness log mismatch",
+            )
+        finally:
+            for child in script.parent.iterdir():
+                child.unlink()
+            script.parent.rmdir()
+    claims = receipt.get("claims")
+    _require(
+        isinstance(claims, dict)
+        and claims.get("board_inference") is False
+        and claims.get("calyx_native_sv") is False
+        and claims.get("syntax_validated") is False
+        and claims.get("synthesis_validated") is False,
+        f"{run_name}: unsupported downstream claim",
+    )
+    return expected_files
 
 
 def _verify_run(
@@ -775,6 +1422,121 @@ def _verify_v2_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     }
 
 
+def _verify_v3_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
+    manifest = _load_json(bundle_root / "manifest.json")
+    _require(
+        manifest.get("schema") == "tinystories-1m-exact-frontier-determinism-bundles-v3",
+        "unsupported v3 determinism manifest schema",
+    )
+    try:
+        root_entries = {entry.name: entry for entry in bundle_root.iterdir()}
+    except OSError as error:
+        raise VerificationError(f"cannot enumerate bundle root: {error}") from error
+    _require(
+        set(root_entries) == {"manifest.json", "run-1", "run-2"},
+        "v3 bundle root contents mismatch",
+    )
+    _require(
+        root_entries["manifest.json"].is_file()
+        and not root_entries["manifest.json"].is_symlink()
+        and all(
+            root_entries[name].is_dir() and not root_entries[name].is_symlink()
+            for name in ("run-1", "run-2")
+        ),
+        "v3 bundle root entry types mismatch",
+    )
+    source_commit = manifest.get("source_commit")
+    _require(isinstance(source_commit, str) and bool(source_commit), "source commit missing")
+    runs_manifest = manifest.get("runs")
+    _require(
+        isinstance(runs_manifest, dict) and sorted(runs_manifest) == ["run-1", "run-2"],
+        "exactly run-1 and run-2 are required",
+    )
+    first_receipt = _load_json(bundle_root / "run-1" / "receipt.json")
+    _require(
+        first_receipt.get("schema") == "tinystories-1m-exact-current-pipeline-frontier-v5",
+        "v3 bundle requires a v5 receipt",
+    )
+    first_stages = first_receipt.get("stages")
+    _require(isinstance(first_stages, list), "v5 stage sequence missing")
+    executed_stages = [
+        record.get("stage") for record in first_stages if isinstance(record, dict)
+    ]
+    _require(
+        executed_stages == _REGISTERED_ORDER[: len(executed_stages)],
+        "v5 executed prefix mismatch",
+    )
+    trust = _independent_v5_trust(
+        Path(__file__).resolve().parents[2], source_commit, executed_stages
+    )
+    verified: dict[str, tuple[dict[str, Any], dict[str, bytes], set[str]]] = {}
+    for run_name in ("run-1", "run-2"):
+        run_root = bundle_root / run_name
+        names = _enumerate_run_files(run_root, run_name)
+        files = {name: (run_root / name).read_bytes() for name in names}
+        receipt = _load_json(run_root / "receipt.json")
+        _require(
+            receipt.get("schema") == "tinystories-1m-exact-current-pipeline-frontier-v5"
+            and receipt.get("source_commit") == source_commit
+            and receipt.get("sha256") == _canonical_receipt_hash(receipt),
+            f"{run_name}: receipt identity mismatch",
+        )
+        expected_files = _verify_v5_receipt(receipt, files, trust, run_name)
+        run_manifest = runs_manifest[run_name]
+        _require(isinstance(run_manifest, dict), f"{run_name}: run manifest missing")
+        bindings = run_manifest.get("files")
+        _require(
+            run_manifest.get("source_commit") == source_commit
+            and run_manifest.get("receipt_self_hash") == receipt.get("sha256")
+            and isinstance(bindings, dict)
+            and set(bindings) == expected_files,
+            f"{run_name}: manifest bindings mismatch",
+        )
+        for filename in expected_files:
+            binding = bindings[filename]
+            _require(
+                isinstance(binding, dict)
+                and binding.get("bytes") == len(files[filename])
+                and binding.get("sha256") == _sha256_bytes(files[filename]),
+                f"{run_name}: manifest file binding mismatch for {filename}",
+            )
+        verified[run_name] = (receipt, files, expected_files)
+    first, first_files, first_expected = verified["run-1"]
+    second, second_files, second_expected = verified["run-2"]
+    _require(first_expected == second_expected, "run schemas differ")
+    _require(
+        manifest.get("canonical_files") == sorted(first_expected),
+        "v3 canonical file list differs from verifier-derived schema",
+    )
+    for filename in first_expected:
+        _require(
+            first_files[filename] == second_files[filename],
+            f"preserved runs differ at canonical file {filename}",
+        )
+    _require(first == second, "parsed receipts differ")
+    expected = manifest.get("expected_comparison")
+    receipt_file_sha256 = _sha256_bytes(first_files["receipt.json"])
+    _require(
+        isinstance(expected, dict)
+        and expected.get("byte_identical") is True
+        and expected.get("first_invalid_stage")
+        == first["pipeline_execution"]["first_invalid_stage"]
+        and expected.get("receipt_file_sha256") == receipt_file_sha256
+        and expected.get("receipt_self_hash") == first["sha256"],
+        "v3 expected comparison mismatch",
+    )
+    return {
+        "source_commit": source_commit,
+        "runs": ["run-1", "run-2"],
+        "byte_identical": True,
+        "first_invalid_stage": first["pipeline_execution"]["first_invalid_stage"],
+        "frontier_evidence_kind": first["frontier_evidence"]["kind"],
+        "receipt_file_sha256": receipt_file_sha256,
+        "receipt_self_hash": first["sha256"],
+        "canonical_file_count": len(first_expected),
+    }
+
+
 def verify_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     """Verify historical v1 or current v2 deterministic capture bundles."""
 
@@ -785,16 +1547,26 @@ def verify_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
         return _verify_v1_determinism_bundles(bundle_root)
     if schema == "tinystories-1m-exact-frontier-determinism-bundles-v2":
         return _verify_v2_determinism_bundles(bundle_root)
+    if schema == "tinystories-1m-exact-frontier-determinism-bundles-v3":
+        return _verify_v3_determinism_bundles(bundle_root)
     raise VerificationError("unsupported determinism manifest schema")
 
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    default_bundle = (
+    current = _load_json(
         repo_root
         / "artifacts"
         / "comparison"
-        / "tinystories-1m-exact-frontier-determinism-scf"
+        / "tinystories-1m-exact-current-pipeline-frontier.json"
+    )
+    default_stage = current.get("pipeline_execution", {}).get("first_invalid_stage")
+    _require(
+        default_stage in {"scf", "flat-scf", "calyx", "calyx-native-sv"},
+        "current receipt has no supported invalid stage",
+    )
+    default_bundle = repo_root / "artifacts" / "comparison" / (
+        f"tinystories-1m-exact-frontier-determinism-{default_stage}"
     )
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle-dir", type=Path, default=default_bundle)

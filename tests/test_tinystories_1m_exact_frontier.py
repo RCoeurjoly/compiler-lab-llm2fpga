@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import shlex
 from unittest import mock
 from pathlib import Path
 
@@ -417,6 +418,112 @@ class AuthenticatedPipelineRunnerTest(unittest.TestCase):
         )
         self.assertIsNone(anonymous.operation)
         self.assertIsNone(anonymous.types)
+
+    def test_control_manifest_frontier_evidence_uses_exact_union_contract(self) -> None:
+        result = MODULE._classify_registered_result(
+            stage="scf",
+            exit_code=0,
+            output=self.unavailable_scf_output,
+            upstream_input=self.linalg_input,
+            log=self.scf_log,
+        )
+        manifest = result.manifest.read_bytes()
+
+        evidence = MODULE._serialize_frontier_evidence(
+            stage="scf",
+            result=result,
+            canonical_root="reproducers/scf",
+            manifest_binding={
+                "path": "reproducers/scf/minimal-reproducer.json",
+                "bytes": len(manifest),
+                "sha256": hashlib.sha256(manifest).hexdigest(),
+            },
+        )
+
+        self.assertEqual(evidence["kind"], "control_manifest")
+        self.assertEqual(evidence["operation"], None)
+        self.assertEqual(evidence["types"], None)
+        self.assertEqual(
+            evidence["minimization"],
+            {"status": "not_applicable", "reason": "control_manifest_is_minimal"},
+        )
+        self.assertEqual(evidence["manifest"]["stage"], "scf")
+        self.assertEqual(evidence["manifest"]["status"], "unavailable")
+        self.assertEqual(evidence["manifest"]["reason"], "no direct SCF route")
+
+    def test_compiler_failure_frontier_evidence_has_no_manifest_and_binds_attempt(self) -> None:
+        result = MODULE._classify_registered_result(
+            stage="scf",
+            exit_code=1,
+            output=self.no_output_path,
+            upstream_input=self.linalg_input,
+            log=self.nonzero_scf_log,
+        )
+        interestingness = {
+            "test": {"path": "reproducers/scf/interestingness-test.sh", "bytes": 17, "sha256": SHA_A},
+            "full_log": {"path": "reproducers/scf/interesting-full.log", "bytes": 19, "sha256": SHA_B},
+        }
+        minimization = {
+            "status": "not_practical",
+            "reason": "mlir_reduce_unavailable",
+            "reduction_log": {"path": "reproducers/scf/reduction.log", "bytes": 21, "sha256": SHA_A},
+        }
+
+        evidence = MODULE._serialize_frontier_evidence(
+            stage="scf",
+            result=result,
+            canonical_root="reproducers/scf",
+            interestingness=interestingness,
+            minimization=minimization,
+        )
+
+        self.assertEqual(evidence["kind"], "compiler_failure")
+        self.assertIsNone(evidence["manifest"])
+        self.assertEqual(evidence["operation"], "scf.for")
+        self.assertEqual(evidence["types"], "(index) -> ()")
+        self.assertEqual(evidence["interestingness"], interestingness)
+        self.assertEqual(evidence["minimization"], minimization)
+
+    def test_interestingness_script_substitutes_candidate_and_matches_exact_failure(self) -> None:
+        compiler = Path(self.temporary.name) / "compiler.sh"
+        compiler.write_text(
+            "#!/bin/sh\n"
+            "if grep -q INTERESTING \"$1\"; then\n"
+            "  echo \"error: failed to legalize operation 'scf.for' : (index) -> ()\" >&2\n"
+            "  exit 7\n"
+            "fi\n"
+            "echo \"error: unrelated failure\" >&2\n"
+            "exit 3\n",
+            encoding="utf-8",
+        )
+        compiler.chmod(0o755)
+        original = Path(self.temporary.name) / "original.mlir"
+        original.write_text("ORIGINAL\n", encoding="utf-8")
+        interesting = Path(self.temporary.name) / "interesting.mlir"
+        interesting.write_text("INTERESTING\nscf.for : (index) -> ()\n", encoding="utf-8")
+        boring = Path(self.temporary.name) / "boring.mlir"
+        boring.write_text("BORING\n", encoding="utf-8")
+        script = Path(self.temporary.name) / "interestingness-test.sh"
+        build_command = (
+            f"{shlex.quote(str(compiler))} {shlex.quote(str(original))} \"$out\""
+        )
+
+        MODULE._write_interestingness_test(
+            script,
+            build_command=build_command,
+            upstream_input=original,
+            expected_exit=7,
+            expected_diagnostic="error: failed to legalize operation 'scf.for' : (index) -> ()",
+            operation="scf.for",
+            types="(index) -> ()",
+        )
+
+        accepted = subprocess.run([str(script), str(interesting)], capture_output=True, text=True)
+        rejected = subprocess.run([str(script), str(boring)], capture_output=True, text=True)
+        self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertIn(str(interesting), accepted.stdout + accepted.stderr)
+        self.assertNotIn(str(original), script.read_text(encoding="utf-8"))
 
     def test_export_provenance_manifest_is_not_a_control_stage_status(self) -> None:
         # Catches rejecting a valid export because its provenance schema has no status.

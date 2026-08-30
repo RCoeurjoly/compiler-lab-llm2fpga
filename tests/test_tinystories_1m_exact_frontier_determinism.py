@@ -370,6 +370,168 @@ class StrongCurrentReceiptValidationTest(unittest.TestCase):
                 self.files["minimal-reproducer.json"] = self.trust["derivations"]["scf"]["artifact_bytes"]
 
 
+class FrontierEvidenceUnionValidationTest(unittest.TestCase):
+    """Branch mutations start from copied bytes of the real SCF capture."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory(prefix="exact-frontier-union-")
+        self.addCleanup(self.temporary.cleanup)
+        self.bundle = Path(self.temporary.name) / "bundle"
+        shutil.copytree(CURRENT_BUNDLES, self.bundle)
+        run_root = self.bundle / "run-1"
+        self.receipt = json.loads((run_root / "receipt.json").read_text(encoding="utf-8"))
+        self.receipt["schema"] = "tinystories-1m-exact-current-pipeline-frontier-v5"
+        old_minimal = self.receipt.pop("minimal_reproducer")
+        manifest = json.loads((run_root / "minimal-reproducer.json").read_text(encoding="utf-8"))
+        self.receipt["frontier_evidence"] = {
+            "kind": "control_manifest",
+            "manifest": {
+                "path": old_minimal["path"],
+                "bytes": old_minimal["bytes"],
+                "sha256": old_minimal["sha256"],
+                "stage": manifest["stage"],
+                "status": manifest["status"],
+                "reason": manifest["reason"],
+            },
+            "operation": None,
+            "types": None,
+            "minimization": {
+                "status": "not_applicable",
+                "reason": "control_manifest_is_minimal",
+            },
+        }
+        self.files = {
+            path.name: path.read_bytes() for path in run_root.iterdir() if path.is_file()
+        }
+        for stage in ("pytorch-exported", "torch"):
+            drv = f"synthetic {stage} derivation\n".encode()
+            drv_json = json.dumps(
+                {"derivations": {f"synthetic-{stage}.drv": {"stage": stage}}},
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+            self.files[f"{stage}.drv"] = drv
+            self.files[f"{stage}.derivation.json"] = drv_json
+            execution = self.receipt["registered_build_execution"][stage]
+            execution.update({
+                "captured_derivation": f"reproducers/scf/{stage}.drv",
+                "captured_derivation_bytes": len(drv),
+                "captured_derivation_sha256": hashlib.sha256(drv).hexdigest(),
+                "captured_derivation_json": f"reproducers/scf/{stage}.derivation.json",
+                "captured_derivation_json_bytes": len(drv_json),
+                "captured_derivation_json_sha256": hashlib.sha256(drv_json).hexdigest(),
+            })
+
+    def _compiler_failure(self) -> None:
+        self.files.pop("minimal-reproducer.json", None)
+        self.files["interestingness-test.sh"] = b"#!/bin/sh\nexit 0\n"
+        self.files["interesting-full.log"] = b"exit_code: 0\n"
+        self.files["reduction.log"] = b"mlir-reduce unavailable\n"
+        self.receipt["frontier_evidence"] = {
+            "kind": "compiler_failure",
+            "manifest": None,
+            "diagnostic": self.receipt["diagnostic"],
+            "operation": None,
+            "types": None,
+            "interestingness": {
+                "test": self._binding("interestingness-test.sh"),
+                "full_log": self._binding("interesting-full.log"),
+            },
+            "minimization": {
+                "status": "not_practical",
+                "reason": "mlir_reduce_unavailable",
+                "reduction_log": self._binding("reduction.log"),
+            },
+        }
+        stage = self.receipt["stages"][-1]
+        execution = self.receipt["registered_build_execution"][stage["stage"]]
+        stage["exit_code"] = 1
+        execution["exit_code"] = 1
+        execution["result"] = None
+        execution["derivation_tool_bindings"] = [{"path": "/bound/tool"}]
+        full = gzip.decompress(self.files["full-input.gz"])
+        stage.update({
+            "artifact": self.receipt["full_failing_input"]["source_artifact"],
+            "artifact_bytes": len(full),
+            "artifact_sha256": hashlib.sha256(full).hexdigest(),
+        })
+        execution.update({
+            "artifact": stage["artifact"],
+            "artifact_bytes": stage["artifact_bytes"],
+            "artifact_sha256": stage["artifact_sha256"],
+        })
+
+    def _binding(self, name: str) -> dict[str, object]:
+        data = self.files[name]
+        return {
+            "path": f"reproducers/scf/{name}",
+            "bytes": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        }
+
+    def _rehash(self) -> None:
+        self.receipt["sha256"] = MODULE._canonical_receipt_hash(self.receipt)
+
+    def _reject(self, pattern: str) -> None:
+        self._rehash()
+        with self.assertRaisesRegex(MODULE.VerificationError, pattern):
+            MODULE._verify_v5_frontier_evidence(self.receipt, self.files, "fixture")
+
+    def test_control_manifest_branch_rejects_nonzero_exit_or_missing_manifest(self) -> None:
+        stage = self.receipt["stages"][-1]
+        execution = self.receipt["registered_build_execution"][stage["stage"]]
+        stage["exit_code"] = execution["exit_code"] = 1
+        self._reject("control manifest.*zero exit")
+        stage["exit_code"] = execution["exit_code"] = 0
+        self.files.pop("minimal-reproducer.json")
+        self._reject("control manifest.*missing")
+
+    def test_compiler_failure_branch_rejects_zero_exit_or_any_manifest(self) -> None:
+        self._compiler_failure()
+        stage = self.receipt["stages"][-1]
+        execution = self.receipt["registered_build_execution"][stage["stage"]]
+        stage["exit_code"] = execution["exit_code"] = 0
+        self._reject("compiler failure.*nonzero exit")
+        stage["exit_code"] = execution["exit_code"] = 1
+        self.receipt["frontier_evidence"]["manifest"] = {}
+        self._reject("compiler failure.*manifest")
+
+    def test_compiler_failure_branch_preserves_linalg_input_log_tool_and_command(self) -> None:
+        self._compiler_failure()
+        self.receipt["full_failing_input"]["content_sha256"] = "0" * 64
+        self._reject("full input")
+        self.receipt["full_failing_input"]["content_sha256"] = hashlib.sha256(
+            gzip.decompress(self.files["full-input.gz"])
+        ).hexdigest()
+        self.receipt["stages"][-1]["log_sha256"] = "0" * 64
+        self._reject("failure log")
+        self.receipt["stages"][-1]["log_sha256"] = hashlib.sha256(
+            self.files["scf.log"]
+        ).hexdigest()
+        execution = self.receipt["registered_build_execution"]["scf"]
+        execution["derivation_tool_bindings"] = []
+        self._reject("tool binding")
+        execution["derivation_tool_bindings"] = [{"path": "/bound/tool"}]
+        execution["derivation_build_command"] = "mutated"
+        self._reject("build command")
+
+    def test_compiler_failure_branch_rejects_unbound_operation_or_types(self) -> None:
+        self._compiler_failure()
+        self.receipt["frontier_evidence"]["operation"] = "scf.while"
+        self._reject("operation")
+        self.receipt["frontier_evidence"]["operation"] = None
+        self.receipt["frontier_evidence"]["types"] = "(i1) -> i1"
+        self._reject("types")
+
+    def test_branch_specific_directory_sets_reject_cross_branch_files(self) -> None:
+        self.files["interestingness-test.sh"] = b"cross-branch\n"
+        self._reject("directory contents")
+        self.files.pop("interestingness-test.sh")
+        self._compiler_failure()
+        self.files["minimal-reproducer.json"] = b"{}\n"
+        self._reject("directory contents")
+
+
 class SuccessorFrontierDeterminismBundleTest(unittest.TestCase):
     @staticmethod
     def _load_verifier():
