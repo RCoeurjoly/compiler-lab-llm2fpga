@@ -87,7 +87,19 @@ class ExactFrontierSemanticContractTest(unittest.TestCase):
             "executor": {
                 "path": decision["semantic_regression"]["probe_executor_contract_path"],
                 "sha256": hashlib.sha256(EXECUTOR.read_bytes()).hexdigest(),
-                "command": ["executor", "--out", "results.json"],
+                "command": [
+                    str(EXECUTOR.resolve()),
+                    "--stage-artifact",
+                    str(stage.resolve()),
+                    "--fixture",
+                    str(FIXTURE.resolve()),
+                    "--tool",
+                    str(tool.resolve()),
+                    "--pass-pipeline",
+                    decision["semantic_regression"]["torch_mlir_pipeline"],
+                    "--out",
+                    "<temporary>/executor-results.json",
+                ],
                 "compiler_route": {
                     "torch_backend_pipeline": "torch-backend-to-linalg-on-tensors-backend-pipeline",
                     "linalg_to_llvm_pipeline": LINALG_TO_LLVM_PIPELINE,
@@ -123,6 +135,38 @@ class ExactFrontierSemanticContractTest(unittest.TestCase):
         report["sha256"] = MODULE.canonical_sha256(report)
         return report
 
+    def _synthetic_verifier_kwargs(
+        self,
+        report: dict[str, object],
+        stage: Path,
+        derivation: Path,
+        tool: Path,
+        mlir_opt: Path,
+        mlir_runner: Path,
+    ) -> dict[str, object]:
+        decision = json.loads(DECISION.read_text(encoding="utf-8"))
+        replay = {
+            "schema": "tinystories-1m-exact-shift-executor-results-v1",
+            "stage_artifact_sha256": hashlib.sha256(stage.read_bytes()).hexdigest(),
+            "fixture_file_sha256": hashlib.sha256(FIXTURE.read_bytes()).hexdigest(),
+            "tool_binary_sha256": hashlib.sha256(tool.read_bytes()).hexdigest(),
+            "pipeline_sha256": MODULE.canonical_sha256(
+                decision["semantic_regression"]["torch_mlir_pipeline"]
+            ),
+            "compiler_route": json.loads(json.dumps(report["executor"]["compiler_route"])),
+            "cases": json.loads(json.dumps(report["cases"])),
+        }
+        return {
+            "derivation_resolver": lambda _: derivation,
+            "stage_resolver": lambda _: stage.resolve(),
+            "tool_resolver": lambda: {
+                "torch_mlir_opt": tool.resolve(),
+                "mlir_opt": mlir_opt.resolve(),
+                "mlir_runner": mlir_runner.resolve(),
+            },
+            "executor_runner": lambda *_: replay,
+        }
+
     def test_probe_rejects_detached_or_misbinding_reports(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -135,8 +179,11 @@ class ExactFrontierSemanticContractTest(unittest.TestCase):
             mlir_runner.write_text("mlir-runner", encoding="utf-8")
             report_path = root / "probe.json"
             report = self._probe_report(stage, derivation, tool, mlir_opt, mlir_runner)
+            verifier_kwargs = self._synthetic_verifier_kwargs(
+                report, stage, derivation, tool, mlir_opt, mlir_runner
+            )
             report_path.write_text(json.dumps(report), encoding="utf-8")
-            result = MODULE.verify_probe_report(report_path, FIXTURE, DECISION, derivation_resolver=lambda _: derivation)
+            result = MODULE.verify_probe_report(report_path, FIXTURE, DECISION, **verifier_kwargs)
             self.assertEqual(result["status"], "accepted")
             for mutation, diagnostic in (
                 (("stage", "artifact_sha256", "0" * 64), "probe_stage_artifact_hash"),
@@ -155,7 +202,7 @@ class ExactFrontierSemanticContractTest(unittest.TestCase):
                 altered["sha256"] = MODULE.canonical_sha256({k: v for k, v in altered.items() if k != "sha256"})
                 report_path.write_text(json.dumps(altered), encoding="utf-8")
                 with self.assertRaisesRegex(ValueError, diagnostic):
-                    MODULE.verify_probe_report(report_path, FIXTURE, DECISION, derivation_resolver=lambda _: derivation)
+                    MODULE.verify_probe_report(report_path, FIXTURE, DECISION, **verifier_kwargs)
             for modifier, diagnostic in (
                 (
                     lambda value: value["executor"]["compiler_route"].__setitem__(
@@ -183,7 +230,7 @@ class ExactFrontierSemanticContractTest(unittest.TestCase):
                 )
                 report_path.write_text(json.dumps(altered), encoding="utf-8")
                 with self.assertRaisesRegex(ValueError, diagnostic):
-                    MODULE.verify_probe_report(report_path, FIXTURE, DECISION, derivation_resolver=lambda _: derivation)
+                    MODULE.verify_probe_report(report_path, FIXTURE, DECISION, **verifier_kwargs)
 
     def test_probe_rejects_stale_hash_and_duplicate_extra_or_missing_cases(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -197,6 +244,9 @@ class ExactFrontierSemanticContractTest(unittest.TestCase):
             mlir_runner.write_text("mlir-runner", encoding="utf-8")
             report_path = root / "probe.json"
             report = self._probe_report(stage, derivation, tool, mlir_opt, mlir_runner)
+            verifier_kwargs = self._synthetic_verifier_kwargs(
+                report, stage, derivation, tool, mlir_opt, mlir_runner
+            )
             for modifier, diagnostic in (
                 (lambda value: value.__setitem__("sha256", "0" * 64), "probe_self_hash"),
                 (lambda value: value["cases"].append(dict(value["cases"][0])), "probe_case_duplicate"),
@@ -213,14 +263,14 @@ class ExactFrontierSemanticContractTest(unittest.TestCase):
                     altered["sha256"] = MODULE.canonical_sha256({k: v for k, v in altered.items() if k != "sha256"})
                 report_path.write_text(json.dumps(altered), encoding="utf-8")
                 with self.assertRaisesRegex(ValueError, diagnostic):
-                    MODULE.verify_probe_report(report_path, FIXTURE, DECISION, derivation_resolver=lambda _: derivation)
+                    MODULE.verify_probe_report(report_path, FIXTURE, DECISION, **verifier_kwargs)
 
             stale_decision = json.loads(DECISION.read_text(encoding="utf-8"))
             stale_decision["decision"]["expected_observable_improvement"] = "stale"
             stale_path = root / "stale-decision.json"
             stale_path.write_text(json.dumps(stale_decision), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "decision_self_hash"):
-                MODULE.verify_probe_report(report_path, FIXTURE, stale_path, derivation_resolver=lambda _: derivation)
+                MODULE.verify_probe_report(report_path, FIXTURE, stale_path, **verifier_kwargs)
 
     def test_contract_interprets_signed_si64_shift_vectors(self) -> None:
         result = MODULE.verify_contract(FIXTURE, DECISION)
@@ -298,6 +348,11 @@ class ExactShiftCompilerExecutorTest(unittest.TestCase):
     def _assert_rejected(self, result: subprocess.CompletedProcess[str], diagnostic: str) -> None:
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(diagnostic, result.stderr)
+
+    def _write_resealed_report(self, path: Path, report: dict[str, object]) -> None:
+        report.pop("sha256", None)
+        report["sha256"] = MODULE.canonical_sha256(report)
+        path.write_text(json.dumps(report), encoding="utf-8")
 
     def test_executor_uses_pinned_compilers_and_returns_exact_fixture_cases(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -401,6 +456,87 @@ class ExactShiftCompilerExecutorTest(unittest.TestCase):
             second = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
             self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
             self.assertEqual(out.read_bytes(), first_bytes)
+
+    def test_verifier_rejects_stage_not_produced_by_declared_nix_build(self) -> None:
+        report = json.loads(
+            (ROOT / "artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        detached_stage = self.tool
+        derivation_result = subprocess.run(
+            ["nix", "path-info", "--derivation", str(detached_stage)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        detached_derivation = Path(derivation_result.stdout.strip())
+        report["stage"].update(
+            {
+                "artifact": str(detached_stage),
+                "artifact_sha256": hashlib.sha256(detached_stage.read_bytes()).hexdigest(),
+                "derivation": str(detached_derivation),
+                "derivation_sha256": hashlib.sha256(detached_derivation.read_bytes()).hexdigest(),
+            }
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            report_path = Path(temporary) / "detached-stage.json"
+            self._write_resealed_report(report_path, report)
+            with self.assertRaisesRegex(ValueError, "probe_stage_build_output_path"):
+                MODULE.verify_probe_report(report_path, FIXTURE, DECISION)
+
+    def test_verifier_rejects_detached_pinned_compiler_tools(self) -> None:
+        original = json.loads(
+            (ROOT / "artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            report = json.loads(json.dumps(original))
+            detached_torch_mlir_opt = root / "torch-mlir-opt"
+            shutil.copy2(Path(report["tool"]["binary"]), detached_torch_mlir_opt)
+            report["tool"] = {
+                **report["tool"],
+                "binary": str(detached_torch_mlir_opt),
+                "binary_sha256": hashlib.sha256(detached_torch_mlir_opt.read_bytes()).hexdigest(),
+            }
+            report_path = root / "detached-torch-mlir-opt.json"
+            self._write_resealed_report(report_path, report)
+            with self.assertRaisesRegex(ValueError, "probe_tool_live_path"):
+                MODULE.verify_probe_report(report_path, FIXTURE, DECISION)
+
+            for key, binary_name, diagnostic in (
+                ("mlir_opt", "mlir-opt", "probe_mlir_opt_live_path"),
+                ("mlir_runner", "mlir-runner", "probe_mlir_runner_live_path"),
+            ):
+                report = json.loads(json.dumps(original))
+                live = Path(report["executor"]["compiler_route"][key]["binary"])
+                detached = root / binary_name
+                shutil.copy2(live, detached)
+                report["executor"]["compiler_route"][key] = {
+                    "binary": str(detached),
+                    "binary_sha256": hashlib.sha256(detached.read_bytes()).hexdigest(),
+                }
+                if key == "mlir_runner":
+                    report["cases"][0]["compiler_evidence"]["runner_stdout_sha256"] = "0" * 64
+                report_path = root / f"detached-{binary_name}.json"
+                self._write_resealed_report(report_path, report)
+                with self.assertRaisesRegex(ValueError, diagnostic):
+                    MODULE.verify_probe_report(report_path, FIXTURE, DECISION)
+
+    def test_verifier_reexecutes_executor_before_accepting_case_evidence(self) -> None:
+        report = json.loads(
+            (ROOT / "artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        report["cases"][0]["compiler_evidence"]["runner_stdout_sha256"] = "0" * 64
+        with tempfile.TemporaryDirectory() as temporary:
+            report_path = Path(temporary) / "mutated-evidence.json"
+            self._write_resealed_report(report_path, report)
+            with self.assertRaisesRegex(ValueError, "probe_executor_results"):
+                MODULE.verify_probe_report(report_path, FIXTURE, DECISION)
 
 
 if __name__ == "__main__":

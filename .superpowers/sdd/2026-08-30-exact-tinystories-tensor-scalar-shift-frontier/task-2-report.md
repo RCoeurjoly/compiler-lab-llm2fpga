@@ -164,3 +164,124 @@ nix develop -c python -m unittest tests/test_tinystories_1m_exact_frontier_seman
 ```
 
 All three completed successfully before commit.
+
+## Review fix round 1/5: standalone trust reconstruction
+
+Status: blocking provenance substitution finding fixed without changing model, compiler, fixture, executor semantics, producer, decision receipt, or canonical probe bytes.
+
+### Reproduction
+
+The committed verifier at `2c6373e` was exercised with two report mutations whose self-hashes were recomputed:
+
+1. The reported stage artifact and derivation were replaced with the live `torch-mlir-opt` binary and its derivation.
+2. The reported `mlir-runner` was replaced by detached copied bytes and `shift_one.compiler_evidence.runner_stdout_sha256` was replaced with 64 zeroes.
+
+Both standalone verifier invocations returned exit 0 and `status: accepted`. This confirmed that file existence, report-selected hashes, and 64-hex evidence shape were internal consistency checks rather than independent provenance.
+
+### Red tests
+
+Three adversarial tests were added before the verifier change:
+
+```text
+nix develop -c python -m unittest \
+  tests.test_tinystories_1m_exact_frontier_semantics.ExactShiftCompilerExecutorTest.test_verifier_rejects_stage_not_produced_by_declared_nix_build \
+  tests.test_tinystories_1m_exact_frontier_semantics.ExactShiftCompilerExecutorTest.test_verifier_rejects_detached_mlir_opt_or_runner \
+  tests.test_tinystories_1m_exact_frontier_semantics.ExactShiftCompilerExecutorTest.test_verifier_reexecutes_executor_before_accepting_case_evidence -v
+```
+
+Observed before implementation:
+
+```text
+Ran 3 tests in 2.195s
+FAILED (failures=3)
+```
+
+Each failed because the expected `ValueError` was not raised.
+
+### Implementation
+
+Standalone/default `verify_probe_report` now reconstructs every trusted input independently:
+
+- Revalidates the receipt's canonical registered-stage command hash.
+- Runs the exact registered Nix build command from the repository root and requires exactly one output.
+- Requires the report's stage path to equal that canonical build output path.
+- Resolves the live stage derivation with `nix path-info --derivation` and compares report path and bytes/hash to it.
+- Runs a fresh `nix develop` tool-resolution command for `torch-mlir-opt`, `mlir-opt`, and `mlir-runner`.
+- Requires each independently resolved tool to exist in a Nix store derivation.
+- Compares the report's exact tool paths and hashes against those independently selected binaries, never against report-selected bytes.
+- Reconstructs and validates the canonical executor command.
+- Re-executes the declared executor with the canonical stage, fixture, pipeline, and `torch-mlir-opt`; PATH is constrained to the independently resolved Torch-MLIR and MLIR tool directories.
+- Compares replay schema, stage hash, fixture hash, tool hash, pipeline hash, complete compiler route, ordered case records, outputs, invalid no-output records, and every per-case compiler/JIT evidence hash to the report.
+
+Synthetic unit tests inject explicit fake stage/tool/replay resolvers so they continue isolating individual report validation branches. These are keyword-only test seams; standalone/default verification always uses the live Nix-backed resolvers and executor replay.
+
+### Green evidence
+
+The original three adversarial tests after implementation reported:
+
+```text
+Ran 3 tests in 21.569s
+OK
+```
+
+Direct pinned-tool substitution coverage was expanded to all three tools:
+
+- detached `torch-mlir-opt` fails with `probe_tool_live_path`
+- detached `mlir-opt` fails with `probe_mlir_opt_live_path`
+- detached `mlir-runner` plus mutated stdout evidence fails with `probe_mlir_runner_live_path`
+- live tool paths plus mutated stdout evidence fails after replay with `probe_executor_results`
+
+The expanded pinned-tool regression reported:
+
+```text
+Ran 1 test in 18.674s
+OK
+```
+
+The standalone verifier with independent reconstruction and replay returned exit 0 and preserved:
+
+- canonical probe file SHA-256 `645a87cdc4292ea584a04d4268187c612dd070b068036f9fa13b71865b36cbe6`
+- canonical stage SHA-256 `e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674`
+- exact three valid outputs and two invalid compiler rejections
+
+### Decision receipt justification
+
+This review fix does not modify `artifacts/comparison/tinystories-1m-exact-frontier-decision.json` or the producer, so there is no new producer/decision hash cycle.
+
+The Task 2 decision changes in commit `2c6373e` remain required provenance bindings rather than semantic changes:
+
+- `probe_producer_script_sha256` had to follow the producer's live bytes after it authenticated the newly exposed compiler route and canonicalized its temporary output path.
+- `registered_stage_build_command_sha256` corrected the pre-existing one-character typo documented above; the unchanged build command otherwise failed the producer's pre-existing canonical hash check.
+- the decision self-hash necessarily followed those two binding corrections.
+
+No Task 1--3 identity, model/compiler/RTL input, pipeline string, fixture binding, stage bytes, or semantic expectation changed.
+
+### Self-review
+
+- Trust decisions occur against independently resolved paths before report-selected byte hashes are considered.
+- Detached same-byte copies are rejected by exact live path comparison, not accepted because their content matches.
+- Nix derivation existence is checked for the stage and every selected tool.
+- Replayed cases are compared as the complete ordered JSON records, so changing any compiler or JIT evidence hash is detected.
+- Invalid cases retain exact status/diagnostic and no `output` field because replay equality covers the complete records.
+- The canonical report remains unchanged because verification is read-only.
+
+### Final review-fix verification
+
+```text
+python3 -m py_compile scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py tests/test_tinystories_1m_exact_frontier_semantics.py
+git diff --check
+nix develop -c python scripts/pipeline/run_tinystories_1m_exact_shift_semantic_probe.py --executor scripts/pipeline/execute_tinystories_1m_exact_shift_semantic_probe.py --out artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json
+nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py --probe-report artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json
+nix develop -c python -m unittest tests/test_tinystories_1m_exact_frontier_semantics.py -v
+sha256sum artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json
+```
+
+Observed:
+
+```text
+standalone semantic probe: status accepted
+standalone registered stage: status accepted
+Ran 11 tests in 39.357s
+OK
+645a87cdc4292ea584a04d4268187c612dd070b068036f9fa13b71865b36cbe6  artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json
+```

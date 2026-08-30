@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
+import tempfile
 from typing import Any
 
 
@@ -198,12 +200,92 @@ def _resolve_derivation_from_store(artifact: Path) -> Path:
     return Path(result.stdout.strip())
 
 
+def _resolve_registered_stage(build_command: list[str]) -> Path:
+    result = subprocess.run(
+        build_command,
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    outputs = [line for line in result.stdout.splitlines() if line]
+    require(len(outputs) == 1, "probe_stage_build_output")
+    stage = Path(outputs[0]).resolve()
+    require(stage.is_file(), "probe_stage_build_output_missing")
+    return stage
+
+
+def _resolve_pinned_tools() -> dict[str, Path]:
+    result = subprocess.run(
+        [
+            "nix",
+            "develop",
+            "-c",
+            "bash",
+            "-c",
+            "command -v torch-mlir-opt; command -v mlir-opt; command -v mlir-runner",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    paths = [Path(line).resolve() for line in result.stdout.splitlines() if line]
+    require(len(paths) == 3, "probe_pinned_tool_resolution")
+    tools = dict(zip(("torch_mlir_opt", "mlir_opt", "mlir_runner"), paths, strict=True))
+    require(all(path.is_file() for path in tools.values()), "probe_pinned_tool_missing")
+    return tools
+
+
+def _reexecute_probe_executor(
+    executor: Path,
+    stage: Path,
+    fixture: Path,
+    torch_mlir_opt: Path,
+    mlir_opt: Path,
+    mlir_runner: Path,
+    pipeline: str,
+) -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix="tinystories-exact-shift-verify-") as temporary:
+        output = Path(temporary) / "executor-results.json"
+        command = [
+            str(executor),
+            "--stage-artifact",
+            str(stage),
+            "--fixture",
+            str(fixture.resolve()),
+            "--tool",
+            str(torch_mlir_opt),
+            "--pass-pipeline",
+            pipeline,
+            "--out",
+            str(output),
+        ]
+        environment = dict(os.environ)
+        environment["PATH"] = os.pathsep.join(
+            [str(torch_mlir_opt.parent), str(mlir_opt.parent), environment.get("PATH", "")]
+        )
+        result = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=environment,
+            capture_output=True,
+            text=True,
+        )
+        require(result.returncode == 0, "probe_executor_replay_failed")
+        require(output.is_file(), "probe_executor_replay_output")
+        return load_object(output)
+
+
 def verify_probe_report(
     report_path: Path,
     fixture_path: Path,
     decision_path: Path,
     *,
     derivation_resolver: Any = _resolve_derivation_from_store,
+    stage_resolver: Any = _resolve_registered_stage,
+    tool_resolver: Any = _resolve_pinned_tools,
+    executor_runner: Any = _reexecute_probe_executor,
 ) -> dict[str, object]:
     verify_contract(fixture_path, decision_path)
     fixture = load_object(fixture_path)
@@ -230,15 +312,40 @@ def verify_probe_report(
     require(stage.get("attribute") == semantic["registered_stage_attribute"], "probe_stage_attribute")
     require(stage.get("build_command") == semantic["registered_stage_build_command"], "probe_stage_command")
     require(stage.get("build_command_sha256") == semantic["registered_stage_build_command_sha256"], "probe_stage_command_hash")
+    build_command = semantic["registered_stage_build_command"]
+    require(
+        isinstance(build_command, list) and all(isinstance(part, str) for part in build_command),
+        "probe_stage_command",
+    )
+    require(
+        canonical_sha256(build_command) == semantic["registered_stage_build_command_sha256"],
+        "decision_stage_command_hash",
+    )
+    live_stage = stage_resolver(build_command)
     artifact = Path(str(stage.get("artifact")))
     derivation = Path(str(stage.get("derivation")))
     binary = Path(str(tool.get("binary")))
-    require(artifact.is_file(), "probe_stage_artifact_missing")
-    require(sha256_file(artifact) == stage.get("artifact_sha256"), "probe_stage_artifact_hash")
-    require(derivation_resolver(artifact).resolve() == derivation.resolve(), "probe_stage_derivation_path")
-    require(derivation.is_file() and sha256_file(derivation) == stage.get("derivation_sha256"), "probe_stage_derivation_hash")
+    require(artifact.resolve() == live_stage, "probe_stage_build_output_path")
+    require(sha256_file(live_stage) == stage.get("artifact_sha256"), "probe_stage_artifact_hash")
+    live_derivation = derivation_resolver(live_stage).resolve()
+    require(derivation.resolve() == live_derivation, "probe_stage_derivation_path")
+    require(
+        live_derivation.is_file() and sha256_file(live_derivation) == stage.get("derivation_sha256"),
+        "probe_stage_derivation_hash",
+    )
+    pinned_tools = tool_resolver()
+    require(
+        isinstance(pinned_tools, dict)
+        and set(pinned_tools) == {"torch_mlir_opt", "mlir_opt", "mlir_runner"},
+        "probe_pinned_tool_resolution",
+    )
+    for live_tool in pinned_tools.values():
+        require(isinstance(live_tool, Path) and live_tool.is_file(), "probe_pinned_tool_missing")
+        require(derivation_resolver(live_tool).resolve().is_file(), "probe_pinned_tool_derivation")
+    live_torch_mlir_opt = pinned_tools["torch_mlir_opt"].resolve()
+    require(binary.resolve() == live_torch_mlir_opt, "probe_tool_live_path")
     require(binary.name == semantic["torch_mlir_tool_name"], "probe_tool_identity")
-    require(binary.is_file() and sha256_file(binary) == tool.get("binary_sha256"), "probe_tool_binary_hash")
+    require(sha256_file(live_torch_mlir_opt) == tool.get("binary_sha256"), "probe_tool_binary_hash")
     require(tool.get("pipeline") == semantic["torch_mlir_pipeline"], "probe_pipeline")
     require(tool.get("pipeline_sha256") == semantic["torch_mlir_pipeline_sha256"], "probe_pipeline_hash")
     executor = report.get("executor")
@@ -263,16 +370,57 @@ def verify_probe_report(
         binding = compiler_route.get(key)
         require(isinstance(binding, dict), f"probe_{key}")
         route_binary = Path(str(binding.get("binary")))
-        require(route_binary.name == name and route_binary.is_file(), f"probe_{key}_identity")
+        live_route_binary = pinned_tools[key].resolve()
+        require(route_binary.resolve() == live_route_binary, f"probe_{key}_live_path")
+        require(route_binary.name == name, f"probe_{key}_identity")
         require(
-            binding.get("binary_sha256") == sha256_file(route_binary),
+            binding.get("binary_sha256") == sha256_file(live_route_binary),
             f"probe_{key}_binary_hash",
         )
     _verify_case_records(report.get("cases"), fixture)
+    expected_executor_command = [
+        str(executor_path.resolve()),
+        "--stage-artifact",
+        str(live_stage),
+        "--fixture",
+        str(fixture_path.resolve()),
+        "--tool",
+        str(live_torch_mlir_opt),
+        "--pass-pipeline",
+        semantic["torch_mlir_pipeline"],
+        "--out",
+        "<temporary>/executor-results.json",
+    ]
+    require(executor.get("command") == expected_executor_command, "probe_executor_command_route")
+    replay = executor_runner(
+        executor_path.resolve(),
+        live_stage,
+        fixture_path.resolve(),
+        live_torch_mlir_opt,
+        pinned_tools["mlir_opt"].resolve(),
+        pinned_tools["mlir_runner"].resolve(),
+        semantic["torch_mlir_pipeline"],
+    )
+    require(
+        replay.get("schema") == "tinystories-1m-exact-shift-executor-results-v1",
+        "probe_executor_replay_schema",
+    )
+    require(replay.get("stage_artifact_sha256") == sha256_file(live_stage), "probe_executor_replay_stage")
+    require(replay.get("fixture_file_sha256") == sha256_file(fixture_path), "probe_executor_replay_fixture")
+    require(
+        replay.get("tool_binary_sha256") == sha256_file(live_torch_mlir_opt),
+        "probe_executor_replay_tool",
+    )
+    require(
+        replay.get("pipeline_sha256") == canonical_sha256(semantic["torch_mlir_pipeline"]),
+        "probe_executor_replay_pipeline",
+    )
+    require(replay.get("compiler_route") == compiler_route, "probe_executor_compiler_route")
+    require(replay.get("cases") == report.get("cases"), "probe_executor_results")
     return {
         "probe_report_sha256": sha256_file(report_path),
-        "stage_artifact": str(artifact),
-        "stage_artifact_sha256": sha256_file(artifact),
+        "stage_artifact": str(live_stage),
+        "stage_artifact_sha256": sha256_file(live_stage),
         "status": "accepted",
     }
 
