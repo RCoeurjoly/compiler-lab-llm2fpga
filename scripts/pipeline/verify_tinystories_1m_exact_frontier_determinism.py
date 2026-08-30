@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import re
 import shlex
+import stat
 import subprocess
 from typing import Any
 
@@ -50,6 +51,30 @@ _FROZEN_IDENTITIES = {
 _DECISION_SELF_SHA256 = "429da5a367755d35bc38308589beaf25d291a8272ebf4d8944bfa4b8919ef8fe"
 _PREDECESSOR_FILE_SHA256 = "b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55"
 _PREDECESSOR_SELF_SHA256 = "af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b"
+_V1_CANONICAL_FILES = (
+    "receipt.json",
+    "pytorch-exported-build.log",
+    "torch-mlir.log",
+    "compiler-import-capture.log",
+)
+_V2_LEGACY_CANONICAL_FILES = (
+    "receipt.json",
+    "pytorch-exported.log",
+    "torch.log",
+    "linalg.log",
+    "scf.log",
+    "full-input.gz",
+    "minimal-reproducer.json",
+)
+_V2_CURRENT_CANONICAL_FILES = (
+    *_V2_LEGACY_CANONICAL_FILES,
+    "linalg.drv",
+    "linalg.derivation.json",
+    "scf.drv",
+    "scf.derivation.json",
+)
+_RUN_METADATA_FILES: frozenset[str] = frozenset()
+_LEGACY_V3_SOURCE_COMMIT = "aec02920481bf9fc4650062f74191fde4943ce3a"
 
 
 class VerificationError(RuntimeError):
@@ -81,6 +106,49 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise VerificationError(f"JSON evidence must be an object: {path}")
     return value
+
+
+def _enumerate_run_files(run_root: Path, run_name: str) -> set[str]:
+    """Enumerate one run without following links and reject non-regular entries."""
+
+    try:
+        root_mode = run_root.lstat().st_mode
+    except OSError as error:
+        raise VerificationError(f"missing preserved run directory: {run_name}") from error
+    _require(
+        stat.S_ISDIR(root_mode) and not run_root.is_symlink(),
+        f"{run_name}: run root must be a real directory",
+    )
+    actual_files: set[str] = set()
+    try:
+        entries = list(run_root.iterdir())
+    except OSError as error:
+        raise VerificationError(f"{run_name}: cannot enumerate run directory: {error}") from error
+    for entry in entries:
+        try:
+            mode = entry.lstat().st_mode
+        except OSError as error:
+            raise VerificationError(f"{run_name}: cannot inspect {entry.name}: {error}") from error
+        _require(
+            not stat.S_ISLNK(mode) and stat.S_ISREG(mode),
+            f"{run_name}: run directory contents must be regular files: {entry.name}",
+        )
+        actual_files.add(entry.name)
+    return actual_files
+
+
+def _verify_run_directory(
+    run_root: Path, run_name: str, canonical_files: tuple[str, ...]
+) -> None:
+    """Enforce one run's exact schema-defined regular-file set."""
+
+    actual_files = _enumerate_run_files(run_root, run_name)
+    expected_files = set(canonical_files) | _RUN_METADATA_FILES
+    _require(
+        actual_files == expected_files,
+        f"{run_name}: run directory contents mismatch: "
+        f"expected {sorted(expected_files)}, found {sorted(actual_files)}",
+    )
 
 
 def _run(command: list[str], repo_root: Path) -> str:
@@ -364,7 +432,7 @@ def _verify_run(
     source_commit: str,
 ) -> tuple[dict[str, Any], dict[str, bytes]]:
     run_root = bundle_root / run_name
-    _require(run_root.is_dir(), f"missing preserved run directory: {run_name}")
+    _verify_run_directory(run_root, run_name, tuple(canonical_files))
     _require(
         run_manifest.get("source_commit") == source_commit,
         f"{run_name}: source commit does not match manifest root",
@@ -492,9 +560,8 @@ def _verify_v1_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     _require(isinstance(source_commit, str) and bool(source_commit), "source commit missing")
     canonical_files = manifest.get("canonical_files")
     _require(
-        isinstance(canonical_files, list)
-        and all(isinstance(item, str) for item in canonical_files),
-        "canonical file list missing",
+        canonical_files == list(_V1_CANONICAL_FILES),
+        "v1 canonical file list does not match schema",
     )
     runs = manifest.get("runs")
     _require(isinstance(runs, dict), "run manifests missing")
@@ -557,7 +624,7 @@ def _verify_v2_run(
     trust: dict[str, Any] | None,
 ) -> tuple[dict[str, Any], dict[str, bytes]]:
     run_root = bundle_root / run_name
-    _require(run_root.is_dir(), f"missing preserved run directory: {run_name}")
+    _verify_run_directory(run_root, run_name, tuple(canonical_files))
     _require(
         run_manifest.get("source_commit") == source_commit,
         f"{run_name}: source commit mismatch",
@@ -640,16 +707,36 @@ def _verify_v2_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     source_commit = manifest.get("source_commit")
     _require(isinstance(source_commit, str) and bool(source_commit), "source commit missing")
     canonical_files = manifest.get("canonical_files")
+    enumerated_runs = {
+        name: _enumerate_run_files(bundle_root / name, name)
+        for name in ("run-1", "run-2")
+    }
+    first_receipt = _load_json(bundle_root / "run-1" / "receipt.json")
+    receipt_schema = first_receipt.get("schema")
+    if receipt_schema == "tinystories-1m-exact-current-pipeline-frontier-v4":
+        schema_files = _V2_CURRENT_CANONICAL_FILES
+    elif (
+        receipt_schema == "tinystories-1m-exact-current-pipeline-frontier-v3"
+        and source_commit == _LEGACY_V3_SOURCE_COMMIT
+    ):
+        schema_files = _V2_LEGACY_CANONICAL_FILES
+    else:
+        raise VerificationError("unsupported v2 receipt schema/source identity")
     _require(
-        isinstance(canonical_files, list)
-        and all(isinstance(filename, str) for filename in canonical_files),
-        "canonical file list missing",
+        canonical_files == list(schema_files),
+        "v2 canonical file list does not match receipt schema",
     )
+    for name, actual_files in enumerated_runs.items():
+        _require(
+            actual_files == set(schema_files) | _RUN_METADATA_FILES,
+            f"{name}: run directory contents mismatch: "
+            f"expected {sorted(set(schema_files) | _RUN_METADATA_FILES)}, "
+            f"found {sorted(actual_files)}",
+        )
     runs = manifest.get("runs")
     _require(isinstance(runs, dict), "run manifests missing")
     run_names = sorted(runs)
     _require(run_names == ["run-1", "run-2"], "exactly run-1 and run-2 are required")
-    first_receipt = _load_json(bundle_root / "run-1" / "receipt.json")
     trust = (
         _independent_trust(Path(__file__).resolve().parents[2], str(source_commit))
         if first_receipt.get("schema")

@@ -103,6 +103,62 @@ class PreservedDeterminismBundleTest(unittest.TestCase):
                 MODULE.verify_determinism_bundles(mutated)
 
 
+class PublicBundleFilesystemBoundaryTest(unittest.TestCase):
+    def test_public_v4_verifier_rejects_unlisted_later_stage_logs_in_both_runs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-frontier-extra-log-") as temporary:
+            mutated = Path(temporary) / "bundles"
+            shutil.copytree(CURRENT_BUNDLES, mutated)
+            for run_name in ("run-1", "run-2"):
+                (mutated / run_name / "flat-scf.log").write_text(
+                    "later stage must not exist\n", encoding="utf-8"
+                )
+
+            with self.assertRaisesRegex(MODULE.VerificationError, "run directory contents"):
+                MODULE.verify_determinism_bundles(mutated)
+
+    def test_public_verifier_rejects_unlisted_artifact(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-frontier-extra-artifact-") as temporary:
+            mutated = Path(temporary) / "bundles"
+            shutil.copytree(BUNDLES, mutated)
+            (mutated / "run-1" / "flat-scf.mlir").write_text(
+                "module {}\n", encoding="utf-8"
+            )
+
+            with self.assertRaisesRegex(MODULE.VerificationError, "run directory contents"):
+                MODULE.verify_determinism_bundles(mutated)
+
+    def test_public_verifier_rejects_symlinked_canonical_file(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-frontier-symlink-") as temporary:
+            mutated = Path(temporary) / "bundles"
+            shutil.copytree(BUNDLES, mutated)
+            target = mutated / "receipt-target.json"
+            target.write_bytes((mutated / "run-1" / "receipt.json").read_bytes())
+            receipt = mutated / "run-1" / "receipt.json"
+            receipt.unlink()
+            receipt.symlink_to(target)
+
+            with self.assertRaisesRegex(MODULE.VerificationError, "regular file"):
+                MODULE.verify_determinism_bundles(mutated)
+
+    def test_public_verifier_rejects_missing_canonical_file(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-frontier-missing-") as temporary:
+            mutated = Path(temporary) / "bundles"
+            shutil.copytree(BUNDLES, mutated)
+            (mutated / "run-2" / "torch-mlir.log").unlink()
+
+            with self.assertRaisesRegex(MODULE.VerificationError, "run directory contents"):
+                MODULE.verify_determinism_bundles(mutated)
+
+    def test_public_verifier_rejects_unexpected_subdirectory(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-frontier-subdirectory-") as temporary:
+            mutated = Path(temporary) / "bundles"
+            shutil.copytree(BUNDLES, mutated)
+            (mutated / "run-1" / ".hidden-stage").mkdir()
+
+            with self.assertRaisesRegex(MODULE.VerificationError, "run directory contents"):
+                MODULE.verify_determinism_bundles(mutated)
+
+
 class StrongCurrentReceiptValidationTest(unittest.TestCase):
     """Adversarial checks use self-consistent mutations against independent trust."""
 
