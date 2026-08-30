@@ -325,6 +325,99 @@ class PipelineSourceAuthenticationTest(unittest.TestCase):
 
 
 class AuthenticatedPipelineRunnerTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory(prefix="exact-scf-result-union-")
+        self.addCleanup(self.temporary.cleanup)
+        root = Path(self.temporary.name)
+        self.linalg_input = root / "input.linalg.mlir"
+        self.linalg_input.write_text("module {}\n", encoding="utf-8")
+        self.unavailable_scf_output = root / "scf-output"
+        self.unavailable_scf_output.mkdir()
+        (self.unavailable_scf_output / "manifest.json").write_text(
+            '{"reason":"no direct SCF route","stage":"scf","status":"unavailable"}\n',
+            encoding="utf-8",
+        )
+        self.scf_log = root / "scf-control.log"
+        self.scf_log.write_text("registered control output\n", encoding="utf-8")
+        self.nonzero_scf_log = root / "scf-compiler.log"
+        self.nonzero_scf_log.write_text(
+            "error: failed to legalize operation 'scf.for' : (index) -> ()\n",
+            encoding="utf-8",
+        )
+        self.no_output_path = root / "no-output"
+
+    def test_exact_runner_selects_registered_linalg_no_handshake_alias(self) -> None:
+        model = "tiny-stories-1m-kev-gpt-exact"
+        self.assertEqual(
+            MODULE._registered_attribute(model, "pytorch-exported"),
+            "tiny-stories-1m-kev-gpt-exact-pytorch-exported",
+        )
+        for stage in (
+            "torch",
+            "linalg",
+            "scf",
+            "flat-scf",
+            "calyx",
+            "calyx-native-sv",
+        ):
+            self.assertEqual(
+                MODULE._registered_attribute(model, stage),
+                f"tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-{stage}",
+            )
+
+    def test_zero_exit_unavailable_manifest_returns_control_manifest_failure(self) -> None:
+        result = MODULE._classify_registered_result(
+            stage="scf",
+            exit_code=0,
+            output=self.unavailable_scf_output,
+            upstream_input=self.linalg_input,
+            log=self.scf_log,
+        )
+        self.assertIsInstance(result, MODULE.ControlManifestFailure)
+        self.assertEqual(result.kind, "control_manifest")
+        self.assertEqual(result.manifest, self.unavailable_scf_output / "manifest.json")
+        self.assertEqual(result.upstream_input, self.linalg_input)
+
+    def test_nonzero_scf_failure_returns_compiler_failure_without_manifest(self) -> None:
+        result = MODULE._classify_registered_result(
+            stage="scf",
+            exit_code=1,
+            output=self.no_output_path,
+            upstream_input=self.linalg_input,
+            log=self.nonzero_scf_log,
+        )
+        self.assertIsInstance(result, MODULE.CompilerFailure)
+        self.assertEqual(result.kind, "compiler_failure")
+        self.assertEqual(result.upstream_input, self.linalg_input)
+        self.assertEqual(result.log, self.nonzero_scf_log)
+        self.assertFalse(hasattr(result, "manifest"))
+
+    def test_nonzero_scf_failure_preserves_full_diagnostic_and_optional_operation_types(self) -> None:
+        identified = MODULE._classify_registered_result(
+            stage="scf",
+            exit_code=1,
+            output=self.no_output_path,
+            upstream_input=self.linalg_input,
+            log=self.nonzero_scf_log,
+        )
+        self.assertEqual(
+            identified.diagnostic,
+            "error: failed to legalize operation 'scf.for' : (index) -> ()",
+        )
+        self.assertEqual(identified.operation, "scf.for")
+        self.assertEqual(identified.types, "(index) -> ()")
+        anonymous_log = Path(self.temporary.name) / "anonymous.log"
+        anonymous_log.write_text("error: compiler terminated\n", encoding="utf-8")
+        anonymous = MODULE._classify_registered_result(
+            stage="scf",
+            exit_code=2,
+            output=self.no_output_path,
+            upstream_input=self.linalg_input,
+            log=anonymous_log,
+        )
+        self.assertIsNone(anonymous.operation)
+        self.assertIsNone(anonymous.types)
+
     def test_export_provenance_manifest_is_not_a_control_stage_status(self) -> None:
         # Catches rejecting a valid export because its provenance schema has no status.
         with tempfile.TemporaryDirectory(prefix="exact-export-manifest-") as temporary:
@@ -383,6 +476,41 @@ class AuthenticatedPipelineRunnerTest(unittest.TestCase):
         self.assertEqual(visited, ["pytorch-exported", "torch", "linalg"])
         self.assertEqual([record.stage for record in records], visited)
         self.assertFalse(records[-1].artifact_accepted)
+
+    def test_alias_prefix_hash_mismatch_is_rejected_before_scf(self) -> None:
+        authenticated = {
+            "torch": "e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674",
+            "linalg": "f4792aef4a0054386bf4e9e6399cc107e6d947b4d608e97e6041ccdf2ffb59c8",
+        }
+        model = "tiny-stories-1m-kev-gpt-exact"
+        for mutated_stage in ("torch", "linalg"):
+            with self.subTest(mutated_stage=mutated_stage):
+                trusted = {**authenticated, mutated_stage: "0" * 64}
+                visited: list[str] = []
+                alias_attributes: list[str] = []
+
+                def execute(stage: str, upstream: StageRecord | None) -> StageRecord:
+                    visited.append(stage)
+                    if stage in authenticated:
+                        alias_attributes.append(MODULE._registered_attribute(model, stage))
+                    return valid(stage, artifact_sha256=authenticated.get(stage, SHA_A))
+
+                with mock.patch.object(
+                    MODULE,
+                    "_AUTHENTICATED_DIRECT_STAGE_SHA256",
+                    trusted,
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "authenticated alias prefix"):
+                        MODULE._run_registered_pipeline(execute)
+
+                self.assertEqual(
+                    alias_attributes,
+                    [
+                        "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-torch",
+                        "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-linalg",
+                    ],
+                )
+                self.assertNotIn("scf", visited)
 
     def test_two_capture_bundles_must_be_byte_identical(self) -> None:
         # Catches comparing only receipt fields while logs or failing inputs differ.

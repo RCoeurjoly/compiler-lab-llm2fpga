@@ -56,6 +56,11 @@ _FRONTIERS = {
     "calyx": "calyx_frontier",
     "calyx-native-sv": "sv_frontier",
 }
+_EXACT_LINALG_ALIAS = "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake"
+_AUTHENTICATED_DIRECT_STAGE_SHA256 = {
+    "torch": "e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674",
+    "linalg": "f4792aef4a0054386bf4e9e6399cc107e6d947b4d608e97e6041ccdf2ffb59c8",
+}
 _TERMINAL_DIAGNOSTIC_RE = re.compile(
     r"(?:\berror:\s|failed to legalize operation|unhandled operation|LLVM ERROR)",
     re.IGNORECASE,
@@ -85,11 +90,49 @@ class StageRecord:
 
 
 @dataclass(frozen=True)
+class AcceptedStageResult:
+    kind: Literal["accepted"]
+    artifact: Path
+    output: Path
+
+
+@dataclass(frozen=True)
+class ControlManifestFailure:
+    kind: Literal["control_manifest"]
+    manifest: Path
+    upstream_input: Path
+    diagnostic: str
+
+
+@dataclass(frozen=True)
+class CompilerFailure:
+    kind: Literal["compiler_failure"]
+    upstream_input: Path
+    log: Path
+    diagnostic: str
+    operation: str | None
+    types: str | None
+
+
+RegisteredStageResult = AcceptedStageResult | ControlManifestFailure | CompilerFailure
+
+
+@dataclass(frozen=True)
 class FrontierReceipt:
     status: Literal["complete", "compiler_frontier", "environment_failure"]
     frontier: str | None
     stage: str | None
     diagnostic: str | None
+
+
+def _registered_attribute(model: str, stage: str) -> str:
+    if model != "tiny-stories-1m-kev-gpt-exact":
+        raise ValueError(f"unsupported exact model: {model}")
+    if stage == "pytorch-exported":
+        return f"{model}-pytorch-exported"
+    if stage not in _FRONTIERS:
+        raise ValueError(f"unregistered exact stage: {stage}")
+    return f"{_EXACT_LINALG_ALIAS}-{stage}"
 
 
 def _canonical_stage(stage: str) -> str:
@@ -215,6 +258,24 @@ def _run_registered_pipeline(execute_stage: object) -> list[StageRecord]:
     records: list[StageRecord] = []
     upstream: StageRecord | None = None
     for stage in _FRONTIERS:
+        if stage == "scf":
+            prefix = {record.stage: record for record in records}
+            for authenticated_stage in ("torch", "linalg"):
+                record = prefix.get(authenticated_stage)
+                expected_sha256 = _AUTHENTICATED_DIRECT_STAGE_SHA256.get(
+                    authenticated_stage
+                )
+                if (
+                    record is None
+                    or record.status != "succeeded"
+                    or not record.artifact_accepted
+                    or not isinstance(expected_sha256, str)
+                    or not _SHA256_RE.fullmatch(expected_sha256)
+                    or record.artifact_sha256 != expected_sha256
+                ):
+                    raise RuntimeError(
+                        f"{authenticated_stage}: authenticated alias prefix hash mismatch"
+                    )
         record = execute_stage(stage, upstream)
         if not isinstance(record, StageRecord):
             raise TypeError(f"{stage}: executor did not return a StageRecord")
@@ -1124,6 +1185,114 @@ def _primary_stage_artifact(stage: str, output: Path) -> Path:
     return artifact
 
 
+def _control_manifest_failure(
+    stage: str,
+    manifest: Path,
+    upstream_input: Path | None,
+    diagnostic: str,
+) -> ControlManifestFailure:
+    if upstream_input is None or not upstream_input.is_file():
+        raise RuntimeError(f"{stage}: control manifest has no preserved upstream input")
+    return ControlManifestFailure(
+        kind="control_manifest",
+        manifest=manifest,
+        upstream_input=upstream_input,
+        diagnostic=diagnostic,
+    )
+
+
+def _classify_registered_result(
+    stage: str,
+    exit_code: int,
+    output: Path,
+    upstream_input: Path | None,
+    log: Path,
+) -> RegisteredStageResult:
+    if exit_code != 0:
+        if upstream_input is None or not upstream_input.is_file():
+            raise RuntimeError(f"{stage}: compiler failure has no preserved upstream input")
+        if not log.is_file():
+            raise RuntimeError(f"{stage}: compiler failure log does not exist: {log}")
+        diagnostic_lines = [
+            line.strip()
+            for line in log.read_text(encoding="utf-8", errors="replace").splitlines()
+            if _TERMINAL_DIAGNOSTIC_RE.search(line)
+        ]
+        if not diagnostic_lines:
+            raise RuntimeError(
+                f"{stage}: nonzero registered build had no classifiable compiler diagnostic"
+            )
+        diagnostic = "\n".join(diagnostic_lines)
+        operation_match = re.search(
+            r"failed to legalize operation\s+['\"]([^'\"]+)['\"]"
+            r"(?:\s*:\s*([^\n]+))?",
+            diagnostic,
+            re.IGNORECASE,
+        )
+        return CompilerFailure(
+            kind="compiler_failure",
+            upstream_input=upstream_input,
+            log=log,
+            diagnostic=diagnostic,
+            operation=operation_match.group(1) if operation_match else None,
+            types=operation_match.group(2).strip()
+            if operation_match and operation_match.group(2)
+            else None,
+        )
+
+    manifest = output / "manifest.json" if output.is_dir() else None
+    if (
+        stage in {"scf", "flat-scf", "calyx", "calyx-native-sv"}
+        and manifest is not None
+        and manifest.is_file()
+    ):
+        try:
+            value = json.loads(manifest.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            return _control_manifest_failure(
+                stage,
+                manifest,
+                upstream_input,
+                f"error: {stage} manifest is invalid JSON: {error.msg}",
+            )
+        if not isinstance(value, dict):
+            return _control_manifest_failure(
+                stage,
+                manifest,
+                upstream_input,
+                f"error: {stage} manifest is not an object",
+            )
+        manifest_stage = value.get("stage")
+        status = value.get("status")
+        reason = value.get("reason")
+        if manifest_stage != stage or status != "ok" or reason is not None:
+            return _control_manifest_failure(
+                stage,
+                manifest,
+                upstream_input,
+                (
+                    f"error: registered {stage} manifest contract mismatch: "
+                    f"stage={manifest_stage!r}, status={status!r}, "
+                    f"reason={reason if reason is not None else 'no reason recorded'}"
+                ),
+            )
+        artifact = _primary_stage_artifact(stage, output)
+        declared_artifact = value.get("artifact")
+        if declared_artifact is not None and output / str(declared_artifact) != artifact:
+            return _control_manifest_failure(
+                stage,
+                manifest,
+                upstream_input,
+                f"error: registered {stage} manifest names the wrong primary artifact",
+            )
+        return AcceptedStageResult(kind="accepted", artifact=artifact, output=output)
+
+    if stage in {"flat-scf", "calyx", "calyx-native-sv"} and output.is_dir():
+        raise RuntimeError(f"{stage}: registered output has no valid manifest")
+    artifact = _primary_stage_artifact(stage, output)
+    return AcceptedStageResult(kind="accepted", artifact=artifact, output=output)
+
+
 def _manifest_diagnostic(stage: str, output: Path) -> tuple[Path | None, str | None]:
     if stage not in {"scf", "flat-scf", "calyx", "calyx-native-sv"}:
         return None, None
@@ -1170,8 +1339,8 @@ def _run_registered_stage(
     source_commit: str,
     stage: str,
     upstream: StageRecord | None,
-) -> tuple[StageRecord, dict[str, object], dict[str, object]]:
-    attribute = f"{model}-{stage}"
+) -> tuple[StageRecord, dict[str, object], RegisteredStageResult]:
+    attribute = _registered_attribute(model, stage)
     derivation = _derivation(repo_root, attribute)
     derivation_capture = (
         _capture_derivation_evidence(evidence_dir, stage, derivation)
@@ -1194,34 +1363,26 @@ def _run_registered_stage(
         if line.strip().startswith("/nix/store/")
     ]
     output = Path(output_lines[0]) if len(output_lines) == 1 else Path(str(derivation["output"]))
-    manifest: Path | None = None
-    diagnostic: str | None = None
-    artifact: Path
-    if result.returncode == 0:
-        if str(output) != str(derivation["output"]):
-            raise RuntimeError(f"{stage}: build output differs from evaluated derivation")
-        manifest, diagnostic = _manifest_diagnostic(stage, output)
-        if diagnostic is None:
-            artifact = _primary_stage_artifact(stage, output)
-        else:
-            artifact = manifest if manifest is not None else output
-            _append_classifier_diagnostic(log, diagnostic)
+    if result.returncode == 0 and str(output) != str(derivation["output"]):
+        raise RuntimeError(f"{stage}: build output differs from evaluated derivation")
+    registered_result = _classify_registered_result(
+        stage=stage,
+        exit_code=result.returncode,
+        output=output,
+        upstream_input=Path(upstream.artifact) if upstream is not None else None,
+        log=log,
+    )
+    accepted = isinstance(registered_result, AcceptedStageResult)
+    if isinstance(registered_result, AcceptedStageResult):
+        artifact = registered_result.artifact
+        diagnostic = None
+    elif isinstance(registered_result, ControlManifestFailure):
+        artifact = registered_result.manifest
+        diagnostic = registered_result.diagnostic
+        _append_classifier_diagnostic(log, diagnostic)
     else:
-        diagnostic_lines = [
-            line.strip()
-            for line in log.read_text(encoding="utf-8", errors="replace").splitlines()
-            if _TERMINAL_DIAGNOSTIC_RE.search(line)
-        ]
-        if not diagnostic_lines:
-            raise RuntimeError(
-                f"{stage}: nonzero registered build had no classifiable compiler diagnostic"
-            )
-        diagnostic = diagnostic_lines[0]
-        if upstream is None:
-            raise RuntimeError(f"{stage}: first stage failed without an upstream input")
-        artifact = Path(upstream.artifact)
-
-    accepted = result.returncode == 0 and diagnostic is None
+        artifact = registered_result.upstream_input
+        diagnostic = registered_result.diagnostic
     canonical_log = f"reproducers/{stage}/{stage}.log" if not accepted else f"reproducers/{stage}/{stage}.log"
     artifact_sha256 = _sha256(artifact)
     record = StageRecord(
@@ -1251,6 +1412,10 @@ def _run_registered_stage(
         exit_code=result.returncode,
     )
     execution = {
+        "route_alias": _EXACT_LINALG_ALIAS,
+        "frontend": "linalg",
+        "backend": "calyx-native-sv",
+        "attribute": attribute,
         "invoked": True,
         "command": record.command,
         "exit_code": result.returncode,
@@ -1272,13 +1437,7 @@ def _run_registered_stage(
         ),
         **derivation_capture,
     }
-    auxiliary = {
-        "output": output,
-        "manifest": manifest,
-        "diagnostic": diagnostic,
-        "log": log,
-    }
-    return record, execution, auxiliary
+    return record, execution, registered_result
 
 
 def build_current_frontier_receipt(
@@ -1296,17 +1455,19 @@ def build_current_frontier_receipt(
     evidence_dir = evidence_dir or (repo_root / "reproducers" / "current")
     evidence_dir.mkdir(parents=True, exist_ok=True)
 
-    export_derivation = _derivation(repo_root, f"{model}-pytorch-exported")
-    torch_derivation = _derivation(repo_root, f"{model}-torch")
+    export_derivation = _derivation(
+        repo_root, _registered_attribute(model, "pytorch-exported")
+    )
+    torch_derivation = _derivation(repo_root, _registered_attribute(model, "torch"))
     source_identity = _authenticate_pipeline_source(
         repo_root, export_derivation, torch_derivation
     )
     source_commit = str(source_identity["evidence_source_commit"])
     executions: dict[str, dict[str, object]] = {}
-    auxiliaries: dict[str, dict[str, object]] = {}
+    registered_results: dict[str, RegisteredStageResult] = {}
 
     def execute(stage: str, upstream: StageRecord | None) -> StageRecord:
-        record, execution, auxiliary = _run_registered_stage(
+        record, execution, registered_result = _run_registered_stage(
             repo_root,
             evidence_dir,
             model,
@@ -1315,7 +1476,7 @@ def build_current_frontier_receipt(
             upstream,
         )
         executions[stage] = execution
-        auxiliaries[stage] = auxiliary
+        registered_results[stage] = registered_result
         return record
 
     stage_records = _run_registered_pipeline(execute)
@@ -1342,17 +1503,12 @@ def build_current_frontier_receipt(
         failure_index = list(_FRONTIERS).index(first_invalid)
         if failure_index == 0:
             raise RuntimeError("cannot capture a frontier without an upstream stage")
-        upstream_record = stage_records[failure_index - 1]
-        upstream_path = Path(upstream_record.artifact)
+        invalid_result = registered_results[first_invalid]
+        if isinstance(invalid_result, AcceptedStageResult):
+            raise RuntimeError(f"{first_invalid}: accepted result classified as a frontier")
+        upstream_path = invalid_result.upstream_input
         archive = evidence_dir / "full-input.gz"
         content_bytes, content_sha256 = _capture_full_input(upstream_path, archive)
-        manifest = auxiliaries[first_invalid]["manifest"]
-        if not isinstance(manifest, Path) or not manifest.is_file():
-            raise RuntimeError(
-                f"{first_invalid}: this runner requires a preserved manifest reproducer"
-            )
-        reproducer = evidence_dir / "minimal-reproducer.json"
-        shutil.copyfile(manifest, reproducer)
         full_input = {
             "path": f"{canonical_root}/full-input.gz",
             "archive_bytes": archive.stat().st_size,
@@ -1362,18 +1518,34 @@ def build_current_frontier_receipt(
             "source_stage": stage_records[failure_index - 1].stage,
             "source_artifact": str(upstream_path),
         }
-        minimal = {
-            "path": f"{canonical_root}/minimal-reproducer.json",
-            "bytes": reproducer.stat().st_size,
-            "sha256": _sha256(reproducer),
-            "diagnostic": classification.diagnostic,
-            "stage": first_invalid,
-            "operation": None,
-            "types": None,
-            "operation_and_types_not_applicable": True,
-            "reduction": "The registered stage manifest is already the minimal 109-byte availability reproducer.",
-            "verified": True,
-        }
+        if isinstance(invalid_result, ControlManifestFailure):
+            reproducer = evidence_dir / "minimal-reproducer.json"
+            shutil.copyfile(invalid_result.manifest, reproducer)
+            minimal = {
+                "path": f"{canonical_root}/minimal-reproducer.json",
+                "bytes": reproducer.stat().st_size,
+                "sha256": _sha256(reproducer),
+                "diagnostic": invalid_result.diagnostic,
+                "stage": first_invalid,
+                "operation": None,
+                "types": None,
+                "operation_and_types_not_applicable": True,
+                "reduction": "The registered control manifest is the availability reproducer.",
+                "verified": True,
+            }
+        else:
+            minimal = {
+                "path": f"{canonical_root}/{first_invalid}.log",
+                "bytes": invalid_result.log.stat().st_size,
+                "sha256": _sha256(invalid_result.log),
+                "diagnostic": invalid_result.diagnostic,
+                "stage": first_invalid,
+                "operation": invalid_result.operation,
+                "types": invalid_result.types,
+                "operation_and_types_not_applicable": invalid_result.operation is None,
+                "reduction": "The preserved compiler log binds the nonzero terminal diagnostic.",
+                "verified": True,
+            }
 
     decision = json.loads(
         (repo_root / "artifacts/comparison/tinystories-1m-exact-frontier-decision.json").read_text(
