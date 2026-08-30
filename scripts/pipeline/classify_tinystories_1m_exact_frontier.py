@@ -103,6 +103,8 @@ class ControlManifestFailure:
     manifest: Path
     upstream_input: Path
     diagnostic: str
+    residual_artifact: Path | None = None
+    blockers: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -132,6 +134,8 @@ def _serialize_frontier_evidence(
     result: ControlManifestFailure | CompilerFailure,
     canonical_root: str,
     manifest_binding: dict[str, object] | None = None,
+    residual_artifact_binding: dict[str, object] | None = None,
+    blockers_binding: dict[str, object] | None = None,
     interestingness: dict[str, object] | None = None,
     minimization: dict[str, object] | None = None,
 ) -> dict[str, object]:
@@ -148,12 +152,30 @@ def _serialize_frontier_evidence(
             raise ValueError(f"cannot serialize control manifest: {error}") from error
         if not isinstance(manifest_value, dict):
             raise ValueError("control manifest must be a JSON object")
-        return {
+        status = manifest_value.get("status")
+        if status == "completed-with-residuals":
+            if (
+                result.residual_artifact is None
+                or result.blockers is None
+                or residual_artifact_binding is None
+                or blockers_binding is None
+            ):
+                raise ValueError(
+                    "completed-with-residuals requires artifact and blockers bindings"
+                )
+        elif (
+            result.residual_artifact is not None
+            or result.blockers is not None
+            or residual_artifact_binding is not None
+            or blockers_binding is not None
+        ):
+            raise ValueError("non-residual control manifest cannot carry residual bindings")
+        evidence = {
             "kind": "control_manifest",
             "manifest": {
                 **manifest_binding,
                 "stage": manifest_value.get("stage"),
-                "status": manifest_value.get("status"),
+                "status": status,
                 "reason": manifest_value.get("reason"),
             },
             "operation": None,
@@ -163,6 +185,16 @@ def _serialize_frontier_evidence(
                 "reason": "control_manifest_is_minimal",
             },
         }
+        if status == "completed-with-residuals":
+            evidence["manifest"].update(
+                {
+                    "artifact": manifest_value.get("artifact"),
+                    "blockers": manifest_value.get("blockers"),
+                }
+            )
+            evidence["residual_artifact"] = residual_artifact_binding
+            evidence["blockers"] = blockers_binding
+        return evidence
 
     if manifest_binding is not None:
         raise ValueError("compiler failure cannot carry a manifest")
@@ -1341,6 +1373,9 @@ def _control_manifest_failure(
     manifest: Path,
     upstream_input: Path | None,
     diagnostic: str,
+    *,
+    residual_artifact: Path | None = None,
+    blockers: Path | None = None,
 ) -> ControlManifestFailure:
     if upstream_input is None or not upstream_input.is_file():
         raise RuntimeError(f"{stage}: control manifest has no preserved upstream input")
@@ -1349,6 +1384,8 @@ def _control_manifest_failure(
         manifest=manifest,
         upstream_input=upstream_input,
         diagnostic=diagnostic,
+        residual_artifact=residual_artifact,
+        blockers=blockers,
     )
 
 
@@ -1439,6 +1476,42 @@ def _classify_registered_result(
         manifest_stage = value.get("stage")
         status = value.get("status")
         reason = value.get("reason")
+        if status == "completed-with-residuals":
+            if (
+                stage != "flat-scf"
+                or set(value) != {"artifact", "blockers", "stage", "status"}
+                or manifest_stage != "flat-scf"
+                or reason is not None
+                or value.get("artifact") != "flat.scf.mlir"
+                or value.get("blockers") != "blockers.json"
+            ):
+                return _control_manifest_failure(
+                    stage,
+                    manifest,
+                    upstream_input,
+                    f"error: registered {stage} residual manifest contract mismatch",
+                )
+            residual_artifact = output / "flat.scf.mlir"
+            blockers = output / "blockers.json"
+            if not residual_artifact.is_file() or residual_artifact.stat().st_size <= 0:
+                raise RuntimeError(
+                    "flat-scf: completed-with-residuals output has no nonempty flat.scf.mlir"
+                )
+            if not blockers.is_file() or blockers.stat().st_size <= 0:
+                raise RuntimeError(
+                    "flat-scf: completed-with-residuals output has no nonempty blockers.json"
+                )
+            return _control_manifest_failure(
+                stage,
+                manifest,
+                upstream_input,
+                (
+                    "error: registered flat-scf stage completed with residuals; "
+                    "artifact remains rejected"
+                ),
+                residual_artifact=residual_artifact,
+                blockers=blockers,
+            )
         if manifest_stage != stage or status != "ok" or reason is not None:
             return _control_manifest_failure(
                 stage,
@@ -1867,6 +1940,21 @@ def build_current_frontier_receipt(
         if isinstance(invalid_result, ControlManifestFailure):
             reproducer = evidence_dir / "minimal-reproducer.json"
             shutil.copyfile(invalid_result.manifest, reproducer)
+            residual_artifact_binding = None
+            blockers_binding = None
+            if invalid_result.residual_artifact is not None:
+                residual_artifact = evidence_dir / "flat.scf.mlir"
+                blockers = evidence_dir / "blockers.json"
+                shutil.copyfile(invalid_result.residual_artifact, residual_artifact)
+                if invalid_result.blockers is None:
+                    raise RuntimeError("residual control manifest lost blockers path")
+                shutil.copyfile(invalid_result.blockers, blockers)
+                residual_artifact_binding = _evidence_binding(
+                    residual_artifact, f"{canonical_root}/flat.scf.mlir"
+                )
+                blockers_binding = _evidence_binding(
+                    blockers, f"{canonical_root}/blockers.json"
+                )
             frontier_evidence = _serialize_frontier_evidence(
                 stage=first_invalid,
                 result=invalid_result,
@@ -1874,6 +1962,8 @@ def build_current_frontier_receipt(
                 manifest_binding=_evidence_binding(
                     reproducer, f"{canonical_root}/minimal-reproducer.json"
                 ),
+                residual_artifact_binding=residual_artifact_binding,
+                blockers_binding=blockers_binding,
             )
         else:
             interestingness, minimization = _capture_compiler_minimization(

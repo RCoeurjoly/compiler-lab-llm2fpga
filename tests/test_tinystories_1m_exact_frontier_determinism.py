@@ -461,10 +461,109 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
             "artifact_sha256": stage["artifact_sha256"],
         })
 
-    def _binding(self, name: str) -> dict[str, object]:
+    def _completed_with_residuals(self) -> None:
+        manifest = (
+            b'{"artifact":"flat.scf.mlir","blockers":"blockers.json",'
+            b'"stage":"flat-scf","status":"completed-with-residuals"}\n'
+        )
+        residual = b"module { func.func @main() }\n"
+        blockers = b'{"residual_operations":["memref.alloc"]}\n'
+        self.files["minimal-reproducer.json"] = manifest
+        self.files["flat.scf.mlir"] = residual
+        self.files["blockers.json"] = blockers
+        self.files["flat-scf.log"] = b"registered residual control output\n"
+        self.files["flat-scf.drv"] = b"synthetic flat-scf derivation\n"
+        self.files["flat-scf.derivation.json"] = b'{"derivations":{}}'
+
+        scf_stage = self.receipt["stages"][-1]
+        scf_stage.update({
+            "status": "succeeded",
+            "artifact_accepted": True,
+            "terminal_diagnostics": [],
+        })
+        scf_execution = self.receipt["registered_build_execution"]["scf"]
+        scf_execution["artifact_accepted"] = True
+
+        flat_stage = copy.deepcopy(scf_stage)
+        flat_stage.update({
+            "stage": "flat-scf",
+            "status": "compiler_failure",
+            "artifact": "/nix/store/synthetic-flat-scf/manifest.json",
+            "artifact_bytes": len(manifest),
+            "artifact_sha256": hashlib.sha256(manifest).hexdigest(),
+            "artifact_accepted": False,
+            "log": "reproducers/flat-scf/flat-scf.log",
+            "log_bytes": len(self.files["flat-scf.log"]),
+            "log_sha256": hashlib.sha256(self.files["flat-scf.log"]).hexdigest(),
+            "terminal_diagnostics": [
+                "error: registered flat-scf manifest contract mismatch"
+            ],
+        })
+        self.receipt["stages"].append(flat_stage)
+
+        flat_execution = copy.deepcopy(scf_execution)
+        flat_execution.update({
+            "artifact": flat_stage["artifact"],
+            "artifact_bytes": flat_stage["artifact_bytes"],
+            "artifact_sha256": flat_stage["artifact_sha256"],
+            "artifact_accepted": False,
+            "log": flat_stage["log"],
+            "log_bytes": flat_stage["log_bytes"],
+            "log_sha256": flat_stage["log_sha256"],
+            "captured_derivation": "reproducers/flat-scf/flat-scf.drv",
+            "captured_derivation_bytes": len(self.files["flat-scf.drv"]),
+            "captured_derivation_sha256": hashlib.sha256(
+                self.files["flat-scf.drv"]
+            ).hexdigest(),
+            "captured_derivation_json": "reproducers/flat-scf/flat-scf.derivation.json",
+            "captured_derivation_json_bytes": len(
+                self.files["flat-scf.derivation.json"]
+            ),
+            "captured_derivation_json_sha256": hashlib.sha256(
+                self.files["flat-scf.derivation.json"]
+            ).hexdigest(),
+        })
+        self.receipt["registered_build_execution"]["flat-scf"] = flat_execution
+
+        for stage, execution in self.receipt["registered_build_execution"].items():
+            execution["captured_derivation"] = f"reproducers/flat-scf/{stage}.drv"
+            execution["captured_derivation_json"] = (
+                f"reproducers/flat-scf/{stage}.derivation.json"
+            )
+
+        self.receipt["pipeline_execution"].update({
+            "first_invalid_stage": "flat-scf",
+            "not_run": ["calyx", "calyx-native-sv"],
+        })
+        self.receipt["full_failing_input"]["path"] = (
+            "reproducers/flat-scf/full-input.gz"
+        )
+        self.receipt["stage"] = "flat-scf"
+        self.receipt["diagnostic"] = flat_stage["terminal_diagnostics"][0]
+        self.receipt["frontier_evidence"] = {
+            "kind": "control_manifest",
+            "manifest": {
+                **self._binding("minimal-reproducer.json", root="flat-scf"),
+                "stage": "flat-scf",
+                "status": "completed-with-residuals",
+                "reason": None,
+                "artifact": "flat.scf.mlir",
+                "blockers": "blockers.json",
+            },
+            "residual_artifact": self._binding("flat.scf.mlir", root="flat-scf"),
+            "blockers": self._binding("blockers.json", root="flat-scf"),
+            "operation": None,
+            "types": None,
+            "minimization": {
+                "status": "not_applicable",
+                "reason": "control_manifest_is_minimal",
+            },
+        }
+
+    def _binding(self, name: str, *, root: str = "scf") -> dict[str, object]:
         data = self.files[name]
         return {
-            "path": f"reproducers/scf/{name}",
+            "path": f"reproducers/{root}/{name}",
             "bytes": len(data),
             "sha256": hashlib.sha256(data).hexdigest(),
         }
@@ -530,6 +629,40 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
         self._compiler_failure()
         self.files["minimal-reproducer.json"] = b"{}\n"
         self._reject("directory contents")
+
+    def test_completed_with_residuals_control_manifest_binds_payloads(self) -> None:
+        self._completed_with_residuals()
+
+        try:
+            expected = MODULE._verify_v5_frontier_evidence(
+                self.receipt, self.files, "fixture"
+            )
+        except MODULE.VerificationError as error:
+            self.fail(str(error))
+
+        self.assertIn("flat.scf.mlir", expected)
+        self.assertIn("blockers.json", expected)
+
+    def test_completed_with_residuals_rejects_missing_or_altered_payloads(self) -> None:
+        self._completed_with_residuals()
+        original = self.files.pop("blockers.json")
+        self._reject("blockers")
+        self.files["blockers.json"] = original + b" "
+        self._reject("blockers")
+        self.files["blockers.json"] = original
+        self.files.pop("flat.scf.mlir")
+        self._reject("residual artifact")
+
+    def test_completed_with_residuals_rejects_manifest_lies_or_acceptance(self) -> None:
+        self._completed_with_residuals()
+        self.receipt["frontier_evidence"]["manifest"]["reason"] = "invented"
+        self._reject("exact control manifest")
+        self.receipt["frontier_evidence"]["manifest"]["reason"] = None
+        self.receipt["stages"][-1]["artifact_accepted"] = True
+        self.receipt["registered_build_execution"]["flat-scf"][
+            "artifact_accepted"
+        ] = True
+        self._reject("invalid artifact was accepted")
 
 
 class SuccessorFrontierDeterminismBundleTest(unittest.TestCase):

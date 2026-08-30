@@ -786,17 +786,58 @@ def _verify_v5_frontier_evidence(
         except json.JSONDecodeError as error:
             raise VerificationError(f"{run_name}: invalid control manifest: {error}") from error
         _require(isinstance(manifest_binding, dict), f"{run_name}: control manifest binding missing")
-        _require(
+        exact_identity = (
             isinstance(manifest, dict)
             and manifest.get("stage") == first_invalid
-            and manifest.get("status") in {"unavailable", "rejected"}
-            and isinstance(manifest.get("reason"), str)
-            and bool(manifest["reason"])
             and manifest_binding.get("stage") == manifest.get("stage")
             and manifest_binding.get("status") == manifest.get("status")
-            and manifest_binding.get("reason") == manifest.get("reason"),
-            f"{run_name}: exact control manifest mismatch",
+            and manifest_binding.get("reason") == manifest.get("reason")
         )
+        status = manifest.get("status") if isinstance(manifest, dict) else None
+        if status in {"unavailable", "rejected"}:
+            _require(
+                exact_identity
+                and isinstance(manifest.get("reason"), str)
+                and bool(manifest["reason"])
+                and "residual_artifact" not in frontier
+                and "blockers" not in frontier,
+                f"{run_name}: exact control manifest mismatch",
+            )
+        elif status == "completed-with-residuals":
+            _require(
+                exact_identity
+                and first_invalid == "flat-scf"
+                and set(manifest) == {"artifact", "blockers", "stage", "status"}
+                and manifest.get("reason") is None
+                and manifest.get("artifact") == "flat.scf.mlir"
+                and manifest.get("blockers") == "blockers.json"
+                and manifest_binding.get("artifact") == "flat.scf.mlir"
+                and manifest_binding.get("blockers") == "blockers.json",
+                f"{run_name}: exact control manifest mismatch",
+            )
+            _require(
+                "flat.scf.mlir" in files,
+                f"{run_name}: residual artifact is missing",
+            )
+            residual = _verify_file_binding(
+                frontier.get("residual_artifact"),
+                files,
+                "flat.scf.mlir",
+                canonical_root,
+                run_name,
+            )
+            blockers = _verify_file_binding(
+                frontier.get("blockers"),
+                files,
+                "blockers.json",
+                canonical_root,
+                run_name,
+            )
+            _require(bool(residual), f"{run_name}: residual artifact is empty")
+            _require(bool(blockers), f"{run_name}: blockers evidence is empty")
+            expected_files.update({"flat.scf.mlir", "blockers.json"})
+        else:
+            raise VerificationError(f"{run_name}: exact control manifest mismatch")
         _require(
             final_record.get("artifact_sha256") == _sha256_bytes(manifest_bytes)
             and final_run.get("artifact_sha256") == _sha256_bytes(manifest_bytes),

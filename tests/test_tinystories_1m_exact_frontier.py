@@ -386,6 +386,19 @@ class AuthenticatedPipelineRunnerTest(unittest.TestCase):
             '{"reason":"no direct SCF route","stage":"scf","status":"unavailable"}\n',
             encoding="utf-8",
         )
+        self.residual_flat_scf_output = root / "flat-scf-output"
+        self.residual_flat_scf_output.mkdir()
+        (self.residual_flat_scf_output / "manifest.json").write_text(
+            '{"artifact":"flat.scf.mlir","blockers":"blockers.json",'
+            '"stage":"flat-scf","status":"completed-with-residuals"}\n',
+            encoding="utf-8",
+        )
+        (self.residual_flat_scf_output / "flat.scf.mlir").write_text(
+            "module { func.func @main() }\n", encoding="utf-8"
+        )
+        (self.residual_flat_scf_output / "blockers.json").write_text(
+            '{"residual_operations":["memref.alloc"]}\n', encoding="utf-8"
+        )
         self.scf_log = root / "scf-control.log"
         self.scf_log.write_text("registered control output\n", encoding="utf-8")
         self.nonzero_scf_log = root / "scf-compiler.log"
@@ -498,6 +511,52 @@ class AuthenticatedPipelineRunnerTest(unittest.TestCase):
         self.assertEqual(evidence["manifest"]["stage"], "scf")
         self.assertEqual(evidence["manifest"]["status"], "unavailable")
         self.assertEqual(evidence["manifest"]["reason"], "no direct SCF route")
+
+    def test_completed_with_residuals_manifest_preserves_exact_payloads(self) -> None:
+        result = MODULE._classify_registered_result(
+            stage="flat-scf",
+            exit_code=0,
+            output=self.residual_flat_scf_output,
+            upstream_input=self.linalg_input,
+            log=self.scf_log,
+        )
+        manifest = result.manifest.read_bytes()
+        self.assertTrue(hasattr(result, "residual_artifact"))
+        self.assertTrue(hasattr(result, "blockers"))
+        residual = result.residual_artifact.read_bytes()
+        blockers = result.blockers.read_bytes()
+
+        evidence = MODULE._serialize_frontier_evidence(
+            stage="flat-scf",
+            result=result,
+            canonical_root="reproducers/flat-scf",
+            manifest_binding={
+                "path": "reproducers/flat-scf/minimal-reproducer.json",
+                "bytes": len(manifest),
+                "sha256": hashlib.sha256(manifest).hexdigest(),
+            },
+            residual_artifact_binding={
+                "path": "reproducers/flat-scf/flat.scf.mlir",
+                "bytes": len(residual),
+                "sha256": hashlib.sha256(residual).hexdigest(),
+            },
+            blockers_binding={
+                "path": "reproducers/flat-scf/blockers.json",
+                "bytes": len(blockers),
+                "sha256": hashlib.sha256(blockers).hexdigest(),
+            },
+        )
+
+        self.assertEqual(evidence["manifest"]["status"], "completed-with-residuals")
+        self.assertIsNone(evidence["manifest"]["reason"])
+        self.assertEqual(evidence["manifest"]["artifact"], "flat.scf.mlir")
+        self.assertEqual(evidence["manifest"]["blockers"], "blockers.json")
+        self.assertEqual(
+            evidence["residual_artifact"]["sha256"], hashlib.sha256(residual).hexdigest()
+        )
+        self.assertEqual(
+            evidence["blockers"]["sha256"], hashlib.sha256(blockers).hexdigest()
+        )
 
     def test_compiler_failure_frontier_evidence_has_no_manifest_and_binds_attempt(self) -> None:
         result = MODULE._classify_registered_result(
