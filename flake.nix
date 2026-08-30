@@ -1,6 +1,13 @@
 {
   description = "LLM2FPGA MLIR pipeline bring-up lab";
 
+  # The exact package adapter authenticates the immutable local package at the
+  # path frozen in the Task 1 contract.  Make only that package visible to the
+  # export derivation; it is never substituted with a copied or FP32 package.
+  nixConfig.extra-sandbox-paths = [
+    "/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m"
+  ];
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     nixpkgs-llvm21.url =
@@ -410,6 +417,151 @@
           adapterPy = ./TinyStories/model_adapter.py;
         };
 
+        # This is deliberately a Nix-generated Python helper rather than a
+        # pipeline/backend change.  It closes the Task 1--3 provenance before
+        # the generic exported-program materializer is allowed to write
+        # exported.pt2, then records the exact inputs alongside that output.
+        exactPackageExportProvenance = pkgs.writeText
+          "tinystories-1m-exact-package-export-provenance.py" ''
+            from __future__ import annotations
+
+            import argparse
+            import hashlib
+            import json
+            from pathlib import Path
+
+
+            EXPECTED = {
+                "adapter": "ee2af98f4f2dfcae20dbe43432bc4bcf6e8ea9340308ec735bd2c1549c16b92c",
+                "contract": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+                "audit_file": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+                "audit_payload": "7d7a37d08df7e63bdb95063674fe5dc306058e51af8a11bbcd97a4cb2972a766",
+                "package_manifest": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+                "task_2_file": "3bc578d7f13263f438d8e7d3f4d3b80386afa89accb859da74d1a4404606eae7",
+                "task_2_artifact": "8f74d35cc90d534fb385608c9cdf1f6f5bb0a5aad83eb6c34133e4b7b6f1e938",
+                "task_2_receipt": "f061dbf4f91bf5389acb0f27ce4b9e672f6f3831478907e01900e60e8869235b",
+                "task_3_file": "b15fe696a21b8fa9ddf0ae17c6cc264c8cac0dbbdd51880b924452de5d388762",
+                "task_3_artifact": "2e4f35b2875127bff7d74bcdc404edd3afad1c8fc6693dca05cd7a1636b22b69",
+                "task_3_result": "3113e57cc016292804beb2e35e6443ca8fc7cd1439272abde0cb62edc1c77524",
+            }
+
+
+            def sha256(path: Path) -> str:
+                digest = hashlib.sha256()
+                with path.open("rb") as stream:
+                    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                return digest.hexdigest()
+
+
+            def load_json(path: Path) -> dict[str, object]:
+                with path.open(encoding="utf-8") as stream:
+                    value = json.load(stream)
+                if not isinstance(value, dict):
+                    raise SystemExit(f"invalid JSON object: {path}")
+                return value
+
+
+            def require(condition: bool, label: str) -> None:
+                if not condition:
+                    raise SystemExit(f"exact package export provenance mismatch: {label}")
+
+
+            def verify(args: argparse.Namespace) -> dict[str, str]:
+                adapter = Path(args.adapter)
+                contract_path = Path(args.contract)
+                package = Path(args.package)
+                model_path = Path(args.model_path)
+                task_2_path = Path(args.task_2_artifact)
+                task_3_path = Path(args.generation_receipt)
+                audit_path = Path(args.audit)
+
+                require(adapter.is_file() and sha256(adapter) == EXPECTED["adapter"], "exact adapter")
+                require(contract_path.is_file() and sha256(contract_path) == EXPECTED["contract"], "Task 1 contract")
+                require(audit_path.is_file() and sha256(audit_path) == EXPECTED["audit_file"], "Task 1 audit")
+                require((package / "manifest.json").is_file()
+                        and sha256(package / "manifest.json") == EXPECTED["package_manifest"],
+                        "canonical package manifest")
+                require((model_path / "config.json").is_file()
+                        and (model_path / "pytorch_model.bin").is_file(), "model snapshot")
+
+                contract = load_json(contract_path)
+                audit = load_json(audit_path)
+                require(contract.get("status") == "authenticated"
+                        and contract.get("package", {}).get("manifest_sha256") == EXPECTED["package_manifest"]
+                        and Path(str(contract.get("package", {}).get("origin", ""))).resolve() == package.resolve(),
+                        "Task 1 contract/package binding")
+                require(audit.get("status") == "authenticated" and audit.get("conflicts") == []
+                        and audit.get("sha256") == EXPECTED["audit_payload"], "Task 1 audit receipt")
+
+                require(task_2_path.is_file() and sha256(task_2_path) == EXPECTED["task_2_file"], "Task 2 artifact file")
+                task_2 = load_json(task_2_path)
+                require(task_2.get("status") == "exact_eager_export_and_independent_oracle_matched"
+                        and task_2.get("artifact_sha256") == EXPECTED["task_2_artifact"]
+                        and task_2.get("identity", {}).get("model_receipt_sha256") == EXPECTED["task_2_receipt"]
+                        and task_2.get("identity", {}).get("package", {}).get("files", {}).get("manifest.json", {}).get("sha256") == EXPECTED["package_manifest"],
+                        "Task 2 exact model artifact")
+
+                require(task_3_path.is_file() and sha256(task_3_path) == EXPECTED["task_3_file"], "Task 3 generation file")
+                task_3 = load_json(task_3_path)
+                require(task_3.get("status") == "exact_generation_matched"
+                        and task_3.get("artifact_sha256") == EXPECTED["task_3_artifact"]
+                        and task_3.get("generation", {}).get("result_sha256") == EXPECTED["task_3_result"]
+                        and task_3.get("identity", {}).get("task_2", {}).get("artifact_sha256") == EXPECTED["task_2_artifact"]
+                        and task_3.get("identity", {}).get("task_2", {}).get("model_receipt_sha256") == EXPECTED["task_2_receipt"],
+                        "Task 3 generation receipt")
+                return {
+                    "adapter_sha256": EXPECTED["adapter"],
+                    "contract_sha256": EXPECTED["contract"],
+                    "audit_file_sha256": EXPECTED["audit_file"],
+                    "audit_payload_sha256": EXPECTED["audit_payload"],
+                    "package_manifest_sha256": EXPECTED["package_manifest"],
+                    "task_2_artifact_file_sha256": EXPECTED["task_2_file"],
+                    "task_2_artifact_sha256": EXPECTED["task_2_artifact"],
+                    "task_2_model_receipt_sha256": EXPECTED["task_2_receipt"],
+                    "task_3_generation_file_sha256": EXPECTED["task_3_file"],
+                    "task_3_generation_artifact_sha256": EXPECTED["task_3_artifact"],
+                    "task_3_generation_result_sha256": EXPECTED["task_3_result"],
+                }
+
+
+            def main() -> None:
+                parser = argparse.ArgumentParser()
+                parser.add_argument("action", choices=("verify", "write"))
+                parser.add_argument("--adapter", required=True)
+                parser.add_argument("--contract", required=True)
+                parser.add_argument("--audit", required=True)
+                parser.add_argument("--package", required=True)
+                parser.add_argument("--model-path", required=True)
+                parser.add_argument("--task-2-artifact", required=True)
+                parser.add_argument("--generation-receipt", required=True)
+                parser.add_argument("--out-dir")
+                args = parser.parse_args()
+                provenance = verify(args)
+                if args.action == "write":
+                    require(args.out_dir is not None, "provenance output directory")
+                    out_dir = Path(args.out_dir)
+                    exported = out_dir / "exported.pt2"
+                    require(exported.is_file(), "exported.pt2")
+                    provenance.update({
+                        "schema": "tinystories-1m-exact-pytorch-export-provenance-v1",
+                        "adapter": str(Path(args.adapter)),
+                        "contract": str(Path(args.contract)),
+                        "package": str(Path(args.package)),
+                        "model_path": str(Path(args.model_path)),
+                        "exported_pt2_sha256": sha256(exported),
+                    })
+                    encoded = json.dumps(provenance, sort_keys=True, separators=(",", ":")).encode()
+                    provenance["provenance_sha256"] = hashlib.sha256(encoded).hexdigest()
+                    (out_dir / "exact-provenance-manifest.json").write_text(
+                        json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+                    )
+
+
+            if __name__ == "__main__":
+                main()
+          '';
+
         # The package is deliberately supplied at runtime.  It is an
         # authenticated local reference input, not a flake input and not a
         # compiler-generated model.  The command runs entirely with the Nix
@@ -504,6 +656,7 @@
             tinyStories1m fpPrimsSv;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
+          inherit exactPackageExportProvenance;
         };
         pipelineStagePackages =
           pipelineLib.pipelineStagePackagesFromRegistry modelRegistry;
@@ -520,6 +673,7 @@
             tinyStories1m fpPrimsSv;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
+          inherit exactPackageExportProvenance;
         };
         pipelineStagePackagesNoHandshake =
           pipelineLib.pipelineStagePackagesFromRegistry
@@ -544,6 +698,7 @@
           inherit torchMlir;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
+          inherit exactPackageExportProvenance;
         };
         pipelineStagePackagesTosa =
           pipelineLibTosa.pipelineStagePackagesFromRegistry modelRegistryTosa;
@@ -554,6 +709,7 @@
           inherit torchMlir;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
+          inherit exactPackageExportProvenance;
         };
         pipelineStagePackagesTosaNoHandshake =
           pipelineLibTosa.pipelineStagePackagesFromRegistry
