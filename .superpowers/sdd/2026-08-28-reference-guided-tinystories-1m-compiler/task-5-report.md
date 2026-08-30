@@ -3,8 +3,9 @@
 ## Status
 
 Verified after fix round 1. The accepted pipeline base is
-`7eed3592a661c0cb3c417dc59b29839266446b2d`; the live evidence source is its
-distinct descendant `0090a8558b93919651bed63c0bfe81f3107340c0`.
+`7eed3592a661c0cb3c417dc59b29839266446b2d`; the final deterministic evidence
+source is its distinct descendant
+`f26177ee480187dd1abf5ee9b1324c61bcceab02`.
 
 The earliest causal invalid stage is `torch-mlir`, classified as
 `torch_mlir_frontier`. Its exact registered-build diagnostic is:
@@ -38,6 +39,10 @@ not run.
   minimal operation retains the original name and types. Automated
   `mlir-reduce` remains unsupported because the packaged reducer is MLIR 21 and
   the Torch dialect/tool is LLVM 23.
+- Run-local capture roots are normalized to `<capture-tmp>` in canonical
+  command/log fields. Exact store/tool paths and diagnostic locations are
+  retained. The flake archive is pinned to the evidence commit rather than the
+  dirty worktree.
 
 ## Executed commands and results
 
@@ -55,14 +60,23 @@ exit 1
 
 The exact capture command, temporary path, output/error log, environment-bound
 tool paths, and hashes are recorded in the machine receipt. The focused suite
-passes 22 tests under `nix develop`.
+passes 24 tests under `nix develop`.
+
+Two final fresh executions from `f26177e` produced byte-identical receipt JSON
+and byte-identical export, Torch, and capture logs. Run 1 started clean; run 2
+started with run 1's evidence files dirty. The observed runtimes were about two
+and three minutes and are deliberately not canonicalized into the receipt.
 
 ## Principal identities
 
 | Item | SHA-256 |
 | --- | --- |
-| receipt | `e801a3546f0e28bad3f30068dad849f6d085d35eae02d9bab1be957dc62bb896` |
-| flake archive NAR | `sha256-F2Ogrc4TE2JVjse8rsTGdyZ4Ymzg3ABxu8htFhZFMMw=` |
+| serialized receipt | `b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55` |
+| receipt self-hash | `af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b` |
+| flake archive NAR | `sha256-ouNdnHwDhw5BlFK16sJL5aAbXgqK6St3MlOiyllKD6w=` |
+| export canonical log | `993972ee373fbef7b0d334fc180f1277dc9b61698df7c3ed4aaa17a8c63b74e2` |
+| Torch canonical log | `1a0867e7081a0e850d2d30048d7e885f157b4d217fea473c789e5d175f485a29` |
+| capture canonical log | `f4e06b290a99aa484117a472a360effa2faecad07c2cdc3fa35273349fdcf399` |
 | export derivation JSON | `2fb13b6f6c3d89598dc1ab00939818524beada3af1cb5fa416dc632d4699eba9` |
 | Torch derivation JSON | `391fc17a7a0236d3939b9207b7a688f8f9c8a1223cba915a888eba332c3c8110` |
 | `exported.pt2` | `6c9d2931a18811560f6565e9d313390fb5e0b7b167af39ddc094e19b949ce085` |
