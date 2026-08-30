@@ -240,3 +240,111 @@ model also contains `torch.aten.bitwise_left_shift.Tensor_Scalar`. That is a
 new compiler frontier outside Task 1's authorized exact-right-shift scope. A
 new bounded plan is required before semantic Task 2 can use the full registered
 stage. No concern remains for the Task 1 right-shift implementation itself.
+
+## Review fix round 1: deterministic successor-frontier evidence
+
+Status remains **DONE_WITH_CONCERNS**. Commit
+`3e09f7ed8672f21fb907e48d51a5e39a47b782af` (`fix: bind exact successor
+compiler frontier`) addresses the review finding that the newly exposed
+left-shift frontier was previously supported only by an ephemeral diagnostic.
+It does not implement left shift or change the model contract.
+
+### Red evidence
+
+Before the fix, the new tests failed three times: the versioned successor
+receipt was missing, the two-capture determinism bundle/verifier was missing,
+and the mutation test could not authenticate a preserved full failing input.
+The runtime `arith.shrsi` assertion already passed against generated IR, which
+isolated the review defect to durable successor-frontier evidence.
+
+### Files added or changed
+
+- `artifacts/comparison/tinystories-1m-exact-successor-frontier.json`
+- `artifacts/comparison/tinystories-1m-exact-successor-frontier-determinism/`
+  (manifest, two complete canonical capture bundles, and explicitly
+  noncanonical timestamp/runtime metadata)
+- `reproducers/tinystories-1m-exact-torch-mlir/bitwise-left-shift-tensor-scalar.mlir`
+- `reproducers/tinystories-1m-exact-torch-mlir/interesting-left-shift.sh`
+- `scripts/pipeline/capture_tinystories_1m_exact_successor_frontier.py`
+- `scripts/pipeline/verify_tinystories_1m_exact_successor_frontier_determinism.py`
+- `tests/test_tinystories_1m_exact_shift_legalization.py`
+- `tests/test_tinystories_1m_exact_frontier_determinism.py`
+- this report
+
+The historical right-shift receipt remains byte-for-byte unchanged at file
+SHA-256 `b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55`
+and self-hash
+`af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b`.
+
+### Exact capture and verification commands
+
+Two independent authenticated captures were made and finalized:
+
+```text
+python3 scripts/pipeline/capture_tinystories_1m_exact_successor_frontier.py --bundle-dir artifacts/comparison/tinystories-1m-exact-successor-frontier-determinism --run-name run-1
+XDG_CACHE_HOME=/tmp/exact-successor-nix-cache python3 scripts/pipeline/capture_tinystories_1m_exact_successor_frontier.py --bundle-dir artifacts/comparison/tinystories-1m-exact-successor-frontier-determinism --run-name run-2
+python3 scripts/pipeline/capture_tinystories_1m_exact_successor_frontier.py --bundle-dir artifacts/comparison/tinystories-1m-exact-successor-frontier-determinism --finalize
+python3 scripts/pipeline/verify_tinystories_1m_exact_successor_frontier_determinism.py
+```
+
+All four commands exited 0. The verifier proved every canonical file in the
+two bundles byte-identical. The versioned successor receipt file SHA-256 is
+`5b40f13383c372b49d8e15a5aedfaab15c09ad4061aee96022481ae55424c313`;
+its deterministic self-hash is
+`638ed427537be14fe53a0d5d694eb2c13bf09f56f8b0679fadd30dbb746b6822`.
+The deterministic compressed full failing input SHA-256 is
+`d56ff38d4ec482297adbc19b81e350b14d703bf5d1424b9ede9200d01e23852e`.
+
+Each bundle binds the complete registered export and Torch-stage commands,
+exit codes, logs, content-bound compiler-import command/log, full 12,121,418
+byte failing MLIR input, pre-`torch-reduce-op-variants` IR/log, patched tool
+derivation/output/binary and hashes, pinned source revision and patch, minimal
+reproducer bytes and interestingness executions, right-shift runtime lowering
+log, current Task 1-3/adapter identities, earliest stage, and explicit later
+stages not run. The raw input has 1,633 right-shift and 122 left-shift generic
+ops; the pre-Reduce dump has zero right-shift and the same 122 left-shift ops.
+The exact earliest diagnostic names
+`torch.aten.bitwise_left_shift.Tensor_Scalar` with
+`(!torch.vtensor<[4,64],si64>, !torch.int) ->
+!torch.vtensor<[4,64],si64>`. Both the full input and the one-op count-16
+reproducer pass the exact interestingness predicate. No later stage ran.
+
+Focused tests and preserved historical evidence were verified with:
+
+```text
+nix develop -c python -m unittest tests/test_tinystories_1m_exact_shift_legalization.py tests/test_tinystories_1m_exact_frontier.py tests/test_tinystories_1m_exact_frontier_determinism.py tests/test_tinystories_1m_exact_frontier_semantics.py tests/test_tinystories_1m_exact_pipeline_registration.py -v
+python3 scripts/pipeline/verify_tinystories_1m_exact_frontier_determinism.py
+python3 -m py_compile scripts/pipeline/capture_tinystories_1m_exact_successor_frontier.py scripts/pipeline/verify_tinystories_1m_exact_successor_frontier_determinism.py
+bash -n reproducers/tinystories-1m-exact-torch-mlir/interesting-left-shift.sh
+```
+
+Outcomes: 47/47 tests passed; the historical verifier passed and retained its
+original hashes; Python compilation and shell syntax checks passed. The test
+suite invokes the packaged runtime pipeline and asserts `arith.shrsi` in its
+generated output rather than a source comment. It also asserts that the
+right-shift implementation source does not mention the left-shift operation.
+
+### Identity preservation and self-review
+
+The successor verifier rehashes the current adapter and Task 1-3 files and
+checks their embedded payload/artifact/result identities against the receipt;
+all match the exact identities listed above. It also rehashes the pinned
+Torch-MLIR derivation file, output binary, source patch, Nix expression,
+producer, verifier, minimal reproducer, all logs, and the compressed and
+uncompressed full input. A regression test mutates one byte of a copied full
+input archive and proves verification fails closed.
+
+Self-review confirmed that the right-shift pass contains no left-shift
+spelling, the new left-shift files are reproducer/evidence only, the runtime
+log contains `arith.shrsi` and no generic right-shift operation, the complete
+registered stage stops at Torch-MLIR, and all downstream success claims remain
+false. `git diff --cached --check` passed for source, tests, receipts, and
+reproducers; the two faithfully captured compiler-import logs intentionally
+retain the tool's terminal blank line and are authenticated byte-for-byte.
+
+### Remaining concern
+
+The full registered stage still cannot produce its Torch artifact because the
+new earliest frontier is the distinct left-shift Tensor-Scalar op. Per the
+controller ruling, that operation was not implemented here. A new bounded
+compiler-frontier follow-up is required before semantic Task 2 can run.
