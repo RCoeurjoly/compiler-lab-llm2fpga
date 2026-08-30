@@ -23,6 +23,12 @@ BUNDLES = (
     / "comparison"
     / "tinystories-1m-exact-frontier-determinism"
 )
+CURRENT_BUNDLES = (
+    ROOT
+    / "artifacts"
+    / "comparison"
+    / "tinystories-1m-exact-frontier-determinism-scf"
+)
 SPEC = importlib.util.spec_from_file_location("exact_frontier_determinism", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"cannot load {SCRIPT}")
@@ -50,6 +56,17 @@ LEFT_SHIFT_SUCCESS_BUNDLES = (
 
 
 class PreservedDeterminismBundleTest(unittest.TestCase):
+    def test_current_scf_captures_are_byte_identical_and_self_hashed(self) -> None:
+        result = MODULE.verify_determinism_bundles(CURRENT_BUNDLES)
+
+        self.assertEqual(result["runs"], ["run-1", "run-2"])
+        self.assertEqual(result["first_invalid_stage"], "scf")
+        self.assertTrue(result["byte_identical"])
+        self.assertEqual(
+            result["receipt_self_hash"],
+            "7451d19a9dd7d10ae61e7759422625de300e3a5e4ae5b1b44dbc56d8f3173425",
+        )
+
     def test_two_preserved_live_runs_verify_and_compare_byte_identical(self) -> None:
         result = MODULE.verify_determinism_bundles(BUNDLES)
 

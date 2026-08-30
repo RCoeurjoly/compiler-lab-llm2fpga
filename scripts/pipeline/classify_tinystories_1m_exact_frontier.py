@@ -13,9 +13,10 @@ import os
 from pathlib import Path
 import re
 import shlex
+import shutil
 import subprocess
 import tempfile
-from typing import Literal
+from typing import Callable, Literal
 
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -40,14 +41,15 @@ _CRITICAL_PIPELINE_INPUTS = (
 )
 _STAGE_ALIASES = {
     "pytorch_exported": "pytorch-exported",
-    "torch_mlir": "torch-mlir",
+    "torch-mlir": "torch",
+    "torch_mlir": "torch",
     "flat_scf": "flat-scf",
     "sv": "calyx-native-sv",
     "calyx_native_sv": "calyx-native-sv",
 }
 _FRONTIERS = {
     "pytorch-exported": "export_frontier",
-    "torch-mlir": "torch_mlir_frontier",
+    "torch": "torch_mlir_frontier",
     "linalg": "pre_calyx_frontier",
     "scf": "pre_calyx_frontier",
     "flat-scf": "pre_calyx_frontier",
@@ -199,6 +201,42 @@ def classify_frontier(stage_records: list[StageRecord]) -> FrontierReceipt:
         raise ValueError("incomplete successful prefix cannot establish pipeline completion")
 
     return FrontierReceipt("complete", None, None, None)
+
+
+def _run_registered_pipeline(execute_stage: object) -> list[StageRecord]:
+    """Execute the registered stages in order and stop at the first invalid one."""
+
+    if not callable(execute_stage):
+        raise TypeError("execute_stage must be callable")
+    records: list[StageRecord] = []
+    upstream: StageRecord | None = None
+    for stage in _FRONTIERS:
+        record = execute_stage(stage, upstream)
+        if not isinstance(record, StageRecord):
+            raise TypeError(f"{stage}: executor did not return a StageRecord")
+        if _canonical_stage(record.stage) != stage:
+            raise ValueError(f"{stage}: executor returned record for {record.stage}")
+        records.append(record)
+        upstream = record
+        if record.status != "succeeded" or not record.artifact_accepted:
+            break
+    return records
+
+
+def _require_byte_identical_bundles(
+    first: Path, second: Path, canonical_files: tuple[str, ...]
+) -> None:
+    """Reject capture runs unless every named canonical file is byte-identical."""
+
+    for filename in canonical_files:
+        if Path(filename).name != filename:
+            raise ValueError(f"unsafe canonical filename: {filename}")
+        first_path = first / filename
+        second_path = second / filename
+        if not first_path.is_file() or not second_path.is_file():
+            raise RuntimeError(f"missing canonical bundle file: {filename}")
+        if first_path.read_bytes() != second_path.read_bytes():
+            raise RuntimeError(f"capture bundles differ at {filename}")
 
 
 def _sha256(path: Path) -> str:
@@ -450,6 +488,7 @@ def _canonicalize_execution_text(
     ephemeral_paths: dict[str, str] | None = None,
     *,
     drop_git_dirty_warning: bool = False,
+    drop_nix_progress: bool = False,
 ) -> str:
     canonical = value
     for actual, placeholder in sorted(
@@ -461,6 +500,23 @@ def _canonicalize_execution_text(
     lines = [line.rstrip() for line in canonical.splitlines()]
     if drop_git_dirty_warning:
         lines = [line for line in lines if not line.startswith("warning: Git tree ")]
+    if drop_nix_progress:
+        filtered: list[str] = []
+        in_store_path_list = False
+        for line in lines:
+            if re.fullmatch(
+                r"(?:this derivation|these \d+ derivations|these paths) will be (?:built|fetched):",
+                line,
+            ):
+                in_store_path_list = True
+                continue
+            if in_store_path_list and re.fullmatch(r"  /nix/store/\S+", line):
+                continue
+            in_store_path_list = False
+            if re.fullmatch(r"(?:building|copying path) '/nix/store/[^']+'(?: from '\S+')?\.\.\.", line):
+                continue
+            filtered.append(line)
+        lines = filtered
     return "\n".join(lines)
 
 
@@ -476,7 +532,10 @@ def _canonical_execution_evidence(
         result.stdout, ephemeral_paths, drop_git_dirty_warning=True
     )
     canonical_stderr = _canonicalize_execution_text(
-        result.stderr, ephemeral_paths, drop_git_dirty_warning=True
+        result.stderr,
+        ephemeral_paths,
+        drop_git_dirty_warning=True,
+        drop_nix_progress=True,
     )
     payload_text = (
         f"$ {canonical_command}\n"
@@ -646,9 +705,20 @@ def _capture_compiler_failure(
     }
 
 
-def build_current_frontier_receipt(repo_root: Path, model: str) -> dict[str, object]:
+def _build_obsolete_torch_frontier_receipt(repo_root: Path, model: str) -> dict[str, object]:
     if model != "tiny-stories-1m-kev-gpt-exact":
         raise ValueError("this classifier only authenticates tiny-stories-1m-kev-gpt-exact")
+
+    semantic_command = [
+        "nix",
+        "develop",
+        "-c",
+        "python",
+        "scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py",
+        "--probe-report",
+        "artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json",
+    ]
+    _run(semantic_command, cwd=repo_root)
 
     requested_attribute = f"{model}-torch-mlir"
     requested_command = f"nix build .#{requested_attribute} -L"
@@ -956,16 +1026,367 @@ def build_current_frontier_receipt(repo_root: Path, model: str) -> dict[str, obj
     return receipt
 
 
+_SEMANTIC_VERIFIER = "scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py"
+_SEMANTIC_REPORT = "artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json"
+_PREDECESSOR_FRONTIER_FILE_SHA256 = (
+    "b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55"
+)
+_PREDECESSOR_FRONTIER_SELF_SHA256 = (
+    "af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b"
+)
+
+
+def _verify_semantic_gate(repo_root: Path) -> dict[str, object]:
+    command = [
+        "nix",
+        "develop",
+        "-c",
+        "python",
+        _SEMANTIC_VERIFIER,
+        "--probe-report",
+        _SEMANTIC_REPORT,
+    ]
+    result = _run(command, cwd=repo_root)
+    try:
+        evidence = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError("semantic verifier did not emit JSON evidence") from error
+    if not isinstance(evidence, dict):
+        raise RuntimeError("semantic verifier evidence is not an object")
+    probe = evidence.get("semantic_probe")
+    registered = evidence.get("registered_stage")
+    if not isinstance(probe, dict) or probe.get("status") != "accepted":
+        raise RuntimeError("semantic verifier did not accept the compiler-backed probe")
+    if not isinstance(registered, dict) or registered.get("status") != "accepted":
+        raise RuntimeError("semantic verifier did not accept the registered Torch stage")
+    return {
+        "command": shlex.join(command),
+        "status": "accepted",
+        "verifier": _SEMANTIC_VERIFIER,
+        "verifier_sha256": _sha256(repo_root / _SEMANTIC_VERIFIER),
+        "probe_report": _SEMANTIC_REPORT,
+        "probe_report_sha256": _sha256(repo_root / _SEMANTIC_REPORT),
+        "evidence": evidence,
+    }
+
+
+def _primary_stage_artifact(stage: str, output: Path) -> Path:
+    if stage == "pytorch-exported":
+        artifact = output / "exported.pt2"
+    elif stage in {"torch", "linalg"}:
+        artifact = output
+    elif stage == "flat-scf":
+        artifact = output / "flat.scf.mlir"
+    elif stage == "calyx":
+        artifact = output / "model.calyx.mlir"
+    elif stage == "calyx-native-sv":
+        artifact = output / "sv" / "main.sv"
+    else:
+        artifact = output
+    if not artifact.is_file() or artifact.stat().st_size <= 0:
+        raise RuntimeError(f"{stage}: registered output has no nonempty primary artifact: {artifact}")
+    return artifact
+
+
+def _manifest_diagnostic(stage: str, output: Path) -> tuple[Path | None, str | None]:
+    if stage not in {"scf", "flat-scf", "calyx", "calyx-native-sv"}:
+        return None, None
+    manifest = output / "manifest.json" if output.is_dir() else None
+    if manifest is None or not manifest.is_file():
+        return None, None
+    try:
+        value = json.loads(manifest.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        return manifest, f"error: {stage} manifest is invalid JSON: {error.msg}"
+    if not isinstance(value, dict):
+        return manifest, f"error: {stage} manifest is not an object"
+    status = value.get("status")
+    if status == "ok":
+        return manifest, None
+    reason = value.get("reason", "no reason recorded")
+    return manifest, f"error: registered {stage} stage status is {status!r}: {reason}"
+
+
+def _append_classifier_diagnostic(log: Path, diagnostic: str) -> None:
+    payload = log.read_bytes()
+    if payload and not payload.endswith(b"\n"):
+        payload += b"\n"
+    log.write_bytes(payload + f"--- classifier validation ---\n{diagnostic}\n".encode())
+
+
+def _capture_full_input(source: Path, destination: Path) -> tuple[int, str]:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256()
+    byte_count = 0
+    with source.open("rb") as input_stream, destination.open("wb") as raw_archive:
+        with gzip.GzipFile(filename="", mode="wb", fileobj=raw_archive, mtime=0) as archive:
+            for chunk in iter(lambda: input_stream.read(1024 * 1024), b""):
+                byte_count += len(chunk)
+                digest.update(chunk)
+                archive.write(chunk)
+    return byte_count, digest.hexdigest()
+
+
+def _run_registered_stage(
+    repo_root: Path,
+    evidence_dir: Path,
+    model: str,
+    source_commit: str,
+    stage: str,
+    upstream: StageRecord | None,
+) -> tuple[StageRecord, dict[str, object], dict[str, object]]:
+    attribute = f"{model}-{stage}"
+    derivation = _derivation(repo_root, attribute)
+    command = [
+        "nix",
+        "build",
+        "--no-link",
+        "--print-out-paths",
+        "-L",
+        f".#{attribute}",
+    ]
+    log = evidence_dir / f"{stage}.log"
+    result = _run_and_log(command, cwd=repo_root, log=log)
+    output_lines = [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if line.strip().startswith("/nix/store/")
+    ]
+    output = Path(output_lines[0]) if len(output_lines) == 1 else Path(str(derivation["output"]))
+    manifest: Path | None = None
+    diagnostic: str | None = None
+    artifact: Path
+    if result.returncode == 0:
+        if str(output) != str(derivation["output"]):
+            raise RuntimeError(f"{stage}: build output differs from evaluated derivation")
+        manifest, diagnostic = _manifest_diagnostic(stage, output)
+        if diagnostic is None:
+            artifact = _primary_stage_artifact(stage, output)
+        else:
+            artifact = manifest if manifest is not None else output
+            _append_classifier_diagnostic(log, diagnostic)
+    else:
+        diagnostic_lines = [
+            line.strip()
+            for line in log.read_text(encoding="utf-8", errors="replace").splitlines()
+            if _TERMINAL_DIAGNOSTIC_RE.search(line)
+        ]
+        if not diagnostic_lines:
+            raise RuntimeError(
+                f"{stage}: nonzero registered build had no classifiable compiler diagnostic"
+            )
+        diagnostic = diagnostic_lines[0]
+        if upstream is None:
+            raise RuntimeError(f"{stage}: first stage failed without an upstream input")
+        artifact = Path(upstream.artifact)
+
+    accepted = result.returncode == 0 and diagnostic is None
+    canonical_log = f"reproducers/{stage}/{stage}.log" if not accepted else f"reproducers/{stage}/{stage}.log"
+    artifact_sha256 = _sha256(artifact)
+    record = StageRecord(
+        stage=stage,
+        status="succeeded" if accepted else "compiler_failure",
+        artifact=str(artifact),
+        artifact_bytes=artifact.stat().st_size,
+        artifact_sha256=artifact_sha256,
+        artifact_accepted=accepted,
+        command=shlex.join(command),
+        tool_revisions={
+            "evidence_source_commit": source_commit,
+            "derivation": str(derivation["path"]),
+            "derivation_file_sha256": str(derivation["file_sha256"]),
+            "derivation_json_sha256": str(derivation["json_sha256"]),
+            "build_command_sha256": str(derivation["build_command_sha256"]),
+        },
+        log=str(log),
+        log_sha256=_sha256(log),
+        log_bytes=log.stat().st_size,
+        terminal_diagnostics=(diagnostic,) if diagnostic else (),
+        upstream_identity=(
+            upstream.artifact_sha256
+            if upstream is not None
+            else "package_manifest_sha256:374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35"
+        ),
+        exit_code=result.returncode,
+    )
+    execution = {
+        "invoked": True,
+        "command": record.command,
+        "exit_code": result.returncode,
+        "result": str(output) if result.returncode == 0 else None,
+        "artifact": str(artifact),
+        "artifact_bytes": record.artifact_bytes,
+        "artifact_sha256": artifact_sha256,
+        "artifact_accepted": accepted,
+        "log": canonical_log,
+        "log_bytes": record.log_bytes,
+        "log_sha256": record.log_sha256,
+        "derivation": derivation["path"],
+        "derivation_file_sha256": derivation["file_sha256"],
+        "derivation_json_sha256": derivation["json_sha256"],
+    }
+    auxiliary = {
+        "output": output,
+        "manifest": manifest,
+        "diagnostic": diagnostic,
+        "log": log,
+    }
+    return record, execution, auxiliary
+
+
+def build_current_frontier_receipt(
+    repo_root: Path,
+    model: str,
+    *,
+    evidence_dir: Path | None = None,
+) -> dict[str, object]:
+    """Replay the authenticated registered pipeline and capture its first invalid stage."""
+
+    if model != "tiny-stories-1m-kev-gpt-exact":
+        raise ValueError("this classifier only authenticates tiny-stories-1m-kev-gpt-exact")
+
+    semantic_gate = _verify_semantic_gate(repo_root)
+    evidence_dir = evidence_dir or (repo_root / "reproducers" / "current")
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+
+    export_derivation = _derivation(repo_root, f"{model}-pytorch-exported")
+    torch_derivation = _derivation(repo_root, f"{model}-torch")
+    source_identity = _authenticate_pipeline_source(
+        repo_root, export_derivation, torch_derivation
+    )
+    source_commit = str(source_identity["evidence_source_commit"])
+    executions: dict[str, dict[str, object]] = {}
+    auxiliaries: dict[str, dict[str, object]] = {}
+
+    def execute(stage: str, upstream: StageRecord | None) -> StageRecord:
+        record, execution, auxiliary = _run_registered_stage(
+            repo_root,
+            evidence_dir,
+            model,
+            source_commit,
+            stage,
+            upstream,
+        )
+        executions[stage] = execution
+        auxiliaries[stage] = auxiliary
+        return record
+
+    stage_records = _run_registered_pipeline(execute)
+    classification = classify_frontier(stage_records)
+    if classification.status == "environment_failure":
+        raise RuntimeError("environment failure cannot establish a compiler frontier")
+
+    first_invalid = classification.stage
+    canonical_root = f"reproducers/{first_invalid}" if first_invalid else "reproducers/complete"
+    for stage, record in zip(_FRONTIERS, stage_records):
+        canonical_log = f"{canonical_root}/{stage}.log"
+        executions[stage]["log"] = canonical_log
+
+    full_input: dict[str, object] | None = None
+    minimal: dict[str, object] | None = None
+    if first_invalid is not None:
+        failure_index = list(_FRONTIERS).index(first_invalid)
+        if failure_index == 0:
+            raise RuntimeError("cannot capture a frontier without an upstream stage")
+        upstream_record = stage_records[failure_index - 1]
+        upstream_path = Path(upstream_record.artifact)
+        archive = evidence_dir / "full-input.gz"
+        content_bytes, content_sha256 = _capture_full_input(upstream_path, archive)
+        manifest = auxiliaries[first_invalid]["manifest"]
+        if not isinstance(manifest, Path) or not manifest.is_file():
+            raise RuntimeError(
+                f"{first_invalid}: this runner requires a preserved manifest reproducer"
+            )
+        reproducer = evidence_dir / "minimal-reproducer.json"
+        shutil.copyfile(manifest, reproducer)
+        full_input = {
+            "path": f"{canonical_root}/full-input.gz",
+            "archive_bytes": archive.stat().st_size,
+            "archive_sha256": _sha256(archive),
+            "content_bytes": content_bytes,
+            "content_sha256": content_sha256,
+            "source_stage": stage_records[failure_index - 1].stage,
+            "source_artifact": str(upstream_path),
+        }
+        minimal = {
+            "path": f"{canonical_root}/minimal-reproducer.json",
+            "bytes": reproducer.stat().st_size,
+            "sha256": _sha256(reproducer),
+            "diagnostic": classification.diagnostic,
+            "stage": first_invalid,
+            "operation": None,
+            "types": None,
+            "operation_and_types_not_applicable": True,
+            "reduction": "The registered stage manifest is already the minimal 109-byte availability reproducer.",
+            "verified": True,
+        }
+
+    decision = json.loads(
+        (repo_root / "artifacts/comparison/tinystories-1m-exact-frontier-decision.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    not_run = list(_FRONTIERS)[len(stage_records) :]
+    receipt: dict[str, object] = {
+        "schema": "tinystories-1m-exact-current-pipeline-frontier-v3",
+        "model": model,
+        "status": classification.status,
+        "frontier": classification.frontier,
+        "stage": classification.stage,
+        "diagnostic": classification.diagnostic,
+        "source_commit": source_commit,
+        "semantic_gate": semantic_gate,
+        "pipeline_source_identity": source_identity,
+        "predecessor_receipt": {
+            "historical_bundle": "artifacts/comparison/tinystories-1m-exact-frontier-determinism",
+            "file_sha256": _PREDECESSOR_FRONTIER_FILE_SHA256,
+            "self_sha256": _PREDECESSOR_FRONTIER_SELF_SHA256,
+        },
+        "frozen_task_1_through_3_identities": decision["identity_hashes"],
+        "task_2_decision_self_sha256": decision["sha256"],
+        "stages": [
+            {
+                **asdict(record),
+                "log": f"{canonical_root}/{record.stage}.log",
+            }
+            for record in stage_records
+        ],
+        "registered_build_execution": executions,
+        "pipeline_execution": {
+            "registered_order": list(_FRONTIERS),
+            "first_invalid_stage": first_invalid,
+            "stopped_after_first_invalid_stage": first_invalid is not None,
+            "not_run": not_run,
+        },
+        "full_failing_input": full_input,
+        "minimal_reproducer": minimal,
+        "claims": {
+            "calyx_native_sv": classification.status == "complete",
+            "syntax_validated": False,
+            "synthesis_validated": False,
+            "board_inference": False,
+            "functional_equivalence": False,
+            "resource_or_timing": False,
+            "backend_model_quantization_ddr_pcie_changed": False,
+        },
+    }
+    receipt["sha256"] = _canonical_receipt_hash(receipt)
+    return receipt
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Classify the first exact TinyStories current-pipeline frontier."
     )
     parser.add_argument("--model", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--evidence-dir", type=Path)
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[2]
-    receipt = build_current_frontier_receipt(repo_root, args.model)
+    receipt = build_current_frontier_receipt(
+        repo_root, args.model, evidence_dir=args.evidence_dir
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"

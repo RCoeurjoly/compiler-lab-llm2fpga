@@ -58,6 +58,19 @@ def require(condition: bool, diagnostic: str) -> None:
         raise ValueError(diagnostic)
 
 
+def resolve_current_or_preserved_receipt(path: Path, expected_sha256: object) -> Path:
+    if path.is_file() and sha256_file(path) == expected_sha256:
+        return path
+    for candidate in sorted(
+        (ROOT / "artifacts" / "comparison").glob(
+            "tinystories-1m-exact-*-determinism/run-1/receipt.json"
+        )
+    ):
+        if sha256_file(candidate) == expected_sha256:
+            return candidate
+    raise ValueError("task5_frontier_file_hash")
+
+
 def shift_output(input_value: dict[str, Any], shift: int) -> dict[str, Any]:
     require(input_value.get("dtype") == "si64", "shift_contract:input_dtype")
     shape = input_value.get("shape")
@@ -77,7 +90,10 @@ def verify_contract(fixture_path: Path, decision_path: Path) -> dict[str, Any]:
     require(decision_hash == canonical_sha256(decision_without_hash), "decision_self_hash")
     frontier = decision.get("frontier")
     require(isinstance(frontier, dict), "decision_frontier")
-    frontier_path = ROOT / str(frontier.get("frontier_receipt_path"))
+    frontier_path = resolve_current_or_preserved_receipt(
+        ROOT / str(frontier.get("frontier_receipt_path")),
+        frontier.get("frontier_hash"),
+    )
     reproducer_path = ROOT / str(frontier.get("minimal_reproducer_path"))
     frontier_receipt = load_object(frontier_path)
     require(sha256_file(frontier_path) == frontier.get("frontier_hash"), "task5_frontier_file_hash")

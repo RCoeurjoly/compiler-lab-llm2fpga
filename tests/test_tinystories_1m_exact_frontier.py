@@ -33,7 +33,7 @@ SHA_A = "a" * 64
 SHA_B = "b" * 64
 STAGES = [
     "pytorch-exported",
-    "torch-mlir",
+    "torch",
     "linalg",
     "scf",
     "flat-scf",
@@ -179,7 +179,7 @@ class ExactFrontierClassifierTest(unittest.TestCase):
 
     def test_classifier_hashes_the_actual_log(self) -> None:
         record = invalid(
-            "torch-mlir",
+            "torch",
             "error: failed to legalize operation 'torch.operator'",
             supplied_diagnostics=(),
         )
@@ -236,13 +236,13 @@ class ExactFrontierClassifierTest(unittest.TestCase):
 
         self.assertEqual(result.status, "environment_failure")
         self.assertIsNone(result.frontier)
-        self.assertEqual(result.stage, "torch-mlir")
+        self.assertEqual(result.stage, "torch")
 
     def test_stage_names_map_to_the_spec_frontiers(self) -> None:
         # Catches drift between registered stage names and the design's labels.
         expected = {
             "pytorch-exported": "export_frontier",
-            "torch-mlir": "torch_mlir_frontier",
+            "torch": "torch_mlir_frontier",
             "linalg": "pre_calyx_frontier",
             "scf": "pre_calyx_frontier",
             "flat-scf": "pre_calyx_frontier",
@@ -267,7 +267,7 @@ class ExactFrontierClassifierTest(unittest.TestCase):
 
     def test_incomplete_successful_prefix_is_not_complete(self) -> None:
         with self.assertRaisesRegex(ValueError, "incomplete successful prefix"):
-            classify_frontier([valid("pytorch-exported"), valid("torch-mlir")])
+            classify_frontier([valid("pytorch-exported"), valid("torch")])
 
 
 class PipelineSourceAuthenticationTest(unittest.TestCase):
@@ -322,6 +322,88 @@ class PipelineSourceAuthenticationTest(unittest.TestCase):
                     MODULE._authenticate_pipeline_source(
                         repo, {"input_sources": []}, {"input_sources": []}
                     )
+
+
+class AuthenticatedPipelineRunnerTest(unittest.TestCase):
+    def test_export_provenance_manifest_is_not_a_control_stage_status(self) -> None:
+        # Catches rejecting a valid export because its provenance schema has no status.
+        with tempfile.TemporaryDirectory(prefix="exact-export-manifest-") as temporary:
+            output = Path(temporary)
+            (output / "manifest.json").write_text(
+                '{"stage":"pytorch-exported","files":{"serialized":"exported.pt2"}}\n',
+                encoding="utf-8",
+            )
+
+            manifest, diagnostic = MODULE._manifest_diagnostic(
+                "pytorch-exported", output
+            )
+
+        self.assertIsNone(manifest)
+        self.assertIsNone(diagnostic)
+
+    def test_semantic_verifier_is_the_first_pipeline_action(self) -> None:
+        # Catches any registered build or derivation lookup before Task 2 is replayed.
+        commands: list[list[str]] = []
+
+        def stop_after_first(command: list[str], **_: object) -> object:
+            commands.append(command)
+            raise RuntimeError("semantic gate sentinel")
+
+        with mock.patch.object(MODULE, "_run", side_effect=stop_after_first):
+            with self.assertRaisesRegex(RuntimeError, "semantic gate sentinel"):
+                MODULE.build_current_frontier_receipt(
+                    ROOT, "tiny-stories-1m-kev-gpt-exact"
+                )
+
+        self.assertEqual(
+            commands,
+            [[
+                "nix",
+                "develop",
+                "-c",
+                "python",
+                "scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py",
+                "--probe-report",
+                "artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json",
+            ]],
+        )
+
+    def test_registered_pipeline_stops_immediately_after_first_invalid_stage(self) -> None:
+        # Catches a cascading Linalg failure being followed by SCF or backend builds.
+        visited: list[str] = []
+
+        def execute(stage: str, upstream: StageRecord | None) -> StageRecord:
+            visited.append(stage)
+            if stage == "linalg":
+                return invalid("linalg", "error: linalg frontier")
+            return valid(stage)
+
+        records = MODULE._run_registered_pipeline(execute)
+
+        self.assertEqual(visited, ["pytorch-exported", "torch", "linalg"])
+        self.assertEqual([record.stage for record in records], visited)
+        self.assertFalse(records[-1].artifact_accepted)
+
+    def test_two_capture_bundles_must_be_byte_identical(self) -> None:
+        # Catches comparing only receipt fields while logs or failing inputs differ.
+        with tempfile.TemporaryDirectory(prefix="exact-frontier-bundles-") as temporary:
+            root = Path(temporary)
+            first = root / "run-1"
+            second = root / "run-2"
+            first.mkdir()
+            second.mkdir()
+            for directory in (first, second):
+                (directory / "receipt.json").write_bytes(b'{"same":true}\n')
+                (directory / "stage.log").write_bytes(b"error: same\n")
+
+            MODULE._require_byte_identical_bundles(
+                first, second, ("receipt.json", "stage.log")
+            )
+            (second / "stage.log").write_bytes(b"error: changed\n")
+            with self.assertRaisesRegex(RuntimeError, "stage.log"):
+                MODULE._require_byte_identical_bundles(
+                    first, second, ("receipt.json", "stage.log")
+                )
 
 
 class CanonicalCaptureNormalizationTest(unittest.TestCase):
@@ -380,6 +462,26 @@ class CanonicalCaptureNormalizationTest(unittest.TestCase):
             hashlib.sha256(original).hexdigest(), hashlib.sha256(mutated).hexdigest()
         )
 
+    def test_cached_and_fresh_nix_progress_produce_identical_evidence(self) -> None:
+        # Catches cache state leaking into otherwise identical stage bundles.
+        command = ["nix", "build", "--no-link", "--print-out-paths", ".#stage"]
+        cached = subprocess.CompletedProcess(command, 0, "/nix/store/result\n", "")
+        fresh = subprocess.CompletedProcess(
+            command,
+            0,
+            "/nix/store/result\n",
+            (
+                "this derivation will be built:\n"
+                "  /nix/store/example-stage.drv\n"
+                "building '/nix/store/example-stage.drv'...\n"
+            ),
+        )
+
+        self.assertEqual(
+            MODULE._canonical_execution_evidence(command, cached),
+            MODULE._canonical_execution_evidence(command, fresh),
+        )
+
 
 class ExactFrontierReceiptTest(unittest.TestCase):
     @classmethod
@@ -392,18 +494,18 @@ class ExactFrontierReceiptTest(unittest.TestCase):
             json.dumps(unsigned, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
         ).hexdigest()
         self.assertEqual(self.report["sha256"], expected)
-        self.assertEqual(self.report["frontier"], "torch_mlir_frontier")
-        self.assertEqual(self.report["stage"], "torch-mlir")
+        self.assertEqual(self.report["frontier"], "pre_calyx_frontier")
+        self.assertEqual(self.report["stage"], "scf")
         self.assertTrue(self.report["pipeline_execution"]["stopped_after_first_invalid_stage"])
         self.assertEqual(
             self.report["pipeline_execution"]["not_run"],
-            ["linalg", "scf", "flat-scf", "calyx", "calyx-native-sv"],
+            ["flat-scf", "calyx", "calyx-native-sv"],
         )
 
     def test_every_record_binds_artifact_command_tools_log_and_upstream(self) -> None:
         self.assertEqual(
             [record["stage"] for record in self.report["stages"]],
-            ["pytorch-exported", "torch-mlir"],
+            ["pytorch-exported", "torch", "linalg", "scf"],
         )
         for record in self.report["stages"]:
             self.assertGreater(record["artifact_bytes"], 0)
@@ -413,8 +515,8 @@ class ExactFrontierReceiptTest(unittest.TestCase):
             self.assertTrue(record["log"])
             self.assertRegex(record["log_sha256"], r"^[0-9a-f]{64}$")
             self.assertTrue(record["upstream_identity"])
-        self.assertTrue(self.report["stages"][0]["artifact_accepted"])
-        self.assertFalse(self.report["stages"][1]["artifact_accepted"])
+        self.assertTrue(all(record["artifact_accepted"] for record in self.report["stages"][:-1]))
+        self.assertFalse(self.report["stages"][-1]["artifact_accepted"])
 
     def test_receipt_proves_task4_ancestry_and_evaluated_source_bytes(self) -> None:
         source = self.report["pipeline_source_identity"]
@@ -456,56 +558,54 @@ class ExactFrontierReceiptTest(unittest.TestCase):
 
     def test_registered_builds_were_invoked_in_this_run(self) -> None:
         execution = self.report["registered_build_execution"]
-        export = execution["pytorch-exported"]
-        torch = execution["torch-mlir"]
-        self.assertTrue(export["invoked"])
-        self.assertTrue(torch["invoked"])
-        self.assertEqual(export["exit_code"], 0)
-        self.assertNotEqual(torch["exit_code"], 0)
-        self.assertIn("nix build", export["command"])
-        self.assertIn("nix build", torch["command"])
-        for run in (export, torch):
+        self.assertEqual(set(execution), {"pytorch-exported", "torch", "linalg", "scf"})
+        for stage, run in execution.items():
+            self.assertTrue(run["invoked"])
+            self.assertEqual(run["exit_code"], 0)
+            self.assertIn("nix build", run["command"])
             log = ROOT / run["log"]
             self.assertEqual(log.stat().st_size, run["log_bytes"])
             self.assertEqual(hashlib.sha256(log.read_bytes()).hexdigest(), run["log_sha256"])
             self.assertRegex(run["derivation_json_sha256"], r"^[0-9a-f]{64}$")
+            self.assertEqual(run["artifact_accepted"], stage != "scf")
 
     def test_full_capture_and_reproducer_hashes_are_bound(self) -> None:
-        archive = ROOT / self.report["full_failing_ir"]["archive"]
+        archive = ROOT / self.report["full_failing_input"]["path"]
         reproducer = ROOT / self.report["minimal_reproducer"]["path"]
         self.assertEqual(
             hashlib.sha256(archive.read_bytes()).hexdigest(),
-            self.report["full_failing_ir"]["archive_sha256"],
+            self.report["full_failing_input"]["archive_sha256"],
         )
         with gzip.open(archive, "rb") as stream:
             full = stream.read()
-        self.assertEqual(len(full), self.report["full_failing_ir"]["content_bytes"])
+        self.assertEqual(len(full), self.report["full_failing_input"]["content_bytes"])
         self.assertEqual(
-            hashlib.sha256(full).hexdigest(),
-            self.report["full_failing_ir"]["content_sha256"],
+            hashlib.sha256(full).hexdigest(), self.report["full_failing_input"]["content_sha256"]
         )
         self.assertEqual(
             hashlib.sha256(reproducer.read_bytes()).hexdigest(),
             self.report["minimal_reproducer"]["sha256"],
         )
-        capture = self.report["compiler_import_capture"]
-        self.assertTrue(capture["executed"])
-        self.assertNotEqual(capture["exit_code"], 0)
-        self.assertEqual(capture["export_sha256"], self.report["stages"][0]["artifact_sha256"])
-        self.assertEqual(capture["produced_ir_sha256"], self.report["full_failing_ir"]["content_sha256"])
-        self.assertEqual(capture["produced_ir_bytes"], self.report["full_failing_ir"]["content_bytes"])
-        capture_log = ROOT / capture["log"]
-        self.assertEqual(hashlib.sha256(capture_log.read_bytes()).hexdigest(), capture["log_sha256"])
-        self.assertRegex(capture["compile_script_sha256"], r"^[0-9a-f]{64}$")
-        self.assertRegex(capture["torch_mlir_opt_sha256"], r"^[0-9a-f]{64}$")
-        self.assertIn("torchdynamo-export-to-torch-backend-pipeline", capture["pass_pipeline"])
-        self.assertIn("<capture-tmp>", capture["command"])
-        self.assertNotRegex(capture["command"], r"/tmp/(?:nix-shell\.|tinystories-exact)")
-        self.assertIn("<capture-tmp>", capture_log.read_text(encoding="utf-8"))
-        self.assertNotRegex(
-            capture_log.read_text(encoding="utf-8"),
-            r"/tmp/(?:nix-shell\.|tinystories-exact)",
+        self.assertEqual(json.loads(reproducer.read_text(encoding="utf-8"))["status"], "unavailable")
+        self.assertTrue(self.report["minimal_reproducer"]["operation_and_types_not_applicable"])
+
+    def test_semantic_gate_and_predecessor_are_bound(self) -> None:
+        gate = self.report["semantic_gate"]
+        self.assertEqual(gate["status"], "accepted")
+        self.assertEqual(gate["evidence"]["semantic_probe"]["status"], "accepted")
+        self.assertEqual(gate["evidence"]["registered_stage"]["status"], "accepted")
+        self.assertEqual(
+            hashlib.sha256((ROOT / gate["probe_report"]).read_bytes()).hexdigest(),
+            gate["probe_report_sha256"],
         )
+        predecessor = self.report["predecessor_receipt"]
+        self.assertEqual(
+            predecessor["historical_bundle"],
+            "artifacts/comparison/tinystories-1m-exact-frontier-determinism",
+        )
+        self.assertRegex(predecessor["file_sha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(predecessor["self_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(len(self.report["frozen_task_1_through_3_identities"]), 11)
 
     def test_receipt_claims_no_downstream_success_or_pipeline_change(self) -> None:
         self.assertTrue(all(value is False for value in self.report["claims"].values()))

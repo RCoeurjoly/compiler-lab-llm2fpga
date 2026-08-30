@@ -164,7 +164,7 @@ def _verify_run(
     return receipt, file_bytes
 
 
-def verify_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
+def _verify_v1_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     """Verify both preserved live runs and require byte-identical canonical files."""
 
     bundle_root = bundle_root.resolve()
@@ -233,13 +233,151 @@ def verify_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     }
 
 
+def _verify_v2_run(
+    bundle_root: Path,
+    run_name: str,
+    run_manifest: dict[str, Any],
+    canonical_files: list[str],
+    source_commit: str,
+) -> tuple[dict[str, Any], dict[str, bytes]]:
+    run_root = bundle_root / run_name
+    _require(run_root.is_dir(), f"missing preserved run directory: {run_name}")
+    _require(
+        run_manifest.get("source_commit") == source_commit,
+        f"{run_name}: source commit mismatch",
+    )
+    bindings = run_manifest.get("files")
+    _require(isinstance(bindings, dict), f"{run_name}: file bindings missing")
+    _require(
+        sorted(bindings) == sorted(canonical_files),
+        f"{run_name}: canonical file set mismatch",
+    )
+    files: dict[str, bytes] = {}
+    for filename in canonical_files:
+        _require(Path(filename).name == filename, f"unsafe canonical filename: {filename}")
+        path = run_root / filename
+        _require(path.is_file(), f"{run_name}: missing canonical file {filename}")
+        data = path.read_bytes()
+        binding = bindings[filename]
+        _require(isinstance(binding, dict), f"{run_name}: invalid binding for {filename}")
+        _require(binding.get("bytes") == len(data), f"{run_name}: byte count mismatch for {filename}")
+        _require(
+            binding.get("sha256") == _sha256_bytes(data),
+            f"{run_name}: SHA-256 mismatch for {filename}",
+        )
+        files[filename] = data
+
+    receipt = _load_json(run_root / "receipt.json")
+    _require(
+        receipt.get("schema") == "tinystories-1m-exact-current-pipeline-frontier-v3",
+        f"{run_name}: unsupported receipt schema",
+    )
+    _require(receipt.get("source_commit") == source_commit, f"{run_name}: receipt source mismatch")
+    _require(receipt.get("stage") == "scf", f"{run_name}: first invalid stage is not SCF")
+    _require(receipt.get("status") == "compiler_frontier", f"{run_name}: frontier status mismatch")
+    _require(receipt.get("sha256") == _canonical_receipt_hash(receipt), f"{run_name}: receipt self-hash mismatch")
+    _require(
+        run_manifest.get("receipt_self_hash") == receipt.get("sha256"),
+        f"{run_name}: manifest receipt self-hash mismatch",
+    )
+    execution = receipt.get("pipeline_execution")
+    _require(isinstance(execution, dict), f"{run_name}: pipeline execution missing")
+    _require(execution.get("first_invalid_stage") == "scf", f"{run_name}: SCF stop missing")
+    _require(execution.get("stopped_after_first_invalid_stage") is True, f"{run_name}: stop flag missing")
+    _require(
+        execution.get("not_run") == ["flat-scf", "calyx", "calyx-native-sv"],
+        f"{run_name}: later-stage exclusion mismatch",
+    )
+    stages = receipt.get("stages")
+    _require(isinstance(stages, list), f"{run_name}: stage records missing")
+    _require(
+        [record.get("stage") for record in stages if isinstance(record, dict)]
+        == ["pytorch-exported", "torch", "linalg", "scf"],
+        f"{run_name}: executed stage order mismatch",
+    )
+    _require(all(record.get("artifact_accepted") is True for record in stages[:-1]), f"{run_name}: valid prefix rejected")
+    _require(stages[-1].get("artifact_accepted") is False, f"{run_name}: invalid SCF artifact accepted")
+
+    full_input = receipt.get("full_failing_input")
+    minimal = receipt.get("minimal_reproducer")
+    _require(isinstance(full_input, dict), f"{run_name}: full input binding missing")
+    _require(isinstance(minimal, dict), f"{run_name}: minimal reproducer binding missing")
+    _require(full_input.get("archive_sha256") == _sha256_bytes(files["full-input.gz"]), f"{run_name}: full input receipt hash mismatch")
+    _require(minimal.get("sha256") == _sha256_bytes(files["minimal-reproducer.json"]), f"{run_name}: reproducer receipt hash mismatch")
+    _require(minimal.get("operation_and_types_not_applicable") is True, f"{run_name}: frontier kind mismatch")
+    for stage in ("pytorch-exported", "torch", "linalg", "scf"):
+        record = next(item for item in stages if item["stage"] == stage)
+        filename = f"{stage}.log"
+        _require(record.get("log_sha256") == _sha256_bytes(files[filename]), f"{run_name}: receipt log hash mismatch for {stage}")
+    return receipt, files
+
+
+def _verify_v2_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
+    manifest = _load_json(bundle_root / "manifest.json")
+    source_commit = manifest.get("source_commit")
+    _require(isinstance(source_commit, str) and bool(source_commit), "source commit missing")
+    canonical_files = manifest.get("canonical_files")
+    _require(
+        isinstance(canonical_files, list)
+        and all(isinstance(filename, str) for filename in canonical_files),
+        "canonical file list missing",
+    )
+    runs = manifest.get("runs")
+    _require(isinstance(runs, dict), "run manifests missing")
+    run_names = sorted(runs)
+    _require(run_names == ["run-1", "run-2"], "exactly run-1 and run-2 are required")
+    verified = {
+        name: _verify_v2_run(
+            bundle_root, name, runs[name], canonical_files, source_commit
+        )
+        for name in run_names
+    }
+    first_receipt, first_files = verified["run-1"]
+    second_receipt, second_files = verified["run-2"]
+    for filename in canonical_files:
+        _require(
+            first_files[filename] == second_files[filename],
+            f"preserved runs differ at canonical file {filename}",
+        )
+    _require(first_receipt == second_receipt, "parsed receipts differ")
+    expected = manifest.get("expected_comparison")
+    _require(isinstance(expected, dict), "expected comparison missing")
+    receipt_file_sha256 = _sha256_bytes(first_files["receipt.json"])
+    _require(expected.get("byte_identical") is True, "manifest does not expect identity")
+    _require(expected.get("first_invalid_stage") == "scf", "manifest frontier mismatch")
+    _require(expected.get("receipt_file_sha256") == receipt_file_sha256, "manifest receipt file hash mismatch")
+    _require(expected.get("receipt_self_hash") == first_receipt["sha256"], "manifest receipt self-hash mismatch")
+    return {
+        "source_commit": source_commit,
+        "runs": run_names,
+        "byte_identical": True,
+        "first_invalid_stage": "scf",
+        "receipt_file_sha256": receipt_file_sha256,
+        "receipt_self_hash": first_receipt["sha256"],
+        "canonical_file_count": len(canonical_files),
+    }
+
+
+def verify_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
+    """Verify historical v1 or current v2 deterministic capture bundles."""
+
+    bundle_root = bundle_root.resolve()
+    manifest = _load_json(bundle_root / "manifest.json")
+    schema = manifest.get("schema")
+    if schema == "tinystories-1m-exact-frontier-determinism-bundles-v1":
+        return _verify_v1_determinism_bundles(bundle_root)
+    if schema == "tinystories-1m-exact-frontier-determinism-bundles-v2":
+        return _verify_v2_determinism_bundles(bundle_root)
+    raise VerificationError("unsupported determinism manifest schema")
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     default_bundle = (
         repo_root
         / "artifacts"
         / "comparison"
-        / "tinystories-1m-exact-frontier-determinism"
+        / "tinystories-1m-exact-frontier-determinism-scf"
     )
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle-dir", type=Path, default=default_bundle)

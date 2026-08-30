@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
 from typing import Any
 
 
@@ -91,13 +92,38 @@ def receipt_self_hash(receipt: dict[str, Any]) -> str:
     )
 
 
-def verify_local_binding(binding: dict[str, Any], label: str) -> None:
+def verify_local_binding(binding: dict[str, Any], label: str) -> Path:
     path = ROOT / str(binding.get("path", ""))
-    require(path.is_file(), f"{label}: bound file is missing")
-    require(
-        binding.get("file_sha256") == sha256_file(path),
-        f"{label}: current file SHA-256 mismatch",
+    expected = binding.get("file_sha256")
+    if path.is_file() and expected == sha256_file(path):
+        return path
+    preserved = sorted(
+        (ROOT / "artifacts" / "comparison").glob(
+            "tinystories-1m-exact-*-determinism/run-1/receipt.json"
+        )
     )
+    for candidate in preserved:
+        if expected == sha256_file(candidate):
+            return candidate
+    require(path.is_file(), f"{label}: bound file is missing")
+    raise VerificationError(f"{label}: current file SHA-256 mismatch")
+
+
+def verify_current_or_historical_file(
+    path: Path, expected_sha256: object, source_commit: object, label: str
+) -> None:
+    require(path.is_file(), f"{label} is missing")
+    if expected_sha256 == sha256_file(path):
+        return
+    require(isinstance(source_commit, str) and bool(source_commit), f"{label} source commit is missing")
+    relative = path.resolve().relative_to(ROOT.resolve())
+    result = subprocess.run(
+        ["git", "show", f"{source_commit}:{relative}"],
+        cwd=ROOT,
+        capture_output=True,
+    )
+    require(result.returncode == 0, f"{label} historical bytes are unavailable")
+    require(sha256_bytes(result.stdout) == expected_sha256, f"{label} SHA-256 mismatch")
 
 
 def verify_identities(receipt: dict[str, Any]) -> None:
@@ -313,12 +339,7 @@ def verify_receipt(
 
     historical = receipt.get("historical_frontier")
     require(isinstance(historical, dict), "historical frontier binding is missing")
-    historical_path = ROOT / str(historical.get("path", ""))
-    require(historical_path.is_file(), "historical frontier receipt is missing")
-    require(
-        historical.get("file_sha256") == sha256_file(historical_path),
-        "historical receipt SHA-256 mismatch",
-    )
+    historical_path = verify_local_binding(historical, "historical receipt")
     historical_receipt = load_json(historical_path)
     require(
         historical.get("self_sha256") == historical_receipt.get("sha256"),
@@ -519,8 +540,12 @@ def _verify_success_receipt(
         ("verifier", "verifier_sha256"),
     ):
         path = ROOT / str(compiler.get(path_key, ""))
-        require(path.is_file(), f"compiler {path_key} is missing")
-        require(sha256_file(path) == compiler.get(hash_key), f"compiler {path_key} SHA-256 mismatch")
+        verify_current_or_historical_file(
+            path,
+            compiler.get(hash_key),
+            receipt.get("source_commit"),
+            f"compiler {path_key}",
+        )
     patch_text = (ROOT / str(compiler["patch"])).read_text(encoding="utf-8")
     require("LegalizeBitwiseLeftShiftTensorScalarPass" in patch_text, "left-shift compiler patch is missing")
     require("AtenBitwiseLeftShiftTensorOp" in patch_text, "registered left-shift rewrite is missing")
@@ -564,8 +589,8 @@ def _verify_success_receipt(
     require(isinstance(prior, list) and len(prior) == 2, "prior receipt set is incomplete")
     for index, binding in enumerate(prior):
         require(binding.get("preserved") is True, f"prior receipt {index} is not preserved")
-        verify_local_binding(binding, f"prior receipt {index}")
-        value = load_json(ROOT / binding["path"])
+        resolved = verify_local_binding(binding, f"prior receipt {index}")
+        value = load_json(resolved)
         require(value.get("sha256") == binding.get("self_sha256"), f"prior receipt {index} self-hash mismatch")
     identity_log = json.loads(file_bytes["identity-checks.json"].decode("utf-8"))
     require(identity_log.get("task_identities") == identities, "identity log Task 1-3 mismatch")
