@@ -391,6 +391,18 @@ def _independent_v5_trust(
             )
             live["artifact_bytes"] = artifact.read_bytes()
             live["artifact_path"] = str(artifact)
+            if stage == "flat-scf" and output.is_dir():
+                residual_payloads: dict[str, dict[str, object]] = {}
+                for filename in ("flat.scf.mlir", "blockers.json"):
+                    payload = output / filename
+                    if payload.is_file() and not payload.is_symlink():
+                        payload_bytes = payload.read_bytes()
+                        residual_payloads[filename] = {
+                            "path": str(payload),
+                            "bytes": payload_bytes,
+                            "sha256": _sha256_bytes(payload_bytes),
+                        }
+                live["residual_payloads"] = residual_payloads
         derivations[stage] = live
         if result.returncode != 0:
             break
@@ -661,7 +673,11 @@ def _verify_file_binding(
 
 
 def _verify_v5_frontier_evidence(
-    receipt: dict[str, Any], files: dict[str, bytes], run_name: str
+    receipt: dict[str, Any],
+    files: dict[str, bytes],
+    run_name: str,
+    *,
+    live_derivation: dict[str, Any] | None = None,
 ) -> set[str]:
     """Validate the v5 branch union and derive its exact regular-file set."""
 
@@ -835,6 +851,33 @@ def _verify_v5_frontier_evidence(
             )
             _require(bool(residual), f"{run_name}: residual artifact is empty")
             _require(bool(blockers), f"{run_name}: blockers evidence is empty")
+            _require(
+                isinstance(live_derivation, dict),
+                f"{run_name}: live flat-scf derivation missing",
+            )
+            live_output = live_derivation.get("output")
+            live_payloads = live_derivation.get("residual_payloads")
+            _require(
+                isinstance(live_output, str) and isinstance(live_payloads, dict),
+                f"{run_name}: live residual payloads missing",
+            )
+            for filename, preserved in (
+                ("flat.scf.mlir", residual),
+                ("blockers.json", blockers),
+            ):
+                live_payload = live_payloads.get(filename)
+                _require(
+                    isinstance(live_payload, dict)
+                    and live_payload.get("path") == str(Path(live_output) / filename),
+                    f"{run_name}: live residual payload path mismatch for {filename}",
+                )
+                live_bytes = live_payload.get("bytes")
+                _require(
+                    isinstance(live_bytes, bytes)
+                    and live_payload.get("sha256") == _sha256_bytes(live_bytes)
+                    and preserved == live_bytes,
+                    f"{run_name}: {filename} differs from live registered output",
+                )
             expected_files.update({"flat.scf.mlir", "blockers.json"})
         else:
             raise VerificationError(f"{run_name}: exact control manifest mismatch")
@@ -996,7 +1039,13 @@ def _verify_v5_receipt(
         receipt.get("frontier") == expected_frontier,
         f"{run_name}: frontier class mismatch",
     )
-    expected_files = _verify_v5_frontier_evidence(receipt, files, run_name)
+    live_frontier = trust["derivations"].get(first_invalid)
+    expected_files = _verify_v5_frontier_evidence(
+        receipt,
+        files,
+        run_name,
+        live_derivation=live_frontier,
+    )
     canonical_root = f"reproducers/{first_invalid}"
 
     for index, stage in enumerate(sequence):

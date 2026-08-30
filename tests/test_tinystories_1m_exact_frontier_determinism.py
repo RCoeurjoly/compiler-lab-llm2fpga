@@ -471,6 +471,21 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
         self.files["minimal-reproducer.json"] = manifest
         self.files["flat.scf.mlir"] = residual
         self.files["blockers.json"] = blockers
+        self.live_flat_scf = {
+            "output": "/nix/store/synthetic-flat-scf",
+            "residual_payloads": {
+                "flat.scf.mlir": {
+                    "path": "/nix/store/synthetic-flat-scf/flat.scf.mlir",
+                    "bytes": residual,
+                    "sha256": hashlib.sha256(residual).hexdigest(),
+                },
+                "blockers.json": {
+                    "path": "/nix/store/synthetic-flat-scf/blockers.json",
+                    "bytes": blockers,
+                    "sha256": hashlib.sha256(blockers).hexdigest(),
+                },
+            },
+        }
         self.files["flat-scf.log"] = b"registered residual control output\n"
         self.files["flat-scf.drv"] = b"synthetic flat-scf derivation\n"
         self.files["flat-scf.derivation.json"] = b'{"derivations":{}}'
@@ -574,7 +589,12 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
     def _reject(self, pattern: str) -> None:
         self._rehash()
         with self.assertRaisesRegex(MODULE.VerificationError, pattern):
-            MODULE._verify_v5_frontier_evidence(self.receipt, self.files, "fixture")
+            MODULE._verify_v5_frontier_evidence(
+                self.receipt,
+                self.files,
+                "fixture",
+                live_derivation=getattr(self, "live_flat_scf", None),
+            )
 
     def test_control_manifest_branch_rejects_nonzero_exit_or_missing_manifest(self) -> None:
         stage = self.receipt["stages"][-1]
@@ -635,7 +655,10 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
 
         try:
             expected = MODULE._verify_v5_frontier_evidence(
-                self.receipt, self.files, "fixture"
+                self.receipt,
+                self.files,
+                "fixture",
+                live_derivation=self.live_flat_scf,
             )
         except MODULE.VerificationError as error:
             self.fail(str(error))
@@ -663,6 +686,31 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
             "artifact_accepted"
         ] = True
         self._reject("invalid artifact was accepted")
+
+    def test_completed_with_residuals_rejects_detached_payload_with_recomputed_hashes(self) -> None:
+        self._completed_with_residuals()
+        detached = self.files["blockers.json"] + b" "
+        self.files["blockers.json"] = detached
+        self.receipt["frontier_evidence"]["blockers"].update({
+            "bytes": len(detached),
+            "sha256": hashlib.sha256(detached).hexdigest(),
+        })
+
+        self._reject("differs from live registered output")
+        self.assertEqual(
+            self.receipt["sha256"], MODULE._canonical_receipt_hash(self.receipt)
+        )
+
+    def test_completed_with_residuals_rejects_altered_live_payload_path(self) -> None:
+        self._completed_with_residuals()
+        self.live_flat_scf["residual_payloads"]["flat.scf.mlir"]["path"] = (
+            "/nix/store/detached/flat.scf.mlir"
+        )
+
+        self._reject("live residual payload path mismatch")
+        self.assertEqual(
+            self.receipt["sha256"], MODULE._canonical_receipt_hash(self.receipt)
+        )
 
 
 class SuccessorFrontierDeterminismBundleTest(unittest.TestCase):
