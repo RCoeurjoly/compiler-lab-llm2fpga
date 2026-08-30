@@ -1,0 +1,74 @@
+{
+  "accepted_task5_receipt_commit": "3418f989fec7996561f4e59ba6a6d902c1fb02a5",
+  "decision": {
+    "expected_observable_improvement": "The reduced signed-si64 Tensor_Scalar arithmetic-right-shift reproducer no longer reports an illegal torch.operator, and the registered exact torch stage advances past the previous Torch-MLIR frontier.",
+    "implementation_boundary": "Patch or extend the pinned Torch-MLIR frontend/legalization pipeline before torchdynamo-export-to-torch-backend-pipeline rejects generic torch.operator. Do not edit the exact adapter, package, contract, export fixture, backend, scheduler, runtime, or RTL in this follow-up.",
+    "selected_response_class": "compiler_pass",
+    "selected_response_class_count": 1,
+    "selection": [
+      "compiler_pass"
+    ],
+    "semantic_contract": {
+      "accepted_input": "torch.aten.bitwise_right_shift.Tensor_Scalar with a signed si64 tensor and scalar integer shift in [0, 62]",
+      "lowering_requirement": "Lower only to a sign-preserving arithmetic right shift (for example arith.shrsi inside elementwise tensor lowering); broadcast the scalar shift across the tensor without narrowing the signed si64 values or shift count.",
+      "negative_value_requirement": "For negative signed inputs, preserve sign extension and floor-style arithmetic-shift results (for example -5 >> 1 == -3 and -1 >> 1 == -1).",
+      "rounding_requirement": "The bitwise operator itself has no rounding mode. Do not replace it with truncating division, round-to-nearest, or logical right shift. Keep the adapter's separately explicit round_shift_signed quotient/remainder/ties-away-from-zero computation intact.",
+      "rejection_requirement": "Reject non-si64 tensors, non-scalar shifts, negative shifts, and shifts greater than 62 unless a separately proven extension is added with its own regression."
+    }
+  },
+  "frontier": {
+    "diagnostic": "failed to legalize operation 'torch.operator' that was explicitly marked illegal",
+    "frontier_hash": "b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55",
+    "frontier_receipt_path": "artifacts/comparison/tinystories-1m-exact-current-pipeline-frontier.json",
+    "frontier_receipt_self_hash": "af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b",
+    "frontier_source_commit": "f26177ee480187dd1abf5ee9b1324c61bcceab02",
+    "minimal_reproducer_path": "reproducers/tinystories-1m-exact-torch-mlir/bitwise-right-shift-tensor-scalar.mlir",
+    "minimal_reproducer_sha256": "285a40e0ba9dd999fb4155c465889e1b3fa2dc0768716328bc7e4c8898bc4b37",
+    "operation": "torch.aten.bitwise_right_shift.Tensor_Scalar",
+    "stage": "torch-mlir",
+    "status": "compiler_frontier"
+  },
+  "identity_hashes": {
+    "adapter_sha256": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e",
+    "contract_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+    "package_manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "task_1_audit_file_sha256": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+    "task_1_audit_payload_sha256": "7d7a37d08df7e63bdb95063674fe5dc306058e51af8a11bbcd97a4cb2972a766",
+    "task_2_artifact_file_sha256": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+    "task_2_artifact_sha256": "af1901917b52876a9b3343712b89928b272e5dd237cd491ddd9d462c56a52838",
+    "task_2_model_receipt_sha256": "5e56907e60c83c5d98b3c3fe88772b7dfba71e53a9435de548a9d54ea7497834",
+    "task_3_generation_artifact_sha256": "9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3",
+    "task_3_generation_file_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+    "task_3_generation_result_sha256": "c18106f25030ec58dfd3abc5d75d774506aca65b655fc34b284076b1294f8644"
+  },
+  "rejected_response_classes": [
+    {
+      "class": "bit_accurate_primitive",
+      "rejection": "The causal boundary is a missing frontend operation legalization, not an operation whose semantics require a model-specific hardware contract. Signed arithmetic shift is a standard compiler integer operation; adding an RTL primitive before a valid Torch-MLIR artifact exists bypasses, rather than resolves, the observed failure."
+    },
+    {
+      "class": "scheduling_or_memory_architecture",
+      "rejection": "No valid Linalg, SCF, Calyx, RTL, resource, or timing artifact exists because execution stops at Torch-MLIR. Scheduling, buffering, memory, streaming, and reuse cannot affect an illegal frontend operation."
+    },
+    {
+      "class": "autoregressive_runtime_boundary",
+      "rejection": "The failure occurs while importing one exported tensor program, before any generated token lifecycle or runtime composition is reached. A runtime boundary cannot legalize this tensor operation and would change scope before the compiler frontier is crossed."
+    }
+  ],
+  "regressions": {
+    "full_registered_stage": {
+      "green_command": "nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-torch",
+      "green_expected": "exit 0; emits a nonempty Torch-MLIR artifact; no failed-to-legalize diagnostic; Task 1--3 identity hashes above remain unchanged before accepting the new artifact.",
+      "red_command": "nix build --no-link --print-out-paths -L .#tiny-stories-1m-kev-gpt-exact-torch",
+      "red_expected": "exit 1 with the recorded failed-to-legalize torch.operator diagnostic."
+    },
+    "minimal_reproducer": {
+      "green_command": "nix develop -c torch-mlir-opt -pass-pipeline='builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=})' reproducers/tinystories-1m-exact-torch-mlir/bitwise-right-shift-tensor-scalar.mlir -o /dev/null",
+      "green_expected": "exit 0; the operation is lowered with signed-si64 arithmetic-right-shift semantics and no generic torch.operator remains for this operation.",
+      "red_command": "nix develop -c torch-mlir-opt -pass-pipeline='builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=})' reproducers/tinystories-1m-exact-torch-mlir/bitwise-right-shift-tensor-scalar.mlir -o /dev/null",
+      "red_expected": "exit 1 with the recorded failed-to-legalize torch.operator diagnostic."
+    }
+  },
+  "schema": "tinystories-1m-exact-frontier-decision-v1",
+  "sha256": "167ce323a25ca4e624dd36464a503507872c0342e2ef1c8a8a6e829ee4624179"
+}

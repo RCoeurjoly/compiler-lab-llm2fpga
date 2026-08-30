@@ -154,3 +154,22 @@ Produce a reproducible report and machine-readable JSON manifest containing the
 aligned contract, source and artifact hashes, RC/1M slice definitions,
 functional results, resource/timing tables, provenance-linked waste map,
 rejected hypotheses, and proposed next compiler changes.
+
+* 2026-08-30 — Exact-input compiler frontier decision
+
+The accepted Task 5 receipt commit =3418f989fec7996561f4e59ba6a6d902c1fb02a5=
+binds the first exact-input failure to Torch-MLIR, not to the model, export,
+backend, or board. The reduced original operation is signed =si64=
+=torch.aten.bitwise_right_shift.Tensor_Scalar= by scalar =1=; the pinned
+Torch-MLIR generated definitions do not contain its scalar overload.
+
+Select exactly one response class: =compiler_pass=. The next follow-up is a
+narrow frontend/legalization change at or before
+=torchdynamo-export-to-torch-backend-pipeline=, which must preserve arithmetic
+right shift for signed =i64= values and retain the adapter's separately
+expressed ties-away-from-zero rounding logic. No adapter/model/package change,
+hardware primitive, scheduler/memory architecture, autoregressive runtime, or
+RTL change is authorized by this checkpoint. The full evidence, retained Task
+1--3 hashes, causal rejections, and red/green regressions are in
+=docs/results/2026-08-29-tinystories-1m-exact-frontier-decision.md= and its
+hash-bound JSON receipt.
