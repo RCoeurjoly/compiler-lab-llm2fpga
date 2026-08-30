@@ -14,6 +14,24 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_DEFAULT = ROOT / "artifacts/comparison/tinystories-1m-exact-shift-semantics.json"
 DECISION_DEFAULT = ROOT / "artifacts/comparison/tinystories-1m-exact-frontier-decision.json"
+TORCH_BACKEND_PIPELINE = "torch-backend-to-linalg-on-tensors-backend-pipeline"
+LINALG_TO_LLVM_PIPELINE = [
+    "--empty-tensor-to-alloc-tensor",
+    "--one-shot-bufferize=bufferize-function-boundaries",
+    "--convert-bufferization-to-memref",
+    "--linalg-generalize-named-ops",
+    "--convert-linalg-to-loops",
+    "--lower-affine",
+    "--convert-scf-to-cf",
+    "--expand-strided-metadata",
+    "--finalize-memref-to-llvm",
+    "--convert-index-to-llvm",
+    "--convert-arith-to-llvm",
+    "--convert-math-to-llvm",
+    "--convert-cf-to-llvm",
+    "--convert-func-to-llvm",
+    "--reconcile-unrealized-casts",
+]
 
 
 def canonical_sha256(value: object) -> str:
@@ -125,11 +143,49 @@ def _verify_case_records(records: object, fixture: dict[str, Any]) -> None:
         require(record.get("status") == "ok", f"lowered_status_mismatch:{case['id']}")
         require(record.get("output") == case["expected"], f"lowered_result_mismatch:{case['id']}")
         require(canonical_sha256(record["output"]) == case["expected_sha256"], f"lowered_output_hash_mismatch:{case['id']}")
+        evidence = record.get("compiler_evidence")
+        require(isinstance(evidence, dict), f"lowered_compiler_evidence:{case['id']}")
+        require(
+            set(evidence)
+            == {
+                "torch_module_sha256",
+                "torch_frontend_output_sha256",
+                "linalg_output_sha256",
+                "native_module_sha256",
+                "runner_stdout_sha256",
+            },
+            f"lowered_compiler_evidence:{case['id']}",
+        )
+        require(
+            all(
+                isinstance(value, str)
+                and len(value) == 64
+                and all(character in "0123456789abcdef" for character in value)
+                for value in evidence.values()
+            ),
+            f"lowered_compiler_evidence_hash:{case['id']}",
+        )
     for case in fixture["invalid_cases"]:
         record = by_id[case["id"]]
         require(record.get("status") == case["status"], f"lowered_status_mismatch:{case['id']}")
         require(record.get("diagnostic") == case["diagnostic"], f"lowered_diagnostic_mismatch:{case['id']}")
         require("output" not in record, f"lowered_invalid_output:{case['id']}")
+        evidence = record.get("compiler_evidence")
+        require(isinstance(evidence, dict), f"lowered_compiler_evidence:{case['id']}")
+        require(
+            set(evidence)
+            == {"torch_module_sha256", "compiler_exit_code", "compiler_stderr_sha256"},
+            f"lowered_compiler_evidence:{case['id']}",
+        )
+        require(evidence.get("compiler_exit_code") == 1, f"lowered_compiler_exit:{case['id']}")
+        for key in ("torch_module_sha256", "compiler_stderr_sha256"):
+            value = evidence.get(key)
+            require(
+                isinstance(value, str)
+                and len(value) == 64
+                and all(character in "0123456789abcdef" for character in value),
+                f"lowered_compiler_evidence_hash:{case['id']}",
+            )
 
 
 def _resolve_derivation_from_store(artifact: Path) -> Path:
@@ -189,8 +245,29 @@ def verify_probe_report(
     require(isinstance(executor, dict), "probe_executor")
     require(executor.get("path") == semantic["probe_executor_contract_path"], "probe_executor_path")
     require(isinstance(executor.get("sha256"), str) and len(executor["sha256"]) == 64, "probe_executor_hash")
+    executor_path = ROOT / str(semantic["probe_executor_contract_path"])
+    require(executor_path.is_file() and sha256_file(executor_path) == executor.get("sha256"), "probe_executor_hash")
     require(isinstance(executor.get("command"), list) and all(isinstance(part, str) for part in executor["command"]), "probe_executor_command")
     require(executor.get("command_sha256") == canonical_sha256(executor["command"]), "probe_executor_command_hash")
+    compiler_route = executor.get("compiler_route")
+    require(isinstance(compiler_route, dict), "probe_compiler_route")
+    require(
+        compiler_route.get("torch_backend_pipeline") == TORCH_BACKEND_PIPELINE,
+        "probe_torch_backend_pipeline",
+    )
+    require(
+        compiler_route.get("linalg_to_llvm_pipeline") == LINALG_TO_LLVM_PIPELINE,
+        "probe_linalg_to_llvm_pipeline",
+    )
+    for key, name in (("mlir_opt", "mlir-opt"), ("mlir_runner", "mlir-runner")):
+        binding = compiler_route.get(key)
+        require(isinstance(binding, dict), f"probe_{key}")
+        route_binary = Path(str(binding.get("binary")))
+        require(route_binary.name == name and route_binary.is_file(), f"probe_{key}_identity")
+        require(
+            binding.get("binary_sha256") == sha256_file(route_binary),
+            f"probe_{key}_binary_hash",
+        )
     _verify_case_records(report.get("cases"), fixture)
     return {
         "probe_report_sha256": sha256_file(report_path),

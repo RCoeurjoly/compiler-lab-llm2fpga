@@ -22,6 +22,26 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_DEFAULT = ROOT / "artifacts/comparison/tinystories-1m-exact-shift-semantics.json"
 DECISION_DEFAULT = ROOT / "artifacts/comparison/tinystories-1m-exact-frontier-decision.json"
+TORCH_BACKEND_PIPELINE = "torch-backend-to-linalg-on-tensors-backend-pipeline"
+LINALG_TO_LLVM_PIPELINE = [
+    "--empty-tensor-to-alloc-tensor",
+    "--one-shot-bufferize=bufferize-function-boundaries",
+    "--convert-bufferization-to-memref",
+    "--linalg-generalize-named-ops",
+    "--convert-linalg-to-loops",
+    "--lower-affine",
+    "--convert-scf-to-cf",
+    "--expand-strided-metadata",
+    "--finalize-memref-to-llvm",
+    "--convert-index-to-llvm",
+    "--convert-arith-to-llvm",
+    "--convert-math-to-llvm",
+    "--convert-cf-to-llvm",
+    "--convert-func-to-llvm",
+    "--reconcile-unrealized-casts",
+]
+
+
 def canonical_sha256(value: object) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 
@@ -81,6 +101,7 @@ def main() -> None:
         ]
         run(executor_command)
         execution = load_object(executor_output)
+    recorded_executor_command = executor_command[:-1] + ["<temporary>/executor-results.json"]
     if execution.get("schema") != "tinystories-1m-exact-shift-executor-results-v1":
         raise ValueError("probe_executor_schema")
     if execution.get("stage_artifact_sha256") != sha256_file(stage):
@@ -91,6 +112,22 @@ def main() -> None:
         raise ValueError("probe_executor_tool_hash")
     if execution.get("pipeline_sha256") != canonical_sha256(semantic["torch_mlir_pipeline"]):
         raise ValueError("probe_executor_pipeline_hash")
+    compiler_route = execution.get("compiler_route")
+    if not isinstance(compiler_route, dict):
+        raise ValueError("probe_compiler_route")
+    if compiler_route.get("torch_backend_pipeline") != TORCH_BACKEND_PIPELINE:
+        raise ValueError("probe_torch_backend_pipeline")
+    if compiler_route.get("linalg_to_llvm_pipeline") != LINALG_TO_LLVM_PIPELINE:
+        raise ValueError("probe_linalg_to_llvm_pipeline")
+    for key, name in (("mlir_opt", "mlir-opt"), ("mlir_runner", "mlir-runner")):
+        binding = compiler_route.get(key)
+        if not isinstance(binding, dict):
+            raise ValueError(f"probe_{key}")
+        binary = Path(str(binding.get("binary")))
+        if binary.name != name or not binary.is_file():
+            raise ValueError(f"probe_{key}_identity")
+        if binding.get("binary_sha256") != sha256_file(binary):
+            raise ValueError(f"probe_{key}_binary_hash")
     report: dict[str, object] = {
         "schema": "tinystories-1m-exact-shift-semantic-probe-v1",
         "decision_sha256": decision["sha256"],
@@ -120,8 +157,9 @@ def main() -> None:
         "executor": {
             "path": semantic["probe_executor_contract_path"],
             "sha256": sha256_file(args.executor),
-            "command": executor_command,
-            "command_sha256": canonical_sha256(executor_command),
+            "command": recorded_executor_command,
+            "command_sha256": canonical_sha256(recorded_executor_command),
+            "compiler_route": compiler_route,
         },
         "cases": execution["cases"],
     }
