@@ -1115,6 +1115,85 @@ def _normalized_compiler_diagnostic(text: str) -> str:
     return "\n".join(generic)
 
 
+def _render_expected_interestingness_test(
+    *,
+    build_command: str,
+    upstream_input: str,
+    expected_exit: int,
+    expected_diagnostic: str,
+    operation: str | None,
+    types: str | None,
+) -> bytes:
+    """Independently reconstruct the canonical compiler-failure predicate."""
+
+    if build_command.count(upstream_input) != 1:
+        raise VerificationError(
+            "bound build command must contain the upstream input exactly once"
+        )
+    candidate_command = build_command.replace(upstream_input, '"${candidate}"')
+    expected_operation = operation or ""
+    expected_types = types or ""
+    script = f"""#!/usr/bin/env bash
+set -uo pipefail
+if [[ $# -ne 1 || ! -f $1 ]]; then
+  echo "usage: $0 CANDIDATE" >&2
+  exit 2
+fi
+candidate=$1
+work=$(mktemp -d)
+trap 'rm -rf -- "$work"' EXIT
+out="$work/output"
+export out
+set +e
+{candidate_command} >"$work/stdout" 2>"$work/stderr"
+actual_exit=$?
+set -e
+while IFS= read -r line; do printf '%s\n' "$line"; done <"$work/stdout" >"$work/combined"
+while IFS= read -r line; do printf '%s\n' "$line"; done <"$work/stderr" >>"$work/combined"
+diagnostic=""
+while IFS= read -r line; do
+  lower=${{line,,}}
+  case "$lower" in
+    *"failed to legalize operation"*|*"unhandled operation"*|*"llvm error"*)
+      if [[ -n $diagnostic ]]; then diagnostic+=$'\\n'; fi
+      diagnostic+="$line"
+      ;;
+  esac
+done <"$work/combined"
+if [[ -z $diagnostic ]]; then
+  while IFS= read -r line; do
+    lower=${{line,,}}
+    case "$lower" in
+      *"error: builder for"*|*"dependencies of derivation"*|*"error: build of"*) ;;
+      *"error:"*)
+        if [[ -n $diagnostic ]]; then diagnostic+=$'\\n'; fi
+        diagnostic+="$line"
+        ;;
+    esac
+  done <"$work/combined"
+fi
+contains_bound_text() {{
+  local needle=$1
+  [[ -z $needle ]] && return 0
+  while IFS= read -r line; do [[ $line == *"$needle"* ]] && return 0; done <"$work/combined"
+  while IFS= read -r line; do [[ $line == *"$needle"* ]] && return 0; done <"$candidate"
+  return 1
+}}
+expected_exit={expected_exit}
+expected_diagnostic={shlex.quote(expected_diagnostic)}
+expected_operation={shlex.quote(expected_operation)}
+expected_types={shlex.quote(expected_types)}
+if [[ $actual_exit -ne $expected_exit || $diagnostic != "$expected_diagnostic" ]]; then
+  printf 'interestingness mismatch: exit=%s diagnostic=%q\n' "$actual_exit" "$diagnostic" >&2
+  exit 1
+fi
+contains_bound_text "$expected_operation" || {{ echo "operation mismatch" >&2; exit 1; }}
+contains_bound_text "$expected_types" || {{ echo "types mismatch" >&2; exit 1; }}
+printf 'interesting candidate: %s\n' "$candidate"
+"""
+    return script.encode("utf-8")
+
+
 def _derive_compiler_failure_diagnostic(
     log: bytes,
     *,
@@ -1813,6 +1892,8 @@ def _verify_v5_frontier_evidence(
     _require(set(execution) == set(sequence), f"{run_name}: execution stage set mismatch")
     canonical_root = f"reproducers/{first_invalid}"
     expected_files = {"receipt.json", "full-input.gz"}
+    predicate: bytes | None = None
+    predicate_arguments: dict[str, Any] | None = None
     for stage in sequence:
         expected_files.update(
             {f"{stage}.log", f"{stage}.drv", f"{stage}.derivation.json"}
@@ -2062,7 +2143,7 @@ def _verify_v5_frontier_evidence(
         )
         interestingness = frontier.get("interestingness")
         _require(isinstance(interestingness, dict), f"{run_name}: interestingness evidence missing")
-        _verify_file_binding(
+        predicate = _verify_file_binding(
             interestingness.get("test"), files, "interestingness-test.sh", canonical_root, run_name
         )
         _verify_file_binding(
@@ -2073,6 +2154,14 @@ def _verify_v5_frontier_evidence(
             and interestingness.get("normalized_terminal_diagnostic") == diagnostic,
             f"{run_name}: interestingness predicate differs from compiler failure",
         )
+        predicate_arguments = {
+            "build_command": str(final_run.get("derivation_build_command")),
+            "upstream_input": str(full.get("source_artifact")),
+            "expected_exit": int(final_record["exit_code"]),
+            "expected_diagnostic": diagnostic,
+            "operation": operation,
+            "types": types,
+        }
         expected_files.update({"interestingness-test.sh", "interesting-full.log", "reduction.log"})
         minimization = frontier.get("minimization")
         _require(isinstance(minimization, dict), f"{run_name}: minimization evidence missing")
@@ -2129,6 +2218,14 @@ def _verify_v5_frontier_evidence(
         set(files) == expected_files,
         f"{run_name}: run directory contents mismatch: expected {sorted(expected_files)}, found {sorted(files)}",
     )
+    if predicate_arguments is not None:
+        expected_predicate = _render_expected_interestingness_test(
+            **predicate_arguments
+        )
+        _require(
+            predicate == expected_predicate,
+            f"{run_name}: predicate bytes differ from independently reconstructed compiler evidence",
+        )
     return expected_files
 
 
@@ -2398,6 +2495,26 @@ def _verify_v5_receipt(
                 replay_log == files["interesting-full.log"],
                 f"{run_name}: full input interestingness log mismatch",
             )
+            minimization = frontier["minimization"]
+            if minimization["status"] == "verified":
+                candidate = script.parent / "minimal-reproducer.mlir"
+                candidate.write_bytes(files["minimal-reproducer.mlir"])
+                result = subprocess.run(
+                    [str(script), str(candidate)], text=True, capture_output=True
+                )
+                replay_log = _canonical_execution_evidence(
+                    [str(script), str(candidate)],
+                    result,
+                    {str(script.parent): "<evidence-dir>"},
+                )
+                _require(
+                    result.returncode == 0,
+                    f"{run_name}: minimal reproducer interestingness replay failed",
+                )
+                _require(
+                    replay_log == files["interesting-reproducer.log"],
+                    f"{run_name}: minimal reproducer interestingness log mismatch",
+                )
         finally:
             for child in script.parent.iterdir():
                 child.unlink()

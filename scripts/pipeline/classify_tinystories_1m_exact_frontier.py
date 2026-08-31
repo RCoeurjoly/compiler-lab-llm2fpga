@@ -221,8 +221,7 @@ def _serialize_frontier_evidence(
     }
 
 
-def _write_interestingness_test(
-    path: Path,
+def _render_interestingness_test(
     *,
     build_command: str,
     upstream_input: Path,
@@ -230,8 +229,8 @@ def _write_interestingness_test(
     expected_diagnostic: str,
     operation: str | None,
     types: str | None,
-) -> None:
-    """Write an exact candidate-substituting compiler-failure predicate."""
+) -> bytes:
+    """Render the canonical candidate-substituting compiler-failure predicate."""
 
     source = str(upstream_input)
     if build_command.count(source) != 1:
@@ -297,7 +296,31 @@ contains_bound_text "$expected_operation" || {{ echo "operation mismatch" >&2; e
 contains_bound_text "$expected_types" || {{ echo "types mismatch" >&2; exit 1; }}
 printf 'interesting candidate: %s\n' "$candidate"
 """
-    path.write_text(script, encoding="utf-8")
+    return script.encode("utf-8")
+
+
+def _write_interestingness_test(
+    path: Path,
+    *,
+    build_command: str,
+    upstream_input: Path,
+    expected_exit: int,
+    expected_diagnostic: str,
+    operation: str | None,
+    types: str | None,
+) -> None:
+    """Write the deterministic canonical compiler-failure predicate."""
+
+    path.write_bytes(
+        _render_interestingness_test(
+            build_command=build_command,
+            upstream_input=upstream_input,
+            expected_exit=expected_exit,
+            expected_diagnostic=expected_diagnostic,
+            operation=operation,
+            types=types,
+        )
+    )
     path.chmod(0o755)
 
 

@@ -1696,6 +1696,45 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
         self.assertEqual(result["frontier_evidence_kind"], "compiler_failure")
         self.assertEqual(result["first_invalid_stage"], "scf")
 
+    def test_public_verifier_rejects_self_consistent_fake_predicate_and_logs(self) -> None:
+        def fake_predicate(root, bundle, current, reproducers):
+            script = b"#!/usr/bin/env bash\nexit 0\n"
+            candidate = root / "full-input.mlir"
+            candidate.write_bytes(b"module {}\n")
+            executable = root / "interestingness-test.sh"
+            executable.write_bytes(script)
+            executable.chmod(0o755)
+            replay = subprocess.run(
+                [str(executable), str(candidate)], text=True, capture_output=True
+            )
+            fake_log = MODULE._canonical_execution_evidence(
+                [str(executable), str(candidate)],
+                replay,
+                {
+                    str(root): "<evidence-dir>",
+                    str(candidate): "<full-input>",
+                },
+            )
+            self._replace_canonical_file(
+                bundle, reproducers, "interestingness-test.sh", script
+            )
+            self._replace_canonical_file(
+                bundle, reproducers, "interesting-full.log", fake_log
+            )
+
+            def mutate(receipt):
+                interestingness = receipt["frontier_evidence"]["interestingness"]
+                interestingness["test"] = self._binding(
+                    "reproducers/scf/interestingness-test.sh", script
+                )
+                interestingness["full_log"] = self._binding(
+                    "reproducers/scf/interesting-full.log", fake_log
+                )
+
+            self._rewrite_receipts(bundle, current, mutate)
+
+        self._reject(fake_predicate, "predicate bytes|independently reconstructed")
+
     def _rewrite_receipts(self, bundle: Path, current: Path, mutate) -> None:
         receipt = json.loads((bundle / "run-1/receipt.json").read_text(encoding="utf-8"))
         mutate(receipt)

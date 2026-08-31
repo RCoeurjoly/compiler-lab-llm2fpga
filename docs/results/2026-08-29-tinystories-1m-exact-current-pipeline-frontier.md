@@ -22,7 +22,9 @@ Two sequential captures from committed code `c22c5f8d85e453a56b185f6238970933f5b
 
 The prior-worker `/tmp/exact-scf-route-run-1`, partial, mixed-source, provisional `4f07`, and c22 cache-warm captures were quarantined. Only `/tmp/exact-scf-route-c22-final-run-1` and `-2` were promoted.
 
-Tracked repo-source changes alter Nix source closure and derivation paths. Each verifier-only source commit forced another roughly six-hour SCF recompilation plus a roughly 40-minute blocker report. This packaging coupling should be addressed next.
+Historically, tracked verifier-only changes altered the whole pipeline-script Nix source closure. Each such commit forced another roughly six-hour SCF recompilation plus a roughly 40-minute blocker report. The derivation-visible source is now restricted to the sorted 29-file runtime allowlist consumed through `${pipelineScripts}/...`; classifier, capture, TinyStories verifier, test, documentation, and evidence bytes remain outside it. The filtered runtime source NAR hash is `sha256-v5VXxWwTVtwgGT1BTZ4nE02jtK+hW623ptAOA+0Wdsg=`. An evaluation regression mutates verifier-only content and requires that hash plus the exact Torch, Linalg, SCF, and flat-SCF alias derivation paths to remain unchanged.
+
+Compiler-failure predicates are no longer trusted from bundle self-consistency. The public verifier independently reconstructs the canonical predicate from the receipt-bound build command, upstream input, nonzero exit, normalized compiler diagnostic, and optional operation/types; requires exact script bytes; and replays those bytes against the full input and any verified minimal reproducer while comparing exact canonical logs. A self-consistent always-success predicate and forged replay log are rejected.
 
 ```text
 nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_determinism.py --bundle-dir artifacts/comparison/tinystories-1m-exact-frontier-determinism-flat-scf

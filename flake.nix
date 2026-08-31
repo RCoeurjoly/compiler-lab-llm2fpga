@@ -365,7 +365,65 @@
             exec ${python}/bin/python3 ${./scripts/pipeline/screen_fpga_llm_math_exp_corpus.py} "$@"
           '';
         };
-        pipelineScripts = ./scripts/pipeline;
+        pipelineRuntimeScriptBasenames = [
+          "calyx_float_frontier_report.py"
+          "calyx_preflight_report.py"
+          "calyx_to_sv_no_handshake.sh"
+          "cf_to_handshake.sh"
+          "compare_task3_representative_core_parity.py"
+          "externalize_large_memories.py"
+          "filter_rtlil_modules.py"
+          "fix_futil_fptosi_handshake.py"
+          "fix_sv_divsqrt_handshake.py"
+          "fix_sv_roundeven_overflow.py"
+          "gen_tiny_stories_selftest_top.py"
+          "handshake_to_hs_ext.sh"
+          "hs_ext_to_hw0.sh"
+          "hw0_to_hw.sh"
+          "hw_clean_to_sv_mlir.sh"
+          "hw_to_hw_clean.sh"
+          "linalg_to_cf.sh"
+          "mlir_op_stats.sh"
+          "normalize_calyx_for_export.py"
+          "normalize_futil_float_constants.py"
+          "sv_mlir_to_sv.sh"
+          "sv_to_il.sh"
+          "sv_to_yosys_stat.sh"
+          "torch_to_linalg.sh"
+          "tosa_to_linalg.sh"
+          "verify_calyx_f32_constant_bits.py"
+          "write_fp_primitive_blackboxes.py"
+          "write_rtlil_stage_stat_report.py"
+          "write_utilization_report.py"
+        ];
+        missingPipelineRuntimeScripts = builtins.filter
+          (name: !(builtins.pathExists (./scripts/pipeline + "/${name}")))
+          pipelineRuntimeScriptBasenames;
+        pipelineRuntimeScripts =
+          assert pkgs.lib.assertMsg (missingPipelineRuntimeScripts == [ ])
+          "missing pipeline runtime script(s): ${builtins.concatStringsSep ", " missingPipelineRuntimeScripts}";
+          let runtimeScriptRoot = toString ./scripts/pipeline;
+          in builtins.path {
+            path = ./scripts/pipeline;
+            name = "llm2fpga-pipeline-runtime-scripts";
+            filter = path: type:
+              let pathString = toString path;
+              in pathString == runtimeScriptRoot ||
+              (type == "regular" && builtins.dirOf pathString == runtimeScriptRoot
+                && builtins.elem (builtins.baseNameOf pathString)
+                pipelineRuntimeScriptBasenames);
+          };
+        pipelineRuntimeSourceClosure = pkgs.runCommand
+          "pipeline-runtime-source-closure" {
+            passthru = {
+              runtimeSource = pipelineRuntimeScripts;
+              runtimeScriptBasenames = pipelineRuntimeScriptBasenames;
+            };
+          } ''
+            mkdir -p "$out"
+            cp -R ${pipelineRuntimeScripts}/. "$out/"
+          '';
+        pipelineScripts = pipelineRuntimeScripts;
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
         noHandshakeLinalgToScf =
           ./scripts/pipeline/linalg_to_scf_no_handshake.sh;
@@ -2862,6 +2920,7 @@ PY
 
         checks = {
           default = modelRegistryJson;
+          "pipeline-runtime-source-closure" = pipelineRuntimeSourceClosure;
           "calyx-float-library" = calyxFloatLibrarySelftest;
           "calyx-rc-basic-float-bindings" = calyxRcBasicFloatBindingsSelftest;
           "calyx-integer-library" = calyxIntegerLibrarySelftest;
