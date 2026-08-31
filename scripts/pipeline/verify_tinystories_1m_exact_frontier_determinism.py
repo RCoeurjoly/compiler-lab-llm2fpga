@@ -238,6 +238,40 @@ def _canonical_execution_evidence(
     return payload.encode()
 
 
+def _expected_v5_replay_log(
+    stage: str, live: dict[str, Any], *, residual_rejected: bool = False
+) -> bytes:
+    """Reconstruct classifier validation appended after the raw registered build log."""
+
+    raw = live.get("log_bytes")
+    _require(isinstance(raw, bytes), f"{stage}: live replay log missing")
+    if not residual_rejected:
+        return raw
+    _require(stage == "flat-scf", "residual replay validation is only valid at flat-scf")
+
+    artifact = live.get("artifact_bytes")
+    _require(isinstance(artifact, bytes), "flat-scf: live manifest bytes missing")
+    try:
+        manifest = json.loads(artifact)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise VerificationError(f"flat-scf: live residual manifest is invalid: {error}") from error
+    _require(
+        isinstance(manifest, dict)
+        and set(manifest) == {"artifact", "blockers", "stage", "status"}
+        and manifest.get("artifact") == "flat.scf.mlir"
+        and manifest.get("blockers") == "blockers.json"
+        and manifest.get("stage") == "flat-scf"
+        and manifest.get("status") == "completed-with-residuals",
+        "flat-scf: live residual manifest contract mismatch",
+    )
+    prefix = raw if not raw or raw.endswith(b"\n") else raw + b"\n"
+    return prefix + (
+        b"--- classifier validation ---\n"
+        b"error: registered flat-scf stage completed with residuals; "
+        b"artifact remains rejected\n"
+    )
+
+
 def _build_command_file_bindings(build_command: str) -> list[dict[str, Any]]:
     candidates = re.findall(
         r"/nix/store/[A-Za-z0-9+._?=-]+(?:/[A-Za-z0-9+._?=/:-]+)?",
@@ -1069,7 +1103,20 @@ def _verify_v5_receipt(
             f"{run_name}: replay exit mismatch for {stage}",
         )
         _require(
-            files[f"{stage}.log"] == live["log_bytes"],
+            files[f"{stage}.log"]
+            == _expected_v5_replay_log(
+                stage,
+                live,
+                residual_rejected=(
+                    stage == first_invalid
+                    and receipt.get("frontier_evidence", {}).get("kind")
+                    == "control_manifest"
+                    and receipt.get("frontier_evidence", {})
+                    .get("manifest", {})
+                    .get("status")
+                    == "completed-with-residuals"
+                ),
+            ),
             f"{run_name}: replay log mismatch for {stage}",
         )
         _require(

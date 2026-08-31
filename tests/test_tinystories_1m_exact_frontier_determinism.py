@@ -712,6 +712,35 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
             self.receipt["sha256"], MODULE._canonical_receipt_hash(self.receipt)
         )
 
+    def test_residual_replay_log_reconstructs_exact_classifier_validation(self) -> None:
+        self._completed_with_residuals()
+        raw = b"$ nix build .#flat-scf\nexit_code: 0\n--- stdout ---\n/store/out\n--- stderr ---\n"
+        self.live_flat_scf.update({
+            "artifact_bytes": self.files["minimal-reproducer.json"],
+            "log_bytes": raw,
+        })
+
+        expected = raw + (
+            b"--- classifier validation ---\n"
+            b"error: registered flat-scf stage completed with residuals; "
+            b"artifact remains rejected\n"
+        )
+        self.assertEqual(
+            MODULE._expected_v5_replay_log(
+                "flat-scf", self.live_flat_scf, residual_rejected=True
+            ),
+            expected,
+        )
+
+        self.live_flat_scf["artifact_bytes"] = (
+            b'{"artifact":"detached.mlir","blockers":"blockers.json",'
+            b'"stage":"flat-scf","status":"completed-with-residuals"}\n'
+        )
+        with self.assertRaisesRegex(MODULE.VerificationError, "live residual manifest"):
+            MODULE._expected_v5_replay_log(
+                "flat-scf", self.live_flat_scf, residual_rejected=True
+            )
+
 
 class SuccessorFrontierDeterminismBundleTest(unittest.TestCase):
     @staticmethod
