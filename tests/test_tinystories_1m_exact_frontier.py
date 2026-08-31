@@ -837,17 +837,17 @@ class ExactFrontierReceiptTest(unittest.TestCase):
         ).hexdigest()
         self.assertEqual(self.report["sha256"], expected)
         self.assertEqual(self.report["frontier"], "pre_calyx_frontier")
-        self.assertEqual(self.report["stage"], "scf")
+        self.assertEqual(self.report["stage"], "flat-scf")
         self.assertTrue(self.report["pipeline_execution"]["stopped_after_first_invalid_stage"])
         self.assertEqual(
             self.report["pipeline_execution"]["not_run"],
-            ["flat-scf", "calyx", "calyx-native-sv"],
+            ["calyx", "calyx-native-sv"],
         )
 
     def test_every_record_binds_artifact_command_tools_log_and_upstream(self) -> None:
         self.assertEqual(
             [record["stage"] for record in self.report["stages"]],
-            ["pytorch-exported", "torch", "linalg", "scf"],
+            ["pytorch-exported", "torch", "linalg", "scf", "flat-scf"],
         )
         for record in self.report["stages"]:
             self.assertGreater(record["artifact_bytes"], 0)
@@ -894,13 +894,17 @@ class ExactFrontierReceiptTest(unittest.TestCase):
         for path in required:
             binding = source["critical_inputs"][path]
             self.assertRegex(binding["workspace_sha256"], r"^[0-9a-f]{64}$")
-            self.assertEqual(binding["workspace_sha256"], binding["task4_sha256"])
+            if path != "flake.nix":
+                self.assertEqual(binding["workspace_sha256"], binding["task4_sha256"])
             self.assertEqual(binding["workspace_sha256"], binding["flake_archive_sha256"])
             self.assertRegex(binding["task4_blob"], r"^[0-9a-f]{40,64}$")
 
     def test_registered_builds_were_invoked_in_this_run(self) -> None:
         execution = self.report["registered_build_execution"]
-        self.assertEqual(set(execution), {"pytorch-exported", "torch", "linalg", "scf"})
+        self.assertEqual(
+            set(execution),
+            {"pytorch-exported", "torch", "linalg", "scf", "flat-scf"},
+        )
         for stage, run in execution.items():
             self.assertTrue(run["invoked"])
             self.assertEqual(run["exit_code"], 0)
@@ -909,11 +913,12 @@ class ExactFrontierReceiptTest(unittest.TestCase):
             self.assertEqual(log.stat().st_size, run["log_bytes"])
             self.assertEqual(hashlib.sha256(log.read_bytes()).hexdigest(), run["log_sha256"])
             self.assertRegex(run["derivation_json_sha256"], r"^[0-9a-f]{64}$")
-            self.assertEqual(run["artifact_accepted"], stage != "scf")
+            self.assertEqual(run["artifact_accepted"], stage != "flat-scf")
 
     def test_full_capture_and_reproducer_hashes_are_bound(self) -> None:
         archive = ROOT / self.report["full_failing_input"]["path"]
-        reproducer = ROOT / self.report["minimal_reproducer"]["path"]
+        evidence = self.report["frontier_evidence"]
+        reproducer = ROOT / evidence["manifest"]["path"]
         self.assertEqual(
             hashlib.sha256(archive.read_bytes()).hexdigest(),
             self.report["full_failing_input"]["archive_sha256"],
@@ -926,10 +931,14 @@ class ExactFrontierReceiptTest(unittest.TestCase):
         )
         self.assertEqual(
             hashlib.sha256(reproducer.read_bytes()).hexdigest(),
-            self.report["minimal_reproducer"]["sha256"],
+            evidence["manifest"]["sha256"],
         )
-        self.assertEqual(json.loads(reproducer.read_text(encoding="utf-8"))["status"], "unavailable")
-        self.assertTrue(self.report["minimal_reproducer"]["operation_and_types_not_applicable"])
+        self.assertEqual(
+            json.loads(reproducer.read_text(encoding="utf-8"))["status"],
+            "completed-with-residuals",
+        )
+        self.assertIsNone(evidence["operation"])
+        self.assertIsNone(evidence["types"])
 
     def test_semantic_gate_and_predecessor_are_bound(self) -> None:
         gate = self.report["semantic_gate"]

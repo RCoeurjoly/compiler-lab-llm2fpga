@@ -1,0 +1,7 @@
+$ nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-flat-scf'
+exit_code: 0
+--- stdout ---
+/nix/store/qskklvplhvrdjz7x097r369n2gjyrr1l-tiny-stories-1m-kev-gpt-exact-flat-scf
+--- stderr ---
+--- classifier validation ---
+error: registered flat-scf stage completed with residuals; artifact remains rejected
