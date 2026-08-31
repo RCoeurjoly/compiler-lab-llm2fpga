@@ -208,8 +208,12 @@ def _serialize_frontier_evidence(
 
     if manifest_binding is not None:
         raise ValueError("compiler failure cannot carry a manifest")
-    if interestingness is None or minimization is None:
-        raise ValueError("compiler failure requires interestingness and minimization evidence")
+    if minimization is None:
+        raise ValueError("compiler failure requires minimization evidence")
+    if interestingness is None and minimization.get("reason") != "unsupported_compiler_command":
+        raise ValueError(
+            "compiler failure may omit interestingness only for an unsupported compiler command"
+        )
     return {
         "kind": "compiler_failure",
         "manifest": None,
@@ -262,16 +266,9 @@ def _shell_command_units(command: str) -> list[tuple[int, int]]:
                 substitution_depth -= 1
             index += 1
             continue
-        separator_width = 0
         if char in {"\n", ";"}:
-            separator_width = 1
-        elif char in {"|", "&"} and not (
-            index > 0 and command[index - 1] in {">", "<"}
-        ):
-            separator_width = 2 if command[index : index + 2] in {"||", "&&"} else 1
-        if separator_width:
             units.append((start, index))
-            start = index + separator_width
+            start = index + 1
             index = start
             continue
         index += 1
@@ -346,6 +343,47 @@ def _literal_shell_words(command: str, start: int, end: int) -> list[tuple[int, 
     return words
 
 
+def _is_supported_simple_command(command: str, start: int, end: int) -> bool:
+    """Reject shell syntax that can change word roles or process boundaries."""
+
+    quote: str | None = None
+    index = start
+    while index < end:
+        char = command[index]
+        if quote == "'":
+            if char == "'":
+                quote = None
+            index += 1
+            continue
+        if quote == '"':
+            if char == "\\" and index + 1 < end:
+                index += 2
+                continue
+            if char == '"':
+                quote = None
+                index += 1
+                continue
+            if char == "`" or (
+                char == "$" and index + 1 < end and command[index + 1] == "("
+            ):
+                return False
+            index += 1
+            continue
+        if char == "\\" and index + 1 < end:
+            index += 2
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            index += 1
+            continue
+        if char in "<>|&()" or char == "`" or (
+            char == "$" and index + 1 < end and command[index + 1] == "("
+        ):
+            return False
+        index += 1
+    return quote is None
+
+
 def _bind_compiler_command(build_command: str, upstream_input: str) -> tuple[str, str]:
     """Bind the unique simple command whose literal shell word is the upstream input."""
 
@@ -358,9 +396,57 @@ def _bind_compiler_command(build_command: str, upstream_input: str) -> tuple[str
                 matches.append((unit_start, unit_end, word_start, word_end))
     if len(matches) != 1:
         raise ValueError(
-            "build command must contain the bound upstream input as exactly one literal shell word"
+            "build command must contain the bound upstream input as exactly one direct argument to a simple compiler command"
         )
     unit_start, unit_end, word_start, word_end = matches[0]
+    words = _literal_shell_words(build_command, unit_start, unit_end)
+    match_index = next(
+        index
+        for index, word in enumerate(words)
+        if word[0] == word_start and word[1] == word_end
+    )
+    executable_index = next(
+        (
+            index
+            for index, (_, _, value, _) in enumerate(words)
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", value) is None
+        ),
+        None,
+    )
+    shell_keywords = {
+        "!",
+        "{",
+        "}",
+        "case",
+        "coproc",
+        "do",
+        "done",
+        "elif",
+        "else",
+        "esac",
+        "fi",
+        "for",
+        "function",
+        "if",
+        "in",
+        "select",
+        "then",
+        "time",
+        "until",
+        "while",
+    }
+    output_options = {"-o", "--output"}
+    if (
+        not _is_supported_simple_command(build_command, unit_start, unit_end)
+        or executable_index is None
+        or match_index <= executable_index
+        or words[executable_index][3]
+        or words[executable_index][2] in shell_keywords
+        or (match_index > 0 and words[match_index - 1][2] in output_options)
+    ):
+        raise ValueError(
+            "bound upstream input is not a direct argument to a simple compiler command"
+        )
     while unit_start < unit_end and build_command[unit_start].isspace():
         unit_start += 1
     while unit_end > unit_start and build_command[unit_end - 1].isspace():
@@ -378,13 +464,15 @@ def _render_interestingness_test(
     *,
     build_command: str,
     upstream_input: Path,
-    expected_exit: int,
+    compiler_exit_nonzero: bool,
     expected_diagnostic: str,
     operation: str | None,
     types: str | None,
 ) -> bytes:
     """Render the canonical candidate-substituting compiler-failure predicate."""
 
+    if compiler_exit_nonzero is not True:
+        raise ValueError("compiler-failure predicate must require a nonzero compiler exit")
     _, candidate_command = _bind_compiler_command(build_command, str(upstream_input))
     expected_operation = operation or ""
     expected_types = types or ""
@@ -436,11 +524,11 @@ contains_bound_text() {{
   while IFS= read -r line; do [[ $line == *"$needle"* ]] && return 0; done <"$candidate"
   return 1
 }}
-expected_exit={expected_exit}
+compiler_exit_nonzero=true
 expected_diagnostic={shlex.quote(expected_diagnostic)}
 expected_operation={shlex.quote(expected_operation)}
 expected_types={shlex.quote(expected_types)}
-if [[ $actual_exit -ne $expected_exit || $diagnostic != "$expected_diagnostic" ]]; then
+if [[ $compiler_exit_nonzero != true || $actual_exit -eq 0 || $diagnostic != "$expected_diagnostic" ]]; then
   printf 'interestingness mismatch: exit=%s diagnostic=%q\n' "$actual_exit" "$diagnostic" >&2
   exit 1
 fi
@@ -456,7 +544,7 @@ def _write_interestingness_test(
     *,
     build_command: str,
     upstream_input: Path,
-    expected_exit: int,
+    compiler_exit_nonzero: bool,
     expected_diagnostic: str,
     operation: str | None,
     types: str | None,
@@ -467,7 +555,7 @@ def _write_interestingness_test(
         _render_interestingness_test(
             build_command=build_command,
             upstream_input=upstream_input,
-            expected_exit=expected_exit,
+            compiler_exit_nonzero=compiler_exit_nonzero,
             expected_diagnostic=expected_diagnostic,
             operation=operation,
             types=types,
@@ -1957,18 +2045,32 @@ def _capture_compiler_minimization(
     canonical_root: str,
     result: CompilerFailure,
     execution: dict[str, object],
-) -> tuple[dict[str, object], dict[str, object]]:
+) -> tuple[dict[str, object] | None, dict[str, object]]:
     """Capture exact interestingness and make one bounded reduction attempt."""
 
-    compiler_command, _ = _bind_compiler_command(
-        str(execution["derivation_build_command"]), str(result.upstream_input)
-    )
+    reduction_log = evidence_dir / "reduction.log"
+    try:
+        compiler_command, _ = _bind_compiler_command(
+            str(execution["derivation_build_command"]), str(result.upstream_input)
+        )
+    except ValueError:
+        reduction_log.write_text(
+            "compiler predicate unavailable: unsupported compiler command\n",
+            encoding="utf-8",
+        )
+        return None, {
+            "status": "not_practical",
+            "reason": "unsupported_compiler_command",
+            "reduction_log": _evidence_binding(
+                reduction_log, f"{canonical_root}/reduction.log"
+            ),
+        }
     script = evidence_dir / "interestingness-test.sh"
     _write_interestingness_test(
         script,
         build_command=str(execution["derivation_build_command"]),
         upstream_input=result.upstream_input,
-        expected_exit=int(execution["exit_code"]),
+        compiler_exit_nonzero=True,
         expected_diagnostic=result.diagnostic,
         operation=result.operation,
         types=result.types,
@@ -1992,10 +2094,9 @@ def _capture_compiler_minimization(
         "full_log": _evidence_binding(
             full_log, f"{canonical_root}/interesting-full.log"
         ),
-        "expected_exit": int(execution["exit_code"]),
+        "compiler_exit_nonzero": True,
         "normalized_terminal_diagnostic": result.diagnostic,
     }
-    reduction_log = evidence_dir / "reduction.log"
     if full_result.returncode != 0:
         reduction_log.write_text(
             "full input did not satisfy the exact interestingness predicate\n",

@@ -201,7 +201,7 @@ _V5_COMPILER_FRONTIER_KEYS = {
 }
 _V5_INTERESTINGNESS_KEYS = {
     "compiler_command",
-    "expected_exit",
+    "compiler_exit_nonzero",
     "full_log",
     "normalized_terminal_diagnostic",
     "test",
@@ -729,35 +729,6 @@ def _verify_v5_schema(receipt: dict[str, Any], run_name: str) -> None:
         _require_json_optional_str(
             frontier.get("types"), f"{run_name}: compiler frontier.types"
         )
-        interestingness = _require_exact_keys(
-            frontier.get("interestingness"),
-            _V5_INTERESTINGNESS_KEYS,
-            f"{run_name}: interestingness schema",
-        )
-        _require_json_int(
-            interestingness.get("expected_exit"),
-            f"{run_name}: interestingness.expected_exit",
-        )
-        _require_json_str(
-            interestingness.get("normalized_terminal_diagnostic"),
-            f"{run_name}: interestingness.normalized_terminal_diagnostic",
-        )
-        _require_json_str(
-            interestingness.get("compiler_command"),
-            f"{run_name}: interestingness.compiler_command",
-        )
-        for name in ("test", "full_log"):
-            binding = _require_exact_keys(
-                interestingness.get(name),
-                _V5_FILE_BINDING_KEYS,
-                f"{run_name}: interestingness.{name} schema",
-            )
-            _require_json_int(
-                binding.get("bytes"), f"{run_name}: interestingness.{name}.bytes"
-            )
-            _require_json_str_fields(
-                binding, {"path", "sha256"}, f"{run_name}: interestingness.{name}"
-            )
         minimization = _require_json_dict(
             frontier.get("minimization"), f"{run_name}: minimization"
         )
@@ -781,6 +752,48 @@ def _verify_v5_schema(receipt: dict[str, Any], run_name: str) -> None:
             }
         else:
             expected_minimization = {"reason", "reduction_log", "status"}
+        unsupported_command = (
+            status_value == "not_practical"
+            and minimization.get("reason") == "unsupported_compiler_command"
+        )
+        if unsupported_command:
+            _require_json_null(
+                frontier.get("interestingness"),
+                f"{run_name}: unavailable interestingness",
+            )
+        else:
+            interestingness = _require_exact_keys(
+                frontier.get("interestingness"),
+                _V5_INTERESTINGNESS_KEYS,
+                f"{run_name}: interestingness schema",
+            )
+            _require_json_bool(
+                interestingness.get("compiler_exit_nonzero"),
+                f"{run_name}: interestingness.compiler_exit_nonzero",
+            )
+            _require_json_str(
+                interestingness.get("normalized_terminal_diagnostic"),
+                f"{run_name}: interestingness.normalized_terminal_diagnostic",
+            )
+            _require_json_str(
+                interestingness.get("compiler_command"),
+                f"{run_name}: interestingness.compiler_command",
+            )
+            for name in ("test", "full_log"):
+                binding = _require_exact_keys(
+                    interestingness.get(name),
+                    _V5_FILE_BINDING_KEYS,
+                    f"{run_name}: interestingness.{name} schema",
+                )
+                _require_json_int(
+                    binding.get("bytes"),
+                    f"{run_name}: interestingness.{name}.bytes",
+                )
+                _require_json_str_fields(
+                    binding,
+                    {"path", "sha256"},
+                    f"{run_name}: interestingness.{name}",
+                )
         _require_exact_keys(
             minimization,
             expected_minimization,
@@ -1161,16 +1174,9 @@ def _expected_shell_command_units(command: str) -> list[tuple[int, int]]:
                 substitution_depth -= 1
             index += 1
             continue
-        separator_width = 0
         if char in {"\n", ";"}:
-            separator_width = 1
-        elif char in {"|", "&"} and not (
-            index > 0 and command[index - 1] in {">", "<"}
-        ):
-            separator_width = 2 if command[index : index + 2] in {"||", "&&"} else 1
-        if separator_width:
             units.append((start, index))
-            start = index + separator_width
+            start = index + 1
             index = start
             continue
         index += 1
@@ -1247,6 +1253,47 @@ def _expected_literal_shell_words(
     return words
 
 
+def _is_expected_simple_command(command: str, start: int, end: int) -> bool:
+    """Independently reject syntax that changes word roles or process boundaries."""
+
+    quote: str | None = None
+    index = start
+    while index < end:
+        char = command[index]
+        if quote == "'":
+            if char == "'":
+                quote = None
+            index += 1
+            continue
+        if quote == '"':
+            if char == "\\" and index + 1 < end:
+                index += 2
+                continue
+            if char == '"':
+                quote = None
+                index += 1
+                continue
+            if char == "`" or (
+                char == "$" and index + 1 < end and command[index + 1] == "("
+            ):
+                return False
+            index += 1
+            continue
+        if char == "\\" and index + 1 < end:
+            index += 2
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            index += 1
+            continue
+        if char in "<>|&()" or char == "`" or (
+            char == "$" and index + 1 < end and command[index + 1] == "("
+        ):
+            return False
+        index += 1
+    return quote is None
+
+
 def _derive_expected_compiler_command(
     build_command: str, upstream_input: str
 ) -> tuple[str, str]:
@@ -1261,9 +1308,57 @@ def _derive_expected_compiler_command(
                 matches.append((unit_start, unit_end, word_start, word_end))
     if len(matches) != 1:
         raise VerificationError(
-            "bound build command must contain the upstream input as exactly one literal shell word"
+            "bound build command must contain the upstream input as exactly one direct argument to a simple compiler command"
         )
     unit_start, unit_end, word_start, word_end = matches[0]
+    words = _expected_literal_shell_words(build_command, unit_start, unit_end)
+    match_index = next(
+        index
+        for index, word in enumerate(words)
+        if word[0] == word_start and word[1] == word_end
+    )
+    executable_index = next(
+        (
+            index
+            for index, (_, _, value, _) in enumerate(words)
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", value) is None
+        ),
+        None,
+    )
+    shell_keywords = {
+        "!",
+        "{",
+        "}",
+        "case",
+        "coproc",
+        "do",
+        "done",
+        "elif",
+        "else",
+        "esac",
+        "fi",
+        "for",
+        "function",
+        "if",
+        "in",
+        "select",
+        "then",
+        "time",
+        "until",
+        "while",
+    }
+    output_options = {"-o", "--output"}
+    if (
+        not _is_expected_simple_command(build_command, unit_start, unit_end)
+        or executable_index is None
+        or match_index <= executable_index
+        or words[executable_index][3]
+        or words[executable_index][2] in shell_keywords
+        or (match_index > 0 and words[match_index - 1][2] in output_options)
+    ):
+        raise VerificationError(
+            "bound upstream input is not a direct argument to a simple compiler command"
+        )
     while unit_start < unit_end and build_command[unit_start].isspace():
         unit_start += 1
     while unit_end > unit_start and build_command[unit_end - 1].isspace():
@@ -1281,13 +1376,17 @@ def _render_expected_interestingness_test(
     *,
     build_command: str,
     upstream_input: str,
-    expected_exit: int,
+    compiler_exit_nonzero: bool,
     expected_diagnostic: str,
     operation: str | None,
     types: str | None,
 ) -> bytes:
     """Independently reconstruct the canonical compiler-failure predicate."""
 
+    if compiler_exit_nonzero is not True:
+        raise VerificationError(
+            "compiler-failure predicate must require a nonzero compiler exit"
+        )
     _, candidate_command = _derive_expected_compiler_command(
         build_command, upstream_input
     )
@@ -1341,11 +1440,11 @@ contains_bound_text() {{
   while IFS= read -r line; do [[ $line == *"$needle"* ]] && return 0; done <"$candidate"
   return 1
 }}
-expected_exit={expected_exit}
+compiler_exit_nonzero=true
 expected_diagnostic={shlex.quote(expected_diagnostic)}
 expected_operation={shlex.quote(expected_operation)}
 expected_types={shlex.quote(expected_types)}
-if [[ $actual_exit -ne $expected_exit || $diagnostic != "$expected_diagnostic" ]]; then
+if [[ $compiler_exit_nonzero != true || $actual_exit -eq 0 || $diagnostic != "$expected_diagnostic" ]]; then
   printf 'interestingness mismatch: exit=%s diagnostic=%q\n' "$actual_exit" "$diagnostic" >&2
   exit 1
 fi
@@ -2323,42 +2422,82 @@ def _verify_v5_frontier_evidence(
             operation == independently_derived[1] and types == independently_derived[2],
             f"{run_name}: operation/types differ from independently derived compiler diagnostic",
         )
-        interestingness = frontier.get("interestingness")
-        _require(isinstance(interestingness, dict), f"{run_name}: interestingness evidence missing")
-        predicate = _verify_file_binding(
-            interestingness.get("test"), files, "interestingness-test.sh", canonical_root, run_name
-        )
-        _verify_file_binding(
-            interestingness.get("full_log"), files, "interesting-full.log", canonical_root, run_name
-        )
-        _require(
-            interestingness.get("expected_exit") == final_record.get("exit_code")
-            and interestingness.get("normalized_terminal_diagnostic") == diagnostic,
-            f"{run_name}: interestingness predicate differs from compiler failure",
-        )
-        expected_compiler_command, _ = _derive_expected_compiler_command(
-            str(final_run.get("derivation_build_command")),
-            str(full.get("source_artifact")),
-        )
-        _require(
-            interestingness.get("compiler_command") == expected_compiler_command,
-            f"{run_name}: bound compiler command differs from independently reconstructed build command unit",
-        )
-        predicate_arguments = {
-            "build_command": str(final_run.get("derivation_build_command")),
-            "upstream_input": str(full.get("source_artifact")),
-            "expected_exit": int(final_record["exit_code"]),
-            "expected_diagnostic": diagnostic,
-            "operation": operation,
-            "types": types,
-        }
-        expected_files.update({"interestingness-test.sh", "interesting-full.log", "reduction.log"})
         minimization = frontier.get("minimization")
         _require(isinstance(minimization, dict), f"{run_name}: minimization evidence missing")
-        _verify_file_binding(
+        reduction_log = _verify_file_binding(
             minimization.get("reduction_log"), files, "reduction.log", canonical_root, run_name
         )
         status_value = minimization.get("status")
+        unsupported_command = (
+            status_value == "not_practical"
+            and minimization.get("reason") == "unsupported_compiler_command"
+        )
+        interestingness = frontier.get("interestingness")
+        if unsupported_command:
+            _require(
+                interestingness is None,
+                f"{run_name}: unsupported compiler command cannot carry a predicate",
+            )
+            try:
+                _derive_expected_compiler_command(
+                    str(final_run.get("derivation_build_command")),
+                    str(full.get("source_artifact")),
+                )
+            except VerificationError:
+                pass
+            else:
+                raise VerificationError(
+                    f"{run_name}: supported compiler command falsely marked unavailable"
+                )
+            _require(
+                reduction_log
+                == b"compiler predicate unavailable: unsupported compiler command\n",
+                f"{run_name}: unsupported compiler command log mismatch",
+            )
+            expected_files.add("reduction.log")
+        else:
+            _require(
+                isinstance(interestingness, dict),
+                f"{run_name}: interestingness evidence missing",
+            )
+            predicate = _verify_file_binding(
+                interestingness.get("test"),
+                files,
+                "interestingness-test.sh",
+                canonical_root,
+                run_name,
+            )
+            _verify_file_binding(
+                interestingness.get("full_log"),
+                files,
+                "interesting-full.log",
+                canonical_root,
+                run_name,
+            )
+            _require(
+                interestingness.get("compiler_exit_nonzero") is True
+                and interestingness.get("normalized_terminal_diagnostic") == diagnostic,
+                f"{run_name}: interestingness predicate differs from compiler failure",
+            )
+            expected_compiler_command, _ = _derive_expected_compiler_command(
+                str(final_run.get("derivation_build_command")),
+                str(full.get("source_artifact")),
+            )
+            _require(
+                interestingness.get("compiler_command") == expected_compiler_command,
+                f"{run_name}: bound compiler command differs from independently reconstructed build command unit",
+            )
+            predicate_arguments = {
+                "build_command": str(final_run.get("derivation_build_command")),
+                "upstream_input": str(full.get("source_artifact")),
+                "compiler_exit_nonzero": True,
+                "expected_diagnostic": diagnostic,
+                "operation": operation,
+                "types": types,
+            }
+            expected_files.update(
+                {"interestingness-test.sh", "interesting-full.log", "reduction.log"}
+            )
         if status_value == "verified":
             _verify_file_binding(
                 minimization.get("minimal_reproducer"),
@@ -2380,7 +2519,12 @@ def _verify_v5_frontier_evidence(
             _require(
                 status_value == "not_practical"
                 and minimization.get("reason")
-                in {"mlir_reduce_unavailable", "full_input_not_interesting", "reduction_failed"}
+                in {
+                    "mlir_reduce_unavailable",
+                    "full_input_not_interesting",
+                    "reduction_failed",
+                    "unsupported_compiler_command",
+                }
                 and "minimal_reproducer" not in minimization
                 and "interesting_reproducer_log" not in minimization,
                 f"{run_name}: invalid not-practical minimization",
@@ -2668,47 +2812,59 @@ def _verify_v5_receipt(
             trust["derivations"][first_invalid]["exit_code"] != 0,
             f"{run_name}: compiler failure did not replay",
         )
-        script = Path(tempfile.mkdtemp(prefix="exact-frontier-verify-script-")) / "interestingness-test.sh"
-        try:
-            script.write_bytes(files["interestingness-test.sh"])
-            script.chmod(0o755)
-            candidate = script.parent / "full-input.mlir"
-            candidate.write_bytes(upstream_bytes)
-            result = subprocess.run([str(script), str(candidate)], text=True, capture_output=True)
-            replay_log = _canonical_execution_evidence(
-                [str(script), str(candidate)],
-                result,
-                {str(script.parent): "<evidence-dir>", str(candidate): "<full-input>"},
+        if frontier["interestingness"] is not None:
+            script = (
+                Path(tempfile.mkdtemp(prefix="exact-frontier-verify-script-"))
+                / "interestingness-test.sh"
             )
-            _require(result.returncode == 0, f"{run_name}: full input interestingness replay failed")
-            _require(
-                replay_log == files["interesting-full.log"],
-                f"{run_name}: full input interestingness log mismatch",
-            )
-            minimization = frontier["minimization"]
-            if minimization["status"] == "verified":
-                candidate = script.parent / "minimal-reproducer.mlir"
-                candidate.write_bytes(files["minimal-reproducer.mlir"])
+            try:
+                script.write_bytes(files["interestingness-test.sh"])
+                script.chmod(0o755)
+                candidate = script.parent / "full-input.mlir"
+                candidate.write_bytes(upstream_bytes)
                 result = subprocess.run(
                     [str(script), str(candidate)], text=True, capture_output=True
                 )
                 replay_log = _canonical_execution_evidence(
                     [str(script), str(candidate)],
                     result,
-                    {str(script.parent): "<evidence-dir>"},
+                    {
+                        str(script.parent): "<evidence-dir>",
+                        str(candidate): "<full-input>",
+                    },
                 )
                 _require(
                     result.returncode == 0,
-                    f"{run_name}: minimal reproducer interestingness replay failed",
+                    f"{run_name}: full input interestingness replay failed",
                 )
                 _require(
-                    replay_log == files["interesting-reproducer.log"],
-                    f"{run_name}: minimal reproducer interestingness log mismatch",
+                    replay_log == files["interesting-full.log"],
+                    f"{run_name}: full input interestingness log mismatch",
                 )
-        finally:
-            for child in script.parent.iterdir():
-                child.unlink()
-            script.parent.rmdir()
+                minimization = frontier["minimization"]
+                if minimization["status"] == "verified":
+                    candidate = script.parent / "minimal-reproducer.mlir"
+                    candidate.write_bytes(files["minimal-reproducer.mlir"])
+                    result = subprocess.run(
+                        [str(script), str(candidate)], text=True, capture_output=True
+                    )
+                    replay_log = _canonical_execution_evidence(
+                        [str(script), str(candidate)],
+                        result,
+                        {str(script.parent): "<evidence-dir>"},
+                    )
+                    _require(
+                        result.returncode == 0,
+                        f"{run_name}: minimal reproducer interestingness replay failed",
+                    )
+                    _require(
+                        replay_log == files["interesting-reproducer.log"],
+                        f"{run_name}: minimal reproducer interestingness log mismatch",
+                    )
+            finally:
+                for child in script.parent.iterdir():
+                    child.unlink()
+                script.parent.rmdir()
     claims = receipt.get("claims")
     _require(
         claims == _V5_CLAIMS,

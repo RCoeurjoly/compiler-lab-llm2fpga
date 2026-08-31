@@ -463,7 +463,7 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
                 ),
                 "test": self._binding("interestingness-test.sh"),
                 "full_log": self._binding("interesting-full.log"),
-                "expected_exit": 1,
+                "compiler_exit_nonzero": True,
                 "normalized_terminal_diagnostic": diagnostic,
             },
             "minimization": {
@@ -1436,7 +1436,9 @@ class V5PublicIntegrationAdversarialTest(unittest.TestCase):
 class V5CompilerPredicateCommandBindingTest(unittest.TestCase):
     DIAGNOSTIC = "error: failed to legalize operation 'scf.for' : (index) -> ()"
 
-    def _fixture(self, root: Path) -> tuple[Path, Path, Path, str]:
+    def _fixture(
+        self, root: Path, *, compiler_exit: int = 7
+    ) -> tuple[Path, Path, Path, str]:
         tools = root / "fixture tools;quoted"
         tools.mkdir()
         received = root / "received compiler argument.txt"
@@ -1445,7 +1447,7 @@ class V5CompilerPredicateCommandBindingTest(unittest.TestCase):
             "#!/bin/sh\n"
             f"printf '%s\\n' \"$1\" > {shlex.quote(str(received))}\n"
             f"printf '%s\\n' {shlex.quote(self.DIAGNOSTIC)} >&2\n"
-            "exit 7\n",
+            f"exit {compiler_exit}\n",
             encoding="utf-8",
         )
         compiler.chmod(0o755)
@@ -1460,7 +1462,7 @@ class V5CompilerPredicateCommandBindingTest(unittest.TestCase):
         classifier = CLASSIFIER._render_interestingness_test(
             build_command=build_command,
             upstream_input=upstream,
-            expected_exit=7,
+            compiler_exit_nonzero=True,
             expected_diagnostic=self.DIAGNOSTIC,
             operation="scf.for",
             types="(index) -> ()",
@@ -1468,13 +1470,42 @@ class V5CompilerPredicateCommandBindingTest(unittest.TestCase):
         verifier = MODULE._render_expected_interestingness_test(
             build_command=build_command,
             upstream_input=str(upstream),
-            expected_exit=7,
+            compiler_exit_nonzero=True,
             expected_diagnostic=self.DIAGNOSTIC,
             operation="scf.for",
             types="(index) -> ()",
         )
         self.assertEqual(classifier, verifier)
         return classifier
+
+    def _assert_render_rejected(self, build_command: str, upstream: Path) -> None:
+        renderers = (
+            (
+                CLASSIFIER._render_interestingness_test,
+                ValueError,
+                str(upstream),
+            ),
+            (
+                MODULE._render_expected_interestingness_test,
+                MODULE.VerificationError,
+                str(upstream),
+            ),
+        )
+        for renderer, error, source in renderers:
+            with self.subTest(renderer=renderer.__module__):
+                with self.assertRaisesRegex(error, "direct argument|simple compiler"):
+                    renderer(
+                        build_command=build_command,
+                        upstream_input=(
+                            Path(source)
+                            if renderer is CLASSIFIER._render_interestingness_test
+                            else source
+                        ),
+                        compiler_exit_nonzero=True,
+                        expected_diagnostic=self.DIAGNOSTIC,
+                        operation="scf.for",
+                        types="(index) -> ()",
+                    )
 
     def test_quoted_special_upstream_shell_word_binds_candidate_path(self) -> None:
         with tempfile.TemporaryDirectory(prefix="exact-predicate-quoted-") as temporary:
@@ -1513,6 +1544,124 @@ class V5CompilerPredicateCommandBindingTest(unittest.TestCase):
             self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
             self.assertEqual(received.read_text(encoding="utf-8").strip(), str(candidate))
             self.assertFalse(marker.exists(), "later validation command must not run")
+
+    def test_rejects_upstream_literal_as_redirection_operand_before_replay(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-predicate-redirection-") as temporary:
+            root = Path(temporary)
+            upstream, _, _, direct_command = self._fixture(root)
+            compiler = shlex.quote(shlex.split(direct_command)[0])
+            source = shlex.quote(str(upstream))
+            cases = {
+                "shell output redirection": f"{compiler} > {source}",
+                "shell input redirection": f"{compiler} < {source}",
+                "short output option": f"{compiler} -o {source}",
+                "long output option": f"{compiler} --output {source}",
+            }
+            for name, build_command in cases.items():
+                with self.subTest(name=name):
+                    self._assert_render_rejected(build_command, upstream)
+
+    def test_rejects_transformed_nested_or_compound_upstream_before_replay(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-predicate-nested-") as temporary:
+            root = Path(temporary)
+            upstream, _, _, direct_command = self._fixture(root)
+            compiler = shlex.quote(shlex.split(direct_command)[0])
+            source = shlex.quote(str(upstream))
+            cases = {
+                "command substitution": f"{compiler} $(basename {source})",
+                "backtick substitution": f"{compiler} `basename {source}`",
+                "process substitution": f"{compiler} <(cat {source})",
+                "subshell grouping": f"( {compiler} {source} )",
+                "brace grouping": f"{{ {compiler} {source}; }}",
+                "conditional compound": f"if {compiler} {source}; then true; fi",
+                "pipeline": f"cat {source} | {compiler}",
+            }
+            for name, build_command in cases.items():
+                with self.subTest(name=name):
+                    self._assert_render_rejected(build_command, upstream)
+
+    def test_unsupported_binding_records_unavailable_minimization(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-predicate-unavailable-") as temporary:
+            root = Path(temporary)
+            upstream, _, _, direct_command = self._fixture(root)
+            compiler = shlex.quote(shlex.split(direct_command)[0])
+            evidence = root / "evidence"
+            evidence.mkdir()
+            failure = CLASSIFIER.CompilerFailure(
+                kind="compiler_failure",
+                upstream_input=upstream,
+                log=root / "compiler.log",
+                diagnostic=self.DIAGNOSTIC,
+                operation="scf.for",
+                types="(index) -> ()",
+            )
+            try:
+                interestingness, minimization = CLASSIFIER._capture_compiler_minimization(
+                    repo_root=root,
+                    evidence_dir=evidence,
+                    canonical_root="reproducers/scf",
+                    result=failure,
+                    execution={
+                        "derivation_build_command": (
+                            f"{compiler} > {shlex.quote(str(upstream))}"
+                        ),
+                        "exit_code": 1,
+                    },
+                )
+            except ValueError as error:
+                self.fail(f"unsupported syntax must produce unavailable evidence: {error}")
+
+            self.assertIsNone(interestingness)
+            self.assertEqual(minimization.get("status"), "not_practical")
+            self.assertEqual(
+                minimization.get("reason"), "unsupported_compiler_command"
+            )
+
+    def test_outer_registered_exit_does_not_claim_inner_compiler_exit(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-predicate-exit-boundary-") as temporary:
+            root = Path(temporary)
+            upstream, _, _, build_command = self._fixture(root)
+            evidence = root / "evidence"
+            evidence.mkdir()
+            failure = CLASSIFIER.CompilerFailure(
+                kind="compiler_failure",
+                upstream_input=upstream,
+                log=root / "compiler.log",
+                diagnostic=self.DIAGNOSTIC,
+                operation="scf.for",
+                types="(index) -> ()",
+            )
+
+            interestingness, minimization = CLASSIFIER._capture_compiler_minimization(
+                repo_root=root,
+                evidence_dir=evidence,
+                canonical_root="reproducers/scf",
+                result=failure,
+                execution={
+                    "derivation_build_command": build_command,
+                    "exit_code": 1,
+                },
+            )
+
+            self.assertIs(interestingness.get("compiler_exit_nonzero"), True)
+            self.assertNotIn("expected_exit", interestingness)
+            self.assertEqual(minimization.get("reason"), "mlir_reduce_unavailable")
+
+    def test_predicate_rejects_zero_inner_compiler_exit(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-predicate-zero-exit-") as temporary:
+            root = Path(temporary)
+            upstream, candidate, _, build_command = self._fixture(
+                root, compiler_exit=0
+            )
+            predicate = root / "interestingness-test.sh"
+            predicate.write_bytes(self._render(build_command, upstream))
+            predicate.chmod(0o755)
+
+            replay = subprocess.run(
+                [str(predicate), str(candidate)], text=True, capture_output=True
+            )
+
+            self.assertNotEqual(replay.returncode, 0, replay.stdout + replay.stderr)
 
 
 class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
@@ -1576,7 +1725,7 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
         ]
         compiler_log = MODULE._canonical_execution_evidence(
             command,
-            subprocess.CompletedProcess(command, 7, "", diagnostic + "\n"),
+            subprocess.CompletedProcess(command, 1, "", diagnostic + "\n"),
         )
         trust["derivations"]["linalg"]["artifact_path"] = str(upstream)
         failing_live = trust["derivations"]["scf"]
@@ -1586,7 +1735,7 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
             "build_command": build_command,
             "build_command_sha256": hashlib.sha256(build_command.encode()).hexdigest(),
             "tool_bindings": [tool_binding],
-            "exit_code": 7,
+            "exit_code": 1,
             "log_bytes": compiler_log,
         })
 
@@ -1604,7 +1753,7 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
             interestingness_script,
             build_command=build_command,
             upstream_input=upstream,
-            expected_exit=7,
+            compiler_exit_nonzero=True,
             expected_diagnostic=diagnostic,
             operation="scf.for",
             types="(index) -> ()",
@@ -1663,7 +1812,7 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
             "artifact_bytes": len(upstream.read_bytes()),
             "artifact_sha256": artifact_sha,
             "artifact_accepted": False,
-            "exit_code": 7,
+            "exit_code": 1,
             "status": "compiler_failure",
             "terminal_diagnostics": [diagnostic],
         })
@@ -1678,7 +1827,7 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
             "derivation_build_command": build_command,
             "derivation_build_command_sha256": failing_live["build_command_sha256"],
             "derivation_tool_bindings": [tool_binding],
-            "exit_code": 7,
+            "exit_code": 1,
             "result": None,
         })
         receipt["full_failing_input"] = {
@@ -1717,7 +1866,7 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
                     "reproducers/scf/interesting-full.log",
                     files["interesting-full.log"],
                 ),
-                "expected_exit": 7,
+                "compiler_exit_nonzero": True,
                 "normalized_terminal_diagnostic": diagnostic,
             },
             minimization={
@@ -1786,6 +1935,51 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
         self.assertEqual(result["frontier_evidence_kind"], "compiler_failure")
         self.assertEqual(result["first_invalid_stage"], "scf")
 
+    def test_public_verifier_accepts_authenticated_unavailable_predicate(self) -> None:
+        root, bundle, trust, current, reproducers = self._fixture()
+        receipt = json.loads((bundle / "run-1/receipt.json").read_text(encoding="utf-8"))
+        upstream = receipt["full_failing_input"]["source_artifact"]
+        original_command = receipt["registered_build_execution"]["scf"][
+            "derivation_build_command"
+        ]
+        compiler = shlex.quote(shlex.split(original_command)[0])
+        unsupported_command = f"{compiler} > {shlex.quote(upstream)}"
+        command_hash = hashlib.sha256(unsupported_command.encode()).hexdigest()
+        unavailable_log = (
+            b"compiler predicate unavailable: unsupported compiler command\n"
+        )
+        self._replace_canonical_file(
+            bundle, reproducers, "reduction.log", unavailable_log
+        )
+        self._remove_canonical_file(
+            bundle, reproducers, "interestingness-test.sh"
+        )
+        self._remove_canonical_file(bundle, reproducers, "interesting-full.log")
+
+        def mutate(value):
+            execution = value["registered_build_execution"]["scf"]
+            execution["derivation_build_command"] = unsupported_command
+            execution["derivation_build_command_sha256"] = command_hash
+            value["stages"][-1]["tool_revisions"][
+                "build_command_sha256"
+            ] = command_hash
+            value["frontier_evidence"]["interestingness"] = None
+            value["frontier_evidence"]["minimization"] = {
+                "status": "not_practical",
+                "reason": "unsupported_compiler_command",
+                "reduction_log": self._binding(
+                    "reproducers/scf/reduction.log", unavailable_log
+                ),
+            }
+
+        self._rewrite_receipts(bundle, current, mutate)
+        trust["derivations"]["scf"]["build_command"] = unsupported_command
+        trust["derivations"]["scf"]["build_command_sha256"] = command_hash
+
+        with mock.patch.object(MODULE, "_independent_v5_trust", return_value=trust):
+            result = MODULE.verify_public_v5_evidence(root, bundle)
+        self.assertEqual(result["frontier_evidence_kind"], "compiler_failure")
+
     def test_public_verifier_rejects_self_consistent_fake_predicate_and_logs(self) -> None:
         def fake_predicate(root, bundle, current, reproducers):
             script = b"#!/usr/bin/env bash\nexit 0\n"
@@ -1824,6 +2018,35 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
             self._rewrite_receipts(bundle, current, mutate)
 
         self._reject(fake_predicate, "predicate bytes|independently reconstructed")
+
+    def test_public_verifier_rejects_false_unavailable_predicate_claim(self) -> None:
+        def false_unavailable(_root, bundle, current, reproducers):
+            unavailable_log = (
+                b"compiler predicate unavailable: unsupported compiler command\n"
+            )
+            self._replace_canonical_file(
+                bundle, reproducers, "reduction.log", unavailable_log
+            )
+            self._remove_canonical_file(
+                bundle, reproducers, "interestingness-test.sh"
+            )
+            self._remove_canonical_file(
+                bundle, reproducers, "interesting-full.log"
+            )
+
+            def mutate(receipt):
+                receipt["frontier_evidence"]["interestingness"] = None
+                receipt["frontier_evidence"]["minimization"] = {
+                    "status": "not_practical",
+                    "reason": "unsupported_compiler_command",
+                    "reduction_log": self._binding(
+                        "reproducers/scf/reduction.log", unavailable_log
+                    ),
+                }
+
+            self._rewrite_receipts(bundle, current, mutate)
+
+        self._reject(false_unavailable, "falsely marked unavailable")
 
     def _rewrite_receipts(self, bundle: Path, current: Path, mutate) -> None:
         receipt = json.loads((bundle / "run-1/receipt.json").read_text(encoding="utf-8"))
@@ -1948,7 +2171,6 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
             def mutate(receipt):
                 receipt["stages"][-1]["exit_code"] = 0
                 receipt["registered_build_execution"]["scf"]["exit_code"] = 0
-                receipt["frontier_evidence"]["interestingness"]["expected_exit"] = 0
             self._rewrite_receipts(bundle, current, mutate)
 
         def environment(_root, bundle, current, reproducers):
@@ -2023,6 +2245,18 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
             "bound compiler command",
         )
 
+    def test_public_compiler_branch_rejects_false_nonzero_claim(self) -> None:
+        self._reject(
+            lambda _r, bundle, current, _p: self._rewrite_receipts(
+                bundle,
+                current,
+                lambda receipt: receipt["frontier_evidence"]["interestingness"].__setitem__(
+                    "compiler_exit_nonzero", False
+                ),
+            ),
+            "interestingness predicate",
+        )
+
     def test_public_compiler_branch_rejects_schema_and_type_mutations(self) -> None:
         cases = {
             "extra frontier key": lambda receipt: receipt["frontier_evidence"].__setitem__(
@@ -2034,9 +2268,17 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
             "extra minimization key": lambda receipt: receipt["frontier_evidence"][
                 "minimization"
             ].__setitem__("invented", None),
-            "boolean exit": lambda receipt: receipt["frontier_evidence"][
+            "integer nonzero claim": lambda receipt: receipt["frontier_evidence"][
                 "interestingness"
-            ].__setitem__("expected_exit", True),
+            ].__setitem__("compiler_exit_nonzero", 1),
+            "rebound exact exit claim": lambda receipt: (
+                receipt["frontier_evidence"]["interestingness"].pop(
+                    "compiler_exit_nonzero"
+                ),
+                receipt["frontier_evidence"]["interestingness"].__setitem__(
+                    "expected_exit", 7
+                ),
+            ),
             "list operation": lambda receipt: receipt["frontier_evidence"].__setitem__(
                 "operation", []
             ),
