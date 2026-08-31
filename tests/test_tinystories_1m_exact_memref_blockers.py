@@ -554,6 +554,112 @@ class StandaloneInterestingnessAttackTest(unittest.TestCase):
             f"escaped-name RED candidate must be valid pinned MLIR:\n{completed.stderr}",
         )
 
+    def _assert_pinned_reject(self, candidate: Path) -> None:
+        completed = subprocess.run(
+            [self.contract["tool"]["path"], str(candidate), "-o", "/dev/null"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertNotEqual(
+            completed.returncode,
+            0,
+            "pinned MLIR unexpectedly accepted unsupported comment trivia",
+        )
+
+    def test_rejects_escaped_generic_names_across_line_comment_trivia(self) -> None:
+        copy_module, copy_metadata = self._canonical_paths("memref.copy")
+        collapse_module, collapse_metadata = self._canonical_paths(
+            "memref.collapse_shape"
+        )
+        copy_types = "(memref<1xi64>, memref<1xi64>) -> ()"
+        same_class = {
+            "single-comment": (
+                r'"memref.\63opy" // legal token-separating comment'
+                "\n      (%source, %target) : "
+                + copy_types
+            ),
+            "repeated-comments-blank-lines": (
+                r'"memref.c\6Fpy" // first comment'
+                "\n\n      // second comment\n\n      (%source, %target) : "
+                + copy_types
+            ),
+            "carriage-return-comment": (
+                r'"memref\2E\63opy" // carriage return ends comment'
+                "\r      (%source, %target) : "
+                + copy_types
+            ),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            candidates: list[tuple[str, Path, Path]] = []
+            for name, generic in same_class.items():
+                candidate = root / f"comment-{name}.mlir"
+                candidate.write_text(
+                    copy_module.read_text(encoding="utf-8").replace(
+                        "    return", f"    {generic}\n    return"
+                    ),
+                    encoding="utf-8",
+                )
+                candidates.append((name, candidate, copy_metadata))
+
+            different = root / "comment-different-class.mlir"
+            different.write_text(
+                collapse_module.read_text(encoding="utf-8")
+                .replace(
+                    ") {",
+                    ", %target: memref<1x4x256xi64>) {",
+                    1,
+                )
+                .replace(
+                    "    return",
+                    r'    "memref.\63opy" // different registered class'
+                    "\n      (%source, %target) : "
+                    "(memref<1x4x256xi64>, memref<1x4x256xi64>) -> ()\n"
+                    "    return",
+                ),
+                encoding="utf-8",
+            )
+            candidates.append(("different-class", different, collapse_metadata))
+
+            for name, candidate, metadata in candidates:
+                with self.subTest(name=name):
+                    self._assert_pinned_parse(candidate)
+                    completed = self._run_checker(candidate, metadata)
+                    self.assertNotEqual(
+                        completed.returncode,
+                        0,
+                        f"comment-separated generic registered operation accepted:\n"
+                        f"{completed.stdout}{completed.stderr}",
+                    )
+
+    def test_rejects_unsupported_or_unterminated_comment_trivia(self) -> None:
+        module, _ = self._canonical_paths("memref.copy")
+        unsupported = {
+            "block": r'"memref.\63opy" /* block */ (%source, %target)',
+            "nested-block": (
+                r'"memref.\63opy" /* outer /* nested */ outer */ '
+                "(%source, %target)"
+            ),
+            "unterminated-block": r'"memref.\63opy" /* unterminated',
+            "line-comment-to-eof": r'"memref.\63opy" // no operand list',
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, spelling in unsupported.items():
+                with self.subTest(name=name):
+                    candidate = root / f"unsupported-{name}.mlir"
+                    candidate.write_text(
+                        module.read_text(encoding="utf-8").replace(
+                            "    return", f"    {spelling}\n    return"
+                        ),
+                        encoding="utf-8",
+                    )
+                    self._assert_pinned_reject(candidate)
+                    with self.assertRaisesRegex(ValueError, "comment|trivia"):
+                        self.verifier._independent_operations(spelling)
+
     def test_rejects_valid_escaped_generic_registered_names(self) -> None:
         copy_module, copy_metadata = self._canonical_paths("memref.copy")
         collapse_module, collapse_metadata = self._canonical_paths(

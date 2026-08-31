@@ -396,6 +396,24 @@ def _decode_mlir_string(raw: str) -> str:
     return "".join(result)
 
 
+def _skip_mlir_trivia(text: str, index: int) -> tuple[int, bool]:
+    """Skip exactly the whitespace and line comments accepted by MLIR."""
+    saw_comment = False
+    while True:
+        while index < len(text) and text[index] in " \t\n\r":
+            index += 1
+        if text.startswith("//", index):
+            saw_comment = True
+            newline = index + 2
+            while newline < len(text) and text[newline] not in "\n\r":
+                newline += 1
+            index = newline
+            continue
+        if text.startswith("/*", index):
+            raise ValueError("block comment trivia is not accepted by pinned MLIR")
+        return index, saw_comment
+
+
 def _reject_registered_generic_forms(text: str) -> None:
     """Fail closed instead of silently masking generic registered operations."""
     index = 0
@@ -422,13 +440,16 @@ def _reject_registered_generic_forms(text: str) -> None:
         if end == len(text):
             raise ValueError("unterminated MLIR string literal")
         name = _decode_mlir_string(text[index + 1 : end])
-        following = end + 1
-        while following < len(text) and text[following].isspace():
-            following += 1
-        if name in CLASS_SET and following < len(text) and text[following] == "(":
-            raise ValueError(
-                f"generic-form registered operation is not accepted at line {line_number}: {name}"
-            )
+        if name in CLASS_SET:
+            following, saw_comment = _skip_mlir_trivia(text, end + 1)
+            if following < len(text) and text[following] == "(":
+                raise ValueError(
+                    f"generic-form registered operation is not accepted at line {line_number}: {name}"
+                )
+            if saw_comment:
+                raise ValueError(
+                    f"registered operation name has comment trivia without an operand list at line {line_number}"
+                )
         index = end + 1
 
 
