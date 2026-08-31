@@ -5,7 +5,8 @@
 - Base: `2dff7ec5ecfd820bf5d6f588e49a93c233a59177`
 - Initial implementation: `37347ddf4a60ee58ebcc3837ebb190b0f835c38f`
 - Initial report: `f3bc741ebb08062ed06db07de37c7b42575607fa`
-- Review-fix implementation head: `6f7a8b3` (`fix: authenticate exact memref pass evidence`)
+- Review-fix implementation heads: `6f7a8b3` (authentication/replay) and
+  `7a1a0c0` (explicit shape/layout/access proofs)
 
 ## RED
 
@@ -66,10 +67,10 @@ All representatives ran, parsed, and were recorded before the complete input.
 
 | Class | Classification | After class count | Pass time (ns) | Output SHA-256 |
 | --- | --- | ---: | ---: | --- |
-| `memref.collapse_shape` | `eliminated` | 0 | 37,707,614 | `3e20c196c823cf15079740ae1385519fd075bd5b66ec5151dbb6419157609c66` |
-| `memref.copy` | `preserved` | 1 | 35,929,499 | `bc331bbe83d22a803d9ea92683738141aac5ed14bf20e87c5f188731d20f125c` |
-| `memref.expand_shape` | `eliminated` | 0 | 35,403,010 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
-| `memref.reinterpret_cast` | `eliminated` | 0 | 43,119,063 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
+| `memref.collapse_shape` | `eliminated` | 0 | 37,099,911 | `3e20c196c823cf15079740ae1385519fd075bd5b66ec5151dbb6419157609c66` |
+| `memref.copy` | `preserved` | 1 | 39,211,045 | `bc331bbe83d22a803d9ea92683738141aac5ed14bf20e87c5f188731d20f125c` |
+| `memref.expand_shape` | `eliminated` | 0 | 36,501,631 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
+| `memref.reinterpret_cast` | `eliminated` | 0 | 39,329,232 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
 
 Each run retains exact stdout, stderr, output, parse-check streams, command,
 exit, elapsed nanoseconds, and byte identities. The verifier independently
@@ -104,7 +105,7 @@ Exact before census:
 | `memref.reinterpret_cast` | 11,449 | 408 |
 | Total | 20,280 | 895 |
 
-The full invocation ran for 883,471,108 ns and exited 1. It produced exact
+The full invocation ran for 885,060,069 ns and exited 1. It produced exact
 empty output (SHA-256
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`)
 and 791 exact stderr bytes (SHA-256
@@ -126,7 +127,7 @@ at retained c22 line 2,389:
 The existing pass flattens `%arg2` from `memref<64x64xi64>` to
 `memref<4096xi64>` while leaving the rank-2 subview offsets/sizes/strides
 unchanged. The 200-byte one-operation exact reproducer independently exits 1
-with the same diagnostic; its measured pass time was 40,879,716 ns. Its exact
+with the same diagnostic; its measured pass time was 40,305,841 ns. Its exact
 command, exit 1, stdout, stderr, absent-output observation, and retained empty
 output bytes are independently reconstructed and replayed. Elapsed time is a
 positive authenticated observation only and is deliberately excluded from
@@ -146,9 +147,9 @@ regression; float-math work remains out of scope.
 ## Canonical evidence
 
 - Evaluation self-hash:
-  `40ad845f860a8588f0ab6b9d63c8f201ee8679c530e1bbbb867475c31d010c87`.
-- Evaluation file: 224,458 bytes,
-  `08d683bcaf47e313f0f66355c62808f50f9f9525aca82f677830ffcffa16b54f`.
+  `f3e6bebf28c6795ce54d8e59189c6ef73bce48e121353ae819f36eeb68a79651`.
+- Evaluation file: 225,078 bytes,
+  `463f1d141a99adfda6a806ac6de55b309e9e3ca76e03631d2908ddc92a21d490`.
 - Exact representative/full streams:
   `artifacts/comparison/tinystories-1m-exact-memref-pass-evidence/`.
 - Exact minimal residual:
@@ -161,12 +162,12 @@ regression; float-math work remains out of scope.
   — `PASS`, with `compiler_pass_extension` and unavailable post-pass counts.
 - Required suite:
   `nix develop -c python -m unittest tests/test_tinystories_1m_exact_memref_pass.py -v`
-  — `Ran 19 tests in 136.368s`, `OK`.
+  — `Ran 19 tests in 137.332s`, `OK`.
 - Python compilation for evaluator, verifier, and tests — PASS.
 - `nix flake check --no-build` — PASS (`all checks passed`).
 - Staged `git diff --check` — PASS after marking raw byte evidence non-diffable;
   no evidence bytes were normalized.
-- Repository pre-commit hygiene hook accepted `6f7a8b3`.
+- Repository pre-commit hygiene hook accepted `6f7a8b3` and `7a1a0c0`.
 
 ## Files
 
