@@ -80,6 +80,17 @@ def canonical_self_hash(payload: dict) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def receipt_self_hash(receipt: dict) -> str:
+    unsigned = {key: value for key, value in receipt.items() if key != "sha256"}
+    raw = json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(raw).hexdigest()
+
+
+def byte_binding(path: Path) -> dict[str, int | str]:
+    raw = path.read_bytes()
+    return {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+
+
 class MissingProductionSurfaceRedTest(unittest.TestCase):
     def test_extractor_exists(self) -> None:
         self.assertTrue(EXTRACTOR.is_file(), f"absent extractor: {EXTRACTOR}")
@@ -348,8 +359,12 @@ class CommittedContractIntegrationTest(unittest.TestCase):
                 )
 
             broken = copy.deepcopy(payload)
-            representative = next(iter(broken["classes"].values()))["representative"]
-            broken_path = root / "reproducers" / Path(representative["path"]).relative_to(REPRODUCERS.relative_to(ROOT))
+            representative = next(iter(broken["classes"].values()))[
+                "representative"
+            ]
+            broken_path = root / "reproducers" / Path(
+                representative["path"]
+            ).relative_to(REPRODUCERS.relative_to(ROOT))
             broken_path.write_text("module { this is not mlir }\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "representative"):
                 verifier.verify_contract_payload(
@@ -363,6 +378,280 @@ class CommittedContractIntegrationTest(unittest.TestCase):
                     representative_root=root / "reproducers",
                 )
 
+
+class ImmutableTrustRootAttackTest(unittest.TestCase):
+    def _rebind_contract(self, contract: dict, receipt: dict, receipt_path: Path) -> None:
+        receipt["sha256"] = receipt_self_hash(receipt)
+        contract["source"]["c22_receipt"].update(byte_binding(receipt_path))
+        contract["c22_receipt_self_sha256"] = receipt["sha256"]
+        contract["task_1_through_3_identities"] = copy.deepcopy(
+            receipt["frozen_task_1_through_3_identities"]
+        )
+        tool = next(
+            binding
+            for binding in receipt["registered_build_execution"]["flat-scf"][
+                "derivation_tool_bindings"
+            ]
+            if Path(binding["path"]).name == "mlir-opt"
+        )
+        contract["tool"] = {
+            key: tool[key] for key in ("path", "bytes", "sha256")
+        }
+        contract["sha256"] = canonical_self_hash(contract)
+
+    def _run_full_default(self, contract_path: Path, receipt_path: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                "python",
+                str(VERIFIER),
+                "--contract",
+                str(contract_path),
+                "--receipt",
+                str(receipt_path),
+            ],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
+    def test_full_default_verifier_rejects_rehashed_receipt_model_identity_and_tool_attacks(self) -> None:
+        original_contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        original_receipt = json.loads(
+            (LIVE_RUN / "receipt.json").read_text(encoding="utf-8")
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fake_tool = root / "fake" / "mlir-opt"
+            fake_tool.parent.mkdir()
+            fake_tool.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            fake_tool.chmod(0o755)
+
+            attacks = []
+
+            altered_bytes = copy.deepcopy(original_receipt)
+            altered_bytes["status"] = "forged-authenticated"
+            attacks.append(("altered receipt bytes", altered_bytes, None))
+
+            altered_schema = copy.deepcopy(original_receipt)
+            altered_schema["schema"] = "forged-frontier-v5"
+            attacks.append(("altered receipt schema", altered_schema, None))
+
+            altered_model = copy.deepcopy(original_receipt)
+            altered_model["model"] = "different-model"
+            attacks.append(("altered frozen model", altered_model, "different-model"))
+
+            altered_identity = copy.deepcopy(original_receipt)
+            altered_identity["frozen_task_1_through_3_identities"][
+                "adapter_sha256"
+            ] = "0" * 64
+            attacks.append(("altered Task 1--3 identity", altered_identity, None))
+
+            altered_tool = copy.deepcopy(original_receipt)
+            tool_binding = next(
+                binding
+                for binding in altered_tool["registered_build_execution"]["flat-scf"][
+                    "derivation_tool_bindings"
+                ]
+                if Path(binding["path"]).name == "mlir-opt"
+            )
+            tool_binding.update({"path": str(fake_tool), **byte_binding(fake_tool)})
+            attacks.append(("altered tool path hash and fake executable", altered_tool, None))
+
+            altered_tool_hash = copy.deepcopy(original_receipt)
+            hash_binding = next(
+                binding
+                for binding in altered_tool_hash["registered_build_execution"]["flat-scf"][
+                    "derivation_tool_bindings"
+                ]
+                if Path(binding["path"]).name == "mlir-opt"
+            )
+            hash_binding["sha256"] = "f" * 64
+            attacks.append(("altered tool hash", altered_tool_hash, None))
+
+            for index, (name, receipt, model) in enumerate(attacks):
+                with self.subTest(name=name):
+                    receipt_path = root / f"receipt-{index}.json"
+                    contract_path = root / f"contract-{index}.json"
+                    contract = copy.deepcopy(original_contract)
+                    if model is not None:
+                        contract["model"] = model
+                    receipt["sha256"] = receipt_self_hash(receipt)
+                    receipt_path.write_text(
+                        json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8"
+                    )
+                    self._rebind_contract(contract, receipt, receipt_path)
+                    receipt_path.write_text(
+                        json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8"
+                    )
+                    contract["source"]["c22_receipt"].update(byte_binding(receipt_path))
+                    contract["sha256"] = canonical_self_hash(contract)
+                    contract_path.write_text(
+                        json.dumps(contract, sort_keys=True) + "\n", encoding="utf-8"
+                    )
+                    completed = self._run_full_default(contract_path, receipt_path)
+                    self.assertNotEqual(
+                        completed.returncode,
+                        0,
+                        f"{name} was accepted:\n{completed.stdout}{completed.stderr}",
+                    )
+
+    def test_full_default_verifier_rejects_contract_only_model_rebinding(self) -> None:
+        contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+        contract["model"] = "different-model"
+        contract["sha256"] = canonical_self_hash(contract)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "contract.json"
+            path.write_text(json.dumps(contract, sort_keys=True) + "\n", encoding="utf-8")
+            completed = self._run_full_default(path, LIVE_RUN / "receipt.json")
+            self.assertNotEqual(
+                completed.returncode,
+                0,
+                f"contract-only model mutation accepted:\n{completed.stdout}{completed.stderr}",
+            )
+
+
+class StandaloneInterestingnessAttackTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.extractor = load_module(EXTRACTOR, "exact_memref_sidecar_attack_extractor")
+        cls.contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+
+    def _run_checker(self, candidate: Path, metadata: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                "python",
+                str(VERIFIER),
+                "--check-representative",
+                str(candidate),
+                "--metadata",
+                str(metadata),
+            ],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
+    def _canonical_paths(self, operation: str) -> tuple[Path, Path]:
+        representative = self.contract["classes"][operation]["representative"]
+        return ROOT / representative["path"], ROOT / representative["metadata"]
+
+    def test_rejects_extra_generic_same_and_different_registered_operations(self) -> None:
+        copy_module, copy_metadata = self._canonical_paths("memref.copy")
+        collapse_module, collapse_metadata = self._canonical_paths(
+            "memref.collapse_shape"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            generic_same = root / "generic-same.mlir"
+            generic_same.write_text(
+                copy_module.read_text(encoding="utf-8").replace(
+                    "    return",
+                    '    "memref.copy"(%source, %target) : '
+                    "(memref<1xi64>, memref<1xi64>) -> ()\n    return",
+                ),
+                encoding="utf-8",
+            )
+            generic_different = root / "generic-different.mlir"
+            generic_different.write_text(
+                collapse_module.read_text(encoding="utf-8")
+                .replace(
+                    ") {",
+                    ", %target: memref<1x4x256xi64>) {",
+                    1,
+                )
+                .replace(
+                    "    return",
+                    '    "memref.copy"(%source, %target) : '
+                    "(memref<1x4x256xi64>, memref<1x4x256xi64>) -> ()\n    return",
+                ),
+                encoding="utf-8",
+            )
+            for name, candidate, metadata in (
+                ("same", generic_same, copy_metadata),
+                ("different", generic_different, collapse_metadata),
+            ):
+                with self.subTest(name=name):
+                    completed = self._run_checker(candidate, metadata)
+                    self.assertNotEqual(
+                        completed.returncode,
+                        0,
+                        f"generic {name}-class operation accepted:\n"
+                        f"{completed.stdout}{completed.stderr}",
+                    )
+
+    def test_rejects_extra_custom_same_and_different_registered_operations(self) -> None:
+        module, metadata = self._canonical_paths("memref.copy")
+        original = module.read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            same = root / "same.mlir"
+            same.write_text(
+                original.replace(
+                    "    return",
+                    "    memref.copy %source, %target : memref<1xi64> to memref<1xi64>\n    return",
+                ),
+                encoding="utf-8",
+            )
+            different = root / "different.mlir"
+            different.write_text(
+                original.replace(
+                    "    return",
+                    "    %view = memref.reinterpret_cast %source to offset: [0], "
+                    "sizes: [1], strides: [1] : memref<1xi64> to "
+                    "memref<1xi64, strided<[1]>>\n    return",
+                ),
+                encoding="utf-8",
+            )
+            for name, candidate in (("same", same), ("different", different)):
+                with self.subTest(name=name):
+                    completed = self._run_checker(candidate, metadata)
+                    self.assertNotEqual(
+                        completed.returncode,
+                        0,
+                        f"extra custom {name}-class operation accepted:\n"
+                        f"{completed.stdout}{completed.stderr}",
+                    )
+
+    def test_rejects_wrong_but_self_consistent_sidecar_signature_and_hash(self) -> None:
+        module, metadata_path = self._canonical_paths("memref.copy")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            candidate = root / "wrong-signature.mlir"
+            candidate.write_text(
+                module.read_text(encoding="utf-8").replace("1xi64", "2xi64"),
+                encoding="utf-8",
+            )
+            operations = self.extractor.parse_registered_operations(
+                candidate.read_text(encoding="utf-8")
+            )
+            self.assertEqual(len(operations), 1)
+            signature = operations[0]["signature"]
+            sidecar = json.loads(metadata_path.read_text(encoding="utf-8"))
+            sidecar["signature"] = signature
+            sidecar["signature_sha256"] = hashlib.sha256(
+                json.dumps(
+                    signature, sort_keys=True, separators=(",", ":")
+                ).encode()
+            ).hexdigest()
+            sidecar["selection_tuple"][1] = json.dumps(
+                signature, sort_keys=True, separators=(",", ":")
+            )
+            metadata = root / "wrong-sidecar.json"
+            metadata.write_text(
+                json.dumps(sidecar, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            completed = self._run_checker(candidate, metadata)
+            self.assertNotEqual(
+                completed.returncode,
+                0,
+                "wrong self-consistent sidecar accepted:\n"
+                + completed.stdout
+                + completed.stderr,
+            )
 
 if __name__ == "__main__":
     unittest.main()

@@ -18,8 +18,8 @@ older blocker report.
 
 The canonical contract is
 `artifacts/comparison/tinystories-1m-exact-memref-blocker-contract.json`.
-It is 4,276,980 bytes and has self-hash
-`e66d005b99c04420fe2ed7639f50ed8cc59feb3668beb172e93a522efda77eda`.
+It is 4,277,281 bytes and has self-hash
+`33d3be2dc306ad086257c096965bc937b5e691cd2346ff79976b55d20079b4d5`.
 It retains all 20,280 exact source locations and every unique signature with
 its multiplicity.
 
@@ -57,6 +57,15 @@ contract and is not represented as a current-output realization.
 
 The receipt self-hash is
 `961b81662493f1241eea58061433779314019e6c46a249022362d77fc61808c8`.
+Its exact 61,835 bytes are authenticated independently of the mutable
+workspace: Task-1 commit
+`99f0b6c109d92b6deef8878c8ce296a5f2a05108`, path
+`artifacts/comparison/tinystories-1m-exact-frontier-determinism-flat-scf/run-1/receipt.json`,
+Git blob `f1add36875bcf403f9ba7bce3f11ca29ef11f641`, and the receipt file SHA-256
+shown above must all agree. Git replace objects are disabled for this lookup.
+The verifier separately freezes the v5 receipt schema, exact model, Task 1--3
+identity map, and MLIR tool identity rather than accepting mutable
+contract-to-receipt agreement.
 The pinned `mlir-opt` binary is
 `/nix/store/qfhb8ajk2kw32lrmk8xqaa1g6h7w95p8-mlir-21.1.2/bin/mlir-opt`,
 496,904 bytes, SHA-256
@@ -70,7 +79,10 @@ lexicographically smallest canonical `(operation, type signature, source
 location)` tuple. Each directory includes the module, its exact signature and
 selection metadata, and an interestingness test. The public verifier requires
 the module to parse with the pinned MLIR tool and to contain exactly the bound
-class and signature.
+class and signature. The standalone checker authenticates the full default
+contract and requires byte-exact canonical sidecar metadata. It rejects
+generic-form registered operations fail-closed and requires exactly one
+registered operation total, independent of custom-form spelling.
 
 | Operation | Selected source line | Signature SHA-256 |
 | --- | ---: | --- |

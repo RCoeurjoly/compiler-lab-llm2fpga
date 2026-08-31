@@ -7,6 +7,7 @@ import argparse
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -29,6 +30,33 @@ TASK1_COMMIT = "99f0b6c109d92b6deef8878c8ce296a5f2a05108"
 C22_COMMIT = "c22c5f8d85e453a56b185f6238970933f5b1d407"
 RUNTIME_SOURCE = "/nix/store/amahjznxmsx37q7x7lazjkf5253syc56-llm2fpga-pipeline-runtime-scripts"
 RUNTIME_NAR_HASH = "sha256-v5VXxWwTVtwgGT1BTZ4nE02jtK+hW623ptAOA+0Wdsg="
+FROZEN_MODEL = "tiny-stories-1m-kev-gpt-exact"
+RECEIPT_SCHEMA = "tinystories-1m-exact-current-pipeline-frontier-v5"
+CANONICAL_RECEIPT_COMMIT = TASK1_COMMIT
+CANONICAL_RECEIPT_PATH = (
+    "artifacts/comparison/tinystories-1m-exact-frontier-determinism-flat-scf/"
+    "run-1/receipt.json"
+)
+CANONICAL_RECEIPT_BLOB = "f1add36875bcf403f9ba7bce3f11ca29ef11f641"
+CANONICAL_RECEIPT_SHA256 = "6af348b82f2e263980f0515f46b0a08c14898118d7e868cacfec3764ceae6acf"
+PINNED_TOOL = {
+    "path": "/nix/store/qfhb8ajk2kw32lrmk8xqaa1g6h7w95p8-mlir-21.1.2/bin/mlir-opt",
+    "bytes": 496904,
+    "sha256": "3da93261c9b6f698539bec86f3606598d8b3ed61a18095eaa03cde87f7140912",
+}
+FROZEN_IDENTITIES = {
+    "adapter_sha256": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e",
+    "contract_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+    "package_manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "task_1_audit_file_sha256": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+    "task_1_audit_payload_sha256": "7d7a37d08df7e63bdb95063674fe5dc306058e51af8a11bbcd97a4cb2972a766",
+    "task_2_artifact_file_sha256": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+    "task_2_artifact_sha256": "af1901917b52876a9b3343712b89928b272e5dd237cd491ddd9d462c56a52838",
+    "task_2_model_receipt_sha256": "5e56907e60c83c5d98b3c3fe88772b7dfba71e53a9435de548a9d54ea7497834",
+    "task_3_generation_artifact_sha256": "9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3",
+    "task_3_generation_file_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+    "task_3_generation_result_sha256": "c18106f25030ec58dfd3abc5d75d774506aca65b655fc34b284076b1294f8644",
+}
 
 
 def _canonical(value: Any) -> bytes:
@@ -333,7 +361,44 @@ def _masked(line: str) -> str:
     return "".join(result)
 
 
+def _reject_registered_generic_forms(text: str) -> None:
+    """Fail closed instead of silently masking generic registered operations."""
+    index = 0
+    while index < len(text):
+        if text.startswith("//", index):
+            newline = text.find("\n", index + 2)
+            index = len(text) if newline < 0 else newline + 1
+            continue
+        if text[index] != '"':
+            index += 1
+            continue
+        line_number = text.count("\n", 0, index) + 1
+        end = index + 1
+        escaped = False
+        while end < len(text):
+            character = text[end]
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                break
+            end += 1
+        if end == len(text):
+            raise ValueError("unterminated MLIR string literal")
+        name = text[index + 1 : end]
+        following = end + 1
+        while following < len(text) and text[following].isspace():
+            following += 1
+        if name in CLASS_SET and following < len(text) and text[following] == "(":
+            raise ValueError(
+                f"generic-form registered operation is not accepted at line {line_number}: {name}"
+            )
+        index = end + 1
+
+
 def _independent_operations(text: str) -> list[dict[str, Any]]:
+    _reject_registered_generic_forms(text)
     lines = text.splitlines()
     output = []
     function = None
@@ -535,17 +600,69 @@ def _parse_with_tool(tool: Path, module: Path) -> None:
         raise ValueError(f"representative does not parse with pinned MLIR tool: {completed.stderr.strip()}")
 
 
-def _check_receipt(receipt: dict[str, Any]) -> None:
+def _git_no_replace_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+    return environment
+
+
+def _canonical_receipt_bytes() -> bytes:
+    tree = subprocess.run(
+        ["git", "ls-tree", CANONICAL_RECEIPT_COMMIT, "--", CANONICAL_RECEIPT_PATH],
+        cwd=ROOT,
+        env=_git_no_replace_environment(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    expected = (
+        f"100644 blob {CANONICAL_RECEIPT_BLOB}\t{CANONICAL_RECEIPT_PATH}\n"
+    ).encode("utf-8")
+    if tree.returncode or tree.stdout != expected:
+        raise ValueError("canonical receipt commit/path/blob binding mismatch")
+    blob = subprocess.run(
+        ["git", "cat-file", "blob", CANONICAL_RECEIPT_BLOB],
+        cwd=ROOT,
+        env=_git_no_replace_environment(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if blob.returncode or _digest(blob.stdout) != CANONICAL_RECEIPT_SHA256:
+        raise ValueError("canonical receipt Git blob bytes mismatch")
+    return blob.stdout
+
+
+def _check_receipt(receipt: dict[str, Any], receipt_path: Path) -> None:
+    if receipt_path.read_bytes() != _canonical_receipt_bytes():
+        raise ValueError("c22 receipt bytes differ from canonical Git object")
     unsigned = {key: value for key, value in receipt.items() if key != "sha256"}
     if receipt.get("sha256") != _digest(_canonical(unsigned)):
         raise ValueError("c22 receipt self-hash mismatch")
+    if receipt.get("schema") != RECEIPT_SCHEMA:
+        raise ValueError("unexpected c22 receipt schema")
+    if receipt.get("model") != FROZEN_MODEL:
+        raise ValueError("unexpected c22 receipt model")
     if receipt.get("source_commit") != C22_COMMIT:
         raise ValueError("c22 source identity mismatch")
+    if receipt.get("frozen_task_1_through_3_identities") != FROZEN_IDENTITIES:
+        raise ValueError("unexpected Task 1--3 identities")
+    execution = receipt.get("registered_build_execution", {}).get("flat-scf", {})
+    tool_bindings = [
+        binding
+        for binding in execution.get("derivation_tool_bindings", [])
+        if Path(str(binding.get("path", ""))).name == "mlir-opt"
+    ]
+    if len(tool_bindings) != 1 or {
+        key: tool_bindings[0].get(key) for key in ("path", "bytes", "sha256")
+    } != PINNED_TOOL:
+        raise ValueError("unexpected pinned MLIR tool identity")
 
 
 def _git_object(commit: str, path: str) -> bytes:
     completed = subprocess.run(
         ["git", "show", f"{commit}:{path}"], cwd=ROOT,
+        env=_git_no_replace_environment(),
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
     )
     if completed.returncode:
@@ -592,11 +709,13 @@ def _verify_runtime_equivalence(proof: Any) -> None:
         raise ValueError("Task 1 filtered runtime source is unavailable")
     ancestry = subprocess.run(
         ["git", "merge-base", "--is-ancestor", C22_COMMIT, TASK1_COMMIT],
-        cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+        cwd=ROOT, env=_git_no_replace_environment(),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
     )
     task1_ancestor = subprocess.run(
         ["git", "merge-base", "--is-ancestor", TASK1_COMMIT, "HEAD"],
-        cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+        cwd=ROOT, env=_git_no_replace_environment(),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
     )
     if ancestry.returncode or task1_ancestor.returncode:
         raise ValueError("c22 -> Task 1 -> current ancestry proof failed")
@@ -630,12 +749,14 @@ def verify_contract_payload(
     expected_keys = {
         "schema", "status", "model", "registered_classes", "source", "nix", "tool",
         "c22_receipt_self_sha256", "task_1_through_3_identities", "task1_runtime_equivalence",
-        "classes", "locations", "sha256",
+        "receipt_git_anchor", "classes", "locations", "sha256",
     }
     if set(payload) != expected_keys:
         raise ValueError("contract schema keys mismatch")
     if payload.get("schema") != "tinystories-1m-exact-memref-blockers-v1" or payload.get("status") != "authenticated":
         raise ValueError("contract schema/status mismatch")
+    if payload.get("model") != FROZEN_MODEL:
+        raise ValueError("contract model mismatch")
     unsigned = copy.deepcopy(payload)
     claimed = unsigned.get("sha256")
     unsigned["sha256"] = None
@@ -647,6 +768,13 @@ def verify_contract_payload(
         raise ValueError("contract contains unknown blocker classes")
     if set(payload.get("classes", {})) != CLASS_SET:
         raise ValueError("contract must contain exactly four registered classes")
+    if payload.get("receipt_git_anchor") != {
+        "commit": CANONICAL_RECEIPT_COMMIT,
+        "path": CANONICAL_RECEIPT_PATH,
+        "blob": CANONICAL_RECEIPT_BLOB,
+        "sha256": CANONICAL_RECEIPT_SHA256,
+    }:
+        raise ValueError("canonical receipt Git anchor mismatch")
 
     paths = {"flat_scf": flat_scf, "blockers": blockers, "manifest": manifest, "c22_receipt": receipt_path}
     expected_source_paths = {
@@ -668,10 +796,10 @@ def verify_contract_payload(
             label = "flat.scf.mlir" if name == "flat_scf" else name
             raise ValueError(f"{label} payload binding mismatch")
     receipt = _object(receipt_path, "c22 receipt")
-    _check_receipt(receipt)
+    _check_receipt(receipt, receipt_path)
     if receipt["sha256"] != payload["c22_receipt_self_sha256"]:
         raise ValueError("c22 receipt identity mismatch")
-    if receipt.get("frozen_task_1_through_3_identities") != payload["task_1_through_3_identities"]:
+    if payload.get("task_1_through_3_identities") != FROZEN_IDENTITIES:
         raise ValueError("Task 1--3 identities mismatch")
     _verify_runtime_equivalence(payload["task1_runtime_equivalence"])
     expected_manifest = {"artifact": "flat.scf.mlir", "blockers": "blockers.json", "stage": "flat-scf", "status": "completed-with-residuals"}
@@ -689,7 +817,7 @@ def verify_contract_payload(
     ]
     if len(tool_bindings) != 1 or {
         key: tool_bindings[0].get(key) for key in ("path", "bytes", "sha256")
-    } != payload["tool"]:
+    } != PINNED_TOOL:
         raise ValueError("c22 receipt MLIR tool binding mismatch")
 
     if not skip_nix_resolution:
@@ -729,6 +857,8 @@ def verify_contract_payload(
     if nix_binding["payload_source"] != "retained-authenticated-c22-output":
         raise ValueError("retained c22 payload source is not explicit")
 
+    if payload.get("tool") != PINNED_TOOL:
+        raise ValueError("pinned MLIR tool identity mismatch")
     if set(payload["tool"]) != {"path", "bytes", "sha256"}:
         raise ValueError("pinned MLIR tool schema mismatch")
     tool = Path(payload["tool"]["path"])
@@ -766,19 +896,39 @@ def verify_contract_payload(
 
 
 def check_representative(module: Path, metadata_path: Path) -> None:
-    metadata = _object(metadata_path, "representative metadata")
-    if metadata.get("schema") != "tinystories-1m-exact-memref-representative-v1" or metadata.get("operation") not in CLASS_SET:
-        raise ValueError("unknown representative metadata")
     payload = _object(CONTRACT, "memref blocker contract")
-    tool = Path(payload["tool"]["path"])
-    if _binding(tool) != {key: payload["tool"][key] for key in ("bytes", "sha256")}:
+    verify_contract_payload(
+        payload,
+        ROOT,
+        CAPTURE / "flat.scf.mlir",
+        CAPTURE / "blockers.json",
+        CAPTURE / "minimal-reproducer.json",
+        CAPTURE / "receipt.json",
+        skip_nix_resolution=False,
+    )
+    metadata = _object(metadata_path, "representative metadata")
+    operation_name = metadata.get("operation")
+    if (
+        metadata.get("schema") != "tinystories-1m-exact-memref-representative-v1"
+        or operation_name not in CLASS_SET
+    ):
+        raise ValueError("unknown representative metadata")
+    representative = payload["classes"][operation_name]["representative"]
+    canonical_metadata_path = ROOT / representative["metadata"]
+    if (
+        metadata_path.read_bytes() != canonical_metadata_path.read_bytes()
+        or _binding(metadata_path)["sha256"] != representative["metadata_sha256"]
+    ):
+        raise ValueError("representative metadata differs from authenticated contract selection")
+    tool = Path(PINNED_TOOL["path"])
+    if {"path": str(tool), **_binding(tool)} != PINNED_TOOL:
         raise ValueError("pinned representative MLIR tool mismatch")
     _parse_with_tool(tool, module)
     operations = _independent_operations(module.read_text(encoding="utf-8"))
     if len(operations) != 1:
         raise ValueError("representative must contain exactly one registered operation")
     operation = operations[0]
-    if operation["operation"] != metadata["operation"] or operation["signature"] != metadata["signature"]:
+    if operation["operation"] != operation_name or operation["signature"] != metadata["signature"]:
         raise ValueError("representative exact class/signature mismatch")
     if _digest(_canonical(operation["signature"])) != metadata["signature_sha256"]:
         raise ValueError("representative signature hash mismatch")
