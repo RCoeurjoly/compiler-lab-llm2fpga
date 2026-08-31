@@ -381,15 +381,17 @@ private:
     if (funcOp.isExternal())
       return;
 
+    SmallVector<memref::SubViewOp> subviews;
+    funcOp.walk(
+        [&](memref::SubViewOp subview) { subviews.push_back(subview); });
+
     DenseMap<Value, StaticMemRefView> argumentViews;
-    flattenStaticIdentityMemRefArguments(funcOp, argumentViews);
+    flattenStaticIdentityMemRefArguments(funcOp, subviews, argumentViews);
 
     SmallVector<memref::LoadOp> loads;
     SmallVector<memref::StoreOp> stores;
     SmallVector<memref::CopyOp> copies;
-    SmallVector<memref::ReinterpretCastOp> casts;
-    SmallVector<memref::ExpandShapeOp> expands;
-    SmallVector<memref::CollapseShapeOp> collapses;
+    SmallVector<Operation *> viewOps;
     funcOp.walk([&](Operation *op) {
       if (auto load = dyn_cast<memref::LoadOp>(op))
         loads.push_back(load);
@@ -397,12 +399,9 @@ private:
         stores.push_back(store);
       else if (auto copy = dyn_cast<memref::CopyOp>(op))
         copies.push_back(copy);
-      else if (auto cast = dyn_cast<memref::ReinterpretCastOp>(op))
-        casts.push_back(cast);
-      else if (auto expand = dyn_cast<memref::ExpandShapeOp>(op))
-        expands.push_back(expand);
-      else if (auto collapse = dyn_cast<memref::CollapseShapeOp>(op))
-        collapses.push_back(collapse);
+      else if (isa<memref::ReinterpretCastOp, memref::ExpandShapeOp,
+                   memref::CollapseShapeOp, memref::SubViewOp>(op))
+        viewOps.push_back(op);
     });
 
     IRRewriter rewriter(funcOp.getContext());
@@ -413,37 +412,55 @@ private:
     for (memref::CopyOp copy : copies)
       rewriteCopy(copy, argumentViews, rewriter);
 
-    for (memref::ReinterpretCastOp cast : llvm::reverse(casts)) {
-      if (cast->use_empty())
-        rewriter.eraseOp(cast);
-    }
-    for (memref::ExpandShapeOp expand : llvm::reverse(expands)) {
-      if (expand->use_empty())
-        rewriter.eraseOp(expand);
-    }
-    for (memref::CollapseShapeOp collapse : llvm::reverse(collapses)) {
-      if (collapse->use_empty())
-        rewriter.eraseOp(collapse);
+    for (Operation *viewOp : llvm::reverse(viewOps)) {
+      if (viewOp->use_empty())
+        rewriter.eraseOp(viewOp);
     }
   }
 
   void flattenStaticIdentityMemRefArguments(
-      func::FuncOp funcOp, DenseMap<Value, StaticMemRefView> &argumentViews) {
+      func::FuncOp funcOp, ArrayRef<memref::SubViewOp> subviews,
+      DenseMap<Value, StaticMemRefView> &argumentViews) {
     FunctionType functionType = funcOp.getFunctionType();
     SmallVector<Type> inputs(functionType.getInputs());
+    DenseMap<Value, StaticMemRefView> candidateViews;
+    for (auto [index, input] : llvm::enumerate(inputs)) {
+      auto memrefType = dyn_cast<MemRefType>(input);
+      if (!getFlattenedStaticIdentityMemRef(memrefType))
+        continue;
+      BlockArgument arg = funcOp.getArgument(index);
+      candidateViews[arg] = StaticMemRefView{
+          arg, 0, SmallVector<int64_t>(memrefType.getShape()),
+          getIdentityStrides(memrefType)};
+    }
+
+    SmallVector<Value> protectedArguments;
+    DenseMap<Value, bool> rewritableViewUses;
+    for (memref::SubViewOp subview : subviews) {
+      if (subview->use_empty())
+        continue;
+      if (getStaticView(subview.getResult(), candidateViews) &&
+          canRewriteAllViewUses(subview.getResult(), candidateViews,
+                                rewritableViewUses))
+        continue;
+      Value root = getViewRoot(subview.getSource());
+      if (isa_and_nonnull<BlockArgument>(root) &&
+          !llvm::is_contained(protectedArguments, root))
+        protectedArguments.push_back(root);
+    }
+
     bool changed = false;
 
     for (auto [index, input] : llvm::enumerate(inputs)) {
-      auto memrefType = dyn_cast<MemRefType>(input);
-      MemRefType flattenedType =
-          getFlattenedStaticIdentityMemRef(memrefType);
-      if (!flattenedType)
+      BlockArgument arg = funcOp.getArgument(index);
+      auto candidate = candidateViews.find(arg);
+      if (candidate == candidateViews.end() ||
+          llvm::is_contained(protectedArguments, arg))
         continue;
 
-      BlockArgument arg = funcOp.getArgument(index);
-      argumentViews[arg] = StaticMemRefView{
-          arg, 0, SmallVector<int64_t>(memrefType.getShape()),
-          getIdentityStrides(memrefType)};
+      auto memrefType = cast<MemRefType>(input);
+      MemRefType flattenedType = getFlattenedStaticIdentityMemRef(memrefType);
+      argumentViews[arg] = candidate->second;
       inputs[index] = flattenedType;
       arg.setType(flattenedType);
       changed = true;
@@ -461,6 +478,42 @@ private:
     auto argView = argViews.find(value);
     if (argView != argViews.end())
       return argView->second;
+
+    if (auto subview = value.getDefiningOp<memref::SubViewOp>()) {
+      auto sourceView = getStaticView(subview.getSource(), argViews);
+      ArrayRef<int64_t> offsets = subview.getStaticOffsets();
+      ArrayRef<int64_t> sizes = subview.getStaticSizes();
+      ArrayRef<int64_t> strides = subview.getStaticStrides();
+      auto resultType = subview.getType();
+      if (!sourceView || !isStatic(offsets) || !isStatic(sizes) ||
+          !isStatic(strides) || !resultType.hasStaticShape() ||
+          sourceView->shape.size() != unsigned(resultType.getRank()) ||
+          offsets.size() != sourceView->shape.size() ||
+          sizes.size() != sourceView->shape.size() ||
+          strides.size() != sourceView->shape.size() ||
+          sourceView->strides.size() != sourceView->shape.size() ||
+          resultType.getShape() != sizes)
+        return std::nullopt;
+
+      int64_t composedOffset = sourceView->offset;
+      SmallVector<int64_t> composedStrides;
+      composedStrides.reserve(strides.size());
+      for (auto [offset, stride, sourceStride] :
+           llvm::zip_equal(offsets, strides, sourceView->strides)) {
+        composedOffset += offset * sourceStride;
+        composedStrides.push_back(stride * sourceStride);
+      }
+
+      SmallVector<int64_t> resultStrides;
+      int64_t resultOffset = 0;
+      if (failed(resultType.getStridesAndOffset(resultStrides, resultOffset)) ||
+          !isStatic(resultStrides) || ShapedType::isDynamic(resultOffset) ||
+          resultStrides != composedStrides || resultOffset != composedOffset)
+        return std::nullopt;
+
+      return StaticMemRefView{sourceView->base, composedOffset,
+                              SmallVector<int64_t>(sizes), composedStrides};
+    }
 
     if (auto cast = value.getDefiningOp<memref::ReinterpretCastOp>()) {
       auto sourceType = dyn_cast<MemRefType>(cast.getSource().getType());
@@ -518,6 +571,66 @@ private:
 
     return StaticMemRefView{value, 0, SmallVector<int64_t>(memrefType.getShape()),
                             SmallVector<int64_t>(memrefType.getRank(), 1)};
+  }
+
+  Value getViewRoot(Value value) {
+    if (isa<BlockArgument>(value))
+      return value;
+    if (auto subview = value.getDefiningOp<memref::SubViewOp>())
+      return getViewRoot(subview.getSource());
+    if (auto cast = value.getDefiningOp<memref::ReinterpretCastOp>())
+      return getViewRoot(cast.getSource());
+    if (auto expand = value.getDefiningOp<memref::ExpandShapeOp>())
+      return getViewRoot(expand.getSrc());
+    if (auto collapse = value.getDefiningOp<memref::CollapseShapeOp>())
+      return getViewRoot(collapse.getSrc());
+    return {};
+  }
+
+  bool canRewriteAllViewUses(
+      Value value, const DenseMap<Value, StaticMemRefView> &argViews,
+      DenseMap<Value, bool> &cache) {
+    auto cached = cache.find(value);
+    if (cached != cache.end())
+      return cached->second;
+
+    for (OpOperand &use : value.getUses()) {
+      Operation *user = use.getOwner();
+      if (auto load = dyn_cast<memref::LoadOp>(user)) {
+        if (load.getMemRef() == value && getStaticView(value, argViews))
+          continue;
+        return false;
+      }
+      if (auto store = dyn_cast<memref::StoreOp>(user)) {
+        if (store.getMemRef() == value && getStaticView(value, argViews))
+          continue;
+        return false;
+      }
+      if (auto copy = dyn_cast<memref::CopyOp>(user)) {
+        auto sourceView = getStaticView(copy.getSource(), argViews);
+        auto targetView = getStaticView(copy.getTarget(), argViews);
+        if (sourceView && targetView && sourceView->shape == targetView->shape)
+          continue;
+        return false;
+      }
+
+      Value result;
+      if (auto subview = dyn_cast<memref::SubViewOp>(user))
+        result = subview.getResult();
+      else if (auto cast = dyn_cast<memref::ReinterpretCastOp>(user))
+        result = cast.getResult();
+      else if (auto expand = dyn_cast<memref::ExpandShapeOp>(user))
+        result = expand.getResult();
+      else if (auto collapse = dyn_cast<memref::CollapseShapeOp>(user))
+        result = collapse.getResult();
+      if (!result || !getStaticView(result, argViews) ||
+          !canRewriteAllViewUses(result, argViews, cache)) {
+        cache[value] = false;
+        return false;
+      }
+    }
+    cache[value] = true;
+    return true;
   }
 
   SmallVector<Value> getAccessIndices(OpBuilder &builder, Location loc,
