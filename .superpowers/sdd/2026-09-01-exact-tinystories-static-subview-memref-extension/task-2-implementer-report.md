@@ -3,9 +3,11 @@
 ## Base and implementation head
 
 - Assigned base: `edd4acb69beb9c7242722f323a96422fd40b8399`.
-- Verified implementation head:
-  `e61d08d78a8b4dbcabdd23d95efb1ec8ed442f6c`.
-- Implementation commit: `fix: lower static subviews of flattened memrefs`.
+- Initial implementation: `e61d08d78a8b4dbcabdd23d95efb1ec8ed442f6c`
+  (`fix: lower static subviews of flattened memrefs`).
+- Review-round-1 fix and verified implementation head:
+  `fe1e621d8d892156b8d3fff5cd0f1b96a846eac1`
+  (`fix: close static subview review findings`).
 - Worktree: `/home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler`.
 - Branch: `codex/exact-tinystories-compiler`.
 
@@ -37,6 +39,18 @@ root argument were still flattened, the supposedly explicit unsupported op
 would be invalid. The implementation therefore preflights live subview use
 chains and protects their root arguments whenever the subview cannot be
 resolved and fully eliminated by the existing load/store/copy rewrites.
+
+Review round 1 identified three additional causes inside that newly activated
+recursive path:
+
+- reinterpret offsets are absolute to the underlying memory, but the first
+  implementation added the source-view offset; its rank-one shortcut also
+  retained an intermediate collapse as the base instead of resolving the
+  flattened argument;
+- copy preflight used all prospective roots once, then independently protected
+  roots without recomputing dependent copies against the final map;
+- subview offset/stride composition used unchecked signed `int64_t`
+  multiplication and addition.
 
 ## Systematic debugging evidence
 
@@ -98,6 +112,34 @@ MLIR itself rejects before the pass. That test was corrected before production
 edits to assert the actual fail-closed boundary:
 `mismatch of result layout` and no output.
 
+### Review-round-1 RED
+
+Before the review fix C++ edit, the expanded suite was forced against the
+reviewed plugin at
+`/nix/store/62550m8h4pv2jzmnn46c66rgdvzpjw4g-llm2fpga-mlir-passes-0.1.0`.
+The seven original cases stayed GREEN and every new review case was RED for
+the expected semantic or safety reason:
+
+- rank-two subview to reinterpret emitted offset `8` and coefficients
+  `[2, 1]`; the hand-derived absolute mapping is offset `0`, coefficients
+  `[2, 1]`;
+- subview to collapse to rank-one reinterpret failed verification because the
+  rewritten load kept the collapse base and the flattened argument invalidated
+  the surviving subview;
+- supported A/B subview copies with a live dynamic B sibling failed at A's
+  changed source rank in both copy directions and with the dynamic sibling
+  before and after the supported views (four independent configurations);
+- offset multiplication, offset addition, and stride multiplication overflow
+  controls were incorrectly accepted and flattened. Their carefully chosen
+  mathematical results exceed signed `int64_t`, while unchecked wraparound
+  equals MLIR's saturated result metadata, so a late layout comparison cannot
+  accidentally hide the bug.
+
+A further fail-closed mutation check showed that a rank-reducing subview to
+reinterpret chain kept the root ranked but incorrectly erased the reinterpret
+and loaded through the immediate subview. It was RED before the recursive
+source requirement was tightened.
+
 ## Narrow implementation
 
 The new `getStaticView(memref::SubViewOp)` branch precedes the generic memref
@@ -125,9 +167,16 @@ shape mismatch, or layout mismatch return `std::nullopt`.
 
 Before changing argument types, the pass builds prospective views for all
 flattenable arguments and checks each live subview plus its transitive
-reinterpret/expand/collapse/subview users. A subview root is protected from
-flattening unless every live leaf is an existing rewriteable load, store, or
-shape-compatible copy. The decision is memoized per view value.
+reinterpret/expand/collapse/subview users. It removes unsupported roots from
+the candidate map in batches and repeats with a fresh per-iteration memo until
+no further root is protected. A copy is therefore rewriteable only if both
+operands resolve against the same final map that actual rewriting consumes.
+
+Recursive reinterpret handling now requires its source to resolve, returns the
+underlying source-view base, and uses only the reinterpret operation's own
+absolute offset and strides. Subview composition uses
+`llvm::checkedMulAdd` for offset terms and `llvm::checkedMul` for strides;
+overflow returns `std::nullopt` and the fixpoint protects the root.
 
 Loads, stores, and copies are then rewritten through the unchanged access
 materialization path. All supported view kinds are collected together and
@@ -220,6 +269,31 @@ The copy case contains no `memref.subview` or `memref.copy`; generic IR has two
 `scf.for` operations and one flattened source load plus one flattened target
 store.
 
+### Recursive reinterpret proofs
+
+The rank-two adversarial chain now emits no view operation and exactly:
+
+```text
+base argument = 0, type = memref<64xi64>
+domain = i in [0,2), j in [0,2)
+offset = 0
+coefficients = [2, 1]
+linear index = 2*i + j
+load base role = source
+```
+
+The subview-to-collapse-to-rank-one reinterpret chain likewise contains no
+subview, collapse, or reinterpret and emits:
+
+```text
+base argument = 0, type = memref<64xi64>
+domain = i in [0,4)
+offset = 0
+coefficients = [2]
+linear index = 2*i
+load base role = source
+```
+
 ## Unsupported and fail-closed behavior
 
 - Rank-reducing control: pass exit `0`, output parses, source stays
@@ -228,6 +302,13 @@ store.
 - Dynamic-offset control: pass exit `0`, output parses, source stays
   `memref<64x64xi64>`, `memref.subview` stays explicit, and
   `memref<4096xi64>` is absent.
+- Rank-reducing subview to reinterpret: both view operations remain explicit,
+  the source stays `memref<8x8xi64>`, and `memref<64xi64>` is absent.
+- Mixed copy dependency: all four direction/order configurations parse with
+  three explicit subviews and the copy; both A and B stay `memref<8x8xi64>`.
+- Overflow controls: offset multiplication, offset addition, and stride
+  multiplication each parse with the reinterpret and subview explicit; the
+  root stays `memref<1x1xi64>` and is never changed to `memref<1xi64>`.
 - Inconsistent result layout: MLIR input verification exits nonzero with
   `mismatch of result layout`; no output is accepted or claimed legalized.
 - Dynamic sizes/strides, dynamic result layouts, unresolved sources, and
@@ -250,10 +331,10 @@ Authenticated baseline:
 Verified rebuilt plugin:
 
 - output:
-  `/nix/store/62550m8h4pv2jzmnn46c66rgdvzpjw4g-llm2fpga-mlir-passes-0.1.0`;
-- plugin bytes: `21,720,736`;
+  `/nix/store/jpbaq3vd25spvvrb90gj5hb3k5ysp3h3-llm2fpga-mlir-passes-0.1.0`;
+- plugin bytes: `21,720,848`;
 - SHA-256:
-  `d745a77d396639836b6cebfbbeed2fa154f675781cc68c9fef72e316c2362580`.
+  `6cc5d3668b066dc7776a511114b47fc77411bc7bb7b6e4ea366d889dd41394f9`.
 
 The digests differ, as required.
 
@@ -288,15 +369,15 @@ nix develop -c python -m unittest \
   -v
 ```
 
-Result: `Ran 10 tests`, `OK` (all seven new behavioral tests and three relevant
-existing integration assertions).
+Result after review round 1: `Ran 18 tests`, `OK` (all fifteen semantic and
+fail-closed tests plus three relevant existing integration assertions).
 
 Also PASS:
 
 - `python -m py_compile tests/test_tinystories_1m_exact_memref_subview_extension.py`;
 - `git diff --check`;
-- the installed repository pre-commit hygiene hook accepted implementation
-  commit `e61d08d`.
+- the installed repository pre-commit hygiene hook accepted initial
+  implementation commit `e61d08d` and review-fix commit `fe1e621`.
 
 A broader pre-existing file-assertion suite ran 36 tests and exposed two
 unrelated failures:
@@ -313,7 +394,7 @@ that same suite pass and are included in the fresh gate above.
 
 ## Files
 
-Implementation commit `e61d08d` contains exactly:
+Initial implementation commit `e61d08d` contains exactly:
 
 - `tools/mlir-passes/FoldConstantTruncFOps.cpp`;
 - `tests/test_tinystories_1m_exact_memref_subview_extension.py`;
@@ -324,15 +405,18 @@ Implementation commit `e61d08d` contains exactly:
 
 This implementer report is the only report-only follow-up file.
 
+Review-fix commit `fe1e621` changes only:
+
+- `tools/mlir-passes/FoldConstantTruncFOps.cpp`;
+- `tests/test_tinystories_1m_exact_memref_subview_extension.py`;
+- `docs/results/2026-09-01-tinystories-1m-static-subview-extension.md`.
+
 ## Residual risks and explicit non-claims
 
 - The complete 18,933,168-byte retained c22 flat-SCF artifact was not run;
   authenticated full replay and its next frontier are Task 3 scope.
 - No valid normalized full artifact, zero-blocker census, Nix stage
   registration, or Calyx eligibility is claimed.
-- Integer overflow for theoretical extreme static offsets/strides is not newly
-  diagnosed. The exact tested shapes are small and the result layout must
-  exactly match MLIR's verified static layout.
 - View kinds outside reinterpret/expand/collapse/subview remain unsupported.
 - The argument-protection root tracer follows the existing recursive view
   model. Unsupported view flow through unrelated region-carried block
