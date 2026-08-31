@@ -134,6 +134,28 @@ class ExactPipelineSourceClosureTest(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "missing pipeline runtime script"):
                 _flake_snapshot(source)
 
+    def test_directory_at_referenced_runtime_basename_fails_evaluation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-pipeline-directory-") as temporary:
+            source = Path(temporary) / "source"
+            source.mkdir()
+            _copy_tracked_source(source)
+            runtime_script = source / "scripts/pipeline/torch_to_linalg.sh"
+            runtime_script.unlink()
+            runtime_script.mkdir()
+            with self.assertRaisesRegex(AssertionError, "regular file"):
+                _flake_snapshot(source)
+
+    def test_symlink_at_referenced_runtime_basename_fails_evaluation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-pipeline-symlink-") as temporary:
+            source = Path(temporary) / "source"
+            source.mkdir()
+            _copy_tracked_source(source)
+            runtime_script = source / "scripts/pipeline/torch_to_linalg.sh"
+            runtime_script.unlink()
+            runtime_script.symlink_to("linalg_to_scf.sh")
+            with self.assertRaisesRegex(AssertionError, "regular file"):
+                _flake_snapshot(source)
+
     def test_evidence_only_mutation_preserves_runtime_nar_and_exact_derivations(self) -> None:
         with tempfile.TemporaryDirectory(prefix="exact-pipeline-mutation-") as temporary:
             source = Path(temporary) / "source"

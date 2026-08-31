@@ -396,12 +396,19 @@
           "write_rtlil_stage_stat_report.py"
           "write_utilization_report.py"
         ];
+        pipelineRuntimeScriptEntries = builtins.readDir ./scripts/pipeline;
         missingPipelineRuntimeScripts = builtins.filter
-          (name: !(builtins.pathExists (./scripts/pipeline + "/${name}")))
+          (name: !(builtins.hasAttr name pipelineRuntimeScriptEntries))
+          pipelineRuntimeScriptBasenames;
+        nonRegularPipelineRuntimeScripts = builtins.filter
+          (name: builtins.hasAttr name pipelineRuntimeScriptEntries
+            && builtins.getAttr name pipelineRuntimeScriptEntries != "regular")
           pipelineRuntimeScriptBasenames;
         pipelineRuntimeScripts =
           assert pkgs.lib.assertMsg (missingPipelineRuntimeScripts == [ ])
           "missing pipeline runtime script(s): ${builtins.concatStringsSep ", " missingPipelineRuntimeScripts}";
+          assert pkgs.lib.assertMsg (nonRegularPipelineRuntimeScripts == [ ])
+          "pipeline runtime script(s) must be a regular file: ${builtins.concatStringsSep ", " nonRegularPipelineRuntimeScripts}";
           let runtimeScriptRoot = toString ./scripts/pipeline;
           in builtins.path {
             path = ./scripts/pipeline;

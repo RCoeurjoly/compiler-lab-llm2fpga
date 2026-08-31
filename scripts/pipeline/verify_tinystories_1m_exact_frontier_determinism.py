@@ -200,6 +200,7 @@ _V5_COMPILER_FRONTIER_KEYS = {
     "types",
 }
 _V5_INTERESTINGNESS_KEYS = {
+    "compiler_command",
     "expected_exit",
     "full_log",
     "normalized_terminal_diagnostic",
@@ -741,6 +742,10 @@ def _verify_v5_schema(receipt: dict[str, Any], run_name: str) -> None:
             interestingness.get("normalized_terminal_diagnostic"),
             f"{run_name}: interestingness.normalized_terminal_diagnostic",
         )
+        _require_json_str(
+            interestingness.get("compiler_command"),
+            f"{run_name}: interestingness.compiler_command",
+        )
         for name in ("test", "full_log"):
             binding = _require_exact_keys(
                 interestingness.get(name),
@@ -1115,6 +1120,163 @@ def _normalized_compiler_diagnostic(text: str) -> str:
     return "\n".join(generic)
 
 
+def _expected_shell_command_units(command: str) -> list[tuple[int, int]]:
+    """Independently identify top-level shell command-unit spans."""
+
+    units: list[tuple[int, int]] = []
+    start = 0
+    quote: str | None = None
+    substitution_depth = 0
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if quote == "'":
+            if char == "'":
+                quote = None
+            index += 1
+            continue
+        if quote == '"':
+            if char == "\\" and index + 1 < len(command):
+                index += 2
+                continue
+            if char == '"':
+                quote = None
+            index += 1
+            continue
+        if char == "\\" and index + 1 < len(command):
+            index += 2
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            index += 1
+            continue
+        if char == "$" and index + 1 < len(command) and command[index + 1] == "(":
+            substitution_depth += 1
+            index += 2
+            continue
+        if substitution_depth:
+            if char == "(":
+                substitution_depth += 1
+            elif char == ")":
+                substitution_depth -= 1
+            index += 1
+            continue
+        separator_width = 0
+        if char in {"\n", ";"}:
+            separator_width = 1
+        elif char in {"|", "&"} and not (
+            index > 0 and command[index - 1] in {">", "<"}
+        ):
+            separator_width = 2 if command[index : index + 2] in {"||", "&&"} else 1
+        if separator_width:
+            units.append((start, index))
+            start = index + separator_width
+            index = start
+            continue
+        index += 1
+    if quote is not None or substitution_depth:
+        raise VerificationError("bound build command has unterminated shell syntax")
+    units.append((start, len(command)))
+    return units
+
+
+def _expected_literal_shell_words(
+    command: str, start: int, end: int
+) -> list[tuple[int, int, str, bool]]:
+    """Independently decode literal shell words and retain source spans."""
+
+    words: list[tuple[int, int, str, bool]] = []
+    index = start
+    delimiters = " \t\r\n<>|&;()"
+    while index < end:
+        while index < end and command[index] in delimiters:
+            index += 1
+        if index >= end or command[index] == "#":
+            break
+        word_start = index
+        value: list[str] = []
+        dynamic = False
+        quote: str | None = None
+        while index < end:
+            char = command[index]
+            if quote == "'":
+                if char == "'":
+                    quote = None
+                else:
+                    value.append(char)
+                index += 1
+                continue
+            if quote == '"':
+                if char == '"':
+                    quote = None
+                    index += 1
+                    continue
+                if char == "\\" and index + 1 < end:
+                    following = command[index + 1]
+                    if following in {'$', '`', '"', "\\", "\n"}:
+                        if following != "\n":
+                            value.append(following)
+                        index += 2
+                        continue
+                if char in {"$", "`"}:
+                    dynamic = True
+                value.append(char)
+                index += 1
+                continue
+            if char in delimiters:
+                break
+            if char in {"'", '"'}:
+                quote = char
+                index += 1
+                continue
+            if char == "\\" and index + 1 < end:
+                following = command[index + 1]
+                if following != "\n":
+                    value.append(following)
+                index += 2
+                continue
+            if char in {"$", "`", "*", "?", "["} or (
+                char == "~" and index == word_start
+            ):
+                dynamic = True
+            value.append(char)
+            index += 1
+        if quote is not None:
+            raise VerificationError("bound build command has unterminated quoted shell word")
+        words.append((word_start, index, "".join(value), dynamic))
+    return words
+
+
+def _derive_expected_compiler_command(
+    build_command: str, upstream_input: str
+) -> tuple[str, str]:
+    """Independently bind the unique command with the literal upstream shell word."""
+
+    matches: list[tuple[int, int, int, int]] = []
+    for unit_start, unit_end in _expected_shell_command_units(build_command):
+        for word_start, word_end, value, dynamic in _expected_literal_shell_words(
+            build_command, unit_start, unit_end
+        ):
+            if not dynamic and value == upstream_input:
+                matches.append((unit_start, unit_end, word_start, word_end))
+    if len(matches) != 1:
+        raise VerificationError(
+            "bound build command must contain the upstream input as exactly one literal shell word"
+        )
+    unit_start, unit_end, word_start, word_end = matches[0]
+    while unit_start < unit_end and build_command[unit_start].isspace():
+        unit_start += 1
+    while unit_end > unit_start and build_command[unit_end - 1].isspace():
+        unit_end -= 1
+    compiler_command = build_command[unit_start:unit_end]
+    candidate_command = (
+        build_command[unit_start:word_start]
+        + '"${candidate}"'
+        + build_command[word_end:unit_end]
+    )
+    return compiler_command, candidate_command
+
+
 def _render_expected_interestingness_test(
     *,
     build_command: str,
@@ -1126,11 +1288,9 @@ def _render_expected_interestingness_test(
 ) -> bytes:
     """Independently reconstruct the canonical compiler-failure predicate."""
 
-    if build_command.count(upstream_input) != 1:
-        raise VerificationError(
-            "bound build command must contain the upstream input exactly once"
-        )
-    candidate_command = build_command.replace(upstream_input, '"${candidate}"')
+    _, candidate_command = _derive_expected_compiler_command(
+        build_command, upstream_input
+    )
     expected_operation = operation or ""
     expected_types = types or ""
     script = f"""#!/usr/bin/env bash
@@ -1145,7 +1305,9 @@ trap 'rm -rf -- "$work"' EXIT
 out="$work/output"
 export out
 set +e
-{candidate_command} >"$work/stdout" 2>"$work/stderr"
+(
+{candidate_command}
+) >"$work/stdout" 2>"$work/stderr"
 actual_exit=$?
 set -e
 while IFS= read -r line; do printf '%s\n' "$line"; done <"$work/stdout" >"$work/combined"
@@ -1963,6 +2125,26 @@ def _verify_v5_frontier_evidence(
     frontier = receipt.get("frontier_evidence")
     _require(isinstance(frontier, dict), f"{run_name}: frontier evidence missing")
     kind = frontier.get("kind")
+    branch_forbidden_files = {
+        "control_manifest": {
+            "interestingness-test.sh",
+            "interesting-full.log",
+            "interesting-reproducer.log",
+            "minimal-reproducer.mlir",
+            "reduction.log",
+        },
+        "compiler_failure": {
+            "blockers.json",
+            "flat.scf.mlir",
+            "minimal-reproducer.json",
+        },
+    }
+    if kind in branch_forbidden_files:
+        crossed = sorted(set(files) & branch_forbidden_files[kind])
+        _require(
+            not crossed,
+            f"{run_name}: run directory contents mismatch for {kind}: {crossed}",
+        )
     if kind == "control_manifest":
         _require(
             final_record.get("exit_code") == 0 and final_run.get("exit_code") == 0,
@@ -2153,6 +2335,14 @@ def _verify_v5_frontier_evidence(
             interestingness.get("expected_exit") == final_record.get("exit_code")
             and interestingness.get("normalized_terminal_diagnostic") == diagnostic,
             f"{run_name}: interestingness predicate differs from compiler failure",
+        )
+        expected_compiler_command, _ = _derive_expected_compiler_command(
+            str(final_run.get("derivation_build_command")),
+            str(full.get("source_artifact")),
+        )
+        _require(
+            interestingness.get("compiler_command") == expected_compiler_command,
+            f"{run_name}: bound compiler command differs from independently reconstructed build command unit",
         )
         predicate_arguments = {
             "build_command": str(final_run.get("derivation_build_command")),

@@ -221,6 +221,159 @@ def _serialize_frontier_evidence(
     }
 
 
+def _shell_command_units(command: str) -> list[tuple[int, int]]:
+    """Return top-level shell command-unit spans without interpreting the shell."""
+
+    units: list[tuple[int, int]] = []
+    start = 0
+    quote: str | None = None
+    substitution_depth = 0
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if quote == "'":
+            if char == "'":
+                quote = None
+            index += 1
+            continue
+        if quote == '"':
+            if char == "\\" and index + 1 < len(command):
+                index += 2
+                continue
+            if char == '"':
+                quote = None
+            index += 1
+            continue
+        if char == "\\" and index + 1 < len(command):
+            index += 2
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            index += 1
+            continue
+        if char == "$" and index + 1 < len(command) and command[index + 1] == "(":
+            substitution_depth += 1
+            index += 2
+            continue
+        if substitution_depth:
+            if char == "(":
+                substitution_depth += 1
+            elif char == ")":
+                substitution_depth -= 1
+            index += 1
+            continue
+        separator_width = 0
+        if char in {"\n", ";"}:
+            separator_width = 1
+        elif char in {"|", "&"} and not (
+            index > 0 and command[index - 1] in {">", "<"}
+        ):
+            separator_width = 2 if command[index : index + 2] in {"||", "&&"} else 1
+        if separator_width:
+            units.append((start, index))
+            start = index + separator_width
+            index = start
+            continue
+        index += 1
+    if quote is not None or substitution_depth:
+        raise ValueError("build command has unterminated shell syntax")
+    units.append((start, len(command)))
+    return units
+
+
+def _literal_shell_words(command: str, start: int, end: int) -> list[tuple[int, int, str, bool]]:
+    """Decode literal shell words while retaining their exact source spans."""
+
+    words: list[tuple[int, int, str, bool]] = []
+    index = start
+    delimiters = " \t\r\n<>|&;()"
+    while index < end:
+        while index < end and command[index] in delimiters:
+            index += 1
+        if index >= end or command[index] == "#":
+            break
+        word_start = index
+        value: list[str] = []
+        dynamic = False
+        quote: str | None = None
+        while index < end:
+            char = command[index]
+            if quote == "'":
+                if char == "'":
+                    quote = None
+                else:
+                    value.append(char)
+                index += 1
+                continue
+            if quote == '"':
+                if char == '"':
+                    quote = None
+                    index += 1
+                    continue
+                if char == "\\" and index + 1 < end:
+                    following = command[index + 1]
+                    if following in {'$', '`', '"', "\\", "\n"}:
+                        if following != "\n":
+                            value.append(following)
+                        index += 2
+                        continue
+                if char in {"$", "`"}:
+                    dynamic = True
+                value.append(char)
+                index += 1
+                continue
+            if char in delimiters:
+                break
+            if char in {"'", '"'}:
+                quote = char
+                index += 1
+                continue
+            if char == "\\" and index + 1 < end:
+                following = command[index + 1]
+                if following != "\n":
+                    value.append(following)
+                index += 2
+                continue
+            if char in {"$", "`", "*", "?", "["} or (
+                char == "~" and index == word_start
+            ):
+                dynamic = True
+            value.append(char)
+            index += 1
+        if quote is not None:
+            raise ValueError("build command has unterminated quoted shell word")
+        words.append((word_start, index, "".join(value), dynamic))
+    return words
+
+
+def _bind_compiler_command(build_command: str, upstream_input: str) -> tuple[str, str]:
+    """Bind the unique simple command whose literal shell word is the upstream input."""
+
+    matches: list[tuple[int, int, int, int]] = []
+    for unit_start, unit_end in _shell_command_units(build_command):
+        for word_start, word_end, value, dynamic in _literal_shell_words(
+            build_command, unit_start, unit_end
+        ):
+            if not dynamic and value == upstream_input:
+                matches.append((unit_start, unit_end, word_start, word_end))
+    if len(matches) != 1:
+        raise ValueError(
+            "build command must contain the bound upstream input as exactly one literal shell word"
+        )
+    unit_start, unit_end, word_start, word_end = matches[0]
+    while unit_start < unit_end and build_command[unit_start].isspace():
+        unit_start += 1
+    while unit_end > unit_start and build_command[unit_end - 1].isspace():
+        unit_end -= 1
+    compiler_command = build_command[unit_start:unit_end]
+    candidate_command = (
+        build_command[unit_start:word_start]
+        + '"${candidate}"'
+        + build_command[word_end:unit_end]
+    )
+    return compiler_command, candidate_command
+
+
 def _render_interestingness_test(
     *,
     build_command: str,
@@ -232,10 +385,7 @@ def _render_interestingness_test(
 ) -> bytes:
     """Render the canonical candidate-substituting compiler-failure predicate."""
 
-    source = str(upstream_input)
-    if build_command.count(source) != 1:
-        raise ValueError("build command must contain the bound upstream input exactly once")
-    candidate_command = build_command.replace(source, '"${candidate}"')
+    _, candidate_command = _bind_compiler_command(build_command, str(upstream_input))
     expected_operation = operation or ""
     expected_types = types or ""
     script = f"""#!/usr/bin/env bash
@@ -250,7 +400,9 @@ trap 'rm -rf -- "$work"' EXIT
 out="$work/output"
 export out
 set +e
-{candidate_command} >"$work/stdout" 2>"$work/stderr"
+(
+{candidate_command}
+) >"$work/stdout" 2>"$work/stderr"
 actual_exit=$?
 set -e
 while IFS= read -r line; do printf '%s\n' "$line"; done <"$work/stdout" >"$work/combined"
@@ -1808,6 +1960,9 @@ def _capture_compiler_minimization(
 ) -> tuple[dict[str, object], dict[str, object]]:
     """Capture exact interestingness and make one bounded reduction attempt."""
 
+    compiler_command, _ = _bind_compiler_command(
+        str(execution["derivation_build_command"]), str(result.upstream_input)
+    )
     script = evidence_dir / "interestingness-test.sh"
     _write_interestingness_test(
         script,
@@ -1830,6 +1985,7 @@ def _capture_compiler_minimization(
         },
     )
     interestingness = {
+        "compiler_command": compiler_command,
         "test": _evidence_binding(
             script, f"{canonical_root}/interestingness-test.sh"
         ),

@@ -456,6 +456,11 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
             "operation": "scf.for",
             "types": "(index) -> ()",
             "interestingness": {
+                "compiler_command": str(
+                    self.receipt["registered_build_execution"]["scf"].get(
+                        "derivation_build_command", "synthetic compiler command"
+                    )
+                ),
                 "test": self._binding("interestingness-test.sh"),
                 "full_log": self._binding("interesting-full.log"),
                 "expected_exit": 1,
@@ -1428,6 +1433,88 @@ class V5PublicIntegrationAdversarialTest(unittest.TestCase):
                 self._reject(lambda _, reproducers, mutate=mutate: mutate(reproducers), "public reproducer")
 
 
+class V5CompilerPredicateCommandBindingTest(unittest.TestCase):
+    DIAGNOSTIC = "error: failed to legalize operation 'scf.for' : (index) -> ()"
+
+    def _fixture(self, root: Path) -> tuple[Path, Path, Path, str]:
+        tools = root / "fixture tools;quoted"
+        tools.mkdir()
+        received = root / "received compiler argument.txt"
+        compiler = tools / "mlir-opt's wrapper"
+        compiler.write_text(
+            "#!/bin/sh\n"
+            f"printf '%s\\n' \"$1\" > {shlex.quote(str(received))}\n"
+            f"printf '%s\\n' {shlex.quote(self.DIAGNOSTIC)} >&2\n"
+            "exit 7\n",
+            encoding="utf-8",
+        )
+        compiler.chmod(0o755)
+        upstream = root / "upstream input;it's quoted.mlir"
+        upstream.write_text("module { scf.for (index) -> () }\n", encoding="utf-8")
+        candidate = root / "candidate input;it's quoted.mlir"
+        candidate.write_text("module { scf.for (index) -> () }\n", encoding="utf-8")
+        build_command = f"{shlex.quote(str(compiler))} {shlex.quote(str(upstream))}"
+        return upstream, candidate, received, build_command
+
+    def _render(self, build_command: str, upstream: Path) -> bytes:
+        classifier = CLASSIFIER._render_interestingness_test(
+            build_command=build_command,
+            upstream_input=upstream,
+            expected_exit=7,
+            expected_diagnostic=self.DIAGNOSTIC,
+            operation="scf.for",
+            types="(index) -> ()",
+        )
+        verifier = MODULE._render_expected_interestingness_test(
+            build_command=build_command,
+            upstream_input=str(upstream),
+            expected_exit=7,
+            expected_diagnostic=self.DIAGNOSTIC,
+            operation="scf.for",
+            types="(index) -> ()",
+        )
+        self.assertEqual(classifier, verifier)
+        return classifier
+
+    def test_quoted_special_upstream_shell_word_binds_candidate_path(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-predicate-quoted-") as temporary:
+            root = Path(temporary)
+            upstream, candidate, received, build_command = self._fixture(root)
+            predicate = root / "interestingness-test.sh"
+            predicate.write_bytes(self._render(build_command, upstream))
+            predicate.chmod(0o755)
+
+            replay = subprocess.run(
+                [str(predicate), str(candidate)], text=True, capture_output=True
+            )
+
+            self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
+            self.assertEqual(received.read_text(encoding="utf-8").strip(), str(candidate))
+
+    def test_multicommand_build_binds_only_upstream_compiler_command(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-predicate-multicommand-") as temporary:
+            root = Path(temporary)
+            upstream, candidate, received, compiler_command = self._fixture(root)
+            marker = root / "later validation ran"
+            build_command = (
+                compiler_command
+                + "\n"
+                + f"printf '%s\\n' validation > {shlex.quote(str(marker))}\n"
+                + "true"
+            )
+            predicate = root / "interestingness-test.sh"
+            predicate.write_bytes(self._render(build_command, upstream))
+            predicate.chmod(0o755)
+
+            replay = subprocess.run(
+                [str(predicate), str(candidate)], text=True, capture_output=True
+            )
+
+            self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
+            self.assertEqual(received.read_text(encoding="utf-8").strip(), str(candidate))
+            self.assertFalse(marker.exists(), "later validation command must not run")
+
+
 class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
     """A real two-run on-disk compiler-failure bundle uses classifier serialization."""
 
@@ -1619,6 +1706,9 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
             result=compiler_result,
             canonical_root="reproducers/scf",
             interestingness={
+                "compiler_command": CLASSIFIER._bind_compiler_command(
+                    build_command, str(upstream)
+                )[0],
                 "test": self._binding(
                     "reproducers/scf/interestingness-test.sh",
                     files["interestingness-test.sh"],
@@ -1920,6 +2010,18 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
                     lambda _r, b, c, _p, m=receipt_mutation: self._rewrite_receipts(b, c, m),
                     "operation/types|tool binding|nonzero exit|replay exit",
                 )
+
+    def test_public_compiler_branch_rejects_rebound_compiler_command_unit(self) -> None:
+        self._reject(
+            lambda _r, bundle, current, _p: self._rewrite_receipts(
+                bundle,
+                current,
+                lambda receipt: receipt["frontier_evidence"]["interestingness"].__setitem__(
+                    "compiler_command", "true"
+                ),
+            ),
+            "bound compiler command",
+        )
 
     def test_public_compiler_branch_rejects_schema_and_type_mutations(self) -> None:
         cases = {
