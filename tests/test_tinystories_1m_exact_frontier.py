@@ -468,17 +468,109 @@ class AuthenticatedPipelineRunnerTest(unittest.TestCase):
         )
         self.assertEqual(identified.operation, "scf.for")
         self.assertEqual(identified.types, "(index) -> ()")
-        anonymous_log = Path(self.temporary.name) / "anonymous.log"
-        anonymous_log.write_text("error: compiler terminated\n", encoding="utf-8")
-        anonymous = MODULE._classify_registered_result(
+        located_log = Path(self.temporary.name) / "located.log"
+        located_log.write_text(
+            f'loc("{self.linalg_input}":3:5): error: compiler terminated\n',
+            encoding="utf-8",
+        )
+        located = MODULE._classify_registered_result(
             stage="scf",
             exit_code=2,
             output=self.no_output_path,
             upstream_input=self.linalg_input,
-            log=anonymous_log,
+            log=located_log,
         )
-        self.assertIsNone(anonymous.operation)
-        self.assertIsNone(anonymous.types)
+        self.assertIsInstance(located, MODULE.CompilerFailure)
+        self.assertIsNone(located.operation)
+        self.assertIsNone(located.types)
+
+    def test_environmental_nonzero_results_are_not_compiler_failures(self) -> None:
+        cases = {
+            "daemon socket": (
+                "error: cannot connect to socket at "
+                "'/nix/var/nix/daemon-socket/socket': Permission denied\n"
+            ),
+            "daemon unavailable": "error: cannot connect to daemon at 'unix:///nix/var/nix/daemon-socket/socket'\n",
+            "store permission": "error: opening lock file '/nix/store/example.lock': Permission denied\n",
+            "sandbox": "error: while setting up the build environment: creating sandbox: Operation not permitted\n",
+            "substituter": "warning: unable to download 'https://cache.invalid/narinfo': Connection refused\nerror: substituter failed\n",
+            "evaluation": "error: attribute 'missing-stage' missing, at flake.nix:12:3\n",
+            "store": "error: path '/nix/store/deadbeef-output' is not valid\n",
+            "wrapper": "error: builder for '/nix/store/example-stage.drv' failed with exit code 1\n",
+            "unattributed": "error: compiler terminated\n",
+        }
+        for name, payload in cases.items():
+            with self.subTest(name=name):
+                log = Path(self.temporary.name) / f"environment-{name.replace(' ', '-')}.log"
+                log.write_text(payload, encoding="utf-8")
+                result = MODULE._classify_registered_result(
+                    stage="scf",
+                    exit_code=1,
+                    output=self.no_output_path,
+                    upstream_input=self.linalg_input,
+                    log=log,
+                )
+                self.assertIsInstance(result, MODULE.EnvironmentFailure)
+                self.assertEqual(result.kind, "environment_failure")
+                self.assertNotEqual(result.category, "compiler")
+
+    def test_environmental_wrapper_suffix_does_not_hide_attributed_compiler_failure(self) -> None:
+        log = Path(self.temporary.name) / "compiler-plus-wrapper.log"
+        log.write_text(
+            "error: failed to legalize operation 'scf.for' : (index) -> ()\n"
+            "error: builder for '/nix/store/example-stage.drv' failed with exit code 1\n",
+            encoding="utf-8",
+        )
+        result = MODULE._classify_registered_result(
+            stage="scf",
+            exit_code=1,
+            output=self.no_output_path,
+            upstream_input=self.linalg_input,
+            log=log,
+        )
+        self.assertIsInstance(result, MODULE.CompilerFailure)
+        self.assertEqual(result.operation, "scf.for")
+
+    def test_registered_stage_aborts_on_environment_failure_before_receipt_evidence(self) -> None:
+        root = Path(self.temporary.name)
+        log_payload = (
+            "error: cannot connect to socket at "
+            "'/nix/var/nix/daemon-socket/socket': Permission denied\n"
+        )
+        derivation = {
+            "output": "/nix/store/unavailable-output",
+            "path": "/nix/store/example.drv",
+            "file_sha256": "a" * 64,
+            "json_sha256": "b" * 64,
+            "build_command": "/nix/store/tool/bin/mlir-opt input.mlir -o $out",
+            "build_command_sha256": "c" * 64,
+        }
+
+        def fake_run_and_log(command, *, cwd, log, **kwargs):
+            log.write_text(log_payload, encoding="utf-8")
+            return subprocess.CompletedProcess(command, 1, "", log_payload)
+
+        with mock.patch.object(MODULE, "_derivation", return_value=derivation), mock.patch.object(
+            MODULE,
+            "_capture_derivation_evidence",
+            return_value={
+                "captured_derivation": "unused",
+                "captured_derivation_bytes": 1,
+                "captured_derivation_sha256": "d" * 64,
+                "captured_derivation_json": "unused",
+                "captured_derivation_json_bytes": 1,
+                "captured_derivation_json_sha256": "e" * 64,
+            },
+        ), mock.patch.object(MODULE, "_run_and_log", side_effect=fake_run_and_log):
+            with self.assertRaisesRegex(RuntimeError, "environment failure invalidates capture"):
+                MODULE._run_registered_stage(
+                    root,
+                    root,
+                    "tiny-stories-1m-kev-gpt-exact",
+                    "f" * 40,
+                    "scf",
+                    valid("linalg"),
+                )
 
     def test_control_manifest_frontier_evidence_uses_exact_union_contract(self) -> None:
         result = MODULE._classify_registered_result(

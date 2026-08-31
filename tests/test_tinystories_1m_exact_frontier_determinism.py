@@ -8,6 +8,7 @@ import gzip
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -23,6 +24,9 @@ SCRIPT = (
     / "scripts"
     / "pipeline"
     / "verify_tinystories_1m_exact_frontier_determinism.py"
+)
+CLASSIFIER_SCRIPT = (
+    ROOT / "scripts" / "pipeline" / "classify_tinystories_1m_exact_frontier.py"
 )
 BUNDLES = (
     ROOT
@@ -42,6 +46,14 @@ if SPEC is None or SPEC.loader is None:
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
+CLASSIFIER_SPEC = importlib.util.spec_from_file_location(
+    "exact_frontier_compiler_fixture", CLASSIFIER_SCRIPT
+)
+if CLASSIFIER_SPEC is None or CLASSIFIER_SPEC.loader is None:
+    raise RuntimeError(f"cannot load {CLASSIFIER_SCRIPT}")
+CLASSIFIER = importlib.util.module_from_spec(CLASSIFIER_SPEC)
+sys.modules[CLASSIFIER_SPEC.name] = CLASSIFIER
+CLASSIFIER_SPEC.loader.exec_module(CLASSIFIER)
 SUCCESSOR_SCRIPT = (
     ROOT
     / "scripts"
@@ -431,19 +443,23 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
             })
 
     def _compiler_failure(self) -> None:
+        diagnostic = "error: failed to legalize operation 'scf.for' : (index) -> ()"
         self.files.pop("minimal-reproducer.json", None)
+        self.files["scf.log"] = (diagnostic + "\n").encode()
         self.files["interestingness-test.sh"] = b"#!/bin/sh\nexit 0\n"
         self.files["interesting-full.log"] = b"exit_code: 0\n"
         self.files["reduction.log"] = b"mlir-reduce unavailable\n"
         self.receipt["frontier_evidence"] = {
             "kind": "compiler_failure",
             "manifest": None,
-            "diagnostic": self.receipt["diagnostic"],
-            "operation": None,
-            "types": None,
+            "diagnostic": diagnostic,
+            "operation": "scf.for",
+            "types": "(index) -> ()",
             "interestingness": {
                 "test": self._binding("interestingness-test.sh"),
                 "full_log": self._binding("interesting-full.log"),
+                "expected_exit": 1,
+                "normalized_terminal_diagnostic": diagnostic,
             },
             "minimization": {
                 "status": "not_practical",
@@ -453,10 +469,15 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
         }
         stage = self.receipt["stages"][-1]
         execution = self.receipt["registered_build_execution"][stage["stage"]]
+        self.receipt["diagnostic"] = diagnostic
         stage["exit_code"] = 1
+        stage["terminal_diagnostics"] = [diagnostic]
         execution["exit_code"] = 1
         execution["result"] = None
         execution["derivation_tool_bindings"] = [{"path": "/bound/tool"}]
+        for value in (stage, execution):
+            value["log_bytes"] = len(self.files["scf.log"])
+            value["log_sha256"] = hashlib.sha256(self.files["scf.log"]).hexdigest()
         full = gzip.decompress(self.files["full-input.gz"])
         stage.update({
             "artifact": self.receipt["full_failing_input"]["source_artifact"],
@@ -1405,6 +1426,507 @@ class V5PublicIntegrationAdversarialTest(unittest.TestCase):
         for name, mutate in cases.items():
             with self.subTest(name=name):
                 self._reject(lambda _, reproducers, mutate=mutate: mutate(reproducers), "public reproducer")
+
+
+class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
+    """A real two-run on-disk compiler-failure bundle uses classifier serialization."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        receipt = json.loads(
+            (FLAT_SCF_BUNDLES / "run-1" / "receipt.json").read_text(encoding="utf-8")
+        )
+        cls.base_trust = MODULE._independent_v5_trust(
+            ROOT,
+            receipt["source_commit"],
+            [record["stage"] for record in receipt["stages"]],
+        )
+
+    @staticmethod
+    def _json_bytes(value: object) -> bytes:
+        return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+
+    @staticmethod
+    def _binding(path: str, data: bytes) -> dict[str, object]:
+        return {
+            "path": path,
+            "bytes": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        }
+
+    def _fixture(self):
+        temporary = tempfile.TemporaryDirectory(prefix="exact-v5-compiler-public-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        source_receipt = json.loads(
+            (FLAT_SCF_BUNDLES / "run-1" / "receipt.json").read_text(encoding="utf-8")
+        )
+        receipt = copy.deepcopy(source_receipt)
+        trust = copy.deepcopy(self.base_trust)
+        stages = ["pytorch-exported", "torch", "linalg", "scf"]
+        diagnostic = "error: failed to legalize operation 'scf.for' : (index) -> ()"
+
+        fixture_tools = root / "fixture-tools"
+        fixture_tools.mkdir()
+        compiler = fixture_tools / "mlir-opt"
+        compiler.write_text(
+            "#!/bin/sh\n"
+            f"printf '%s\\n' {shlex.quote(diagnostic)} >&2\n"
+            "exit 7\n",
+            encoding="utf-8",
+        )
+        compiler.chmod(0o755)
+        upstream = fixture_tools / "input.linalg.mlir"
+        upstream.write_bytes(trust["derivations"]["linalg"]["artifact_bytes"])
+        build_command = (
+            f"{shlex.quote(str(compiler))} {shlex.quote(str(upstream))} -o \"$out\""
+        )
+        tool_binding = self._binding(str(compiler), compiler.read_bytes())
+
+        command = [
+            "nix", "build", "--no-link", "--print-out-paths", "-L",
+            ".#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-scf",
+        ]
+        compiler_log = MODULE._canonical_execution_evidence(
+            command,
+            subprocess.CompletedProcess(command, 7, "", diagnostic + "\n"),
+        )
+        trust["derivations"]["linalg"]["artifact_path"] = str(upstream)
+        failing_live = trust["derivations"]["scf"]
+        failing_live.update({
+            "artifact_bytes": upstream.read_bytes(),
+            "artifact_path": str(upstream),
+            "build_command": build_command,
+            "build_command_sha256": hashlib.sha256(build_command.encode()).hexdigest(),
+            "tool_bindings": [tool_binding],
+            "exit_code": 7,
+            "log_bytes": compiler_log,
+        })
+
+        files: dict[str, bytes] = {}
+        source_run = FLAT_SCF_BUNDLES / "run-1"
+        for stage in stages:
+            for suffix in ("log", "drv", "derivation.json"):
+                filename = f"{stage}.{suffix}"
+                files[filename] = (source_run / filename).read_bytes()
+        files["scf.log"] = compiler_log
+        files["full-input.gz"] = gzip.compress(upstream.read_bytes(), mtime=0)
+
+        interestingness_script = root / "interestingness-test.sh"
+        CLASSIFIER._write_interestingness_test(
+            interestingness_script,
+            build_command=build_command,
+            upstream_input=upstream,
+            expected_exit=7,
+            expected_diagnostic=diagnostic,
+            operation="scf.for",
+            types="(index) -> ()",
+        )
+        files["interestingness-test.sh"] = interestingness_script.read_bytes()
+        replay = subprocess.run(
+            [str(interestingness_script), str(upstream)],
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
+        files["interesting-full.log"] = MODULE._canonical_execution_evidence(
+            [str(interestingness_script), str(upstream)],
+            replay,
+            {
+                str(root): "<evidence-dir>",
+                str(upstream): "<full-input>",
+            },
+        )
+        files["reduction.log"] = b"mlir-reduce is unavailable beside the bound mlir-opt tool\n"
+
+        receipt["stages"] = receipt["stages"][:4]
+        receipt["registered_build_execution"] = {
+            stage: receipt["registered_build_execution"][stage] for stage in stages
+        }
+        receipt["pipeline_execution"].update({
+            "first_invalid_stage": "scf",
+            "not_run": ["flat-scf", "calyx", "calyx-native-sv"],
+        })
+        receipt["stage"] = "scf"
+        receipt["diagnostic"] = diagnostic
+        receipt["frontier"] = "pre_calyx_frontier"
+        for stage_record in receipt["stages"]:
+            stage = stage_record["stage"]
+            stage_record["log"] = f"reproducers/scf/{stage}.log"
+            stage_record["log_bytes"] = len(files[f"{stage}.log"])
+            stage_record["log_sha256"] = hashlib.sha256(files[f"{stage}.log"]).hexdigest()
+            execution = receipt["registered_build_execution"][stage]
+            execution["log"] = stage_record["log"]
+            execution["log_bytes"] = stage_record["log_bytes"]
+            execution["log_sha256"] = stage_record["log_sha256"]
+            execution["captured_derivation"] = f"reproducers/scf/{stage}.drv"
+            execution["captured_derivation_json"] = (
+                f"reproducers/scf/{stage}.derivation.json"
+            )
+
+        linalg_stage = receipt["stages"][-2]
+        linalg_execution = receipt["registered_build_execution"]["linalg"]
+        linalg_stage["artifact"] = str(upstream)
+        linalg_execution["artifact"] = str(upstream)
+        failing_stage = receipt["stages"][-1]
+        failing_execution = receipt["registered_build_execution"]["scf"]
+        artifact_sha = hashlib.sha256(upstream.read_bytes()).hexdigest()
+        failing_stage.update({
+            "artifact": str(upstream),
+            "artifact_bytes": len(upstream.read_bytes()),
+            "artifact_sha256": artifact_sha,
+            "artifact_accepted": False,
+            "exit_code": 7,
+            "status": "compiler_failure",
+            "terminal_diagnostics": [diagnostic],
+        })
+        failing_stage["tool_revisions"]["build_command_sha256"] = failing_live[
+            "build_command_sha256"
+        ]
+        failing_execution.update({
+            "artifact": str(upstream),
+            "artifact_bytes": len(upstream.read_bytes()),
+            "artifact_sha256": artifact_sha,
+            "artifact_accepted": False,
+            "derivation_build_command": build_command,
+            "derivation_build_command_sha256": failing_live["build_command_sha256"],
+            "derivation_tool_bindings": [tool_binding],
+            "exit_code": 7,
+            "result": None,
+        })
+        receipt["full_failing_input"] = {
+            **self._binding("reproducers/scf/full-input.gz", files["full-input.gz"]),
+            "archive_bytes": len(files["full-input.gz"]),
+            "archive_sha256": hashlib.sha256(files["full-input.gz"]).hexdigest(),
+            "content_bytes": len(upstream.read_bytes()),
+            "content_sha256": artifact_sha,
+            "source_artifact": str(upstream),
+            "source_stage": "linalg",
+        }
+        receipt["full_failing_input"].pop("bytes", None)
+        receipt["full_failing_input"].pop("sha256", None)
+
+        compiler_result = CLASSIFIER.CompilerFailure(
+            kind="compiler_failure",
+            upstream_input=upstream,
+            log=root / "scf.log",
+            diagnostic=diagnostic,
+            operation="scf.for",
+            types="(index) -> ()",
+        )
+        receipt["frontier_evidence"] = CLASSIFIER._serialize_frontier_evidence(
+            stage="scf",
+            result=compiler_result,
+            canonical_root="reproducers/scf",
+            interestingness={
+                "test": self._binding(
+                    "reproducers/scf/interestingness-test.sh",
+                    files["interestingness-test.sh"],
+                ),
+                "full_log": self._binding(
+                    "reproducers/scf/interesting-full.log",
+                    files["interesting-full.log"],
+                ),
+                "expected_exit": 7,
+                "normalized_terminal_diagnostic": diagnostic,
+            },
+            minimization={
+                "status": "not_practical",
+                "reason": "mlir_reduce_unavailable",
+                "reduction_log": self._binding(
+                    "reproducers/scf/reduction.log", files["reduction.log"]
+                ),
+            },
+        )
+        receipt["sha256"] = MODULE._canonical_receipt_hash(receipt)
+        files["receipt.json"] = self._json_bytes(receipt)
+
+        canonical_files = sorted(files)
+        file_manifest = {
+            name: {
+                "bytes": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+            }
+            for name, data in files.items()
+        }
+        receipt_file_sha = hashlib.sha256(files["receipt.json"]).hexdigest()
+        bundle_manifest = {
+            "schema": "tinystories-1m-exact-frontier-determinism-bundles-v3",
+            "source_commit": receipt["source_commit"],
+            "canonical_files": canonical_files,
+            "expected_comparison": {
+                "byte_identical": True,
+                "first_invalid_stage": "scf",
+                "receipt_file_sha256": receipt_file_sha,
+                "receipt_self_hash": receipt["sha256"],
+            },
+            "runs": {
+                name: {
+                    "files": copy.deepcopy(file_manifest),
+                    "receipt_self_hash": receipt["sha256"],
+                    "source_commit": receipt["source_commit"],
+                }
+                for name in ("run-1", "run-2")
+            },
+        }
+        bundle = root / "artifacts/comparison/compiler-failure-bundle"
+        bundle.mkdir(parents=True)
+        (bundle / "manifest.json").write_bytes(self._json_bytes(bundle_manifest))
+        for run_name in ("run-1", "run-2"):
+            run = bundle / run_name
+            run.mkdir()
+            for name, data in files.items():
+                (run / name).write_bytes(data)
+        public_receipt = (
+            root / "artifacts/comparison/tinystories-1m-exact-current-pipeline-frontier.json"
+        )
+        public_receipt.parent.mkdir(parents=True, exist_ok=True)
+        public_receipt.write_bytes(files["receipt.json"])
+        public_reproducers = root / "reproducers/scf"
+        public_reproducers.mkdir(parents=True)
+        for name, data in files.items():
+            if name != "receipt.json":
+                (public_reproducers / name).write_bytes(data)
+        return root, bundle, trust, public_receipt, public_reproducers
+
+    def test_public_verifier_accepts_classifier_serialized_compiler_failure_bundle(self) -> None:
+        root, bundle, trust, _, _ = self._fixture()
+        with mock.patch.object(MODULE, "_independent_v5_trust", return_value=trust):
+            result = MODULE.verify_public_v5_evidence(root, bundle)
+        self.assertEqual(result["frontier_evidence_kind"], "compiler_failure")
+        self.assertEqual(result["first_invalid_stage"], "scf")
+
+    def _rewrite_receipts(self, bundle: Path, current: Path, mutate) -> None:
+        receipt = json.loads((bundle / "run-1/receipt.json").read_text(encoding="utf-8"))
+        mutate(receipt)
+        receipt["sha256"] = MODULE._canonical_receipt_hash(receipt)
+        payload = self._json_bytes(receipt)
+        current.write_bytes(payload)
+        for run_name in ("run-1", "run-2"):
+            (bundle / run_name / "receipt.json").write_bytes(payload)
+        manifest_path = bundle / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        binding = {
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        }
+        for run_name in ("run-1", "run-2"):
+            manifest["runs"][run_name]["files"]["receipt.json"] = binding
+            manifest["runs"][run_name]["receipt_self_hash"] = receipt["sha256"]
+        manifest["expected_comparison"]["receipt_file_sha256"] = binding["sha256"]
+        manifest["expected_comparison"]["receipt_self_hash"] = receipt["sha256"]
+        manifest_path.write_bytes(self._json_bytes(manifest))
+
+    def _replace_canonical_file(
+        self,
+        bundle: Path,
+        reproducers: Path,
+        filename: str,
+        payload: bytes,
+    ) -> None:
+        for run_name in ("run-1", "run-2"):
+            (bundle / run_name / filename).write_bytes(payload)
+        (reproducers / filename).write_bytes(payload)
+        manifest_path = bundle / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        binding = {
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        }
+        for run_name in ("run-1", "run-2"):
+            manifest["runs"][run_name]["files"][filename] = binding
+        manifest_path.write_bytes(self._json_bytes(manifest))
+
+    def _add_canonical_file(
+        self,
+        bundle: Path,
+        reproducers: Path,
+        filename: str,
+        payload: bytes,
+    ) -> None:
+        self._replace_canonical_file(bundle, reproducers, filename, payload)
+        manifest_path = bundle / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["canonical_files"] = sorted([*manifest["canonical_files"], filename])
+        manifest_path.write_bytes(self._json_bytes(manifest))
+
+    def _remove_canonical_file(
+        self, bundle: Path, reproducers: Path, filename: str
+    ) -> None:
+        for run_name in ("run-1", "run-2"):
+            (bundle / run_name / filename).unlink()
+        (reproducers / filename).unlink()
+        manifest_path = bundle / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["canonical_files"].remove(filename)
+        for run_name in ("run-1", "run-2"):
+            manifest["runs"][run_name]["files"].pop(filename)
+        manifest_path.write_bytes(self._json_bytes(manifest))
+
+    def _reject(self, mutate, pattern: str) -> None:
+        root, bundle, trust, current, reproducers = self._fixture()
+        mutate(root, bundle, current, reproducers)
+        with mock.patch.object(MODULE, "_independent_v5_trust", return_value=trust):
+            with self.assertRaisesRegex(MODULE.VerificationError, pattern):
+                MODULE.verify_public_v5_evidence(root, bundle)
+
+    def test_public_compiler_branch_rejects_crossed_files_and_manifest_injection(self) -> None:
+        cases = {
+            "crossed control file": (
+                lambda _r, b, _c, p: self._add_canonical_file(
+                    b, p, "minimal-reproducer.json", b'{}\n'
+                ),
+                "directory contents",
+            ),
+            "manifest injection": (
+                lambda _r, b, c, _p: self._rewrite_receipts(
+                    b, c, lambda receipt: receipt["frontier_evidence"].__setitem__("manifest", {})
+                ),
+                "compiler frontier.manifest",
+            ),
+        }
+        for name, (mutate, pattern) in cases.items():
+            with self.subTest(name=name):
+                self._reject(mutate, pattern)
+
+    def test_public_compiler_branch_rejects_missing_log_input_or_tool_binding(self) -> None:
+        cases = {
+            "log": (
+                lambda _r, b, _c, p: self._remove_canonical_file(b, p, "scf.log"),
+                "missing scf log|directory contents",
+            ),
+            "input": (
+                lambda _r, b, _c, p: self._remove_canonical_file(b, p, "full-input.gz"),
+                "full input|directory contents",
+            ),
+            "tool binding": (
+                lambda _r, b, c, _p: self._rewrite_receipts(
+                    b,
+                    c,
+                    lambda receipt: receipt["registered_build_execution"]["scf"].__setitem__(
+                        "derivation_tool_bindings", []
+                    ),
+                ),
+                "tool binding|derivation/tool",
+            ),
+        }
+        for name, (mutate, pattern) in cases.items():
+            with self.subTest(name=name):
+                self._reject(mutate, pattern)
+
+    def test_public_compiler_branch_rejects_zero_exit_and_environmental_diagnostic(self) -> None:
+        def zero_exit(_root, bundle, current, _reproducers):
+            def mutate(receipt):
+                receipt["stages"][-1]["exit_code"] = 0
+                receipt["registered_build_execution"]["scf"]["exit_code"] = 0
+                receipt["frontier_evidence"]["interestingness"]["expected_exit"] = 0
+            self._rewrite_receipts(bundle, current, mutate)
+
+        def environment(_root, bundle, current, reproducers):
+            diagnostic = (
+                "error: cannot connect to socket at "
+                "'/nix/var/nix/daemon-socket/socket': Permission denied"
+            )
+            command = [
+                "nix", "build", "--no-link", "--print-out-paths", "-L",
+                ".#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-scf",
+            ]
+            payload = MODULE._canonical_execution_evidence(
+                command,
+                subprocess.CompletedProcess(command, 1, "", diagnostic + "\n"),
+            )
+            self._replace_canonical_file(bundle, reproducers, "scf.log", payload)
+
+            def mutate(receipt):
+                receipt["diagnostic"] = diagnostic
+                receipt["frontier_evidence"]["diagnostic"] = diagnostic
+                receipt["frontier_evidence"]["interestingness"][
+                    "normalized_terminal_diagnostic"
+                ] = diagnostic
+                receipt["stages"][-1]["terminal_diagnostics"] = [diagnostic]
+                for value in (
+                    receipt["stages"][-1],
+                    receipt["registered_build_execution"]["scf"],
+                ):
+                    value["log_bytes"] = len(payload)
+                    value["log_sha256"] = hashlib.sha256(payload).hexdigest()
+            self._rewrite_receipts(bundle, current, mutate)
+
+        for name, mutate, pattern in (
+            ("zero exit", zero_exit, "nonzero exit|replay exit"),
+            ("environment", environment, "environmental/Nix failure"),
+        ):
+            with self.subTest(name=name):
+                self._reject(mutate, pattern)
+
+    def test_public_compiler_branch_rejects_operation_type_and_combined_mutations(self) -> None:
+        cases = {
+            "operation": lambda receipt: receipt["frontier_evidence"].__setitem__(
+                "operation", "scf.while"
+            ),
+            "types": lambda receipt: receipt["frontier_evidence"].__setitem__(
+                "types", "(i1) -> i1"
+            ),
+            "combined": lambda receipt: (
+                receipt["frontier_evidence"].__setitem__("operation", "scf.while"),
+                receipt["registered_build_execution"]["scf"].__setitem__(
+                    "derivation_tool_bindings", []
+                ),
+                receipt["stages"][-1].__setitem__("exit_code", 0),
+            ),
+        }
+        for name, receipt_mutation in cases.items():
+            with self.subTest(name=name):
+                self._reject(
+                    lambda _r, b, c, _p, m=receipt_mutation: self._rewrite_receipts(b, c, m),
+                    "operation/types|tool binding|nonzero exit|replay exit",
+                )
+
+    def test_public_compiler_branch_rejects_schema_and_type_mutations(self) -> None:
+        cases = {
+            "extra frontier key": lambda receipt: receipt["frontier_evidence"].__setitem__(
+                "invented", None
+            ),
+            "missing interestingness key": lambda receipt: receipt["frontier_evidence"][
+                "interestingness"
+            ].pop("full_log"),
+            "extra minimization key": lambda receipt: receipt["frontier_evidence"][
+                "minimization"
+            ].__setitem__("invented", None),
+            "boolean exit": lambda receipt: receipt["frontier_evidence"][
+                "interestingness"
+            ].__setitem__("expected_exit", True),
+            "list operation": lambda receipt: receipt["frontier_evidence"].__setitem__(
+                "operation", []
+            ),
+            "string failed result": lambda receipt: receipt[
+                "registered_build_execution"
+            ]["scf"].__setitem__("result", "/nix/store/invented"),
+        }
+        for name, receipt_mutation in cases.items():
+            with self.subTest(name=name):
+                self._reject(
+                    lambda _r, b, c, _p, m=receipt_mutation: self._rewrite_receipts(b, c, m),
+                    "schema|JSON type",
+                )
+
+    def test_public_compiler_branch_rejects_extra_missing_and_nonregular_entries(self) -> None:
+        cases = {
+            "extra": lambda _r, b, _c, _p: (b / "run-1/extra").write_bytes(b"extra"),
+            "missing": lambda _r, b, _c, _p: (b / "run-2/scf.log").unlink(),
+            "symlink": lambda _r, b, _c, _p: (
+                (b / "run-1/scf.log").unlink(),
+                (b / "run-1/scf.log").symlink_to("linalg.log"),
+            ),
+            "subdir": lambda _r, b, _c, _p: (b / "run-2/subdir").mkdir(),
+            "nonregular": lambda _r, _b, _c, p: os.mkfifo(p / "fifo"),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                self._reject(
+                    mutate,
+                    "directory contents|regular files|public reproducer|missing scf log",
+                )
 
 
 class GeneratedMlirDiffScopeTest(unittest.TestCase):

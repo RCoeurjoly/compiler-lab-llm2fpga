@@ -181,7 +181,7 @@ _V5_FULL_INPUT_KEYS = {
     "source_artifact",
     "source_stage",
 }
-_V5_FRONTIER_KEYS = {
+_V5_CONTROL_FRONTIER_KEYS = {
     "blockers",
     "kind",
     "manifest",
@@ -189,6 +189,21 @@ _V5_FRONTIER_KEYS = {
     "operation",
     "residual_artifact",
     "types",
+}
+_V5_COMPILER_FRONTIER_KEYS = {
+    "diagnostic",
+    "interestingness",
+    "kind",
+    "manifest",
+    "minimization",
+    "operation",
+    "types",
+}
+_V5_INTERESTINGNESS_KEYS = {
+    "expected_exit",
+    "full_log",
+    "normalized_terminal_diagnostic",
+    "test",
 }
 _V5_MANIFEST_BINDING_KEYS = {
     "artifact",
@@ -354,6 +369,12 @@ def _require_json_null(value: object, context: str) -> None:
     _require(value is None, f"{context}: JSON type mismatch; expected null")
 
 
+def _require_json_optional_str(value: object, context: str) -> str | None:
+    if value is None:
+        return None
+    return _require_json_str(value, context)
+
+
 def _require_json_str_list(value: object, context: str) -> list[str]:
     items = _require_json_list(value, context)
     for index, item in enumerate(items):
@@ -397,6 +418,12 @@ def _verify_v5_schema(receipt: dict[str, Any], run_name: str) -> None:
     """Reject every missing, unversioned, or mistyped v5 field."""
 
     _require_exact_keys(receipt, _V5_TOP_KEYS, f"{run_name}: receipt schema")
+    frontier_preview = _require_json_dict(
+        receipt.get("frontier_evidence"), f"{run_name}: frontier evidence"
+    )
+    frontier_kind = _require_json_str(
+        frontier_preview.get("kind"), f"{run_name}: frontier evidence.kind"
+    )
     _require_json_str_fields(
         receipt,
         {
@@ -583,7 +610,6 @@ def _verify_v5_schema(receipt: dict[str, Any], run_name: str) -> None:
                 "frontend",
                 "log",
                 "log_sha256",
-                "result",
                 "route_alias",
             },
             context,
@@ -601,6 +627,13 @@ def _verify_v5_schema(receipt: dict[str, Any], run_name: str) -> None:
             },
             context,
         )
+        if (
+            frontier_kind == "compiler_failure"
+            and stage_name == pipeline.get("first_invalid_stage")
+        ):
+            _require_json_null(run.get("result"), f"{context}.result")
+        else:
+            _require_json_str(run.get("result"), f"{context}.result")
         bindings = _require_json_list(
             run.get("derivation_tool_bindings"), f"{context}.derivation_tool_bindings"
         )
@@ -634,44 +667,136 @@ def _verify_v5_schema(receipt: dict[str, Any], run_name: str) -> None:
         {"archive_sha256", "content_sha256", "path", "source_artifact", "source_stage"},
         f"{run_name}: full input",
     )
-    frontier = _require_exact_keys(
-        receipt.get("frontier_evidence"),
-        _V5_FRONTIER_KEYS,
-        f"{run_name}: frontier evidence schema",
-    )
-    _require_json_str(frontier.get("kind"), f"{run_name}: frontier evidence.kind")
-    _require_json_null(frontier.get("operation"), f"{run_name}: frontier evidence.operation")
-    _require_json_null(frontier.get("types"), f"{run_name}: frontier evidence.types")
-    manifest = _require_exact_keys(
-        frontier.get("manifest"),
-        _V5_MANIFEST_BINDING_KEYS,
-        f"{run_name}: frontier manifest schema",
-    )
-    _require_json_str_fields(
-        manifest,
-        {"artifact", "blockers", "path", "sha256", "stage", "status"},
-        f"{run_name}: frontier manifest",
-    )
-    _require_json_int(manifest.get("bytes"), f"{run_name}: frontier manifest.bytes")
-    _require_json_null(manifest.get("reason"), f"{run_name}: frontier manifest.reason")
-    for name in ("residual_artifact", "blockers"):
-        binding = _require_exact_keys(
-            frontier.get(name),
-            _V5_FILE_BINDING_KEYS,
-            f"{run_name}: frontier {name} schema",
+    frontier = frontier_preview
+    if frontier_kind == "control_manifest":
+        _require_exact_keys(
+            frontier,
+            _V5_CONTROL_FRONTIER_KEYS,
+            f"{run_name}: frontier evidence schema",
         )
-        _require_json_int(binding.get("bytes"), f"{run_name}: frontier {name}.bytes")
+        _require_json_null(
+            frontier.get("operation"), f"{run_name}: frontier evidence.operation"
+        )
+        _require_json_null(
+            frontier.get("types"), f"{run_name}: frontier evidence.types"
+        )
+        manifest = _require_exact_keys(
+            frontier.get("manifest"),
+            _V5_MANIFEST_BINDING_KEYS,
+            f"{run_name}: frontier manifest schema",
+        )
         _require_json_str_fields(
-            binding, {"path", "sha256"}, f"{run_name}: frontier {name}"
+            manifest,
+            {"artifact", "blockers", "path", "sha256", "stage", "status"},
+            f"{run_name}: frontier manifest",
         )
-    minimization = _require_exact_keys(
-        frontier.get("minimization"),
-        _V5_MINIMIZATION_KEYS,
-        f"{run_name}: frontier minimization schema",
-    )
-    _require_json_str_fields(
-        minimization, _V5_MINIMIZATION_KEYS, f"{run_name}: frontier minimization"
-    )
+        _require_json_int(manifest.get("bytes"), f"{run_name}: frontier manifest.bytes")
+        _require_json_null(manifest.get("reason"), f"{run_name}: frontier manifest.reason")
+        for name in ("residual_artifact", "blockers"):
+            binding = _require_exact_keys(
+                frontier.get(name),
+                _V5_FILE_BINDING_KEYS,
+                f"{run_name}: frontier {name} schema",
+            )
+            _require_json_int(binding.get("bytes"), f"{run_name}: frontier {name}.bytes")
+            _require_json_str_fields(
+                binding, {"path", "sha256"}, f"{run_name}: frontier {name}"
+            )
+        minimization = _require_exact_keys(
+            frontier.get("minimization"),
+            _V5_MINIMIZATION_KEYS,
+            f"{run_name}: frontier minimization schema",
+        )
+        _require_json_str_fields(
+            minimization, _V5_MINIMIZATION_KEYS, f"{run_name}: frontier minimization"
+        )
+    elif frontier_kind == "compiler_failure":
+        _require_exact_keys(
+            frontier,
+            _V5_COMPILER_FRONTIER_KEYS,
+            f"{run_name}: frontier evidence schema",
+        )
+        _require_json_null(
+            frontier.get("manifest"), f"{run_name}: compiler frontier.manifest"
+        )
+        _require_json_str(
+            frontier.get("diagnostic"), f"{run_name}: compiler frontier.diagnostic"
+        )
+        _require_json_optional_str(
+            frontier.get("operation"), f"{run_name}: compiler frontier.operation"
+        )
+        _require_json_optional_str(
+            frontier.get("types"), f"{run_name}: compiler frontier.types"
+        )
+        interestingness = _require_exact_keys(
+            frontier.get("interestingness"),
+            _V5_INTERESTINGNESS_KEYS,
+            f"{run_name}: interestingness schema",
+        )
+        _require_json_int(
+            interestingness.get("expected_exit"),
+            f"{run_name}: interestingness.expected_exit",
+        )
+        _require_json_str(
+            interestingness.get("normalized_terminal_diagnostic"),
+            f"{run_name}: interestingness.normalized_terminal_diagnostic",
+        )
+        for name in ("test", "full_log"):
+            binding = _require_exact_keys(
+                interestingness.get(name),
+                _V5_FILE_BINDING_KEYS,
+                f"{run_name}: interestingness.{name} schema",
+            )
+            _require_json_int(
+                binding.get("bytes"), f"{run_name}: interestingness.{name}.bytes"
+            )
+            _require_json_str_fields(
+                binding, {"path", "sha256"}, f"{run_name}: interestingness.{name}"
+            )
+        minimization = _require_json_dict(
+            frontier.get("minimization"), f"{run_name}: minimization"
+        )
+        status_value = _require_json_str(
+            minimization.get("status"), f"{run_name}: minimization.status"
+        )
+        if status_value == "verified":
+            expected_minimization = {
+                "interesting_reproducer_log",
+                "minimal_reproducer",
+                "mlir_reduce",
+                "reduction_log",
+                "status",
+            }
+        elif minimization.get("reason") == "reduction_failed":
+            expected_minimization = {
+                "mlir_reduce",
+                "reason",
+                "reduction_log",
+                "status",
+            }
+        else:
+            expected_minimization = {"reason", "reduction_log", "status"}
+        _require_exact_keys(
+            minimization,
+            expected_minimization,
+            f"{run_name}: minimization schema",
+        )
+        if "reason" in minimization:
+            _require_json_str(minimization.get("reason"), f"{run_name}: minimization.reason")
+        for name in expected_minimization - {"reason", "status"}:
+            binding = _require_exact_keys(
+                minimization.get(name),
+                _V5_FILE_BINDING_KEYS,
+                f"{run_name}: minimization.{name} schema",
+            )
+            _require_json_int(
+                binding.get("bytes"), f"{run_name}: minimization.{name}.bytes"
+            )
+            _require_json_str_fields(
+                binding, {"path", "sha256"}, f"{run_name}: minimization.{name}"
+            )
+    else:
+        raise VerificationError(f"{run_name}: unsupported frontier evidence kind")
 
     source = _require_exact_keys(
         receipt.get("pipeline_source_identity"),
@@ -947,6 +1072,109 @@ def _expected_v5_replay_log(
         b"error: registered flat-scf stage completed with residuals; "
         b"artifact remains rejected\n"
     )
+
+
+_VERIFIER_STRONG_ENVIRONMENT_RE = re.compile(
+    r"cannot connect to (?:the )?(?:nix )?daemon|cannot connect to socket|"
+    r"daemon-socket|permission denied|operation not permitted|read-only file system|"
+    r"sandbox.{0,40}(?:failed|unavailable|not permitted)|build users group|"
+    r"substituter|narinfo|unable to download|failed to fetch|connection refused|"
+    r"connection timed out|name or service not known|"
+    r"path ['\"]?/nix/store/[^\n]+ is not valid|while evaluating|evaluation aborted|"
+    r"infinite recursion encountered|undefined variable|"
+    r"attribute ['\"][^'\"]+['\"] missing|"
+    r"flake ['\"]?[^\n]+ does not provide attribute",
+    re.IGNORECASE,
+)
+_VERIFIER_WRAPPER_RE = re.compile(
+    r"(?:builder for|build of|dependencies of derivation).{0,160}failed|"
+    r"failed to produce output path",
+    re.IGNORECASE,
+)
+_VERIFIER_COMPILER_RE = re.compile(
+    r"failed to legalize operation|unhandled operation|LLVM ERROR",
+    re.IGNORECASE,
+)
+
+
+def _normalized_compiler_diagnostic(text: str) -> str:
+    lines = [line.strip() for line in text.splitlines()]
+    specific = [line for line in lines if _VERIFIER_COMPILER_RE.search(line)]
+    if specific:
+        return "\n".join(specific)
+    generic = [
+        line
+        for line in lines
+        if re.search(r"\berror:\s", line, re.IGNORECASE)
+        and not re.search(
+            r"error: (?:builder for|build of|\d+ dependencies of derivation)",
+            line,
+            re.IGNORECASE,
+        )
+    ]
+    return "\n".join(generic)
+
+
+def _derive_compiler_failure_diagnostic(
+    log: bytes,
+    *,
+    upstream_path: str,
+    build_command: str,
+    context: str,
+) -> tuple[str, str | None, str | None]:
+    """Independently reject environmental wrappers and derive exact compiler facts."""
+
+    text = log.decode("utf-8", errors="replace")
+    diagnostic = _normalized_compiler_diagnostic(text)
+    intrinsic = bool(_VERIFIER_COMPILER_RE.search(diagnostic))
+    names = {upstream_path, Path(upstream_path).name}
+    located = any(
+        re.search(
+            rf"{re.escape(name)}(?:['\"])?[:]\d+:\d+[^\n]*\berror:",
+            diagnostic,
+            re.IGNORECASE,
+        )
+        for name in names
+        if name
+    )
+    tool_names = {
+        Path(token.rstrip("'\"),;")).name
+        for token in re.findall(r"(?:/[^\s]+/bin/[^\s]+)", build_command)
+    }
+    tool_names.discard("nix")
+    tool_attributed = any(
+        tool
+        and re.search(
+            rf"(?:^|\n).*\b{re.escape(tool)}\b[^\n]*(?:error|fatal):|"
+            rf"(?:^|\n).*?(?:error|fatal):[^\n]*\b{re.escape(tool)}\b",
+            diagnostic,
+            re.IGNORECASE,
+        )
+        for tool in tool_names
+    )
+    attributed = intrinsic or located or tool_attributed
+    _require(
+        not _VERIFIER_STRONG_ENVIRONMENT_RE.search(text)
+        and not (_VERIFIER_WRAPPER_RE.search(text) and not attributed),
+        f"{context}: environmental/Nix failure cannot establish compiler frontier",
+    )
+    _require(
+        bool(diagnostic) and attributed,
+        f"{context}: nonzero result lacks compiler-attributed diagnostic",
+    )
+    operation_match = re.search(
+        r"failed to legalize operation\s+['\"]([^'\"]+)['\"]"
+        r"(?:\s*:\s*([^\n]+))?",
+        diagnostic,
+        re.IGNORECASE,
+    )
+    operation = operation_match.group(1) if operation_match else None
+    types = (
+        operation_match.group(2).strip()
+        if operation_match and operation_match.group(2)
+        else None
+    )
+    return diagnostic, operation, types
 
 
 def _build_command_file_bindings(build_command: str) -> list[dict[str, Any]]:
@@ -1806,9 +2034,16 @@ def _verify_v5_frontier_evidence(
         )
         _require(frontier.get("manifest") is None, f"{run_name}: compiler failure cannot carry any manifest")
         diagnostic = frontier.get("diagnostic")
+        independently_derived = _derive_compiler_failure_diagnostic(
+            files[f"{first_invalid}.log"],
+            upstream_path=str(full.get("source_artifact")),
+            build_command=str(final_run.get("derivation_build_command")),
+            context=run_name,
+        )
         _require(
             isinstance(diagnostic, str)
             and diagnostic == receipt.get("diagnostic")
+            and diagnostic == independently_derived[0]
             and diagnostic.encode() in files[f"{first_invalid}.log"],
             f"{run_name}: failure log lost normalized diagnostic",
         )
@@ -1819,16 +2054,11 @@ def _verify_v5_frontier_evidence(
             and final_run.get("artifact") == full.get("source_artifact"),
             f"{run_name}: compiler failure did not preserve full input artifact",
         )
-        searchable = diagnostic + "\n" + content.decode("utf-8", errors="replace")
         operation = frontier.get("operation")
         types = frontier.get("types")
         _require(
-            operation is None or (isinstance(operation, str) and operation in searchable),
-            f"{run_name}: operation is not bound by diagnostic or input",
-        )
-        _require(
-            types is None or (isinstance(types, str) and types in searchable),
-            f"{run_name}: types are not bound by diagnostic or input",
+            operation == independently_derived[1] and types == independently_derived[2],
+            f"{run_name}: operation/types differ from independently derived compiler diagnostic",
         )
         interestingness = frontier.get("interestingness")
         _require(isinstance(interestingness, dict), f"{run_name}: interestingness evidence missing")
@@ -1837,6 +2067,11 @@ def _verify_v5_frontier_evidence(
         )
         _verify_file_binding(
             interestingness.get("full_log"), files, "interesting-full.log", canonical_root, run_name
+        )
+        _require(
+            interestingness.get("expected_exit") == final_record.get("exit_code")
+            and interestingness.get("normalized_terminal_diagnostic") == diagnostic,
+            f"{run_name}: interestingness predicate differs from compiler failure",
         )
         expected_files.update({"interestingness-test.sh", "interesting-full.log", "reduction.log"})
         minimization = frontier.get("minimization")
@@ -1870,6 +2105,22 @@ def _verify_v5_frontier_evidence(
                 and "minimal_reproducer" not in minimization
                 and "interesting_reproducer_log" not in minimization,
                 f"{run_name}: invalid not-practical minimization",
+            )
+        reducer = minimization.get("mlir_reduce")
+        if reducer is not None:
+            _require(isinstance(reducer, dict), f"{run_name}: mlir-reduce binding missing")
+            reducer_path = reducer.get("path")
+            _require(
+                isinstance(reducer_path, str)
+                and Path(reducer_path).is_file()
+                and not Path(reducer_path).is_symlink(),
+                f"{run_name}: bound mlir-reduce is not a regular live tool",
+            )
+            reducer_bytes = Path(reducer_path).read_bytes()
+            _require(
+                reducer.get("bytes") == len(reducer_bytes)
+                and reducer.get("sha256") == _sha256_bytes(reducer_bytes),
+                f"{run_name}: live mlir-reduce binding mismatch",
             )
     else:
         raise VerificationError(f"{run_name}: unsupported frontier evidence kind")
@@ -1927,15 +2178,16 @@ def _verify_v5_receipt(
     sequence = [record.get("stage") for record in stages if isinstance(record, dict)]
     first_invalid = pipeline.get("first_invalid_stage")
     _require(
-        first_invalid == "flat-scf"
-        and len(stages) == 5
+        first_invalid in _REGISTERED_ORDER
+        and bool(stages)
         and all(isinstance(record, dict) for record in stages)
-        and sequence == _REGISTERED_ORDER[:5]
+        and sequence == _REGISTERED_ORDER[: len(stages)]
+        and sequence[-1] == first_invalid
         and set(execution) == set(sequence)
         and pipeline.get("registered_order") == _REGISTERED_ORDER
-        and pipeline.get("not_run") == _REGISTERED_ORDER[5:]
+        and pipeline.get("not_run") == _REGISTERED_ORDER[len(stages) :]
         and pipeline.get("stopped_after_first_invalid_stage") is True,
-        f"{run_name}: exact c22 stage order mismatch",
+        f"{run_name}: exact registered stage order mismatch",
     )
     _require(
         receipt.get("status") == "compiler_frontier"
@@ -1953,10 +2205,12 @@ def _verify_v5_receipt(
         receipt.get("frontier") == expected_frontier,
         f"{run_name}: frontier class mismatch",
     )
-    _require(
-        receipt.get("diagnostic") == _RESIDUAL_DIAGNOSTIC,
-        f"{run_name}: top-level control-manifest diagnostic mismatch",
-    )
+    frontier_kind = receipt.get("frontier_evidence", {}).get("kind")
+    if frontier_kind == "control_manifest":
+        _require(
+            receipt.get("diagnostic") == _RESIDUAL_DIAGNOSTIC,
+            f"{run_name}: top-level control-manifest diagnostic mismatch",
+        )
     live_frontier = trust["derivations"].get(first_invalid)
     expected_files = _verify_v5_frontier_evidence(
         receipt,
@@ -1979,10 +2233,28 @@ def _verify_v5_receipt(
         log_path = f"{canonical_root}/{log_name}"
         log = files.get(log_name)
         _require(isinstance(log, bytes), f"{run_name}: missing log for {stage}")
-        artifact = live.get("artifact_bytes")
+        compiler_invalid = stage == first_invalid and frontier_kind == "compiler_failure"
+        upstream_live = trust["derivations"].get(sequence[index - 1]) if index else None
+        artifact_live = upstream_live if compiler_invalid else live
+        artifact = artifact_live.get("artifact_bytes") if isinstance(artifact_live, dict) else None
         _require(isinstance(artifact, bytes), f"{run_name}: live artifact missing for {stage}")
         expected_accepted = stage != first_invalid
-        expected_diagnostics = [] if expected_accepted else [_RESIDUAL_DIAGNOSTIC]
+        if expected_accepted:
+            expected_diagnostics: list[str] = []
+        elif compiler_invalid:
+            expected_diagnostic, _, _ = _derive_compiler_failure_diagnostic(
+                _expected_v5_replay_log(stage, live),
+                upstream_path=str(artifact_live.get("artifact_path")),
+                build_command=str(live.get("build_command")),
+                context=run_name,
+            )
+            expected_diagnostics = [expected_diagnostic]
+            _require(
+                receipt.get("diagnostic") == expected_diagnostic,
+                f"{run_name}: top-level compiler diagnostic mismatch",
+            )
+        else:
+            expected_diagnostics = [_RESIDUAL_DIAGNOSTIC]
         expected_upstream = (
             f"package_manifest_sha256:{_FROZEN_IDENTITIES['package_manifest_sha256']}"
             if index == 0
@@ -1991,7 +2263,7 @@ def _verify_v5_receipt(
         _require(
             record.get("status") == ("succeeded" if expected_accepted else "compiler_failure")
             and record.get("terminal_diagnostics") == expected_diagnostics
-            and record.get("artifact") == live.get("artifact_path")
+            and record.get("artifact") == artifact_live.get("artifact_path")
             and record.get("artifact_bytes") == len(artifact)
             and record.get("artifact_sha256") == _sha256_bytes(artifact)
             and record.get("upstream_identity") == expected_upstream,
@@ -2019,11 +2291,11 @@ def _verify_v5_receipt(
         )
         _require(
             run.get("invoked") is True
-            and run.get("result") == live.get("output")
+            and run.get("result") == (None if compiler_invalid else live.get("output"))
             and run.get("route_alias") == _ALIAS
             and run.get("frontend") == "linalg"
             and run.get("backend") == "calyx-native-sv"
-            and run.get("artifact") == live.get("artifact_path")
+            and run.get("artifact") == artifact_live.get("artifact_path")
             and run.get("artifact_bytes") == len(artifact)
             and run.get("artifact_sha256") == _sha256_bytes(artifact),
             f"{run_name}: execution semantics mismatch for {stage}",
@@ -2046,7 +2318,7 @@ def _verify_v5_receipt(
                 live,
                 residual_rejected=(
                     stage == first_invalid
-                    and receipt.get("frontier_evidence", {}).get("kind")
+                    and frontier_kind
                     == "control_manifest"
                     and receipt.get("frontier_evidence", {})
                     .get("manifest", {})
@@ -2639,7 +2911,7 @@ def verify_public_v5_evidence(repo_root: Path, bundle_root: Path) -> dict[str, A
     _require(
         manifest.get("schema") == "tinystories-1m-exact-frontier-determinism-bundles-v3"
         and manifest.get("source_commit") == _V5_SOURCE_COMMIT,
-        "public evidence requires the pinned c22 v5 bundle",
+        "public evidence requires a pinned c22 v5 bundle",
     )
     run_receipts = [
         (bundle_root / run_name / "receipt.json").read_bytes()
@@ -2664,7 +2936,12 @@ def verify_public_v5_evidence(repo_root: Path, bundle_root: Path) -> dict[str, A
     canonical_files = manifest.get("canonical_files")
     _require(isinstance(canonical_files, list), "public canonical file list missing")
     expected_reproducers = set(canonical_files) - {"receipt.json"}
-    public_reproducers = repo_root / "reproducers/flat-scf"
+    first_invalid = result.get("first_invalid_stage")
+    _require(
+        isinstance(first_invalid, str) and first_invalid in _REGISTERED_ORDER,
+        "public evidence has an invalid frontier stage",
+    )
+    public_reproducers = repo_root / "reproducers" / first_invalid
     actual_reproducers = _enumerate_run_files(public_reproducers, "public reproducer")
     _require(
         actual_reproducers == expected_reproducers,

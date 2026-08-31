@@ -117,7 +117,17 @@ class CompilerFailure:
     types: str | None
 
 
-RegisteredStageResult = AcceptedStageResult | ControlManifestFailure | CompilerFailure
+@dataclass(frozen=True)
+class EnvironmentFailure:
+    kind: Literal["environment_failure"]
+    log: Path
+    diagnostic: str
+    category: str
+
+
+RegisteredStageResult = (
+    AcceptedStageResult | ControlManifestFailure | CompilerFailure | EnvironmentFailure
+)
 
 
 @dataclass(frozen=True)
@@ -1415,24 +1425,172 @@ def _normalized_terminal_diagnostic(text: str) -> str:
     return "\n".join(generic)
 
 
+_STRONG_ENVIRONMENT_FAILURES = (
+    (
+        "nix_daemon",
+        re.compile(
+            r"cannot connect to (?:the )?(?:nix )?daemon|"
+            r"cannot connect to socket|daemon-socket|nix daemon is not running",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "permission",
+        re.compile(
+            r"permission denied|operation not permitted|read-only file system",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "sandbox",
+        re.compile(
+            r"(?:creating|setting up|initializing).{0,40}sandbox|"
+            r"sandbox.{0,40}(?:failed|unavailable|not permitted)|build users group",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "substituter",
+        re.compile(
+            r"substituter|narinfo|unable to download|failed to fetch|"
+            r"connection (?:refused|timed out)|name or service not known",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "nix_store",
+        re.compile(
+            r"(?:path ['\"]?/nix/store/[^\n]+ is not valid)|"
+            r"(?:/nix/store/[^\n]*(?:corrupt|lock file|database|store path))",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "nix_evaluation",
+        re.compile(
+            r"while evaluating|evaluation aborted|infinite recursion encountered|"
+            r"undefined variable|attribute ['\"][^'\"]+['\"] missing|"
+            r"flake ['\"]?[^\n]+ does not provide attribute",
+            re.IGNORECASE,
+        ),
+    ),
+)
+_NIX_WRAPPER_FAILURE_RE = re.compile(
+    r"(?:builder for|build of|dependencies of derivation).{0,160}failed|"
+    r"failed to produce output path|build command failed before invoking",
+    re.IGNORECASE,
+)
+_INTRINSIC_COMPILER_DIAGNOSTIC_RE = re.compile(
+    r"failed to legalize operation|unhandled operation|LLVM ERROR",
+    re.IGNORECASE,
+)
+
+
+def _diagnostic_is_compiler_attributed(
+    diagnostic: str,
+    upstream_input: Path,
+    build_command: str | None,
+) -> bool:
+    """Require the failure to name compiler semantics, its bound input, or bound tool."""
+
+    if _INTRINSIC_COMPILER_DIAGNOSTIC_RE.search(diagnostic):
+        return True
+    upstream_names = {str(upstream_input), upstream_input.name}
+    if any(
+        re.search(
+            rf"{re.escape(name)}(?:['\"])?[:]\d+:\d+[^\n]*\berror:",
+            diagnostic,
+            re.IGNORECASE,
+        )
+        for name in upstream_names
+        if name
+    ):
+        return True
+    if build_command:
+        tool_names = {
+            Path(token.rstrip("'\"),;")).name
+            for token in re.findall(r"(?:/[^\s]+/bin/[^\s]+)", build_command)
+        }
+        tool_names.discard("nix")
+        for tool in tool_names:
+            if tool and re.search(
+                rf"(?:^|\n).*\b{re.escape(tool)}\b[^\n]*(?:error|fatal):|"
+                rf"(?:^|\n).*?(?:error|fatal):[^\n]*\b{re.escape(tool)}\b",
+                diagnostic,
+                re.IGNORECASE,
+            ):
+                return True
+    return False
+
+
+def _environment_failure_category(
+    text: str, *, compiler_attributed: bool
+) -> str | None:
+    for category, pattern in _STRONG_ENVIRONMENT_FAILURES:
+        if pattern.search(text):
+            return category
+    if not compiler_attributed and _NIX_WRAPPER_FAILURE_RE.search(text):
+        return "nix_build_wrapper"
+    if not compiler_attributed:
+        return "unattributed_nonzero"
+    return None
+
+
+def _normalized_environment_diagnostic(text: str) -> str:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    failures = [
+        line
+        for line in lines
+        if re.search(
+            r"\b(?:error|warning|fatal):|failed|permission denied|"
+            r"operation not permitted|cannot connect",
+            line,
+            re.IGNORECASE,
+        )
+    ]
+    return "\n".join(failures or lines[-1:])
+
+
 def _classify_registered_result(
     stage: str,
     exit_code: int,
     output: Path,
     upstream_input: Path | None,
     log: Path,
+    *,
+    build_command: str | None = None,
 ) -> RegisteredStageResult:
     if exit_code != 0:
+        if not log.is_file():
+            raise RuntimeError(f"{stage}: nonzero build log does not exist: {log}")
+        text = log.read_text(encoding="utf-8", errors="replace")
+        diagnostic = _normalized_terminal_diagnostic(text)
+        attributed = bool(
+            upstream_input is not None
+            and upstream_input.is_file()
+            and diagnostic
+            and _diagnostic_is_compiler_attributed(
+                diagnostic, upstream_input, build_command
+            )
+        )
+        environment_category = _environment_failure_category(
+            text, compiler_attributed=attributed
+        )
+        if environment_category is not None:
+            environment_diagnostic = _normalized_environment_diagnostic(text)
+            if not environment_diagnostic:
+                environment_diagnostic = f"nonzero {stage} build without a compiler diagnostic"
+            return EnvironmentFailure(
+                kind="environment_failure",
+                log=log,
+                diagnostic=environment_diagnostic,
+                category=environment_category,
+            )
         if upstream_input is None or not upstream_input.is_file():
             raise RuntimeError(f"{stage}: compiler failure has no preserved upstream input")
-        if not log.is_file():
-            raise RuntimeError(f"{stage}: compiler failure log does not exist: {log}")
-        diagnostic = _normalized_terminal_diagnostic(
-            log.read_text(encoding="utf-8", errors="replace")
-        )
-        if not diagnostic:
+        if not diagnostic or not attributed:
             raise RuntimeError(
-                f"{stage}: nonzero registered build had no classifiable compiler diagnostic"
+                f"{stage}: nonzero registered build had no attributable compiler diagnostic"
             )
         operation_match = re.search(
             r"failed to legalize operation\s+['\"]([^'\"]+)['\"]"
@@ -1791,7 +1949,13 @@ def _run_registered_stage(
         output=output,
         upstream_input=Path(upstream.artifact) if upstream is not None else None,
         log=log,
+        build_command=str(derivation["build_command"]),
     )
+    if isinstance(registered_result, EnvironmentFailure):
+        raise RuntimeError(
+            f"{stage}: environment failure invalidates capture "
+            f"({registered_result.category}): {registered_result.diagnostic}"
+        )
     accepted = isinstance(registered_result, AcceptedStageResult)
     if isinstance(registered_result, AcceptedStageResult):
         artifact = registered_result.artifact
