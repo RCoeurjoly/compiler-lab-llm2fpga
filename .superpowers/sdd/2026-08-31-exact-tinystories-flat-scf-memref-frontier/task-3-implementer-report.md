@@ -7,6 +7,8 @@
 - Initial report: `f3bc741ebb08062ed06db07de37c7b42575607fa`
 - Review-fix implementation heads: `6f7a8b3` (authentication/replay) and
   `7a1a0c0` (explicit shape/layout/access proofs)
+- Review-fix round 2 implementation head: `4a8aac2`
+  (canonical run attribution and complete affine proofs)
 
 ## RED
 
@@ -36,7 +38,15 @@ rebound model/Task-1-through-3/provenance data, three parse-check fields, all
 five reproducer execution fields, and semantic-evidence mutation because no
 live probes existed. A representative-byte rebound also reached the wrong
 trust boundary. The corresponding adversarial tests failed before production
-changes and are retained in the 19-test suite.
+changes and are retained in the 21-test suite.
+
+Review fix round 2 also began with conclusive RED. Four independently
+full-rehashed controls survived fresh replay: a mutable run ID, cross-run empty
+stdout/stderr bindings, the byte-identical expand/reinterpret representative
+outputs, and the byte-identical expand/reinterpret semantic outputs plus parse
+streams. The old evidence also had no variable domains or affine formulas, and
+its semantic-model API could not classify a non-affine multiplication as
+`unproven`. All five failures were observed before production changes.
 
 ## Exact identities and provenance
 
@@ -67,31 +77,40 @@ All representatives ran, parsed, and were recorded before the complete input.
 
 | Class | Classification | After class count | Pass time (ns) | Output SHA-256 |
 | --- | --- | ---: | ---: | --- |
-| `memref.collapse_shape` | `eliminated` | 0 | 37,099,911 | `3e20c196c823cf15079740ae1385519fd075bd5b66ec5151dbb6419157609c66` |
-| `memref.copy` | `preserved` | 1 | 39,211,045 | `bc331bbe83d22a803d9ea92683738141aac5ed14bf20e87c5f188731d20f125c` |
-| `memref.expand_shape` | `eliminated` | 0 | 36,501,631 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
-| `memref.reinterpret_cast` | `eliminated` | 0 | 39,329,232 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
+| `memref.collapse_shape` | `eliminated` | 0 | 34,367,016 | `3e20c196c823cf15079740ae1385519fd075bd5b66ec5151dbb6419157609c66` |
+| `memref.copy` | `preserved` | 1 | 36,993,307 | `bc331bbe83d22a803d9ea92683738141aac5ed14bf20e87c5f188731d20f125c` |
+| `memref.expand_shape` | `eliminated` | 0 | 36,781,261 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
+| `memref.reinterpret_cast` | `eliminated` | 0 | 44,574,836 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
 
 Each run retains exact stdout, stderr, output, parse-check streams, command,
 exit, elapsed nanoseconds, and byte identities. The verifier independently
 reconstructs the parse command and compares fresh exit/stdout/stderr exactly.
+The ordered kind/operation sequence now independently owns every exact run ID
+and evidence directory. Every run binding and pass/parse command must name its
+canonical path; equal bytes can no longer be attributed to another run.
 
 ## Semantically live representative probes
 
 Four additional executions, still before the complete artifact, use the exact
 authenticated selected operation with live `memref.load` and `memref.store`
 uses. Both evaluator and verifier independently derive shape, strides, offset,
-element count, and linear memory-access maps from the before/after IR.
+element count, base-buffer identity/role, logical variable domains, raw affine
+indices and bounds, copy source/target provenance, and the complete affine
+linearization from the before/after IR.
 
-| Class | Before shape/layout | After shape/layout | Linear load/store | Status |
-| --- | --- | --- | ---: | --- |
-| `memref.collapse_shape` | `4x256`, `[256,1]`, offset 0 | `1024`, `[1]`, offset 0 | 515 / 515 | `proven` |
-| `memref.copy` | `1`, `[1]`, offset 0 | `1`, `[1]`, offset 0 | 0 / 0 | `proven` |
-| `memref.expand_shape` | `1x1`, `[1,1]`, offset 0 | `1`, `[1]`, offset 0 | 0 / 0 | `proven` |
-| `memref.reinterpret_cast` | `1`, `[1]`, offset 0 | `1`, `[1]`, offset 0 | 0 / 0 | `proven` |
+| Class | Logical domain | Before → after raw indices | Equal linear formula | Base/provenance | Status |
+| --- | --- | --- | --- | --- | --- |
+| `memref.collapse_shape` | `i0∈[0,4), i1∈[0,256)` | `[i0,i1]` → `[256*i0+i1]` | `256*i0+i1` | argument 0 / source | `proven` |
+| `memref.copy` | singleton | `[0]` → `[0]` | `0` | argument 1 / target; copy 0/source → 1/target | `proven` |
+| `memref.expand_shape` | singleton | `[0,0]` → `[0]` | `0` | argument 0 / source | `proven` |
+| `memref.reinterpret_cast` | singleton | `[0]` → `[0]` | `0` | argument 0 / source | `proven` |
 
-The collapse probe preserves 1,024 elements; the other probes preserve one.
-Semantic-evidence mutations are rejected by independent recomputation.
+The collapse formula proves all 1,024 elements, not only the retained
+supplementary sample `[2,3] → 515`; singleton domains prove the only possible
+element without a free variable. Affine coefficients/offsets, raw indices,
+bounds, base role/identity, and copy provenance mutations are all rejected by
+independent recomputation. Dynamic or non-affine indexing returns `unproven`
+and cannot support registration.
 
 ## Complete retained c22 result
 
@@ -105,7 +124,7 @@ Exact before census:
 | `memref.reinterpret_cast` | 11,449 | 408 |
 | Total | 20,280 | 895 |
 
-The full invocation ran for 885,060,069 ns and exited 1. It produced exact
+The full invocation ran for 887,284,327 ns and exited 1. It produced exact
 empty output (SHA-256
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`)
 and 791 exact stderr bytes (SHA-256
@@ -127,7 +146,7 @@ at retained c22 line 2,389:
 The existing pass flattens `%arg2` from `memref<64x64xi64>` to
 `memref<4096xi64>` while leaving the rank-2 subview offsets/sizes/strides
 unchanged. The 200-byte one-operation exact reproducer independently exits 1
-with the same diagnostic; its measured pass time was 40,305,841 ns. Its exact
+with the same diagnostic; its measured pass time was 36,388,662 ns. Its exact
 command, exit 1, stdout, stderr, absent-output observation, and retained empty
 output bytes are independently reconstructed and replayed. Elapsed time is a
 positive authenticated observation only and is deliberately excluded from
@@ -147,9 +166,9 @@ regression; float-math work remains out of scope.
 ## Canonical evidence
 
 - Evaluation self-hash:
-  `f3e6bebf28c6795ce54d8e59189c6ef73bce48e121353ae819f36eeb68a79651`.
-- Evaluation file: 225,078 bytes,
-  `463f1d141a99adfda6a806ac6de55b309e9e3ca76e03631d2908ddc92a21d490`.
+  `8eef242d6e6301749769f7cb019ab380d6a32d867fcf3f01b11b280de591db95`.
+- Evaluation file: 233,038 bytes,
+  `26e0ddcaf0abc6100332378d2cacf0555f3560a7635bcdd60dbb9f47bd5ad0d8`.
 - Exact representative/full streams:
   `artifacts/comparison/tinystories-1m-exact-memref-pass-evidence/`.
 - Exact minimal residual:
@@ -162,12 +181,12 @@ regression; float-math work remains out of scope.
   — `PASS`, with `compiler_pass_extension` and unavailable post-pass counts.
 - Required suite:
   `nix develop -c python -m unittest tests/test_tinystories_1m_exact_memref_pass.py -v`
-  — `Ran 19 tests in 137.332s`, `OK`.
+  — `Ran 21 tests in 139.943s`, `OK`.
 - Python compilation for evaluator, verifier, and tests — PASS.
 - `nix flake check --no-build` — PASS (`all checks passed`).
 - Staged `git diff --check` — PASS after marking raw byte evidence non-diffable;
   no evidence bytes were normalized.
-- Repository pre-commit hygiene hook accepted `6f7a8b3` and `7a1a0c0`.
+- Repository pre-commit hygiene hook accepted `4a8aac2`.
 
 ## Files
 
