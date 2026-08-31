@@ -9,9 +9,11 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -57,6 +59,12 @@ LEFT_SHIFT_SUCCESS_BUNDLES = (
     / "artifacts"
     / "comparison"
     / "tinystories-1m-exact-left-shift-success-determinism"
+)
+FLAT_SCF_BUNDLES = (
+    ROOT
+    / "artifacts"
+    / "comparison"
+    / "tinystories-1m-exact-frontier-determinism-flat-scf"
 )
 
 
@@ -740,6 +748,369 @@ class FrontierEvidenceUnionValidationTest(unittest.TestCase):
             MODULE._expected_v5_replay_log(
                 "flat-scf", self.live_flat_scf, residual_rejected=True
             )
+
+
+class V5PublicReceiptAdversarialTest(unittest.TestCase):
+    """Mutations remain internally self-hashed and enter through the public verifier."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        receipt = json.loads(
+            (FLAT_SCF_BUNDLES / "run-1" / "receipt.json").read_text(encoding="utf-8")
+        )
+        cls.trust = MODULE._independent_v5_trust(
+            ROOT,
+            receipt["source_commit"],
+            [record["stage"] for record in receipt["stages"]],
+        )
+
+    def _mutated_bundle(self, mutate):
+        temporary = tempfile.TemporaryDirectory(prefix="exact-v5-public-mutation-")
+        self.addCleanup(temporary.cleanup)
+        bundle = Path(temporary.name) / "bundle"
+        shutil.copytree(FLAT_SCF_BUNDLES, bundle, copy_function=os.link)
+        manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+        receipts = []
+        for run_name in ("run-1", "run-2"):
+            path = bundle / run_name / "receipt.json"
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+            mutate(receipt)
+            receipt["sha256"] = MODULE._canonical_receipt_hash(receipt)
+            data = (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode()
+            replacement = path.with_suffix(".replacement")
+            replacement.write_bytes(data)
+            replacement.replace(path)
+            binding = manifest["runs"][run_name]["files"]["receipt.json"]
+            binding.update({"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+            manifest["runs"][run_name]["receipt_self_hash"] = receipt["sha256"]
+            manifest["runs"][run_name]["source_commit"] = receipt["source_commit"]
+            receipts.append((receipt, data))
+        self.assertEqual(receipts[0], receipts[1])
+        receipt, data = receipts[0]
+        manifest["source_commit"] = receipt["source_commit"]
+        manifest["expected_comparison"].update({
+            "receipt_file_sha256": hashlib.sha256(data).hexdigest(),
+            "receipt_self_hash": receipt["sha256"],
+        })
+        manifest_path = bundle / "manifest.json"
+        replacement = manifest_path.with_suffix(".replacement")
+        replacement.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        replacement.replace(manifest_path)
+        return bundle
+
+    def _reject(self, mutate, pattern: str) -> None:
+        bundle = self._mutated_bundle(mutate)
+        with mock.patch.object(MODULE, "_independent_v5_trust", return_value=self.trust):
+            with self.assertRaisesRegex(MODULE.VerificationError, pattern):
+                MODULE.verify_determinism_bundles(bundle)
+
+    def _payload_mutated_bundle(self, filename: str):
+        bundle = self._mutated_bundle(lambda _: None)
+        manifest_path = bundle / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        receipts = []
+        for run_name in ("run-1", "run-2"):
+            payload_path = bundle / run_name / filename
+            payload = payload_path.read_bytes() + b"\n"
+            replacement = payload_path.with_suffix(payload_path.suffix + ".replacement")
+            replacement.write_bytes(payload)
+            replacement.replace(payload_path)
+            payload_binding = manifest["runs"][run_name]["files"][filename]
+            payload_binding.update({
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            })
+            receipt_path = bundle / run_name / "receipt.json"
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if filename == "minimal-reproducer.json":
+                binding = receipt["frontier_evidence"]["manifest"]
+                receipt["stages"][-1].update({
+                    "artifact_bytes": len(payload),
+                    "artifact_sha256": hashlib.sha256(payload).hexdigest(),
+                })
+                receipt["registered_build_execution"]["flat-scf"].update({
+                    "artifact_bytes": len(payload),
+                    "artifact_sha256": hashlib.sha256(payload).hexdigest(),
+                })
+            elif filename == "flat.scf.mlir":
+                binding = receipt["frontier_evidence"]["residual_artifact"]
+            else:
+                binding = receipt["frontier_evidence"]["blockers"]
+            binding.update(payload_binding)
+            receipt["sha256"] = MODULE._canonical_receipt_hash(receipt)
+            receipt_data = (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode()
+            replacement = receipt_path.with_suffix(".replacement")
+            replacement.write_bytes(receipt_data)
+            replacement.replace(receipt_path)
+            receipt_binding = manifest["runs"][run_name]["files"]["receipt.json"]
+            receipt_binding.update({
+                "bytes": len(receipt_data),
+                "sha256": hashlib.sha256(receipt_data).hexdigest(),
+            })
+            manifest["runs"][run_name]["receipt_self_hash"] = receipt["sha256"]
+            receipts.append((receipt, receipt_data))
+        self.assertEqual(receipts[0], receipts[1])
+        manifest["expected_comparison"].update({
+            "receipt_file_sha256": hashlib.sha256(receipts[0][1]).hexdigest(),
+            "receipt_self_hash": receipts[0][0]["sha256"],
+        })
+        replacement = manifest_path.with_suffix(".replacement")
+        replacement.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+        replacement.replace(manifest_path)
+        return bundle
+
+    def test_public_verifier_rejects_each_stage_semantic_lie(self) -> None:
+        cases = {
+            "status": lambda r: r["stages"][-1].__setitem__("status", "succeeded"),
+            "terminal_diagnostics": lambda r: r["stages"][-1].__setitem__(
+                "terminal_diagnostics", []
+            ),
+            "artifact_bytes": lambda r: r["stages"][-1].__setitem__(
+                "artifact_bytes", r["stages"][-1]["artifact_bytes"] + 1
+            ),
+            "upstream_identity": lambda r: r["stages"][-1].__setitem__(
+                "upstream_identity", "0" * 64
+            ),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                self._reject(mutate, "stage semantics")
+
+    def test_public_verifier_rejects_each_execution_semantic_lie(self) -> None:
+        cases = {
+            "invoked": ("invoked", False),
+            "result": ("result", "/nix/store/detached"),
+            "route_alias": ("route_alias", "detached-route"),
+            "frontend": ("frontend", "torch"),
+            "backend": ("backend", "detached-backend"),
+            "artifact_bytes": ("artifact_bytes", 1),
+        }
+        for name, (key, value) in cases.items():
+            with self.subTest(name=name):
+                self._reject(
+                    lambda r, key=key, value=value: r["registered_build_execution"][
+                        "flat-scf"
+                    ].__setitem__(key, value),
+                    "execution semantics",
+                )
+
+    def test_public_verifier_rejects_acceptance_and_stage_order_lies(self) -> None:
+        def accepted(receipt):
+            receipt["stages"][-1]["artifact_accepted"] = True
+            receipt["registered_build_execution"]["flat-scf"]["artifact_accepted"] = True
+
+        self._reject(accepted, "invalid artifact|replay acceptance")
+
+        def reordered(receipt):
+            receipt["stages"][2], receipt["stages"][3] = (
+                receipt["stages"][3],
+                receipt["stages"][2],
+            )
+
+        self._reject(reordered, "stage order|sequence|executed prefix")
+
+        self._reject(
+            lambda receipt: receipt["stages"].append("ignored-stage-record"),
+            "stage order|sequence|executed prefix",
+        )
+        self._reject(
+            lambda receipt: receipt["registered_build_execution"].__setitem__(
+                "calyx", receipt["registered_build_execution"]["flat-scf"]
+            ),
+            "stage order|execution",
+        )
+
+    def test_public_verifier_rejects_top_level_diagnostic_and_combined_lies(self) -> None:
+        self._reject(lambda r: r.__setitem__("diagnostic", "invented"), "diagnostic")
+
+        def combined(receipt):
+            receipt["diagnostic"] = "invented"
+            receipt["stages"][-1].update({
+                "status": "succeeded",
+                "terminal_diagnostics": [],
+                "artifact_bytes": 1,
+                "upstream_identity": "0" * 64,
+            })
+            receipt["registered_build_execution"]["flat-scf"].update({
+                "invoked": False,
+                "result": "/nix/store/detached",
+                "route_alias": "detached-route",
+                "frontend": "torch",
+                "backend": "detached-backend",
+            })
+
+        self._reject(combined, "diagnostic|stage semantics|execution semantics")
+
+    def test_public_verifier_rejects_live_manifest_residual_and_blocker_substitutions(self) -> None:
+        for filename in ("minimal-reproducer.json", "flat.scf.mlir", "blockers.json"):
+            with self.subTest(filename=filename):
+                bundle = self._payload_mutated_bundle(filename)
+                with mock.patch.object(
+                    MODULE, "_independent_v5_trust", return_value=self.trust
+                ):
+                    with self.assertRaisesRegex(
+                        MODULE.VerificationError,
+                        "stage semantics|registered output|live registered output|control manifest",
+                    ):
+                        MODULE.verify_determinism_bundles(bundle)
+
+    def test_public_verifier_rejects_producer_commit_and_source_substitutions(self) -> None:
+        self._reject(
+            lambda r: r.__setitem__("source_commit", f"{r['source_commit']}^0"),
+            "producer source commit",
+        )
+        self._reject(
+            lambda r: r["pipeline_source_identity"].__setitem__(
+                "evidence_source_commit", "4f07c607717705401a8fdfd906f8a142910b8af7"
+            ),
+            "pipeline source identity",
+        )
+        self._reject(
+            lambda r: r["pipeline_source_identity"]["critical_inputs"]["flake.nix"].__setitem__(
+                "workspace_sha256", "0" * 64
+            ),
+            "critical pipeline input",
+        )
+
+    def test_unpinned_source_commit_is_rejected_before_nix_trust_resolution(self) -> None:
+        bundle = self._mutated_bundle(
+            lambda r: r.__setitem__("source_commit", f"{r['source_commit']}^0")
+        )
+        with mock.patch.object(
+            MODULE,
+            "_independent_v5_trust",
+            side_effect=AssertionError("must not resolve unpinned source"),
+        ):
+            with self.assertRaisesRegex(MODULE.VerificationError, "producer source commit"):
+                MODULE.verify_determinism_bundles(bundle)
+
+    def test_public_verifier_rejects_all_bound_provenance_substitutions(self) -> None:
+        cases = {
+            "flake archive": lambda r: r["pipeline_source_identity"].__setitem__(
+                "flake_archive_nar_hash", "sha256-detached"
+            ),
+            "Nix source": lambda r: r["pipeline_source_identity"][
+                "torch_derivation"
+            ].__setitem__("output", "/nix/store/detached"),
+            "Task identities": lambda r: r[
+                "frozen_task_1_through_3_identities"
+            ].__setitem__("adapter_sha256", "0" * 64),
+            "semantic": lambda r: r["semantic_gate"].__setitem__(
+                "probe_report_sha256", "0" * 64
+            ),
+            "predecessor": lambda r: r["predecessor_receipt"].__setitem__(
+                "self_sha256", "0" * 64
+            ),
+            "producer verifier": lambda r: r["capture_tools"][
+                "determinism_verifier"
+            ].__setitem__("sha256", "0" * 64),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                self._reject(mutate, "source identity|frozen Task|semantic|predecessor|source-commit-byte")
+
+
+class V5PublicIntegrationAdversarialTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        receipt = json.loads(
+            (FLAT_SCF_BUNDLES / "run-1" / "receipt.json").read_text(encoding="utf-8")
+        )
+        cls.trust = MODULE._independent_v5_trust(
+            ROOT,
+            receipt["source_commit"],
+            [record["stage"] for record in receipt["stages"]],
+        )
+
+    def _public_tree(self):
+        temporary = tempfile.TemporaryDirectory(prefix="exact-v5-public-tree-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        bundle = (
+            root
+            / "artifacts/comparison/tinystories-1m-exact-frontier-determinism-flat-scf"
+        )
+        bundle.parent.mkdir(parents=True)
+        shutil.copytree(FLAT_SCF_BUNDLES, bundle, copy_function=os.link)
+        current = root / "artifacts/comparison/tinystories-1m-exact-current-pipeline-frontier.json"
+        os.link(FLAT_SCF_BUNDLES / "run-1/receipt.json", current)
+        reproducers = root / "reproducers/flat-scf"
+        reproducers.parent.mkdir(parents=True)
+        shutil.copytree(ROOT / "reproducers/flat-scf", reproducers, copy_function=os.link)
+        return root, bundle, current, reproducers
+
+    @staticmethod
+    def _replace(path: Path, data: bytes) -> None:
+        replacement = path.with_name(path.name + ".replacement")
+        replacement.write_bytes(data)
+        replacement.replace(path)
+
+    def _reject(self, mutate, pattern: str) -> None:
+        root, bundle, current, reproducers = self._public_tree()
+        mutate(current, reproducers)
+        with mock.patch.object(MODULE, "_independent_v5_trust", return_value=self.trust):
+            with self.assertRaisesRegex(MODULE.VerificationError, pattern):
+                MODULE.verify_public_v5_evidence(root, bundle)
+
+    def test_public_verifier_accepts_exact_current_receipt_and_reproducer_tree(self) -> None:
+        root, bundle, _, _ = self._public_tree()
+        with mock.patch.object(MODULE, "_independent_v5_trust", return_value=self.trust):
+            result = MODULE.verify_public_v5_evidence(root, bundle)
+        self.assertEqual(result["public_reproducer_file_count"], 19)
+
+    def test_public_verifier_rejects_detached_current_receipt(self) -> None:
+        self._reject(
+            lambda current, _: self._replace(current, b"{}\n"),
+            "public receipt",
+        )
+
+    def test_public_verifier_rejects_mutated_live_bound_payloads(self) -> None:
+        for filename in ("flat.scf.mlir", "blockers.json"):
+            with self.subTest(filename=filename):
+                self._reject(
+                    lambda _, reproducers, filename=filename: self._replace(
+                        reproducers / filename,
+                        (reproducers / filename).read_bytes() + b"detached",
+                    ),
+                    "public reproducer",
+                )
+
+    def test_public_verifier_rejects_extra_missing_symlink_subdir_and_nonregular(self) -> None:
+        cases = {
+            "extra": lambda r: (r / "extra").write_bytes(b"extra"),
+            "missing": lambda r: (r / "blockers.json").unlink(),
+            "symlink": lambda r: ((r / "blockers.json").unlink(), (r / "blockers.json").symlink_to("flat.scf.mlir")),
+            "subdir": lambda r: (r / "subdir").mkdir(),
+            "nonregular": lambda r: os.mkfifo(r / "fifo"),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                self._reject(lambda _, reproducers, mutate=mutate: mutate(reproducers), "public reproducer")
+
+
+class GeneratedMlirDiffScopeTest(unittest.TestCase):
+    def test_only_three_live_bound_generated_mlir_files_disable_git_diff(self) -> None:
+        generated = [
+            "artifacts/comparison/tinystories-1m-exact-frontier-determinism-flat-scf/run-1/flat.scf.mlir",
+            "artifacts/comparison/tinystories-1m-exact-frontier-determinism-flat-scf/run-2/flat.scf.mlir",
+            "reproducers/flat-scf/flat.scf.mlir",
+        ]
+        ordinary = "tests/fixtures/redundant_integer_casts.mlir"
+        result = subprocess.run(
+            ["git", "check-attr", "diff", "--", *generated, ordinary],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        values = {
+            line.split(": ", 2)[0]: line.split(": ", 2)[2]
+            for line in result.stdout.splitlines()
+        }
+        self.assertEqual([values[path] for path in generated], ["unset"] * 3)
+        self.assertEqual(values[ordinary], "unspecified")
 
 
 class SuccessorFrontierDeterminismBundleTest(unittest.TestCase):

@@ -62,6 +62,27 @@ _FROZEN_IDENTITIES = {
 _DECISION_SELF_SHA256 = "429da5a367755d35bc38308589beaf25d291a8272ebf4d8944bfa4b8919ef8fe"
 _PREDECESSOR_FILE_SHA256 = "b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55"
 _PREDECESSOR_SELF_SHA256 = "af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b"
+_V5_SOURCE_COMMIT = "c22c5f8d85e453a56b185f6238970933f5b1d407"
+_ACCEPTED_TASK4_COMMIT = "7eed3592a661c0cb3c417dc59b29839266446b2d"
+_REGISTRATION_COMMIT = "3314a70ac1cfe0e998f445162d1a2b5ae8398a20"
+_RESIDUAL_DIAGNOSTIC = (
+    "error: registered flat-scf stage completed with residuals; "
+    "artifact remains rejected"
+)
+_CRITICAL_INPUTS = (
+    "TinyStories/model_adapter_exact_package.py",
+    "artifacts/reference/tinystories-1m-exact-generation.json",
+    "artifacts/reference/tinystories-1m-exact-input-audit.json",
+    "artifacts/reference/tinystories-1m-exact-input-contract.json",
+    "artifacts/reference/tinystories-1m-exact-package-model.json",
+    "docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md",
+    "flake.lock",
+    "flake.nix",
+    "nix/models.nix",
+    "nix/pipeline.nix",
+    "scripts/compile-pytorch.py",
+    "scripts/materialize-pytorch-exported.py",
+)
 _V1_CANONICAL_FILES = (
     "receipt.json",
     "pytorch-exported-build.log",
@@ -310,6 +331,24 @@ def _live_derivation(
     output_name = derivation.get("outputs", {}).get("out", {}).get("path")
     _require(isinstance(output_name, str), f"{stage}: live output missing")
     build_command = str(derivation.get("env", {}).get("buildCommand", ""))
+    input_data = derivation.get("inputs", {})
+    receipt_derivation = {
+        "attribute": attribute,
+        "path": str(drv),
+        "file_sha256": _sha256_bytes(drv_bytes),
+        "json_sha256": _sha256_bytes(canonical),
+        "canonical_json": canonical.decode("utf-8"),
+        "output": f"/nix/store/{output_name}",
+        "build_command": build_command,
+        "build_command_sha256": _sha256_bytes(build_command.encode()),
+        "build_inputs": str(derivation.get("env", {}).get("buildInputs", "")),
+        "input_derivations": sorted(
+            f"/nix/store/{name}" for name in input_data.get("drvs", {})
+        ),
+        "input_sources": sorted(
+            f"/nix/store/{name}" for name in input_data.get("srcs", [])
+        ),
+    }
     return {
         "attribute": attribute,
         "path": str(drv),
@@ -321,6 +360,7 @@ def _live_derivation(
         "build_command": build_command,
         "build_command_sha256": _sha256_bytes(build_command.encode()),
         "tool_bindings": _build_command_file_bindings(build_command),
+        "receipt_derivation": receipt_derivation,
     }
 
 
@@ -344,6 +384,82 @@ def _git_source_bytes(repo_root: Path, source_commit: str, path: str) -> bytes:
     )
     _require(result.returncode == 0, f"source commit lacks {path}")
     return result.stdout
+
+
+def _git_object(repo_root: Path, revision: str) -> tuple[str, str]:
+    resolved = _run(["git", "rev-parse", revision], repo_root).strip()
+    object_type = _run(["git", "cat-file", "-t", resolved], repo_root).strip()
+    return resolved, object_type
+
+
+def _verify_pinned_v5_source_commit(
+    repo_root: Path, source_commit: object, context: str
+) -> None:
+    _require(
+        source_commit == _V5_SOURCE_COMMIT,
+        f"{context}: producer source commit is not the pinned c22 commit",
+    )
+    resolved, object_type = _git_object(repo_root, str(source_commit))
+    _require(
+        resolved == _V5_SOURCE_COMMIT and object_type == "commit",
+        f"{context}: producer source object is not the pinned commit",
+    )
+    for ancestor, label in (
+        (_ACCEPTED_TASK4_COMMIT, "accepted Task 4"),
+        (_REGISTRATION_COMMIT, "registered route"),
+    ):
+        result = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", ancestor, resolved],
+            cwd=repo_root,
+            capture_output=True,
+        )
+        _require(result.returncode == 0, f"{context}: producer lacks {label} ancestry")
+
+
+def _authenticate_v5_pipeline_source(
+    receipt: dict[str, Any], trust: dict[str, Any], run_name: str
+) -> None:
+    repo_root = trust["repo_root"]
+    source_commit = receipt.get("source_commit")
+    _verify_pinned_v5_source_commit(repo_root, source_commit, run_name)
+
+    source = receipt.get("pipeline_source_identity")
+    expected_source = trust.get("pipeline_source_identity")
+    _require(
+        isinstance(source, dict) and isinstance(expected_source, dict),
+        f"{run_name}: pipeline source identity missing",
+    )
+    for key in (
+        "accepted_task4_commit",
+        "evidence_source_commit",
+        "task4_is_ancestor",
+        "critical_inputs_clean",
+        "flake_archive_path",
+        "flake_archive_nar_hash",
+        "flake_archive_source",
+    ):
+        _require(
+            source.get(key) == expected_source.get(key),
+            f"{run_name}: pipeline source identity mismatch at {key}",
+        )
+    _require(
+        source.get("export_derivation") == expected_source.get("export_derivation")
+        and source.get("torch_derivation") == expected_source.get("torch_derivation"),
+        f"{run_name}: pipeline Nix derivation source identity mismatch",
+    )
+    critical = source.get("critical_inputs")
+    expected_critical = expected_source.get("critical_inputs")
+    _require(
+        isinstance(critical, dict)
+        and isinstance(expected_critical, dict)
+        and set(critical) == set(_CRITICAL_INPUTS),
+        f"{run_name}: critical pipeline input set mismatch",
+    )
+    for path in _CRITICAL_INPUTS:
+        _require(
+            critical.get(path) == expected_critical.get(path),
+            f"{run_name}: critical pipeline input mismatch: {path}",
+        )
 
 
 def _independent_v5_trust(
@@ -440,6 +556,109 @@ def _independent_v5_trust(
         derivations[stage] = live
         if result.returncode != 0:
             break
+    archive_document = json.loads(
+        _run(["nix", "flake", "archive", "--json", source_flake], repo_root)
+    )
+    archive = Path(archive_document["path"])
+    archive_nar_hash = _run(["nix", "hash", "path", str(archive)], repo_root).strip()
+    evaluated_sources = {
+        "scripts/compile-pytorch.py": ("torch", "-compile-pytorch.py", None),
+        "scripts/materialize-pytorch-exported.py": (
+            "pytorch-exported",
+            "-materialize-pytorch-exported.py",
+            None,
+        ),
+        "TinyStories/model_adapter_exact_package.py": (
+            "pytorch-exported",
+            "-TinyStories",
+            "model_adapter_exact_package.py",
+        ),
+        "artifacts/reference/tinystories-1m-exact-input-contract.json": (
+            "pytorch-exported",
+            "-tinystories-1m-exact-input-contract.json",
+            None,
+        ),
+        "artifacts/reference/tinystories-1m-exact-input-audit.json": (
+            "pytorch-exported",
+            "-tinystories-1m-exact-input-audit.json",
+            None,
+        ),
+        "artifacts/reference/tinystories-1m-exact-package-model.json": (
+            "pytorch-exported",
+            "-tinystories-1m-exact-package-model.json",
+            None,
+        ),
+        "artifacts/reference/tinystories-1m-exact-generation.json": (
+            "pytorch-exported",
+            "-tinystories-1m-exact-generation.json",
+            None,
+        ),
+        "docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md": (
+            "pytorch-exported",
+            "-2026-08-28-reference-guided-tinystories-1m-compiler-design.md",
+            None,
+        ),
+    }
+    critical: dict[str, dict[str, Any]] = {}
+    for path in _CRITICAL_INPUTS:
+        evidence_bytes = _git_source_bytes(repo_root, source_commit, path)
+        task4_bytes = _git_source_bytes(repo_root, _ACCEPTED_TASK4_COMMIT, path)
+        authenticated_commit = (
+            _REGISTRATION_COMMIT if path == "flake.nix" else _ACCEPTED_TASK4_COMMIT
+        )
+        authenticated_bytes = _git_source_bytes(repo_root, authenticated_commit, path)
+        archived = archive / path
+        _require(archived.is_file(), f"archived critical input missing: {path}")
+        archived_bytes = archived.read_bytes()
+        evidence_blob, evidence_type = _git_object(repo_root, f"{source_commit}:{path}")
+        task4_blob, task4_type = _git_object(repo_root, f"{_ACCEPTED_TASK4_COMMIT}:{path}")
+        authenticated_blob, authenticated_type = _git_object(
+            repo_root, f"{authenticated_commit}:{path}"
+        )
+        _require(
+            evidence_type == task4_type == authenticated_type == "blob"
+            and archived_bytes == evidence_bytes == authenticated_bytes,
+            f"authenticated critical input bytes mismatch: {path}",
+        )
+        binding: dict[str, Any] = {
+            "workspace_sha256": _sha256_bytes(evidence_bytes),
+            "task4_sha256": _sha256_bytes(task4_bytes),
+            "task4_blob": task4_blob,
+            "authenticated_commit": authenticated_commit,
+            "authenticated_sha256": _sha256_bytes(authenticated_bytes),
+            "authenticated_blob": authenticated_blob,
+            "evidence_blob": evidence_blob,
+            "flake_archive_path": str(archived),
+            "flake_archive_sha256": _sha256_bytes(archived_bytes),
+        }
+        if path in evaluated_sources:
+            stage, suffix, child = evaluated_sources[path]
+            candidates = [
+                Path(value)
+                for value in derivations[stage]["receipt_derivation"]["input_sources"]
+                if str(value).endswith(suffix)
+            ]
+            _require(len(candidates) == 1, f"evaluated source identity missing: {path}")
+            evaluated = candidates[0] / child if child else candidates[0]
+            evaluated_bytes = evaluated.read_bytes()
+            _require(evaluated_bytes == evidence_bytes, f"evaluated source bytes mismatch: {path}")
+            binding.update({
+                "derivation_store_path": str(evaluated),
+                "derivation_store_sha256": _sha256_bytes(evaluated_bytes),
+            })
+        critical[path] = binding
+    pipeline_source_identity = {
+        "accepted_task4_commit": _ACCEPTED_TASK4_COMMIT,
+        "evidence_source_commit": source_commit,
+        "task4_is_ancestor": True,
+        "critical_inputs_clean": True,
+        "flake_archive_path": str(archive),
+        "flake_archive_nar_hash": archive_nar_hash,
+        "flake_archive_source": source_flake,
+        "critical_inputs": critical,
+        "export_derivation": derivations["pytorch-exported"]["receipt_derivation"],
+        "torch_derivation": derivations["torch"]["receipt_derivation"],
+    }
     return {
         "repo_root": repo_root,
         "capture_tool_paths": {
@@ -467,6 +686,7 @@ def _independent_v5_trust(
             "self_sha256": _PREDECESSOR_SELF_SHA256,
         },
         "derivations": derivations,
+        "pipeline_source_identity": pipeline_source_identity,
     }
 
 
@@ -1016,6 +1236,7 @@ def _verify_v5_receipt(
     run_name: str,
 ) -> set[str]:
     _require(receipt.get("model") == _MODEL, f"{run_name}: model mismatch")
+    _authenticate_v5_pipeline_source(receipt, trust, run_name)
     _require(
         receipt.get("semantic_gate") == trust["semantic_gate"],
         f"{run_name}: semantic gate/probe mismatch",
@@ -1054,8 +1275,15 @@ def _verify_v5_receipt(
     sequence = [record.get("stage") for record in stages if isinstance(record, dict)]
     first_invalid = pipeline.get("first_invalid_stage")
     _require(
-        first_invalid in {"scf", "flat-scf", "calyx", "calyx-native-sv"},
-        f"{run_name}: invalid successor stage",
+        first_invalid == "flat-scf"
+        and len(stages) == 5
+        and all(isinstance(record, dict) for record in stages)
+        and sequence == _REGISTERED_ORDER[:5]
+        and set(execution) == set(sequence)
+        and pipeline.get("registered_order") == _REGISTERED_ORDER
+        and pipeline.get("not_run") == _REGISTERED_ORDER[5:]
+        and pipeline.get("stopped_after_first_invalid_stage") is True,
+        f"{run_name}: exact c22 stage order mismatch",
     )
     _require(
         receipt.get("status") == "compiler_frontier"
@@ -1072,6 +1300,10 @@ def _verify_v5_receipt(
     _require(
         receipt.get("frontier") == expected_frontier,
         f"{run_name}: frontier class mismatch",
+    )
+    _require(
+        receipt.get("diagnostic") == _RESIDUAL_DIAGNOSTIC,
+        f"{run_name}: top-level control-manifest diagnostic mismatch",
     )
     live_frontier = trust["derivations"].get(first_invalid)
     expected_files = _verify_v5_frontier_evidence(
@@ -1090,6 +1322,35 @@ def _verify_v5_receipt(
         attribute = _registered_attribute(stage)
         expected_command = shlex.join(
             ["nix", "build", "--no-link", "--print-out-paths", "-L", f".#{attribute}"]
+        )
+        artifact = live.get("artifact_bytes")
+        _require(isinstance(artifact, bytes), f"{run_name}: live artifact missing for {stage}")
+        expected_accepted = stage != first_invalid
+        expected_diagnostics = [] if expected_accepted else [_RESIDUAL_DIAGNOSTIC]
+        expected_upstream = (
+            f"package_manifest_sha256:{_FROZEN_IDENTITIES['package_manifest_sha256']}"
+            if index == 0
+            else _sha256_bytes(trust["derivations"][sequence[index - 1]]["artifact_bytes"])
+        )
+        _require(
+            record.get("status") == ("succeeded" if expected_accepted else "compiler_failure")
+            and record.get("terminal_diagnostics") == expected_diagnostics
+            and record.get("artifact") == live.get("artifact_path")
+            and record.get("artifact_bytes") == len(artifact)
+            and record.get("artifact_sha256") == _sha256_bytes(artifact)
+            and record.get("upstream_identity") == expected_upstream,
+            f"{run_name}: stage semantics mismatch for {stage}",
+        )
+        _require(
+            run.get("invoked") is True
+            and run.get("result") == live.get("output")
+            and run.get("route_alias") == _ALIAS
+            and run.get("frontend") == "linalg"
+            and run.get("backend") == "calyx-native-sv"
+            and run.get("artifact") == live.get("artifact_path")
+            and run.get("artifact_bytes") == len(artifact)
+            and run.get("artifact_sha256") == _sha256_bytes(artifact),
+            f"{run_name}: execution semantics mismatch for {stage}",
         )
         _require(
             record.get("command") == expected_command
@@ -1134,15 +1395,12 @@ def _verify_v5_receipt(
             and files[f"{stage}.derivation.json"] == live["canonical_json"],
             f"{run_name}: captured derivation bytes mismatch for {stage}",
         )
-        expected_accepted = stage != first_invalid
         _require(
             record.get("artifact_accepted") is expected_accepted
             and run.get("artifact_accepted") is expected_accepted,
             f"{run_name}: replay acceptance mismatch for {stage}",
         )
         if expected_accepted:
-            artifact = live.get("artifact_bytes")
-            _require(isinstance(artifact, bytes), f"{run_name}: live artifact missing for {stage}")
             _require(
                 record.get("artifact") == live.get("artifact_path")
                 and run.get("artifact") == live.get("artifact_path")
@@ -1584,6 +1842,8 @@ def _verify_v3_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     )
     source_commit = manifest.get("source_commit")
     _require(isinstance(source_commit, str) and bool(source_commit), "source commit missing")
+    repo_root = Path(__file__).resolve().parents[2]
+    _verify_pinned_v5_source_commit(repo_root, source_commit, "bundle")
     runs_manifest = manifest.get("runs")
     _require(
         isinstance(runs_manifest, dict) and sorted(runs_manifest) == ["run-1", "run-2"],
@@ -1604,7 +1864,7 @@ def _verify_v3_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
         "v5 executed prefix mismatch",
     )
     trust = _independent_v5_trust(
-        Path(__file__).resolve().parents[2], source_commit, executed_stages
+        repo_root, source_commit, executed_stages
     )
     verified: dict[str, tuple[dict[str, Any], dict[str, bytes], set[str]]] = {}
     for run_name in ("run-1", "run-2"):
@@ -1689,26 +1949,72 @@ def verify_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     raise VerificationError("unsupported determinism manifest schema")
 
 
+def verify_public_v5_evidence(repo_root: Path, bundle_root: Path) -> dict[str, Any]:
+    """Verify the canonical bundles and their public receipt/reproducer projections."""
+
+    result = verify_determinism_bundles(bundle_root)
+    manifest = _load_json(bundle_root / "manifest.json")
+    _require(
+        manifest.get("schema") == "tinystories-1m-exact-frontier-determinism-bundles-v3"
+        and manifest.get("source_commit") == _V5_SOURCE_COMMIT,
+        "public evidence requires the pinned c22 v5 bundle",
+    )
+    run_receipts = [
+        (bundle_root / run_name / "receipt.json").read_bytes()
+        for run_name in ("run-1", "run-2")
+    ]
+    public_receipt = (
+        repo_root
+        / "artifacts/comparison/tinystories-1m-exact-current-pipeline-frontier.json"
+    )
+    try:
+        receipt_mode = public_receipt.lstat().st_mode
+        public_receipt_bytes = public_receipt.read_bytes()
+    except OSError as error:
+        raise VerificationError(f"public receipt is missing: {error}") from error
+    _require(
+        stat.S_ISREG(receipt_mode)
+        and not public_receipt.is_symlink()
+        and public_receipt_bytes == run_receipts[0] == run_receipts[1],
+        "public receipt differs from canonical bundled receipts",
+    )
+
+    canonical_files = manifest.get("canonical_files")
+    _require(isinstance(canonical_files, list), "public canonical file list missing")
+    expected_reproducers = set(canonical_files) - {"receipt.json"}
+    public_reproducers = repo_root / "reproducers/flat-scf"
+    actual_reproducers = _enumerate_run_files(public_reproducers, "public reproducer")
+    _require(
+        actual_reproducers == expected_reproducers,
+        "public reproducer directory contents mismatch",
+    )
+    for filename in expected_reproducers:
+        public_bytes = (public_reproducers / filename).read_bytes()
+        run_1_bytes = (bundle_root / "run-1" / filename).read_bytes()
+        run_2_bytes = (bundle_root / "run-2" / filename).read_bytes()
+        _require(
+            public_bytes == run_1_bytes == run_2_bytes,
+            f"public reproducer differs from canonical bundle: {filename}",
+        )
+    return {**result, "public_reproducer_file_count": len(expected_reproducers)}
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    current = _load_json(
+    default_bundle = (
         repo_root
         / "artifacts"
         / "comparison"
-        / "tinystories-1m-exact-current-pipeline-frontier.json"
-    )
-    default_stage = current.get("pipeline_execution", {}).get("first_invalid_stage")
-    _require(
-        default_stage in {"scf", "flat-scf", "calyx", "calyx-native-sv"},
-        "current receipt has no supported invalid stage",
-    )
-    default_bundle = repo_root / "artifacts" / "comparison" / (
-        f"tinystories-1m-exact-frontier-determinism-{default_stage}"
+        / "tinystories-1m-exact-frontier-determinism-flat-scf"
     )
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle-dir", type=Path, default=default_bundle)
     args = parser.parse_args()
-    print(json.dumps(verify_determinism_bundles(args.bundle_dir), indent=2, sort_keys=True))
+    if args.bundle_dir.resolve() == default_bundle.resolve():
+        result = verify_public_v5_evidence(repo_root, args.bundle_dir)
+    else:
+        result = verify_determinism_bundles(args.bundle_dir)
+    print(json.dumps(result, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":
