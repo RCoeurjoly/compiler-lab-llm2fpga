@@ -83,6 +83,203 @@ _CRITICAL_INPUTS = (
     "scripts/compile-pytorch.py",
     "scripts/materialize-pytorch-exported.py",
 )
+_V5_TOP_KEYS = {
+    "capture_tools",
+    "claims",
+    "diagnostic",
+    "frontier",
+    "frontier_evidence",
+    "frozen_task_1_through_3_identities",
+    "full_failing_input",
+    "model",
+    "pipeline_execution",
+    "pipeline_source_identity",
+    "predecessor_receipt",
+    "registered_build_execution",
+    "schema",
+    "semantic_gate",
+    "sha256",
+    "source_commit",
+    "stage",
+    "stages",
+    "status",
+    "task_2_decision_self_sha256",
+}
+_V5_CLAIMS = {
+    "backend_model_quantization_ddr_pcie_changed": False,
+    "board_inference": False,
+    "calyx_native_sv": False,
+    "functional_equivalence": False,
+    "resource_or_timing": False,
+    "syntax_validated": False,
+    "synthesis_validated": False,
+}
+_V5_PIPELINE_EXECUTION_KEYS = {
+    "first_invalid_stage",
+    "not_run",
+    "registered_order",
+    "stopped_after_first_invalid_stage",
+}
+_V5_STAGE_KEYS = {
+    "artifact",
+    "artifact_accepted",
+    "artifact_bytes",
+    "artifact_sha256",
+    "command",
+    "exit_code",
+    "log",
+    "log_bytes",
+    "log_sha256",
+    "stage",
+    "status",
+    "terminal_diagnostics",
+    "tool_revisions",
+    "upstream_identity",
+}
+_V5_TOOL_REVISION_KEYS = {
+    "build_command_sha256",
+    "derivation",
+    "derivation_file_sha256",
+    "derivation_json_sha256",
+    "evidence_source_commit",
+}
+_V5_EXECUTION_KEYS = {
+    "artifact",
+    "artifact_accepted",
+    "artifact_bytes",
+    "artifact_sha256",
+    "attribute",
+    "backend",
+    "captured_derivation",
+    "captured_derivation_bytes",
+    "captured_derivation_json",
+    "captured_derivation_json_bytes",
+    "captured_derivation_json_sha256",
+    "captured_derivation_sha256",
+    "command",
+    "derivation",
+    "derivation_build_command",
+    "derivation_build_command_sha256",
+    "derivation_file_sha256",
+    "derivation_json_sha256",
+    "derivation_tool_bindings",
+    "exit_code",
+    "frontend",
+    "invoked",
+    "log",
+    "log_bytes",
+    "log_sha256",
+    "result",
+    "route_alias",
+}
+_V5_FULL_INPUT_KEYS = {
+    "archive_bytes",
+    "archive_sha256",
+    "content_bytes",
+    "content_sha256",
+    "path",
+    "source_artifact",
+    "source_stage",
+}
+_V5_FRONTIER_KEYS = {
+    "blockers",
+    "kind",
+    "manifest",
+    "minimization",
+    "operation",
+    "residual_artifact",
+    "types",
+}
+_V5_MANIFEST_BINDING_KEYS = {
+    "artifact",
+    "blockers",
+    "bytes",
+    "path",
+    "reason",
+    "sha256",
+    "stage",
+    "status",
+}
+_V5_FILE_BINDING_KEYS = {"bytes", "path", "sha256"}
+_V5_MINIMIZATION_KEYS = {"reason", "status"}
+_V5_SOURCE_KEYS = {
+    "accepted_task4_commit",
+    "critical_inputs",
+    "critical_inputs_clean",
+    "evidence_source_commit",
+    "export_derivation",
+    "flake_archive_nar_hash",
+    "flake_archive_path",
+    "flake_archive_source",
+    "task4_is_ancestor",
+    "torch_derivation",
+}
+_V5_CRITICAL_INPUT_KEYS = {
+    "authenticated_blob",
+    "authenticated_commit",
+    "authenticated_sha256",
+    "evidence_blob",
+    "flake_archive_path",
+    "flake_archive_sha256",
+    "task4_blob",
+    "task4_sha256",
+    "workspace_sha256",
+}
+_V5_EVALUATED_CRITICAL_INPUTS = {
+    "TinyStories/model_adapter_exact_package.py",
+    "artifacts/reference/tinystories-1m-exact-generation.json",
+    "artifacts/reference/tinystories-1m-exact-input-audit.json",
+    "artifacts/reference/tinystories-1m-exact-input-contract.json",
+    "artifacts/reference/tinystories-1m-exact-package-model.json",
+    "docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md",
+    "scripts/compile-pytorch.py",
+    "scripts/materialize-pytorch-exported.py",
+}
+_V5_DERIVATION_IDENTITY_KEYS = {
+    "attribute",
+    "build_command",
+    "build_command_sha256",
+    "build_inputs",
+    "canonical_json",
+    "file_sha256",
+    "input_derivations",
+    "input_sources",
+    "json_sha256",
+    "output",
+    "path",
+}
+_V5_SEMANTIC_GATE_KEYS = {
+    "command",
+    "evidence",
+    "probe_report",
+    "probe_report_sha256",
+    "status",
+    "verifier",
+    "verifier_sha256",
+}
+_V5_SEMANTIC_EVIDENCE_KEYS = {"contract", "registered_stage", "semantic_probe"}
+_V5_SEMANTIC_CONTRACT_KEYS = {
+    "decision_sha256",
+    "fixture_file_sha256",
+    "fixture_self_hash",
+    "rejected_cases",
+    "shift_one_output",
+    "valid_cases",
+}
+_V5_SEMANTIC_REGISTERED_KEYS = {"stage_artifact_sha256", "status"}
+_V5_SEMANTIC_PROBE_KEYS = {
+    "probe_report_sha256",
+    "stage_artifact",
+    "stage_artifact_sha256",
+    "status",
+}
+_V5_BUNDLE_MANIFEST_KEYS = {
+    "canonical_files",
+    "expected_comparison",
+    "runs",
+    "schema",
+    "source_commit",
+}
 _V1_CANONICAL_FILES = (
     "receipt.json",
     "pytorch-exported-build.log",
@@ -120,6 +317,157 @@ def _sha256_bytes(data: bytes) -> str:
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise VerificationError(message)
+
+
+def _require_exact_keys(
+    value: object, expected: set[str], context: str
+) -> dict[str, Any]:
+    _require(
+        isinstance(value, dict) and set(value) == expected,
+        f"{context}: exact schema keys mismatch",
+    )
+    return value
+
+
+def _verify_v5_schema(receipt: dict[str, Any], run_name: str) -> None:
+    """Reject every missing or unversioned v5 field before semantic checks."""
+
+    _require_exact_keys(receipt, _V5_TOP_KEYS, f"{run_name}: receipt schema")
+    capture_tools = _require_exact_keys(
+        receipt.get("capture_tools"),
+        {"classifier", "determinism_verifier"},
+        f"{run_name}: capture tools schema",
+    )
+    for name in ("classifier", "determinism_verifier"):
+        _require_exact_keys(
+            capture_tools.get(name), {"path", "sha256"}, f"{run_name}: {name} schema"
+        )
+
+    _require_exact_keys(
+        receipt.get("claims"), set(_V5_CLAIMS), f"{run_name}: claims schema"
+    )
+    _require_exact_keys(
+        receipt.get("frozen_task_1_through_3_identities"),
+        set(_FROZEN_IDENTITIES),
+        f"{run_name}: frozen identity schema",
+    )
+    _require_exact_keys(
+        receipt.get("predecessor_receipt"),
+        {"file_sha256", "historical_bundle", "self_sha256"},
+        f"{run_name}: predecessor identity schema",
+    )
+
+    semantic = _require_exact_keys(
+        receipt.get("semantic_gate"),
+        _V5_SEMANTIC_GATE_KEYS,
+        f"{run_name}: semantic gate schema",
+    )
+    evidence = _require_exact_keys(
+        semantic.get("evidence"),
+        _V5_SEMANTIC_EVIDENCE_KEYS,
+        f"{run_name}: semantic evidence schema",
+    )
+    _require_exact_keys(
+        evidence.get("contract"),
+        _V5_SEMANTIC_CONTRACT_KEYS,
+        f"{run_name}: semantic contract schema",
+    )
+    _require_exact_keys(
+        evidence.get("registered_stage"),
+        _V5_SEMANTIC_REGISTERED_KEYS,
+        f"{run_name}: semantic registered-stage schema",
+    )
+    _require_exact_keys(
+        evidence.get("semantic_probe"),
+        _V5_SEMANTIC_PROBE_KEYS,
+        f"{run_name}: semantic probe schema",
+    )
+
+    _require_exact_keys(
+        receipt.get("pipeline_execution"),
+        _V5_PIPELINE_EXECUTION_KEYS,
+        f"{run_name}: pipeline execution schema",
+    )
+    stages = receipt.get("stages")
+    _require(isinstance(stages, list), f"{run_name}: stages schema mismatch")
+    for index, record in enumerate(stages):
+        stage = _require_exact_keys(
+            record, _V5_STAGE_KEYS, f"{run_name}: stage {index} schema"
+        )
+        _require_exact_keys(
+            stage.get("tool_revisions"),
+            _V5_TOOL_REVISION_KEYS,
+            f"{run_name}: stage {index} tool revision schema",
+        )
+
+    execution = receipt.get("registered_build_execution")
+    _require(isinstance(execution, dict), f"{run_name}: execution schema mismatch")
+    for stage_name, value in execution.items():
+        run = _require_exact_keys(
+            value, _V5_EXECUTION_KEYS, f"{run_name}: {stage_name} execution schema"
+        )
+        bindings = run.get("derivation_tool_bindings")
+        _require(
+            isinstance(bindings, list),
+            f"{run_name}: {stage_name} tool binding schema mismatch",
+        )
+        for index, binding in enumerate(bindings):
+            _require_exact_keys(
+                binding,
+                {"bytes", "path", "sha256"},
+                f"{run_name}: {stage_name} tool binding {index} schema",
+            )
+
+    _require_exact_keys(
+        receipt.get("full_failing_input"),
+        _V5_FULL_INPUT_KEYS,
+        f"{run_name}: full input schema",
+    )
+    frontier = _require_exact_keys(
+        receipt.get("frontier_evidence"),
+        _V5_FRONTIER_KEYS,
+        f"{run_name}: frontier evidence schema",
+    )
+    _require_exact_keys(
+        frontier.get("manifest"),
+        _V5_MANIFEST_BINDING_KEYS,
+        f"{run_name}: frontier manifest schema",
+    )
+    for name in ("residual_artifact", "blockers"):
+        _require_exact_keys(
+            frontier.get(name),
+            _V5_FILE_BINDING_KEYS,
+            f"{run_name}: frontier {name} schema",
+        )
+    _require_exact_keys(
+        frontier.get("minimization"),
+        _V5_MINIMIZATION_KEYS,
+        f"{run_name}: frontier minimization schema",
+    )
+
+    source = _require_exact_keys(
+        receipt.get("pipeline_source_identity"),
+        _V5_SOURCE_KEYS,
+        f"{run_name}: pipeline source identity schema",
+    )
+    critical = source.get("critical_inputs")
+    _require(
+        isinstance(critical, dict) and set(critical) == set(_CRITICAL_INPUTS),
+        f"{run_name}: critical input schema mismatch",
+    )
+    for path, binding in critical.items():
+        expected = set(_V5_CRITICAL_INPUT_KEYS)
+        if path in _V5_EVALUATED_CRITICAL_INPUTS:
+            expected.update({"derivation_store_path", "derivation_store_sha256"})
+        _require_exact_keys(
+            binding, expected, f"{run_name}: critical input {path} schema"
+        )
+    for name in ("export_derivation", "torch_derivation"):
+        _require_exact_keys(
+            source.get(name),
+            _V5_DERIVATION_IDENTITY_KEYS,
+            f"{run_name}: {name} source identity schema",
+        )
 
 
 def _canonical_receipt_hash(receipt: dict[str, Any]) -> str:
@@ -429,37 +777,10 @@ def _authenticate_v5_pipeline_source(
         isinstance(source, dict) and isinstance(expected_source, dict),
         f"{run_name}: pipeline source identity missing",
     )
-    for key in (
-        "accepted_task4_commit",
-        "evidence_source_commit",
-        "task4_is_ancestor",
-        "critical_inputs_clean",
-        "flake_archive_path",
-        "flake_archive_nar_hash",
-        "flake_archive_source",
-    ):
-        _require(
-            source.get(key) == expected_source.get(key),
-            f"{run_name}: pipeline source identity mismatch at {key}",
-        )
     _require(
-        source.get("export_derivation") == expected_source.get("export_derivation")
-        and source.get("torch_derivation") == expected_source.get("torch_derivation"),
-        f"{run_name}: pipeline Nix derivation source identity mismatch",
+        source == expected_source,
+        f"{run_name}: exact pipeline source identity mismatch",
     )
-    critical = source.get("critical_inputs")
-    expected_critical = expected_source.get("critical_inputs")
-    _require(
-        isinstance(critical, dict)
-        and isinstance(expected_critical, dict)
-        and set(critical) == set(_CRITICAL_INPUTS),
-        f"{run_name}: critical pipeline input set mismatch",
-    )
-    for path in _CRITICAL_INPUTS:
-        _require(
-            critical.get(path) == expected_critical.get(path),
-            f"{run_name}: critical pipeline input mismatch: {path}",
-        )
 
 
 def _independent_v5_trust(
@@ -1235,6 +1556,7 @@ def _verify_v5_receipt(
     trust: dict[str, Any],
     run_name: str,
 ) -> set[str]:
+    _verify_v5_schema(receipt, run_name)
     _require(receipt.get("model") == _MODEL, f"{run_name}: model mismatch")
     _authenticate_v5_pipeline_source(receipt, trust, run_name)
     _require(
@@ -1323,6 +1645,10 @@ def _verify_v5_receipt(
         expected_command = shlex.join(
             ["nix", "build", "--no-link", "--print-out-paths", "-L", f".#{attribute}"]
         )
+        log_name = f"{stage}.log"
+        log_path = f"{canonical_root}/{log_name}"
+        log = files.get(log_name)
+        _require(isinstance(log, bytes), f"{run_name}: missing log for {stage}")
         artifact = live.get("artifact_bytes")
         _require(isinstance(artifact, bytes), f"{run_name}: live artifact missing for {stage}")
         expected_accepted = stage != first_invalid
@@ -1340,6 +1666,26 @@ def _verify_v5_receipt(
             and record.get("artifact_sha256") == _sha256_bytes(artifact)
             and record.get("upstream_identity") == expected_upstream,
             f"{run_name}: stage semantics mismatch for {stage}",
+        )
+        expected_tool_revisions = {
+            "build_command_sha256": live["build_command_sha256"],
+            "derivation": live["path"],
+            "derivation_file_sha256": live["file_sha256"],
+            "derivation_json_sha256": live["json_sha256"],
+            "evidence_source_commit": _V5_SOURCE_COMMIT,
+        }
+        _require(
+            record.get("tool_revisions") == expected_tool_revisions,
+            f"{run_name}: exact tool revision mismatch for {stage}",
+        )
+        _require(
+            record.get("log") == log_path
+            and run.get("log") == log_path
+            and record.get("log_bytes") == len(log)
+            and run.get("log_bytes") == len(log)
+            and record.get("log_sha256") == _sha256_bytes(log)
+            and run.get("log_sha256") == _sha256_bytes(log),
+            f"{run_name}: exact log binding mismatch for {stage}",
         )
         _require(
             run.get("invoked") is True
@@ -1456,12 +1802,8 @@ def _verify_v5_receipt(
             script.parent.rmdir()
     claims = receipt.get("claims")
     _require(
-        isinstance(claims, dict)
-        and claims.get("board_inference") is False
-        and claims.get("calyx_native_sv") is False
-        and claims.get("syntax_validated") is False
-        and claims.get("synthesis_validated") is False,
-        f"{run_name}: unsupported downstream claim",
+        claims == _V5_CLAIMS,
+        f"{run_name}: exact claims mismatch",
     )
     return expected_files
 
@@ -1819,6 +2161,7 @@ def _verify_v2_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
 
 def _verify_v3_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     manifest = _load_json(bundle_root / "manifest.json")
+    _require_exact_keys(manifest, _V5_BUNDLE_MANIFEST_KEYS, "v5 bundle manifest schema")
     _require(
         manifest.get("schema") == "tinystories-1m-exact-frontier-determinism-bundles-v3",
         "unsupported v3 determinism manifest schema",
@@ -1848,6 +2191,11 @@ def _verify_v3_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     _require(
         isinstance(runs_manifest, dict) and sorted(runs_manifest) == ["run-1", "run-2"],
         "exactly run-1 and run-2 are required",
+    )
+    _require_exact_keys(
+        manifest.get("expected_comparison"),
+        {"byte_identical", "first_invalid_stage", "receipt_file_sha256", "receipt_self_hash"},
+        "v5 bundle expected comparison schema",
     )
     first_receipt = _load_json(bundle_root / "run-1" / "receipt.json")
     _require(
@@ -1879,8 +2227,11 @@ def _verify_v3_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
             f"{run_name}: receipt identity mismatch",
         )
         expected_files = _verify_v5_receipt(receipt, files, trust, run_name)
-        run_manifest = runs_manifest[run_name]
-        _require(isinstance(run_manifest, dict), f"{run_name}: run manifest missing")
+        run_manifest = _require_exact_keys(
+            runs_manifest[run_name],
+            {"files", "receipt_self_hash", "source_commit"},
+            f"{run_name}: run manifest schema",
+        )
         bindings = run_manifest.get("files")
         _require(
             run_manifest.get("source_commit") == source_commit
@@ -1890,7 +2241,11 @@ def _verify_v3_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
             f"{run_name}: manifest bindings mismatch",
         )
         for filename in expected_files:
-            binding = bindings[filename]
+            binding = _require_exact_keys(
+                bindings[filename],
+                {"bytes", "sha256"},
+                f"{run_name}: manifest file binding schema for {filename}",
+            )
             _require(
                 isinstance(binding, dict)
                 and binding.get("bytes") == len(files[filename])

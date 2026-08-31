@@ -802,9 +802,24 @@ class V5PublicReceiptAdversarialTest(unittest.TestCase):
 
     def _reject(self, mutate, pattern: str) -> None:
         bundle = self._mutated_bundle(mutate)
+        self._reject_bundle(bundle, pattern)
+
+    def _reject_bundle(self, bundle: Path, pattern: str) -> None:
+        root = bundle.parent
+        current = (
+            root
+            / "artifacts/comparison/tinystories-1m-exact-current-pipeline-frontier.json"
+        )
+        current.parent.mkdir(parents=True)
+        os.link(bundle / "run-1/receipt.json", current)
+        reproducers = root / "reproducers/flat-scf"
+        reproducers.mkdir(parents=True)
+        manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+        for filename in set(manifest["canonical_files"]) - {"receipt.json"}:
+            os.link(bundle / "run-1" / filename, reproducers / filename)
         with mock.patch.object(MODULE, "_independent_v5_trust", return_value=self.trust):
             with self.assertRaisesRegex(MODULE.VerificationError, pattern):
-                MODULE.verify_determinism_bundles(bundle)
+                MODULE.verify_public_v5_evidence(root, bundle)
 
     def _payload_mutated_bundle(self, filename: str):
         bundle = self._mutated_bundle(lambda _: None)
@@ -836,9 +851,23 @@ class V5PublicReceiptAdversarialTest(unittest.TestCase):
                 })
             elif filename == "flat.scf.mlir":
                 binding = receipt["frontier_evidence"]["residual_artifact"]
+            elif filename.endswith(".log"):
+                stage = filename.removesuffix(".log")
+                record = next(item for item in receipt["stages"] if item["stage"] == stage)
+                run = receipt["registered_build_execution"][stage]
+                record.update({
+                    "log_bytes": len(payload),
+                    "log_sha256": hashlib.sha256(payload).hexdigest(),
+                })
+                run.update({
+                    "log_bytes": len(payload),
+                    "log_sha256": hashlib.sha256(payload).hexdigest(),
+                })
+                binding = None
             else:
                 binding = receipt["frontier_evidence"]["blockers"]
-            binding.update(payload_binding)
+            if binding is not None:
+                binding.update(payload_binding)
             receipt["sha256"] = MODULE._canonical_receipt_hash(receipt)
             receipt_data = (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode()
             replacement = receipt_path.with_suffix(".replacement")
@@ -913,7 +942,7 @@ class V5PublicReceiptAdversarialTest(unittest.TestCase):
 
         self._reject(
             lambda receipt: receipt["stages"].append("ignored-stage-record"),
-            "stage order|sequence|executed prefix",
+            "schema|stage order|sequence|executed prefix",
         )
         self._reject(
             lambda receipt: receipt["registered_build_execution"].__setitem__(
@@ -947,14 +976,16 @@ class V5PublicReceiptAdversarialTest(unittest.TestCase):
         for filename in ("minimal-reproducer.json", "flat.scf.mlir", "blockers.json"):
             with self.subTest(filename=filename):
                 bundle = self._payload_mutated_bundle(filename)
-                with mock.patch.object(
-                    MODULE, "_independent_v5_trust", return_value=self.trust
-                ):
-                    with self.assertRaisesRegex(
-                        MODULE.VerificationError,
-                        "stage semantics|registered output|live registered output|control manifest",
-                    ):
-                        MODULE.verify_determinism_bundles(bundle)
+                self._reject_bundle(
+                    bundle,
+                    "stage semantics|registered output|live registered output|control manifest",
+                )
+
+    def test_public_verifier_rejects_detached_rehashed_log_payload(self) -> None:
+        self._reject_bundle(
+            self._payload_mutated_bundle("flat-scf.log"),
+            "replay log",
+        )
 
     def test_public_verifier_rejects_producer_commit_and_source_substitutions(self) -> None:
         self._reject(
@@ -971,7 +1002,7 @@ class V5PublicReceiptAdversarialTest(unittest.TestCase):
             lambda r: r["pipeline_source_identity"]["critical_inputs"]["flake.nix"].__setitem__(
                 "workspace_sha256", "0" * 64
             ),
-            "critical pipeline input",
+            "pipeline source identity|critical pipeline input",
         )
 
     def test_unpinned_source_commit_is_rejected_before_nix_trust_resolution(self) -> None:
@@ -1010,6 +1041,145 @@ class V5PublicReceiptAdversarialTest(unittest.TestCase):
         for name, mutate in cases.items():
             with self.subTest(name=name):
                 self._reject(mutate, "source identity|frozen Task|semantic|predecessor|source-commit-byte")
+
+    def test_public_verifier_rejects_log_path_and_byte_count_lies(self) -> None:
+        cases = {
+            "stage renamed log": lambda r: r["stages"][-1].__setitem__(
+                "log", "reproducers/flat-scf/detached.log"
+            ),
+            "execution renamed log": lambda r: r["registered_build_execution"][
+                "flat-scf"
+            ].__setitem__("log", "reproducers/flat-scf/detached.log"),
+            "stage false log bytes": lambda r: r["stages"][-1].__setitem__(
+                "log_bytes", 1
+            ),
+            "execution false log bytes": lambda r: r[
+                "registered_build_execution"
+            ]["flat-scf"].__setitem__("log_bytes", 1),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                self._reject(mutate, "log")
+
+    def test_public_verifier_rejects_added_removed_and_changed_tool_revisions(self) -> None:
+        cases = {
+            "added": lambda r: r["stages"][-1]["tool_revisions"].__setitem__(
+                "invented", "detached"
+            ),
+            "removed": lambda r: r["stages"][-1]["tool_revisions"].pop(
+                "derivation_json_sha256"
+            ),
+            "changed": lambda r: r["stages"][-1]["tool_revisions"].__setitem__(
+                "evidence_source_commit", "0" * 40
+            ),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                self._reject(mutate, "tool revision")
+
+    def test_public_verifier_rejects_every_claim_flag_lie(self) -> None:
+        claim_names = (
+            "backend_model_quantization_ddr_pcie_changed",
+            "board_inference",
+            "calyx_native_sv",
+            "functional_equivalence",
+            "resource_or_timing",
+            "syntax_validated",
+            "synthesis_validated",
+        )
+        for claim in claim_names:
+            with self.subTest(claim=claim):
+                self._reject(
+                    lambda r, claim=claim: r["claims"].__setitem__(claim, True),
+                    "claims",
+                )
+
+    def test_public_verifier_rejects_extra_and_missing_nested_schema_keys(self) -> None:
+        cases = {
+            "top extra": lambda r: r.__setitem__("invented", None),
+            "top missing": lambda r: r.pop("claims"),
+            "claims extra": lambda r: r["claims"].__setitem__("invented", False),
+            "claims missing": lambda r: r["claims"].pop("functional_equivalence"),
+            "capture tool extra": lambda r: r["capture_tools"]["classifier"].__setitem__(
+                "invented", None
+            ),
+            "semantic gate extra": lambda r: r["semantic_gate"].__setitem__(
+                "invented", None
+            ),
+            "semantic evidence extra": lambda r: r["semantic_gate"][
+                "evidence"
+            ].__setitem__("invented", None),
+            "predecessor extra": lambda r: r["predecessor_receipt"].__setitem__(
+                "invented", None
+            ),
+            "stage extra": lambda r: r["stages"][-1].__setitem__("invented", None),
+            "stage missing": lambda r: r["stages"][-1].pop("log"),
+            "execution extra": lambda r: r["registered_build_execution"][
+                "flat-scf"
+            ].__setitem__("invented", None),
+            "execution missing": lambda r: r["registered_build_execution"][
+                "flat-scf"
+            ].pop("log"),
+            "execution tool binding extra": lambda r: r[
+                "registered_build_execution"
+            ]["flat-scf"]["derivation_tool_bindings"][0].__setitem__("invented", None),
+            "pipeline extra": lambda r: r["pipeline_execution"].__setitem__(
+                "invented", None
+            ),
+            "frontier extra": lambda r: r["frontier_evidence"].__setitem__(
+                "invented", None
+            ),
+            "frontier missing": lambda r: r["frontier_evidence"].pop("operation"),
+            "manifest extra": lambda r: r["frontier_evidence"]["manifest"].__setitem__(
+                "invented", None
+            ),
+            "manifest missing": lambda r: r["frontier_evidence"]["manifest"].pop(
+                "reason"
+            ),
+            "residual binding extra": lambda r: r["frontier_evidence"][
+                "residual_artifact"
+            ].__setitem__("invented", None),
+            "blocker binding missing": lambda r: r["frontier_evidence"][
+                "blockers"
+            ].pop("bytes"),
+            "minimization extra": lambda r: r["frontier_evidence"][
+                "minimization"
+            ].__setitem__("invented", None),
+            "identity extra": lambda r: r[
+                "frozen_task_1_through_3_identities"
+            ].__setitem__("invented", "0" * 64),
+            "source extra": lambda r: r["pipeline_source_identity"].__setitem__(
+                "invented", None
+            ),
+            "critical input extra": lambda r: r["pipeline_source_identity"][
+                "critical_inputs"
+            ]["flake.nix"].__setitem__("invented", None),
+            "source derivation extra": lambda r: r["pipeline_source_identity"][
+                "torch_derivation"
+            ].__setitem__("invented", None),
+            "full input extra": lambda r: r["full_failing_input"].__setitem__(
+                "invented", None
+            ),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                self._reject(mutate, "schema|keys|identity|minimization")
+
+    def test_public_verifier_rejects_combined_log_tool_claim_and_schema_lies(self) -> None:
+        def combined(receipt):
+            receipt["stages"][-1].update({
+                "log": "reproducers/flat-scf/detached.log",
+                "log_bytes": 1,
+                "invented": None,
+            })
+            receipt["stages"][-1]["tool_revisions"]["invented"] = "detached"
+            receipt["registered_build_execution"]["flat-scf"].update({
+                "log": "reproducers/flat-scf/detached.log",
+                "log_bytes": 1,
+            })
+            receipt["claims"]["functional_equivalence"] = True
+
+        self._reject(combined, "schema|log|tool revision|claims")
 
 
 class V5PublicIntegrationAdversarialTest(unittest.TestCase):
@@ -1065,6 +1235,19 @@ class V5PublicIntegrationAdversarialTest(unittest.TestCase):
             lambda current, _: self._replace(current, b"{}\n"),
             "public receipt",
         )
+
+    def test_public_verifier_rejects_unversioned_bundle_manifest_key(self) -> None:
+        root, bundle, _, _ = self._public_tree()
+        manifest_path = bundle / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["invented"] = None
+        self._replace(
+            manifest_path,
+            (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode(),
+        )
+        with mock.patch.object(MODULE, "_independent_v5_trust", return_value=self.trust):
+            with self.assertRaisesRegex(MODULE.VerificationError, "manifest schema"):
+                MODULE.verify_public_v5_evidence(root, bundle)
 
     def test_public_verifier_rejects_mutated_live_bound_payloads(self) -> None:
         for filename in ("flat.scf.mlir", "blockers.json"):

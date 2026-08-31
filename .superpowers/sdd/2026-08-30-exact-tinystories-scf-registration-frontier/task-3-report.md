@@ -17,3 +17,11 @@ Default verification now also requires the public receipt to be byte-identical t
 The three immutable generated `flat.scf.mlir` paths alone are marked `-diff`; ordinary MLIR remains text-diffed. Their bytes remain unchanged at SHA-256 `66c78e412ade3262c4eb0f61b5776e9c765fb434fdbb53d09cbba7e724ff2fc6`.
 
 The blocker census was not independently regenerated. The registered reporter took roughly 40 CPU-minutes and rerunning or reimplementing its census would either duplicate that cost or define new census semantics. Its report is therefore described only as the authenticated registered `blockers.json`: exact live path, bytes, and SHA-256 are independently verified; census meaning is not independently claimed.
+
+## Review fix round 2
+
+The v5 verifier is now fail-closed over the complete preserved receipt schema. Exact key sets cover the top-level receipt, claims, capture tools, semantic evidence, frozen and predecessor identities, pipeline execution, each stage and tool-revision object, each registered execution and derivation-tool binding, full input, control-manifest frontier evidence and minimization, and every pipeline-source identity object. The v3 bundle manifest, run records, comparison record, and file bindings are also closed to missing or unversioned extra fields.
+
+Every executed-stage log now has one canonical public path and is bound independently to the exact bundled bytes, byte count, SHA-256, live replay semantics, and the matching stage/execution fields. Stage tool revisions are reconstructed exactly from the pinned c22 source commit and live registered derivations. Claims are the exact seven-key c22 object with every value `false`: no functional equivalence, resources/timing, syntax, synthesis, Calyx-native-SV, board inference, or backend/model/quantization/DDR/PCIe change is claimed.
+
+Public end-to-end adversarial tests recompute receipt self-hashes and bundle bindings while mutating log paths/counts/payloads, tool revisions, every claim flag, and representative missing/extra keys throughout the nested schema. The immutable c22 compiler evidence and Git objects were not changed or regenerated.
