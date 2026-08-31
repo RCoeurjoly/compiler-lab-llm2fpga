@@ -42,4 +42,20 @@ unrealized; this experiment uses the retained authenticated c22 bytes.
 
 `memref.subview` / `6149b92a9d179ef65caa53ff8dd33259b3d0c05085e5289384627b80c931f693`. The exact one-operation reproducer is `reproducers/tinystories-1m-exact-flat-scf-memref/task3-earliest-remaining/input.mlir`.
 
+The public verifier closes the complete earliest-frontier claim. It requires
+exact schemas for the inline signature, its memref descriptions, and the
+source location; independently reconstructs the diagnostic-emitting operation
+from the authenticated complete-run stderr and retained flat-SCF source; and
+requires the claimed operation, signature, canonical signature digest,
+classification, source location, and diagnostic to equal that reconstructed
+`invalid[0]` frontier. The reproducer sidecar's operation, signature, digest,
+and classification must equal the same object. Canonically rehashed unknown
+keys, stale or rebound inline signatures, and sidecar disagreement are rejected.
+
+This verification closure did not rewrite the canonical evaluation or
+reproducer evidence. Their file SHA-256 identities remain
+`26e0ddcaf0abc6100332378d2cacf0555f3560a7635bcdd60dbb9f47bd5ad0d8` and
+`a93f7cf5e94cd7977c5dd038c023076a5594ea698386802d8dd9594cbcc8d5fe`,
+respectively.
+
 No Calyx stage ran and no pipeline stage was registered by this evaluation.

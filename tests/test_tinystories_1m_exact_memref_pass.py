@@ -462,6 +462,74 @@ class PublicVerifierTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, message):
                     self.verifier.validate_payload(payload, ROOT, replay=False)
 
+    def test_verifier_rejects_unbound_earliest_frontier_claims(self) -> None:
+        attacks = []
+
+        unknown_signature = copy.deepcopy(self.payload)
+        unknown_signature["earliest_remaining_signature"]["signature"][
+            "registration_claim"
+        ] = True
+        attacks.append(("signature schema", canonical_rehash(unknown_signature)))
+
+        unknown_memref = copy.deepcopy(self.payload)
+        unknown_memref["earliest_remaining_signature"]["signature"][
+            "operand_memrefs"
+        ][0]["registration_claim"] = True
+        attacks.append(("memref schema", canonical_rehash(unknown_memref)))
+
+        unknown_location = copy.deepcopy(self.payload)
+        unknown_location["earliest_remaining_signature"]["source_location"][
+            "registration_claim"
+        ] = True
+        attacks.append(("source location schema", canonical_rehash(unknown_location)))
+
+        stale_digest = copy.deepcopy(self.payload)
+        stale_digest["earliest_remaining_signature"]["signature"]["offsets"][0] = 1
+        attacks.append(("earliest remaining frontier", canonical_rehash(stale_digest)))
+
+        rebound_signature = copy.deepcopy(self.payload)
+        signature = rebound_signature["earliest_remaining_signature"]["signature"]
+        signature["offsets"][0] = 1
+        rebound_signature["earliest_remaining_signature"]["signature_sha256"] = sha256(
+            json.dumps(
+                signature, sort_keys=True, separators=(",", ":"), allow_nan=False
+            ).encode()
+        )
+        attacks.append(
+            ("earliest remaining frontier", canonical_rehash(rebound_signature))
+        )
+
+        for message, payload in attacks:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    self.verifier.validate_payload(payload, ROOT, replay=False)
+
+        metadata_path = ROOT / self.payload["earliest_remaining_signature"][
+            "reproducer"
+        ]["metadata"]["path"]
+        original = metadata_path.read_bytes()
+        try:
+            metadata = json.loads(original)
+            metadata["signature"]["offsets"][0] = 1
+            metadata_path.write_bytes(
+                json.dumps(
+                    metadata,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode()
+                + b"\n"
+            )
+            payload = copy.deepcopy(self.payload)
+            payload["earliest_remaining_signature"]["reproducer"]["metadata"] = (
+                binding(metadata_path)
+            )
+            canonical_rehash(payload)
+            with self.assertRaisesRegex(ValueError, "reproducer metadata signature"):
+                self.verifier.validate_payload(payload, ROOT, replay=False)
+        finally:
+            metadata_path.write_bytes(original)
+
     def test_verifier_rejects_launcher_and_task2_identity_rebound(self) -> None:
         attacks = []
         launcher = copy.deepcopy(self.payload)

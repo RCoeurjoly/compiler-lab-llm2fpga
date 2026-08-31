@@ -79,6 +79,14 @@ EARLIEST_KEYS = {
     "operation", "signature_sha256", "classification", "signature",
     "source_location", "diagnostic", "reproducer",
 }
+SIGNATURE_KEYS = {
+    "operation", "operand_types", "result_types", "operand_memrefs",
+    "result_memrefs", "offsets", "sizes", "strides",
+}
+MEMREF_KEYS = {
+    "text", "rank", "shape", "element_type", "layout", "offset", "strides",
+}
+SOURCE_LOCATION_KEYS = {"function", "line", "column", "mlir"}
 REPRODUCER_KEYS = {"path", "bytes", "sha256", "operation_count", "metadata"}
 METADATA_KEYS = {
     "operation", "signature", "signature_sha256", "classification", "selection",
@@ -381,6 +389,15 @@ def _require_keys(value: Any, expected: set[str], label: str) -> None:
     _require(isinstance(value, dict) and set(value) == expected, f"{label} mismatch")
 
 
+def _require_signature_schema(signature: Any) -> None:
+    _require_keys(signature, SIGNATURE_KEYS, "signature schema")
+    for group in ("operand_memrefs", "result_memrefs"):
+        memrefs = signature[group]
+        _require(isinstance(memrefs, list), "memref schema mismatch")
+        for memref in memrefs:
+            _require_keys(memref, MEMREF_KEYS, "memref schema")
+
+
 def _validate_closed_schema(payload: dict[str, Any]) -> None:
     decision = payload.get("decision")
     _require(
@@ -413,6 +430,12 @@ def _validate_closed_schema(payload: dict[str, Any]) -> None:
     if decision == "compiler_pass_extension":
         earliest = payload["earliest_remaining_signature"]
         _require_keys(earliest, EARLIEST_KEYS, "earliest signature schema")
+        _require_signature_schema(earliest.get("signature"))
+        _require_keys(
+            earliest.get("source_location"),
+            SOURCE_LOCATION_KEYS,
+            "source location schema",
+        )
         _require_keys(earliest.get("reproducer"), REPRODUCER_KEYS, "reproducer schema")
         _require_keys(earliest["reproducer"].get("metadata"), BINDING_KEYS, "reproducer metadata binding schema")
     else:
@@ -978,7 +1001,21 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
         _require("earliest_remaining_signature" not in payload, "unexpected extension reproducer")
     else:
         earliest = payload.get("earliest_remaining_signature", {})
-        _require(earliest.get("operation") == invalid[0]["operation"], "earliest remaining signature missing")
+        expected_earliest = {
+            key: invalid[0][key] for key in EARLIEST_KEYS - {"reproducer"}
+        }
+        claimed_earliest = {
+            key: earliest.get(key) for key in EARLIEST_KEYS - {"reproducer"}
+        }
+        _require(
+            invalid[0]["signature_sha256"]
+            == _digest(_canonical(invalid[0]["signature"])),
+            "independently reconstructed signature mismatch",
+        )
+        _require(
+            claimed_earliest == expected_earliest,
+            "earliest remaining frontier mismatch",
+        )
         reproducer_record = earliest.get("reproducer", {})
         reproducer = _check_binding(
             {key: reproducer_record.get(key) for key in BINDING_KEYS},
@@ -991,7 +1028,17 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
         metadata_path = _check_binding(earliest["reproducer"].get("metadata"), "earliest remaining metadata")
         metadata = _load_object(metadata_path, "earliest remaining metadata")
         _require_keys(metadata, METADATA_KEYS, "reproducer metadata schema")
-        _require(metadata.get("signature_sha256") == earliest.get("signature_sha256"), "earliest remaining signature mismatch")
+        _require(
+            {
+                key: metadata.get(key)
+                for key in ("operation", "signature", "signature_sha256", "classification")
+            }
+            == {
+                key: invalid[0][key]
+                for key in ("operation", "signature", "signature_sha256", "classification")
+            },
+            "reproducer metadata signature mismatch",
+        )
         execution = metadata.get("execution", {})
         _require_keys(execution, METADATA_EXECUTION_KEYS, "reproducer execution schema")
         expected_stdout = reproducer.parent / "pass.stdout.bin"
