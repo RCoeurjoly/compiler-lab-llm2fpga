@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -55,6 +56,25 @@ def load_module(path: Path, name: str):
     return module
 
 
+def canonical_rehash(value: dict) -> dict:
+    value["sha256"] = None
+    value["sha256"] = sha256(
+        json.dumps(
+            value, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode()
+    )
+    return value
+
+
+def binding(path: Path) -> dict:
+    data = path.read_bytes()
+    try:
+        rendered = str(path.relative_to(ROOT))
+    except ValueError:
+        rendered = str(path)
+    return {"path": rendered, "bytes": len(data), "sha256": sha256(data)}
+
+
 class ProductionSurfaceTest(unittest.TestCase):
     def test_all_task3_production_surfaces_exist(self) -> None:
         for path in (EVALUATOR, VERIFIER, EVALUATION, EVIDENCE, RESULT):
@@ -99,6 +119,7 @@ class EvaluatorUnitTest(unittest.TestCase):
                 blocker_counts=zero,
                 invalid_signatures=[],
                 unknown_blocker_classes=[],
+                invariant_status="proven",
             ),
             "register_existing_pass",
         )
@@ -107,12 +128,15 @@ class EvaluatorUnitTest(unittest.TestCase):
             {"blocker_counts": {**zero, "memref.copy": 1}},
             {"invalid_signatures": ["bad"]},
             {"unknown_blocker_classes": ["memref.subview"]},
+            {"invariant_status": "unavailable_due_invalid_output"},
+            {"invariant_status": "unproven"},
         ):
             args = {
                 "parseable": True,
                 "blocker_counts": zero,
                 "invalid_signatures": [],
                 "unknown_blocker_classes": [],
+                "invariant_status": "proven",
             }
             args.update(mutation)
             self.assertEqual(
@@ -188,10 +212,12 @@ class CommittedEvaluationTest(unittest.TestCase):
 
     def test_every_representative_precedes_the_complete_artifact(self) -> None:
         runs = self.payload["executions"]
-        self.assertEqual(len(runs), len(REGISTERED) + 1)
-        self.assertEqual([run["sequence"] for run in runs], list(range(1, 6)))
-        self.assertEqual({run["operation"] for run in runs[:-1]}, REGISTERED)
-        self.assertTrue(all(run["kind"] == "representative" for run in runs[:-1]))
+        self.assertEqual(len(runs), len(REGISTERED) * 2 + 1)
+        self.assertEqual([run["sequence"] for run in runs], list(range(1, 10)))
+        self.assertEqual({run["operation"] for run in runs[:4]}, REGISTERED)
+        self.assertTrue(all(run["kind"] == "representative" for run in runs[:4]))
+        self.assertEqual({run["operation"] for run in runs[4:8]}, REGISTERED)
+        self.assertTrue(all(run["kind"] == "semantic_probe" for run in runs[4:8]))
         self.assertEqual(runs[-1]["kind"], "complete")
         self.assertEqual(runs[-1]["input"]["sha256"], FLAT_SCF_SHA256)
 
@@ -206,7 +232,7 @@ class CommittedEvaluationTest(unittest.TestCase):
                     data = path.read_bytes()
                     self.assertEqual(len(data), binding["bytes"])
                     self.assertEqual(sha256(data), binding["sha256"])
-                if run["kind"] == "representative" or run["parseable"]:
+                if run["kind"] in {"representative", "semantic_probe"} or run["parseable"]:
                     self.assertEqual(run["exit_code"], 0)
                     parsed = subprocess.run(
                         [str(tool), str(ROOT / run["output"]["path"]), "-o", "/dev/null"],
@@ -242,9 +268,11 @@ class CommittedEvaluationTest(unittest.TestCase):
         self.assertEqual(complete["unknown_blocker_classes"], [])
         if complete["parseable"]:
             self.assertEqual(complete["new_invalid_signatures"], [])
-            self.assertTrue(complete["shape_layout_invariants_preserved"])
+            self.assertEqual(complete["invariant_status"], "proven")
         else:
-            self.assertFalse(complete["shape_layout_invariants_preserved"])
+            self.assertEqual(
+                complete["invariant_status"], "unavailable_due_invalid_output"
+            )
             self.assertEqual(len(complete["new_invalid_signatures"]), 1)
             self.assertEqual(
                 complete["new_invalid_signatures"][0]["operation"], "memref.subview"
@@ -257,6 +285,7 @@ class CommittedEvaluationTest(unittest.TestCase):
             and all(value == 0 for value in complete["after"]["blocker_counts"].values())
             and not complete["new_invalid_signatures"]
             and not complete["unknown_blocker_classes"]
+            and complete["invariant_status"] == "proven"
         )
         expected = "register_existing_pass" if gate_satisfied else "compiler_pass_extension"
         self.assertEqual(self.payload["decision"], expected)
@@ -276,6 +305,26 @@ class CommittedEvaluationTest(unittest.TestCase):
             self.assertEqual(sha256(reproducer.read_bytes()), earliest["reproducer"]["sha256"])
             self.assertEqual(earliest["reproducer"]["operation_count"], 1)
 
+    def test_semantically_live_probes_prove_shape_layout_and_access_maps(self) -> None:
+        self.assertIn(
+            "semantic_probes", self.payload,
+            "evaluation lacks semantically live representative probes",
+        )
+        probes = self.payload["semantic_probes"]
+        self.assertEqual({probe["operation"] for probe in probes}, REGISTERED)
+        self.assertTrue(all(probe["invariant_status"] == "proven" for probe in probes))
+        for probe in probes:
+            with self.subTest(operation=probe["operation"]):
+                self.assertTrue(probe["before"]["access_maps"])
+                self.assertEqual(
+                    probe["before"]["access_maps"], probe["after"]["access_maps"]
+                )
+                self.assertEqual(
+                    probe["before"]["element_count"],
+                    probe["after"]["element_count"],
+                )
+                self.assertTrue(probe["checks"]["shape_layout_access_equivalent"])
+
 
 @unittest.skipUnless(VERIFIER.is_file() and EVALUATION.is_file(), "Task 3 verifier absent")
 class PublicVerifierTest(unittest.TestCase):
@@ -286,7 +335,7 @@ class PublicVerifierTest(unittest.TestCase):
 
     def test_public_verifier_replays_the_exact_evaluation(self) -> None:
         completed = subprocess.run(
-            [str(self.payload["python"]["path"]), str(VERIFIER)],
+            [sys.executable, str(VERIFIER)],
             cwd=ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -296,41 +345,185 @@ class PublicVerifierTest(unittest.TestCase):
         self.assertIn(b"PASS", completed.stdout)
 
     def test_verifier_rejects_mutated_hash_pipeline_order_and_semantics(self) -> None:
-        def rehash(value: dict) -> dict:
-            value["sha256"] = None
-            value["sha256"] = sha256(
-                json.dumps(
-                    value, sort_keys=True, separators=(",", ":"), allow_nan=False
-                ).encode()
-            )
-            return value
-
         attacks = []
         wrong_hash = copy.deepcopy(self.payload)
         wrong_hash["input"]["sha256"] = "0" * 64
-        attacks.append(("input SHA-256", rehash(wrong_hash)))
+        attacks.append(("input SHA-256", canonical_rehash(wrong_hash)))
         wrong_pipeline = copy.deepcopy(self.payload)
         wrong_pipeline["pipeline"] += ",canonicalize"
-        attacks.append(("pipeline", rehash(wrong_pipeline)))
+        attacks.append(("pipeline", canonical_rehash(wrong_pipeline)))
         wrong_order = copy.deepcopy(self.payload)
         wrong_order["executions"][0], wrong_order["executions"][-1] = (
             wrong_order["executions"][-1],
             wrong_order["executions"][0],
         )
-        attacks.append(("representative order", rehash(wrong_order)))
+        attacks.append(("representative order", canonical_rehash(wrong_order)))
         wrong_invariant = copy.deepcopy(self.payload)
-        wrong_invariant["complete"]["shape_layout_invariants_preserved"] = True
-        attacks.append(("shape/layout", rehash(wrong_invariant)))
+        wrong_invariant["complete"]["invariant_status"] = "proven"
+        attacks.append(("invariant status", canonical_rehash(wrong_invariant)))
         wrong_unknown = copy.deepcopy(self.payload)
         wrong_unknown["complete"]["unknown_blocker_classes"] = ["memref.subview"]
-        attacks.append(("unknown blocker", rehash(wrong_unknown)))
+        attacks.append(("unknown blocker", canonical_rehash(wrong_unknown)))
         wrong_census = copy.deepcopy(self.payload)
         wrong_census["complete"]["before"]["operation_census"]["memref.load"] += 1
-        attacks.append(("operation census", rehash(wrong_census)))
+        attacks.append(("operation census", canonical_rehash(wrong_census)))
         for message, payload in attacks:
             with self.subTest(message=message):
                 with self.assertRaisesRegex(ValueError, message):
                     self.verifier.validate_payload(payload, ROOT, replay=False)
+
+    def test_verifier_rejects_launcher_and_task2_identity_rebound(self) -> None:
+        attacks = []
+        launcher = copy.deepcopy(self.payload)
+        launcher["python"]["path"] = "/bin/true"
+        attacks.append(("python interpreter", canonical_rehash(launcher)))
+        model = copy.deepcopy(self.payload)
+        model["model"] = "rebound-model"
+        model["python"]["path"] = "/bin/true"
+        attacks.append(("model", canonical_rehash(model)))
+        identities = copy.deepcopy(self.payload)
+        identities["task_1_through_3_identities"] = {"rebound": "identity"}
+        identities["python"]["path"] = "/bin/true"
+        attacks.append(("Task 1--3 identities", canonical_rehash(identities)))
+        provenance = copy.deepcopy(self.payload)
+        provenance["provenance"].update(
+            {
+                "payload_source": "rebound",
+                "c22_derivation": "/nix/store/rebound-c22.drv",
+                "c22_output": "/nix/store/rebound-c22",
+                "current_alias_derivation": "/nix/store/rebound-current.drv",
+                "current_alias_output": "/nix/store/rebound-current",
+                "current_alias_realized": True,
+                "unrealized_current_alias_residual": "rebound",
+            }
+        )
+        provenance["python"]["path"] = "/bin/true"
+        attacks.append(("provenance", canonical_rehash(provenance)))
+        for message, payload in attacks:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    self.verifier.validate_payload(payload, ROOT, replay=False)
+
+    def test_verifier_rejects_rebound_authenticated_representative_during_replay(self) -> None:
+        contract = json.loads(CONTRACT.read_bytes())
+        representative = ROOT / contract["classes"]["memref.collapse_shape"][
+            "representative"
+        ]["path"]
+        original = representative.read_bytes()
+        payload = copy.deepcopy(self.payload)
+        try:
+            representative.write_bytes(
+                original + b"\n// authenticated representative rebound attack\n"
+            )
+            payload["executions"][0]["input"] = binding(representative)
+            payload["executions"][0]["input_after"] = binding(representative)
+            payload["python"]["path"] = "/bin/true"
+            canonical_rehash(payload)
+            with self.assertRaisesRegex(ValueError, "representative binding"):
+                self.verifier.validate_payload(payload, ROOT, replay=True)
+        finally:
+            representative.write_bytes(original)
+
+    def test_verifier_rejects_rebound_parse_command_and_streams(self) -> None:
+        report_binding = binding(RESULT)
+        attacks = []
+        wrong_command = copy.deepcopy(self.payload)
+        wrong_command["executions"][0]["parse_check"]["command"] = ["/bin/true"]
+        attacks.append(("parse command", canonical_rehash(wrong_command)))
+        wrong_stdout = copy.deepcopy(self.payload)
+        wrong_stdout["executions"][0]["parse_check"]["stdout"] = report_binding
+        attacks.append(("parse stdout", canonical_rehash(wrong_stdout)))
+        wrong_stderr = copy.deepcopy(self.payload)
+        wrong_stderr["executions"][0]["parse_check"]["stderr"] = report_binding
+        attacks.append(("parse stderr", canonical_rehash(wrong_stderr)))
+        wrong_exit = copy.deepcopy(self.payload)
+        wrong_exit["executions"][0]["parse_check"]["exit_code"] = 99
+        attacks.append(("parse exit", canonical_rehash(wrong_exit)))
+        for message, payload in attacks:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    self.verifier.validate_payload(payload, ROOT, replay=True)
+
+    def test_verifier_rejects_rebound_reproducer_command_exit_and_streams(self) -> None:
+        metadata_path = ROOT / self.payload["earliest_remaining_signature"][
+            "reproducer"
+        ]["metadata"]["path"]
+        original = metadata_path.read_bytes()
+        base_metadata = json.loads(original)
+        report_binding = binding(RESULT)
+        complete_stderr = self.payload["executions"][-1]["stderr"]
+        mutations = {
+            "reproducer command": ("command", ["/bin/true"]),
+            "reproducer exit": ("exit_code", 99),
+            "reproducer stdout": ("stdout", report_binding),
+            "reproducer stderr": ("stderr", complete_stderr),
+            "reproducer output": ("output", report_binding),
+        }
+        try:
+            for message, (field, value) in mutations.items():
+                with self.subTest(message=message):
+                    metadata = copy.deepcopy(base_metadata)
+                    metadata["execution"][field] = value
+                    metadata_path.write_bytes(
+                        json.dumps(
+                            metadata,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            allow_nan=False,
+                        ).encode()
+                        + b"\n"
+                    )
+                    payload = copy.deepcopy(self.payload)
+                    payload["earliest_remaining_signature"]["reproducer"][
+                        "metadata"
+                    ] = binding(metadata_path)
+                    canonical_rehash(payload)
+                    with self.assertRaisesRegex(ValueError, message):
+                        self.verifier.validate_payload(payload, ROOT, replay=True)
+        finally:
+            metadata_path.write_bytes(original)
+
+    def test_verifier_rejects_semantic_probe_mutation(self) -> None:
+        self.assertIn(
+            "semantic_probes", self.payload,
+            "evaluation lacks semantic probes for mutation testing",
+        )
+        payload = copy.deepcopy(self.payload)
+        payload["semantic_probes"][0]["after"]["access_maps"][0][
+            "linear_index"
+        ] += 1
+        canonical_rehash(payload)
+        with self.assertRaisesRegex(ValueError, "semantic probe"):
+            self.verifier.validate_payload(payload, ROOT, replay=False)
+
+    def test_elapsed_time_is_positive_authenticated_observation_not_replay_equality(self) -> None:
+        invalid = copy.deepcopy(self.payload)
+        invalid["executions"][0]["elapsed_ns"] = 0
+        canonical_rehash(invalid)
+        with self.assertRaisesRegex(ValueError, "elapsed time invalid"):
+            self.verifier.validate_payload(invalid, ROOT, replay=False)
+        payload = copy.deepcopy(self.payload)
+        payload["executions"][0]["elapsed_ns"] += 1_000_000_000
+        metadata_path = ROOT / payload["earliest_remaining_signature"]["reproducer"][
+            "metadata"
+        ]["path"]
+        original = metadata_path.read_bytes()
+        try:
+            metadata = json.loads(original)
+            metadata["execution"]["elapsed_ns"] += 1_000_000_000
+            metadata_path.write_bytes(
+                json.dumps(
+                    metadata, sort_keys=True, separators=(",", ":"), allow_nan=False
+                ).encode()
+                + b"\n"
+            )
+            payload["earliest_remaining_signature"]["reproducer"]["metadata"] = binding(
+                metadata_path
+            )
+            canonical_rehash(payload)
+            self.verifier.validate_payload(payload, ROOT, replay=True)
+        finally:
+            metadata_path.write_bytes(original)
 
 
 if __name__ == "__main__":

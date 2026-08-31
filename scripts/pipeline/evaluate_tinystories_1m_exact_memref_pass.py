@@ -142,6 +142,7 @@ def apply_decision_gate(
     blocker_counts: dict[str, int],
     invalid_signatures: list[Any],
     unknown_blocker_classes: list[str],
+    invariant_status: str,
 ) -> str:
     if (
         parseable
@@ -149,9 +150,116 @@ def apply_decision_gate(
         and all(blocker_counts[name] == 0 for name in REGISTERED_CLASSES)
         and not invalid_signatures
         and not unknown_blocker_classes
+        and invariant_status == "proven"
     ):
         return "register_existing_pass"
     return "compiler_pass_extension"
+
+
+def _representative_signature(contract: dict[str, Any], name: str) -> dict[str, Any]:
+    representative = contract["classes"][name]["representative"]
+    signature = json.loads(representative["selection_tuple"][1])
+    if sha256_bytes(canonical_json(signature)) != representative["signature_sha256"]:
+        raise ValueError(f"authenticated representative signature mismatch for {name}")
+    return signature
+
+
+def render_semantic_probe(contract: dict[str, Any], name: str) -> str:
+    """Render a live load/store use of the exact authenticated representative."""
+    signature = _representative_signature(contract, name)
+    operands = signature["operand_types"]
+    results = signature["result_types"]
+    if name == "memref.collapse_shape":
+        return (
+            "module {\n"
+            f"  func.func @probe(%source: {operands[0]}) -> i64 {{\n"
+            "    %c2 = arith.constant 2 : index\n"
+            "    %c3 = arith.constant 3 : index\n"
+            f"    %view = memref.collapse_shape %source [[0, 1], [2]] : {operands[0]} into {results[0]}\n"
+            f"    %value = memref.load %view[%c2, %c3] : {results[0]}\n"
+            f"    memref.store %value, %view[%c2, %c3] : {results[0]}\n"
+            "    return %value : i64\n  }\n}\n"
+        )
+    if name == "memref.copy":
+        return (
+            "module {\n"
+            f"  func.func @probe(%source: {operands[0]}, %target: {operands[1]}) -> i64 {{\n"
+            "    %c0 = arith.constant 0 : index\n"
+            f"    memref.copy %source, %target : {operands[0]} to {operands[1]}\n"
+            f"    %value = memref.load %target[%c0] : {operands[1]}\n"
+            f"    memref.store %value, %target[%c0] : {operands[1]}\n"
+            "    return %value : i64\n  }\n}\n"
+        )
+    if name == "memref.expand_shape":
+        return (
+            "module {\n"
+            f"  func.func @probe(%source: {operands[0]}) -> i64 {{\n"
+            "    %c0 = arith.constant 0 : index\n"
+            f"    %view = memref.expand_shape %source [[0, 1]] output_shape [1, 1] : {operands[0]} into {results[0]}\n"
+            f"    %value = memref.load %view[%c0, %c0] : {results[0]}\n"
+            f"    memref.store %value, %view[%c0, %c0] : {results[0]}\n"
+            "    return %value : i64\n  }\n}\n"
+        )
+    if name == "memref.reinterpret_cast":
+        return (
+            "module {\n"
+            f"  func.func @probe(%source: {operands[0]}) -> i64 {{\n"
+            "    %c0 = arith.constant 0 : index\n"
+            f"    %view = memref.reinterpret_cast %source to offset: [0], sizes: [1], strides: [1] : {operands[0]} to {results[0]}\n"
+            f"    %value = memref.load %view[%c0] : {results[0]}\n"
+            f"    memref.store %value, %view[%c0] : {results[0]}\n"
+            "    return %value : i64\n  }\n}\n"
+        )
+    raise ValueError(f"unsupported semantic probe operation {name}")
+
+
+_INDEX_CONSTANT = re.compile(r"^\s*(%[A-Za-z0-9_.$-]+)\s*=\s*arith\.constant\s+(-?[0-9]+)\s*:\s*index\s*$")
+_MEMORY_ACCESS = re.compile(
+    r"^\s*(?:%[A-Za-z0-9_.$-]+\s*=\s*)?memref\.(load|store)\s+.*?"
+    r"(%[A-Za-z0-9_.$-]+)\[([^]]+)\]\s*:\s*(memref<.+>)\s*$"
+)
+
+
+def semantic_access_model(text: str, parser: Any) -> dict[str, Any]:
+    constants: dict[str, int] = {}
+    for line in text.splitlines():
+        matched = _INDEX_CONSTANT.match(line)
+        if matched:
+            constants[matched.group(1)] = int(matched.group(2))
+    accesses = []
+    memrefs = []
+    for line in text.splitlines():
+        matched = _MEMORY_ACCESS.match(line)
+        if not matched:
+            continue
+        memref = parser.parse_memref_type(matched.group(4))
+        indices = []
+        for token in matched.group(3).split(","):
+            token = token.strip()
+            if token not in constants:
+                raise ValueError("semantic probe has a non-constant memory access")
+            indices.append(constants[token])
+        if len(indices) != memref["rank"]:
+            raise ValueError("semantic probe access rank mismatch")
+        linear = memref["offset"] + sum(
+            index * stride for index, stride in zip(indices, memref["strides"])
+        )
+        accesses.append({"kind": matched.group(1), "linear_index": linear})
+        memrefs.append(memref)
+    if not accesses or len(memrefs) != len(accesses):
+        raise ValueError("semantic probe has no live memory access")
+    element_counts = [
+        __import__("math").prod(memref["shape"]) for memref in memrefs
+    ]
+    if len(set(element_counts)) != 1:
+        raise ValueError("semantic probe accesses disagree on element count")
+    return {
+        "shape": memrefs[0]["shape"],
+        "strides": memrefs[0]["strides"],
+        "offset": memrefs[0]["offset"],
+        "element_count": element_counts[0],
+        "access_maps": accesses,
+    }
 
 
 def _mask_line(line: str) -> str:
@@ -599,19 +707,19 @@ def _write_invalid_reproducer(invalid: dict[str, Any]) -> dict[str, Any]:
     stderr_path = directory / "pass.stderr.bin"
     output_path = directory / "pass.output.mlir"
     input_path.write_text(text, encoding="utf-8")
-    with tempfile.TemporaryDirectory(prefix="exact-memref-invalid-reproducer-") as raw:
-        transient_output = Path(raw) / "output.mlir"
-        command = [
-            TOOL["path"], str(input_path),
-            f"--load-pass-plugin={PLUGIN['path']}",
-            f"--pass-pipeline={PIPELINE}", "-o", str(transient_output),
-        ]
-        started = time.monotonic_ns()
-        completed = subprocess.run(
-            command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
-        )
-        elapsed = time.monotonic_ns() - started
-        output = transient_output.read_bytes() if transient_output.exists() else b""
+    output_path.unlink(missing_ok=True)
+    command = [
+        TOOL["path"], str(input_path),
+        f"--load-pass-plugin={PLUGIN['path']}",
+        f"--pass-pipeline={PIPELINE}", "-o", str(output_path),
+    ]
+    started = time.monotonic_ns()
+    completed = subprocess.run(
+        command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
+    )
+    elapsed = time.monotonic_ns() - started
+    output_created = output_path.exists()
+    output = output_path.read_bytes() if output_created else b""
     stdout_path.write_bytes(completed.stdout)
     stderr_path.write_bytes(completed.stderr)
     output_path.write_bytes(output)
@@ -631,6 +739,7 @@ def _write_invalid_reproducer(invalid: dict[str, Any]) -> dict[str, Any]:
             "command": command,
             "exit_code": completed.returncode,
             "elapsed_ns": elapsed,
+            "output_created": output_created,
             "stdout": file_binding(stdout_path, relative=True),
             "stderr": file_binding(stderr_path, relative=True),
             "output": file_binding(output_path, relative=True),
@@ -709,8 +818,8 @@ unrealized; this experiment uses the retained authenticated c22 bytes.
 - Parseable output: `{str(complete['parseable']).lower()}`
 - Unknown blocker classes: `{len(complete['unknown_blocker_classes'])}`
 - New invalid signatures: `{len(complete['new_invalid_signatures'])}`
-- Shape/layout invariants preserved: `{str(complete['shape_layout_invariants_preserved']).lower()}`
-- Measured pass time over five ordered executions: `{elapsed}` ns
+- Full-artifact invariant status: `{complete['invariant_status']}`
+- Measured pass time over nine ordered executions: `{elapsed}` ns
 {extension}
 No Calyx stage ran and no pipeline stage was registered by this evaluation.
 """
@@ -754,6 +863,43 @@ def evaluate(*, output: Path, evidence_root: Path, report: Path) -> dict[str, An
         )
         sequence += 1
 
+    semantic_probes = []
+    for name in REGISTERED_CLASSES:
+        slug = "semantic-" + name.replace(".", "-").replace("_", "-")
+        probe_dir = evidence_root / slug
+        probe_dir.mkdir(parents=True, exist_ok=True)
+        probe_input = probe_dir / "input.mlir"
+        probe_text = render_semantic_probe(contract, name)
+        probe_input.write_text(probe_text, encoding="utf-8")
+        run, _, _ = run_pass(
+            sequence=sequence, identifier=slug, kind="semantic_probe",
+            operation=name, input_path=probe_input, output_dir=probe_dir, parser=parser,
+        )
+        executions.append(run)
+        before_model = semantic_access_model(probe_text, parser)
+        after_model = (
+            semantic_access_model(
+                (ROOT / run["output"]["path"]).read_text(encoding="utf-8"), parser
+            )
+            if run["parseable"] and run["exit_code"] == 0 else None
+        )
+        proven = (
+            after_model is not None
+            and before_model["element_count"] == after_model["element_count"]
+            and before_model["access_maps"] == after_model["access_maps"]
+        )
+        semantic_probes.append(
+            {
+                "operation": name,
+                "execution_id": slug,
+                "invariant_status": "proven" if proven else "unproven",
+                "before": before_model,
+                "after": after_model,
+                "checks": {"shape_layout_access_equivalent": proven},
+            }
+        )
+        sequence += 1
+
     full_run, full_after_ops, full_after_summary = run_pass(
         sequence=sequence, identifier="complete-retained-c22-flat-scf", kind="complete",
         operation=None, input_path=flat_scf, output_dir=evidence_root / "complete",
@@ -779,7 +925,17 @@ def evaluate(*, output: Path, evidence_root: Path, report: Path) -> dict[str, An
             )
         ]
     unknown = _unknown_blockers(before_census, after_census)
-    shape_layout_ok = full_run["parseable"] and not invalid
+    invariant_status = (
+        "unavailable_due_invalid_output"
+        if not full_run["parseable"]
+        else (
+            "proven"
+            if not invalid and all(
+                probe["invariant_status"] == "proven" for probe in semantic_probes
+            )
+            else "unproven"
+        )
+    )
     complete = {
         "parseable": full_run["parseable"],
         "before": {
@@ -797,13 +953,14 @@ def evaluate(*, output: Path, evidence_root: Path, report: Path) -> dict[str, An
         "signature_mappings": mappings,
         "new_invalid_signatures": invalid,
         "unknown_blocker_classes": unknown,
-        "shape_layout_invariants_preserved": shape_layout_ok,
+        "invariant_status": invariant_status,
     }
     decision = apply_decision_gate(
         parseable=complete["parseable"],
         blocker_counts=complete["after"]["blocker_counts"],
         invalid_signatures=invalid,
         unknown_blocker_classes=unknown,
+        invariant_status=invariant_status,
     )
     python_path = Path(sys.executable).resolve()
     payload: dict[str, Any] = {
@@ -828,6 +985,7 @@ def evaluate(*, output: Path, evidence_root: Path, report: Path) -> dict[str, An
         "task_1_through_3_identities": contract["task_1_through_3_identities"],
         "executions": executions,
         "representatives": representatives,
+        "semantic_probes": semantic_probes,
         "complete": complete,
         "decision": decision,
         "sha256": None,

@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 from typing import Any
 
@@ -52,6 +53,107 @@ PLUGIN = {
     "bytes": 21714240,
     "sha256": "6e6782b5db0255e688f1599c51f6076c3c30514362194ec5eff2632eeb8a6744",
 }
+
+
+def _expected_provenance(contract: dict[str, Any]) -> dict[str, Any]:
+    nix = contract["nix"]
+    return {
+        "payload_source": nix["payload_source"],
+        "c22_derivation": nix["c22_derivation"],
+        "c22_output": nix["c22_output"],
+        "current_alias_derivation": nix["current_derivation"],
+        "current_alias_output": nix["current_output"],
+        "current_alias_realized": nix["current_output_realized"],
+        "unrealized_current_alias_residual": nix["provenance_residual"],
+    }
+
+
+def _contract_signature(contract: dict[str, Any], name: str) -> dict[str, Any]:
+    representative = contract["classes"][name]["representative"]
+    signature = json.loads(representative["selection_tuple"][1])
+    _require(
+        _digest(_canonical(signature)) == representative["signature_sha256"],
+        f"representative binding signature mismatch for {name}",
+    )
+    return signature
+
+
+def _expected_probe_text(contract: dict[str, Any], name: str) -> str:
+    signature = _contract_signature(contract, name)
+    operands, results = signature["operand_types"], signature["result_types"]
+    if name == "memref.collapse_shape":
+        operation = f"    %view = memref.collapse_shape %source [[0, 1], [2]] : {operands[0]} into {results[0]}\n"
+        constants = "    %c2 = arith.constant 2 : index\n    %c3 = arith.constant 3 : index\n"
+        indices = "%c2, %c3"
+        arguments = f"%source: {operands[0]}"
+        access_type = results[0]
+    elif name == "memref.copy":
+        operation = f"    memref.copy %source, %target : {operands[0]} to {operands[1]}\n"
+        constants = "    %c0 = arith.constant 0 : index\n"
+        indices = "%c0"
+        arguments = f"%source: {operands[0]}, %target: {operands[1]}"
+        access_type = operands[1]
+    elif name == "memref.expand_shape":
+        operation = f"    %view = memref.expand_shape %source [[0, 1]] output_shape [1, 1] : {operands[0]} into {results[0]}\n"
+        constants = "    %c0 = arith.constant 0 : index\n"
+        indices = "%c0, %c0"
+        arguments = f"%source: {operands[0]}"
+        access_type = results[0]
+    elif name == "memref.reinterpret_cast":
+        operation = f"    %view = memref.reinterpret_cast %source to offset: [0], sizes: [1], strides: [1] : {operands[0]} to {results[0]}\n"
+        constants = "    %c0 = arith.constant 0 : index\n"
+        indices = "%c0"
+        arguments = f"%source: {operands[0]}"
+        access_type = results[0]
+    else:
+        raise ValueError(f"unsupported semantic probe operation {name}")
+    base = "%target" if name == "memref.copy" else "%view"
+    return (
+        "module {\n"
+        f"  func.func @probe({arguments}) -> i64 {{\n"
+        + constants + operation
+        + f"    %value = memref.load {base}[{indices}] : {access_type}\n"
+        + f"    memref.store %value, {base}[{indices}] : {access_type}\n"
+        + "    return %value : i64\n  }\n}\n"
+    )
+
+
+_INDEX_CONSTANT = re.compile(r"^\s*(%[A-Za-z0-9_.$-]+)\s*=\s*arith\.constant\s+(-?[0-9]+)\s*:\s*index\s*$")
+_MEMORY_ACCESS = re.compile(
+    r"^\s*(?:%[A-Za-z0-9_.$-]+\s*=\s*)?memref\.(load|store)\s+.*?"
+    r"(%[A-Za-z0-9_.$-]+)\[([^]]+)\]\s*:\s*(memref<.+>)\s*$"
+)
+
+
+def _access_model(text: str, parser: Any) -> dict[str, Any]:
+    constants = {
+        matched.group(1): int(matched.group(2))
+        for line in text.splitlines()
+        if (matched := _INDEX_CONSTANT.match(line))
+    }
+    accesses, memrefs = [], []
+    for line in text.splitlines():
+        matched = _MEMORY_ACCESS.match(line)
+        if not matched:
+            continue
+        memref = parser.parse_memref_type(matched.group(4))
+        tokens = [token.strip() for token in matched.group(3).split(",")]
+        _require(all(token in constants for token in tokens), "semantic probe access is not constant")
+        indices = [constants[token] for token in tokens]
+        _require(len(indices) == memref["rank"], "semantic probe access rank mismatch")
+        linear = memref["offset"] + sum(
+            index * stride for index, stride in zip(indices, memref["strides"])
+        )
+        accesses.append({"kind": matched.group(1), "linear_index": linear})
+        memrefs.append(memref)
+    _require(bool(accesses), "semantic probe has no live memory access")
+    counts = [__import__("math").prod(memref["shape"]) for memref in memrefs]
+    _require(len(set(counts)) == 1, "semantic probe element-count mismatch")
+    return {
+        "shape": memrefs[0]["shape"], "strides": memrefs[0]["strides"],
+        "offset": memrefs[0]["offset"], "element_count": counts[0],
+        "access_maps": accesses,
+    }
 
 
 def _canonical(value: Any) -> bytes:
@@ -333,30 +435,59 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
     _require(_digest(CONTRACT_PATH.read_bytes()) == CONTRACT_SHA256, "Task 2 contract bytes mismatch")
     _require(payload.get("task2_contract") == _binding(CONTRACT_PATH, relative=True), "Task 2 contract binding mismatch")
     contract = _load_object(CONTRACT_PATH, "Task 2 contract")
+    _require(payload.get("model") == contract["model"], "model mismatch")
+    _require(
+        payload.get("task_1_through_3_identities")
+        == contract["task_1_through_3_identities"],
+        "Task 1--3 identities mismatch",
+    )
+    _require(payload.get("provenance") == _expected_provenance(contract), "provenance mismatch")
     flat_scf = ROOT / contract["source"]["flat_scf"]["path"]
     _require(_digest(flat_scf.read_bytes()) == FLAT_SCF_SHA256, "input SHA-256 mismatch")
     _require(payload.get("input") == _binding(flat_scf, relative=True), "input SHA-256 mismatch")
-    provenance = payload.get("provenance", {})
-    _require(provenance.get("payload_source") == "retained-authenticated-c22-output", "c22 provenance mismatch")
-    _require(provenance.get("current_alias_realized") is False, "current alias unrealized provenance mismatch")
-
     parser = _load_parser()
     runs = payload.get("executions")
-    _require(isinstance(runs, list) and len(runs) == 5, "representative order is incomplete")
-    _require([run.get("sequence") for run in runs] == [1, 2, 3, 4, 5], "representative order sequence mismatch")
+    _require(isinstance(runs, list) and len(runs) == 9, "representative order is incomplete")
+    _require([run.get("sequence") for run in runs] == list(range(1, 10)), "representative order sequence mismatch")
     _require([run.get("operation") for run in runs[:4]] == list(REGISTERED), "representative order mismatch")
     _require(all(run.get("kind") == "representative" for run in runs[:4]), "representative order kind mismatch")
-    _require(runs[4].get("kind") == "complete" and runs[4].get("operation") is None, "representative order complete mismatch")
+    _require([run.get("operation") for run in runs[4:8]] == list(REGISTERED), "semantic probe order mismatch")
+    _require(all(run.get("kind") == "semantic_probe" for run in runs[4:8]), "semantic probe order kind mismatch")
+    _require(runs[8].get("kind") == "complete" and runs[8].get("operation") is None, "representative order complete mismatch")
+
+    expected_inputs = []
+    for name in REGISTERED:
+        representative = contract["classes"][name]["representative"]
+        path = ROOT / representative["path"]
+        actual = _binding(path, relative=True)
+        _require(
+            actual["sha256"] == representative["sha256"],
+            f"representative binding mismatch for {name}",
+        )
+        expected_inputs.append(path)
+    trusted_python = Path(sys.executable).resolve()
+    _require(
+        payload.get("python") == _binding(trusted_python),
+        "python interpreter binding mismatch",
+    )
+    for name in REGISTERED:
+        slug = "semantic-" + name.replace(".", "-").replace("_", "-")
+        path = ROOT / "artifacts/comparison/tinystories-1m-exact-memref-pass-evidence" / slug / "input.mlir"
+        _require(path.is_file(), f"semantic probe input unavailable for {name}")
+        _require(
+            path.read_text(encoding="utf-8") == _expected_probe_text(contract, name),
+            f"semantic probe input mismatch for {name}",
+        )
+        expected_inputs.append(path)
+    expected_inputs.append(flat_scf)
 
     for index, run in enumerate(runs):
-        expected_input = (
-            ROOT / contract["classes"][REGISTERED[index]]["representative"]["path"]
-            if index < 4 else flat_scf
-        )
-        _require(run.get("input") == _binding(expected_input, relative=True), "unchanged input identity mismatch")
+        expected_input = expected_inputs[index]
+        binding_label = "representative binding" if index < 4 else "unchanged input identity"
+        _require(run.get("input") == _binding(expected_input, relative=True), f"{binding_label} mismatch")
         _require(run.get("input_after") == run.get("input"), "unchanged input identity mismatch")
         _require(isinstance(run.get("elapsed_ns"), int) and run["elapsed_ns"] > 0, "elapsed time invalid")
-        if index < 4:
+        if index < 8:
             _require(run.get("exit_code") == 0, "representative pass execution failed")
             _require(run.get("parseable") is True, "representative parseable output required")
         else:
@@ -370,13 +501,17 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
         _check_binding(run.get("stderr"), f"{run.get('id')} stderr")
         _check_binding(run.get("parse_check", {}).get("stdout"), f"{run.get('id')} parse stdout")
         _check_binding(run.get("parse_check", {}).get("stderr"), f"{run.get('id')} parse stderr")
-        _require(run.get("parse_check", {}).get("exit_code") == 0, "parseable output required")
+        _require(run.get("parse_check", {}).get("exit_code") == 0, "parse exit mismatch")
         _check_command(run, expected_input, output_path)
+        parse_command = [TOOL["path"], str(output_path), "-o", "/dev/null"]
+        _require(run["parse_check"].get("command") == parse_command, "parse command mismatch")
         parsed = subprocess.run(
-            [TOOL["path"], str(output_path), "-o", "/dev/null"],
+            parse_command,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
         )
-        _require(parsed.returncode == run["parse_check"]["exit_code"], "parse-check replay mismatch")
+        _require(parsed.returncode == run["parse_check"]["exit_code"], "parse exit mismatch")
+        _require(parsed.stdout == (ROOT / run["parse_check"]["stdout"]["path"]).read_bytes(), "parse stdout mismatch")
+        _require(parsed.stderr == (ROOT / run["parse_check"]["stderr"]["path"]).read_bytes(), "parse stderr mismatch")
 
     representatives = payload.get("representatives")
     _require(
@@ -416,6 +551,32 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
             },
         }
         _require(result == expected_result, "representative census/classification mismatch")
+
+    semantic_probes = payload.get("semantic_probes")
+    _require(
+        isinstance(semantic_probes, list) and len(semantic_probes) == 4,
+        "semantic probe result set mismatch",
+    )
+    for index, name in enumerate(REGISTERED):
+        probe_text = _expected_probe_text(contract, name)
+        before_model = _access_model(probe_text, parser)
+        after_model = _access_model(
+            (ROOT / runs[index + 4]["output"]["path"]).read_text(encoding="utf-8"),
+            parser,
+        )
+        proven = (
+            before_model["element_count"] == after_model["element_count"]
+            and before_model["access_maps"] == after_model["access_maps"]
+        )
+        expected_probe = {
+            "operation": name,
+            "execution_id": runs[index + 4]["id"],
+            "invariant_status": "proven" if proven else "unproven",
+            "before": before_model,
+            "after": after_model,
+            "checks": {"shape_layout_access_equivalent": proven},
+        }
+        _require(semantic_probes[index] == expected_probe, "semantic probe mismatch")
 
     complete = payload.get("complete", {})
     _require(complete.get("unknown_blocker_classes") == [], "unknown blocker classes present")
@@ -458,9 +619,20 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
         invalid = expected_invalid_from_output
     _require(complete.get("signature_mappings") == mappings, "per-signature classification mismatch")
     _require(complete.get("new_invalid_signatures") == invalid, "new invalid signatures mismatch")
+    expected_invariant_status = (
+        "unavailable_due_invalid_output"
+        if not full_parseable
+        else (
+            "proven"
+            if not invalid and all(
+                item["invariant_status"] == "proven" for item in semantic_probes
+            )
+            else "unproven"
+        )
+    )
     _require(
-        complete.get("shape_layout_invariants_preserved") is (full_parseable and not invalid),
-        "shape/layout invariants not preserved",
+        complete.get("invariant_status") == expected_invariant_status,
+        "invariant status mismatch",
     )
     _require(all(item["classification"] in CLASSIFICATIONS for item in mappings), "classification vocabulary mismatch")
     gate = (
@@ -468,20 +640,17 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
         and all(expected_after[name] == 0 for name in REGISTERED)
         and not invalid
         and not complete["unknown_blocker_classes"]
+        and expected_invariant_status == "proven"
     )
     decision = "register_existing_pass" if gate else "compiler_pass_extension"
     authenticated = subprocess.run(
-        [str(payload["python"]["path"]), str(TASK2_VERIFIER)], cwd=ROOT,
+        [sys.executable, str(TASK2_VERIFIER)], cwd=ROOT,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
     )
     _require(authenticated.returncode == 0, "authenticated Task 2 verifier failed")
     if replay:
         for index, run in enumerate(runs):
-            input_path = (
-                ROOT / contract["classes"][REGISTERED[index]]["representative"]["path"]
-                if index < 4 else flat_scf
-            )
-            _replay(run, input_path)
+            _replay(run, expected_inputs[index])
     _require(payload.get("decision") == decision, "decision gate mismatch")
     if decision == "register_existing_pass":
         _require(payload.get("normalized_artifact") == runs[-1]["output"], "normalized artifact identity mismatch")
@@ -498,10 +667,23 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
         metadata = _load_object(metadata_path, "earliest remaining metadata")
         _require(metadata.get("signature_sha256") == earliest.get("signature_sha256"), "earliest remaining signature mismatch")
         execution = metadata.get("execution", {})
-        _require(execution.get("exit_code") != 0, "earliest reproducer unexpectedly passed")
+        expected_stdout = reproducer.parent / "pass.stdout.bin"
+        expected_stderr = reproducer.parent / "pass.stderr.bin"
+        expected_output = reproducer.parent / "pass.output.mlir"
+        expected_repro_command = [
+            TOOL["path"], str(reproducer), f"--load-pass-plugin={PLUGIN['path']}",
+            f"--pass-pipeline={PIPELINE}", "-o", str(expected_output),
+        ]
+        _require(execution.get("command") == expected_repro_command, "reproducer command mismatch")
+        _require(execution.get("exit_code") == 1, "reproducer exit mismatch")
+        _require(isinstance(execution.get("elapsed_ns"), int) and execution["elapsed_ns"] > 0, "reproducer elapsed time invalid")
+        _require(execution.get("output_created") is False, "reproducer output-created status mismatch")
+        _require(execution.get("stdout") == _binding(expected_stdout, relative=True), "reproducer stdout mismatch")
+        _require(execution.get("stderr") == _binding(expected_stderr, relative=True), "reproducer stderr mismatch")
+        _require(execution.get("output") == _binding(expected_output, relative=True), "reproducer output mismatch")
         repro_stderr = _check_binding(execution.get("stderr"), "earliest reproducer stderr")
-        _check_binding(execution.get("stdout"), "earliest reproducer stdout")
-        _check_binding(execution.get("output"), "earliest reproducer output")
+        repro_stdout = _check_binding(execution.get("stdout"), "earliest reproducer stdout")
+        repro_output = _check_binding(execution.get("output"), "earliest reproducer output")
         _require(b"expected 1 offset values, got 2" in repro_stderr.read_bytes(), "earliest reproducer diagnostic mismatch")
         if replay:
             with tempfile.TemporaryDirectory(prefix="exact-subview-replay-") as raw:
@@ -513,8 +695,13 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
                 completed_repro = subprocess.run(
                     command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
                 )
-                _require(completed_repro.returncode != 0, "earliest reproducer replay unexpectedly passed")
-                _require(b"expected 1 offset values, got 2" in completed_repro.stderr, "earliest reproducer replay diagnostic mismatch")
+                replay_created = output.exists()
+                replay_output = output.read_bytes() if replay_created else b""
+                _require(completed_repro.returncode == execution["exit_code"], "reproducer exit mismatch")
+                _require(completed_repro.stdout == repro_stdout.read_bytes(), "reproducer stdout mismatch")
+                _require(completed_repro.stderr == repro_stderr.read_bytes(), "reproducer stderr mismatch")
+                _require(replay_created == execution["output_created"], "reproducer output-created status mismatch")
+                _require(replay_output == repro_output.read_bytes(), "reproducer output mismatch")
 
 
 def _args() -> argparse.Namespace:
