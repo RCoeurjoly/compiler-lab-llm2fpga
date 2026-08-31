@@ -36,7 +36,7 @@ unrealized; this experiment uses the retained authenticated c22 bytes.
 - Unknown blocker classes: `0`
 - New invalid signatures: `1`
 - Full-artifact invariant status: `unavailable_due_invalid_output`
-- Measured pass time over nine ordered executions: `1189191325` ns
+- Measured pass time over nine ordered executions: `1201333877` ns
 
 ## Earliest residual
 

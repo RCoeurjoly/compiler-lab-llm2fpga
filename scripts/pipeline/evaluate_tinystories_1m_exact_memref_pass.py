@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import importlib.util
 import json
@@ -172,12 +173,10 @@ def render_semantic_probe(contract: dict[str, Any], name: str) -> str:
     if name == "memref.collapse_shape":
         return (
             "module {\n"
-            f"  func.func @probe(%source: {operands[0]}) -> i64 {{\n"
-            "    %c2 = arith.constant 2 : index\n"
-            "    %c3 = arith.constant 3 : index\n"
+            f"  func.func @probe(%source: {operands[0]}, %i0: index, %i1: index) -> i64 {{\n"
             f"    %view = memref.collapse_shape %source [[0, 1], [2]] : {operands[0]} into {results[0]}\n"
-            f"    %value = memref.load %view[%c2, %c3] : {results[0]}\n"
-            f"    memref.store %value, %view[%c2, %c3] : {results[0]}\n"
+            f"    %value = memref.load %view[%i0, %i1] : {results[0]}\n"
+            f"    memref.store %value, %view[%i0, %i1] : {results[0]}\n"
             "    return %value : i64\n  }\n}\n"
         )
     if name == "memref.copy":
@@ -213,61 +212,222 @@ def render_semantic_probe(contract: dict[str, Any], name: str) -> str:
     raise ValueError(f"unsupported semantic probe operation {name}")
 
 
+_FUNC_PROBE = re.compile(r"^\s*func\.func @probe\((.*)\) -> i64 \{\s*$")
+_FUNC_ARG = re.compile(r"(%[A-Za-z0-9_.$-]+)\s*:\s*(memref<[^>]+>|index)")
 _INDEX_CONSTANT = re.compile(r"^\s*(%[A-Za-z0-9_.$-]+)\s*=\s*arith\.constant\s+(-?[0-9]+)\s*:\s*index\s*$")
-_MEMORY_ACCESS = re.compile(
-    r"^\s*(?:%[A-Za-z0-9_.$-]+\s*=\s*)?memref\.(load|store)\s+.*?"
-    r"(%[A-Za-z0-9_.$-]+)\[([^]]+)\]\s*:\s*(memref<.+>)\s*$"
-)
+_INDEX_BINARY = re.compile(r"^\s*(%[A-Za-z0-9_.$-]+)\s*=\s*arith\.(addi|subi|muli)\s+(%[A-Za-z0-9_.$-]+),\s*(%[A-Za-z0-9_.$-]+)\s*:\s*index\s*$")
+_VIEW_ALIAS = re.compile(r"^\s*(%[A-Za-z0-9_.$-]+)\s*=\s*memref\.(?:collapse_shape|expand_shape|reinterpret_cast)\s+(%[A-Za-z0-9_.$-]+)\b")
+_LOAD = re.compile(r"^\s*%[A-Za-z0-9_.$-]+\s*=\s*memref\.load\s+(%[A-Za-z0-9_.$-]+)\[([^]]+)\]\s*:\s*(memref<.+>)\s*$")
+_STORE = re.compile(r"^\s*memref\.store\s+%[A-Za-z0-9_.$-]+,\s*(%[A-Za-z0-9_.$-]+)\[([^]]+)\]\s*:\s*(memref<.+>)\s*$")
+_COPY = re.compile(r"^\s*memref\.copy\s+(%[A-Za-z0-9_.$-]+),\s*(%[A-Za-z0-9_.$-]+)\s*:")
 
 
-def semantic_access_model(text: str, parser: Any) -> dict[str, Any]:
-    constants: dict[str, int] = {}
+def _affine_add(left: dict[str, Any], right: dict[str, Any], scale: int = 1) -> dict[str, Any]:
+    return {
+        "coefficients": [
+            lhs + scale * rhs
+            for lhs, rhs in zip(left["coefficients"], right["coefficients"])
+        ],
+        "offset": left["offset"] + scale * right["offset"],
+    }
+
+
+def _affine_scale(value: dict[str, Any], scale: int) -> dict[str, Any]:
+    return {
+        "coefficients": [scale * item for item in value["coefficients"]],
+        "offset": scale * value["offset"],
+    }
+
+
+def _semantic_access_model(
+    text: str, parser: Any, *, operation: str, signature: dict[str, Any]
+) -> dict[str, Any]:
+    logical_shape = (
+        signature["operand_memrefs"][1]["shape"]
+        if operation == "memref.copy"
+        else signature["result_memrefs"][0]["shape"]
+    )
+    function = next(
+        (matched for line in text.splitlines() if (matched := _FUNC_PROBE.match(line))),
+        None,
+    )
+    if function is None:
+        raise ValueError("semantic probe function signature is unavailable")
+    arguments = list(_FUNC_ARG.finditer(function.group(1)))
+    memref_arguments = [item for item in arguments if item.group(2).startswith("memref<")]
+    index_arguments = [item for item in arguments if item.group(2) == "index"]
+    variable_dimensions = [
+        (dimension, extent)
+        for dimension, extent in enumerate(logical_shape)
+        if extent > 1
+    ]
+    if len(index_arguments) != len(variable_dimensions):
+        raise ValueError("semantic probe index-variable rank is dynamic or mismatched")
+    variables = [
+        {
+            "name": f"i{variable_dimensions[index][0]}",
+            "argument": arguments.index(item),
+            "lower_inclusive": 0,
+            "upper_exclusive": variable_dimensions[index][1],
+        }
+        for index, item in enumerate(index_arguments)
+    ]
+    variable_count = len(variables)
+    expressions: dict[str, dict[str, Any]] = {}
+    for index, item in enumerate(index_arguments):
+        coefficients = [0] * variable_count
+        coefficients[index] = 1
+        expressions[item.group(1)] = {"coefficients": coefficients, "offset": 0}
     for line in text.splitlines():
-        matched = _INDEX_CONSTANT.match(line)
-        if matched:
-            constants[matched.group(1)] = int(matched.group(2))
+        constant = _INDEX_CONSTANT.match(line)
+        if constant:
+            expressions[constant.group(1)] = {
+                "coefficients": [0] * variable_count,
+                "offset": int(constant.group(2)),
+            }
+            continue
+        binary = _INDEX_BINARY.match(line)
+        if not binary:
+            continue
+        left, right = expressions.get(binary.group(3)), expressions.get(binary.group(4))
+        if left is None or right is None:
+            raise ValueError("semantic probe contains a dynamic index expression")
+        if binary.group(2) == "addi":
+            result = _affine_add(left, right)
+        elif binary.group(2) == "subi":
+            result = _affine_add(left, right, -1)
+        else:
+            left_constant = not any(left["coefficients"])
+            right_constant = not any(right["coefficients"])
+            if not left_constant and not right_constant:
+                raise ValueError("semantic probe contains a non-affine multiplication")
+            result = _affine_scale(
+                right if left_constant else left,
+                left["offset"] if left_constant else right["offset"],
+            )
+        expressions[binary.group(1)] = result
+
+    buffer_roles = {0: "source"}
+    if operation == "memref.copy":
+        buffer_roles[1] = "target"
+    buffers = {
+        item.group(1): {"argument": arguments.index(item), "role": buffer_roles[index]}
+        for index, item in enumerate(memref_arguments)
+    }
+    aliases = {}
+    for line in text.splitlines():
+        alias = _VIEW_ALIAS.match(line)
+        if alias:
+            aliases[alias.group(1)] = alias.group(2)
+
+    def base_identity(name: str) -> dict[str, Any]:
+        while name in aliases:
+            name = aliases[name]
+        if name not in buffers:
+            raise ValueError("semantic probe access base is not a function buffer")
+        return buffers[name]
+
+    copy_provenance = None
+    for line in text.splitlines():
+        copied = _COPY.match(line)
+        if copied:
+            copy_provenance = {
+                "source": base_identity(copied.group(1)),
+                "target": base_identity(copied.group(2)),
+            }
     accesses = []
     memrefs = []
     for line in text.splitlines():
-        matched = _MEMORY_ACCESS.match(line)
-        if not matched:
+        matched = _LOAD.match(line)
+        kind = "load"
+        if matched is None:
+            matched = _STORE.match(line)
+            kind = "store"
+        if matched is None:
             continue
-        memref = parser.parse_memref_type(matched.group(4))
-        indices = []
-        for token in matched.group(3).split(","):
-            token = token.strip()
-            if token not in constants:
-                raise ValueError("semantic probe has a non-constant memory access")
-            indices.append(constants[token])
-        if len(indices) != memref["rank"]:
+        memref = parser.parse_memref_type(matched.group(3))
+        tokens = [token.strip() for token in matched.group(2).split(",")]
+        raw_indices = []
+        for token in tokens:
+            expression = expressions.get(token)
+            if expression is None:
+                raise ValueError("semantic probe contains a dynamic or non-affine index")
+            raw_indices.append(copy.deepcopy(expression))
+        if len(raw_indices) != memref["rank"]:
             raise ValueError("semantic probe access rank mismatch")
-        linear = memref["offset"] + sum(
-            index * stride for index, stride in zip(indices, memref["strides"])
+        for expression, dimension in zip(raw_indices, memref["shape"]):
+            lower, upper = expression["offset"], expression["offset"]
+            for coefficient, variable in zip(expression["coefficients"], variables):
+                extent = variable["upper_exclusive"] - 1
+                lower += min(0, coefficient * extent)
+                upper += max(0, coefficient * extent)
+            expression["range"] = {
+                "lower_inclusive": lower,
+                "upper_exclusive": upper + 1,
+                "memref_upper_exclusive": dimension,
+                "in_bounds": 0 <= lower and upper < dimension,
+            }
+        linear = {"coefficients": [0] * variable_count, "offset": memref["offset"]}
+        for stride, expression in zip(memref["strides"], raw_indices):
+            linear = _affine_add(linear, _affine_scale(expression, stride))
+        sample_values = [
+            min(variable["upper_exclusive"] - 1, index + 2)
+            for index, variable in enumerate(variables)
+        ]
+        sample_linear = linear["offset"] + sum(
+            coefficient * value
+            for coefficient, value in zip(linear["coefficients"], sample_values)
         )
-        accesses.append({"kind": matched.group(1), "linear_index": linear})
+        accesses.append(
+            {
+                "kind": kind,
+                "base": base_identity(matched.group(1)),
+                "raw_indices": raw_indices,
+                "linear_formula": linear,
+                "supplementary_sample": {
+                    "variables": sample_values, "linear_index": sample_linear
+                },
+            }
+        )
         memrefs.append(memref)
-    if not accesses or len(memrefs) != len(accesses):
+    if not accesses:
         raise ValueError("semantic probe has no live memory access")
-    element_counts = [
-        __import__("math").prod(memref["shape"]) for memref in memrefs
-    ]
+    if operation == "memref.copy" and copy_provenance is None:
+        raise ValueError("semantic copy probe lacks source-target provenance")
+    element_counts = [__import__("math").prod(memref["shape"]) for memref in memrefs]
     if len(set(element_counts)) != 1:
         raise ValueError("semantic probe accesses disagree on element count")
-    shape = memrefs[0]["shape"]
-    strides = memrefs[0]["strides"]
-    expected_stride = 1
-    contiguous = True
+    shape, strides = memrefs[0]["shape"], memrefs[0]["strides"]
+    expected_stride, contiguous = 1, True
     for dimension, stride in reversed(list(zip(shape, strides))):
         contiguous = contiguous and stride == expected_stride
         expected_stride *= dimension
+    affine_mappings = [
+        {
+            "kind": access["kind"], "base": access["base"],
+            "linear_formula": access["linear_formula"],
+        }
+        for access in accesses
+    ]
     return {
-        "shape": memrefs[0]["shape"],
-        "strides": memrefs[0]["strides"],
-        "offset": memrefs[0]["offset"],
-        "contiguous": contiguous,
-        "element_count": element_counts[0],
-        "access_maps": accesses,
+        "affine_status": "proven",
+        "index_variables": variables,
+        "shape": shape, "strides": strides, "offset": memrefs[0]["offset"],
+        "contiguous": contiguous, "element_count": element_counts[0],
+        "copy_provenance": copy_provenance,
+        "access_maps": accesses, "affine_mappings": affine_mappings,
     }
+
+
+def semantic_access_model(
+    text: str, parser: Any, *, operation: str, signature: dict[str, Any]
+) -> dict[str, Any]:
+    try:
+        return _semantic_access_model(
+            text, parser, operation=operation, signature=signature
+        )
+    except ValueError as error:
+        return {"affine_status": "unproven", "reason": str(error)}
 
 
 def _mask_line(line: str) -> str:
@@ -884,26 +1044,42 @@ def evaluate(*, output: Path, evidence_root: Path, report: Path) -> dict[str, An
             operation=name, input_path=probe_input, output_dir=probe_dir, parser=parser,
         )
         executions.append(run)
-        before_model = semantic_access_model(probe_text, parser)
+        signature = _representative_signature(contract, name)
+        before_model = semantic_access_model(
+            probe_text, parser, operation=name, signature=signature
+        )
         after_model = (
             semantic_access_model(
-                (ROOT / run["output"]["path"]).read_text(encoding="utf-8"), parser
+                (ROOT / run["output"]["path"]).read_text(encoding="utf-8"), parser,
+                operation=name, signature=signature,
             )
             if run["parseable"] and run["exit_code"] == 0 else None
         )
         shape_element_count_preserved = (
             after_model is not None
+            and before_model["affine_status"] == "proven"
+            and after_model["affine_status"] == "proven"
             and before_model["element_count"] == after_model["element_count"]
         )
         layout_preserved = (
             after_model is not None
+            and before_model["affine_status"] == "proven"
+            and after_model["affine_status"] == "proven"
             and before_model["contiguous"]
             and after_model["contiguous"]
             and before_model["offset"] == after_model["offset"]
         )
         access_maps_preserved = (
             after_model is not None
-            and before_model["access_maps"] == after_model["access_maps"]
+            and before_model.get("index_variables") == after_model.get("index_variables")
+            and before_model.get("affine_mappings") == after_model.get("affine_mappings")
+            and before_model.get("copy_provenance") == after_model.get("copy_provenance")
+            and all(
+                raw["range"]["in_bounds"]
+                for model in (before_model, after_model)
+                for access in model.get("access_maps", [])
+                for raw in access["raw_indices"]
+            )
         )
         proven = (
             shape_element_count_preserved
@@ -921,6 +1097,7 @@ def evaluate(*, output: Path, evidence_root: Path, report: Path) -> dict[str, An
                     "shape_element_count_preserved": shape_element_count_preserved,
                     "layout_contiguous_and_offset_preserved": layout_preserved,
                     "memory_access_maps_preserved": access_maps_preserved,
+                    "complete_affine_mapping_preserved": access_maps_preserved,
                     "shape_layout_access_equivalent": proven,
                 },
             }
@@ -929,7 +1106,8 @@ def evaluate(*, output: Path, evidence_root: Path, report: Path) -> dict[str, An
 
     full_run, full_after_ops, full_after_summary = run_pass(
         sequence=sequence, identifier="complete-retained-c22-flat-scf", kind="complete",
-        operation=None, input_path=flat_scf, output_dir=evidence_root / "complete",
+        operation=None, input_path=flat_scf,
+        output_dir=evidence_root / "complete-retained-c22-flat-scf",
         parser=parser,
     )
     executions.append(full_run)

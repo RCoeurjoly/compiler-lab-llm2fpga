@@ -20,6 +20,9 @@ ROOT = Path(__file__).resolve().parents[2]
 EVALUATION = (
     ROOT / "artifacts/comparison/tinystories-1m-exact-memref-pass-evaluation.json"
 )
+EVIDENCE_ROOT = (
+    ROOT / "artifacts/comparison/tinystories-1m-exact-memref-pass-evidence"
+)
 CONTRACT_PATH = (
     ROOT / "artifacts/comparison/tinystories-1m-exact-memref-blocker-contract.json"
 )
@@ -83,9 +86,8 @@ def _expected_probe_text(contract: dict[str, Any], name: str) -> str:
     operands, results = signature["operand_types"], signature["result_types"]
     if name == "memref.collapse_shape":
         operation = f"    %view = memref.collapse_shape %source [[0, 1], [2]] : {operands[0]} into {results[0]}\n"
-        constants = "    %c2 = arith.constant 2 : index\n    %c3 = arith.constant 3 : index\n"
-        indices = "%c2, %c3"
-        arguments = f"%source: {operands[0]}"
+        indices = "%i0, %i1"
+        arguments = f"%source: {operands[0]}, %i0: index, %i1: index"
         access_type = results[0]
     elif name == "memref.copy":
         operation = f"    memref.copy %source, %target : {operands[0]} to {operands[1]}\n"
@@ -111,55 +113,214 @@ def _expected_probe_text(contract: dict[str, Any], name: str) -> str:
     return (
         "module {\n"
         f"  func.func @probe({arguments}) -> i64 {{\n"
-        + constants + operation
+        + ("" if name == "memref.collapse_shape" else constants)
+        + operation
         + f"    %value = memref.load {base}[{indices}] : {access_type}\n"
         + f"    memref.store %value, {base}[{indices}] : {access_type}\n"
         + "    return %value : i64\n  }\n}\n"
     )
 
 
+_FUNC_PROBE = re.compile(r"^\s*func\.func @probe\((.*)\) -> i64 \{\s*$")
+_FUNC_ARG = re.compile(r"(%[A-Za-z0-9_.$-]+)\s*:\s*(memref<[^>]+>|index)")
 _INDEX_CONSTANT = re.compile(r"^\s*(%[A-Za-z0-9_.$-]+)\s*=\s*arith\.constant\s+(-?[0-9]+)\s*:\s*index\s*$")
-_MEMORY_ACCESS = re.compile(
-    r"^\s*(?:%[A-Za-z0-9_.$-]+\s*=\s*)?memref\.(load|store)\s+.*?"
-    r"(%[A-Za-z0-9_.$-]+)\[([^]]+)\]\s*:\s*(memref<.+>)\s*$"
-)
+_INDEX_BINARY = re.compile(r"^\s*(%[A-Za-z0-9_.$-]+)\s*=\s*arith\.(addi|subi|muli)\s+(%[A-Za-z0-9_.$-]+),\s*(%[A-Za-z0-9_.$-]+)\s*:\s*index\s*$")
+_VIEW_ALIAS = re.compile(r"^\s*(%[A-Za-z0-9_.$-]+)\s*=\s*memref\.(?:collapse_shape|expand_shape|reinterpret_cast)\s+(%[A-Za-z0-9_.$-]+)\b")
+_LOAD = re.compile(r"^\s*%[A-Za-z0-9_.$-]+\s*=\s*memref\.load\s+(%[A-Za-z0-9_.$-]+)\[([^]]+)\]\s*:\s*(memref<.+>)\s*$")
+_STORE = re.compile(r"^\s*memref\.store\s+%[A-Za-z0-9_.$-]+,\s*(%[A-Za-z0-9_.$-]+)\[([^]]+)\]\s*:\s*(memref<.+>)\s*$")
+_COPY = re.compile(r"^\s*memref\.copy\s+(%[A-Za-z0-9_.$-]+),\s*(%[A-Za-z0-9_.$-]+)\s*:")
 
 
-def _access_model(text: str, parser: Any) -> dict[str, Any]:
-    constants = {
-        matched.group(1): int(matched.group(2))
-        for line in text.splitlines()
-        if (matched := _INDEX_CONSTANT.match(line))
+def _sum_affine(left: dict[str, Any], right: dict[str, Any], factor: int = 1) -> dict[str, Any]:
+    return {
+        "coefficients": [
+            lhs + factor * rhs
+            for lhs, rhs in zip(left["coefficients"], right["coefficients"])
+        ],
+        "offset": left["offset"] + factor * right["offset"],
     }
+
+
+def _scale_affine(value: dict[str, Any], factor: int) -> dict[str, Any]:
+    return {
+        "coefficients": [factor * item for item in value["coefficients"]],
+        "offset": factor * value["offset"],
+    }
+
+
+def _derive_access_model(
+    text: str, parser: Any, *, operation: str, signature: dict[str, Any]
+) -> dict[str, Any]:
+    logical_shape = (
+        signature["operand_memrefs"][1]["shape"]
+        if operation == "memref.copy"
+        else signature["result_memrefs"][0]["shape"]
+    )
+    function = next(
+        (match for line in text.splitlines() if (match := _FUNC_PROBE.match(line))),
+        None,
+    )
+    if function is None:
+        raise ValueError("semantic probe function signature is unavailable")
+    arguments = list(_FUNC_ARG.finditer(function.group(1)))
+    buffers = [item for item in arguments if item.group(2).startswith("memref<")]
+    indices = [item for item in arguments if item.group(2) == "index"]
+    variable_dimensions = [
+        (dimension, extent)
+        for dimension, extent in enumerate(logical_shape)
+        if extent > 1
+    ]
+    if len(indices) != len(variable_dimensions):
+        raise ValueError("semantic probe index-variable rank is dynamic or mismatched")
+    variables = [
+        {
+            "name": f"i{variable_dimensions[position][0]}",
+            "argument": arguments.index(item), "lower_inclusive": 0,
+            "upper_exclusive": variable_dimensions[position][1],
+        }
+        for position, item in enumerate(indices)
+    ]
+    count = len(variables)
+    expressions = {}
+    for position, item in enumerate(indices):
+        coefficients = [0] * count
+        coefficients[position] = 1
+        expressions[item.group(1)] = {"coefficients": coefficients, "offset": 0}
+    for line in text.splitlines():
+        constant = _INDEX_CONSTANT.match(line)
+        if constant:
+            expressions[constant.group(1)] = {
+                "coefficients": [0] * count, "offset": int(constant.group(2))
+            }
+            continue
+        binary = _INDEX_BINARY.match(line)
+        if binary is None:
+            continue
+        left, right = expressions.get(binary.group(3)), expressions.get(binary.group(4))
+        if left is None or right is None:
+            raise ValueError("semantic probe contains a dynamic index expression")
+        if binary.group(2) == "addi":
+            value = _sum_affine(left, right)
+        elif binary.group(2) == "subi":
+            value = _sum_affine(left, right, -1)
+        else:
+            left_constant = not any(left["coefficients"])
+            right_constant = not any(right["coefficients"])
+            if not left_constant and not right_constant:
+                raise ValueError("semantic probe contains a non-affine multiplication")
+            value = _scale_affine(
+                right if left_constant else left,
+                left["offset"] if left_constant else right["offset"],
+            )
+        expressions[binary.group(1)] = value
+
+    roles = {0: "source", 1: "target"} if operation == "memref.copy" else {0: "source"}
+    buffer_identities = {
+        item.group(1): {"argument": arguments.index(item), "role": roles[position]}
+        for position, item in enumerate(buffers)
+    }
+    aliases = {
+        match.group(1): match.group(2)
+        for line in text.splitlines()
+        if (match := _VIEW_ALIAS.match(line))
+    }
+
+    def resolve_base(name: str) -> dict[str, Any]:
+        while name in aliases:
+            name = aliases[name]
+        if name not in buffer_identities:
+            raise ValueError("semantic probe access base is not a function buffer")
+        return buffer_identities[name]
+
+    copy_provenance = None
+    for line in text.splitlines():
+        copied = _COPY.match(line)
+        if copied:
+            copy_provenance = {
+                "source": resolve_base(copied.group(1)),
+                "target": resolve_base(copied.group(2)),
+            }
     accesses, memrefs = [], []
     for line in text.splitlines():
-        matched = _MEMORY_ACCESS.match(line)
-        if not matched:
+        matched, kind = _LOAD.match(line), "load"
+        if matched is None:
+            matched, kind = _STORE.match(line), "store"
+        if matched is None:
             continue
-        memref = parser.parse_memref_type(matched.group(4))
-        tokens = [token.strip() for token in matched.group(3).split(",")]
-        _require(all(token in constants for token in tokens), "semantic probe access is not constant")
-        indices = [constants[token] for token in tokens]
-        _require(len(indices) == memref["rank"], "semantic probe access rank mismatch")
-        linear = memref["offset"] + sum(
-            index * stride for index, stride in zip(indices, memref["strides"])
+        memref = parser.parse_memref_type(matched.group(3))
+        raw_indices = []
+        for token in (item.strip() for item in matched.group(2).split(",")):
+            expression = expressions.get(token)
+            if expression is None:
+                raise ValueError("semantic probe contains a dynamic or non-affine index")
+            raw_indices.append(copy.deepcopy(expression))
+        if len(raw_indices) != memref["rank"]:
+            raise ValueError("semantic probe access rank mismatch")
+        for expression, dimension in zip(raw_indices, memref["shape"]):
+            lower = upper = expression["offset"]
+            for coefficient, variable in zip(expression["coefficients"], variables):
+                extent = variable["upper_exclusive"] - 1
+                lower += min(0, coefficient * extent)
+                upper += max(0, coefficient * extent)
+            expression["range"] = {
+                "lower_inclusive": lower, "upper_exclusive": upper + 1,
+                "memref_upper_exclusive": dimension,
+                "in_bounds": 0 <= lower and upper < dimension,
+            }
+        linear = {"coefficients": [0] * count, "offset": memref["offset"]}
+        for stride, expression in zip(memref["strides"], raw_indices):
+            linear = _sum_affine(linear, _scale_affine(expression, stride))
+        sample_values = [
+            min(variable["upper_exclusive"] - 1, position + 2)
+            for position, variable in enumerate(variables)
+        ]
+        sample_linear = linear["offset"] + sum(
+            coefficient * value
+            for coefficient, value in zip(linear["coefficients"], sample_values)
         )
-        accesses.append({"kind": matched.group(1), "linear_index": linear})
+        accesses.append({
+            "kind": kind, "base": resolve_base(matched.group(1)),
+            "raw_indices": raw_indices, "linear_formula": linear,
+            "supplementary_sample": {
+                "variables": sample_values, "linear_index": sample_linear,
+            },
+        })
         memrefs.append(memref)
-    _require(bool(accesses), "semantic probe has no live memory access")
-    counts = [__import__("math").prod(memref["shape"]) for memref in memrefs]
-    _require(len(set(counts)) == 1, "semantic probe element-count mismatch")
+    if not accesses:
+        raise ValueError("semantic probe has no live memory access")
+    if operation == "memref.copy" and copy_provenance is None:
+        raise ValueError("semantic copy probe lacks source-target provenance")
+    element_counts = [__import__("math").prod(item["shape"]) for item in memrefs]
+    if len(set(element_counts)) != 1:
+        raise ValueError("semantic probe element-count mismatch")
     shape, strides = memrefs[0]["shape"], memrefs[0]["strides"]
     expected_stride, contiguous = 1, True
     for dimension, stride in reversed(list(zip(shape, strides))):
         contiguous = contiguous and stride == expected_stride
         expected_stride *= dimension
+    affine_mappings = [
+        {"kind": item["kind"], "base": item["base"],
+         "linear_formula": item["linear_formula"]}
+        for item in accesses
+    ]
     return {
-        "shape": memrefs[0]["shape"], "strides": memrefs[0]["strides"],
-        "offset": memrefs[0]["offset"], "contiguous": contiguous,
-        "element_count": counts[0],
-        "access_maps": accesses,
+        "affine_status": "proven", "index_variables": variables,
+        "shape": shape, "strides": strides, "offset": memrefs[0]["offset"],
+        "contiguous": contiguous, "element_count": element_counts[0],
+        "copy_provenance": copy_provenance,
+        "access_maps": accesses, "affine_mappings": affine_mappings,
     }
+
+
+def _access_model(
+    text: str, parser: Any, *, operation: str, signature: dict[str, Any]
+) -> dict[str, Any]:
+    try:
+        return _derive_access_model(
+            text, parser, operation=operation, signature=signature
+        )
+    except ValueError as error:
+        return {"affine_status": "unproven", "reason": str(error)}
 
 
 def _canonical(value: Any) -> bytes:
@@ -399,6 +560,26 @@ def _check_binding(binding: Any, label: str) -> Path:
     return path
 
 
+def _check_canonical_binding(binding: Any, path: Path, label: str) -> Path:
+    _require(
+        binding == _binding(path, relative=True),
+        f"canonical evidence path mismatch for {label}",
+    )
+    return path
+
+
+def _run_identifier(kind: str, operation: str | None) -> str:
+    if kind == "complete" and operation is None:
+        return "complete-retained-c22-flat-scf"
+    _require(operation in REGISTERED, "canonical run operation mismatch")
+    slug = operation.replace(".", "-").replace("_", "-")
+    if kind == "representative":
+        return slug
+    if kind == "semantic_probe":
+        return "semantic-" + slug
+    raise ValueError("canonical run kind mismatch")
+
+
 def _check_command(run: dict[str, Any], input_path: Path, output_path: Path) -> None:
     expected = [
         TOOL["path"], str(input_path), f"--load-pass-plugin={PLUGIN['path']}",
@@ -410,7 +591,7 @@ def _check_command(run: dict[str, Any], input_path: Path, output_path: Path) -> 
     _require("circt-opt" not in command_text, "Calyx invocation is forbidden")
 
 
-def _replay(run: dict[str, Any], input_path: Path) -> None:
+def _replay(run: dict[str, Any], input_path: Path, evidence_dir: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="exact-memref-pass-replay-") as raw:
         output = Path(raw) / "output.mlir"
         command = [
@@ -421,10 +602,10 @@ def _replay(run: dict[str, Any], input_path: Path) -> None:
             command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
         )
         _require(completed.returncode == run["exit_code"], "replay exit code mismatch")
-        _require(completed.stdout == (ROOT / run["stdout"]["path"]).read_bytes(), "replay stdout mismatch")
-        _require(completed.stderr == (ROOT / run["stderr"]["path"]).read_bytes(), "replay stderr mismatch")
+        _require(completed.stdout == (evidence_dir / "stdout.bin").read_bytes(), "replay stdout mismatch")
+        _require(completed.stderr == (evidence_dir / "stderr.bin").read_bytes(), "replay stderr mismatch")
         replay_output = output.read_bytes() if output.exists() else b""
-        _require(replay_output == (ROOT / run["output"]["path"]).read_bytes(), "replay output mismatch")
+        _require(replay_output == (evidence_dir / "output.mlir").read_bytes(), "replay output mismatch")
 
 
 def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool) -> None:
@@ -461,6 +642,21 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
     _require(all(run.get("kind") == "semantic_probe" for run in runs[4:8]), "semantic probe order kind mismatch")
     _require(runs[8].get("kind") == "complete" and runs[8].get("operation") is None, "representative order complete mismatch")
 
+    expected_kinds_operations = (
+        [("representative", name) for name in REGISTERED]
+        + [("semantic_probe", name) for name in REGISTERED]
+        + [("complete", None)]
+    )
+    expected_ids = [
+        _run_identifier(kind, operation)
+        for kind, operation in expected_kinds_operations
+    ]
+    _require(
+        [run.get("id") for run in runs] == expected_ids,
+        "canonical run id mismatch",
+    )
+    evidence_dirs = [EVIDENCE_ROOT / identifier for identifier in expected_ids]
+
     expected_inputs = []
     for name in REGISTERED:
         representative = contract["classes"][name]["representative"]
@@ -471,14 +667,9 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
             f"representative binding mismatch for {name}",
         )
         expected_inputs.append(path)
-    trusted_python = Path(sys.executable).resolve()
-    _require(
-        payload.get("python") == _binding(trusted_python),
-        "python interpreter binding mismatch",
-    )
     for name in REGISTERED:
         slug = "semantic-" + name.replace(".", "-").replace("_", "-")
-        path = ROOT / "artifacts/comparison/tinystories-1m-exact-memref-pass-evidence" / slug / "input.mlir"
+        path = EVIDENCE_ROOT / slug / "input.mlir"
         _require(path.is_file(), f"semantic probe input unavailable for {name}")
         _require(
             path.read_text(encoding="utf-8") == _expected_probe_text(contract, name),
@@ -489,6 +680,7 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
 
     for index, run in enumerate(runs):
         expected_input = expected_inputs[index]
+        evidence_dir = evidence_dirs[index]
         binding_label = "representative binding" if index < 4 else "unchanged input identity"
         _require(run.get("input") == _binding(expected_input, relative=True), f"{binding_label} mismatch")
         _require(run.get("input_after") == run.get("input"), "unchanged input identity mismatch")
@@ -502,11 +694,23 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
                 and run.get("parse_check", {}).get("exit_code") == 0
             )
             _require(run.get("parseable") is expected_parseable, "complete parseable status mismatch")
-        output_path = _check_binding(run.get("output"), f"{run.get('id')} output")
-        _check_binding(run.get("stdout"), f"{run.get('id')} stdout")
-        _check_binding(run.get("stderr"), f"{run.get('id')} stderr")
-        _check_binding(run.get("parse_check", {}).get("stdout"), f"{run.get('id')} parse stdout")
-        _check_binding(run.get("parse_check", {}).get("stderr"), f"{run.get('id')} parse stderr")
+        output_path = _check_canonical_binding(
+            run.get("output"), evidence_dir / "output.mlir", f"{run['id']} output"
+        )
+        _check_canonical_binding(
+            run.get("stdout"), evidence_dir / "stdout.bin", f"{run['id']} stdout"
+        )
+        _check_canonical_binding(
+            run.get("stderr"), evidence_dir / "stderr.bin", f"{run['id']} stderr"
+        )
+        _check_canonical_binding(
+            run.get("parse_check", {}).get("stdout"),
+            evidence_dir / "parse.stdout.bin", f"{run['id']} parse stdout",
+        )
+        _check_canonical_binding(
+            run.get("parse_check", {}).get("stderr"),
+            evidence_dir / "parse.stderr.bin", f"{run['id']} parse stderr",
+        )
         _require(run.get("parse_check", {}).get("exit_code") == 0, "parse exit mismatch")
         _check_command(run, expected_input, output_path)
         parse_command = [TOOL["path"], str(output_path), "-o", "/dev/null"]
@@ -516,8 +720,14 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
         )
         _require(parsed.returncode == run["parse_check"]["exit_code"], "parse exit mismatch")
-        _require(parsed.stdout == (ROOT / run["parse_check"]["stdout"]["path"]).read_bytes(), "parse stdout mismatch")
-        _require(parsed.stderr == (ROOT / run["parse_check"]["stderr"]["path"]).read_bytes(), "parse stderr mismatch")
+        _require(parsed.stdout == (evidence_dir / "parse.stdout.bin").read_bytes(), "parse stdout mismatch")
+        _require(parsed.stderr == (evidence_dir / "parse.stderr.bin").read_bytes(), "parse stderr mismatch")
+
+    trusted_python = Path(sys.executable).resolve()
+    _require(
+        payload.get("python") == _binding(trusted_python),
+        "python interpreter binding mismatch",
+    )
 
     representatives = payload.get("representatives")
     _require(
@@ -528,7 +738,7 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
         name = REGISTERED[index]
         input_path = ROOT / contract["classes"][name]["representative"]["path"]
         input_text = input_path.read_text(encoding="utf-8")
-        output_text_rep = (ROOT / runs[index]["output"]["path"]).read_text(
+        output_text_rep = (evidence_dirs[index] / "output.mlir").read_text(
             encoding="utf-8"
         )
         before_ops = parser.parse_registered_operations(input_text)
@@ -564,21 +774,37 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
         "semantic probe result set mismatch",
     )
     for index, name in enumerate(REGISTERED):
+        signature = _contract_signature(contract, name)
         probe_text = _expected_probe_text(contract, name)
-        before_model = _access_model(probe_text, parser)
+        before_model = _access_model(
+            probe_text, parser, operation=name, signature=signature
+        )
         after_model = _access_model(
-            (ROOT / runs[index + 4]["output"]["path"]).read_text(encoding="utf-8"),
-            parser,
+            (evidence_dirs[index + 4] / "output.mlir").read_text(encoding="utf-8"),
+            parser, operation=name, signature=signature,
         )
         shape_element_count_preserved = (
+            before_model["affine_status"] == "proven"
+            and after_model["affine_status"] == "proven"
+            and
             before_model["element_count"] == after_model["element_count"]
         )
         layout_preserved = (
-            before_model["contiguous"] and after_model["contiguous"]
+            before_model["affine_status"] == "proven"
+            and after_model["affine_status"] == "proven"
+            and before_model["contiguous"] and after_model["contiguous"]
             and before_model["offset"] == after_model["offset"]
         )
         access_maps_preserved = (
-            before_model["access_maps"] == after_model["access_maps"]
+            before_model.get("index_variables") == after_model.get("index_variables")
+            and before_model.get("affine_mappings") == after_model.get("affine_mappings")
+            and before_model.get("copy_provenance") == after_model.get("copy_provenance")
+            and all(
+                raw["range"]["in_bounds"]
+                for model in (before_model, after_model)
+                for access in model.get("access_maps", [])
+                for raw in access["raw_indices"]
+            )
         )
         proven = shape_element_count_preserved and layout_preserved and access_maps_preserved
         expected_probe = {
@@ -591,6 +817,7 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
                 "shape_element_count_preserved": shape_element_count_preserved,
                 "layout_contiguous_and_offset_preserved": layout_preserved,
                 "memory_access_maps_preserved": access_maps_preserved,
+                "complete_affine_mapping_preserved": access_maps_preserved,
                 "shape_layout_access_equivalent": proven,
             },
         }
@@ -600,7 +827,7 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
     _require(complete.get("unknown_blocker_classes") == [], "unknown blocker classes present")
     full_parseable = runs[-1]["parseable"]
     output_text = (
-        (ROOT / runs[-1]["output"]["path"]).read_text(encoding="utf-8")
+        (evidence_dirs[-1] / "output.mlir").read_text(encoding="utf-8")
         if full_parseable else ""
     )
     operations = parser.parse_registered_operations(output_text)
@@ -614,7 +841,7 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
         expected_after = {name: None for name in REGISTERED}
         expected_invalid_from_output = [
             _invalid_frontier(
-                (ROOT / runs[-1]["stderr"]["path"]).read_bytes(),
+                (evidence_dirs[-1] / "stderr.bin").read_bytes(),
                 flat_scf.read_text(encoding="utf-8"),
                 parser,
             )
@@ -668,7 +895,7 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
     _require(authenticated.returncode == 0, "authenticated Task 2 verifier failed")
     if replay:
         for index, run in enumerate(runs):
-            _replay(run, expected_inputs[index])
+            _replay(run, expected_inputs[index], evidence_dirs[index])
     _require(payload.get("decision") == decision, "decision gate mismatch")
     if decision == "register_existing_pass":
         _require(payload.get("normalized_artifact") == runs[-1]["output"], "normalized artifact identity mismatch")

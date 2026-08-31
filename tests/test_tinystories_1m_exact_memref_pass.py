@@ -6,6 +6,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import importlib.util
+import inspect
 import json
 import subprocess
 import sys
@@ -179,6 +180,34 @@ class EvaluatorUnitTest(unittest.TestCase):
         self.assertEqual(invalid["signature"]["sizes"], [64, 1])
         self.assertEqual(invalid["signature"]["strides"], [1, 1])
 
+    def test_non_affine_semantic_access_is_explicitly_unproven(self) -> None:
+        self.assertIn(
+            "operation",
+            inspect.signature(self.module.semantic_access_model).parameters,
+            "semantic access model cannot classify operation-specific affine domains",
+        )
+        contract = json.loads(CONTRACT.read_bytes())
+        signature = json.loads(
+            contract["classes"]["memref.collapse_shape"]["representative"][
+                "selection_tuple"
+            ][1]
+        )
+        source = """module {
+  func.func @probe(%source: memref<1024xi64>, %i0: index, %i1: index) -> i64 {
+    %product = arith.muli %i0, %i1 : index
+    %value = memref.load %source[%product] : memref<1024xi64>
+    return %value : i64
+  }
+}
+"""
+        model = self.module.semantic_access_model(
+            source,
+            self.module._load_task2_extractor(),
+            operation="memref.collapse_shape",
+            signature=signature,
+        )
+        self.assertEqual(model["affine_status"], "unproven")
+
 
 @unittest.skipUnless(EVALUATION.is_file(), "Task 3 evidence not produced")
 class CommittedEvaluationTest(unittest.TestCase):
@@ -317,7 +346,8 @@ class CommittedEvaluationTest(unittest.TestCase):
             with self.subTest(operation=probe["operation"]):
                 self.assertTrue(probe["before"]["access_maps"])
                 self.assertEqual(
-                    probe["before"]["access_maps"], probe["after"]["access_maps"]
+                    probe["before"]["affine_mappings"],
+                    probe["after"]["affine_mappings"],
                 )
                 self.assertEqual(
                     probe["before"]["element_count"],
@@ -327,6 +357,15 @@ class CommittedEvaluationTest(unittest.TestCase):
                 self.assertTrue(probe["checks"]["shape_element_count_preserved"])
                 self.assertTrue(probe["checks"]["layout_contiguous_and_offset_preserved"])
                 self.assertTrue(probe["checks"]["memory_access_maps_preserved"])
+                self.assertTrue(probe["checks"]["complete_affine_mapping_preserved"])
+                for phase in ("before", "after"):
+                    self.assertEqual(probe[phase]["affine_status"], "proven")
+                    self.assertIsInstance(probe[phase]["index_variables"], list)
+                    for access in probe[phase]["access_maps"]:
+                        self.assertIn("base", access)
+                        self.assertIn("raw_indices", access)
+                        self.assertIn("linear_formula", access)
+                        self.assertIn("supplementary_sample", access)
 
 
 @unittest.skipUnless(VERIFIER.is_file() and EVALUATION.is_file(), "Task 3 verifier absent")
@@ -447,6 +486,57 @@ class PublicVerifierTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, message):
                     self.verifier.validate_payload(payload, ROOT, replay=True)
 
+    def test_verifier_rejects_cross_run_equal_byte_evidence_rebinding(self) -> None:
+        attacks = []
+
+        wrong_id = copy.deepcopy(self.payload)
+        wrong_id["executions"][0]["id"] = "memref-copy"
+        attacks.append(("canonical run id", canonical_rehash(wrong_id)))
+
+        empty_streams = copy.deepcopy(self.payload)
+        empty_streams["executions"][0]["stdout"] = copy.deepcopy(
+            empty_streams["executions"][1]["stdout"]
+        )
+        empty_streams["executions"][0]["stderr"] = copy.deepcopy(
+            empty_streams["executions"][1]["stderr"]
+        )
+        attacks.append(("canonical evidence path", canonical_rehash(empty_streams)))
+
+        equal_representatives = copy.deepcopy(self.payload)
+        left, right = equal_representatives["executions"][2:4]
+        left["output"], right["output"] = right["output"], left["output"]
+        left["command"][-1], right["command"][-1] = (
+            right["command"][-1], left["command"][-1]
+        )
+        left["parse_check"]["command"][1], right["parse_check"]["command"][1] = (
+            right["parse_check"]["command"][1], left["parse_check"]["command"][1]
+        )
+        attacks.append(
+            ("canonical evidence path", canonical_rehash(equal_representatives))
+        )
+
+        equal_semantic_probes = copy.deepcopy(self.payload)
+        left, right = equal_semantic_probes["executions"][6:8]
+        left["output"], right["output"] = right["output"], left["output"]
+        left["command"][-1], right["command"][-1] = (
+            right["command"][-1], left["command"][-1]
+        )
+        left["parse_check"]["command"][1], right["parse_check"]["command"][1] = (
+            right["parse_check"]["command"][1], left["parse_check"]["command"][1]
+        )
+        for stream in ("stdout", "stderr"):
+            left["parse_check"][stream], right["parse_check"][stream] = (
+                right["parse_check"][stream], left["parse_check"][stream]
+            )
+        attacks.append(
+            ("canonical evidence path", canonical_rehash(equal_semantic_probes))
+        )
+
+        for message, payload in attacks:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    self.verifier.validate_payload(payload, ROOT, replay=True)
+
     def test_verifier_rejects_rebound_reproducer_command_exit_and_streams(self) -> None:
         metadata_path = ROOT / self.payload["earliest_remaining_signature"][
             "reproducer"
@@ -491,11 +581,29 @@ class PublicVerifierTest(unittest.TestCase):
             "semantic_probes", self.payload,
             "evaluation lacks semantic probes for mutation testing",
         )
+        collapse = self.payload["semantic_probes"][0]
+        self.assertIn(
+            "index_variables", collapse["before"],
+            "semantic proof lacks complete variable domains",
+        )
+        self.assertIn(
+            "linear_formula", collapse["before"]["access_maps"][0],
+            "semantic proof lacks a complete affine formula",
+        )
+        self.assertIn(
+            "copy_provenance", self.payload["semantic_probes"][1]["before"],
+            "copy proof lacks source-vs-target provenance",
+        )
         mutations = (
             ("shape", lambda probe: probe["before"]["shape"].append(1)),
             ("layout", lambda probe: probe["after"]["strides"].__setitem__(0, 2)),
             ("element count", lambda probe: probe["after"].__setitem__("element_count", 7)),
-            ("access map", lambda probe: probe["after"]["access_maps"][0].__setitem__("linear_index", 7)),
+            ("affine coefficient", lambda probe: probe["after"]["access_maps"][0]["linear_formula"]["coefficients"].__setitem__(0, 7)),
+            ("affine offset", lambda probe: probe["after"]["access_maps"][0]["linear_formula"].__setitem__("offset", 7)),
+            ("raw variable index", lambda probe: probe["after"]["access_maps"][0]["raw_indices"][0]["coefficients"].__setitem__(0, 7)),
+            ("variable bound", lambda probe: probe["after"]["index_variables"][0].__setitem__("upper_exclusive", 7)),
+            ("base role", lambda probe: probe["after"]["access_maps"][0]["base"].__setitem__("role", "target")),
+            ("base identity", lambda probe: probe["after"]["access_maps"][0]["base"].__setitem__("argument", 7)),
         )
         for label, mutate in mutations:
             with self.subTest(label=label):
@@ -504,6 +612,14 @@ class PublicVerifierTest(unittest.TestCase):
                 canonical_rehash(payload)
                 with self.assertRaisesRegex(ValueError, "semantic probe"):
                     self.verifier.validate_payload(payload, ROOT, replay=False)
+
+        copy_payload = copy.deepcopy(self.payload)
+        copy_payload["semantic_probes"][1]["after"]["copy_provenance"][
+            "source"
+        ]["role"] = "target"
+        canonical_rehash(copy_payload)
+        with self.assertRaisesRegex(ValueError, "semantic probe"):
+            self.verifier.validate_payload(copy_payload, ROOT, replay=False)
 
     def test_elapsed_time_is_positive_authenticated_observation_not_replay_equality(self) -> None:
         invalid = copy.deepcopy(self.payload)
