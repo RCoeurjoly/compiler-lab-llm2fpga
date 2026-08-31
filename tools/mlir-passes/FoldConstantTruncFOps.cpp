@@ -14,6 +14,7 @@
 #include "mlir/Tools/Plugins/PassPlugin.h"
 
 #include "llvm/ADT/APFloat.h"
+#include "llvm/Support/CheckedArithmetic.h"
 
 #include <optional>
 #include <cstdlib>
@@ -434,19 +435,26 @@ private:
           getIdentityStrides(memrefType)};
     }
 
-    SmallVector<Value> protectedArguments;
-    DenseMap<Value, bool> rewritableViewUses;
-    for (memref::SubViewOp subview : subviews) {
-      if (subview->use_empty())
-        continue;
-      if (getStaticView(subview.getResult(), candidateViews) &&
-          canRewriteAllViewUses(subview.getResult(), candidateViews,
-                                rewritableViewUses))
-        continue;
-      Value root = getViewRoot(subview.getSource());
-      if (isa_and_nonnull<BlockArgument>(root) &&
-          !llvm::is_contained(protectedArguments, root))
-        protectedArguments.push_back(root);
+    while (true) {
+      SmallVector<Value> newlyProtectedArguments;
+      DenseMap<Value, bool> rewritableViewUses;
+      for (memref::SubViewOp subview : subviews) {
+        if (subview->use_empty())
+          continue;
+        if (getStaticView(subview.getResult(), candidateViews) &&
+            canRewriteAllViewUses(subview.getResult(), candidateViews,
+                                  rewritableViewUses))
+          continue;
+        Value root = getViewRoot(subview.getSource());
+        if (isa_and_nonnull<BlockArgument>(root) &&
+            candidateViews.find(root) != candidateViews.end() &&
+            !llvm::is_contained(newlyProtectedArguments, root))
+          newlyProtectedArguments.push_back(root);
+      }
+      if (newlyProtectedArguments.empty())
+        break;
+      for (Value argument : newlyProtectedArguments)
+        candidateViews.erase(argument);
     }
 
     bool changed = false;
@@ -454,8 +462,7 @@ private:
     for (auto [index, input] : llvm::enumerate(inputs)) {
       BlockArgument arg = funcOp.getArgument(index);
       auto candidate = candidateViews.find(arg);
-      if (candidate == candidateViews.end() ||
-          llvm::is_contained(protectedArguments, arg))
+      if (candidate == candidateViews.end())
         continue;
 
       auto memrefType = cast<MemRefType>(input);
@@ -500,8 +507,14 @@ private:
       composedStrides.reserve(strides.size());
       for (auto [offset, stride, sourceStride] :
            llvm::zip_equal(offsets, strides, sourceView->strides)) {
-        composedOffset += offset * sourceStride;
-        composedStrides.push_back(stride * sourceStride);
+        std::optional<int64_t> nextOffset =
+            llvm::checkedMulAdd(offset, sourceStride, composedOffset);
+        std::optional<int64_t> composedStride =
+            llvm::checkedMul(stride, sourceStride);
+        if (!nextOffset || !composedStride)
+          return std::nullopt;
+        composedOffset = *nextOffset;
+        composedStrides.push_back(*composedStride);
       }
 
       SmallVector<int64_t> resultStrides;
@@ -516,8 +529,7 @@ private:
     }
 
     if (auto cast = value.getDefiningOp<memref::ReinterpretCastOp>()) {
-      auto sourceType = dyn_cast<MemRefType>(cast.getSource().getType());
-      if (!sourceType)
+      if (!isa<MemRefType>(cast.getSource().getType()))
         return std::nullopt;
 
       ArrayRef<int64_t> offsets = cast.getStaticOffsets();
@@ -529,16 +541,11 @@ private:
       if (!resultType.hasStaticShape())
         return std::nullopt;
 
-      if (sourceType.getRank() <= 1)
-        return StaticMemRefView{cast.getSource(), offsets.front(),
-                                SmallVector<int64_t>(resultType.getShape()),
-                                SmallVector<int64_t>(strides)};
-
       auto sourceView = getStaticView(cast.getSource(), argViews);
       if (!sourceView)
         return std::nullopt;
 
-      return StaticMemRefView{sourceView->base, sourceView->offset + offsets.front(),
+      return StaticMemRefView{sourceView->base, offsets.front(),
                               SmallVector<int64_t>(resultType.getShape()),
                               SmallVector<int64_t>(strides)};
     }

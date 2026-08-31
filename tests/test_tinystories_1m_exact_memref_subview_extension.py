@@ -66,6 +66,117 @@ COPY_CONTROL = """module {
 }
 """
 
+ABSOLUTE_REINTERPRET_CONTROL = """module {
+  func.func @absolute_reinterpret(%source: memref<8x8xi64>, %i: index, %j: index) -> i64 {
+    %slice = memref.subview %source[1, 0] [4, 4] [1, 1]
+      : memref<8x8xi64> to memref<4x4xi64, strided<[8, 1], offset: 8>>
+    %reinterpreted = memref.reinterpret_cast %slice to
+      offset: [0], sizes: [2, 2], strides: [2, 1]
+      : memref<4x4xi64, strided<[8, 1], offset: 8>> to memref<2x2xi64, strided<[2, 1]>>
+    %loaded = memref.load %reinterpreted[%i, %j]
+      : memref<2x2xi64, strided<[2, 1]>>
+    return %loaded : i64
+  }
+}
+"""
+
+RANK_ONE_REINTERPRET_CONTROL = """module {
+  func.func @rank_one_reinterpret(%source: memref<8x8xi64>, %i: index) -> i64 {
+    %slice = memref.subview %source[1, 0] [4, 8] [1, 1]
+      : memref<8x8xi64> to memref<4x8xi64, strided<[8, 1], offset: 8>>
+    %collapsed = memref.collapse_shape %slice [[0, 1]]
+      : memref<4x8xi64, strided<[8, 1], offset: 8>> into memref<32xi64, strided<[1], offset: 8>>
+    %reinterpreted = memref.reinterpret_cast %collapsed to
+      offset: [0], sizes: [4], strides: [2]
+      : memref<32xi64, strided<[1], offset: 8>> to memref<4xi64, strided<[2]>>
+    %loaded = memref.load %reinterpreted[%i] : memref<4xi64, strided<[2]>>
+    return %loaded : i64
+  }
+}
+"""
+
+RANK_REDUCING_REINTERPRET_CONTROL = """module {
+  func.func @rank_reducing_reinterpret(%source: memref<8x8xi64>, %i: index) -> i64 {
+    %slice = memref.subview %source[1, 0] [1, 8] [1, 1]
+      : memref<8x8xi64> to memref<8xi64, strided<[1], offset: 8>>
+    %reinterpreted = memref.reinterpret_cast %slice to
+      offset: [0], sizes: [4], strides: [2]
+      : memref<8xi64, strided<[1], offset: 8>> to memref<4xi64, strided<[2]>>
+    %loaded = memref.load %reinterpreted[%i] : memref<4xi64, strided<[2]>>
+    return %loaded : i64
+  }
+}
+"""
+
+OFFSET_MULTIPLY_OVERFLOW_CONTROL = """module {
+  func.func @offset_multiply_overflow(%source: memref<1x1xi64>) -> i64 {
+    %reinterpreted = memref.reinterpret_cast %source to
+      offset: [9223372036854775807], sizes: [3, 3], strides: [9223372036854775807, 1]
+      : memref<1x1xi64> to memref<3x3xi64, strided<[9223372036854775807, 1], offset: 9223372036854775807>>
+    %slice = memref.subview %reinterpreted[2, 2] [1, 1] [1, 1]
+      : memref<3x3xi64, strided<[9223372036854775807, 1], offset: 9223372036854775807>> to memref<1x1xi64, strided<[9223372036854775807, 1], offset: 9223372036854775807>>
+    %c0 = arith.constant 0 : index
+    %loaded = memref.load %slice[%c0, %c0]
+      : memref<1x1xi64, strided<[9223372036854775807, 1], offset: 9223372036854775807>>
+    return %loaded : i64
+  }
+}
+"""
+
+OFFSET_ADD_OVERFLOW_CONTROL = """module {
+  func.func @offset_add_overflow(%source: memref<1x1xi64>) -> i64 {
+    %reinterpreted = memref.reinterpret_cast %source to
+      offset: [9223372036854775807], sizes: [2, 2, 3], strides: [9223372036854775807, 9223372036854775807, 1]
+      : memref<1x1xi64> to memref<2x2x3xi64, strided<[9223372036854775807, 9223372036854775807, 1], offset: 9223372036854775807>>
+    %slice = memref.subview %reinterpreted[1, 1, 2] [1, 1, 1] [1, 1, 1]
+      : memref<2x2x3xi64, strided<[9223372036854775807, 9223372036854775807, 1], offset: 9223372036854775807>> to memref<1x1x1xi64, strided<[9223372036854775807, 9223372036854775807, 1], offset: 9223372036854775807>>
+    %c0 = arith.constant 0 : index
+    %loaded = memref.load %slice[%c0, %c0, %c0]
+      : memref<1x1x1xi64, strided<[9223372036854775807, 9223372036854775807, 1], offset: 9223372036854775807>>
+    return %loaded : i64
+  }
+}
+"""
+
+STRIDE_MULTIPLY_OVERFLOW_CONTROL = """module {
+  func.func @stride_multiply_overflow(%source: memref<1x1xi64>) -> i64 {
+    %reinterpreted = memref.reinterpret_cast %source to
+      offset: [0], sizes: [1, 1], strides: [5869418568907584605, 1]
+      : memref<1x1xi64> to memref<1x1xi64, strided<[5869418568907584605, 1]>>
+    %slice = memref.subview %reinterpreted[0, 0] [1, 1] [11, 1]
+      : memref<1x1xi64, strided<[5869418568907584605, 1]>> to memref<1x1xi64, strided<[9223372036854775807, 1]>>
+    %c0 = arith.constant 0 : index
+    %loaded = memref.load %slice[%c0, %c0]
+      : memref<1x1xi64, strided<[9223372036854775807, 1]>>
+    return %loaded : i64
+  }
+}
+"""
+
+
+def mixed_copy_control(*, reverse_copy: bool, unsupported_first: bool) -> str:
+    unsupported = """    %dynamic_view = memref.subview %b[%dynamic, 0] [2, 2] [1, 1]
+      : memref<8x8xi64> to memref<2x2xi64, strided<[8, 1], offset: ?>>
+    %dynamic_load = memref.load %dynamic_view[%i, %j]
+      : memref<2x2xi64, strided<[8, 1], offset: ?>>
+"""
+    copy_source = "%b_view" if reverse_copy else "%a_view"
+    copy_target = "%a_view" if reverse_copy else "%b_view"
+    supported = f"""    %a_view = memref.subview %a[0, 0] [2, 2] [1, 1]
+      : memref<8x8xi64> to memref<2x2xi64, strided<[8, 1]>>
+    %b_view = memref.subview %b[0, 0] [2, 2] [1, 1]
+      : memref<8x8xi64> to memref<2x2xi64, strided<[8, 1]>>
+    memref.copy {copy_source}, {copy_target}
+      : memref<2x2xi64, strided<[8, 1]>> to memref<2x2xi64, strided<[8, 1]>>
+"""
+    body = unsupported + supported if unsupported_first else supported + unsupported
+    return f"""module {{
+  func.func @mixed_copy(%a: memref<8x8xi64>, %b: memref<8x8xi64>, %dynamic: index, %i: index, %j: index) -> i64 {{
+{body}    return %dynamic_load : i64
+  }}
+}}
+"""
+
 
 @dataclass(frozen=True)
 class AffineExpr:
@@ -175,12 +286,18 @@ def _affine_accesses(
     generic_ir: str, domains: list[dict[str, int | str]]
 ) -> list[dict[str, object]]:
     arguments = _arguments(generic_ir)
-    if len(arguments) < 3:
-        raise AssertionError(f"expected a base and two symbolic indices: {arguments}")
-    variable_names = arguments[1:3]
+    variable_count = len(domains)
+    if len(arguments) < variable_count + 1:
+        raise AssertionError(
+            f"expected a base and {variable_count} symbolic indices: {arguments}"
+        )
+    variable_names = arguments[1 : variable_count + 1]
     expressions: dict[str, AffineExpr] = {
-        variable_names[0]: AffineExpr(0, (1, 0)),
-        variable_names[1]: AffineExpr(0, (0, 1)),
+        variable_name: AffineExpr(
+            0,
+            tuple(1 if index == variable_index else 0 for index in range(variable_count)),
+        )
+        for variable_index, variable_name in enumerate(variable_names)
     }
     binary = re.compile(
         r'^\s*(%[A-Za-z0-9_]+) = "arith\.(addi|muli)"\('
@@ -345,6 +462,130 @@ class ExactStaticSubviewExtensionTest(unittest.TestCase):
         self.assertIn('"memref.load"', output)
         self.assertIn('"memref.store"', output)
         self.assertEqual(output.count("memref<4096xi64>"), 6)
+
+    def assert_single_load_mapping(
+        self,
+        source: str,
+        *,
+        coefficients: list[int],
+        offset: int,
+        upper_bounds: list[int],
+    ) -> None:
+        completed, output = run_text(source)
+        self.assertEqual(
+            completed.returncode,
+            0,
+            completed.stderr.decode(errors="replace"),
+        )
+        self.assertNotIn("memref.subview", output)
+        self.assertNotIn("memref.reinterpret_cast", output)
+        self.assertNotIn("memref.collapse_shape", output)
+        self.assertIn("memref<64xi64>", output)
+        domains = [
+            {
+                "name": f"i{dimension}",
+                "lower": 0,
+                "upper_exclusive": upper,
+            }
+            for dimension, upper in enumerate(upper_bounds)
+        ]
+        variables = _arguments(output)[1 : len(domains) + 1]
+        self.assertEqual(
+            _affine_accesses(output, domains),
+            [
+                {
+                    "operation": "memref.load",
+                    "base_argument": 0,
+                    "base_role": "source",
+                    "variables": [
+                        {**domain, "ssa": variable}
+                        for domain, variable in zip(domains, variables)
+                    ],
+                    "offset": offset,
+                    "coefficients": coefficients,
+                }
+            ],
+        )
+
+    def test_reinterpret_offset_is_absolute_after_rank_two_subview(self) -> None:
+        self.assert_single_load_mapping(
+            ABSOLUTE_REINTERPRET_CONTROL,
+            coefficients=[2, 1],
+            offset=0,
+            upper_bounds=[2, 2],
+        )
+
+    def test_rank_one_reinterpret_recovers_base_through_collapse_and_subview(
+        self,
+    ) -> None:
+        self.assert_single_load_mapping(
+            RANK_ONE_REINTERPRET_CONTROL,
+            coefficients=[2],
+            offset=0,
+            upper_bounds=[4],
+        )
+
+    def test_rank_reducing_reinterpret_chain_remains_explicit(self) -> None:
+        completed, output = run_text(RANK_REDUCING_REINTERPRET_CONTROL)
+        self.assertEqual(
+            completed.returncode,
+            0,
+            completed.stderr.decode(errors="replace"),
+        )
+        self.assertIn("memref.subview", output)
+        self.assertIn("memref.reinterpret_cast", output)
+        self.assertIn("memref<8x8xi64>", output)
+        self.assertNotIn("memref<64xi64>", output)
+
+    def assert_mixed_copy_roots_remain_consistently_ranked(
+        self, *, reverse_copy: bool
+    ) -> None:
+        for unsupported_first in (False, True):
+            with self.subTest(
+                reverse_copy=reverse_copy, unsupported_first=unsupported_first
+            ):
+                completed, output = run_text(
+                    mixed_copy_control(
+                        reverse_copy=reverse_copy,
+                        unsupported_first=unsupported_first,
+                    )
+                )
+                self.assertEqual(
+                    completed.returncode,
+                    0,
+                    completed.stderr.decode(errors="replace"),
+                )
+                self.assertEqual(output.count('"memref.subview"'), 3)
+                self.assertIn('"memref.copy"', output)
+                self.assertIn("memref<8x8xi64>", output)
+                self.assertNotIn("memref<64xi64>", output)
+
+    def test_mixed_copy_source_to_protected_target_protects_both_roots(self) -> None:
+        self.assert_mixed_copy_roots_remain_consistently_ranked(reverse_copy=False)
+
+    def test_mixed_copy_protected_source_to_target_protects_both_roots(self) -> None:
+        self.assert_mixed_copy_roots_remain_consistently_ranked(reverse_copy=True)
+
+    def assert_overflow_remains_explicit(self, source: str) -> None:
+        completed, output = run_text(source)
+        self.assertEqual(
+            completed.returncode,
+            0,
+            completed.stderr.decode(errors="replace"),
+        )
+        self.assertIn("memref.subview", output)
+        self.assertIn("memref.reinterpret_cast", output)
+        self.assertIn("memref<1x1xi64>", output)
+        self.assertNotIn("memref<1xi64>", output)
+
+    def test_offset_multiply_overflow_remains_explicit(self) -> None:
+        self.assert_overflow_remains_explicit(OFFSET_MULTIPLY_OVERFLOW_CONTROL)
+
+    def test_offset_add_overflow_remains_explicit(self) -> None:
+        self.assert_overflow_remains_explicit(OFFSET_ADD_OVERFLOW_CONTROL)
+
+    def test_stride_multiply_overflow_remains_explicit(self) -> None:
+        self.assert_overflow_remains_explicit(STRIDE_MULTIPLY_OVERFLOW_CONTROL)
 
     def assert_unsupported_remains_explicit(self, source: str | Path) -> None:
         if isinstance(source, Path):

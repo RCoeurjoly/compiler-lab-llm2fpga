@@ -54,9 +54,17 @@ For a `memref::SubViewOp`, `getStaticView` now requires all of the following:
 Before mutating function argument types, the pass checks every live subview and
 its transitive view users. If the view is unsupported or cannot be eliminated
 through the existing load/store/copy rewrites, its originating argument is not
-flattened. Cleanup uses reverse use order and erases only use-empty view
-operations. The preflight result is memoized so shared view chains are not
-repeatedly traversed.
+flattened. Protection is computed to a fixpoint against the remaining final
+candidate map. Thus a copy whose other root becomes protected also protects
+every root whose supported view would otherwise survive. The actual rewrites
+consume that same final map. Cleanup uses reverse use order and erases only
+use-empty view operations.
+
+Recursive `memref.reinterpret_cast` handling resolves the underlying base and
+uses the reinterpret operation's own offset and strides as absolute metadata;
+it does not add a source-view offset. Subview offset multiplication/addition
+and stride multiplication use checked signed arithmetic. Overflow returns no
+view and therefore protects the originating argument.
 
 ## Exact post-pass affine proof
 
@@ -69,6 +77,8 @@ sample point.
 | --- | --- | --- | --- |
 | exact identity/offset | `i0 in [0,64)`, `i1 in [0,1)` | `0 + 64*i0 + 1*i1` | flattened argument 0; store target and load source |
 | nonzero offset/stride | `i0 in [0,16)`, `i1 in [0,8)` | `64 + 128*i0 + 2*i1` | flattened argument 0; store target and load source |
+| subview to rank-two reinterpret | `i in [0,2)`, `j in [0,2)` | `0 + 2*i + 1*j` | flattened argument 0; reinterpret offset is absolute |
+| subview/collapse to rank-one reinterpret | `i in [0,4)` | `0 + 2*i` | flattened argument 0; no intermediate view base survives |
 
 The exact emitted bodies are structurally:
 
@@ -108,6 +118,13 @@ Unsupported cases are never reported as legalized:
   `memref<64x64xi64>`, and the output parses;
 - a live dynamic-offset subview remains explicit, its source argument remains
   `memref<64x64xi64>`, and the output parses;
+- a rank-reducing subview followed by a reinterpret stays explicit with its
+  original rank-two root;
+- a supported A/B copy paired with a live dynamic unsupported sibling on B
+  leaves both roots and all views explicit, in both copy directions and both
+  subview enumeration orders;
+- offset multiplication, offset addition, or stride multiplication overflow
+  leaves the reinterpret/subview chain explicit and the root unflattened;
 - a result layout inconsistent with the statically inferred subview layout is
   rejected by the MLIR verifier with `mismatch of result layout` and produces
   no output;
@@ -124,12 +141,12 @@ plugin derivation was built.
 - build: `nix build .#llm2fpgaMlirPasses -L` — PASS;
 - focused suite:
   `nix develop -c python -m unittest tests/test_tinystories_1m_exact_memref_subview_extension.py -v`
-  — `Ran 7 tests`, `OK`;
+  — `Ran 15 tests`, `OK`;
 - output:
-  `/nix/store/62550m8h4pv2jzmnn46c66rgdvzpjw4g-llm2fpga-mlir-passes-0.1.0`;
-- plugin bytes: `21,720,736`;
+  `/nix/store/jpbaq3vd25spvvrb90gj5hb3k5ysp3h3-llm2fpga-mlir-passes-0.1.0`;
+- plugin bytes: `21,720,848`;
 - plugin SHA-256:
-  `d745a77d396639836b6cebfbbeed2fa154f675781cc68c9fef72e316c2362580`;
+  `6cc5d3668b066dc7776a511114b47fc77411bc7bb7b6e4ea366d889dd41394f9`;
 - the new plugin digest differs from the authenticated baseline digest.
 
 ## Residual risks
@@ -137,8 +154,5 @@ plugin derivation was built.
 - The complete 18,933,168-byte retained c22 artifact is Task 3 scope, so this
   task does not claim a later compiler frontier or a valid normalized full
   output.
-- Integer overflow in extremely large static layout arithmetic is not newly
-  diagnosed; the exact TinyStories shapes and strides are small and all source
-  and result layouts remain subject to MLIR verification.
 - View kinds outside the existing reinterpret/expand/collapse/subview model
   remain unsupported and explicit.
