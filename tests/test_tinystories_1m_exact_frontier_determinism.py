@@ -764,6 +764,14 @@ class V5PublicReceiptAdversarialTest(unittest.TestCase):
             [record["stage"] for record in receipt["stages"]],
         )
 
+    @staticmethod
+    def _adversarial_receipt_hash(receipt) -> str:
+        unsigned = {key: value for key, value in receipt.items() if key != "sha256"}
+        canonical = json.dumps(
+            unsigned, sort_keys=True, separators=(",", ":"), allow_nan=True
+        ).encode()
+        return hashlib.sha256(canonical).hexdigest()
+
     def _mutated_bundle(self, mutate):
         temporary = tempfile.TemporaryDirectory(prefix="exact-v5-public-mutation-")
         self.addCleanup(temporary.cleanup)
@@ -775,7 +783,7 @@ class V5PublicReceiptAdversarialTest(unittest.TestCase):
             path = bundle / run_name / "receipt.json"
             receipt = json.loads(path.read_text(encoding="utf-8"))
             mutate(receipt)
-            receipt["sha256"] = MODULE._canonical_receipt_hash(receipt)
+            receipt["sha256"] = self._adversarial_receipt_hash(receipt)
             data = (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode()
             replacement = path.with_suffix(".replacement")
             replacement.write_bytes(data)
@@ -814,8 +822,10 @@ class V5PublicReceiptAdversarialTest(unittest.TestCase):
         os.link(bundle / "run-1/receipt.json", current)
         reproducers = root / "reproducers/flat-scf"
         reproducers.mkdir(parents=True)
-        manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
-        for filename in set(manifest["canonical_files"]) - {"receipt.json"}:
+        canonical_manifest = json.loads(
+            (FLAT_SCF_BUNDLES / "manifest.json").read_text(encoding="utf-8")
+        )
+        for filename in set(canonical_manifest["canonical_files"]) - {"receipt.json"}:
             os.link(bundle / "run-1" / filename, reproducers / filename)
         with mock.patch.object(MODULE, "_independent_v5_trust", return_value=self.trust):
             with self.assertRaisesRegex(MODULE.VerificationError, pattern):
@@ -887,6 +897,18 @@ class V5PublicReceiptAdversarialTest(unittest.TestCase):
         })
         replacement = manifest_path.with_suffix(".replacement")
         replacement.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+        replacement.replace(manifest_path)
+        return bundle
+
+    def _manifest_mutated_bundle(self, mutate):
+        bundle = self._mutated_bundle(lambda _: None)
+        manifest_path = bundle / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        mutate(manifest)
+        replacement = manifest_path.with_suffix(".replacement")
+        replacement.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         replacement.replace(manifest_path)
         return bundle
 
@@ -1180,6 +1202,118 @@ class V5PublicReceiptAdversarialTest(unittest.TestCase):
             receipt["claims"]["functional_equivalence"] = True
 
         self._reject(combined, "schema|log|tool revision|claims")
+
+    def test_public_verifier_rejects_bool_int_and_float_confusion(self) -> None:
+        def false_exit_codes(receipt):
+            receipt["stages"][-1]["exit_code"] = False
+            receipt["registered_build_execution"]["flat-scf"]["exit_code"] = False
+
+        cases = {
+            "claim integer zero": lambda r: r["claims"].__setitem__(
+                "functional_equivalence", 0
+            ),
+            "false exit codes": false_exit_codes,
+            "float artifact bytes": lambda r: r["stages"][-1].__setitem__(
+                "artifact_bytes", float(r["stages"][-1]["artifact_bytes"])
+            ),
+            "integer pipeline boolean": lambda r: r["pipeline_execution"].__setitem__(
+                "stopped_after_first_invalid_stage", 1
+            ),
+            "integer invoked boolean": lambda r: r["registered_build_execution"][
+                "flat-scf"
+            ].__setitem__("invoked", 1),
+            "float semantic integer": lambda r: r["semantic_gate"]["evidence"][
+                "contract"
+            ]["shift_one_output"].__setitem__(0, -3.0),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                self._reject(mutate, "JSON type")
+
+    def test_public_verifier_rejects_recursive_type_and_range_swaps(self) -> None:
+        cases = {
+            "top string to null": lambda r: r.__setitem__("model", None),
+            "capture object to list": lambda r: r.__setitem__("capture_tools", []),
+            "diagnostic string to list": lambda r: r.__setitem__("diagnostic", []),
+            "log path string to null": lambda r: r["stages"][-1].__setitem__(
+                "log", None
+            ),
+            "diagnostic list to dict": lambda r: r["stages"][-1].__setitem__(
+                "terminal_diagnostics", {}
+            ),
+            "diagnostic element to int": lambda r: r["stages"][-1][
+                "terminal_diagnostics"
+            ].__setitem__(0, 1),
+            "registered order element to bool": lambda r: r["pipeline_execution"][
+                "registered_order"
+            ].__setitem__(0, False),
+            "operation null to string": lambda r: r["frontier_evidence"].__setitem__(
+                "operation", "none"
+            ),
+            "manifest null reason to bool": lambda r: r["frontier_evidence"][
+                "manifest"
+            ].__setitem__("reason", False),
+            "minimization string to null": lambda r: r["frontier_evidence"][
+                "minimization"
+            ].__setitem__("reason", None),
+            "negative full input bytes": lambda r: r["full_failing_input"].__setitem__(
+                "archive_bytes", -1
+            ),
+            "negative tool binding bytes": lambda r: r[
+                "registered_build_execution"
+            ]["flat-scf"]["derivation_tool_bindings"][0].__setitem__("bytes", -1),
+            "critical inputs dict to list": lambda r: r[
+                "pipeline_source_identity"
+            ].__setitem__("critical_inputs", []),
+            "derivation source element to int": lambda r: r[
+                "pipeline_source_identity"
+            ]["torch_derivation"]["input_sources"].__setitem__(0, 1),
+            "identity hash string to null": lambda r: r[
+                "frozen_task_1_through_3_identities"
+            ].__setitem__("adapter_sha256", None),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                self._reject(mutate, "JSON type")
+
+    def test_public_verifier_rejects_nonfinite_json_numbers(self) -> None:
+        for name, value in (
+            ("nan", float("nan")),
+            ("positive infinity", float("inf")),
+            ("negative infinity", float("-inf")),
+        ):
+            with self.subTest(name=name):
+                self._reject(
+                    lambda r, value=value: r["stages"][-1].__setitem__(
+                        "artifact_bytes", value
+                    ),
+                    "JSON type",
+                )
+
+    def test_public_verifier_rejects_bundle_manifest_type_confusion(self) -> None:
+        cases = {
+            "integer expected boolean": lambda m: m["expected_comparison"].__setitem__(
+                "byte_identical", 1
+            ),
+            "float file bytes": lambda m: m["runs"]["run-1"]["files"][
+                "receipt.json"
+            ].__setitem__(
+                "bytes", float(m["runs"]["run-1"]["files"]["receipt.json"]["bytes"])
+            ),
+            "negative file bytes": lambda m: m["runs"]["run-1"]["files"][
+                "receipt.json"
+            ].__setitem__("bytes", -1),
+            "canonical file element to int": lambda m: m["canonical_files"].__setitem__(
+                0, 1
+            ),
+            "run object to list": lambda m: m["runs"].__setitem__("run-1", []),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                self._reject_bundle(
+                    self._manifest_mutated_bundle(mutate),
+                    "JSON type",
+                )
 
 
 class V5PublicIntegrationAdversarialTest(unittest.TestCase):

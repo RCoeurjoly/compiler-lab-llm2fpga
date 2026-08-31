@@ -319,42 +319,132 @@ def _require(condition: bool, message: str) -> None:
         raise VerificationError(message)
 
 
-def _require_exact_keys(
-    value: object, expected: set[str], context: str
-) -> dict[str, Any]:
+def _require_json_dict(value: object, context: str) -> dict[str, Any]:
+    _require(type(value) is dict, f"{context}: JSON type mismatch; expected object")
+    return value
+
+
+def _require_json_list(value: object, context: str) -> list[Any]:
+    _require(type(value) is list, f"{context}: JSON type mismatch; expected array")
+    return value
+
+
+def _require_json_str(value: object, context: str) -> str:
+    _require(type(value) is str, f"{context}: JSON type mismatch; expected string")
+    return value
+
+
+def _require_json_bool(value: object, context: str) -> bool:
+    _require(type(value) is bool, f"{context}: JSON type mismatch; expected boolean")
+    return value
+
+
+def _require_json_int(
+    value: object, context: str, *, nonnegative: bool = True
+) -> int:
+    _require(type(value) is int, f"{context}: JSON type mismatch; expected integer")
     _require(
-        isinstance(value, dict) and set(value) == expected,
-        f"{context}: exact schema keys mismatch",
+        not nonnegative or value >= 0,
+        f"{context}: JSON type/range mismatch; expected nonnegative integer",
     )
     return value
 
 
+def _require_json_null(value: object, context: str) -> None:
+    _require(value is None, f"{context}: JSON type mismatch; expected null")
+
+
+def _require_json_str_list(value: object, context: str) -> list[str]:
+    items = _require_json_list(value, context)
+    for index, item in enumerate(items):
+        _require_json_str(item, f"{context}[{index}]")
+    return items
+
+
+def _require_json_int_list(value: object, context: str) -> list[int]:
+    items = _require_json_list(value, context)
+    for index, item in enumerate(items):
+        _require_json_int(item, f"{context}[{index}]", nonnegative=False)
+    return items
+
+
+def _require_json_str_fields(
+    value: dict[str, Any], fields: set[str], context: str
+) -> None:
+    for field in fields:
+        _require_json_str(value.get(field), f"{context}.{field}")
+
+
+def _require_json_int_fields(
+    value: dict[str, Any], fields: set[str], context: str
+) -> None:
+    for field in fields:
+        _require_json_int(value.get(field), f"{context}.{field}")
+
+
+def _require_exact_keys(
+    value: object, expected: set[str], context: str
+) -> dict[str, Any]:
+    mapping = _require_json_dict(value, context)
+    _require(
+        set(mapping) == expected,
+        f"{context}: exact schema keys mismatch",
+    )
+    return mapping
+
+
 def _verify_v5_schema(receipt: dict[str, Any], run_name: str) -> None:
-    """Reject every missing or unversioned v5 field before semantic checks."""
+    """Reject every missing, unversioned, or mistyped v5 field."""
 
     _require_exact_keys(receipt, _V5_TOP_KEYS, f"{run_name}: receipt schema")
+    _require_json_str_fields(
+        receipt,
+        {
+            "diagnostic",
+            "frontier",
+            "model",
+            "schema",
+            "sha256",
+            "source_commit",
+            "stage",
+            "status",
+            "task_2_decision_self_sha256",
+        },
+        f"{run_name}: receipt",
+    )
     capture_tools = _require_exact_keys(
         receipt.get("capture_tools"),
         {"classifier", "determinism_verifier"},
         f"{run_name}: capture tools schema",
     )
     for name in ("classifier", "determinism_verifier"):
-        _require_exact_keys(
+        tool = _require_exact_keys(
             capture_tools.get(name), {"path", "sha256"}, f"{run_name}: {name} schema"
         )
+        _require_json_str_fields(tool, {"path", "sha256"}, f"{run_name}: {name}")
 
-    _require_exact_keys(
+    claims = _require_exact_keys(
         receipt.get("claims"), set(_V5_CLAIMS), f"{run_name}: claims schema"
     )
-    _require_exact_keys(
+    for name, value in claims.items():
+        _require_json_bool(value, f"{run_name}: claims.{name}")
+    identities = _require_exact_keys(
         receipt.get("frozen_task_1_through_3_identities"),
         set(_FROZEN_IDENTITIES),
         f"{run_name}: frozen identity schema",
     )
-    _require_exact_keys(
+    _require_json_str_fields(
+        identities, set(_FROZEN_IDENTITIES), f"{run_name}: frozen identity"
+    )
+    predecessor = _require_exact_keys(
         receipt.get("predecessor_receipt"),
         {"file_sha256", "historical_bundle", "self_sha256"},
         f"{run_name}: predecessor identity schema",
+    )
+    _require_json_str_fields(
+        predecessor,
+        {"file_sha256", "historical_bundle", "self_sha256"},
+        f"{run_name}: predecessor identity",
     )
 
     semantic = _require_exact_keys(
@@ -362,87 +452,225 @@ def _verify_v5_schema(receipt: dict[str, Any], run_name: str) -> None:
         _V5_SEMANTIC_GATE_KEYS,
         f"{run_name}: semantic gate schema",
     )
+    _require_json_str_fields(
+        semantic,
+        _V5_SEMANTIC_GATE_KEYS - {"evidence"},
+        f"{run_name}: semantic gate",
+    )
     evidence = _require_exact_keys(
         semantic.get("evidence"),
         _V5_SEMANTIC_EVIDENCE_KEYS,
         f"{run_name}: semantic evidence schema",
     )
-    _require_exact_keys(
+    contract = _require_exact_keys(
         evidence.get("contract"),
         _V5_SEMANTIC_CONTRACT_KEYS,
         f"{run_name}: semantic contract schema",
     )
-    _require_exact_keys(
+    _require_json_str_fields(
+        contract,
+        {"decision_sha256", "fixture_file_sha256", "fixture_self_hash"},
+        f"{run_name}: semantic contract",
+    )
+    _require_json_str_list(
+        contract.get("rejected_cases"), f"{run_name}: semantic contract.rejected_cases"
+    )
+    _require_json_str_list(
+        contract.get("valid_cases"), f"{run_name}: semantic contract.valid_cases"
+    )
+    _require_json_int_list(
+        contract.get("shift_one_output"),
+        f"{run_name}: semantic contract.shift_one_output",
+    )
+    registered_stage = _require_exact_keys(
         evidence.get("registered_stage"),
         _V5_SEMANTIC_REGISTERED_KEYS,
         f"{run_name}: semantic registered-stage schema",
     )
-    _require_exact_keys(
+    _require_json_str_fields(
+        registered_stage,
+        _V5_SEMANTIC_REGISTERED_KEYS,
+        f"{run_name}: semantic registered-stage",
+    )
+    semantic_probe = _require_exact_keys(
         evidence.get("semantic_probe"),
         _V5_SEMANTIC_PROBE_KEYS,
         f"{run_name}: semantic probe schema",
     )
+    _require_json_str_fields(
+        semantic_probe, _V5_SEMANTIC_PROBE_KEYS, f"{run_name}: semantic probe"
+    )
 
-    _require_exact_keys(
+    pipeline = _require_exact_keys(
         receipt.get("pipeline_execution"),
         _V5_PIPELINE_EXECUTION_KEYS,
         f"{run_name}: pipeline execution schema",
     )
-    stages = receipt.get("stages")
-    _require(isinstance(stages, list), f"{run_name}: stages schema mismatch")
+    _require_json_str(
+        pipeline.get("first_invalid_stage"),
+        f"{run_name}: pipeline execution.first_invalid_stage",
+    )
+    _require_json_str_list(
+        pipeline.get("registered_order"),
+        f"{run_name}: pipeline execution.registered_order",
+    )
+    _require_json_str_list(
+        pipeline.get("not_run"), f"{run_name}: pipeline execution.not_run"
+    )
+    _require_json_bool(
+        pipeline.get("stopped_after_first_invalid_stage"),
+        f"{run_name}: pipeline execution.stopped_after_first_invalid_stage",
+    )
+    stages = _require_json_list(receipt.get("stages"), f"{run_name}: stages")
     for index, record in enumerate(stages):
+        context = f"{run_name}: stage {index}"
         stage = _require_exact_keys(
-            record, _V5_STAGE_KEYS, f"{run_name}: stage {index} schema"
+            record, _V5_STAGE_KEYS, f"{context} schema"
         )
-        _require_exact_keys(
+        _require_json_str_fields(
+            stage,
+            {
+                "artifact",
+                "artifact_sha256",
+                "command",
+                "log",
+                "log_sha256",
+                "stage",
+                "status",
+                "upstream_identity",
+            },
+            context,
+        )
+        _require_json_bool(stage.get("artifact_accepted"), f"{context}.artifact_accepted")
+        _require_json_int_fields(stage, {"artifact_bytes", "exit_code", "log_bytes"}, context)
+        _require_json_str_list(
+            stage.get("terminal_diagnostics"), f"{context}.terminal_diagnostics"
+        )
+        revisions = _require_exact_keys(
             stage.get("tool_revisions"),
             _V5_TOOL_REVISION_KEYS,
-            f"{run_name}: stage {index} tool revision schema",
+            f"{context} tool revision schema",
+        )
+        _require_json_str_fields(
+            revisions, _V5_TOOL_REVISION_KEYS, f"{context} tool revision"
         )
 
-    execution = receipt.get("registered_build_execution")
-    _require(isinstance(execution, dict), f"{run_name}: execution schema mismatch")
+    execution = _require_json_dict(
+        receipt.get("registered_build_execution"), f"{run_name}: execution"
+    )
     for stage_name, value in execution.items():
+        context = f"{run_name}: {stage_name} execution"
         run = _require_exact_keys(
-            value, _V5_EXECUTION_KEYS, f"{run_name}: {stage_name} execution schema"
+            value, _V5_EXECUTION_KEYS, f"{context} schema"
         )
-        bindings = run.get("derivation_tool_bindings")
-        _require(
-            isinstance(bindings, list),
-            f"{run_name}: {stage_name} tool binding schema mismatch",
+        _require_json_str_fields(
+            run,
+            {
+                "artifact",
+                "artifact_sha256",
+                "attribute",
+                "backend",
+                "captured_derivation",
+                "captured_derivation_json",
+                "captured_derivation_json_sha256",
+                "captured_derivation_sha256",
+                "command",
+                "derivation",
+                "derivation_build_command",
+                "derivation_build_command_sha256",
+                "derivation_file_sha256",
+                "derivation_json_sha256",
+                "frontend",
+                "log",
+                "log_sha256",
+                "result",
+                "route_alias",
+            },
+            context,
+        )
+        for name in ("artifact_accepted", "invoked"):
+            _require_json_bool(run.get(name), f"{context}.{name}")
+        _require_json_int_fields(
+            run,
+            {
+                "artifact_bytes",
+                "captured_derivation_bytes",
+                "captured_derivation_json_bytes",
+                "exit_code",
+                "log_bytes",
+            },
+            context,
+        )
+        bindings = _require_json_list(
+            run.get("derivation_tool_bindings"), f"{context}.derivation_tool_bindings"
         )
         for index, binding in enumerate(bindings):
-            _require_exact_keys(
+            tool_binding = _require_exact_keys(
                 binding,
                 {"bytes", "path", "sha256"},
-                f"{run_name}: {stage_name} tool binding {index} schema",
+                f"{context} tool binding {index} schema",
+            )
+            _require_json_int(
+                tool_binding.get("bytes"), f"{context} tool binding {index}.bytes"
+            )
+            _require_json_str_fields(
+                tool_binding,
+                {"path", "sha256"},
+                f"{context} tool binding {index}",
             )
 
-    _require_exact_keys(
+    full = _require_exact_keys(
         receipt.get("full_failing_input"),
         _V5_FULL_INPUT_KEYS,
         f"{run_name}: full input schema",
+    )
+    _require_json_int_fields(
+        full,
+        {"archive_bytes", "content_bytes"},
+        f"{run_name}: full input",
+    )
+    _require_json_str_fields(
+        full,
+        {"archive_sha256", "content_sha256", "path", "source_artifact", "source_stage"},
+        f"{run_name}: full input",
     )
     frontier = _require_exact_keys(
         receipt.get("frontier_evidence"),
         _V5_FRONTIER_KEYS,
         f"{run_name}: frontier evidence schema",
     )
-    _require_exact_keys(
+    _require_json_str(frontier.get("kind"), f"{run_name}: frontier evidence.kind")
+    _require_json_null(frontier.get("operation"), f"{run_name}: frontier evidence.operation")
+    _require_json_null(frontier.get("types"), f"{run_name}: frontier evidence.types")
+    manifest = _require_exact_keys(
         frontier.get("manifest"),
         _V5_MANIFEST_BINDING_KEYS,
         f"{run_name}: frontier manifest schema",
     )
+    _require_json_str_fields(
+        manifest,
+        {"artifact", "blockers", "path", "sha256", "stage", "status"},
+        f"{run_name}: frontier manifest",
+    )
+    _require_json_int(manifest.get("bytes"), f"{run_name}: frontier manifest.bytes")
+    _require_json_null(manifest.get("reason"), f"{run_name}: frontier manifest.reason")
     for name in ("residual_artifact", "blockers"):
-        _require_exact_keys(
+        binding = _require_exact_keys(
             frontier.get(name),
             _V5_FILE_BINDING_KEYS,
             f"{run_name}: frontier {name} schema",
         )
-    _require_exact_keys(
+        _require_json_int(binding.get("bytes"), f"{run_name}: frontier {name}.bytes")
+        _require_json_str_fields(
+            binding, {"path", "sha256"}, f"{run_name}: frontier {name}"
+        )
+    minimization = _require_exact_keys(
         frontier.get("minimization"),
         _V5_MINIMIZATION_KEYS,
         f"{run_name}: frontier minimization schema",
+    )
+    _require_json_str_fields(
+        minimization, _V5_MINIMIZATION_KEYS, f"{run_name}: frontier minimization"
     )
 
     source = _require_exact_keys(
@@ -450,24 +678,104 @@ def _verify_v5_schema(receipt: dict[str, Any], run_name: str) -> None:
         _V5_SOURCE_KEYS,
         f"{run_name}: pipeline source identity schema",
     )
-    critical = source.get("critical_inputs")
+    _require_json_str_fields(
+        source,
+        {
+            "accepted_task4_commit",
+            "evidence_source_commit",
+            "flake_archive_nar_hash",
+            "flake_archive_path",
+            "flake_archive_source",
+        },
+        f"{run_name}: pipeline source identity",
+    )
+    for name in ("critical_inputs_clean", "task4_is_ancestor"):
+        _require_json_bool(
+            source.get(name), f"{run_name}: pipeline source identity.{name}"
+        )
+    critical = _require_json_dict(
+        source.get("critical_inputs"), f"{run_name}: critical inputs"
+    )
     _require(
-        isinstance(critical, dict) and set(critical) == set(_CRITICAL_INPUTS),
+        set(critical) == set(_CRITICAL_INPUTS),
         f"{run_name}: critical input schema mismatch",
     )
     for path, binding in critical.items():
         expected = set(_V5_CRITICAL_INPUT_KEYS)
         if path in _V5_EVALUATED_CRITICAL_INPUTS:
             expected.update({"derivation_store_path", "derivation_store_sha256"})
-        _require_exact_keys(
+        critical_binding = _require_exact_keys(
             binding, expected, f"{run_name}: critical input {path} schema"
         )
+        _require_json_str_fields(
+            critical_binding, expected, f"{run_name}: critical input {path}"
+        )
     for name in ("export_derivation", "torch_derivation"):
-        _require_exact_keys(
+        derivation = _require_exact_keys(
             source.get(name),
             _V5_DERIVATION_IDENTITY_KEYS,
             f"{run_name}: {name} source identity schema",
         )
+        _require_json_str_fields(
+            derivation,
+            _V5_DERIVATION_IDENTITY_KEYS - {"input_derivations", "input_sources"},
+            f"{run_name}: {name} source identity",
+        )
+        _require_json_str_list(
+            derivation.get("input_derivations"),
+            f"{run_name}: {name} source identity.input_derivations",
+        )
+        _require_json_str_list(
+            derivation.get("input_sources"),
+            f"{run_name}: {name} source identity.input_sources",
+        )
+
+
+def _verify_v5_bundle_manifest_schema(manifest: dict[str, Any]) -> None:
+    _require_exact_keys(manifest, _V5_BUNDLE_MANIFEST_KEYS, "v5 bundle manifest schema")
+    _require_json_str_fields(
+        manifest, {"schema", "source_commit"}, "v5 bundle manifest"
+    )
+    _require_json_str_list(
+        manifest.get("canonical_files"), "v5 bundle manifest.canonical_files"
+    )
+    expected = _require_exact_keys(
+        manifest.get("expected_comparison"),
+        {"byte_identical", "first_invalid_stage", "receipt_file_sha256", "receipt_self_hash"},
+        "v5 bundle expected comparison schema",
+    )
+    _require_json_bool(
+        expected.get("byte_identical"),
+        "v5 bundle expected comparison.byte_identical",
+    )
+    _require_json_str_fields(
+        expected,
+        {"first_invalid_stage", "receipt_file_sha256", "receipt_self_hash"},
+        "v5 bundle expected comparison",
+    )
+    runs = _require_json_dict(manifest.get("runs"), "v5 bundle manifest.runs")
+    for run_name, value in runs.items():
+        run = _require_exact_keys(
+            value,
+            {"files", "receipt_self_hash", "source_commit"},
+            f"{run_name}: run manifest schema",
+        )
+        _require_json_str_fields(
+            run, {"receipt_self_hash", "source_commit"}, f"{run_name}: run manifest"
+        )
+        files = _require_json_dict(run.get("files"), f"{run_name}: file manifest")
+        for filename, value in files.items():
+            binding = _require_exact_keys(
+                value,
+                {"bytes", "sha256"},
+                f"{run_name}: file manifest {filename} schema",
+            )
+            _require_json_int(
+                binding.get("bytes"), f"{run_name}: file manifest {filename}.bytes"
+            )
+            _require_json_str(
+                binding.get("sha256"), f"{run_name}: file manifest {filename}.sha256"
+            )
 
 
 def _canonical_receipt_hash(receipt: dict[str, Any]) -> str:
@@ -483,7 +791,7 @@ def _load_json(path: Path) -> dict[str, Any]:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise VerificationError(f"cannot load JSON evidence {path}: {error}") from error
-    if not isinstance(value, dict):
+    if type(value) is not dict:
         raise VerificationError(f"JSON evidence must be an object: {path}")
     return value
 
@@ -1376,6 +1684,9 @@ def _verify_v5_frontier_evidence(
             manifest = json.loads(manifest_bytes)
         except json.JSONDecodeError as error:
             raise VerificationError(f"{run_name}: invalid control manifest: {error}") from error
+        manifest = _require_json_dict(manifest, f"{run_name}: control manifest")
+        _require_json_str(manifest.get("stage"), f"{run_name}: control manifest.stage")
+        _require_json_str(manifest.get("status"), f"{run_name}: control manifest.status")
         _require(isinstance(manifest_binding, dict), f"{run_name}: control manifest binding missing")
         exact_identity = (
             isinstance(manifest, dict)
@@ -1386,6 +1697,16 @@ def _verify_v5_frontier_evidence(
         )
         status = manifest.get("status") if isinstance(manifest, dict) else None
         if status in {"unavailable", "rejected"}:
+            _require_exact_keys(
+                manifest,
+                {"reason", "stage", "status"},
+                f"{run_name}: control manifest schema",
+            )
+            _require_json_str_fields(
+                manifest,
+                {"reason", "stage", "status"},
+                f"{run_name}: control manifest",
+            )
             _require(
                 exact_identity
                 and isinstance(manifest.get("reason"), str)
@@ -1395,6 +1716,16 @@ def _verify_v5_frontier_evidence(
                 f"{run_name}: exact control manifest mismatch",
             )
         elif status == "completed-with-residuals":
+            _require_exact_keys(
+                manifest,
+                {"artifact", "blockers", "stage", "status"},
+                f"{run_name}: control manifest schema",
+            )
+            _require_json_str_fields(
+                manifest,
+                {"artifact", "blockers", "stage", "status"},
+                f"{run_name}: control manifest",
+            )
             _require(
                 exact_identity
                 and first_invalid == "flat-scf"
@@ -1556,7 +1887,6 @@ def _verify_v5_receipt(
     trust: dict[str, Any],
     run_name: str,
 ) -> set[str]:
-    _verify_v5_schema(receipt, run_name)
     _require(receipt.get("model") == _MODEL, f"{run_name}: model mismatch")
     _authenticate_v5_pipeline_source(receipt, trust, run_name)
     _require(
@@ -2161,7 +2491,7 @@ def _verify_v2_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
 
 def _verify_v3_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
     manifest = _load_json(bundle_root / "manifest.json")
-    _require_exact_keys(manifest, _V5_BUNDLE_MANIFEST_KEYS, "v5 bundle manifest schema")
+    _verify_v5_bundle_manifest_schema(manifest)
     _require(
         manifest.get("schema") == "tinystories-1m-exact-frontier-determinism-bundles-v3",
         "unsupported v3 determinism manifest schema",
@@ -2192,12 +2522,8 @@ def _verify_v3_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
         isinstance(runs_manifest, dict) and sorted(runs_manifest) == ["run-1", "run-2"],
         "exactly run-1 and run-2 are required",
     )
-    _require_exact_keys(
-        manifest.get("expected_comparison"),
-        {"byte_identical", "first_invalid_stage", "receipt_file_sha256", "receipt_self_hash"},
-        "v5 bundle expected comparison schema",
-    )
     first_receipt = _load_json(bundle_root / "run-1" / "receipt.json")
+    _verify_v5_schema(first_receipt, "run-1")
     _require(
         first_receipt.get("schema") == "tinystories-1m-exact-current-pipeline-frontier-v5",
         "v3 bundle requires a v5 receipt",
@@ -2220,6 +2546,7 @@ def _verify_v3_determinism_bundles(bundle_root: Path) -> dict[str, Any]:
         names = _enumerate_run_files(run_root, run_name)
         files = {name: (run_root / name).read_bytes() for name in names}
         receipt = _load_json(run_root / "receipt.json")
+        _verify_v5_schema(receipt, run_name)
         _require(
             receipt.get("schema") == "tinystories-1m-exact-current-pipeline-frontier-v5"
             and receipt.get("source_commit") == source_commit
