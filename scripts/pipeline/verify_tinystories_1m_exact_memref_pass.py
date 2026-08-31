@@ -149,9 +149,15 @@ def _access_model(text: str, parser: Any) -> dict[str, Any]:
     _require(bool(accesses), "semantic probe has no live memory access")
     counts = [__import__("math").prod(memref["shape"]) for memref in memrefs]
     _require(len(set(counts)) == 1, "semantic probe element-count mismatch")
+    shape, strides = memrefs[0]["shape"], memrefs[0]["strides"]
+    expected_stride, contiguous = 1, True
+    for dimension, stride in reversed(list(zip(shape, strides))):
+        contiguous = contiguous and stride == expected_stride
+        expected_stride *= dimension
     return {
         "shape": memrefs[0]["shape"], "strides": memrefs[0]["strides"],
-        "offset": memrefs[0]["offset"], "element_count": counts[0],
+        "offset": memrefs[0]["offset"], "contiguous": contiguous,
+        "element_count": counts[0],
         "access_maps": accesses,
     }
 
@@ -564,17 +570,29 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
             (ROOT / runs[index + 4]["output"]["path"]).read_text(encoding="utf-8"),
             parser,
         )
-        proven = (
+        shape_element_count_preserved = (
             before_model["element_count"] == after_model["element_count"]
-            and before_model["access_maps"] == after_model["access_maps"]
         )
+        layout_preserved = (
+            before_model["contiguous"] and after_model["contiguous"]
+            and before_model["offset"] == after_model["offset"]
+        )
+        access_maps_preserved = (
+            before_model["access_maps"] == after_model["access_maps"]
+        )
+        proven = shape_element_count_preserved and layout_preserved and access_maps_preserved
         expected_probe = {
             "operation": name,
             "execution_id": runs[index + 4]["id"],
             "invariant_status": "proven" if proven else "unproven",
             "before": before_model,
             "after": after_model,
-            "checks": {"shape_layout_access_equivalent": proven},
+            "checks": {
+                "shape_element_count_preserved": shape_element_count_preserved,
+                "layout_contiguous_and_offset_preserved": layout_preserved,
+                "memory_access_maps_preserved": access_maps_preserved,
+                "shape_layout_access_equivalent": proven,
+            },
         }
         _require(semantic_probes[index] == expected_probe, "semantic probe mismatch")
 

@@ -253,10 +253,18 @@ def semantic_access_model(text: str, parser: Any) -> dict[str, Any]:
     ]
     if len(set(element_counts)) != 1:
         raise ValueError("semantic probe accesses disagree on element count")
+    shape = memrefs[0]["shape"]
+    strides = memrefs[0]["strides"]
+    expected_stride = 1
+    contiguous = True
+    for dimension, stride in reversed(list(zip(shape, strides))):
+        contiguous = contiguous and stride == expected_stride
+        expected_stride *= dimension
     return {
         "shape": memrefs[0]["shape"],
         "strides": memrefs[0]["strides"],
         "offset": memrefs[0]["offset"],
+        "contiguous": contiguous,
         "element_count": element_counts[0],
         "access_maps": accesses,
     }
@@ -883,10 +891,24 @@ def evaluate(*, output: Path, evidence_root: Path, report: Path) -> dict[str, An
             )
             if run["parseable"] and run["exit_code"] == 0 else None
         )
-        proven = (
+        shape_element_count_preserved = (
             after_model is not None
             and before_model["element_count"] == after_model["element_count"]
+        )
+        layout_preserved = (
+            after_model is not None
+            and before_model["contiguous"]
+            and after_model["contiguous"]
+            and before_model["offset"] == after_model["offset"]
+        )
+        access_maps_preserved = (
+            after_model is not None
             and before_model["access_maps"] == after_model["access_maps"]
+        )
+        proven = (
+            shape_element_count_preserved
+            and layout_preserved
+            and access_maps_preserved
         )
         semantic_probes.append(
             {
@@ -895,7 +917,12 @@ def evaluate(*, output: Path, evidence_root: Path, report: Path) -> dict[str, An
                 "invariant_status": "proven" if proven else "unproven",
                 "before": before_model,
                 "after": after_model,
-                "checks": {"shape_layout_access_equivalent": proven},
+                "checks": {
+                    "shape_element_count_preserved": shape_element_count_preserved,
+                    "layout_contiguous_and_offset_preserved": layout_preserved,
+                    "memory_access_maps_preserved": access_maps_preserved,
+                    "shape_layout_access_equivalent": proven,
+                },
             }
         )
         sequence += 1

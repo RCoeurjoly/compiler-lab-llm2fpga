@@ -324,6 +324,9 @@ class CommittedEvaluationTest(unittest.TestCase):
                     probe["after"]["element_count"],
                 )
                 self.assertTrue(probe["checks"]["shape_layout_access_equivalent"])
+                self.assertTrue(probe["checks"]["shape_element_count_preserved"])
+                self.assertTrue(probe["checks"]["layout_contiguous_and_offset_preserved"])
+                self.assertTrue(probe["checks"]["memory_access_maps_preserved"])
 
 
 @unittest.skipUnless(VERIFIER.is_file() and EVALUATION.is_file(), "Task 3 verifier absent")
@@ -488,13 +491,19 @@ class PublicVerifierTest(unittest.TestCase):
             "semantic_probes", self.payload,
             "evaluation lacks semantic probes for mutation testing",
         )
-        payload = copy.deepcopy(self.payload)
-        payload["semantic_probes"][0]["after"]["access_maps"][0][
-            "linear_index"
-        ] += 1
-        canonical_rehash(payload)
-        with self.assertRaisesRegex(ValueError, "semantic probe"):
-            self.verifier.validate_payload(payload, ROOT, replay=False)
+        mutations = (
+            ("shape", lambda probe: probe["before"]["shape"].append(1)),
+            ("layout", lambda probe: probe["after"]["strides"].__setitem__(0, 2)),
+            ("element count", lambda probe: probe["after"].__setitem__("element_count", 7)),
+            ("access map", lambda probe: probe["after"]["access_maps"][0].__setitem__("linear_index", 7)),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label):
+                payload = copy.deepcopy(self.payload)
+                mutate(payload["semantic_probes"][0])
+                canonical_rehash(payload)
+                with self.assertRaisesRegex(ValueError, "semantic probe"):
+                    self.verifier.validate_payload(payload, ROOT, replay=False)
 
     def test_elapsed_time_is_positive_authenticated_observation_not_replay_equality(self) -> None:
         invalid = copy.deepcopy(self.payload)
