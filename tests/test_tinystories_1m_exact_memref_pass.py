@@ -414,6 +414,54 @@ class PublicVerifierTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, message):
                     self.verifier.validate_payload(payload, ROOT, replay=False)
 
+    def test_verifier_rejects_open_schema_and_crossed_decision_branches(self) -> None:
+        attacks = []
+
+        wrong_status = copy.deepcopy(self.payload)
+        wrong_status["status"] = "registered"
+        attacks.append(("status", canonical_rehash(wrong_status)))
+
+        unknown_top = copy.deepcopy(self.payload)
+        unknown_top["registration_claim"] = True
+        attacks.append(("top-level schema", canonical_rehash(unknown_top)))
+
+        unknown_execution = copy.deepcopy(self.payload)
+        unknown_execution["executions"][0]["registered"] = True
+        attacks.append(("execution schema", canonical_rehash(unknown_execution)))
+
+        unknown_reproducer = copy.deepcopy(self.payload)
+        unknown_reproducer["earliest_remaining_signature"]["reproducer"][
+            "registered"
+        ] = True
+        attacks.append(("reproducer schema", canonical_rehash(unknown_reproducer)))
+
+        normalized_extension = copy.deepcopy(self.payload)
+        normalized_extension["normalized_artifact"] = copy.deepcopy(
+            normalized_extension["executions"][-1]["output"]
+        )
+        attacks.append(("decision schema", canonical_rehash(normalized_extension)))
+
+        missing_extension_field = copy.deepcopy(self.payload)
+        del missing_extension_field["earliest_remaining_signature"]
+        attacks.append(("decision schema", canonical_rehash(missing_extension_field)))
+
+        crossed_registration = copy.deepcopy(self.payload)
+        crossed_registration["decision"] = "register_existing_pass"
+        crossed_registration["normalized_artifact"] = copy.deepcopy(
+            crossed_registration["executions"][-1]["output"]
+        )
+        attacks.append(("decision schema", canonical_rehash(crossed_registration)))
+
+        missing_registration_field = copy.deepcopy(self.payload)
+        missing_registration_field["decision"] = "register_existing_pass"
+        del missing_registration_field["earliest_remaining_signature"]
+        attacks.append(("decision schema", canonical_rehash(missing_registration_field)))
+
+        for message, payload in attacks:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    self.verifier.validate_payload(payload, ROOT, replay=False)
+
     def test_verifier_rejects_launcher_and_task2_identity_rebound(self) -> None:
         attacks = []
         launcher = copy.deepcopy(self.payload)
@@ -551,6 +599,7 @@ class PublicVerifierTest(unittest.TestCase):
             "reproducer stdout": ("stdout", report_binding),
             "reproducer stderr": ("stderr", complete_stderr),
             "reproducer output": ("output", report_binding),
+            "reproducer execution schema": ("registered", True),
         }
         try:
             for message, (field, value) in mutations.items():

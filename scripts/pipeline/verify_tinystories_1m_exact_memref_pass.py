@@ -56,6 +56,39 @@ PLUGIN = {
     "bytes": 21714240,
     "sha256": "6e6782b5db0255e688f1599c51f6076c3c30514362194ec5eff2632eeb8a6744",
 }
+TOP_LEVEL_COMMON_KEYS = {
+    "schema", "status", "model", "pipeline", "task2_contract", "input",
+    "tool", "plugin", "python", "provenance", "task_1_through_3_identities",
+    "executions", "representatives", "semantic_probes", "complete", "decision",
+    "sha256",
+}
+RUN_KEYS = {
+    "sequence", "id", "kind", "operation", "command", "input", "input_after",
+    "exit_code", "elapsed_ns", "stdout", "stderr", "output", "parse_check",
+    "parseable",
+}
+PARSE_CHECK_KEYS = {"command", "exit_code", "stdout", "stderr"}
+COMPLETE_KEYS = {
+    "parseable", "before", "after", "signature_mappings",
+    "new_invalid_signatures", "unknown_blocker_classes", "invariant_status",
+}
+COMPLETE_PHASE_KEYS = {
+    "operation_census", "blocker_counts", "registered_operation_count",
+}
+EARLIEST_KEYS = {
+    "operation", "signature_sha256", "classification", "signature",
+    "source_location", "diagnostic", "reproducer",
+}
+REPRODUCER_KEYS = {"path", "bytes", "sha256", "operation_count", "metadata"}
+METADATA_KEYS = {
+    "operation", "signature", "signature_sha256", "classification", "selection",
+    "execution",
+}
+METADATA_EXECUTION_KEYS = {
+    "command", "exit_code", "elapsed_ns", "output_created", "stdout", "stderr",
+    "output",
+}
+BINDING_KEYS = {"path", "bytes", "sha256"}
 
 
 def _expected_provenance(contract: dict[str, Any]) -> dict[str, Any]:
@@ -344,6 +377,48 @@ def _require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def _require_keys(value: Any, expected: set[str], label: str) -> None:
+    _require(isinstance(value, dict) and set(value) == expected, f"{label} mismatch")
+
+
+def _validate_closed_schema(payload: dict[str, Any]) -> None:
+    decision = payload.get("decision")
+    _require(
+        decision in {"compiler_pass_extension", "register_existing_pass"},
+        "decision schema mismatch",
+    )
+    branch_fields = {
+        key for key in ("earliest_remaining_signature", "normalized_artifact")
+        if key in payload
+    }
+    expected_branch = (
+        {"earliest_remaining_signature"}
+        if decision == "compiler_pass_extension"
+        else {"normalized_artifact"}
+    )
+    _require(branch_fields == expected_branch, "decision schema mismatch")
+    _require(
+        set(payload) - branch_fields == TOP_LEVEL_COMMON_KEYS,
+        "top-level schema mismatch",
+    )
+    _require(payload.get("status") == "evaluated", "status mismatch")
+    runs = payload.get("executions")
+    _require(isinstance(runs, list), "execution schema mismatch")
+    for run in runs:
+        _require_keys(run, RUN_KEYS, "execution schema")
+        _require_keys(run.get("parse_check"), PARSE_CHECK_KEYS, "parse-check schema")
+    _require_keys(payload.get("complete"), COMPLETE_KEYS, "complete schema")
+    _require_keys(payload["complete"].get("before"), COMPLETE_PHASE_KEYS, "complete before schema")
+    _require_keys(payload["complete"].get("after"), COMPLETE_PHASE_KEYS, "complete after schema")
+    if decision == "compiler_pass_extension":
+        earliest = payload["earliest_remaining_signature"]
+        _require_keys(earliest, EARLIEST_KEYS, "earliest signature schema")
+        _require_keys(earliest.get("reproducer"), REPRODUCER_KEYS, "reproducer schema")
+        _require_keys(earliest["reproducer"].get("metadata"), BINDING_KEYS, "reproducer metadata binding schema")
+    else:
+        _require_keys(payload.get("normalized_artifact"), BINDING_KEYS, "normalized artifact schema")
+
+
 def _load_object(path: Path, label: str) -> dict[str, Any]:
     try:
         value = json.loads(path.read_bytes())
@@ -547,7 +622,7 @@ def _invalid_frontier(stderr: bytes, source: str, parser: Any) -> dict[str, Any]
 
 def _check_binding(binding: Any, label: str) -> Path:
     _require(isinstance(binding, dict), f"{label} binding missing")
-    _require(set(binding) >= {"path", "bytes", "sha256"}, f"{label} binding incomplete")
+    _require(set(binding) == BINDING_KEYS, f"{label} binding schema mismatch")
     path = Path(str(binding["path"]))
     if not path.is_absolute():
         path = ROOT / path
@@ -614,6 +689,7 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
     unsigned = copy.deepcopy(payload)
     unsigned["sha256"] = None
     _require(payload.get("sha256") == _digest(_canonical(unsigned)), "evaluation self-hash mismatch")
+    _validate_closed_schema(payload)
     _require(payload.get("pipeline") == PIPELINE, "pipeline mismatch")
     _require(payload.get("tool") == TOOL, "tool identity mismatch")
     _require(payload.get("plugin") == PLUGIN, "plugin identity mismatch")
@@ -903,15 +979,21 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
     else:
         earliest = payload.get("earliest_remaining_signature", {})
         _require(earliest.get("operation") == invalid[0]["operation"], "earliest remaining signature missing")
-        reproducer = _check_binding(earliest.get("reproducer"), "earliest remaining reproducer")
+        reproducer_record = earliest.get("reproducer", {})
+        reproducer = _check_binding(
+            {key: reproducer_record.get(key) for key in BINDING_KEYS},
+            "earliest remaining reproducer",
+        )
         lines = reproducer.read_text(encoding="utf-8").splitlines()
         subviews = [line for line in lines if "memref.subview" in line]
         _require(len(subviews) == 1, "earliest remaining reproducer is not exact")
         _require(earliest.get("reproducer", {}).get("operation_count") == 1, "earliest remaining reproducer count mismatch")
         metadata_path = _check_binding(earliest["reproducer"].get("metadata"), "earliest remaining metadata")
         metadata = _load_object(metadata_path, "earliest remaining metadata")
+        _require_keys(metadata, METADATA_KEYS, "reproducer metadata schema")
         _require(metadata.get("signature_sha256") == earliest.get("signature_sha256"), "earliest remaining signature mismatch")
         execution = metadata.get("execution", {})
+        _require_keys(execution, METADATA_EXECUTION_KEYS, "reproducer execution schema")
         expected_stdout = reproducer.parent / "pass.stdout.bin"
         expected_stderr = reproducer.parent / "pass.stderr.bin"
         expected_output = reproducer.parent / "pass.output.mlir"
