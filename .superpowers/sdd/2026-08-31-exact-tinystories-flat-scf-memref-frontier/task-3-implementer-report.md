@@ -9,6 +9,8 @@
   `7a1a0c0` (explicit shape/layout/access proofs)
 - Review-fix round 2 implementation head: `4a8aac2`
   (canonical run attribution and complete affine proofs)
+- Final-review schema implementation head: `dbc68d9`
+  (closed evidence schemas and decision union)
 
 ## RED
 
@@ -47,6 +49,13 @@ outputs, and the byte-identical expand/reinterpret semantic outputs plus parse
 streams. The old evidence also had no variable domains or affine formulas, and
 its semantic-model API could not classify a non-affine multiplication as
 `unproven`. All five failures were observed before production changes.
+
+The final-review fix began with eight independently rehashed RED attacks.
+The old verifier accepted `status: registered`, unknown top-level and nested
+execution/reproducer keys, and `normalized_artifact` on the extension branch.
+Missing or crossed decision fields were rejected only later for unrelated
+semantic-gate messages, not by a closed decision schema. All eight cases now
+assert their exact trust boundary and remain in the suite.
 
 ## Exact identities and provenance
 
@@ -181,12 +190,27 @@ regression; float-math work remains out of scope.
   — `PASS`, with `compiler_pass_extension` and unavailable post-pass counts.
 - Required suite:
   `nix develop -c python -m unittest tests/test_tinystories_1m_exact_memref_pass.py -v`
-  — `Ran 21 tests in 139.943s`, `OK`.
+  — `Ran 22 tests in 165.275s`, `OK`.
+- Final-review schema checks require the exact top-level and nested execution,
+  parse, complete-result, reproducer, metadata, and binding key sets; exact
+  `status: evaluated`; and a closed decision union. Extension requires only
+  `earliest_remaining_signature`, while registration requires only
+  `normalized_artifact`.
+- Task 2 verifier smoke — PASS, independently recomputing exact counts
+  `{collapse_shape: 4682, copy: 3228, expand_shape: 921,
+  reinterpret_cast: 11449}`.
+- Task 1 verifier smoke failed closed at its historical source-identity gate:
+  `run-1: exact pipeline source identity mismatch`. No upstream receipt or
+  evidence was rewritten to bypass that authenticated mismatch.
 - Python compilation for evaluator, verifier, and tests — PASS.
 - `nix flake check --no-build` — PASS (`all checks passed`).
 - Staged `git diff --check` — PASS after marking raw byte evidence non-diffable;
   no evidence bytes were normalized.
 - Repository pre-commit hygiene hook accepted `4a8aac2`.
+- Final-review implementation commit `dbc68d9` changed only the Task 3 verifier
+  and its tests. Canonical evaluation/evidence/reproducer bytes and the
+  observed full-run failure and `compiler_pass_extension` decision are
+  unchanged.
 
 ## Files
 
