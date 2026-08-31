@@ -516,6 +516,7 @@ class StandaloneInterestingnessAttackTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.extractor = load_module(EXTRACTOR, "exact_memref_sidecar_attack_extractor")
+        cls.verifier = load_module(VERIFIER, "exact_memref_sidecar_attack_verifier")
         cls.contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
 
     def _run_checker(self, candidate: Path, metadata: Path) -> subprocess.CompletedProcess[str]:
@@ -538,6 +539,89 @@ class StandaloneInterestingnessAttackTest(unittest.TestCase):
     def _canonical_paths(self, operation: str) -> tuple[Path, Path]:
         representative = self.contract["classes"][operation]["representative"]
         return ROOT / representative["path"], ROOT / representative["metadata"]
+
+    def _assert_pinned_parse(self, candidate: Path) -> None:
+        completed = subprocess.run(
+            [self.contract["tool"]["path"], str(candidate), "-o", "/dev/null"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(
+            completed.returncode,
+            0,
+            f"escaped-name RED candidate must be valid pinned MLIR:\n{completed.stderr}",
+        )
+
+    def test_rejects_valid_escaped_generic_registered_names(self) -> None:
+        copy_module, copy_metadata = self._canonical_paths("memref.copy")
+        collapse_module, collapse_metadata = self._canonical_paths(
+            "memref.collapse_shape"
+        )
+        generic_copy_types = "(memref<1xi64>, memref<1xi64>) -> ()"
+        escaped_same = {
+            "lowercase-hex": rf'"memref.c\6fpy"(%source, %target) : {generic_copy_types}',
+            "uppercase-hex": rf'"memref.c\6Fpy"(%source, %target) : {generic_copy_types}',
+            "multi-escape": rf'"memref\2E\63\6fpy"(%source, %target) : {generic_copy_types}',
+            "newline-whitespace": (
+                r'"memref.\63opy"' + "\n      (%source, %target) : "
+                + generic_copy_types
+            ),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            candidates: list[tuple[str, Path, Path]] = []
+            for name, generic in escaped_same.items():
+                candidate = root / f"same-{name}.mlir"
+                candidate.write_text(
+                    copy_module.read_text(encoding="utf-8").replace(
+                        "    return", f"    {generic}\n    return"
+                    ),
+                    encoding="utf-8",
+                )
+                candidates.append((name, candidate, copy_metadata))
+
+            different = root / "different-class.mlir"
+            different.write_text(
+                collapse_module.read_text(encoding="utf-8")
+                .replace(
+                    ") {",
+                    ", %target: memref<1x4x256xi64>) {",
+                    1,
+                )
+                .replace(
+                    "    return",
+                    r'    "memref.\63opy"(%source, %target) : '
+                    "(memref<1x4x256xi64>, memref<1x4x256xi64>) -> ()\n"
+                    "    return",
+                ),
+                encoding="utf-8",
+            )
+            candidates.append(("different-class", different, collapse_metadata))
+
+            for name, candidate, metadata in candidates:
+                with self.subTest(name=name):
+                    self._assert_pinned_parse(candidate)
+                    completed = self._run_checker(candidate, metadata)
+                    self.assertNotEqual(
+                        completed.returncode,
+                        0,
+                        f"escaped generic registered operation accepted:\n"
+                        f"{completed.stdout}{completed.stderr}",
+                    )
+
+    def test_independent_scanner_rejects_malformed_or_ambiguous_escapes(self) -> None:
+        malformed = (
+            r'"memref.\qopy"() : () -> ()',
+            r'"memref.\6opy"() : () -> ()',
+            r'"memref.\6"() : () -> ()',
+            '"memref.\\',
+        )
+        for spelling in malformed:
+            with self.subTest(spelling=spelling):
+                with self.assertRaisesRegex(ValueError, "escape|string"):
+                    self.verifier._independent_operations(spelling)
 
     def test_rejects_extra_generic_same_and_different_registered_operations(self) -> None:
         copy_module, copy_metadata = self._canonical_paths("memref.copy")

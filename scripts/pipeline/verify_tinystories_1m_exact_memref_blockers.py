@@ -361,6 +361,41 @@ def _masked(line: str) -> str:
     return "".join(result)
 
 
+def _decode_mlir_string(raw: str) -> str:
+    """Decode exactly the escape forms accepted by the pinned MLIR lexer."""
+    result: list[str] = []
+    index = 0
+    while index < len(raw):
+        character = raw[index]
+        if character != "\\":
+            result.append(character)
+            index += 1
+            continue
+        index += 1
+        if index >= len(raw):
+            raise ValueError("incomplete MLIR string escape")
+        escaped = raw[index]
+        if escaped in ('"', "\\"):
+            result.append(escaped)
+            index += 1
+        elif escaped == "n":
+            result.append("\n")
+            index += 1
+        elif escaped == "t":
+            result.append("\t")
+            index += 1
+        elif (
+            index + 1 < len(raw)
+            and escaped in "0123456789abcdefABCDEF"
+            and raw[index + 1] in "0123456789abcdefABCDEF"
+        ):
+            result.append(chr(int(raw[index : index + 2], 16)))
+            index += 2
+        else:
+            raise ValueError("unknown or ambiguous MLIR string escape")
+    return "".join(result)
+
+
 def _reject_registered_generic_forms(text: str) -> None:
     """Fail closed instead of silently masking generic registered operations."""
     index = 0
@@ -386,7 +421,7 @@ def _reject_registered_generic_forms(text: str) -> None:
             end += 1
         if end == len(text):
             raise ValueError("unterminated MLIR string literal")
-        name = text[index + 1 : end]
+        name = _decode_mlir_string(text[index + 1 : end])
         following = end + 1
         while following < len(text) and text[following].isspace():
             following += 1
