@@ -3,8 +3,9 @@
 ## Base and implementation head
 
 - Base: `2dff7ec5ecfd820bf5d6f588e49a93c233a59177`
-- Implementation head: `37347ddf4a60ee58ebcc3837ebb190b0f835c38f`
-- Implementation commit: `37347dd` (`test: evaluate existing exact memref legalization`)
+- Initial implementation: `37347ddf4a60ee58ebcc3837ebb190b0f835c38f`
+- Initial report: `f3bc741ebb08062ed06db07de37c7b42575607fa`
+- Review-fix implementation head: `6f7a8b3` (`fix: authenticate exact memref pass evidence`)
 
 ## RED
 
@@ -28,6 +29,14 @@ Two later defects also received focused behavioral REDs before their fixes:
   verifier; the focused adversarial test failed before independent complete
   and representative census recomputation was added.
 
+Review fix round 1 began with a second conclusive RED. Full-rehashed attacks
+showed that the old verifier accepted `/bin/true` as its Task 2 launcher,
+rebound model/Task-1-through-3/provenance data, three parse-check fields, all
+five reproducer execution fields, and semantic-evidence mutation because no
+live probes existed. A representative-byte rebound also reached the wrong
+trust boundary. The corresponding adversarial tests failed before production
+changes and are retained in the 19-test suite.
+
 ## Exact identities and provenance
 
 - Task 2 contract: 4,277,281 bytes,
@@ -43,10 +52,13 @@ Two later defects also received focused behavioral REDs before their fixes:
 - Exact pipeline:
   `builtin.module(llm2fpga-lower-static-memref-views-for-calyx,canonicalize,cse)`.
 
-The evaluator re-authenticated the Task 2 contract and retained c22 store
-payload before execution. It records the protected current alias as unrealized
-and does not claim the retained c22 deriver is the current alias. Every input
-binding was identical before and after its pass invocation.
+The evaluator and verifier now use the current trusted interpreter to run the
+exact Task 2 verifier. The verifier independently compares the complete model,
+Task-1-through-3 identities, c22/current derivations and outputs, unrealized
+current-alias provenance, and every representative binding against the
+authenticated contract. It never delegates trust to the interpreter recorded
+inside the mutable evaluation payload. Every input binding was identical
+before and after its pass invocation.
 
 ## Representative results
 
@@ -54,13 +66,31 @@ All representatives ran, parsed, and were recorded before the complete input.
 
 | Class | Classification | After class count | Pass time (ns) | Output SHA-256 |
 | --- | --- | ---: | ---: | --- |
-| `memref.collapse_shape` | `eliminated` | 0 | 35,860,536 | `3e20c196c823cf15079740ae1385519fd075bd5b66ec5151dbb6419157609c66` |
-| `memref.copy` | `preserved` | 1 | 35,958,012 | `bc331bbe83d22a803d9ea92683738141aac5ed14bf20e87c5f188731d20f125c` |
-| `memref.expand_shape` | `eliminated` | 0 | 37,980,497 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
-| `memref.reinterpret_cast` | `eliminated` | 0 | 38,637,976 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
+| `memref.collapse_shape` | `eliminated` | 0 | 37,707,614 | `3e20c196c823cf15079740ae1385519fd075bd5b66ec5151dbb6419157609c66` |
+| `memref.copy` | `preserved` | 1 | 35,929,499 | `bc331bbe83d22a803d9ea92683738141aac5ed14bf20e87c5f188731d20f125c` |
+| `memref.expand_shape` | `eliminated` | 0 | 35,403,010 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
+| `memref.reinterpret_cast` | `eliminated` | 0 | 43,119,063 | `a739daf1be198edb9ad0c024715672b8ccc417c0fc698a1af94f627015483726` |
 
 Each run retains exact stdout, stderr, output, parse-check streams, command,
-exit, elapsed nanoseconds, and byte identities.
+exit, elapsed nanoseconds, and byte identities. The verifier independently
+reconstructs the parse command and compares fresh exit/stdout/stderr exactly.
+
+## Semantically live representative probes
+
+Four additional executions, still before the complete artifact, use the exact
+authenticated selected operation with live `memref.load` and `memref.store`
+uses. Both evaluator and verifier independently derive shape, strides, offset,
+element count, and linear memory-access maps from the before/after IR.
+
+| Class | Before shape/layout | After shape/layout | Linear load/store | Status |
+| --- | --- | --- | ---: | --- |
+| `memref.collapse_shape` | `4x256`, `[256,1]`, offset 0 | `1024`, `[1]`, offset 0 | 515 / 515 | `proven` |
+| `memref.copy` | `1`, `[1]`, offset 0 | `1`, `[1]`, offset 0 | 0 / 0 | `proven` |
+| `memref.expand_shape` | `1x1`, `[1,1]`, offset 0 | `1`, `[1]`, offset 0 | 0 / 0 | `proven` |
+| `memref.reinterpret_cast` | `1`, `[1]`, offset 0 | `1`, `[1]`, offset 0 | 0 / 0 | `proven` |
+
+The collapse probe preserves 1,024 elements; the other probes preserve one.
+Semantic-evidence mutations are rejected by independent recomputation.
 
 ## Complete retained c22 result
 
@@ -74,7 +104,7 @@ Exact before census:
 | `memref.reinterpret_cast` | 11,449 | 408 |
 | Total | 20,280 | 895 |
 
-The full invocation ran for 807,319,243 ns and exited 1. It produced exact
+The full invocation ran for 883,471,108 ns and exited 1. It produced exact
 empty output (SHA-256
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`)
 and 791 exact stderr bytes (SHA-256
@@ -82,6 +112,8 @@ and 791 exact stderr bytes (SHA-256
 Therefore there is no parseable post-pass artifact and the four after counts
 are recorded as unavailable, not falsely reported as zero. All 895 registered
 input signatures are fail-closed as `new_invalid` for this invalid full run.
+The full invariant status is `unavailable_due_invalid_output`; it is not a
+parseability-derived preservation claim and independently blocks registration.
 
 The earliest diagnostic-emitting canonical signature is the source operation
 at retained c22 line 2,389:
@@ -94,7 +126,11 @@ at retained c22 line 2,389:
 The existing pass flattens `%arg2` from `memref<64x64xi64>` to
 `memref<4096xi64>` while leaving the rank-2 subview offsets/sizes/strides
 unchanged. The 200-byte one-operation exact reproducer independently exits 1
-with the same diagnostic; its measured pass time was 39,331,862 ns.
+with the same diagnostic; its measured pass time was 40,879,716 ns. Its exact
+command, exit 1, stdout, stderr, absent-output observation, and retained empty
+output bytes are independently reconstructed and replayed. Elapsed time is a
+positive authenticated observation only and is deliberately excluded from
+replay equality and semantic decisions.
 
 ## Decision
 
@@ -110,9 +146,9 @@ regression; float-math work remains out of scope.
 ## Canonical evidence
 
 - Evaluation self-hash:
-  `2c9eaad849c34680a59d676c468191cf2991ef3f98c666a7337e32f1d7830c39`.
-- Evaluation file: 212,139 bytes,
-  `2e608d8bd5883fcb16fc84c86f1cd8996644e571bbe3563465a5025359b71739`.
+  `40ad845f860a8588f0ab6b9d63c8f201ee8679c530e1bbbb867475c31d010c87`.
+- Evaluation file: 224,458 bytes,
+  `08d683bcaf47e313f0f66355c62808f50f9f9525aca82f677830ffcffa16b54f`.
 - Exact representative/full streams:
   `artifacts/comparison/tinystories-1m-exact-memref-pass-evidence/`.
 - Exact minimal residual:
@@ -125,11 +161,12 @@ regression; float-math work remains out of scope.
   — `PASS`, with `compiler_pass_extension` and unavailable post-pass counts.
 - Required suite:
   `nix develop -c python -m unittest tests/test_tinystories_1m_exact_memref_pass.py -v`
-  — `Ran 12 tests in 22.205s`, `OK`.
+  — `Ran 19 tests in 136.368s`, `OK`.
 - Python compilation for evaluator, verifier, and tests — PASS.
+- `nix flake check --no-build` — PASS (`all checks passed`).
 - Staged `git diff --check` — PASS after marking raw byte evidence non-diffable;
   no evidence bytes were normalized.
-- Repository pre-commit hygiene hook accepted `37347dd`.
+- Repository pre-commit hygiene hook accepted `6f7a8b3`.
 
 ## Files
 
