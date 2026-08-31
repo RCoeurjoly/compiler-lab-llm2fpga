@@ -1294,6 +1294,48 @@ def _is_expected_simple_command(command: str, start: int, end: int) -> bool:
     return quote is None
 
 
+def _has_expected_positional_input(
+    words: list[tuple[int, int, str, bool]],
+    executable_index: int,
+    input_index: int,
+) -> bool:
+    """Independently recognize registered command shapes and their input slot."""
+
+    executable_name = words[executable_index][2].split("/")[-1]
+    arguments = words[executable_index + 1 :]
+    input_offset = input_index - executable_index - 1
+
+    if executable_name in {"circt-opt", "mlir-opt", "torch-mlir-opt"}:
+        if input_offset != 0:
+            return False
+        if len(arguments) == 1:
+            return True
+        if len(arguments) != 3:
+            return False
+        option = arguments[1]
+        return option[2] in {"-o", "--output"} and option[3] is False
+
+    registered_wrappers = (
+        ("torch_to_linalg.sh", "torch-mlir-opt"),
+        ("linalg_to_scf_no_handshake.sh", "mlir-opt"),
+        ("scf_to_flat_scf_no_handshake.sh", "mlir-opt"),
+    )
+    if executable_name != "bash" or input_offset != 2 or len(arguments) != 4:
+        return False
+    wrapper_name = arguments[0][2].split("/")[-1]
+    tool_name = arguments[1][2].split("/")[-1]
+    for registered_name, registered_tool in registered_wrappers:
+        if wrapper_name == registered_name or wrapper_name.endswith(
+            "-" + registered_name
+        ):
+            return (
+                arguments[0][3] is False
+                and arguments[1][3] is False
+                and tool_name == registered_tool
+            )
+    return False
+
+
 def _derive_expected_compiler_command(
     build_command: str, upstream_input: str
 ) -> tuple[str, str]:
@@ -1347,17 +1389,18 @@ def _derive_expected_compiler_command(
         "until",
         "while",
     }
-    output_options = {"-o", "--output"}
     if (
         not _is_expected_simple_command(build_command, unit_start, unit_end)
         or executable_index is None
         or match_index <= executable_index
         or words[executable_index][3]
         or words[executable_index][2] in shell_keywords
-        or (match_index > 0 and words[match_index - 1][2] in output_options)
+        or not _has_expected_positional_input(
+            words, executable_index, match_index
+        )
     ):
         raise VerificationError(
-            "bound upstream input is not a direct argument to a simple compiler command"
+            "bound upstream input is not in a supported positional input slot of a simple compiler command"
         )
     while unit_start < unit_end and build_command[unit_start].isspace():
         unit_start += 1

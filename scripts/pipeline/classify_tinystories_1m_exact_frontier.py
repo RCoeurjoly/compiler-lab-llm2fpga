@@ -384,6 +384,53 @@ def _is_supported_simple_command(command: str, start: int, end: int) -> bool:
     return quote is None
 
 
+def _has_supported_positional_input(
+    words: list[tuple[int, int, str, bool]],
+    executable_index: int,
+    input_index: int,
+) -> bool:
+    """Recognize only registered compiler shapes with a proven input slot."""
+
+    executable = words[executable_index]
+    executable_name = executable[2].rsplit("/", 1)[-1]
+    arguments = words[executable_index + 1 :]
+    input_offset = input_index - executable_index - 1
+
+    direct_compilers = {"circt-opt", "mlir-opt", "torch-mlir-opt"}
+    if executable_name in direct_compilers and input_offset == 0:
+        if len(arguments) == 1:
+            return True
+        return (
+            len(arguments) == 3
+            and arguments[1][2] in {"-o", "--output"}
+            and not arguments[1][3]
+        )
+
+    wrapper_tools = {
+        "linalg_to_scf_no_handshake.sh": "mlir-opt",
+        "scf_to_flat_scf_no_handshake.sh": "mlir-opt",
+        "torch_to_linalg.sh": "torch-mlir-opt",
+    }
+    if executable_name != "bash" or input_offset != 2 or len(arguments) != 4:
+        return False
+    wrapper_name = arguments[0][2].rsplit("/", 1)[-1]
+    wrapper = next(
+        (
+            name
+            for name in wrapper_tools
+            if wrapper_name == name or wrapper_name.endswith(f"-{name}")
+        ),
+        None,
+    )
+    tool_name = arguments[1][2].rsplit("/", 1)[-1]
+    return (
+        wrapper is not None
+        and not arguments[0][3]
+        and not arguments[1][3]
+        and tool_name == wrapper_tools[wrapper]
+    )
+
+
 def _bind_compiler_command(build_command: str, upstream_input: str) -> tuple[str, str]:
     """Bind the unique simple command whose literal shell word is the upstream input."""
 
@@ -435,17 +482,18 @@ def _bind_compiler_command(build_command: str, upstream_input: str) -> tuple[str
         "until",
         "while",
     }
-    output_options = {"-o", "--output"}
     if (
         not _is_supported_simple_command(build_command, unit_start, unit_end)
         or executable_index is None
         or match_index <= executable_index
         or words[executable_index][3]
         or words[executable_index][2] in shell_keywords
-        or (match_index > 0 and words[match_index - 1][2] in output_options)
+        or not _has_supported_positional_input(
+            words, executable_index, match_index
+        )
     ):
         raise ValueError(
-            "bound upstream input is not a direct argument to a simple compiler command"
+            "bound upstream input is not in a supported positional input slot of a simple compiler command"
         )
     while unit_start < unit_end and build_command[unit_start].isspace():
         unit_start += 1

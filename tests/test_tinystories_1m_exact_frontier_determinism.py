@@ -1437,12 +1437,15 @@ class V5CompilerPredicateCommandBindingTest(unittest.TestCase):
     DIAGNOSTIC = "error: failed to legalize operation 'scf.for' : (index) -> ()"
 
     def _fixture(
-        self, root: Path, *, compiler_exit: int = 7
+        self,
+        root: Path,
+        *,
+        compiler_exit: int = 7,
     ) -> tuple[Path, Path, Path, str]:
         tools = root / "fixture tools;quoted"
         tools.mkdir()
         received = root / "received compiler argument.txt"
-        compiler = tools / "mlir-opt's wrapper"
+        compiler = tools / "mlir-opt"
         compiler.write_text(
             "#!/bin/sh\n"
             f"printf '%s\\n' \"$1\" > {shlex.quote(str(received))}\n"
@@ -1545,6 +1548,40 @@ class V5CompilerPredicateCommandBindingTest(unittest.TestCase):
             self.assertEqual(received.read_text(encoding="utf-8").strip(), str(candidate))
             self.assertFalse(marker.exists(), "later validation command must not run")
 
+    def test_registered_pipeline_wrapper_positional_input_remains_supported(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-predicate-wrapper-") as temporary:
+            root = Path(temporary)
+            upstream, candidate, received, direct_command = self._fixture(root)
+            compiler = shlex.split(direct_command)[0]
+            wrapper = root / "linalg_to_scf_no_handshake.sh"
+            wrapper.write_text(
+                "#!/bin/sh\n"
+                '"$1" "$2" -o "$3"\n',
+                encoding="utf-8",
+            )
+            wrapper.chmod(0o755)
+            output = root / "output path.mlir"
+            build_command = " ".join(
+                shlex.quote(value)
+                for value in (
+                    "/bin/bash",
+                    str(wrapper),
+                    compiler,
+                    str(upstream),
+                    str(output),
+                )
+            )
+            predicate = root / "interestingness-test.sh"
+            predicate.write_bytes(self._render(build_command, upstream))
+            predicate.chmod(0o755)
+
+            replay = subprocess.run(
+                [str(predicate), str(candidate)], text=True, capture_output=True
+            )
+
+            self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
+            self.assertEqual(received.read_text(encoding="utf-8").strip(), str(candidate))
+
     def test_rejects_upstream_literal_as_redirection_operand_before_replay(self) -> None:
         with tempfile.TemporaryDirectory(prefix="exact-predicate-redirection-") as temporary:
             root = Path(temporary)
@@ -1556,6 +1593,29 @@ class V5CompilerPredicateCommandBindingTest(unittest.TestCase):
                 "shell input redirection": f"{compiler} < {source}",
                 "short output option": f"{compiler} -o {source}",
                 "long output option": f"{compiler} --output {source}",
+                "alternate output-file option": f"{compiler} --output-file {source}",
+                "alternate output-path option": f"{compiler} --output-path {source}",
+                "unknown option value": f"{compiler} --mystery-role {source}",
+            }
+            for name, build_command in cases.items():
+                with self.subTest(name=name):
+                    self._assert_render_rejected(build_command, upstream)
+
+    def test_rejects_unregistered_positional_or_option_command_shapes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="exact-predicate-role-shape-") as temporary:
+            root = Path(temporary)
+            upstream, _, _, direct_command = self._fixture(root)
+            compiler = shlex.quote(shlex.split(direct_command)[0])
+            source = shlex.quote(str(upstream))
+            other = shlex.quote(str(root / "other positional.mlir"))
+            cases = {
+                "candidate after another positional": f"{compiler} {other} {source}",
+                "extra positional after candidate": f"{compiler} {source} {other}",
+                "unknown flag after candidate": f"{compiler} {source} --mystery-mode",
+                "unknown input-looking option": f"{compiler} --input {source}",
+                "candidate after output pair": f"{compiler} -o {other} {source}",
+                "candidate as shell script": f"/bin/bash {source}",
+                "candidate as interpreter script": f"/usr/bin/python3 {source}",
             }
             for name, build_command in cases.items():
                 with self.subTest(name=name):
@@ -1603,7 +1663,7 @@ class V5CompilerPredicateCommandBindingTest(unittest.TestCase):
                     result=failure,
                     execution={
                         "derivation_build_command": (
-                            f"{compiler} > {shlex.quote(str(upstream))}"
+                            f"{compiler} --mystery-role {shlex.quote(str(upstream))}"
                         ),
                         "exit_code": 1,
                     },
@@ -1943,7 +2003,7 @@ class V5CompilerFailurePublicIntegrationTest(unittest.TestCase):
             "derivation_build_command"
         ]
         compiler = shlex.quote(shlex.split(original_command)[0])
-        unsupported_command = f"{compiler} > {shlex.quote(upstream)}"
+        unsupported_command = f"{compiler} --output-file {shlex.quote(upstream)}"
         command_hash = hashlib.sha256(unsupported_command.encode()).hexdigest()
         unavailable_log = (
             b"compiler predicate unavailable: unsupported compiler command\n"
