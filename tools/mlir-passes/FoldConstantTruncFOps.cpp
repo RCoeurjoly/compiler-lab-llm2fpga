@@ -960,8 +960,8 @@ struct LowerExactMathForCalyxPass
     return "llm2fpga-lower-exact-math-for-calyx";
   }
   StringRef getDescription() const final {
-    return "Lower scalar f32 floor, ceil, and rsqrt to arithmetic supported by "
-           "SCF-to-Calyx.";
+    return "Lower fused scalar f64 floor-to-i64 and scalar f32 floor, ceil, "
+           "and rsqrt to arithmetic supported by SCF-to-Calyx.";
   }
 
   void getDependentDialects(DialectRegistry &registry) const final {
@@ -969,13 +969,51 @@ struct LowerExactMathForCalyxPass
   }
 
   void runOnOperation() final {
+    SmallVector<math::FloorOp> f64FloorToI64;
+    getOperation().walk([&](math::FloorOp op) {
+      auto floatType = dyn_cast<FloatType>(op.getType());
+      if (!floatType || !floatType.isF64() || !op.getResult().hasOneUse())
+        return;
+
+      auto consumer = dyn_cast<arith::FPToSIOp>(*op.getResult().getUsers().begin());
+      auto intType = consumer ? dyn_cast<IntegerType>(consumer.getType())
+                              : IntegerType();
+      if (consumer && intType && intType.isInteger(64))
+        f64FloorToI64.push_back(op);
+    });
+
+    IRRewriter rewriter(getOperation().getContext());
+    for (math::FloorOp floor : f64FloorToI64) {
+      auto consumer = cast<arith::FPToSIOp>(*floor.getResult().getUsers().begin());
+      auto floatType = cast<FloatType>(floor.getType());
+      auto intType = cast<IntegerType>(consumer.getType());
+      Location loc = consumer.getLoc();
+      Value input = floor.getOperand();
+
+      rewriter.setInsertionPoint(consumer);
+      Value zero = arith::ConstantOp::create(
+          rewriter, loc, intType, rewriter.getIntegerAttr(intType, 0));
+      Value negativeOne = arith::ConstantOp::create(
+          rewriter, loc, intType, rewriter.getIntegerAttr(intType, -1));
+      Value truncI = arith::FPToSIOp::create(rewriter, loc, intType, input);
+      Value truncF =
+          arith::SIToFPOp::create(rewriter, loc, floatType, truncI);
+      Value below = arith::CmpFOp::create(
+          rewriter, loc, arith::CmpFPredicate::OLT, input, truncF);
+      Value adjustment =
+          arith::SelectOp::create(rewriter, loc, below, negativeOne, zero);
+      Value roundedI = arith::AddIOp::create(rewriter, loc, truncI, adjustment);
+
+      rewriter.replaceOp(consumer, roundedI);
+      rewriter.eraseOp(floor);
+    }
+
     SmallVector<Operation *> ops;
     getOperation().walk([&](Operation *op) {
       if (isa<math::FloorOp, math::CeilOp, math::RsqrtOp>(op))
         ops.push_back(op);
     });
 
-    IRRewriter rewriter(getOperation().getContext());
     for (Operation *op : ops) {
       auto floatType = dyn_cast<FloatType>(op->getResult(0).getType());
       if (!floatType || !floatType.isF32())
