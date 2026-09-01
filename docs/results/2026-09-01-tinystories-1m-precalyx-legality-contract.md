@@ -54,8 +54,11 @@ without SSA result assignments and quoted generic operation names, including
 multiple and nested operations on one line and legal trivia in result groups
 such as `%r: 1 =`. It decodes MLIR two-digit hex escapes before
 classification, skips whitespace and `//` comment trivia, and tracks explicit
-attribute dictionaries so attribute keys and strings do not enter the census.
-It retains exact counts for `arith.uitofp`, `memref.collapse_shape`,
+attribute dictionaries and location parentheses so attribute keys, attribute
+strings, quoted symbol names, and `loc(...)` strings do not enter the census.
+These data contexts are excluded without suppressing neighboring result-bearing
+or region-nested generic operations. It retains exact counts for
+`arith.uitofp`, `memref.collapse_shape`,
 `memref.copy`, `memref.expand_shape`, and `memref.reinterpret_cast` while also
 prohibiting `arith.negf`, `math.floor`, and `math.absi`.
 
@@ -72,7 +75,8 @@ The focused suite covers result-bearing custom spellings, generic spellings,
 SSA result lists and result-group trivia, escaped names, comments between a
 generic name and operands, multiple and nested same-line operations, multiline
 attribute keys, malformed zero-result operations, unknown quoted and custom
-operations, comment/string false positives, deterministic bytes, exact first
+operations, comment/attribute/symbol/location string false positives,
+neighboring true generic operations, deterministic bytes, exact first
 locations, the schema-v2 key set, and independent self-hash reconstruction.
 Existing callers use the checker's exit status rather than parsing schema-v1
 fields, so no coupled caller change is required for this task.

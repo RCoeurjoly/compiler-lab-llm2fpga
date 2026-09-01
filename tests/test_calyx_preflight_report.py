@@ -256,6 +256,43 @@ class CalyxPreflightReportTest(unittest.TestCase):
         self.assertEqual(report["scanner_diagnostics"], [])
         self.assert_valid_self_hash(report)
 
+    def test_quoted_symbol_does_not_hide_neighboring_generic_operation(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            'module { func.func @"math.floor"(%arg0: f32) -> f32 { '
+            '%0 = "math.floor"(%arg0) : (f32) -> f32 return %0 : f32 } }\n',
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 1, "column": 60}},
+        )
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
+    def test_location_string_does_not_hide_neighboring_generic_operation(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            "module { func.func @main(%arg0: f32) -> f32 { "
+            '%0 = "math.floor"(%arg0) : (f32) -> f32 '
+            'return %0 : f32 } } loc("math.floor")\n',
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 1, "column": 52}},
+        )
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
     def test_counts_multiple_and_nested_operations_on_one_line(self) -> None:
         mlir = (
             "module { func.func @main(%arg0: i32, %arg1: f32) -> f32 { "

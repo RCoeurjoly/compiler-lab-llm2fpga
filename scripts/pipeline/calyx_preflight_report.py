@@ -277,6 +277,24 @@ def _attribute_context(tokens: list[Token]) -> list[bool]:
     return contexts
 
 
+def _location_context(tokens: list[Token]) -> list[bool]:
+    contexts: list[bool] = []
+    parentheses: list[bool] = []
+    for index, token in enumerate(tokens):
+        contexts.append(any(parentheses))
+        if token.value == "(":
+            previous = tokens[index - 1] if index else None
+            is_location = bool(
+                previous is not None
+                and previous.kind == "identifier"
+                and previous.value == "loc"
+            )
+            parentheses.append(is_location or any(parentheses))
+        elif token.value == ")" and parentheses:
+            parentheses.pop()
+    return contexts
+
+
 def _record_operation(
     operation: str,
     line: int,
@@ -300,6 +318,7 @@ def _scan_operations(
     source_map = SourceMap(text)
     tokens, diagnostics = _tokenize(text, source_map)
     attribute_contexts = _attribute_context(tokens)
+    location_contexts = _location_context(tokens)
     counts: dict[str, int] = {}
     first_locations: dict[str, dict[str, int]] = {}
 
@@ -315,6 +334,10 @@ def _scan_operations(
         )
 
         if token.kind == "string":
+            if location_contexts[index]:
+                continue
+            if previous is not None and previous.value == "@":
+                continue
             if OPERATION_NAME.fullmatch(token.value) is None:
                 if (
                     previous is not None
