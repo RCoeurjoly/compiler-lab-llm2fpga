@@ -785,20 +785,13 @@ def _scan_operations(
                 continue
             if previous is not None and previous.value == "@":
                 continue
+            if previous_is_attribute_equals:
+                continue
             if OPERATION_NAME.fullmatch(token.value) is None:
-                if (
-                    not previous_is_attribute_equals
-                    and (
-                        (
-                            following is not None
-                            and following.value == "("
-                        )
-                        or (
-                            previous is not None
-                            and previous.value == "="
-                        )
-                    )
-                ):
+                # A parser-accepted string that cannot spell an operation is
+                # necessarily data. Rejected or unvalidated text stays
+                # conservative and diagnoses every remaining string here.
+                if not parser_validated:
                     line, column = source_map.location(token.offset)
                     diagnostics.append(
                         _diagnostic(
@@ -810,8 +803,6 @@ def _scan_operations(
                     )
                 continue
             if following is not None and following.value == "=":
-                continue
-            if previous_is_attribute_equals:
                 continue
 
             line, column = source_map.location(token.offset)

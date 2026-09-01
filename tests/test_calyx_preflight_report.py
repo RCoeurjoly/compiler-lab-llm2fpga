@@ -186,6 +186,34 @@ TOP_LEVEL_ARRAY_ALIAS_WITH_INVALID_OPERATION_NAME = (
     "loc(fused<#metadata>[unknown])\n"
 )
 
+TOP_LEVEL_INVALID_NAME_ALIAS_WITH_COMPACT_NEIGHBORS = (
+    'module { func.func @before(%x: f32) -> f32 { %0 = "math.floor"(%x) '
+    ": (f32) -> f32 return %0 : f32 } } "
+    '#metadata = ["bad name"] '
+    'module { func.func @after(%x: f32) -> f32 { %0 = "math.floor"(%x) '
+    ": (f32) -> f32 return %0 : f32 } }\n"
+)
+
+INVALID_NAME_BOUNDED_DATA_CONTEXTS = (
+    '#metadata = "bad name"\n'
+    '#source = loc(callsite("bad name"(unknown) at '
+    'fused["caller bad", unknown]))\n'
+    'module attributes {math.note = "bad name", sym_name = "bad name"} { '
+    'func.func @"bad name"() { "func.return"() '
+    '{math.note = "bad name", sym_name = "bad name"} : () -> () } '
+    '} loc(#source)\n'
+)
+
+INVALID_NAME_DIALECT_TYPE = (
+    'module { func.func @main(%arg0: !llvm.struct<"bad name", (i32)>) '
+    "{ return } }\n"
+)
+
+INVALID_NAME_COMPLEX_LOCATION_METADATA = (
+    "module { func.func @main() { return } } "
+    'loc(fused<"bad name">[unknown])\n'
+)
+
 TOP_LEVEL_ALIAS_WITH_COMPACT_NEIGHBORS = (
     'module { func.func @before(%x: f32) -> f32 { %0 = "math.floor"(%x) '
     ": (f32) -> f32 return %0 : f32 } } "
@@ -516,6 +544,60 @@ class CalyxPreflightReportTest(unittest.TestCase):
         self.assertEqual(report["scanner_diagnostics"], [])
         self.assert_valid_self_hash(report)
 
+    def test_unvalidated_invalid_name_alias_stays_visible_between_true_operations(self) -> None:
+        mlir = TOP_LEVEL_INVALID_NAME_ALIAS_WITH_COMPACT_NEIGHBORS
+        rc, report, stderr, _ = self.run_report(mlir, require_clean=True)
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 2})
+        self.assertEqual(
+            report["first_locations"],
+            {
+                "math.floor": {
+                    "line": 1,
+                    "column": mlir.index('"math.floor"') + 1,
+                }
+            },
+        )
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "malformed_quoted_operation",
+                    "line": 1,
+                    "column": mlir.index('"bad name"') + 1,
+                    "message": "malformed quoted operation: invalid operation name",
+                }
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_validated_invalid_name_alias_is_data_between_true_operations(self) -> None:
+        mlir = TOP_LEVEL_INVALID_NAME_ALIAS_WITH_COMPACT_NEIGHBORS
+        rc, report, stderr, _ = self.run_cli_report(
+            mlir,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 2})
+        self.assertEqual(
+            report["first_locations"],
+            {
+                "math.floor": {
+                    "line": 1,
+                    "column": mlir.index('"math.floor"') + 1,
+                }
+            },
+        )
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
     def test_validated_alias_rhs_does_not_hide_compact_neighbor_operations(self) -> None:
         rc, report, stderr, _ = self.run_cli_report(
             TOP_LEVEL_ALIAS_WITH_COMPACT_NEIGHBORS,
@@ -639,6 +721,7 @@ class CalyxPreflightReportTest(unittest.TestCase):
             [
                 "mlir_parser_rejected",
                 "malformed_location",
+                "malformed_quoted_operation",
                 "unknown_operation",
             ],
         )
@@ -747,6 +830,12 @@ class CalyxPreflightReportTest(unittest.TestCase):
                     "message": "malformed location expression",
                 },
                 {
+                    "kind": "malformed_quoted_operation",
+                    "line": 1,
+                    "column": 11,
+                    "message": "malformed quoted operation: invalid operation name",
+                },
+                {
                     "kind": "malformed_location",
                     "line": 2,
                     "column": 1,
@@ -757,6 +846,12 @@ class CalyxPreflightReportTest(unittest.TestCase):
                     "line": 3,
                     "column": 1,
                     "message": "malformed location expression",
+                },
+                {
+                    "kind": "malformed_quoted_operation",
+                    "line": 3,
+                    "column": 11,
+                    "message": "malformed quoted operation: invalid operation name",
                 },
                 {
                     "kind": "unknown_operation",
@@ -981,6 +1076,52 @@ class CalyxPreflightReportTest(unittest.TestCase):
         )
         self.assert_valid_self_hash(report)
 
+    def test_standalone_malformed_quoted_operation_name_fails_closed(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            '"bad name"\n', require_clean=True
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "malformed_quoted_operation",
+                    "line": 1,
+                    "column": 1,
+                    "message": "malformed quoted operation: invalid operation name",
+                }
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_malformed_name_with_bad_post_name_trivia_fails_closed(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            '"bad name" / not-a-comment\n', require_clean=True
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "malformed_quoted_operation",
+                    "line": 1,
+                    "column": 1,
+                    "message": "malformed quoted operation: invalid operation name",
+                }
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
     def test_malformed_quoted_operation_escape_fails_closed(self) -> None:
         rc, report, stderr, _ = self.run_report(
             "%0 = \"math.\\6loor\"(%arg0) : (f64) -> f64\n", require_clean=True
@@ -1093,13 +1234,20 @@ class CalyxPreflightReportTest(unittest.TestCase):
         self.assert_valid_self_hash(report)
 
     def test_invalid_operation_name_strings_in_valid_data_contexts_are_not_operations(self) -> None:
-        rc, report, stderr, _ = self.run_report(
-            'module attributes {note = "bad name"} { '
-            'func.func @"bad name"() { "func.return"() : () -> () } '
-            '} loc("bad name")\n',
+        mlir = INVALID_NAME_BOUNDED_DATA_CONTEXTS
+        cli_rc, cli_report, cli_stderr, _ = self.run_cli_report(
+            mlir,
+            mlir_opt=self.pinned_mlir_opt(),
             require_clean=True,
         )
+        rc, report, stderr, _ = self.run_report(mlir, require_clean=True)
 
+        self.assertEqual(cli_rc, 0, cli_stderr)
+        self.assertIsNotNone(cli_report)
+        self.assertEqual(cli_report["status"], "ok")
+        self.assertEqual(cli_report["prohibited_ops"], {})
+        self.assertEqual(cli_report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(cli_report)
         self.assertEqual(rc, 0, stderr)
         self.assertIsNotNone(report)
         self.assertEqual(report["status"], "ok")
@@ -1107,6 +1255,56 @@ class CalyxPreflightReportTest(unittest.TestCase):
         self.assertEqual(report["first_locations"], {})
         self.assertEqual(report["scanner_diagnostics"], [])
         self.assert_valid_self_hash(report)
+
+    def test_unvalidated_dialect_type_and_complex_metadata_strings_stay_conservative(self) -> None:
+        cases = {
+            "dialect_type": (
+                INVALID_NAME_DIALECT_TYPE,
+                ["malformed_quoted_operation"],
+            ),
+            "complex_location_metadata": (
+                INVALID_NAME_COMPLEX_LOCATION_METADATA,
+                ["malformed_location", "malformed_quoted_operation"],
+            ),
+        }
+        for name, (mlir, expected_kinds) in cases.items():
+            with self.subTest(context=name):
+                rc, report, stderr, _ = self.run_report(
+                    mlir, require_clean=True
+                )
+
+                self.assertEqual(rc, 1, stderr)
+                self.assertIsNotNone(report)
+                self.assertEqual(report["status"], "blocked")
+                self.assertEqual(report["prohibited_ops"], {})
+                self.assertEqual(
+                    [
+                        diagnostic["kind"]
+                        for diagnostic in report["scanner_diagnostics"]
+                    ],
+                    expected_kinds,
+                )
+                self.assert_valid_self_hash(report)
+
+    def test_parser_validated_dialect_type_and_metadata_strings_are_data(self) -> None:
+        for name, mlir in {
+            "dialect_type": INVALID_NAME_DIALECT_TYPE,
+            "complex_location_metadata": INVALID_NAME_COMPLEX_LOCATION_METADATA,
+        }.items():
+            with self.subTest(context=name):
+                rc, report, stderr, _ = self.run_cli_report(
+                    mlir,
+                    mlir_opt=self.pinned_mlir_opt(),
+                    require_clean=True,
+                )
+
+                self.assertEqual(rc, 0, stderr)
+                self.assertIsNotNone(report)
+                self.assertEqual(report["status"], "ok")
+                self.assertEqual(report["prohibited_ops"], {})
+                self.assertEqual(report["first_locations"], {})
+                self.assertEqual(report["scanner_diagnostics"], [])
+                self.assert_valid_self_hash(report)
 
     def test_quoted_symbol_does_not_hide_neighboring_generic_operation(self) -> None:
         rc, report, stderr, _ = self.run_report(
@@ -1170,10 +1368,22 @@ class CalyxPreflightReportTest(unittest.TestCase):
                     "message": "malformed location expression",
                 },
                 {
+                    "kind": "malformed_quoted_operation",
+                    "line": 1,
+                    "column": 5,
+                    "message": "malformed quoted operation: invalid operation name",
+                },
+                {
                     "kind": "malformed_location",
                     "line": 2,
                     "column": 1,
                     "message": "malformed location expression",
+                },
+                {
+                    "kind": "malformed_quoted_operation",
+                    "line": 2,
+                    "column": 5,
+                    "message": "malformed quoted operation: invalid operation name",
                 },
                 {
                     "kind": "unknown_operation",
@@ -1213,6 +1423,12 @@ class CalyxPreflightReportTest(unittest.TestCase):
                     "message": "unclosed location expression",
                 },
                 {
+                    "kind": "malformed_quoted_operation",
+                    "line": 1,
+                    "column": 5,
+                    "message": "malformed quoted operation: invalid operation name",
+                },
+                {
                     "kind": "unknown_operation",
                     "line": 4,
                     "column": 3,
@@ -1242,6 +1458,18 @@ class CalyxPreflightReportTest(unittest.TestCase):
                     "line": 1,
                     "column": 1,
                     "message": "malformed location expression",
+                },
+                {
+                    "kind": "malformed_quoted_operation",
+                    "line": 1,
+                    "column": 14,
+                    "message": "malformed quoted operation: invalid operation name",
+                },
+                {
+                    "kind": "malformed_quoted_operation",
+                    "line": 1,
+                    "column": 24,
+                    "message": "malformed quoted operation: invalid operation name",
                 },
                 {
                     "kind": "unknown_operation",
