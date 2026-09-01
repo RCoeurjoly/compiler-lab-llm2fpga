@@ -104,6 +104,8 @@ HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
 OPERATION_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_$.-]*\.[A-Za-z0-9_$.-]+\Z")
 IDENTIFIER_CHARS = frozenset("_$.-")
 SIGILS = frozenset({"#", "!", "@", "^"})
+OPENING_DELIMITERS = {"(": ")", "[": "]", "{": "}", "<": ">"}
+CLOSING_DELIMITERS = frozenset(OPENING_DELIMITERS.values())
 
 
 @dataclass(frozen=True)
@@ -221,10 +223,34 @@ def _tokenize(
             continue
         if char.isdigit():
             start = cursor
-            cursor += 1
-            while cursor < len(text) and text[cursor].isdigit():
+            kind = "number"
+            if (
+                char == "0"
+                and cursor + 2 < len(text)
+                and text[cursor + 1] in {"x", "X"}
+                and text[cursor + 2] in HEX_DIGITS
+            ):
+                cursor += 3
+                while cursor < len(text) and text[cursor] in HEX_DIGITS:
+                    cursor += 1
+            else:
                 cursor += 1
-            tokens.append(Token("number", text[start:cursor], start))
+                while cursor < len(text) and text[cursor].isdigit():
+                    cursor += 1
+                if cursor < len(text) and text[cursor] == ".":
+                    kind = "float"
+                    cursor += 1
+                    while cursor < len(text) and text[cursor].isdigit():
+                        cursor += 1
+                    if cursor < len(text) and text[cursor] in {"e", "E"}:
+                        exponent = cursor + 1
+                        if exponent < len(text) and text[exponent] in {"+", "-"}:
+                            exponent += 1
+                        if exponent < len(text) and text[exponent].isdigit():
+                            cursor = exponent + 1
+                            while cursor < len(text) and text[cursor].isdigit():
+                                cursor += 1
+            tokens.append(Token(kind, text[start:cursor], start))
             continue
         tokens.append(Token("punctuation", char, cursor))
         cursor += 1
@@ -277,11 +303,178 @@ def _attribute_context(tokens: list[Token]) -> list[bool]:
     return contexts
 
 
+def _delimiter_pairs(tokens: list[Token]) -> dict[int, int]:
+    pairs: dict[int, int] = {}
+    stack: list[tuple[str, int]] = []
+    for index, token in enumerate(tokens):
+        closing = OPENING_DELIMITERS.get(token.value)
+        if closing is not None:
+            stack.append((closing, index))
+            continue
+        if token.value not in CLOSING_DELIMITERS:
+            continue
+        if token.value == ">" and index and tokens[index - 1].value == "-":
+            continue
+        if stack and stack[-1][0] == token.value:
+            _, opening = stack.pop()
+            pairs[opening] = index
+    return pairs
+
+
+def _parse_metadata_atom(
+    tokens: list[Token],
+    start: int,
+    end: int,
+    delimiter_pairs: dict[int, int],
+) -> int | None:
+    if start >= end:
+        return None
+
+    cursor = start
+    first = tokens[cursor]
+    if first.value in {"+", "-"}:
+        cursor += 1
+        if cursor >= end or tokens[cursor].kind not in {
+            "float",
+            "identifier",
+            "number",
+        }:
+            return None
+        cursor += 1
+    elif first.value in {"#", "!"}:
+        cursor += 1
+        if cursor >= end or tokens[cursor].kind not in {"identifier", "number"}:
+            return None
+        cursor += 1
+    elif first.value == "@":
+        cursor += 1
+        if cursor >= end or tokens[cursor].kind not in {"identifier", "string"}:
+            return None
+        cursor += 1
+        while (
+            cursor + 3 < end
+            and tokens[cursor].value == ":"
+            and tokens[cursor + 1].value == ":"
+            and tokens[cursor + 2].value == "@"
+            and tokens[cursor + 3].kind in {"identifier", "string"}
+        ):
+            cursor += 4
+    elif first.kind in {"float", "identifier", "number", "string"}:
+        cursor += 1
+    elif first.value in {"{", "["}:
+        closing = delimiter_pairs.get(cursor)
+        if closing is None or closing >= end:
+            return None
+        if not _metadata_container_is_valid(
+            tokens, cursor, closing, delimiter_pairs
+        ):
+            return None
+        cursor = closing + 1
+    else:
+        return None
+
+    while cursor < end and tokens[cursor].value in {"<", "("}:
+        closing = delimiter_pairs.get(cursor)
+        if closing is None or closing >= end:
+            return None
+        cursor = closing + 1
+    return cursor
+
+
+def _parse_metadata_value(
+    tokens: list[Token],
+    start: int,
+    end: int,
+    delimiter_pairs: dict[int, int],
+) -> int | None:
+    cursor = _parse_metadata_atom(tokens, start, end, delimiter_pairs)
+    if cursor is None or cursor == end or tokens[cursor].value != ":":
+        return cursor
+    return _parse_metadata_atom(tokens, cursor + 1, end, delimiter_pairs)
+
+
+def _metadata_container_is_valid(
+    tokens: list[Token],
+    opening: int,
+    closing: int,
+    delimiter_pairs: dict[int, int],
+) -> bool:
+    cursor = opening + 1
+    if cursor == closing:
+        return True
+
+    is_dictionary = tokens[opening].value == "{"
+    while cursor < closing:
+        if is_dictionary:
+            if tokens[cursor].kind not in {"identifier", "string"}:
+                return False
+            cursor += 1
+            if cursor < closing and tokens[cursor].value == "=":
+                cursor = _parse_metadata_value(
+                    tokens, cursor + 1, closing, delimiter_pairs
+                )
+                if cursor is None:
+                    return False
+        else:
+            cursor = _parse_metadata_value(
+                tokens, cursor, closing, delimiter_pairs
+            )
+            if cursor is None:
+                return False
+
+        if cursor == closing:
+            return True
+        if tokens[cursor].value != ",":
+            return False
+        cursor += 1
+        if cursor == closing:
+            return False
+    return False
+
+
+def _metadata_structure_is_valid(
+    tokens: list[Token],
+    start: int,
+    end: int,
+    delimiter_pairs: dict[int, int],
+) -> bool:
+    if start >= end or any(token.kind == "ssa" for token in tokens[start:end]):
+        return False
+
+    paired_closings = frozenset(delimiter_pairs.values())
+    for index in range(start, end):
+        token = tokens[index]
+        if token.value in OPENING_DELIMITERS:
+            closing = delimiter_pairs.get(index)
+            if closing is None or closing >= end:
+                return False
+        elif (
+            token.value in CLOSING_DELIMITERS
+            and not (
+                token.value == ">"
+                and index > start
+                and tokens[index - 1].value == "-"
+            )
+            and index not in paired_closings
+        ):
+            return False
+
+    return _parse_metadata_value(tokens, start, end, delimiter_pairs) == end
+
+
+def _unsigned_integer_is_valid(token: Token) -> bool:
+    if token.kind != "number":
+        return False
+    base = 16 if token.value.lower().startswith("0x") else 10
+    return int(token.value, base) <= (1 << 64) - 1
+
+
 def _parse_location_instance(
     tokens: list[Token],
     start: int,
     end: int,
-    parenthesis_pairs: dict[int, int],
+    delimiter_pairs: dict[int, int],
+    location_aliases: frozenset[tuple[str, str]],
 ) -> int | None:
     if start >= end:
         return None
@@ -289,20 +482,42 @@ def _parse_location_instance(
     first = tokens[start]
     if first.kind == "string":
         cursor = start + 1
-        if (
-            cursor + 3 < end
-            and tokens[cursor].value == ":"
-            and tokens[cursor + 1].kind == "number"
-            and tokens[cursor + 2].value == ":"
-            and tokens[cursor + 3].kind == "number"
-        ):
-            return cursor + 4
+        if cursor < end and tokens[cursor].value == ":":
+            cursor += 1
+            if cursor >= end or not _unsigned_integer_is_valid(tokens[cursor]):
+                return None
+            cursor += 1
+            if cursor >= end or tokens[cursor].value != ":":
+                return cursor
+            cursor += 1
+            if cursor >= end or not _unsigned_integer_is_valid(tokens[cursor]):
+                return None
+            cursor += 1
+            if (
+                cursor >= end
+                or tokens[cursor].kind != "identifier"
+                or tokens[cursor].value != "to"
+            ):
+                return cursor
+            cursor += 1
+            if cursor < end and _unsigned_integer_is_valid(tokens[cursor]):
+                cursor += 1
+            if cursor >= end or tokens[cursor].value != ":":
+                return None
+            cursor += 1
+            if cursor >= end or not _unsigned_integer_is_valid(tokens[cursor]):
+                return None
+            return cursor + 1
         if cursor < end and tokens[cursor].value == "(":
-            nested_closing = parenthesis_pairs.get(cursor)
+            nested_closing = delimiter_pairs.get(cursor)
             if nested_closing is None or nested_closing >= end:
                 return None
             nested_end = _parse_location_instance(
-                tokens, cursor + 1, nested_closing, parenthesis_pairs
+                tokens,
+                cursor + 1,
+                nested_closing,
+                delimiter_pairs,
+                location_aliases,
             )
             if nested_end != nested_closing:
                 return None
@@ -316,23 +531,77 @@ def _parse_location_instance(
         opening = start + 1
         if opening >= end or tokens[opening].value != "(":
             return None
-        closing = parenthesis_pairs.get(opening)
+        closing = delimiter_pairs.get(opening)
         if closing is None or closing >= end:
             return None
         caller_end = _parse_location_instance(
-            tokens, opening + 1, closing, parenthesis_pairs
+            tokens,
+            opening + 1,
+            closing,
+            delimiter_pairs,
+            location_aliases,
         )
-        if caller_end is None or tokens[caller_end].value != "at":
+        if (
+            caller_end is None
+            or caller_end >= closing
+            or tokens[caller_end].kind != "identifier"
+            or tokens[caller_end].value != "at"
+        ):
             return None
         callee_end = _parse_location_instance(
-            tokens, caller_end + 1, closing, parenthesis_pairs
+            tokens,
+            caller_end + 1,
+            closing,
+            delimiter_pairs,
+            location_aliases,
         )
         return closing + 1 if callee_end == closing else None
+
+    if first.kind == "identifier" and first.value == "fused":
+        cursor = start + 1
+        if cursor < end and tokens[cursor].value == "<":
+            metadata_closing = delimiter_pairs.get(cursor)
+            if metadata_closing is None or metadata_closing >= end:
+                return None
+            if not _metadata_structure_is_valid(
+                tokens, cursor + 1, metadata_closing, delimiter_pairs
+            ):
+                return None
+            cursor = metadata_closing + 1
+        if cursor >= end or tokens[cursor].value != "[":
+            return None
+        fused_closing = delimiter_pairs.get(cursor)
+        if fused_closing is None or fused_closing >= end:
+            return None
+        cursor += 1
+        if cursor == fused_closing:
+            return fused_closing + 1
+        while cursor < fused_closing:
+            location_end = _parse_location_instance(
+                tokens,
+                cursor,
+                fused_closing,
+                delimiter_pairs,
+                location_aliases,
+            )
+            if location_end is None or location_end > fused_closing:
+                return None
+            cursor = location_end
+            if cursor == fused_closing:
+                return fused_closing + 1
+            if tokens[cursor].value != ",":
+                return None
+            cursor += 1
+            if cursor == fused_closing:
+                return None
+        return None
 
     if (
         first.value == "#"
         and start + 1 < end
-        and tokens[start + 1].kind == "identifier"
+        and tokens[start + 1].kind in {"identifier", "number"}
+        and (tokens[start + 1].kind, tokens[start + 1].value)
+        in location_aliases
     ):
         return start + 2
 
@@ -343,28 +612,80 @@ def _location_structure_is_valid(
     tokens: list[Token],
     start: int,
     end: int,
-    parenthesis_pairs: dict[int, int],
+    delimiter_pairs: dict[int, int],
+    location_aliases: frozenset[tuple[str, str]],
 ) -> bool:
-    if any(
-        token.kind == "ssa" or token.value in {"{", "}", "="}
-        for token in tokens[start:end]
-    ):
-        return False
     return (
-        _parse_location_instance(tokens, start, end, parenthesis_pairs) == end
+        _parse_location_instance(
+            tokens, start, end, delimiter_pairs, location_aliases
+        )
+        == end
     )
+
+
+def _defined_location_aliases(
+    tokens: list[Token], delimiter_pairs: dict[int, int]
+) -> frozenset[tuple[str, str]]:
+    candidates: list[tuple[tuple[str, str], int, int]] = []
+    references: list[
+        tuple[tuple[str, str], tuple[str, str]]
+    ] = []
+    for index, token in enumerate(tokens):
+        if (
+            token.value != "#"
+            or index + 3 >= len(tokens)
+            or tokens[index + 1].kind not in {"identifier", "number"}
+            or tokens[index + 2].value != "="
+        ):
+            continue
+        name = (tokens[index + 1].kind, tokens[index + 1].value)
+        if (
+            index + 4 < len(tokens)
+            and tokens[index + 3].kind == "identifier"
+            and tokens[index + 3].value == "loc"
+            and tokens[index + 4].value == "("
+        ):
+            closing = delimiter_pairs.get(index + 4)
+            if closing is not None:
+                candidates.append((name, index + 5, closing))
+            continue
+        if (
+            index + 4 < len(tokens)
+            and tokens[index + 3].value == "#"
+            and tokens[index + 4].kind in {"identifier", "number"}
+        ):
+            references.append(
+                (name, (tokens[index + 4].kind, tokens[index + 4].value))
+            )
+
+    aliases: set[tuple[str, str]] = set()
+    changed = True
+    while changed:
+        changed = False
+        known_aliases = frozenset(aliases)
+        for name, start, end in candidates:
+            if name in aliases:
+                continue
+            if (
+                _parse_location_instance(
+                    tokens, start, end, delimiter_pairs, known_aliases
+                )
+                == end
+            ):
+                aliases.add(name)
+                changed = True
+        for name, target in references:
+            if name not in aliases and target in aliases:
+                aliases.add(name)
+                changed = True
+    return frozenset(aliases)
 
 
 def _location_context(
     tokens: list[Token], source_map: SourceMap
 ) -> tuple[list[bool], list[dict[str, object]]]:
-    parenthesis_pairs: dict[int, int] = {}
-    open_parentheses: list[int] = []
-    for index, token in enumerate(tokens):
-        if token.value == "(":
-            open_parentheses.append(index)
-        elif token.value == ")" and open_parentheses:
-            parenthesis_pairs[open_parentheses.pop()] = index
+    delimiter_pairs = _delimiter_pairs(tokens)
+    location_aliases = _defined_location_aliases(tokens, delimiter_pairs)
 
     contexts = [False] * len(tokens)
     diagnostics: list[dict[str, object]] = []
@@ -377,7 +698,7 @@ def _location_context(
         ):
             continue
         opening = index + 1
-        closing = parenthesis_pairs.get(opening)
+        closing = delimiter_pairs.get(opening)
         line, column = source_map.location(token.offset)
         if closing is None:
             diagnostics.append(
@@ -390,7 +711,11 @@ def _location_context(
             )
             continue
         if not _location_structure_is_valid(
-            tokens, opening + 1, closing, parenthesis_pairs
+            tokens,
+            opening + 1,
+            closing,
+            delimiter_pairs,
+            location_aliases,
         ):
             diagnostics.append(
                 _diagnostic(

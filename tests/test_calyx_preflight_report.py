@@ -1,5 +1,6 @@
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -9,6 +10,140 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REPORT = REPO_ROOT / "scripts" / "pipeline" / "calyx_preflight_report.py"
+
+VALID_LOCATION_CORPUS = {
+    "name": 'module { func.func @main() { return } } loc("math.floor")\n',
+    "file_line": (
+        'module { func.func @main() { return } } loc("math.floor":7)\n'
+    ),
+    "file_line_column": (
+        'module { func.func @main() { return } } loc("math.floor":7:11)\n'
+    ),
+    "file_hex_line_column": (
+        'module { func.func @main() { return } } loc("math.floor":0x7:0xB)\n'
+    ),
+    "file_range_same_line": (
+        'module { func.func @main() { return } } '
+        'loc("math.floor":7:11 to :19)\n'
+    ),
+    "file_range_multiple_lines": (
+        'module { func.func @main() { return } } '
+        'loc("math.floor":7:11 to 13:19)\n'
+    ),
+    "name_with_child": (
+        'module { func.func @main() { return } } '
+        'loc("outer"("math.floor":7:11))\n'
+    ),
+    "unknown": "module { func.func @main() { return } } loc(unknown)\n",
+    "alias": (
+        '#source = loc("math.floor":7:11)\n'
+        "module { func.func @main() { return } } loc(#source)\n"
+    ),
+    "numeric_alias": (
+        '#0 = loc("math.floor":7:11)\n'
+        "module { func.func @main() { return } } loc(#0)\n"
+    ),
+    "alias_chain": (
+        '#base = loc("math.floor":7:11)\n'
+        "#source = #base\n"
+        "module { func.func @main() { return } } loc(#source)\n"
+    ),
+    "callsite": (
+        'module { func.func @main() { return } } '
+        'loc(callsite("math.floor":7:11 at '
+        '"mystery.operation"(unknown)))\n'
+    ),
+    "fused": (
+        'module { func.func @main() { return } } '
+        'loc(fused["math.floor":7:11, '
+        '"mystery.operation"(unknown)])\n'
+    ),
+    "empty_fused": (
+        "module { func.func @main() { return } } loc(fused[])\n"
+    ),
+    "fused_string_metadata": (
+        'module { func.func @main() { return } } '
+        'loc(fused<"math.floor">['
+        '"mystery.operation":7:11, unknown])\n'
+    ),
+    "fused_structured_metadata": (
+        'module { func.func @main() { return } } '
+        'loc(fused<{description = "math.floor", frames = [1, 2]}>['
+        '"mystery.operation":7:11])\n'
+    ),
+    "fused_typed_metadata": (
+        'module { func.func @main() { return } } '
+        'loc(fused<dense<[1, 2]> : tensor<2xi64>>['
+        '"math.floor":7:11])\n'
+    ),
+    "fused_float_metadata": (
+        'module { func.func @main() { return } } '
+        'loc(fused<1.250000e+00 : f32>["math.floor":7:11])\n'
+    ),
+    "fused_location_metadata": (
+        'module { func.func @main() { return } } '
+        'loc(fused<loc("math.floor")>[unknown])\n'
+    ),
+    "fused_alias_metadata": (
+        '#metadata = "math.floor"\n'
+        "module { func.func @main() { return } } "
+        "loc(fused<#metadata>[unknown])\n"
+    ),
+    "nested": (
+        '#source = loc("math.floor":7:11)\n'
+        'module { func.func @main() { return } } '
+        'loc(callsite(fused<"metadata">[#source, unknown] at '
+        '"caller"(fused["mystery.operation", unknown])))\n'
+    ),
+}
+
+MALFORMED_LOCATION_CORPUS = {
+    "fused_missing_comma": (
+        'module { func.func @main() { return } } '
+        'loc(fused["safe" "math.floor"()])\n'
+    ),
+    "fused_unclosed_metadata": (
+        'module { func.func @main() { return } } '
+        'loc(fused<"metadata"["math.floor"()])\n'
+    ),
+    "fused_malformed_metadata_dictionary": (
+        'module { func.func @main() { return } } '
+        'loc(fused<{description "math.floor"()}>[unknown])\n'
+    ),
+    "callsite_missing_at": (
+        'module { func.func @main() { return } } '
+        'loc(callsite("callee" "math.floor"()))\n'
+    ),
+    "name_child_unbalanced": (
+        'module { func.func @main() { return } } '
+        'loc("name"("math.floor")\n'
+    ),
+    "file_integer_overflow": (
+        'module { func.func @main() { return } } '
+        'loc("math.floor":18446744073709551616:1)\n'
+    ),
+    "undefined_location_alias": (
+        "module { func.func @main() { return } } loc(#missing)\n"
+    ),
+    "non_location_alias": (
+        "#source = 42 : i64\n"
+        "module { func.func @main() { return } } loc(#source)\n"
+    ),
+}
+
+LOCATION_NEIGHBORING_OPERATIONS = (
+    "module {\n"
+    "  func.func @main(%arg0: f32) -> f32 {\n"
+    '    %0 = "math.floor"(%arg0) : (f32) -> f32\n'
+    '    %1 = "scf.execute_region"() ({\n'
+    '      %2 = "math.floor"(%0) : (f32) -> f32\n'
+    '      "scf.yield"(%2) : (f32) -> ()\n'
+    "    }) : () -> f32\n"
+    "    return %1 : f32\n"
+    "  }\n"
+    '} loc(fused<"metadata">['
+    '"math.floor", "mystery.operation"(unknown)])\n'
+)
 
 
 class CalyxPreflightReportTest(unittest.TestCase):
@@ -40,6 +175,191 @@ class CalyxPreflightReportTest(unittest.TestCase):
             json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
         self.assertEqual(actual, expected)
+
+    def test_pinned_mlir_parser_accepts_complete_builtin_location_corpus(self) -> None:
+        mlir_opt = shutil.which("mlir-opt")
+        if mlir_opt is None:
+            self.skipTest("mlir-opt is available in the pinned Nix environment")
+
+        version = subprocess.run(
+            [mlir_opt, "--version"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.assertIn("LLVM version 21.1.2", version.stdout)
+
+        for name, mlir in VALID_LOCATION_CORPUS.items():
+            with self.subTest(location=name):
+                parsed = subprocess.run(
+                    [mlir_opt, "-o", "/dev/null"],
+                    input=mlir,
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                self.assertEqual(parsed.returncode, 0, parsed.stderr)
+
+        for name, mlir in MALFORMED_LOCATION_CORPUS.items():
+            with self.subTest(mutation=name):
+                parsed = subprocess.run(
+                    [mlir_opt, "-o", "/dev/null"],
+                    input=mlir,
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                self.assertNotEqual(parsed.returncode, 0, mlir)
+
+        parsed = subprocess.run(
+            [mlir_opt, "-o", "/dev/null"],
+            input=LOCATION_NEIGHBORING_OPERATIONS,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.assertEqual(parsed.returncode, 0, parsed.stderr)
+
+    def test_valid_builtin_locations_and_their_strings_are_data(self) -> None:
+        for name, mlir in VALID_LOCATION_CORPUS.items():
+            with self.subTest(location=name):
+                rc, report, stderr, _ = self.run_report(
+                    mlir, require_clean=True
+                )
+
+                self.assertEqual(rc, 0, stderr)
+                self.assertIsNotNone(report)
+                self.assertEqual(report["status"], "ok")
+                self.assertEqual(report["prohibited_ops"], {})
+                self.assertEqual(report["first_locations"], {})
+                self.assertEqual(report["scanner_diagnostics"], [])
+                self.assert_valid_self_hash(report)
+
+    def test_malformed_fused_locations_block_without_hiding_operations(self) -> None:
+        mlir = (
+            'loc(fused<"safe" "math.floor"()>[unknown])\n'
+            'loc(fused<{description "attribute.data"}>[unknown])\n'
+            'loc(fused["safe" "mystery.operation"()])\n'
+            'loc("math.floor":18446744073709551616:1)\n'
+        )
+        rc, report, stderr, output = self.run_report(mlir, require_clean=True)
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 2})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 1, "column": 18}},
+        )
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "malformed_location",
+                    "line": 1,
+                    "column": 1,
+                    "message": "malformed location expression",
+                },
+                {
+                    "kind": "malformed_location",
+                    "line": 2,
+                    "column": 1,
+                    "message": "malformed location expression",
+                },
+                {
+                    "kind": "malformed_location",
+                    "line": 3,
+                    "column": 1,
+                    "message": "malformed location expression",
+                },
+                {
+                    "kind": "unknown_operation",
+                    "line": 3,
+                    "column": 18,
+                    "message": "unknown quoted operation: mystery.operation",
+                },
+                {
+                    "kind": "malformed_location",
+                    "line": 4,
+                    "column": 1,
+                    "message": "malformed location expression",
+                },
+                {
+                    "kind": "malformed_trivia",
+                    "line": 4,
+                    "column": 17,
+                    "message": "malformed trivia after quoted operation",
+                },
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
+        rc2, report2, stderr2, output2 = self.run_report(
+            mlir, require_clean=True
+        )
+        self.assertEqual(rc2, 1, stderr2)
+        self.assertEqual(report2, report)
+        self.assertEqual(output2, output)
+
+    def test_invalid_location_aliases_block_and_keep_following_operation_visible(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            "loc(#missing)\n"
+            "#source = 42 : i64\n"
+            "loc(#source)\n"
+            '"mystery.operation"() : () -> ()\n',
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "malformed_location",
+                    "line": 1,
+                    "column": 1,
+                    "message": "malformed location expression",
+                },
+                {
+                    "kind": "malformed_location",
+                    "line": 3,
+                    "column": 1,
+                    "message": "malformed location expression",
+                },
+                {
+                    "kind": "unknown_operation",
+                    "line": 4,
+                    "column": 1,
+                    "message": "unknown quoted operation: mystery.operation",
+                },
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_fused_location_boundary_keeps_nested_generic_operations_visible(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            LOCATION_NEIGHBORING_OPERATIONS, require_clean=True
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 2})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 3, "column": 10}},
+        )
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
 
     def test_counts_result_bearing_custom_operations_and_ignores_comments(self) -> None:
         rc, report, stderr, _ = self.run_report(

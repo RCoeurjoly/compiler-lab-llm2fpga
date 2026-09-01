@@ -56,7 +56,14 @@ such as `%r: 1 =`. It decodes MLIR two-digit hex escapes before
 classification, skips whitespace and `//` comment trivia, and tracks explicit
 attribute dictionaries and structurally valid location expressions so
 attribute keys, attribute strings, quoted symbol names, and valid `loc(...)`
-strings do not enter the census. A malformed or unclosed location emits a
+strings do not enter the census. Location recognition follows the pinned MLIR
+21.1.2 builtin grammar recursively: name and file locations (including line,
+column, range, decimal, and hexadecimal forms), unknown locations, resolved
+named and numeric aliases, callsites, and fused locations with optional
+structured metadata. Fused elements, name children, callsites, and metadata
+locations may nest without turning their strings into operations. A malformed
+or unclosed location, unresolved/non-location alias, overflowing source
+coordinate, malformed fused list, or malformed metadata value emits a
 deterministic `malformed_location` diagnostic and does not suppress its tokens
 from the operation scan. These data contexts are excluded without suppressing
 neighboring, result-bearing, or region-nested generic operations. It retains
@@ -81,6 +88,10 @@ operations, comment/attribute/symbol/location string false positives,
 neighboring true generic operations, balanced-malformed and unclosed location
 wrappers, nested malformed callsite locations, deterministic bytes, exact
 first locations, the schema-v2 key set, and independent self-hash
-reconstruction.
+reconstruction. A pinned-parser corpus exercises 21 accepted builtin-location
+and metadata combinations plus eight rejected malformed, unbalanced,
+overflow, and alias mutations; a compact parser-accepted fixture confirms that
+result-bearing and region-nested generic operations adjacent to a fused
+location remain visible.
 Existing callers use the checker's exit status rather than parsing schema-v1
 fields, so no coupled caller change is required for this task.
