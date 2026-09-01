@@ -431,6 +431,33 @@
             cp -R ${pipelineRuntimeScripts}/. "$out/"
           '';
         pipelineScripts = pipelineRuntimeScripts;
+        exactTinyStoriesC22Input = builtins.path {
+          path = ./artifacts/comparison/tinystories-1m-exact-frontier-determinism-flat-scf/run-1/flat.scf.mlir;
+          name = "tinystories-1m-exact-c22-input";
+        };
+        exactTinyStoriesPreflightSource = builtins.path {
+          path = ./scripts/pipeline/calyx_preflight_report.py;
+          name = "tinystories-1m-exact-calyx-preflight-report.py";
+        };
+        exactTinyStoriesPreflight = pkgs.substituteAll {
+          src = exactTinyStoriesPreflightSource;
+          calyxPreflightMlirOptPath = "${mlir}/bin/mlir-opt";
+          calyxPreflightMlirOptVersion = pkgs.lib.getVersion mlir;
+          calyxPreflightMlirOptSha256 =
+            builtins.hashFile "sha256" "${mlir}/bin/mlir-opt";
+        };
+        exactTinyStoriesNormalized = import ./nix/exact-tinystories-normalized.nix {
+          inherit pkgs mlir python;
+          mlirPasses = llm2fpgaMlirPasses;
+          c22Input = exactTinyStoriesC22Input;
+          preflightScript = exactTinyStoriesPreflight;
+          expectedC22Sha256 =
+            "66c78e412ade3262c4eb0f61b5776e9c765fb434fdbb53d09cbba7e724ff2fc6";
+          expectedPluginSha256 =
+            "79c0ab56022ce6c91279bca8aefeea7251a1eb19c92675f6df7b90265fb0d738";
+          expectedNormalizedSha256 =
+            "e669a26338fbcf055266db29d6351228b78314d11ea3687751cb7f2045552d77";
+        };
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
         noHandshakeLinalgToScf =
           ./scripts/pipeline/linalg_to_scf_no_handshake.sh;
@@ -2783,6 +2810,8 @@ PY
             llm2fpgaMlirPasses llm2fpgaTorchMlirPasses llm2fpgaCirctPasses
             calyx;
           "rc-math-exp-paper-screen" = rcMathExpPaperScreen;
+          "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf" =
+            exactTinyStoriesNormalized;
           "calyx-float-library-selftest" = calyxFloatLibrarySelftest;
           "calyx-rc-basic-float-bindings-selftest" =
             calyxRcBasicFloatBindingsSelftest;
