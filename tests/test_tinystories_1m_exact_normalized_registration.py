@@ -6,7 +6,6 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
-import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -83,19 +82,26 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
-    def _copy_bundle(self, temporary: Path) -> Path:
+    def _copy_bundle(self, temporary: Path, verifier):
         bundle = temporary / "bundle"
         bundle.mkdir()
         for name in ("flat.scf.mlir", "pre-calyx.mlir", "pre-calyx-legality.json", "manifest.json"):
             target = bundle / name
             shutil.copy2(self.output / name, target)
             target.chmod(0o600)
-        return bundle
+        manifest = json.loads((bundle / "manifest.json").read_text())
+        authority = verifier._resolve_authority()
+        manifest["commands"] = verifier._expected_commands(authority, bundle)
+        (bundle / "manifest.json").write_text(
+            json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n"
+        )
+        verifier.verify_output(bundle)
+        return bundle, authority
 
-    def _drv_path(self) -> str:
+    def _drv_path(self, root: Path = ROOT) -> str:
         return subprocess.run(
             ["nix", "eval", "--raw", f".#${ALIAS}.drvPath".replace("$", "")],
-            cwd=ROOT,
+            cwd=root,
             check=True,
             stdout=subprocess.PIPE,
             text=True,
@@ -171,16 +177,15 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
         """Replacing preparation output with parser-clean MLIR must fail replay."""
         verifier = self._verifier_module()
         with tempfile.TemporaryDirectory(prefix="exact-prepared-forgery-", dir="/dev/shm") as raw:
-            bundle = self._copy_bundle(Path(raw))
+            bundle, authority = self._copy_bundle(Path(raw), verifier)
             manifest = json.loads((bundle / "manifest.json").read_text())
-            commands = manifest["commands"]
             prepared = bundle / "pre-calyx.mlir"
             prepared.write_text("module {}\n", encoding="utf-8")
             legality = bundle / "pre-calyx-legality.json"
             completed = subprocess.run(
                 [
-                    commands["preflight"][0], commands["preflight"][1], str(prepared),
-                    str(legality), "--mlir-opt", commands["preflight"][-1],
+                    authority["python"], authority["checker"], str(prepared),
+                    str(legality), "--mlir-opt", authority["mlir_opt"],
                 ],
                 check=False,
                 stdout=subprocess.PIPE,
@@ -198,14 +203,14 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
             }
             manifest["calyx_authorized"] = True
             (bundle / "manifest.json").write_text(json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n")
-            with self.assertRaises(ValueError):
+            with self.assertRaisesRegex(ValueError, "preparation replay mismatch"):
                 verifier.verify_output(bundle)
 
     def test_verifier_rejects_coherent_resigned_receipt_from_stub_checker(self) -> None:
         """A manifest-selected checker stub cannot turn the blocked bundle clean."""
         verifier = self._verifier_module()
         with tempfile.TemporaryDirectory(prefix="exact-checker-forgery-", dir="/dev/shm") as raw:
-            bundle = self._copy_bundle(Path(raw))
+            bundle, _ = self._copy_bundle(Path(raw), verifier)
             manifest = json.loads((bundle / "manifest.json").read_text())
             authentic = json.loads((bundle / "pre-calyx-legality.json").read_text())
             forged = {
@@ -234,7 +239,7 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
             }
             manifest["calyx_authorized"] = True
             (bundle / "manifest.json").write_text(json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n")
-            with self.assertRaises(ValueError):
+            with self.assertRaisesRegex(ValueError, "manifest command vector mismatch"):
                 verifier.verify_output(bundle)
 
     def test_derivation_source_closure_excludes_the_evidence_directory(self) -> None:
@@ -259,17 +264,43 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
         self.assertIn("tinystories-1m-exact-c22-input", source_names)
         self.assertNotIn("rank1-copy-extension-evidence", source_names)
 
-    def test_evidence_only_mutation_does_not_change_the_exact_drv(self) -> None:
-        """An isolated evidence-only mutation must not perturb the file-scoped stage."""
-        evidence_only = ROOT / "artifacts/comparison/tinystories-1m-exact-rank1-copy-extension-evidence" / (
-            f"task-2-evidence-only-{os.getpid()}.json"
+    def test_tracked_evidence_mutation_in_isolated_worktree_keeps_exact_drv(self) -> None:
+        """A tracked excluded evidence byte cannot perturb the file-scoped stage."""
+        relative = Path(
+            "artifacts/comparison/tinystories-1m-exact-rank1-copy-extension-evidence/"
+            "semantic-size1-pass-only/stdout.bin"
         )
-        before = self._drv_path()
-        try:
-            evidence_only.write_text('{"task":"2","evidence_only":true}\n', encoding="utf-8")
-            self.assertEqual(before, self._drv_path())
-        finally:
-            evidence_only.unlink(missing_ok=True)
+        live_bytes = (ROOT / relative).read_bytes()
+        with tempfile.TemporaryDirectory(prefix="exact-evidence-worktree-", dir="/dev/shm") as raw:
+            worktree = Path(raw) / "source"
+            subprocess.run(
+                ["git", "worktree", "add", "--detach", str(worktree), "HEAD"],
+                cwd=ROOT,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            try:
+                tracked = worktree / relative
+                subprocess.run(
+                    ["git", "ls-files", "--error-unmatch", str(relative)],
+                    cwd=worktree,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                before = self._drv_path(worktree)
+                tracked.write_bytes(b"task-2 isolated evidence mutation\n")
+                self.assertEqual(before, self._drv_path(worktree))
+            finally:
+                subprocess.run(
+                    ["git", "worktree", "remove", "--force", str(worktree)],
+                    cwd=ROOT,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+        self.assertEqual((ROOT / relative).read_bytes(), live_bytes)
 
 
 if __name__ == "__main__":

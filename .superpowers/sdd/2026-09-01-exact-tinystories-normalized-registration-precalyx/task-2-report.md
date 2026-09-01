@@ -46,3 +46,18 @@ schema-v3 checker tests: 59/59; `nix flake check --no-build` passed.
 The authentic package and its frontier remain unchanged: blocked,
 `math.floor` 1376 at 422:18, `arith.negf` 1369, `math.absi` 1156, and
 `calyx_authorized: false`; no backend action ran.
+
+## Fix round 2: regression-fixture validity
+
+Relocated bundle fixtures now rewrite their command claims from independently
+resolved flake authority and first pass `verify_output`.  The prepared-output
+replacement then reaches and asserts `preparation replay mismatch`; the
+manifest-selected stub checker reaches and asserts `manifest command vector
+mismatch`, rather than failing only because copied commands name the original
+bundle path.
+
+The derivation-sensitivity proof now changes the tracked, tiny excluded
+`semantic-size1-pass-only/stdout.bin` only in a detached `/dev/shm` Git
+worktree.  Its exact package `drvPath` was identical before and after the byte
+mutation, and the live worktree bytes were checked unchanged after removal.
+Focused Task 2 tests passed 8/8 with these baseline and precise-error checks.
