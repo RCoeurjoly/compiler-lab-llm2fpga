@@ -10,6 +10,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Tools/Plugins/PassPlugin.h"
 
@@ -318,7 +319,7 @@ struct LowerStaticMemRefViewsForCalyxPass
 
   void runOnOperation() final {
     ModuleOp module = getOperation();
-    llvm::DenseSet<StringAttr> signatureProtectedFunctions;
+    llvm::DenseSet<Operation *> signatureProtectedFunctions;
     collectSignatureProtectedFunctions(module, signatureProtectedFunctions);
 
     materializeDenseResourceMemRefGlobals(module);
@@ -326,9 +327,9 @@ struct LowerStaticMemRefViewsForCalyxPass
     flattenStaticIdentityMemRefGlobals(module, flattenedGlobals);
     updateGetGlobalTypes(module, flattenedGlobals);
     module.walk([&](func::FuncOp funcOp) {
-      runOnFunction(funcOp,
-                    signatureProtectedFunctions.contains(
-                        funcOp.getSymNameAttr()));
+      runOnFunction(
+          funcOp,
+          signatureProtectedFunctions.contains(funcOp.getOperation()));
     });
   }
 
@@ -340,16 +341,32 @@ struct LowerStaticMemRefViewsForCalyxPass
 private:
   void collectSignatureProtectedFunctions(
       ModuleOp module,
-      llvm::DenseSet<StringAttr> &signatureProtectedFunctions) {
-    auto protectDefinedCallee = [&](StringRef symbol) {
-      auto callee = module.lookupSymbol<func::FuncOp>(symbol);
-      if (callee && !callee.isExternal())
-        signatureProtectedFunctions.insert(callee.getSymNameAttr());
+      llvm::DenseSet<Operation *> &signatureProtectedFunctions) {
+    SymbolTableCollection symbolTables;
+    auto protectDefinedCallee = [&](Operation *symbolUser,
+                                    SymbolRefAttr symbol) {
+      auto callee = symbolTables.lookupNearestSymbolFrom<func::FuncOp>(
+          symbolUser, symbol);
+      if (callee) {
+        if (!callee.isExternal())
+          signatureProtectedFunctions.insert(callee.getOperation());
+        return;
+      }
+
+      if (auto caller = symbolUser->getParentOfType<func::FuncOp>())
+        signatureProtectedFunctions.insert(caller.getOperation());
     };
-    module.walk(
-        [&](func::CallOp call) { protectDefinedCallee(call.getCallee()); });
+    module.walk([&](func::CallOp call) {
+      if (auto symbol = call->getAttrOfType<SymbolRefAttr>("callee"))
+        protectDefinedCallee(call.getOperation(), symbol);
+      else if (auto caller = call->getParentOfType<func::FuncOp>())
+        signatureProtectedFunctions.insert(caller.getOperation());
+    });
     module.walk([&](func::ConstantOp constant) {
-      protectDefinedCallee(constant.getValue());
+      if (auto symbol = constant->getAttrOfType<SymbolRefAttr>("value"))
+        protectDefinedCallee(constant.getOperation(), symbol);
+      else if (auto caller = constant->getParentOfType<func::FuncOp>())
+        signatureProtectedFunctions.insert(caller.getOperation());
     });
   }
 

@@ -339,6 +339,166 @@ CALLED_AND_UNCALLED_CONTROL = """module {
 }
 """
 
+NESTED_DIRECT_CALLEE_FIRST_CONTROL = """module {
+  module @nested_scope {
+    func.func private @consume_nested(%arg: memref<64x64xi64>) {
+      return
+    }
+
+    func.func @call_nested(
+        %source: memref<64x64xi64>, %i: index) -> i64 {
+      %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+        : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+      %flat = memref.collapse_shape %sub [[0, 1]]
+        : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+      %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+      func.call @consume_nested(%source) : (memref<64x64xi64>) -> ()
+      return %loaded : i64
+    }
+  }
+}
+"""
+
+NESTED_DIRECT_CALLER_FIRST_CONTROL = """module {
+  module @reverse_nested_scope {
+    func.func @call_nested_reverse(
+        %source: memref<64x64xi64>, %i: index) -> (i64, i64) {
+      %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+        : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+      %flat = memref.collapse_shape %sub [[0, 1]]
+        : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+      %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+      %callee_value = func.call @consume_nested_reverse(%source, %i)
+        : (memref<64x64xi64>, index) -> i64
+      return %loaded, %callee_value : i64, i64
+    }
+
+    func.func private @consume_nested_reverse(
+        %arg: memref<64x64xi64>, %i: index) -> i64 {
+      %value = memref.load %arg[%i, %i] : memref<64x64xi64>
+      return %value : i64
+    }
+  }
+}
+"""
+
+NESTED_INDIRECT_CONSTANT_CONTROL = """module {
+  module @indirect_nested_scope {
+    func.func private @consume_nested_indirect(%arg: memref<64x64xi64>) {
+      return
+    }
+
+    func.func @call_nested_indirect(
+        %source: memref<64x64xi64>, %i: index) -> i64 {
+      %callee = func.constant @consume_nested_indirect
+        : (memref<64x64xi64>) -> ()
+      %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+        : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+      %flat = memref.collapse_shape %sub [[0, 1]]
+        : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+      %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+      func.call_indirect %callee(%source) : (memref<64x64xi64>) -> ()
+      return %loaded : i64
+    }
+  }
+}
+"""
+
+SHADOWED_OUTER_FIRST_CONTROL = """module {
+  func.func @shadowed(%source: memref<64x64xi64>, %i: index) -> i64 {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    return %loaded : i64
+  }
+
+  module @shadowing_scope {
+    func.func private @shadowed(%arg: memref<64x64xi64>) {
+      return
+    }
+
+    func.func @call_shadowed(
+        %source: memref<64x64xi64>, %i: index) -> i64 {
+      %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+        : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+      %flat = memref.collapse_shape %sub [[0, 1]]
+        : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+      %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+      func.call @shadowed(%source) : (memref<64x64xi64>) -> ()
+      return %loaded : i64
+    }
+  }
+}
+"""
+
+SHADOWED_NESTED_FIRST_CONTROL = """module {
+  module @reverse_shadowing_scope {
+    func.func private @shadowed(%arg: memref<64x64xi64>) {
+      return
+    }
+
+    func.func @call_shadowed_reverse(
+        %source: memref<64x64xi64>, %i: index) -> i64 {
+      %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+        : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+      %flat = memref.collapse_shape %sub [[0, 1]]
+        : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+      %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+      func.call @shadowed(%source) : (memref<64x64xi64>) -> ()
+      return %loaded : i64
+    }
+  }
+
+  func.func @shadowed(%source: memref<64x64xi64>, %i: index) -> i64 {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    return %loaded : i64
+  }
+}
+"""
+
+QUALIFIED_FUNC_CALL_CONTROL = """module {
+  module @qualified_scope {
+    func.func @qualified_callee(%arg: memref<64x64xi64>)
+  }
+
+  func.func @qualified_caller(%source: memref<64x64xi64>) {
+    func.call @qualified_scope::@qualified_callee(%source)
+      : (memref<64x64xi64>) -> ()
+    return
+  }
+}
+"""
+
+UNRESOLVED_FUNC_CALL_CONTROL = """module {
+  func.func @unresolved_call(
+      %source: memref<64x64xi64>, %i: index) -> i64 {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    func.call @missing_callee(%source) : (memref<64x64xi64>) -> ()
+    return %loaded : i64
+  }
+}
+"""
+
+UNRESOLVED_FUNC_CONSTANT_CONTROL = """module {
+  func.func @unresolved_constant(%source: memref<64x64xi64>) {
+    %callee = func.constant @missing_constant
+      : (memref<64x64xi64>) -> ()
+    func.call_indirect %callee(%source) : (memref<64x64xi64>) -> ()
+    return
+  }
+}
+"""
+
 COLLAPSED_COPY_CONTROL = """module {
   func.func @collapsed_copy(%source: memref<64x64xi64>, %target: memref<64x64xi64>) {
     %source_sub = memref.subview %source[0, 7] [64, 1] [1, 1]
@@ -474,6 +634,16 @@ def _function_type(generic_ir: str, symbol: str) -> str:
     if not match:
         raise AssertionError(f"missing generic function type for @{symbol}")
     return match.group(1)
+
+
+def _function_types(generic_ir: str, symbol: str) -> list[str]:
+    matches = re.findall(
+        rf'function_type = (.*?), sym_name = "{re.escape(symbol)}"',
+        generic_ir,
+    )
+    if not matches:
+        raise AssertionError(f"missing generic function types for @{symbol}")
+    return matches
 
 
 def _affine_accesses(
@@ -618,6 +788,12 @@ class ExactStridedUnitCollapseTest(unittest.TestCase):
             completed.stderr.decode(errors="replace"),
         )
         return output
+
+    def assert_verifier_rejected(self, source: str, diagnostic: str) -> None:
+        completed, output = run_text(source)
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertEqual(output, "")
+        self.assertIn(diagnostic, completed.stderr.decode(errors="replace"))
 
     def assert_supported_mapping(self, fixture: str, *, offset: int) -> None:
         output = self.assert_passes(REPRODUCERS / fixture)
@@ -979,6 +1155,103 @@ class ExactStridedUnitCollapseTest(unittest.TestCase):
         )
         self.assertEqual(output.count('"memref.subview"'), 0)
         self.assertEqual(output.count('"memref.collapse_shape"'), 0)
+
+    def test_nested_direct_callee_before_caller_uses_nearest_symbol_table(
+        self,
+    ) -> None:
+        output = self.assert_passes(NESTED_DIRECT_CALLEE_FIRST_CONTROL)
+        self.assertEqual(
+            _function_type(output, "consume_nested"),
+            "(memref<64x64xi64>) -> ()",
+        )
+        self.assertEqual(
+            _function_type(output, "call_nested"),
+            "(memref<64x64xi64>, index) -> i64",
+        )
+        self.assertIn("memref.subview", output)
+        self.assertIn("memref.collapse_shape", output)
+
+    def test_nested_direct_caller_before_callee_is_order_independent(
+        self,
+    ) -> None:
+        output = self.assert_passes(NESTED_DIRECT_CALLER_FIRST_CONTROL)
+        self.assertEqual(
+            _function_type(output, "consume_nested_reverse"),
+            "(memref<64x64xi64>, index) -> i64",
+        )
+        self.assertEqual(
+            _function_type(output, "call_nested_reverse"),
+            "(memref<64x64xi64>, index) -> (i64, i64)",
+        )
+        self.assertIn("memref.subview", output)
+        self.assertIn("memref.collapse_shape", output)
+
+    def test_nested_indirect_constant_uses_nearest_symbol_table(self) -> None:
+        output = self.assert_passes(NESTED_INDIRECT_CONSTANT_CONTROL)
+        self.assertEqual(
+            _function_type(output, "consume_nested_indirect"),
+            "(memref<64x64xi64>) -> ()",
+        )
+        self.assertEqual(
+            _function_type(output, "call_nested_indirect"),
+            "(memref<64x64xi64>, index) -> i64",
+        )
+        self.assertIn("memref.subview", output)
+        self.assertIn("memref.collapse_shape", output)
+
+    def test_shadowed_outer_first_protects_only_resolved_nested_callee(
+        self,
+    ) -> None:
+        output = self.assert_passes(SHADOWED_OUTER_FIRST_CONTROL)
+        self.assertEqual(
+            _function_types(output, "shadowed"),
+            [
+                "(memref<4096xi64>, index) -> i64",
+                "(memref<64x64xi64>) -> ()",
+            ],
+        )
+        self.assertEqual(
+            _function_type(output, "call_shadowed"),
+            "(memref<64x64xi64>, index) -> i64",
+        )
+        self.assertEqual(output.count('"memref.subview"'), 1)
+        self.assertEqual(output.count('"memref.collapse_shape"'), 1)
+
+    def test_shadowed_nested_first_protects_only_resolved_nested_callee(
+        self,
+    ) -> None:
+        output = self.assert_passes(SHADOWED_NESTED_FIRST_CONTROL)
+        self.assertEqual(
+            _function_types(output, "shadowed"),
+            [
+                "(memref<64x64xi64>) -> ()",
+                "(memref<4096xi64>, index) -> i64",
+            ],
+        )
+        self.assertEqual(
+            _function_type(output, "call_shadowed_reverse"),
+            "(memref<64x64xi64>, index) -> i64",
+        )
+        self.assertEqual(output.count('"memref.subview"'), 1)
+        self.assertEqual(output.count('"memref.collapse_shape"'), 1)
+
+    def test_qualified_func_call_is_rejected_before_the_pass(self) -> None:
+        self.assert_verifier_rejected(
+            QUALIFIED_FUNC_CALL_CONTROL,
+            "invalid kind of attribute specified",
+        )
+
+    def test_unresolved_func_call_fails_closed_before_the_pass(self) -> None:
+        self.assert_verifier_rejected(
+            UNRESOLVED_FUNC_CALL_CONTROL,
+            "'missing_callee' does not reference a valid function",
+        )
+
+    def test_unresolved_func_constant_fails_closed_before_the_pass(self) -> None:
+        self.assert_verifier_rejected(
+            UNRESOLVED_FUNC_CONSTANT_CONTROL,
+            "reference to undefined function 'missing_constant'",
+        )
 
 
 if __name__ == "__main__":

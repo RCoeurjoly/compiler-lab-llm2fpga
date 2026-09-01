@@ -81,6 +81,21 @@ symbol use, and a mixed module that also contains an uncalled eligible
 function. The recursive/self-call control and all prior 18 controls stayed
 green, isolating cross-function signature mutation from local root protection.
 
+## Review round 3: nested symbol tables
+
+Review found that round 2 walked nested call operations but resolved every
+flat name in the outer pass module and keyed protection by `StringAttr`. A
+nested call could therefore miss its actual callee, while an unrelated
+same-named outer function was protected. The former produced the familiar
+rank-two caller/rank-one callee verifier failure; the latter unnecessarily
+preserved an otherwise eligible exact chain.
+
+Strict round-3 RED ran 32 tests against the round-2 plugin with exactly five
+failures: nested direct calls in both source orders, a nested
+`func.constant`/indirect call, and same-name shadowing in both source orders.
+Qualified Func references and unresolved calls/constants were rejected by the
+input verifier with no output, while all 24 prior controls remained green.
+
 ## Narrow implementation
 
 The identity-layout collapse path is unchanged and remains first. The new
@@ -108,13 +123,19 @@ order-independent convergence when a protected root invalidates a copy peer.
 
 Before any per-function lowering, the pass now collects defined internal
 function symbols referenced by direct `func.call` operations or by
-`func.constant` address-taking for indirect calls. Signature flattening is
-skipped for those functions; their callers continue to protect operands as
-unhandled direct/transitive root users. The collection happens before mutation,
-so callee/caller source order, multiple callers, and recursion cannot affect
-the decision. External declarations were already immutable. An unreferenced
-top-level function is not in the protection set and remains eligible for the
-exact flattening behavior.
+`func.constant` address-taking for indirect calls. Each reference is resolved
+from the symbol-using operation through `SymbolTableCollection` nearest-symbol
+semantics, and the protection set stores the exact resolved `Operation *`
+identity. Signature flattening is skipped only for those functions; their
+callers continue to protect operands as unhandled direct/transitive root users.
+The collection happens before mutation, so callee/caller source order,
+multiple callers, recursion, nesting, and shadowing cannot affect the
+decision. External declarations were already immutable. An unresolved symbol
+conservatively protects its containing function if invalid IR reaches the
+pass; normal `mlir-opt` verification rejects unresolved or non-flat Func
+references before the pass. An unreferenced function remains eligible for the
+exact flattening behavior even when another symbol table contains the same
+bare name.
 
 ## Complete affine proofs
 
@@ -172,6 +193,14 @@ output has neither view operation nor `memref.copy`.
   indirect call is canonicalized.
 - An unrelated unreferenced exact function in the same module still flattens
   to `memref<4096xi64>` and removes its subview/collapse chain.
+- Nested direct and constant-backed indirect callees retain compatible
+  rank-two signatures in both source orders.
+- Same-named functions in different symbol tables are distinguished by
+  identity: only the nearest resolved callee is protected, while the unrelated
+  exact function flattens to `memref<4096xi64>`.
+- Qualified `func.call` attributes are rejected because this Func dialect
+  requires `FlatSymbolRefAttr`; unresolved calls/constants are also rejected
+  before the pass, with no transformed output.
 - The pre-existing identity-layout collapse control still lowers exactly.
 - The prior 15-test subview suite retains recursive absolute reinterpret
   semantics, copy-protection fixpoint behavior in both directions/orders,
@@ -180,16 +209,16 @@ output has neither view operation nor `memref.copy`.
 ## GREEN and plugin identity
 
 - build: `nix build .#llm2fpgaMlirPasses -L` — exit 0;
-- focused suite: 24 tests — `OK`;
-- prescribed combined collapse/subview suite: 39 tests — `OK`;
+- focused suite: 32 tests — `OK`;
+- prescribed combined collapse/subview suite: 47 tests — `OK`;
 - three relevant static-memref/pass integration assertions — `OK`;
 - output:
-  `/nix/store/5xilqb0sarmxdycyh0b75pn5vm8v9nih-llm2fpga-mlir-passes-0.1.0`;
-- plugin bytes: `21,726,160`;
+  `/nix/store/7nffqc9cn9da37py316ilmcarjpp9gbn-llm2fpga-mlir-passes-0.1.0`;
+- plugin bytes: `21,726,600`;
 - plugin SHA-256:
-  `7d7b8962565ed8177a5ea6b2648f88232d7ef11c74c5ed4b0fc4902fede01e5f`.
+  `9a96615321f61f04d250cb2cf872f1fedc317cb4555c9cece457d0bbe842e984`.
 
-The round-2 digest differs from the predecessor and both earlier Task 1 plugin
+The round-3 digest differs from the predecessor and earlier Task 1 plugin
 digests.
 
 ## Residual risks and non-claims
@@ -205,6 +234,9 @@ digests.
 - Defined internal functions referenced by direct or constant-backed indirect
   calls conservatively retain memref signatures until a separate
   interprocedural call/signature rewrite is designed.
+- Func operations currently expose flat callee attributes. General qualified
+  `SymbolRefAttr` lookup is used internally, but qualified Func syntax remains
+  an input-verifier rejection rather than a new accepted surface.
 - Full-artifact replay and selection of the next compiler frontier remain Task
   2 scope. No claim is made about new full-artifact blocker counts or Calyx
   eligibility.
