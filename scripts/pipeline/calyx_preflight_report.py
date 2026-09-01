@@ -787,9 +787,17 @@ def _scan_operations(
                 continue
             if OPERATION_NAME.fullmatch(token.value) is None:
                 if (
-                    previous is not None
-                    and previous.value == "="
-                    and not previous_is_attribute_equals
+                    not previous_is_attribute_equals
+                    and (
+                        (
+                            following is not None
+                            and following.value == "("
+                        )
+                        or (
+                            previous is not None
+                            and previous.value == "="
+                        )
+                    )
                 ):
                     line, column = source_map.location(token.offset)
                     diagnostics.append(

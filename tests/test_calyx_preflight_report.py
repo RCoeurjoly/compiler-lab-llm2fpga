@@ -180,6 +180,12 @@ TOP_LEVEL_ARRAY_ALIAS_METADATA = (
     "loc(fused<#metadata>[unknown])\n"
 )
 
+TOP_LEVEL_ARRAY_ALIAS_WITH_INVALID_OPERATION_NAME = (
+    '#metadata = ["bad name"]\n'
+    "module { func.func @main() { return } } "
+    "loc(fused<#metadata>[unknown])\n"
+)
+
 TOP_LEVEL_ALIAS_WITH_COMPACT_NEIGHBORS = (
     'module { func.func @before(%x: f32) -> f32 { %0 = "math.floor"(%x) '
     ": (f32) -> f32 return %0 : f32 } } "
@@ -483,6 +489,21 @@ class CalyxPreflightReportTest(unittest.TestCase):
     def test_validated_top_level_array_alias_rhs_is_data(self) -> None:
         rc, report, stderr, _ = self.run_cli_report(
             TOP_LEVEL_ARRAY_ALIAS_METADATA,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 0, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
+    def test_validated_alias_string_with_invalid_operation_name_is_data(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            TOP_LEVEL_ARRAY_ALIAS_WITH_INVALID_OPERATION_NAME,
             mlir_opt=self.pinned_mlir_opt(),
             require_clean=True,
         )
@@ -937,6 +958,29 @@ class CalyxPreflightReportTest(unittest.TestCase):
         )
         self.assert_valid_self_hash(report)
 
+    def test_malformed_zero_result_quoted_operation_name_fails_closed(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            '"bad name"() : () -> ()\n', require_clean=True
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "malformed_quoted_operation",
+                    "line": 1,
+                    "column": 1,
+                    "message": "malformed quoted operation: invalid operation name",
+                }
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
     def test_malformed_quoted_operation_escape_fails_closed(self) -> None:
         rc, report, stderr, _ = self.run_report(
             "%0 = \"math.\\6loor\"(%arg0) : (f64) -> f64\n", require_clean=True
@@ -1045,6 +1089,22 @@ class CalyxPreflightReportTest(unittest.TestCase):
         self.assertIsNotNone(report)
         self.assertEqual(report["status"], "ok")
         self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
+    def test_invalid_operation_name_strings_in_valid_data_contexts_are_not_operations(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            'module attributes {note = "bad name"} { '
+            'func.func @"bad name"() { "func.return"() : () -> () } '
+            '} loc("bad name")\n',
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 0, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
         self.assertEqual(report["scanner_diagnostics"], [])
         self.assert_valid_self_hash(report)
 
