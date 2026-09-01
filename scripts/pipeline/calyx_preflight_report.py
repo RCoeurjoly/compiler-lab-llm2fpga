@@ -109,6 +109,14 @@ SIGILS = frozenset({"#", "!", "@", "^"})
 OPENING_DELIMITERS = {"(": ")", "[": "]", "{": "}", "<": ">"}
 CLOSING_DELIMITERS = frozenset(OPENING_DELIMITERS.values())
 
+# Nix substitutes these three values into the checker artifact used by the
+# authorization route.  The checked-in source intentionally remains unbound:
+# command-line callers may select a candidate executable, but cannot assert
+# which executable identity is authorized.
+AUTHORIZED_MLIR_OPT_PATH = "@calyxPreflightMlirOptPath@"
+AUTHORIZED_MLIR_OPT_VERSION = "@calyxPreflightMlirOptVersion@"
+AUTHORIZED_MLIR_OPT_SHA256 = "@calyxPreflightMlirOptSha256@"
+
 
 @dataclass(frozen=True)
 class Token:
@@ -621,6 +629,105 @@ def _parser_validated_location_context(
     return contexts, diagnostics
 
 
+def _consume_parser_validated_alias_atom(
+    tokens: list[Token], start: int, delimiter_pairs: dict[int, int]
+) -> int | None:
+    """Return one complete alias RHS atom after authoritative MLIR parsing."""
+    if start >= len(tokens):
+        return None
+
+    cursor = start
+    first = tokens[cursor]
+    if first.value in {"+", "-"}:
+        cursor += 1
+        if cursor >= len(tokens) or tokens[cursor].kind not in {
+            "float",
+            "identifier",
+            "number",
+        }:
+            return None
+        cursor += 1
+    elif first.value in {"#", "!", "@"}:
+        cursor += 1
+        if cursor >= len(tokens) or tokens[cursor].kind not in {
+            "identifier",
+            "number",
+            "string",
+        }:
+            return None
+        cursor += 1
+    elif first.value in OPENING_DELIMITERS:
+        closing = delimiter_pairs.get(cursor)
+        if closing is None:
+            return None
+        cursor = closing + 1
+    elif first.kind in {"float", "identifier", "number", "string"}:
+        cursor += 1
+    else:
+        return None
+
+    while cursor < len(tokens):
+        if tokens[cursor].value in OPENING_DELIMITERS:
+            closing = delimiter_pairs.get(cursor)
+            if closing is None:
+                return None
+            cursor = closing + 1
+            continue
+        if (
+            cursor + 3 < len(tokens)
+            and tokens[cursor].value == ":"
+            and tokens[cursor + 1].value == ":"
+            and tokens[cursor + 2].value == "@"
+            and tokens[cursor + 3].kind in {"identifier", "string"}
+        ):
+            cursor += 4
+            continue
+        break
+
+    if cursor < len(tokens) and tokens[cursor].value == ":":
+        return _consume_parser_validated_alias_atom(
+            tokens, cursor + 1, delimiter_pairs
+        )
+    return cursor
+
+
+def _parser_validated_alias_declaration_context(
+    tokens: list[Token],
+) -> list[bool]:
+    """Mark top-level attribute/location alias RHS tokens as parsed data."""
+    delimiter_pairs = _delimiter_pairs(tokens)
+    opening_indices = frozenset(delimiter_pairs)
+    closing_indices = frozenset(delimiter_pairs.values())
+    top_level: list[bool] = []
+    depth = 0
+    for index in range(len(tokens)):
+        top_level.append(depth == 0)
+        if index in opening_indices:
+            depth += 1
+        if index in closing_indices:
+            depth -= 1
+
+    contexts = [False] * len(tokens)
+    for index, token in enumerate(tokens):
+        if (
+            not top_level[index]
+            or token.value != "#"
+            or index + 3 >= len(tokens)
+            or tokens[index + 1].kind not in {"identifier", "number"}
+            or tokens[index + 2].value != "="
+        ):
+            continue
+        rhs_start = index + 3
+        rhs_end = _consume_parser_validated_alias_atom(
+            tokens, rhs_start, delimiter_pairs
+        )
+        if rhs_end is None:
+            continue
+        for context_index in range(rhs_start, rhs_end):
+            contexts[context_index] = True
+    return contexts
+
+
 def _record_operation(
     operation: str,
     line: int,
@@ -648,6 +755,11 @@ def _scan_operations(
     tokens, tokenizer_diagnostics = _tokenize(text, source_map)
     diagnostics = [*initial_diagnostics, *tokenizer_diagnostics]
     attribute_contexts = _attribute_context(tokens)
+    alias_declaration_contexts = (
+        _parser_validated_alias_declaration_context(tokens)
+        if parser_validated
+        else [False] * len(tokens)
+    )
     location_contexts, location_diagnostics = (
         _parser_validated_location_context(tokens, source_map)
         if parser_validated
@@ -658,7 +770,7 @@ def _scan_operations(
     first_locations: dict[str, dict[str, int]] = {}
 
     for index, token in enumerate(tokens):
-        if attribute_contexts[index]:
+        if attribute_contexts[index] or alias_declaration_contexts[index]:
             continue
         previous = tokens[index - 1] if index else None
         following = tokens[index + 1] if index + 1 < len(tokens) else None
@@ -762,11 +874,21 @@ def _canonical_json(payload: dict[str, object]) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
 
 
+def _not_run_parser_validation() -> dict[str, object]:
+    return {
+        "authorized_identity": None,
+        "identity_status": "not_run",
+        "input_status": "not_run",
+        "observed_identity": None,
+    }
+
+
 def _build_report(
     text: str,
     *,
     parser_validated: bool,
     initial_diagnostics: tuple[dict[str, object], ...] = (),
+    parser_validation: dict[str, object] | None = None,
 ) -> dict[str, object]:
     prohibited_ops, first_locations, scanner_diagnostics = _scan_operations(
         text,
@@ -774,13 +896,16 @@ def _build_report(
         initial_diagnostics=initial_diagnostics,
     )
     report: dict[str, object] = {
-        "schema_version": 2,
+        "schema_version": 3,
         "status": "blocked"
         if prohibited_ops or scanner_diagnostics
         else "ok",
         "prohibited_ops": prohibited_ops,
         "first_locations": first_locations,
         "scanner_diagnostics": scanner_diagnostics,
+        "parser_validation": parser_validation
+        if parser_validation is not None
+        else _not_run_parser_validation(),
     }
     report["sha256"] = hashlib.sha256(_canonical_json(report)).hexdigest()
     return report
@@ -791,44 +916,217 @@ def build_report(text: str) -> dict[str, object]:
     return _build_report(text, parser_validated=False)
 
 
-def build_report_from_parser_validated_text(text: str) -> dict[str, object]:
-    """Build a report for text already accepted by the pinned MLIR parser."""
-    return _build_report(text, parser_validated=True)
+def _authorized_parser_identity() -> dict[str, str] | None:
+    values = (
+        AUTHORIZED_MLIR_OPT_PATH,
+        AUTHORIZED_MLIR_OPT_VERSION,
+        AUTHORIZED_MLIR_OPT_SHA256,
+    )
+    if any(value.startswith("@calyxPreflight") for value in values):
+        return None
+    if (
+        not AUTHORIZED_MLIR_OPT_PATH.startswith("/nix/store/")
+        or re.fullmatch(r"[0-9a-f]{64}", AUTHORIZED_MLIR_OPT_SHA256) is None
+        or not AUTHORIZED_MLIR_OPT_VERSION
+    ):
+        return None
+    return {
+        "canonical_path": AUTHORIZED_MLIR_OPT_PATH,
+        "sha256": AUTHORIZED_MLIR_OPT_SHA256,
+        "version": AUTHORIZED_MLIR_OPT_VERSION,
+    }
 
 
-def _validate_with_pinned_parser(
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _parser_validation(
+    *,
+    authorized: dict[str, str] | None,
+    identity_status: str,
+    input_status: str,
+    observed: dict[str, object] | None,
+) -> dict[str, object]:
+    return {
+        "authorized_identity": authorized,
+        "identity_status": identity_status,
+        "input_status": input_status,
+        "observed_identity": observed,
+    }
+
+
+def _validate_with_authorized_parser(
     text: str, mlir_opt: str | None
-) -> dict[str, object] | None:
-    if mlir_opt is None:
-        return _diagnostic(
-            "mlir_parser_unavailable",
-            1,
-            1,
-            "pinned MLIR parser is not configured",
+) -> tuple[bool, dict[str, object], dict[str, object] | None]:
+    authorized = _authorized_parser_identity()
+    if authorized is None:
+        return (
+            False,
+            _parser_validation(
+                authorized=None,
+                identity_status="unbound",
+                input_status="not_run",
+                observed=None,
+            ),
+            _diagnostic(
+                "mlir_parser_identity_unbound",
+                1,
+                1,
+                "authorized MLIR parser identity is not bound by Nix",
+            ),
         )
+
+    candidate = Path(mlir_opt or authorized["canonical_path"])
+    try:
+        canonical = candidate.resolve(strict=True)
+        if not canonical.is_file() or not os.access(canonical, os.X_OK):
+            raise OSError("parser is not an executable file")
+        observed: dict[str, object] = {
+            "canonical_path": str(canonical),
+            "sha256": _sha256_file(canonical),
+            "version_output": None,
+        }
+    except (OSError, RuntimeError):
+        return (
+            False,
+            _parser_validation(
+                authorized=authorized,
+                identity_status="unavailable",
+                input_status="not_run",
+                observed=None,
+            ),
+            _diagnostic(
+                "mlir_parser_unavailable",
+                1,
+                1,
+                "authorized MLIR parser could not be resolved",
+            ),
+        )
+
+    if (
+        observed["canonical_path"] != authorized["canonical_path"]
+        or observed["sha256"] != authorized["sha256"]
+    ):
+        return (
+            False,
+            _parser_validation(
+                authorized=authorized,
+                identity_status="mismatch",
+                input_status="not_run",
+                observed=observed,
+            ),
+            _diagnostic(
+                "mlir_parser_identity_mismatch",
+                1,
+                1,
+                "configured MLIR parser does not match the authorized identity",
+            ),
+        )
+
+    try:
+        version = subprocess.run(
+            [str(canonical), "--version"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+    except OSError:
+        return (
+            False,
+            _parser_validation(
+                authorized=authorized,
+                identity_status="unavailable",
+                input_status="not_run",
+                observed=observed,
+            ),
+            _diagnostic(
+                "mlir_parser_unavailable",
+                1,
+                1,
+                "authorized MLIR parser version could not be queried",
+            ),
+        )
+    version_output = version.stdout.decode("utf-8", errors="replace")
+    observed["version_output"] = version_output
+    version_match = re.search(
+        r"^\s*LLVM version ([^\s]+)\s*$", version_output, re.MULTILINE
+    )
+    if (
+        version.returncode != 0
+        or version_match is None
+        or version_match.group(1) != authorized["version"]
+    ):
+        return (
+            False,
+            _parser_validation(
+                authorized=authorized,
+                identity_status="mismatch",
+                input_status="not_run",
+                observed=observed,
+            ),
+            _diagnostic(
+                "mlir_parser_identity_mismatch",
+                1,
+                1,
+                "authorized MLIR parser version output does not match",
+            ),
+        )
+
     try:
         parsed = subprocess.run(
-            [mlir_opt, "-o", os.devnull],
+            [str(canonical), "-o", os.devnull],
             input=text.encode("utf-8"),
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
     except OSError:
-        return _diagnostic(
-            "mlir_parser_unavailable",
-            1,
-            1,
-            "pinned MLIR parser could not be executed",
+        return (
+            False,
+            _parser_validation(
+                authorized=authorized,
+                identity_status="verified",
+                input_status="unavailable",
+                observed=observed,
+            ),
+            _diagnostic(
+                "mlir_parser_unavailable",
+                1,
+                1,
+                "authorized MLIR parser could not parse input",
+            ),
         )
     if parsed.returncode != 0:
-        return _diagnostic(
-            "mlir_parser_rejected",
-            1,
-            1,
-            "pinned MLIR parser rejected input",
+        return (
+            False,
+            _parser_validation(
+                authorized=authorized,
+                identity_status="verified",
+                input_status="rejected",
+                observed=observed,
+            ),
+            _diagnostic(
+                "mlir_parser_rejected",
+                1,
+                1,
+                "authorized MLIR parser rejected input",
+            ),
         )
-    return None
+    return (
+        True,
+        _parser_validation(
+            authorized=authorized,
+            identity_status="verified",
+            input_status="accepted",
+            observed=observed,
+        ),
+        None,
+    )
 
 
 def main() -> int:
@@ -839,10 +1137,10 @@ def main() -> int:
     parser.add_argument("output", type=Path)
     parser.add_argument(
         "--mlir-opt",
-        default=os.environ.get("CALYX_PREFLIGHT_MLIR_OPT"),
+        default=None,
         help=(
-            "pinned mlir-opt executable; defaults to "
-            "CALYX_PREFLIGHT_MLIR_OPT"
+            "candidate mlir-opt executable; its canonical identity must match "
+            "the authorization embedded by Nix"
         ),
     )
     parser.add_argument("--require-clean", action="store_true")
@@ -852,15 +1150,17 @@ def main() -> int:
         raise SystemExit(f"missing input MLIR: {args.input}")
 
     text = args.input.read_text(encoding="utf-8")
-    parser_diagnostic = _validate_with_pinned_parser(text, args.mlir_opt)
-    if parser_diagnostic is None:
-        report = build_report_from_parser_validated_text(text)
-    else:
-        report = _build_report(
-            text,
-            parser_validated=False,
-            initial_diagnostics=(parser_diagnostic,),
-        )
+    parser_validated, parser_validation, parser_diagnostic = (
+        _validate_with_authorized_parser(text, args.mlir_opt)
+    )
+    report = _build_report(
+        text,
+        parser_validated=parser_validated,
+        initial_diagnostics=(parser_diagnostic,)
+        if parser_diagnostic is not None
+        else (),
+        parser_validation=parser_validation,
+    )
     args.output.write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )

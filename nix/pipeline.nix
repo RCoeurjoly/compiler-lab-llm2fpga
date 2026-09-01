@@ -44,6 +44,14 @@ let
   else
     builtins.head matches;
 
+  calyxPreflightReport = pkgs.substituteAll {
+    src = "${pipelineScripts}/calyx_preflight_report.py";
+    calyxPreflightMlirOptPath = "${mlir}/bin/mlir-opt";
+    calyxPreflightMlirOptVersion = pkgs.lib.getVersion mlir;
+    calyxPreflightMlirOptSha256 =
+      builtins.hashFile "sha256" "${mlir}/bin/mlir-opt";
+  };
+
   mkUnavailableStage = { name, stage, reason }:
     pkgs.runCommand "${name}-${stage}" { } ''
       mkdir -p "$out"
@@ -144,8 +152,7 @@ let
         --load-pass-plugin=${mlirPasses}/lib/LLM2FPGAMLIRPasses.so \
         --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx${scoutMathPass},llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
         -o "$tmp_pre_calyx"
-      export CALYX_PREFLIGHT_REPORT=${pipelineScripts}/calyx_preflight_report.py
-      export CALYX_PREFLIGHT_MLIR_OPT=${mlir}/bin/mlir-opt
+      export CALYX_PREFLIGHT_REPORT=${calyxPreflightReport}
       ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
         ${circt}/bin/circt-opt "$tmp_pre_calyx" "$out"
       ${python}/bin/python3 ${pipelineScripts}/calyx_float_frontier_report.py \

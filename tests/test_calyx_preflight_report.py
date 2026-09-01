@@ -1,7 +1,6 @@
 import importlib.util
 import hashlib
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -175,6 +174,22 @@ LOCATION_NEIGHBORING_OPERATIONS = (
     '"math.floor", "mystery.operation"(unknown)])\n'
 )
 
+TOP_LEVEL_ARRAY_ALIAS_METADATA = (
+    '#metadata = ["math.floor", "mystery.operation"]\n'
+    "module { func.func @main() { return } } "
+    "loc(fused<#metadata>[unknown])\n"
+)
+
+TOP_LEVEL_ALIAS_WITH_COMPACT_NEIGHBORS = (
+    'module { func.func @before(%x: f32) -> f32 { %0 = "math.floor"(%x) '
+    ": (f32) -> f32 return %0 : f32 } } "
+    '#metadata = [distinct[0]<"math.floor">, '
+    "#llvm.access_group<id = distinct[1]<>>, "
+    '"mystery.operation"] '
+    'module { func.func @after(%x: f32) -> f32 { %0 = "math.floor"(%x) '
+    ": (f32) -> f32 return %0 : f32 } }\n"
+)
+
 
 class CalyxPreflightReportTest(unittest.TestCase):
     def pinned_mlir_opt(self) -> str:
@@ -198,24 +213,44 @@ class CalyxPreflightReportTest(unittest.TestCase):
         mlir: str,
         *,
         mlir_opt: str | None,
+        bind_authorized_parser: bool = True,
+        authorized_version: str = "21.1.2",
+        authorized_sha256: str | None = None,
         require_clean: bool = False,
     ) -> tuple[int, dict[str, object] | None, str, bytes | None]:
         with tempfile.TemporaryDirectory() as tmp:
             input_path = Path(tmp) / "input.mlir"
             output_path = Path(tmp) / "report.json"
+            report_program = Path(tmp) / "calyx_preflight_report.py"
             input_path.write_text(mlir, encoding="utf-8")
-            cmd = [sys.executable, str(REPORT), str(input_path), str(output_path)]
+            source = REPORT.read_text(encoding="utf-8")
+            if bind_authorized_parser:
+                authorized_path = Path(self.pinned_mlir_opt()).resolve(strict=True)
+                source = source.replace(
+                    "@calyxPreflightMlirOptPath@", str(authorized_path)
+                )
+                source = source.replace(
+                    "@calyxPreflightMlirOptVersion@", authorized_version
+                )
+                source = source.replace(
+                    "@calyxPreflightMlirOptSha256@",
+                    authorized_sha256
+                    or hashlib.sha256(authorized_path.read_bytes()).hexdigest(),
+                )
+            report_program.write_text(source, encoding="utf-8")
+            cmd = [
+                sys.executable,
+                str(report_program),
+                str(input_path),
+                str(output_path),
+            ]
+            if mlir_opt is not None:
+                cmd.extend(["--mlir-opt", mlir_opt])
             if require_clean:
                 cmd.append("--require-clean")
-            env = os.environ.copy()
-            if mlir_opt is None:
-                env.pop("CALYX_PREFLIGHT_MLIR_OPT", None)
-            else:
-                env["CALYX_PREFLIGHT_MLIR_OPT"] = mlir_opt
             result = subprocess.run(
                 cmd,
                 check=False,
-                env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -310,6 +345,212 @@ class CalyxPreflightReportTest(unittest.TestCase):
                 self.assertEqual(report["scanner_diagnostics"], [])
                 self.assert_valid_self_hash(report)
 
+    def test_cli_binds_successful_parse_to_authorized_parser_identity(self) -> None:
+        mlir_opt = self.pinned_mlir_opt()
+
+        rc, report, stderr, _ = self.run_cli_report(
+            "module { func.func @main() { return } }\n",
+            mlir_opt=mlir_opt,
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 0, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["schema_version"], 3)
+        self.assertIn("parser_validation", report)
+        validation = report["parser_validation"]
+        self.assertEqual(validation["identity_status"], "verified")
+        self.assertEqual(validation["input_status"], "accepted")
+        authorized = validation["authorized_identity"]
+        observed = validation["observed_identity"]
+        canonical = str(Path(mlir_opt).resolve(strict=True))
+        self.assertEqual(authorized["canonical_path"], canonical)
+        self.assertEqual(observed["canonical_path"], canonical)
+        self.assertEqual(
+            observed["sha256"],
+            hashlib.sha256(Path(canonical).read_bytes()).hexdigest(),
+        )
+        self.assertEqual(observed["sha256"], authorized["sha256"])
+        self.assertEqual(authorized["version"], "21.1.2")
+        self.assertIn("LLVM version 21.1.2", observed["version_output"])
+        self.assert_valid_self_hash(report)
+
+    def test_exit_zero_non_parser_cannot_self_authorize(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            MALFORMED_LOCATION_CORPUS["invalid_arbitrary_metadata"],
+            mlir_opt="/bin/true",
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(
+            report["parser_validation"]["identity_status"], "mismatch"
+        )
+        self.assertEqual(
+            report["parser_validation"]["input_status"], "not_run"
+        )
+        self.assertEqual(
+            report["parser_validation"]["observed_identity"]["canonical_path"],
+            str(Path("/bin/true").resolve(strict=True)),
+        )
+        self.assertEqual(
+            report["scanner_diagnostics"][0]["kind"],
+            "mlir_parser_identity_mismatch",
+        )
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assert_valid_self_hash(report)
+
+    def test_version_spoofing_parser_wrapper_cannot_self_authorize(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            wrapper = Path(tmp) / "mlir-opt"
+            wrapper.write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ \"${1:-}\" == \"--version\" ]]; then\n"
+                "  printf 'LLVM version 21.1.2\\n'\n"
+                "fi\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            wrapper.chmod(0o755)
+            rc, report, stderr, _ = self.run_cli_report(
+                MALFORMED_LOCATION_CORPUS["invalid_arbitrary_metadata"],
+                mlir_opt=str(wrapper),
+                require_clean=True,
+            )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(
+            report["parser_validation"]["identity_status"], "mismatch"
+        )
+        self.assertEqual(
+            report["scanner_diagnostics"][0]["kind"],
+            "mlir_parser_identity_mismatch",
+        )
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assert_valid_self_hash(report)
+
+    def test_authorized_parser_hash_is_checked_before_parsing(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            MALFORMED_LOCATION_CORPUS["invalid_arbitrary_metadata"],
+            mlir_opt=self.pinned_mlir_opt(),
+            authorized_sha256="0" * 64,
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(
+            report["parser_validation"]["identity_status"], "mismatch"
+        )
+        self.assertEqual(
+            report["parser_validation"]["input_status"], "not_run"
+        )
+        self.assertEqual(
+            report["scanner_diagnostics"][0]["kind"],
+            "mlir_parser_identity_mismatch",
+        )
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assert_valid_self_hash(report)
+
+    def test_authorized_parser_version_output_is_checked_before_parsing(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            MALFORMED_LOCATION_CORPUS["invalid_arbitrary_metadata"],
+            mlir_opt=self.pinned_mlir_opt(),
+            authorized_version="0.0.0",
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        validation = report["parser_validation"]
+        self.assertEqual(validation["identity_status"], "mismatch")
+        self.assertEqual(validation["input_status"], "not_run")
+        self.assertIn(
+            "LLVM version 21.1.2",
+            validation["observed_identity"]["version_output"],
+        )
+        self.assertEqual(
+            report["scanner_diagnostics"][0]["kind"],
+            "mlir_parser_identity_mismatch",
+        )
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assert_valid_self_hash(report)
+
+    def test_validated_top_level_array_alias_rhs_is_data(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            TOP_LEVEL_ARRAY_ALIAS_METADATA,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 0, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
+    def test_validated_alias_rhs_does_not_hide_compact_neighbor_operations(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            TOP_LEVEL_ALIAS_WITH_COMPACT_NEIGHBORS,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 2})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 1, "column": 51}},
+        )
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
+    def test_unvalidated_alias_rhs_remains_fail_closed(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            TOP_LEVEL_ARRAY_ALIAS_METADATA, require_clean=True
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertIn(
+            "unknown_operation",
+            [item["kind"] for item in report["scanner_diagnostics"]],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_rejected_alias_mutation_cannot_hide_rhs_or_following_operation(self) -> None:
+        mlir = (
+            '#metadata = ["math.floor", "mystery.operation"\n'
+            'module { func.func @main(%x: f32) -> f32 { %0 = "math.floor"(%x) '
+            ": (f32) -> f32 return %0 : f32 } }\n"
+        )
+        rc, report, stderr, _ = self.run_cli_report(
+            mlir,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 2})
+        diagnostic_kinds = [
+            item["kind"] for item in report["scanner_diagnostics"]
+        ]
+        self.assertEqual(diagnostic_kinds[0], "mlir_parser_rejected")
+        self.assertIn("unknown_operation", diagnostic_kinds)
+        self.assert_valid_self_hash(report)
+
     def test_pure_api_refuses_unvalidated_arbitrary_location_metadata(self) -> None:
         mlir = MALFORMED_LOCATION_CORPUS["invalid_arbitrary_metadata"]
         rc, report, stderr, _ = self.run_report(mlir, require_clean=True)
@@ -346,7 +587,7 @@ class CalyxPreflightReportTest(unittest.TestCase):
         )
         self.assertEqual(
             report["scanner_diagnostics"][0]["message"],
-            "pinned MLIR parser rejected input",
+            "authorized MLIR parser rejected input",
         )
         self.assert_valid_self_hash(report)
 
@@ -382,11 +623,14 @@ class CalyxPreflightReportTest(unittest.TestCase):
         )
         self.assert_valid_self_hash(report)
 
-    def test_missing_pinned_parser_is_a_deterministic_blocker(self) -> None:
+    def test_unbound_parser_identity_is_a_deterministic_blocker(self) -> None:
         mlir = "module { func.func @main() { return } }\n"
 
         rc, report, stderr, output = self.run_cli_report(
-            mlir, mlir_opt=None, require_clean=True
+            mlir,
+            mlir_opt=None,
+            bind_authorized_parser=False,
+            require_clean=True,
         )
 
         self.assertEqual(rc, 1, stderr)
@@ -396,21 +640,64 @@ class CalyxPreflightReportTest(unittest.TestCase):
             report["scanner_diagnostics"],
             [
                 {
-                    "kind": "mlir_parser_unavailable",
+                    "kind": "mlir_parser_identity_unbound",
                     "line": 1,
                     "column": 1,
-                    "message": "pinned MLIR parser is not configured",
+                    "message": "authorized MLIR parser identity is not bound by Nix",
                 }
             ],
+        )
+        self.assertEqual(
+            report["parser_validation"],
+            {
+                "authorized_identity": None,
+                "identity_status": "unbound",
+                "input_status": "not_run",
+                "observed_identity": None,
+            },
         )
         self.assert_valid_self_hash(report)
 
         rc2, report2, stderr2, output2 = self.run_cli_report(
-            mlir, mlir_opt=None, require_clean=True
+            mlir,
+            mlir_opt=None,
+            bind_authorized_parser=False,
+            require_clean=True,
         )
         self.assertEqual(rc2, 1, stderr2)
         self.assertEqual(report2, report)
         self.assertEqual(output2, output)
+
+    def test_missing_authorized_parser_candidate_is_a_deterministic_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "missing-mlir-opt"
+            rc, report, stderr, _ = self.run_cli_report(
+                "module { func.func @main() { return } }\n",
+                mlir_opt=str(missing),
+                require_clean=True,
+            )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(
+            report["parser_validation"]["identity_status"], "unavailable"
+        )
+        self.assertEqual(
+            report["parser_validation"]["input_status"], "not_run"
+        )
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "mlir_parser_unavailable",
+                    "line": 1,
+                    "column": 1,
+                    "message": "authorized MLIR parser could not be resolved",
+                }
+            ],
+        )
+        self.assert_valid_self_hash(report)
 
     def test_malformed_fused_locations_block_without_hiding_operations(self) -> None:
         mlir = (
@@ -552,7 +839,7 @@ class CalyxPreflightReportTest(unittest.TestCase):
 
         self.assertEqual(rc, 1, stderr)
         self.assertIsNotNone(report)
-        self.assertEqual(report["schema_version"], 2)
+        self.assertEqual(report["schema_version"], 3)
         self.assertEqual(report["status"], "blocked")
         self.assertEqual(
             report["prohibited_ops"],
@@ -710,7 +997,7 @@ class CalyxPreflightReportTest(unittest.TestCase):
         )
         self.assert_valid_self_hash(report)
 
-    def test_clean_scalar_mlir_has_exact_schema_v2_and_hash(self) -> None:
+    def test_clean_scalar_mlir_has_exact_schema_v3_and_hash(self) -> None:
         rc, report, stderr, _ = self.run_report(
             "%0 = arith.sitofp %arg0 : i32 to f32\n", require_clean=True
         )
@@ -725,10 +1012,20 @@ class CalyxPreflightReportTest(unittest.TestCase):
                 "prohibited_ops",
                 "first_locations",
                 "scanner_diagnostics",
+                "parser_validation",
                 "sha256",
             },
         )
-        self.assertEqual(report["schema_version"], 2)
+        self.assertEqual(report["schema_version"], 3)
+        self.assertEqual(
+            report["parser_validation"],
+            {
+                "authorized_identity": None,
+                "identity_status": "not_run",
+                "input_status": "not_run",
+                "observed_identity": None,
+            },
+        )
         self.assertEqual(report["status"], "ok")
         self.assertEqual(report["prohibited_ops"], {})
         self.assertEqual(report["first_locations"], {})
