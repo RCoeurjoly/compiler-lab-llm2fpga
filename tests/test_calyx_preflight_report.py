@@ -242,6 +242,42 @@ PARSER_VALIDATED_OPERATION_DATA_WITH_COMPACT_NEIGHBORS = (
     ": (f32) -> f32 return %0 : f32 } }\n"
 )
 
+PARSER_VALIDATED_OPAQUE_CALLEE_WITH_COMPACT_NEIGHBORS = (
+    'module { func.func @main(%x: f32) -> f32 { %0 = "math.floor"(%x) '
+    ': (f32) -> f32 emitc.call_opaque "math.floor"() : () -> () '
+    '%1 = "math.floor"(%0) : (f32) -> f32 return %1 : f32 } }\n'
+)
+
+PARSER_VALIDATED_ADVERSARIAL_CUSTOM_DATA = (
+    '#metadata = ["math.floor", "mystery.operation"]\n'
+    'module attributes {math.note = "math.floor"} { '
+    'func.func @main(%llvm: !llvm.struct<"math.floor", (i32)>, '
+    '%opaque: !emitc.opaque<"mystery.operation">, %condition: i1) { '
+    'cf.assert %condition, "math.floor" '
+    'emitc.call_opaque "mystery.operation"() : () -> () return } '
+    '} loc(fused<#metadata>["math.floor":7:11])\n'
+)
+
+PARSER_VALIDATED_SEMANTIC_LOCATION_OPERATION = (
+    'module { func.func @main(%x: f32) -> f32 { '
+    '%0 = "math.floor"(%x) : (f32) -> f32 loc("semantic") '
+    'return %0 : f32 } }\n'
+)
+
+PARSER_VALIDATED_AMBIGUOUS_SOURCE_MAPPING = (
+    'module { func.func @main(%x: f32, %condition: i1) -> f32 { '
+    'cf.assert %condition, "math.floor" '
+    '%0 = "math.floor"(%x) : (f32) -> f32 loc("semantic") '
+    'return %0 : f32 } }\n'
+)
+
+PARSER_VALIDATED_SPOOFED_SOURCE_MAPPING = (
+    'module { func.func @main(%x: f32, %condition: i1) -> f32 { '
+    'cf.assert %condition, "math.floor" '
+    '%0 = "math.floor"(%x) : (f32) -> f32 loc("<stdin>":1:82) '
+    'return %0 : f32 } }\n'
+)
+
 PARSER_VALIDATED_GENERIC_OPERATION_FORMS = (
     "module {\n"
     "  func.func @main(%x: f32, %src: memref<1xi8>, %dst: memref<1xi8>) "
@@ -1388,6 +1424,162 @@ class CalyxPreflightReportTest(unittest.TestCase):
         self.assertEqual(
             report["parser_validation"]["input_status"], "accepted"
         )
+        self.assert_valid_self_hash(report)
+
+    def test_parser_validated_emitc_opaque_callee_is_data(self) -> None:
+        mlir = (
+            'module { func.func @main() { emitc.call_opaque "math.floor"() '
+            ': () -> () return } }\n'
+        )
+        rc, report, stderr, _ = self.run_cli_report(
+            mlir,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "unknown_operation",
+                    "line": 1,
+                    "column": 30,
+                    "message": "unknown custom operation: emitc.call_opaque",
+                }
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_parser_validated_opaque_callee_keeps_compact_true_ops_exact(self) -> None:
+        rc, report, stderr, output = self.run_cli_report(
+            PARSER_VALIDATED_OPAQUE_CALLEE_WITH_COMPACT_NEIGHBORS,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 2})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 1, "column": 49}},
+        )
+        self.assertEqual(
+            [
+                diagnostic["message"]
+                for diagnostic in report["scanner_diagnostics"]
+            ],
+            ["unknown custom operation: emitc.call_opaque"],
+        )
+        self.assert_valid_self_hash(report)
+
+        rc2, report2, stderr2, output2 = self.run_cli_report(
+            PARSER_VALIDATED_OPAQUE_CALLEE_WITH_COMPACT_NEIGHBORS,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+        self.assertEqual(rc2, rc, stderr2)
+        self.assertEqual(report2, report)
+        self.assertEqual(output2, output)
+
+    def test_parser_validated_custom_data_never_enters_authoritative_census(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            PARSER_VALIDATED_ADVERSARIAL_CUSTOM_DATA,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(
+            [
+                diagnostic["message"]
+                for diagnostic in report["scanner_diagnostics"]
+            ],
+            ["unknown custom operation: emitc.call_opaque"],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_parser_validated_semantic_location_maps_to_original_operation(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            PARSER_VALIDATED_SEMANTIC_LOCATION_OPERATION,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 1, "column": 49}},
+        )
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
+    def test_parser_validated_ambiguous_source_mapping_blocks_without_guessing(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            PARSER_VALIDATED_AMBIGUOUS_SOURCE_MAPPING,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(
+            [
+                diagnostic["kind"]
+                for diagnostic in report["scanner_diagnostics"]
+            ],
+            ["operation_source_mapping_failed"],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_parser_validated_spoofed_source_location_cannot_anchor_mapping(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            PARSER_VALIDATED_SPOOFED_SOURCE_MAPPING,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(
+            [
+                diagnostic["kind"]
+                for diagnostic in report["scanner_diagnostics"]
+            ],
+            ["operation_source_mapping_failed"],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_parser_inserted_implicit_terminator_is_not_a_source_operation(self) -> None:
+        mlir = (
+            "module { func.func @main(%lb: index, %ub: index, %step: index) { "
+            "scf.for %index = %lb to %ub step %step {} return } }\n"
+        )
+        rc, report, stderr, _ = self.run_cli_report(
+            mlir,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 0, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(report["scanner_diagnostics"], [])
         self.assert_valid_self_hash(report)
 
     def test_unvalidated_operation_shaped_type_and_message_strings_stay_conservative(self) -> None:

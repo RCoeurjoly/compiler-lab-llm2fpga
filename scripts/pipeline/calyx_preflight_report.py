@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import bisect
 import hashlib
+import io
 import json
 import os
 import re
@@ -123,6 +124,21 @@ class Token:
     kind: str
     value: str
     offset: int
+
+
+@dataclass(frozen=True)
+class SourceOperationCandidate:
+    name: str
+    offset: int
+    token_kind: str
+
+
+@dataclass(frozen=True)
+class AuthoritativeOperation:
+    name: str
+    source_line: int | None
+    source_column: int | None
+    parent_index: int | None
 
 
 class SourceMap:
@@ -596,138 +612,6 @@ def _location_context(
     return contexts, diagnostics
 
 
-def _parser_validated_location_context(
-    tokens: list[Token], source_map: SourceMap
-) -> tuple[list[bool], list[dict[str, object]]]:
-    """Mark complete loc(...) spans after the pinned parser accepted the text."""
-    delimiter_pairs = _delimiter_pairs(tokens)
-    contexts = [False] * len(tokens)
-    diagnostics: list[dict[str, object]] = []
-    for index, token in enumerate(tokens):
-        if (
-            token.kind != "identifier"
-            or token.value != "loc"
-            or index + 1 >= len(tokens)
-            or tokens[index + 1].value != "("
-        ):
-            continue
-        opening = index + 1
-        closing = delimiter_pairs.get(opening)
-        if closing is None:
-            line, column = source_map.location(token.offset)
-            diagnostics.append(
-                _diagnostic(
-                    "malformed_location",
-                    line,
-                    column,
-                    "unclosed location expression",
-                )
-            )
-            continue
-        for context_index in range(opening + 1, closing):
-            contexts[context_index] = True
-    return contexts, diagnostics
-
-
-def _consume_parser_validated_alias_atom(
-    tokens: list[Token], start: int, delimiter_pairs: dict[int, int]
-) -> int | None:
-    """Return one complete alias RHS atom after authoritative MLIR parsing."""
-    if start >= len(tokens):
-        return None
-
-    cursor = start
-    first = tokens[cursor]
-    if first.value in {"+", "-"}:
-        cursor += 1
-        if cursor >= len(tokens) or tokens[cursor].kind not in {
-            "float",
-            "identifier",
-            "number",
-        }:
-            return None
-        cursor += 1
-    elif first.value in {"#", "!", "@"}:
-        cursor += 1
-        if cursor >= len(tokens) or tokens[cursor].kind not in {
-            "identifier",
-            "number",
-            "string",
-        }:
-            return None
-        cursor += 1
-    elif first.value in OPENING_DELIMITERS:
-        closing = delimiter_pairs.get(cursor)
-        if closing is None:
-            return None
-        cursor = closing + 1
-    elif first.kind in {"float", "identifier", "number", "string"}:
-        cursor += 1
-    else:
-        return None
-
-    while cursor < len(tokens):
-        if tokens[cursor].value in OPENING_DELIMITERS:
-            closing = delimiter_pairs.get(cursor)
-            if closing is None:
-                return None
-            cursor = closing + 1
-            continue
-        if (
-            cursor + 3 < len(tokens)
-            and tokens[cursor].value == ":"
-            and tokens[cursor + 1].value == ":"
-            and tokens[cursor + 2].value == "@"
-            and tokens[cursor + 3].kind in {"identifier", "string"}
-        ):
-            cursor += 4
-            continue
-        break
-
-    if cursor < len(tokens) and tokens[cursor].value == ":":
-        return _consume_parser_validated_alias_atom(
-            tokens, cursor + 1, delimiter_pairs
-        )
-    return cursor
-
-
-def _parser_validated_alias_declaration_context(
-    tokens: list[Token],
-) -> list[bool]:
-    """Mark top-level attribute/location alias RHS tokens as parsed data."""
-    delimiter_pairs = _delimiter_pairs(tokens)
-    opening_indices = frozenset(delimiter_pairs)
-    closing_indices = frozenset(delimiter_pairs.values())
-    top_level: list[bool] = []
-    depth = 0
-    for index in range(len(tokens)):
-        top_level.append(depth == 0)
-        if index in opening_indices:
-            depth += 1
-        if index in closing_indices:
-            depth -= 1
-
-    contexts = [False] * len(tokens)
-    for index, token in enumerate(tokens):
-        if (
-            not top_level[index]
-            or token.value != "#"
-            or index + 3 >= len(tokens)
-            or tokens[index + 1].kind not in {"identifier", "number"}
-            or tokens[index + 2].value != "="
-        ):
-            continue
-        rhs_start = index + 3
-        rhs_end = _consume_parser_validated_alias_atom(
-            tokens, rhs_start, delimiter_pairs
-        )
-        if rhs_end is None:
-            continue
-        for context_index in range(rhs_start, rhs_end):
-            contexts[context_index] = True
-    return contexts
-
-
 def _record_operation(
     operation: str,
     line: int,
@@ -741,10 +625,360 @@ def _record_operation(
     first_locations.setdefault(operation, _location(line, column))
 
 
+_CUSTOM_OPERATION_ALIASES = {
+    "module": "builtin.module",
+    "return": "func.return",
+}
+_GENERIC_OPERATION_LINE = re.compile(
+    r'^[ \t]*(?:%[^=\r\n]*=\s*)?"((?:[^"\\]|\\.)+)"\('
+)
+_GENERIC_SOURCE_LOCATION = re.compile(
+    r'loc\("<stdin>":([0-9]+):([0-9]+)\)\Z'
+)
+_IMPLICIT_TERMINATORS = frozenset(
+    {
+        ("scf.for", "scf.yield"),
+        ("scf.if", "scf.yield"),
+        ("scf.parallel", "scf.reduce"),
+    }
+)
+
+
+def _decode_mlir_string_contents(value: str) -> str | None:
+    decoded: list[str] = []
+    cursor = 0
+    while cursor < len(value):
+        if value[cursor] != "\\":
+            decoded.append(value[cursor])
+            cursor += 1
+            continue
+        if cursor + 1 >= len(value):
+            return None
+        escaped = value[cursor + 1]
+        if escaped in {'"', "\\"}:
+            decoded.append(escaped)
+            cursor += 2
+            continue
+        if escaped in {"n", "t"}:
+            decoded.append("\n" if escaped == "n" else "\t")
+            cursor += 2
+            continue
+        if (
+            cursor + 2 >= len(value)
+            or value[cursor + 1] not in HEX_DIGITS
+            or value[cursor + 2] not in HEX_DIGITS
+        ):
+            return None
+        decoded.append(chr(int(value[cursor + 1 : cursor + 3], 16)))
+        cursor += 3
+    return "".join(decoded)
+
+
+def _terminal_generic_location(
+    line: str,
+) -> tuple[bool, tuple[int, int] | None]:
+    location_start = line.rfind(" loc(")
+    if location_start == -1 or not line.endswith(")"):
+        return False, None
+    location = line[location_start + 1 :]
+    source_match = _GENERIC_SOURCE_LOCATION.fullmatch(location)
+    if source_match is None:
+        return True, None
+    return True, (int(source_match.group(1)), int(source_match.group(2)))
+
+
+def _parse_authoritative_operations(
+    generic_text: str,
+) -> list[AuthoritativeOperation] | None:
+    operations: list[AuthoritativeOperation] = []
+    region_stack: list[int] = []
+    for raw_line in io.StringIO(generic_text):
+        line = raw_line.rstrip("\r\n")
+        operation_match = _GENERIC_OPERATION_LINE.match(line)
+        if operation_match is not None:
+            operation = _decode_mlir_string_contents(
+                operation_match.group(1)
+            )
+            if operation is None or OPERATION_NAME.fullmatch(operation) is None:
+                return None
+            has_location, source_location = _terminal_generic_location(line)
+            parent_index = region_stack[-1] if region_stack else None
+            operations.append(
+                AuthoritativeOperation(
+                    name=operation,
+                    source_line=source_location[0]
+                    if source_location is not None
+                    else None,
+                    source_column=source_location[1]
+                    if source_location is not None
+                    else None,
+                    parent_index=parent_index,
+                )
+            )
+            operation_index = len(operations) - 1
+            if has_location:
+                continue
+            if "({" not in line:
+                return None
+            region_stack.append(operation_index)
+            continue
+
+        if region_stack and line.lstrip().startswith("})"):
+            has_location, source_location = _terminal_generic_location(line)
+            if not has_location:
+                continue
+            operation_index = region_stack.pop()
+            operation = operations[operation_index]
+            operations[operation_index] = AuthoritativeOperation(
+                name=operation.name,
+                source_line=source_location[0]
+                if source_location is not None
+                else None,
+                source_column=source_location[1]
+                if source_location is not None
+                else None,
+                parent_index=operation.parent_index,
+            )
+
+    if region_stack:
+        return None
+    return operations
+
+
+def _source_operation_candidates(
+    text: str, source_map: SourceMap
+) -> tuple[list[SourceOperationCandidate], bool]:
+    tokens, diagnostics = _tokenize(text, source_map)
+    if diagnostics:
+        return [], False
+    candidates: list[SourceOperationCandidate] = []
+    source_location_can_be_spoofed = False
+    for token in tokens:
+        if token.kind == "string" and token.value == "<stdin>":
+            source_location_can_be_spoofed = True
+        operation: str | None = None
+        if token.kind in {"identifier", "string"}:
+            if OPERATION_NAME.fullmatch(token.value) is not None:
+                operation = token.value
+            elif token.kind == "identifier":
+                operation = _CUSTOM_OPERATION_ALIASES.get(token.value)
+        if operation is not None:
+            candidates.append(
+                SourceOperationCandidate(
+                    name=operation,
+                    offset=token.offset,
+                    token_kind=token.kind,
+                )
+            )
+    return candidates, not source_location_can_be_spoofed
+
+
+def _unique_segment_mapping(
+    operation_indices: list[int],
+    operations: list[AuthoritativeOperation],
+    candidates: list[SourceOperationCandidate],
+    lower_candidate: int,
+    upper_candidate: int,
+) -> list[int] | None:
+    left: list[int] = []
+    candidate_index = lower_candidate + 1
+    for operation_index in operation_indices:
+        operation = operations[operation_index].name
+        while (
+            candidate_index < upper_candidate
+            and candidates[candidate_index].name != operation
+        ):
+            candidate_index += 1
+        if candidate_index >= upper_candidate:
+            return None
+        left.append(candidate_index)
+        candidate_index += 1
+
+    right_reversed: list[int] = []
+    candidate_index = upper_candidate - 1
+    for operation_index in reversed(operation_indices):
+        operation = operations[operation_index].name
+        while (
+            candidate_index > lower_candidate
+            and candidates[candidate_index].name != operation
+        ):
+            candidate_index -= 1
+        if candidate_index <= lower_candidate:
+            return None
+        right_reversed.append(candidate_index)
+        candidate_index -= 1
+    right = list(reversed(right_reversed))
+    return left if left == right else None
+
+
+def _map_authoritative_operations(
+    text: str,
+    generic_text: str,
+) -> tuple[
+    list[AuthoritativeOperation],
+    list[SourceOperationCandidate | None],
+] | None:
+    operations = _parse_authoritative_operations(generic_text)
+    if operations is None:
+        return None
+    source_map = SourceMap(text)
+    candidates, trust_source_locations = _source_operation_candidates(
+        text, source_map
+    )
+    if not trust_source_locations and not candidates and operations:
+        return None
+
+    candidates_by_location: dict[tuple[int, int], int] = {}
+    for index, candidate in enumerate(candidates):
+        location = source_map.location(candidate.offset)
+        if location in candidates_by_location:
+            return None
+        candidates_by_location[location] = index
+
+    mapped_indices: list[int | None] = [None] * len(operations)
+    synthetic_indices: set[int] = {
+        index
+        for index, operation in enumerate(operations)
+        if operation.name == "builtin.module"
+        and operation.parent_index is None
+        and operation.source_line == 0
+        and operation.source_column == 0
+    }
+    if trust_source_locations:
+        for index, operation in enumerate(operations):
+            if index in synthetic_indices:
+                continue
+            if operation.source_line is None or operation.source_column is None:
+                continue
+            claimed_location = (
+                operation.source_line,
+                operation.source_column,
+            )
+            candidate_index = candidates_by_location.get(claimed_location)
+            if (
+                candidate_index is not None
+                and candidates[candidate_index].name == operation.name
+            ):
+                mapped_indices[index] = candidate_index
+                continue
+            if operation.parent_index is None or candidate_index is None:
+                continue
+            parent = operations[operation.parent_index]
+            if (
+                (parent.name, operation.name) in _IMPLICIT_TERMINATORS
+                and parent.source_line == operation.source_line
+                and parent.source_column == operation.source_column
+                and candidates[candidate_index].name == parent.name
+            ):
+                synthetic_indices.add(index)
+
+    anchored = [
+        index
+        for index, candidate_index in enumerate(mapped_indices)
+        if candidate_index is not None
+    ]
+    previous_candidate = -1
+    previous_operation = -1
+    for operation_index in [*anchored, len(operations)]:
+        next_candidate = (
+            int(mapped_indices[operation_index])
+            if operation_index < len(operations)
+            else len(candidates)
+        )
+        if next_candidate <= previous_candidate:
+            return None
+        segment = [
+            index
+            for index in range(previous_operation + 1, operation_index)
+            if index not in synthetic_indices
+        ]
+        segment_mapping = _unique_segment_mapping(
+            segment,
+            operations,
+            candidates,
+            previous_candidate,
+            next_candidate,
+        )
+        if segment_mapping is None:
+            return None
+        for index, candidate_index in zip(segment, segment_mapping):
+            mapped_indices[index] = candidate_index
+        previous_operation = operation_index
+        previous_candidate = next_candidate
+
+    mapped: list[SourceOperationCandidate | None] = []
+    for index, candidate_index in enumerate(mapped_indices):
+        if index in synthetic_indices:
+            mapped.append(None)
+        elif candidate_index is None:
+            return None
+        else:
+            mapped.append(candidates[candidate_index])
+    return operations, mapped
+
+
+def _scan_authoritative_operations(
+    text: str,
+    generic_text: str,
+    *,
+    initial_diagnostics: tuple[dict[str, object], ...] = (),
+) -> tuple[
+    dict[str, int],
+    dict[str, dict[str, int]],
+    list[dict[str, object]],
+]:
+    mapping = _map_authoritative_operations(text, generic_text)
+    if mapping is None:
+        return (
+            {},
+            {},
+            [
+                *initial_diagnostics,
+                _diagnostic(
+                    "operation_source_mapping_failed",
+                    1,
+                    1,
+                    "authoritative operation sequence could not be mapped uniquely to source",
+                ),
+            ],
+        )
+
+    source_map = SourceMap(text)
+    operations, mapped = mapping
+    counts: dict[str, int] = {}
+    first_locations: dict[str, dict[str, int]] = {}
+    diagnostics = list(initial_diagnostics)
+    for operation, candidate in zip(operations, mapped):
+        if candidate is None:
+            continue
+        line, column = source_map.location(candidate.offset)
+        _record_operation(
+            operation.name, line, column, counts, first_locations
+        )
+        if operation.name not in KNOWN_OPERATIONS:
+            description = (
+                "quoted" if candidate.token_kind == "string" else "custom"
+            )
+            diagnostics.append(
+                _diagnostic(
+                    "unknown_operation",
+                    line,
+                    column,
+                    f"unknown {description} operation: {operation.name}",
+                )
+            )
+
+    diagnostics.sort(key=lambda item: (int(item["line"]), int(item["column"])))
+    return (
+        dict(sorted(counts.items())),
+        dict(sorted(first_locations.items())),
+        diagnostics,
+    )
+
+
 def _scan_operations(
     text: str,
     *,
-    parser_validated: bool = False,
     initial_diagnostics: tuple[dict[str, object], ...] = (),
 ) -> tuple[
     dict[str, int],
@@ -755,22 +989,15 @@ def _scan_operations(
     tokens, tokenizer_diagnostics = _tokenize(text, source_map)
     diagnostics = [*initial_diagnostics, *tokenizer_diagnostics]
     attribute_contexts = _attribute_context(tokens)
-    alias_declaration_contexts = (
-        _parser_validated_alias_declaration_context(tokens)
-        if parser_validated
-        else [False] * len(tokens)
-    )
-    location_contexts, location_diagnostics = (
-        _parser_validated_location_context(tokens, source_map)
-        if parser_validated
-        else _location_context(tokens, source_map)
+    location_contexts, location_diagnostics = _location_context(
+        tokens, source_map
     )
     diagnostics.extend(location_diagnostics)
     counts: dict[str, int] = {}
     first_locations: dict[str, dict[str, int]] = {}
 
     for index, token in enumerate(tokens):
-        if attribute_contexts[index] or alias_declaration_contexts[index]:
+        if attribute_contexts[index]:
             continue
         previous = tokens[index - 1] if index else None
         following = tokens[index + 1] if index + 1 < len(tokens) else None
@@ -788,30 +1015,17 @@ def _scan_operations(
             if previous_is_attribute_equals:
                 continue
             if OPERATION_NAME.fullmatch(token.value) is None:
-                # A parser-accepted string that cannot spell an operation is
-                # necessarily data. Rejected or unvalidated text stays
-                # conservative and diagnoses every remaining string here.
-                if not parser_validated:
-                    line, column = source_map.location(token.offset)
-                    diagnostics.append(
-                        _diagnostic(
-                            "malformed_quoted_operation",
-                            line,
-                            column,
-                            "malformed quoted operation: invalid operation name",
-                        )
+                line, column = source_map.location(token.offset)
+                diagnostics.append(
+                    _diagnostic(
+                        "malformed_quoted_operation",
+                        line,
+                        column,
+                        "malformed quoted operation: invalid operation name",
                     )
+                )
                 continue
             if following is not None and following.value == "=":
-                continue
-            if parser_validated and (
-                following is None or following.value != "("
-            ):
-                # Generic operation syntax always places its operand list
-                # immediately after the quoted name (modulo trivia, which
-                # tokenization already removes). Once the authoritative
-                # parser accepted the text, another following token proves
-                # that this operation-shaped string is data.
                 continue
 
             line, column = source_map.location(token.offset)
@@ -897,12 +1111,21 @@ def _build_report(
     parser_validated: bool,
     initial_diagnostics: tuple[dict[str, object], ...] = (),
     parser_validation: dict[str, object] | None = None,
+    authoritative_generic: str | None = None,
 ) -> dict[str, object]:
-    prohibited_ops, first_locations, scanner_diagnostics = _scan_operations(
-        text,
-        parser_validated=parser_validated,
-        initial_diagnostics=initial_diagnostics,
-    )
+    if parser_validated and authoritative_generic is not None:
+        prohibited_ops, first_locations, scanner_diagnostics = (
+            _scan_authoritative_operations(
+                text,
+                authoritative_generic,
+                initial_diagnostics=initial_diagnostics,
+            )
+        )
+    else:
+        prohibited_ops, first_locations, scanner_diagnostics = _scan_operations(
+            text,
+            initial_diagnostics=initial_diagnostics,
+        )
     report: dict[str, object] = {
         "schema_version": 3,
         "status": "blocked"
@@ -970,7 +1193,12 @@ def _parser_validation(
 
 def _validate_with_authorized_parser(
     text: str, mlir_opt: str | None
-) -> tuple[bool, dict[str, object], dict[str, object] | None]:
+) -> tuple[
+    bool,
+    dict[str, object],
+    dict[str, object] | None,
+    str | None,
+]:
     authorized = _authorized_parser_identity()
     if authorized is None:
         return (
@@ -987,6 +1215,7 @@ def _validate_with_authorized_parser(
                 1,
                 "authorized MLIR parser identity is not bound by Nix",
             ),
+            None,
         )
 
     candidate = Path(mlir_opt or authorized["canonical_path"])
@@ -1014,6 +1243,7 @@ def _validate_with_authorized_parser(
                 1,
                 "authorized MLIR parser could not be resolved",
             ),
+            None,
         )
 
     if (
@@ -1034,6 +1264,7 @@ def _validate_with_authorized_parser(
                 1,
                 "configured MLIR parser does not match the authorized identity",
             ),
+            None,
         )
 
     try:
@@ -1058,6 +1289,7 @@ def _validate_with_authorized_parser(
                 1,
                 "authorized MLIR parser version could not be queried",
             ),
+            None,
         )
     version_output = version.stdout.decode("utf-8", errors="replace")
     observed["version_output"] = version_output
@@ -1083,14 +1315,20 @@ def _validate_with_authorized_parser(
                 1,
                 "authorized MLIR parser version output does not match",
             ),
+            None,
         )
 
     try:
         parsed = subprocess.run(
-            [str(canonical), "-o", os.devnull],
+            [
+                str(canonical),
+                "-mlir-print-op-generic",
+                "-mlir-print-debuginfo",
+                "-mlir-print-local-scope",
+            ],
             input=text.encode("utf-8"),
             check=False,
-            stdout=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
     except OSError:
@@ -1108,6 +1346,7 @@ def _validate_with_authorized_parser(
                 1,
                 "authorized MLIR parser could not parse input",
             ),
+            None,
         )
     if parsed.returncode != 0:
         return (
@@ -1124,6 +1363,26 @@ def _validate_with_authorized_parser(
                 1,
                 "authorized MLIR parser rejected input",
             ),
+            None,
+        )
+    try:
+        authoritative_generic = parsed.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        return (
+            False,
+            _parser_validation(
+                authorized=authorized,
+                identity_status="verified",
+                input_status="accepted",
+                observed=observed,
+            ),
+            _diagnostic(
+                "mlir_parser_output_invalid",
+                1,
+                1,
+                "authorized MLIR parser produced invalid generic output",
+            ),
+            None,
         )
     return (
         True,
@@ -1134,6 +1393,7 @@ def _validate_with_authorized_parser(
             observed=observed,
         ),
         None,
+        authoritative_generic,
     )
 
 
@@ -1158,7 +1418,12 @@ def main() -> int:
         raise SystemExit(f"missing input MLIR: {args.input}")
 
     text = args.input.read_text(encoding="utf-8")
-    parser_validated, parser_validation, parser_diagnostic = (
+    (
+        parser_validated,
+        parser_validation,
+        parser_diagnostic,
+        authoritative_generic,
+    ) = (
         _validate_with_authorized_parser(text, args.mlir_opt)
     )
     report = _build_report(
@@ -1168,6 +1433,7 @@ def main() -> int:
         if parser_diagnostic is not None
         else (),
         parser_validation=parser_validation,
+        authoritative_generic=authoritative_generic,
     )
     args.output.write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
