@@ -461,6 +461,10 @@
           expectedPreflightSourceSha256 =
             "3957d6cfc6da168f9a5c1cb6f1013c172eff3c83f42be6266265009c84ad0839";
         };
+        exactTinyStoriesCalyx = import ./nix/exact-tinystories-calyx.nix {
+          inherit pkgs circt python;
+          predecessor = exactTinyStoriesNormalized;
+        };
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
         noHandshakeLinalgToScf =
           ./scripts/pipeline/linalg_to_scf_no_handshake.sh;
@@ -2815,6 +2819,7 @@ PY
           "rc-math-exp-paper-screen" = rcMathExpPaperScreen;
           "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf" =
             exactTinyStoriesNormalized;
+          "tiny-stories-1m-kev-gpt-exact-calyx-frontier" = exactTinyStoriesCalyx;
           "calyx-float-library-selftest" = calyxFloatLibrarySelftest;
           "calyx-rc-basic-float-bindings-selftest" =
             calyxRcBasicFloatBindingsSelftest;
