@@ -88,6 +88,14 @@ class CalyxMathLegalizationTest(unittest.TestCase):
         self.assertIn("PassRegistration<LowerRationalTanhForCalyxPass>", source)
         self.assertIn("gated rational candidate", source)
 
+    def test_scalar_f32_negf_legalization_is_registered(self) -> None:
+        source = (
+            ROOT / "tools" / "mlir-passes" / "FoldConstantTruncFOps.cpp"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("llm2fpga-lower-negf-for-calyx", source)
+        self.assertIn("PassRegistration<LowerNegFForCalyxPass>", source)
+
 
 if __name__ == "__main__":
     unittest.main()

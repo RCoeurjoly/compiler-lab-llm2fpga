@@ -1055,6 +1055,47 @@ struct LowerExactMathForCalyxPass
   }
 };
 
+struct LowerNegFForCalyxPass
+    : public PassWrapper<LowerNegFForCalyxPass, OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerNegFForCalyxPass)
+
+  StringRef getArgument() const final {
+    return "llm2fpga-lower-negf-for-calyx";
+  }
+  StringRef getDescription() const final {
+    return "Lower scalar f32 arith.negf by exactly toggling its sign bit.";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<arith::ArithDialect>();
+  }
+
+  void runOnOperation() final {
+    SmallVector<arith::NegFOp> ops;
+    getOperation().walk([&](arith::NegFOp op) {
+      auto inputType = dyn_cast<FloatType>(op.getOperand().getType());
+      auto resultType = dyn_cast<FloatType>(op.getType());
+      if (inputType && resultType && inputType.isF32() && resultType.isF32())
+        ops.push_back(op);
+    });
+
+    IRRewriter rewriter(getOperation().getContext());
+    for (arith::NegFOp op : ops) {
+      Location loc = op.getLoc();
+      auto f32 = rewriter.getF32Type();
+      auto i32 = rewriter.getI32Type();
+      rewriter.setInsertionPoint(op);
+      Value bits =
+          arith::BitcastOp::create(rewriter, loc, i32, op.getOperand());
+      Value signMask = arith::ConstantOp::create(
+          rewriter, loc, i32, rewriter.getIntegerAttr(i32, -2147483648));
+      Value flipped = arith::XOrIOp::create(rewriter, loc, bits, signMask);
+      Value result = arith::BitcastOp::create(rewriter, loc, f32, flipped);
+      rewriter.replaceOp(op, result);
+    }
+  }
+};
+
 struct LowerI1UIToFPForCalyxPass
     : public PassWrapper<LowerI1UIToFPForCalyxPass,
                          OperationPass<ModuleOp>> {
@@ -1340,6 +1381,8 @@ MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerRoundEvenForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerRoundEvenForCalyxPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerExactMathForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerExactMathForCalyxPass)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerNegFForCalyxPass)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerNegFForCalyxPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerI1UIToFPForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerI1UIToFPForCalyxPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerScoutMathForCalyxPass)
@@ -1363,6 +1406,7 @@ extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo mlirGetPassPluginInfo() {
             PassRegistration<DropCalyxUnsupportedAssertOpsPass>();
             PassRegistration<LowerRoundEvenForCalyxPass>();
             PassRegistration<LowerExactMathForCalyxPass>();
+            PassRegistration<LowerNegFForCalyxPass>();
             PassRegistration<LowerI1UIToFPForCalyxPass>();
             PassRegistration<LowerScoutMathForCalyxPass>();
             PassRegistration<LowerPolynomialExpForCalyxPass>();
