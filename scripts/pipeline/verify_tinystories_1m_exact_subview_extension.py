@@ -440,38 +440,7 @@ def _proof_matches_literal(proof: dict[str, Any], probe_id: str) -> bool:
     )
 
 
-def _mask(line: str) -> str:
-    result: list[str] = []
-    quoted = False
-    escaped = False
-    index = 0
-    while index < len(line):
-        character = line[index]
-        if quoted:
-            result.append(" ")
-            if escaped:
-                escaped = False
-            elif character == "\\":
-                escaped = True
-            elif character == '"':
-                quoted = False
-        elif character == '"':
-            quoted = True
-            result.append(" ")
-        elif character == "/" and index + 1 < len(line) and line[index + 1] == "/":
-            result.extend(" " * (len(line) - index))
-            break
-        else:
-            result.append(character)
-        index += 1
-    return "".join(result)
-
-
-_OP = re.compile(
-    r"^\s*(?:[%][^=]+?=\s*)?(?:\([^=]+\)\s*=\s*)?"
-    r"([A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_.]*)\b"
-)
-_GENERIC_OP = re.compile(r'^\s*"((?:[^"\\]|\\.)+)"\s*\(')
+_GENERIC_OPERATION = re.compile(r'"((?:[^"\\]|\\.)+)"\s*\(')
 
 
 def _decode_generic_name(raw: str) -> str:
@@ -504,27 +473,35 @@ def _decode_generic_name(raw: str) -> str:
     return "".join(decoded)
 
 
-def _operation_census(text: str) -> dict[str, int]:
+def _operation_census(generic_text: str) -> dict[str, int]:
     census: dict[str, int] = {}
-    for line in text.splitlines():
-        match = _OP.match(_mask(line))
-        if match is not None:
-            name = match.group(1)
-        else:
-            generic = _GENERIC_OP.match(line)
-            if generic is None:
-                continue
-            name = _decode_generic_name(generic.group(1))
-            _require(
-                re.fullmatch(
-                    r"[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_.]*",
-                    name,
-                )
-                is not None,
-                "malformed generic operation name",
-            )
+    for match in _GENERIC_OPERATION.finditer(generic_text):
+        name = _decode_generic_name(match.group(1))
         census[name] = census.get(name, 0) + 1
     return dict(sorted(census.items()))
+
+
+def _canonical_operation_census(path: Path) -> dict[str, int]:
+    command = [TOOL["path"], str(path), "-mlir-print-op-generic"]
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    _require(
+        completed.returncode == 0,
+        "canonical generic printing failed: "
+        + completed.stderr.decode(errors="replace").strip(),
+    )
+    try:
+        generic_text = completed.stdout.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError("canonical generic output is not UTF-8") from error
+    census = _operation_census(generic_text)
+    _require(bool(census), "canonical generic operation census is empty")
+    return census
 
 
 def _counts(operations: list[dict[str, Any]]) -> dict[str, int]:
@@ -532,15 +509,7 @@ def _counts(operations: list[dict[str, Any]]) -> dict[str, int]:
 
 
 def _new_invalid(before: dict[str, int], after: dict[str, int]) -> list[str]:
-    suspicious = re.compile(r"(?:view|cast|shape|copy)")
-    return sorted(
-        name
-        for name in after
-        if name.startswith("memref.")
-        and name not in before
-        and name not in REGISTERED
-        and suspicious.search(name.split(".", 1)[1])
-    )
+    return sorted(set(after) - set(before))
 
 
 def _expected_provenance(contract: dict[str, Any]) -> dict[str, Any]:
@@ -774,14 +743,14 @@ def validate_payload(payload: dict[str, Any], root: Path = ROOT, *, replay: bool
 
     before_text = flat_scf.read_text(encoding="utf-8")
     before_operations = task2._independent_operations(before_text)
-    before_census = _operation_census(before_text)
+    before_census = _canonical_operation_census(flat_scf)
     full_parseable = runs[-1]["parseable"]
     if full_parseable:
         after_text = (evidence_dirs[-1] / "output.mlir").read_text(encoding="utf-8")
         after_operations = task2._independent_operations(after_text)
         after_counts: dict[str, int | None] = _counts(after_operations)
         after_registered_count: int | None = len(after_operations)
-        after_census = _operation_census(after_text)
+        after_census = _canonical_operation_census(evidence_dirs[-1] / "output.mlir")
         invalid_classes = _new_invalid(before_census, after_census)
     else:
         after_text = ""

@@ -63,9 +63,31 @@ was absent. No production Task 3 file existed during this RED.
 
 A later audit added a separate adversarial RED for a generic escaped operation
 name, `"memref.future\\5fview"`. The custom-only census returned `{}` instead
-of `{"memref.future_view": 1}`. Both evaluator and independent verifier now
-decode pinned-MLIR string escapes and include generic spellings in the new
-invalid-class census; the focused test is GREEN.
+of `{"memref.future_view": 1}`. Both evaluator and independent verifier decode
+pinned-MLIR string escapes.
+
+Review round 1 then exposed that the line-oriented parser still skipped quoted
+operations with SSA results and that the `view|cast|shape|copy` fragment filter
+was not a fail-closed class gate. Four parseable RED fixtures were added before
+the fix. The focused command ran seven tests and produced seven behavioral
+failures:
+
+- both censuses omitted a result-bearing generic `memref.cast`, and the
+  evaluator consequently selected `valid_normalized_output` instead of
+  `next_compiler_frontier`;
+- both censuses omitted the escaped result-bearing `"memref.c\\61st"`;
+- both censuses omitted the result-bearing generic form of a custom
+  `memref.transpose`, while the prior spelling predicate would also have
+  accepted that class;
+- both censuses omitted result-bearing `arith.constant`, `arith.addi`, and
+  `scf.for` from an otherwise complete generic core fixture.
+
+The minimal fix independently invokes the pinned tool with
+`-mlir-print-op-generic` for the input and output, decodes every quoted
+operation name independent of result syntax, and computes exactly
+`after classes - before classes`. The verifier deterministically recomputes
+both generic-print censuses rather than trusting the receipt. The same focused
+seven tests are GREEN.
 
 ## Causal probe replay
 
@@ -79,10 +101,10 @@ The mandatory causal order and final captured timings were:
 
 | Sequence | Run | Pass ns | Exit | Parse exit | Result |
 | ---: | --- | ---: | ---: | ---: | --- |
-| 1 | predecessor Task 3 subview | 37,969,076 | 0 | 0 | subview removed; argument flattened |
-| 2 | identity-offset live probe | 39,454,203 | 0 | 0 | complete affine proof passed |
-| 3 | nonzero-offset/stride live probe | 38,677,640 | 0 | 0 | complete affine proof passed |
-| 4 | complete retained c22 input | 2,498,552,923 | 0 | 0 | valid parsed output |
+| 1 | predecessor Task 3 subview | 36,294,292 | 0 | 0 | subview removed; argument flattened |
+| 2 | identity-offset live probe | 39,790,314 | 0 | 0 | complete affine proof passed |
+| 3 | nonzero-offset/stride live probe | 43,439,156 | 0 | 0 | complete affine proof passed |
+| 4 | complete retained c22 input | 2,712,162,821 | 0 | 0 | valid parsed output |
 
 The full input was not executed until the first three results were proven.
 Both evaluator and verifier independently reconstructed every symbolic index
@@ -101,7 +123,8 @@ contain no `memref.subview`.
 
 The complete command exited zero with empty stdout/stderr. Its 16,373,009-byte
 output parses with the pinned tool and has SHA-256
-`42d682b642b899b10bc0814a7786a5803d69b839148e79bbfdc803425e261f34`.
+`42d682b642b899b10bc0814a7786a5803d69b839148e79bbfdc803425e261f34`,
+unchanged from the initial Task 3 capture.
 
 Independent after census:
 
@@ -113,36 +136,43 @@ Independent after census:
 | `memref.reinterpret_cast` | 11,449 | 1 | -11,448 |
 | **Total** | **20,280** | **5,695** | **-14,585** |
 
-No newly introduced invalid operation class was found, including custom,
-generic, and escaped generic spellings. The semantic boundary/access status is
-`proven`. The closed decision is therefore `valid_normalized_output`; it does
-not require or claim a zero residual count. The canonical receipt has self-hash
-`3c8fbee9e95422c619e5aff1bb8e19e84c90412c1a05e261ba3005bd2826c048`.
+Canonical generic printing found 33 operation classes and 286,983 operations
+before, and 32 classes and 283,816 operations after. The receipt now includes
+previously omitted core and terminator classes, including `builtin.module=1`,
+`func.return=1`, and `scf.yield=40,862/42,558` before/after. The exact after-only
+class set is empty; no partial name predicate remains. The semantic
+boundary/access status is `proven`. The closed decision is therefore
+`valid_normalized_output`; it does not require or claim a zero residual count.
+The canonical receipt has self-hash
+`64fa2b94030ce859c1d2a6cc648ea52caeffb3f1038dca7f1c567ccbaf32772c`.
 
 ## GREEN and adversarial verification
 
 - Public independent verifier: `PASS`, decision `valid_normalized_output`,
   exact after counts 4,672 / 1,022 / 0 / 1.
-- Final Task 3 suite: `Ran 15 tests in 155.398s` — `OK`.
+- Final Task 3 suite: `Ran 19 tests in 163.488s` — `OK`.
 - The suite replays the exact commands/streams/output and rejects canonically
   rehashed mutations of model/input/tool/plugin/baseline identities, pipeline,
   command and evidence paths, stale baseline output, causal order, schemas,
   crossed decision branches, false valid/frontier claims, after census, new
   invalid classes, and every affine coefficient/offset/bound/base role or
-  identity used by the two proofs.
-- Python compilation passed. `git diff --cached --check` passed for every
-  authored file; the four exact MLIR stdout artifacts retain their
-  receipt-bound trailing blank record and were excluded from that whitespace
-  check rather than rewritten.
+  identity used by the two proofs. Parseable cases cover result-bearing
+  generic and escaped operation names, custom `memref.transpose`, and exact
+  result-bearing/core generic operation counts in both implementations.
+- Python compilation and `git diff --check` passed. `nix flake check
+  --no-build` completed with all checks passed; only the existing application
+  metadata and incompatible-system warnings remain.
 
 ## Risks and follow-up boundary
 
 - The valid output still has 5,695 registered blockers. In addition, its full
   operation census includes 4,672 `memref.subview` operations already present
   as a class in the input; no claim is made that the artifact is Calyx-ready.
-- The follow-up must start from this exact residual census and extend only the
-  earliest remaining registered blocker. Registration is ineligible because
-  the registered blocker total is not zero.
+- The next causal behavior is the paired static strided
+  `memref.collapse_shape` composition over an already-supported
+  `memref.subview`, not standalone subview or the collateral lone reinterpret.
+  Registration is ineligible because the registered blocker total is not
+  zero.
 - Dynamic, rank-reducing, overflowed, and otherwise unsupported view semantics
   remain outside this extension, as proven by Task 2 controls.
 - Calyx, SystemVerilog, resource, timing, and board stages were not invoked.

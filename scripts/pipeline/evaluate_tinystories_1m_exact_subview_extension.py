@@ -343,38 +343,7 @@ def proof_matches_literal(proof: dict[str, Any], probe_id: str) -> bool:
     )
 
 
-def _mask_line(line: str) -> str:
-    result: list[str] = []
-    quoted = False
-    escaped = False
-    index = 0
-    while index < len(line):
-        character = line[index]
-        if quoted:
-            result.append(" ")
-            if escaped:
-                escaped = False
-            elif character == "\\":
-                escaped = True
-            elif character == '"':
-                quoted = False
-        elif character == '"':
-            quoted = True
-            result.append(" ")
-        elif character == "/" and index + 1 < len(line) and line[index + 1] == "/":
-            result.extend(" " * (len(line) - index))
-            break
-        else:
-            result.append(character)
-        index += 1
-    return "".join(result)
-
-
-_OP_LINE = re.compile(
-    r"^\s*(?:[%][^=]+?=\s*)?(?:\([^=]+\)\s*=\s*)?"
-    r"([A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_.]*)\b"
-)
-_GENERIC_OP_LINE = re.compile(r'^\s*"((?:[^"\\]|\\.)+)"\s*\(')
+_GENERIC_OPERATION = re.compile(r'"((?:[^"\\]|\\.)+)"\s*\(')
 
 
 def _decode_mlir_name(raw: str) -> str:
@@ -410,23 +379,34 @@ def _decode_mlir_name(raw: str) -> str:
     return "".join(result)
 
 
-def operation_census(text: str) -> dict[str, int]:
+def operation_census(generic_text: str) -> dict[str, int]:
     counts: dict[str, int] = {}
-    for raw in text.splitlines():
-        match = _OP_LINE.match(_mask_line(raw))
-        if match is not None:
-            name = match.group(1)
-        else:
-            generic = _GENERIC_OP_LINE.match(raw)
-            if generic is None:
-                continue
-            name = _decode_mlir_name(generic.group(1))
-            if re.fullmatch(
-                r"[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_.]*", name
-            ) is None:
-                raise ValueError("malformed generic operation name")
+    for match in _GENERIC_OPERATION.finditer(generic_text):
+        name = _decode_mlir_name(match.group(1))
         counts[name] = counts.get(name, 0) + 1
     return dict(sorted(counts.items()))
+
+
+def canonical_operation_census(path: Path) -> dict[str, int]:
+    command = [TOOL["path"], str(path), "-mlir-print-op-generic"]
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode != 0:
+        diagnostic = completed.stderr.decode(errors="replace").strip()
+        raise ValueError(f"canonical generic printing failed for {path}: {diagnostic}")
+    try:
+        generic_text = completed.stdout.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError(f"canonical generic output is not UTF-8 for {path}") from error
+    census = operation_census(generic_text)
+    if not census:
+        raise ValueError(f"canonical generic operation census is empty for {path}")
+    return census
 
 
 def registered_counts(operations: list[dict[str, Any]]) -> dict[str, int]:
@@ -437,15 +417,7 @@ def registered_counts(operations: list[dict[str, Any]]) -> dict[str, int]:
 
 
 def new_invalid_classes(before: dict[str, int], after: dict[str, int]) -> list[str]:
-    suspicious = re.compile(r"(?:view|cast|shape|copy)")
-    return sorted(
-        name
-        for name in after
-        if name.startswith("memref.")
-        and name not in before
-        and name not in REGISTERED
-        and suspicious.search(name.split(".", 1)[1])
-    )
+    return sorted(set(after) - set(before))
 
 
 def run_pass(
@@ -709,6 +681,10 @@ def _report(payload: dict[str, Any]) -> str:
         )
     )
     elapsed = sum(run["elapsed_ns"] for run in payload["executions"])
+    registered_after = complete["after"]["registered_operation_count"]
+    residual_subviews = complete["after"]["operation_census"].get(
+        "memref.subview", 0
+    )
     return f"""# Exact TinyStories-1M static-subview extension evaluation
 
 The rebuilt pass was replayed in causal order against the authenticated
@@ -735,6 +711,13 @@ pipeline stage was registered.
 
 - Full output parseable: `{str(complete['parseable']).lower()}`
 - New invalid classes: `{len(complete['new_invalid_classes'])}`
+- Complete operation-name census: pinned `mlir-opt -mlir-print-op-generic`,
+  deterministically recomputed by the independent verifier
+- Registered blocker total after: `{registered_after:,}` (only the four tabled
+  collapse/copy/expand/reinterpret classes)
+- Additional unregistered residual `memref.subview` operations: `{residual_subviews:,}`
+- Next causal pair: static strided `memref.collapse_shape` composition over an
+  already-supported `memref.subview`
 - Semantic boundary/access status: `{complete['invariant_status']}`
 - Input SHA-256: `{payload['input']['sha256']}`
 - Tool SHA-256: `{payload['tool']['sha256']}`
@@ -883,13 +866,14 @@ def evaluate(*, output: Path, evidence_root: Path, report: Path) -> dict[str, An
     parser = load_task2_parser()
     before_text = flat_scf.read_text(encoding="utf-8")
     before_operations = parser.parse_registered_operations(before_text)
-    before_census = operation_census(before_text)
+    before_census = canonical_operation_census(flat_scf)
     if full_run["parseable"]:
-        after_text = (ROOT / full_run["output"]["path"]).read_text(encoding="utf-8")
+        after_path = ROOT / full_run["output"]["path"]
+        after_text = after_path.read_text(encoding="utf-8")
         after_operations = parser.parse_registered_operations(after_text)
         after_counts: dict[str, int | None] = registered_counts(after_operations)
         after_registered_count: int | None = len(after_operations)
-        after_census = operation_census(after_text)
+        after_census = canonical_operation_census(after_path)
         invalid_classes = new_invalid_classes(before_census, after_census)
     else:
         after_text = ""

@@ -9,6 +9,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -106,6 +107,40 @@ class EvaluatorUnitTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.module = load_module(EVALUATOR, "exact_subview_extension_evaluator_unit")
+        cls.verifier = load_module(
+            VERIFIER, "exact_subview_extension_verifier_census_unit"
+        )
+
+    def generic_print(self, source: str) -> str:
+        with tempfile.TemporaryDirectory(prefix="task3-census-red-") as raw:
+            input_path = Path(raw) / "input.mlir"
+            output_path = Path(raw) / "generic.mlir"
+            input_path.write_text(source, encoding="utf-8")
+            completed = subprocess.run(
+                [
+                    self.module.TOOL["path"],
+                    str(input_path),
+                    "-mlir-print-op-generic",
+                    "-o",
+                    str(output_path),
+                ],
+                cwd=ROOT,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(
+                completed.returncode,
+                0,
+                completed.stderr.decode(errors="replace"),
+            )
+            return output_path.read_text(encoding="utf-8")
+
+    def censuses(self, generic_ir: str) -> tuple[dict[str, int], dict[str, int]]:
+        return (
+            self.module.operation_census(generic_ir),
+            self.verifier._operation_census(generic_ir),
+        )
 
     def test_decision_gate_accepts_valid_output_with_measured_residuals(self) -> None:
         residuals = {name: index + 1 for index, name in enumerate(REGISTERED)}
@@ -162,6 +197,120 @@ class EvaluatorUnitTest(unittest.TestCase):
             self.module.new_invalid_classes(before, after),
             ["memref.future_view"],
         )
+
+    def test_result_bearing_generic_memref_cast_forces_frontier(self) -> None:
+        before_source = """module {
+  func.func @probe(%source: memref<4xi64>) -> memref<4xi64> {
+    return %source : memref<4xi64>
+  }
+}
+"""
+        after_source = """module {
+  func.func @probe(%source: memref<4xi64>) -> memref<?xi64> {
+    %cast = "memref.cast"(%source) : (memref<4xi64>) -> memref<?xi64>
+    return %cast : memref<?xi64>
+  }
+}
+"""
+        before_generic = self.generic_print(before_source)
+        after_generic = self.generic_print(after_source)
+        evaluator_before, verifier_before = self.censuses(before_generic)
+        evaluator_after, verifier_after = self.censuses(after_generic)
+        evaluator_invalid = self.module.new_invalid_classes(
+            evaluator_before, evaluator_after
+        )
+        verifier_invalid = self.verifier._new_invalid(
+            verifier_before, verifier_after
+        )
+        with self.subTest(surface="evaluator false-valid decision"):
+            self.assertEqual(
+                self.module.apply_decision_gate(
+                    parseable=True,
+                    blocker_counts={name: 0 for name in REGISTERED},
+                    new_invalid_classes=evaluator_invalid,
+                    semantic_status="proven",
+                ),
+                "next_compiler_frontier",
+            )
+        for surface, after, invalid in (
+            ("evaluator", evaluator_after, evaluator_invalid),
+            ("verifier", verifier_after, verifier_invalid),
+        ):
+            with self.subTest(surface=surface):
+                self.assertEqual(after.get("memref.cast"), 1)
+                self.assertEqual(invalid, ["memref.cast"])
+
+    def test_result_bearing_escaped_generic_name_is_decoded(self) -> None:
+        source = """module {
+  func.func @probe(%source: memref<4xi64>) -> memref<?xi64> {
+    %cast = "memref.c\\61st"(%source) : (memref<4xi64>) -> memref<?xi64>
+    return %cast : memref<?xi64>
+  }
+}
+"""
+        self.generic_print(source)
+        evaluator, verifier = self.censuses(source)
+        self.assertEqual(evaluator.get("memref.cast"), 1)
+        self.assertEqual(verifier.get("memref.cast"), 1)
+
+    def test_custom_memref_transpose_is_an_exact_new_class(self) -> None:
+        before_source = """module {
+  func.func @probe(%source: memref<2x3xi64>) -> memref<2x3xi64> {
+    return %source : memref<2x3xi64>
+  }
+}
+"""
+        after_source = """module {
+  func.func @probe(%source: memref<2x3xi64>) -> memref<3x2xi64, strided<[1, 3]>> {
+    %transpose = memref.transpose %source (d0, d1) -> (d1, d0) : memref<2x3xi64> to memref<3x2xi64, strided<[1, 3]>>
+    return %transpose : memref<3x2xi64, strided<[1, 3]>>
+  }
+}
+"""
+        before_generic = self.generic_print(before_source)
+        after_generic = self.generic_print(after_source)
+        for before, after, invalid in (
+            (
+                self.module.operation_census(before_generic),
+                self.module.operation_census(after_generic),
+                self.module.new_invalid_classes,
+            ),
+            (
+                self.verifier._operation_census(before_generic),
+                self.verifier._operation_census(after_generic),
+                self.verifier._new_invalid,
+            ),
+        ):
+            with self.subTest(parser=invalid.__module__):
+                self.assertEqual(after.get("memref.transpose"), 1)
+                self.assertEqual(invalid(before, after), ["memref.transpose"])
+
+    def test_canonical_generic_census_includes_result_and_core_operations(self) -> None:
+        source = """module {
+  func.func @core(%upper: index) -> index {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %result = scf.for %i = %c0 to %upper step %c1 iter_args(%sum = %c0) -> index {
+      %next = arith.addi %sum, %i : index
+      scf.yield %next : index
+    }
+    return %result : index
+  }
+}
+"""
+        generic = self.generic_print(source)
+        expected = {
+            "arith.addi": 1,
+            "arith.constant": 2,
+            "builtin.module": 1,
+            "func.func": 1,
+            "func.return": 1,
+            "scf.for": 1,
+            "scf.yield": 1,
+        }
+        evaluator, verifier = self.censuses(generic)
+        self.assertEqual(evaluator, expected)
+        self.assertEqual(verifier, expected)
 
 
 @unittest.skipUnless(EVALUATION.is_file(), "Task 3 evidence not produced")
