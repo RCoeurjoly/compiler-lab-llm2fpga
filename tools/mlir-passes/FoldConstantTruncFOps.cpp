@@ -734,9 +734,42 @@ private:
     if (!sourceView || !targetView || sourceView->shape != targetView->shape)
       return;
 
-    if (sourceView->base == copy.getSource() && targetView->base == copy.getTarget() &&
-        sourceView->shape.size() <= 1 && targetView->shape.size() <= 1)
-      return;
+    if (sourceView->base == copy.getSource() &&
+        targetView->base == copy.getTarget() &&
+        sourceView->shape.size() <= 1 && targetView->shape.size() <= 1) {
+      auto sourceAlloc = copy.getSource().getDefiningOp<memref::AllocOp>();
+      auto targetAlloc = copy.getTarget().getDefiningOp<memref::AllocOp>();
+      auto sourceType = dyn_cast<MemRefType>(copy.getSource().getType());
+      auto targetType = dyn_cast<MemRefType>(copy.getTarget().getType());
+      if (!sourceAlloc || !targetAlloc ||
+          sourceAlloc.getOperation() == targetAlloc.getOperation() ||
+          !sourceType || !targetType ||
+          sourceType.getRank() != 1 || targetType.getRank() != 1 ||
+          !sourceType.hasStaticShape() || !targetType.hasStaticShape() ||
+          sourceType.getShape().front() <= 0 ||
+          sourceType.getShape() != targetType.getShape() ||
+          sourceType.getElementType() != targetType.getElementType() ||
+          sourceView->offset != 0 || targetView->offset != 0 ||
+          sourceView->strides.size() != 1 ||
+          targetView->strides.size() != 1 ||
+          sourceView->strides.front() != 1 ||
+          targetView->strides.front() != 1)
+        return;
+
+      SmallVector<int64_t> sourceStrides;
+      SmallVector<int64_t> targetStrides;
+      int64_t sourceOffset = 0;
+      int64_t targetOffset = 0;
+      if (failed(sourceType.getStridesAndOffset(sourceStrides, sourceOffset)) ||
+          failed(targetType.getStridesAndOffset(targetStrides, targetOffset)) ||
+          !isStatic(sourceStrides) || !isStatic(targetStrides) ||
+          ShapedType::isDynamic(sourceOffset) ||
+          ShapedType::isDynamic(targetOffset) || sourceOffset != 0 ||
+          targetOffset != 0 || sourceStrides.size() != 1 ||
+          targetStrides.size() != 1 || sourceStrides.front() != 1 ||
+          targetStrides.front() != 1)
+        return;
+    }
 
     rewriter.setInsertionPoint(copy);
     SmallVector<Value> indices;
