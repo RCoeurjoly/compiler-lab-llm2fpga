@@ -214,6 +214,49 @@ INVALID_NAME_COMPLEX_LOCATION_METADATA = (
     'loc(fused<"bad name">[unknown])\n'
 )
 
+PARSER_VALIDATED_OPERATION_SHAPED_DATA = {
+    "llvm_named_struct": (
+        'module { func.func @main(%x: !llvm.struct<"math.floor", (i32)>) '
+        "{ return } }\n"
+    ),
+    "emitc_opaque_type": (
+        'module { func.func @main(%x: !emitc.opaque<"math.floor">) '
+        "{ return } }\n"
+    ),
+    "cf_assert_message": (
+        'module { func.func @main(%c: i1) { cf.assert %c, "math.floor" '
+        "return } }\n"
+    ),
+    "unknown_llvm_named_struct": (
+        'module { func.func @main(%x: !llvm.struct<"mystery.operation", '
+        "(i32)>) { return } }\n"
+    ),
+}
+
+PARSER_VALIDATED_OPERATION_DATA_WITH_COMPACT_NEIGHBORS = (
+    'module { func.func @before(%x: f32) -> f32 { %0 = "math.floor"(%x) '
+    ": (f32) -> f32 return %0 : f32 } } "
+    'module { func.func @data(%x: !llvm.struct<"math.floor", (i32)>, '
+    '%c: i1) { cf.assert %c, "math.floor" return } } '
+    'module { func.func @after(%x: f32) -> f32 { %0 = "math.floor"(%x) '
+    ": (f32) -> f32 return %0 : f32 } }\n"
+)
+
+PARSER_VALIDATED_GENERIC_OPERATION_FORMS = (
+    "module {\n"
+    "  func.func @main(%x: f32, %src: memref<1xi8>, %dst: memref<1xi8>) "
+    "-> f32 {\n"
+    '    "memref.\\63opy" // zero-result escaped generic operation\n'
+    "    (%src, %dst) : (memref<1xi8>, memref<1xi8>) -> ()\n"
+    '    %0 = "math.\\66loor" // result-bearing escaped generic operation\n'
+    "    (%x) : (f32) -> f32\n"
+    '    %1 = "scf.execute_region"() ({ %2 = "math.floor"(%0) '
+    ': (f32) -> f32 "scf.yield"(%2) : (f32) -> () }) : () -> f32\n'
+    "    return %1 : f32\n"
+    "  }\n"
+    "}\n"
+)
+
 TOP_LEVEL_ALIAS_WITH_COMPACT_NEIGHBORS = (
     'module { func.func @before(%x: f32) -> f32 { %0 = "math.floor"(%x) '
     ": (f32) -> f32 return %0 : f32 } } "
@@ -1305,6 +1348,133 @@ class CalyxPreflightReportTest(unittest.TestCase):
                 self.assertEqual(report["first_locations"], {})
                 self.assertEqual(report["scanner_diagnostics"], [])
                 self.assert_valid_self_hash(report)
+
+    def test_parser_validated_operation_shaped_type_and_message_strings_are_data(self) -> None:
+        for name, mlir in PARSER_VALIDATED_OPERATION_SHAPED_DATA.items():
+            with self.subTest(context=name):
+                rc, report, stderr, _ = self.run_cli_report(
+                    mlir,
+                    mlir_opt=self.pinned_mlir_opt(),
+                    require_clean=True,
+                )
+
+                self.assertEqual(rc, 0, stderr)
+                self.assertIsNotNone(report)
+                self.assertEqual(report["status"], "ok")
+                self.assertEqual(report["prohibited_ops"], {})
+                self.assertEqual(report["first_locations"], {})
+                self.assertEqual(report["scanner_diagnostics"], [])
+                self.assertEqual(
+                    report["parser_validation"]["input_status"], "accepted"
+                )
+                self.assert_valid_self_hash(report)
+
+    def test_parser_validated_operation_shaped_data_keeps_compact_neighbors_exact(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            PARSER_VALIDATED_OPERATION_DATA_WITH_COMPACT_NEIGHBORS,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 2})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 1, "column": 51}},
+        )
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assertEqual(
+            report["parser_validation"]["input_status"], "accepted"
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_unvalidated_operation_shaped_type_and_message_strings_stay_conservative(self) -> None:
+        expected = {
+            "llvm_named_struct": ({"math.floor": 1}, ["malformed_trivia"]),
+            "emitc_opaque_type": ({"math.floor": 1}, ["malformed_trivia"]),
+            "cf_assert_message": ({"math.floor": 1}, ["malformed_trivia"]),
+            "unknown_llvm_named_struct": (
+                {},
+                ["unknown_operation", "malformed_trivia"],
+            ),
+        }
+        for name, mlir in PARSER_VALIDATED_OPERATION_SHAPED_DATA.items():
+            with self.subTest(context=name):
+                rc, report, stderr, _ = self.run_report(
+                    mlir, require_clean=True
+                )
+
+                self.assertEqual(rc, 1, stderr)
+                self.assertIsNotNone(report)
+                self.assertEqual(report["status"], "blocked")
+                self.assertEqual(report["prohibited_ops"], expected[name][0])
+                self.assertEqual(
+                    [
+                        diagnostic["kind"]
+                        for diagnostic in report["scanner_diagnostics"]
+                    ],
+                    expected[name][1],
+                )
+                self.assert_valid_self_hash(report)
+
+    def test_parser_validated_generic_operation_grammar_remains_visible(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            PARSER_VALIDATED_GENERIC_OPERATION_FORMS,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(
+            report["prohibited_ops"],
+            {"math.floor": 2, "memref.copy": 1},
+        )
+        self.assertEqual(
+            report["first_locations"],
+            {
+                "math.floor": {"line": 5, "column": 10},
+                "memref.copy": {"line": 3, "column": 5},
+            },
+        )
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assertEqual(
+            report["parser_validation"]["input_status"], "accepted"
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_parser_rejection_keeps_generic_and_malformed_names_conservative(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            '"math.floor" / not-a-comment\n'
+            '"bad name"\n'
+            '"mystery.operation"() : () -> ()\n',
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertEqual(
+            [
+                diagnostic["kind"]
+                for diagnostic in report["scanner_diagnostics"]
+            ],
+            [
+                "mlir_parser_rejected",
+                "malformed_trivia",
+                "malformed_quoted_operation",
+                "unknown_operation",
+            ],
+        )
+        self.assertEqual(
+            report["parser_validation"]["input_status"], "rejected"
+        )
+        self.assert_valid_self_hash(report)
 
     def test_quoted_symbol_does_not_hide_neighboring_generic_operation(self) -> None:
         rc, report, stderr, _ = self.run_report(

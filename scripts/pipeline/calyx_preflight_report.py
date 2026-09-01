@@ -804,6 +804,15 @@ def _scan_operations(
                 continue
             if following is not None and following.value == "=":
                 continue
+            if parser_validated and (
+                following is None or following.value != "("
+            ):
+                # Generic operation syntax always places its operand list
+                # immediately after the quoted name (modulo trivia, which
+                # tokenization already removes). Once the authoritative
+                # parser accepted the text, another following token proves
+                # that this operation-shaped string is data.
+                continue
 
             line, column = source_map.location(token.offset)
             _record_operation(

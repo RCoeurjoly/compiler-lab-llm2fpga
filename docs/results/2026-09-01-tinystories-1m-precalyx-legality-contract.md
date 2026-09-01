@@ -93,6 +93,18 @@ exactly one complete balanced RHS atom, including strings, arrays,
 This boundary leaves compact operations immediately before or after a
 declaration visible.
 
+Authoritative parser acceptance also supplies the quoted-generic grammar
+boundary. A parser-accepted operation-shaped string enters the census only
+when its next non-trivia token is the required operand-list `(`. Thus strings
+such as LLVM named-struct identifiers, EmitC opaque type payloads, and
+`cf.assert` messages remain data even when their decoded spelling is
+`math.floor` or an unknown dotted name. Quoted zero-result, result-bearing,
+escaped, comment-separated, same-line, and region-nested generic operations
+all retain the required `(` and remain visible. Unvalidated or parser-rejected
+text does not receive this exclusion: standalone names, malformed post-name
+trivia, unknown operations, and operation-shaped strings in unproven metadata
+continue through the conservative fail-closed path.
+
 Location handling has an explicit trust boundary. The CLI first sends the
 exact input text to pinned `mlir-opt` 21.1.2. Only after that authoritative
 parse succeeds does the scanner treat each balanced, complete `loc(...)` span
@@ -154,3 +166,13 @@ and an LLVM dialect attribute, and true operations on both sides; a rejected
 unclosed-array mutation and the pure API prove the mask is parser-gated. The
 Calyx-stage caller continues to use the checker's exit status and now invokes
 the Nix-materialized identity-bound checker directly.
+
+The accepted-parser boundary is additionally pinned by LLVM named-struct,
+EmitC opaque-type, and `cf.assert` message fixtures using both prohibited and
+unknown operation-shaped strings. A compact accepted fixture places two real
+generic `math.floor` operations around two such data strings and requires an
+exact count of two at the original first location. Accepted generic controls
+cover zero-result `memref.copy`, result-bearing and escaped `math.floor`,
+comments before the operand list, and a compact region-nested operation.
+Pure-API and parser-rejected controls retain conservative diagnostics for the
+same lexical shapes.
