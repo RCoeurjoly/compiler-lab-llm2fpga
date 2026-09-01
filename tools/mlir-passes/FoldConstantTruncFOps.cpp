@@ -564,12 +564,37 @@ private:
     if (auto collapse = value.getDefiningOp<memref::CollapseShapeOp>()) {
       auto sourceView = getStaticView(collapse.getSrc(), argViews);
       auto resultType = collapse.getResult().getType();
-      if (!sourceView || !resultType.hasStaticShape() ||
-          sourceView->strides != getIdentityStrides(sourceView->shape))
+      if (!sourceView || !resultType.hasStaticShape())
         return std::nullopt;
-      return StaticMemRefView{sourceView->base, sourceView->offset,
-                              SmallVector<int64_t>(resultType.getShape()),
-                              getIdentityStrides(resultType)};
+
+      if (sourceView->strides == getIdentityStrides(sourceView->shape))
+        return StaticMemRefView{sourceView->base, sourceView->offset,
+                                SmallVector<int64_t>(resultType.getShape()),
+                                getIdentityStrides(resultType)};
+
+      auto reassociation = collapse.getReassociationIndices();
+      if (sourceView->shape.size() != 2 ||
+          sourceView->strides.size() != 2 || sourceView->shape[0] <= 0 ||
+          sourceView->shape[1] != 1 || sourceView->strides[0] <= 0 ||
+          sourceView->strides[1] != 1 || reassociation.size() != 1 ||
+          reassociation.front().size() != 2 ||
+          reassociation.front()[0] != 0 || reassociation.front()[1] != 1 ||
+          resultType.getRank() != 1 ||
+          resultType.getShape().front() != sourceView->shape[0])
+        return std::nullopt;
+
+      SmallVector<int64_t> resultStrides;
+      int64_t resultOffset = 0;
+      if (failed(resultType.getStridesAndOffset(resultStrides, resultOffset)) ||
+          !isStatic(resultStrides) || ShapedType::isDynamic(resultOffset) ||
+          resultStrides.size() != 1 ||
+          resultStrides.front() != sourceView->strides[0] ||
+          resultOffset != sourceView->offset)
+        return std::nullopt;
+
+      return StaticMemRefView{
+          sourceView->base, sourceView->offset,
+          SmallVector<int64_t>(resultType.getShape()), resultStrides};
     }
 
     auto memrefType = dyn_cast<MemRefType>(value.getType());
