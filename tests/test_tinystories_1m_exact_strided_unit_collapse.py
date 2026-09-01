@@ -119,6 +119,100 @@ MIXED_SIBLING_CONTROL = """module {
 }
 """
 
+DIRECT_DIM_SIBLING_CONTROL = """module {
+  func.func @mixed_direct_root_user(%source: memref<64x64xi64>, %i: index) -> (i64, index) {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    %c0 = arith.constant 0 : index
+    %dim = memref.dim %source, %c0 : memref<64x64xi64>
+    return %loaded, %dim : i64, index
+  }
+}
+"""
+
+DIRECT_TYPED_CALL_SIBLING_CONTROL = """module {
+  func.func private @consume_rank_two(memref<64x64xi64>)
+
+  func.func @direct_typed_call(%source: memref<64x64xi64>, %i: index) -> i64 {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    func.call @consume_rank_two(%source) : (memref<64x64xi64>) -> ()
+    return %loaded : i64
+  }
+}
+"""
+
+DIRECT_RETURN_ESCAPE_CONTROL = """module {
+  func.func @direct_return_escape(%source: memref<64x64xi64>, %i: index)
+      -> (i64, memref<64x64xi64>) {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    return %loaded, %source : i64, memref<64x64xi64>
+  }
+}
+"""
+
+TRANSITIVE_TYPED_CALL_CONTROL = """module {
+  func.func private @consume_collapsed(memref<64xi64, strided<[64]>>)
+
+  func.func @transitive_typed_call(%source: memref<64x64xi64>, %i: index) -> i64 {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    func.call @consume_collapsed(%flat)
+      : (memref<64xi64, strided<[64]>>) -> ()
+    return %loaded : i64
+  }
+}
+"""
+
+DIRECT_ACCESS_SIBLING_CONTROL = """module {
+  func.func @direct_access_sibling(
+      %source: memref<64x64xi64>, %i: index, %j: index, %value: i64)
+      -> (i64, i64) {
+    memref.store %value, %source[%i, %j] : memref<64x64xi64>
+    %direct = memref.load %source[%i, %j] : memref<64x64xi64>
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %collapsed = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    return %direct, %collapsed : i64, i64
+  }
+}
+"""
+
+DIRECT_USER_COPY_DEPENDENCY_CONTROL = """module {
+  func.func @direct_user_copy_dependency(
+      %source: memref<64x64xi64>, %target: memref<64x64xi64>) -> index {
+    %source_sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %source_flat = memref.collapse_shape %source_sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %target_sub = memref.subview %target[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %target_flat = memref.collapse_shape %target_sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    memref.copy %source_flat, %target_flat
+      : memref<64xi64, strided<[64]>> to memref<64xi64, strided<[64]>>
+    %c0 = arith.constant 0 : index
+    %dim = memref.dim %target, %c0 : memref<64x64xi64>
+    return %dim : index
+  }
+}
+"""
+
 COLLAPSED_COPY_CONTROL = """module {
   func.func @collapsed_copy(%source: memref<64x64xi64>, %target: memref<64x64xi64>) {
     %source_sub = memref.subview %source[0, 7] [64, 1] [1, 1]
@@ -562,6 +656,101 @@ class ExactStridedUnitCollapseTest(unittest.TestCase):
         self.assertIn("memref.collapse_shape", output)
         self.assertIn("memref<64x64xi64>", output)
         self.assertNotIn("memref<4096xi64>", output)
+
+    def assert_rank_two_root_and_chain_remain_explicit(self, source: str) -> str:
+        output = self.assert_passes(source)
+        self.assertIn("memref<64x64xi64>", output)
+        self.assertNotIn("memref<4096xi64>", output)
+        self.assertIn("memref.subview", output)
+        self.assertIn("memref.collapse_shape", output)
+        return output
+
+    def test_direct_dim_sibling_preserves_original_dimension(self) -> None:
+        output = self.assert_rank_two_root_and_chain_remain_explicit(
+            DIRECT_DIM_SIBLING_CONTROL
+        )
+        self.assertIn("value = 64 : index", output)
+        self.assertNotIn("value = 4096 : index", output)
+
+    def test_direct_typed_call_sibling_protects_root(self) -> None:
+        output = self.assert_rank_two_root_and_chain_remain_explicit(
+            DIRECT_TYPED_CALL_SIBLING_CONTROL
+        )
+        self.assertIn("func.call", output)
+
+    def test_direct_return_escape_protects_root(self) -> None:
+        output = self.assert_rank_two_root_and_chain_remain_explicit(
+            DIRECT_RETURN_ESCAPE_CONTROL
+        )
+        self.assertIn(
+            "(memref<64x64xi64>, index) -> (i64, memref<64x64xi64>)",
+            output,
+        )
+
+    def test_transitive_typed_call_protects_root(self) -> None:
+        output = self.assert_rank_two_root_and_chain_remain_explicit(
+            TRANSITIVE_TYPED_CALL_CONTROL
+        )
+        self.assertIn("func.call", output)
+
+    def test_direct_load_store_sibling_remains_rewriteable(self) -> None:
+        output = self.assert_passes(DIRECT_ACCESS_SIBLING_CONTROL)
+        self.assertNotIn("memref.subview", output)
+        self.assertNotIn("memref.collapse_shape", output)
+        self.assertIn("memref<4096xi64>", output)
+        arguments = _entry_arguments(output)
+        variables = arguments[1:3]
+        domains = [
+            {"name": "i", "lower": 0, "upper_exclusive": 64},
+            {"name": "j", "lower": 0, "upper_exclusive": 64},
+        ]
+        expected_variables = [
+            {**domain, "ssa": variable}
+            for domain, variable in zip(domains, variables)
+        ]
+        self.assertCountEqual(
+            _affine_accesses(
+                output,
+                variable_names=variables,
+                domains=domains,
+            ),
+            [
+                {
+                    "operation": "memref.store",
+                    "base_argument": 0,
+                    "base_role": "target",
+                    "variables": expected_variables,
+                    "offset": 0,
+                    "coefficients": [64, 1],
+                },
+                {
+                    "operation": "memref.load",
+                    "base_argument": 0,
+                    "base_role": "source",
+                    "variables": expected_variables,
+                    "offset": 0,
+                    "coefficients": [64, 1],
+                },
+                {
+                    "operation": "memref.load",
+                    "base_argument": 0,
+                    "base_role": "source",
+                    "variables": expected_variables,
+                    "offset": 0,
+                    "coefficients": [64, 0],
+                },
+            ],
+        )
+
+    def test_direct_user_protection_propagates_across_collapsed_copy(self) -> None:
+        output = self.assert_passes(DIRECT_USER_COPY_DEPENDENCY_CONTROL)
+        self.assertEqual(output.count('"memref.subview"'), 2)
+        self.assertEqual(output.count('"memref.collapse_shape"'), 2)
+        self.assertIn("memref.copy", output)
+        self.assertIn("memref<64x64xi64>", output)
+        self.assertNotIn("memref<4096xi64>", output)
+        self.assertIn("value = 64 : index", output)
+        self.assertNotIn("value = 4096 : index", output)
 
 
 if __name__ == "__main__":

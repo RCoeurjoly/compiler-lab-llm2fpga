@@ -382,12 +382,8 @@ private:
     if (funcOp.isExternal())
       return;
 
-    SmallVector<memref::SubViewOp> subviews;
-    funcOp.walk(
-        [&](memref::SubViewOp subview) { subviews.push_back(subview); });
-
     DenseMap<Value, StaticMemRefView> argumentViews;
-    flattenStaticIdentityMemRefArguments(funcOp, subviews, argumentViews);
+    flattenStaticIdentityMemRefArguments(funcOp, argumentViews);
 
     SmallVector<memref::LoadOp> loads;
     SmallVector<memref::StoreOp> stores;
@@ -420,7 +416,7 @@ private:
   }
 
   void flattenStaticIdentityMemRefArguments(
-      func::FuncOp funcOp, ArrayRef<memref::SubViewOp> subviews,
+      func::FuncOp funcOp,
       DenseMap<Value, StaticMemRefView> &argumentViews) {
     FunctionType functionType = funcOp.getFunctionType();
     SmallVector<Type> inputs(functionType.getInputs());
@@ -438,18 +434,12 @@ private:
     while (true) {
       SmallVector<Value> newlyProtectedArguments;
       DenseMap<Value, bool> rewritableViewUses;
-      for (memref::SubViewOp subview : subviews) {
-        if (subview->use_empty())
-          continue;
-        if (getStaticView(subview.getResult(), candidateViews) &&
-            canRewriteAllViewUses(subview.getResult(), candidateViews,
+      for (auto &candidate : candidateViews) {
+        Value argument = candidate.first;
+        if (canRewriteAllViewUses(argument, candidateViews,
                                   rewritableViewUses))
           continue;
-        Value root = getViewRoot(subview.getSource());
-        if (isa_and_nonnull<BlockArgument>(root) &&
-            candidateViews.find(root) != candidateViews.end() &&
-            !llvm::is_contained(newlyProtectedArguments, root))
-          newlyProtectedArguments.push_back(root);
+        newlyProtectedArguments.push_back(argument);
       }
       if (newlyProtectedArguments.empty())
         break;
@@ -603,20 +593,6 @@ private:
 
     return StaticMemRefView{value, 0, SmallVector<int64_t>(memrefType.getShape()),
                             SmallVector<int64_t>(memrefType.getRank(), 1)};
-  }
-
-  Value getViewRoot(Value value) {
-    if (isa<BlockArgument>(value))
-      return value;
-    if (auto subview = value.getDefiningOp<memref::SubViewOp>())
-      return getViewRoot(subview.getSource());
-    if (auto cast = value.getDefiningOp<memref::ReinterpretCastOp>())
-      return getViewRoot(cast.getSource());
-    if (auto expand = value.getDefiningOp<memref::ExpandShapeOp>())
-      return getViewRoot(expand.getSrc());
-    if (auto collapse = value.getDefiningOp<memref::CollapseShapeOp>())
-      return getViewRoot(collapse.getSrc());
-    return {};
   }
 
   bool canRewriteAllViewUses(
