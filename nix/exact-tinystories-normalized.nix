@@ -5,7 +5,7 @@ let
   normalizationPipeline =
     "builtin.module(llm2fpga-lower-static-memref-views-for-calyx,canonicalize,cse)";
   preparationPipeline =
-    "builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)";
+    "builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-negf-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)";
   plugin = "${mlirPasses}/lib/LLM2FPGAMLIRPasses.so";
 in
 pkgs.runCommand "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf" {

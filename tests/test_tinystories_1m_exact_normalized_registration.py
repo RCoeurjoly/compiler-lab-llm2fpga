@@ -16,10 +16,11 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 ALIAS = "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf"
 MODULE = ROOT / "nix/exact-tinystories-normalized.nix"
+SHARED_PIPELINE = ROOT / "nix/pipeline.nix"
 VERIFIER = ROOT / "scripts/pipeline/verify_tinystories_1m_exact_normalized_registration.py"
 NORMALIZED_SHA256 = "e669a26338fbcf055266db29d6351228b78314d11ea3687751cb7f2045552d77"
 C22_SHA256 = "66c78e412ade3262c4eb0f61b5776e9c765fb434fdbb53d09cbba7e724ff2fc6"
-PLUGIN_SHA256 = "ec7aa6d4ad5f33696e9599ad23390209bb705cbea78af6ea759daba8d7c767ac"
+PLUGIN_SHA256 = "da138b78750abcdcc7f5f467d0991b1e2eb9cf04708186a6b4f0dd8e14df2c6e"
 NORMALIZATION_PIPELINE = (
     "builtin.module(llm2fpga-lower-static-memref-views-for-calyx,canonicalize,cse)"
 )
@@ -28,6 +29,7 @@ PREPARATION_PIPELINE = (
     "llm2fpga-drop-calyx-unsupported-asserts,"
     "llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,"
     "llm2fpga-lower-exact-math-for-calyx,"
+    "llm2fpga-lower-negf-for-calyx,"
     "llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)"
 )
 REGISTERED = (
@@ -122,6 +124,25 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
             {name: 0 for name in REGISTERED},
         )
 
+    def test_shared_and_exact_preparation_literals_lower_negf_once_in_order(self) -> None:
+        """Omitting, duplicating, or moving NegF breaks the preparation contract."""
+        exact = MODULE.read_text(encoding="utf-8")
+        shared = SHARED_PIPELINE.read_text(encoding="utf-8")
+        exact_expected = (
+            "llm2fpga-lower-exact-math-for-calyx,"
+            "llm2fpga-lower-negf-for-calyx,"
+            "llm2fpga-lower-i1-uitofp-for-calyx"
+        )
+        shared_expected = (
+            "llm2fpga-lower-exact-math-for-calyx,"
+            "llm2fpga-lower-negf-for-calyx${scoutMathPass},"
+            "llm2fpga-lower-i1-uitofp-for-calyx"
+        )
+        self.assertEqual(exact.count("llm2fpga-lower-negf-for-calyx"), 1)
+        self.assertIn(exact_expected, exact)
+        self.assertEqual(shared.count("llm2fpga-lower-negf-for-calyx"), 1)
+        self.assertIn(shared_expected, shared)
+
     def test_preparation_is_parsed_and_authorized_only_by_its_legality_receipt(self) -> None:
         """A false clean receipt or an altered no-scout pipeline must fail."""
         manifest = self._manifest()
@@ -137,10 +158,11 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
         )
 
     def test_preparation_replay_eliminates_floor_but_keeps_residuals_blocked(self) -> None:
-        """A replayed floor successor must not authorize any backend route."""
+        """A replayed NegF successor must not authorize any backend route."""
         manifest = self._manifest()
         legality = json.loads((self.output / "pre-calyx-legality.json").read_text())
         self.assertEqual(legality["prohibited_ops"].get("math.floor", 0), 0)
+        self.assertEqual(legality["prohibited_ops"].get("arith.negf", 0), 0)
         self.assertTrue(
             legality["prohibited_ops"] or legality["scanner_diagnostics"],
             "the successor frontier must remain measured before Calyx authorization",
@@ -166,15 +188,25 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
         self.assertTrue(all(term not in rendered.lower() for term in forbidden), rendered)
         self.assertTrue(all(command[0].endswith(("/mlir-opt", "/python3")) for command in commands.values()))
 
-    def test_independent_verifier_rejects_identity_and_legality_mutations(self) -> None:
-        """Stale c22/plugin/output, false-clean legality, or pipeline edits must fail."""
+    def test_independent_verifier_rejects_identity_pipeline_and_legality_mutations(self) -> None:
+        """Stale authority, malformed NegF ordering, or false-clean legality must fail."""
         verifier = self._verifier_module()
         manifest = self._manifest()
         for path, replacement in (
             (("normalization", "input", "sha256"), "0" * 64),
             (("normalization", "plugin", "sha256"), "1" * 64),
             (("normalization", "output", "sha256"), "2" * 64),
-            (("preparation", "pipeline"), "builtin.module(cse)"),
+            (("preparation", "output", "sha256"), "3" * 64),
+            (("preparation", "pipeline"), PREPARATION_PIPELINE.replace(
+                ",llm2fpga-lower-negf-for-calyx", ""
+            )),
+            (("preparation", "pipeline"), PREPARATION_PIPELINE.replace(
+                ",llm2fpga-lower-negf-for-calyx", ",llm2fpga-lower-negf-for-calyx,llm2fpga-lower-negf-for-calyx"
+            )),
+            (("preparation", "pipeline"), PREPARATION_PIPELINE.replace(
+                "llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-negf-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx",
+                "llm2fpga-lower-negf-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx",
+            )),
             (("preparation", "legality", "status"), "ok"),
         ):
             candidate = json.loads(json.dumps(manifest))

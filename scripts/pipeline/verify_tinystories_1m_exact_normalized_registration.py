@@ -18,13 +18,13 @@ ALIAS = "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf"
 C22_INPUT = ROOT / "artifacts/comparison/tinystories-1m-exact-frontier-determinism-flat-scf/run-1/flat.scf.mlir"
 CHECKER_SOURCE = ROOT / "scripts/pipeline/calyx_preflight_report.py"
 C22_SHA256 = "66c78e412ade3262c4eb0f61b5776e9c765fb434fdbb53d09cbba7e724ff2fc6"
-PLUGIN_SHA256 = "ec7aa6d4ad5f33696e9599ad23390209bb705cbea78af6ea759daba8d7c767ac"
+PLUGIN_SHA256 = "da138b78750abcdcc7f5f467d0991b1e2eb9cf04708186a6b4f0dd8e14df2c6e"
 MLIR_OPT_SHA256 = "3da93261c9b6f698539bec86f3606598d8b3ed61a18095eaa03cde87f7140912"
 CHECKER_SOURCE_SHA256 = "3957d6cfc6da168f9a5c1cb6f1013c172eff3c83f42be6266265009c84ad0839"
 NORMALIZED_SHA256 = "e669a26338fbcf055266db29d6351228b78314d11ea3687751cb7f2045552d77"
 MLIR_VERSION = "21.1.2"
 NORMALIZATION_PIPELINE = "builtin.module(llm2fpga-lower-static-memref-views-for-calyx,canonicalize,cse)"
-PREPARATION_PIPELINE = "builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)"
+PREPARATION_PIPELINE = "builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-negf-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)"
 REGISTERED = ("memref.collapse_shape", "memref.copy", "memref.expand_shape", "memref.reinterpret_cast")
 FORBIDDEN = ("circt-opt", "/bin/calyx", "calyx ", "sv_mlir", "systemverilog", "yosys", "nextpnr", "vivado", "board")
 AUTHORITY_KEYS = {
@@ -125,6 +125,7 @@ def _validate_legality(legality: dict[str, Any], authority: Mapping[str, str]) -
     prohibited, diagnostics = legality.get("prohibited_ops"), legality.get("scanner_diagnostics")
     _require(isinstance(prohibited, dict) and isinstance(diagnostics, list), "legality census malformed")
     _require(prohibited.get("math.floor", 0) == 0, "math.floor successor frontier mismatch")
+    _require(prohibited.get("arith.negf", 0) == 0, "arith.negf successor frontier mismatch")
     _require(legality.get("status") == ("blocked" if prohibited or diagnostics else "ok"), "legality status mismatch")
     validation = legality.get("parser_validation")
     _require(isinstance(validation, dict) and validation.get("identity_status") == "verified" and validation.get("input_status") == "accepted", "parser validation mismatch")
