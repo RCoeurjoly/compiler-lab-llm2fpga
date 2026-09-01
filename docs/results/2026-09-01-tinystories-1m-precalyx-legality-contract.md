@@ -48,26 +48,31 @@ stage can retain the receipt.
 
 ## Scanner boundary
 
-The scanner recognizes custom operation names with or without SSA result
-assignments and quoted generic operation names. It decodes MLIR two-digit hex
-escapes before classification, skips whitespace and `//` comment trivia, and
-does not count names appearing only in comments or attribute strings. It
-retains exact counts for `arith.uitofp`, `memref.collapse_shape`,
+The scanner tokenizes the complete input buffer rather than treating physical
+lines as operation boundaries. It recognizes custom operation names with or
+without SSA result assignments and quoted generic operation names, including
+multiple and nested operations on one line and legal trivia in result groups
+such as `%r: 1 =`. It decodes MLIR two-digit hex escapes before
+classification, skips whitespace and `//` comment trivia, and tracks explicit
+attribute dictionaries so attribute keys and strings do not enter the census.
+It retains exact counts for `arith.uitofp`, `memref.collapse_shape`,
 `memref.copy`, `memref.expand_shape`, and `memref.reinterpret_cast` while also
 prohibiting `arith.negf`, `math.floor`, and `math.absi`.
 
-Quoted generic operations are checked against an explicit reviewed vocabulary.
-An unknown decoded operation, malformed hex escape, missing closing quote,
-missing operand list, or malformed post-name trivia emits a deterministic
-scanner diagnostic and therefore cannot produce a clean result. Adding a new
-quoted operation class requires an explicit checker-contract change.
+Generic and bare custom operation names are checked against an explicit
+reviewed vocabulary. An unknown operation, malformed hex escape, missing
+closing quote, missing operand list, or malformed post-name trivia emits a
+deterministic scanner diagnostic regardless of whether the operation has SSA
+results. Adding a new operation class requires an explicit checker-contract
+change.
 
 ## Regression evidence
 
 The focused suite covers result-bearing custom spellings, generic spellings,
-SSA result lists, escaped names, comments between a generic name and operands,
-multiple occurrences, malformed escapes and trivia, unknown quoted operations,
-comment/string false positives, deterministic bytes, exact first locations,
-the schema-v2 key set, and independent self-hash reconstruction. Existing
-callers use the checker's exit status rather than parsing schema-v1 fields, so
-no coupled caller change is required for this task.
+SSA result lists and result-group trivia, escaped names, comments between a
+generic name and operands, multiple and nested same-line operations, multiline
+attribute keys, malformed zero-result operations, unknown quoted and custom
+operations, comment/string false positives, deterministic bytes, exact first
+locations, the schema-v2 key set, and independent self-hash reconstruction.
+Existing callers use the checker's exit status rather than parsing schema-v1
+fields, so no coupled caller change is required for this task.

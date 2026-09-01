@@ -243,7 +243,9 @@ class CalyxPreflightReportTest(unittest.TestCase):
     def test_operation_names_in_comments_and_attribute_strings_are_not_counted(self) -> None:
         rc, report, stderr, _ = self.run_report(
             "// math.floor arith.negf math.absi\n"
-            "%0 = arith.constant 0 : i32 {note = \"math.floor and mystery.operation\"}\n",
+            "%0 = arith.constant 0 : i32 {note = \"math.floor and mystery.operation\"}\n"
+            r'%1 = arith.constant 0 : i32 {note = "math.floor \" \\ \n \t"}'
+            "\n",
             require_clean=True,
         )
 
@@ -252,6 +254,114 @@ class CalyxPreflightReportTest(unittest.TestCase):
         self.assertEqual(report["status"], "ok")
         self.assertEqual(report["prohibited_ops"], {})
         self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
+    def test_counts_multiple_and_nested_operations_on_one_line(self) -> None:
+        mlir = (
+            "module { func.func @main(%arg0: i32, %arg1: f32) -> f32 { "
+            "%0 = arith.sitofp %arg0 : i32 to f32 "
+            "%1 = math.floor %arg1 : f32 "
+            "%2 = \"scf.execute_region\"() ({ %3 = math.floor %1 : f32 "
+            "\"scf.yield\"(%3) : (f32) -> () }) : () -> f32 "
+            "return %2 : f32 } }"
+        )
+        rc, report, stderr, _ = self.run_report(mlir, require_clean=True)
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 2})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 1, "column": mlir.index("math.floor") + 1}},
+        )
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
+    def test_accepts_result_group_trivia_before_generic_operation(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            "module {\n"
+            "  func.func @main(%arg0: f32) {\n"
+            "    %r: 1 = \"math.floor\"(%arg0) : (f32) -> f32\n"
+            "    return\n"
+            "  }\n"
+            "}\n",
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 3, "column": 13}},
+        )
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
+    def test_multiline_attribute_key_is_not_an_operation(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            "module attributes {\n"
+            "  math.floor = \"not an operation\"\n"
+            "} {\n"
+            "  func.func @main() {\n"
+            "    \"func.return\"() {math.floor} : () -> ()\n"
+            "  }\n"
+            "}\n",
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 0, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
+    def test_malformed_zero_result_generic_operation_fails_closed(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            "\"math.floor\" / not-a-comment\n", require_clean=True
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 1, "column": 1}},
+        )
+        self.assertEqual(len(report["scanner_diagnostics"]), 1)
+        self.assertEqual(report["scanner_diagnostics"][0]["kind"], "malformed_trivia")
+        self.assertEqual(report["scanner_diagnostics"][0]["line"], 1)
+        self.assertEqual(report["scanner_diagnostics"][0]["column"], 14)
+        self.assert_valid_self_hash(report)
+
+    def test_unknown_custom_operations_fail_closed_with_and_without_results(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            "mystery.zero_result\n"
+            "%0 = mystery.with_result %arg0 : i32\n",
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(
+            [diagnostic["kind"] for diagnostic in report["scanner_diagnostics"]],
+            ["unknown_operation", "unknown_operation"],
+        )
+        self.assertEqual(
+            [
+                (diagnostic["line"], diagnostic["column"])
+                for diagnostic in report["scanner_diagnostics"]
+            ],
+            [(1, 1), (2, 6)],
+        )
         self.assert_valid_self_hash(report)
 
 
