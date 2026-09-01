@@ -960,8 +960,8 @@ struct LowerExactMathForCalyxPass
     return "llm2fpga-lower-exact-math-for-calyx";
   }
   StringRef getDescription() const final {
-    return "Lower fused scalar f64 floor-to-i64 and scalar f32 floor, ceil, "
-           "and rsqrt to arithmetic supported by SCF-to-Calyx.";
+    return "Lower scalar i64 absi, fused scalar f64 floor-to-i64, and scalar "
+           "f32 floor, ceil, and rsqrt to arithmetic supported by SCF-to-Calyx.";
   }
 
   void getDependentDialects(DialectRegistry &registry) const final {
@@ -969,6 +969,15 @@ struct LowerExactMathForCalyxPass
   }
 
   void runOnOperation() final {
+    SmallVector<math::AbsIOp> i64AbsI;
+    getOperation().walk([&](math::AbsIOp op) {
+      auto operandType = dyn_cast<IntegerType>(op.getOperand().getType());
+      auto resultType = dyn_cast<IntegerType>(op.getType());
+      if (operandType && resultType && operandType.isInteger(64) &&
+          resultType.isInteger(64))
+        i64AbsI.push_back(op);
+    });
+
     SmallVector<math::FloorOp> f64FloorToI64;
     getOperation().walk([&](math::FloorOp op) {
       auto floatType = dyn_cast<FloatType>(op.getType());
@@ -983,6 +992,20 @@ struct LowerExactMathForCalyxPass
     });
 
     IRRewriter rewriter(getOperation().getContext());
+    for (math::AbsIOp absi : i64AbsI) {
+      Location loc = absi.getLoc();
+      auto i64 = rewriter.getI64Type();
+      rewriter.setInsertionPoint(absi);
+      Value shiftAmount = arith::ConstantOp::create(
+          rewriter, loc, i64, rewriter.getIntegerAttr(i64, 63));
+      Value sign =
+          arith::ShRSIOp::create(rewriter, loc, absi.getOperand(), shiftAmount);
+      Value flipped =
+          arith::XOrIOp::create(rewriter, loc, absi.getOperand(), sign);
+      Value result = arith::SubIOp::create(rewriter, loc, flipped, sign);
+      rewriter.replaceOp(absi, result);
+    }
+
     for (math::FloorOp floor : f64FloorToI64) {
       auto consumer = cast<arith::FPToSIOp>(*floor.getResult().getUsers().begin());
       auto floatType = cast<FloatType>(floor.getType());

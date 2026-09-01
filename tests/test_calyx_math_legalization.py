@@ -41,6 +41,7 @@ class CalyxMathLegalizationTest(unittest.TestCase):
         self.assertIn("math::FloorOp", source)
         self.assertIn("math::CeilOp", source)
         self.assertIn("math::RsqrtOp", source)
+        self.assertIn("math::AbsIOp", source)
         self.assertIn("math::SqrtOp::create", source)
 
     def test_scout_approximations_are_explicit_and_opt_in(self) -> None:
