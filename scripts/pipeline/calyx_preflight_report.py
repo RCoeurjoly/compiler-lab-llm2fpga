@@ -5,7 +5,9 @@ import argparse
 import bisect
 import hashlib
 import json
+import os
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -321,147 +323,6 @@ def _delimiter_pairs(tokens: list[Token]) -> dict[int, int]:
     return pairs
 
 
-def _parse_metadata_atom(
-    tokens: list[Token],
-    start: int,
-    end: int,
-    delimiter_pairs: dict[int, int],
-) -> int | None:
-    if start >= end:
-        return None
-
-    cursor = start
-    first = tokens[cursor]
-    if first.value in {"+", "-"}:
-        cursor += 1
-        if cursor >= end or tokens[cursor].kind not in {
-            "float",
-            "identifier",
-            "number",
-        }:
-            return None
-        cursor += 1
-    elif first.value in {"#", "!"}:
-        cursor += 1
-        if cursor >= end or tokens[cursor].kind not in {"identifier", "number"}:
-            return None
-        cursor += 1
-    elif first.value == "@":
-        cursor += 1
-        if cursor >= end or tokens[cursor].kind not in {"identifier", "string"}:
-            return None
-        cursor += 1
-        while (
-            cursor + 3 < end
-            and tokens[cursor].value == ":"
-            and tokens[cursor + 1].value == ":"
-            and tokens[cursor + 2].value == "@"
-            and tokens[cursor + 3].kind in {"identifier", "string"}
-        ):
-            cursor += 4
-    elif first.kind in {"float", "identifier", "number", "string"}:
-        cursor += 1
-    elif first.value in {"{", "["}:
-        closing = delimiter_pairs.get(cursor)
-        if closing is None or closing >= end:
-            return None
-        if not _metadata_container_is_valid(
-            tokens, cursor, closing, delimiter_pairs
-        ):
-            return None
-        cursor = closing + 1
-    else:
-        return None
-
-    while cursor < end and tokens[cursor].value in {"<", "("}:
-        closing = delimiter_pairs.get(cursor)
-        if closing is None or closing >= end:
-            return None
-        cursor = closing + 1
-    return cursor
-
-
-def _parse_metadata_value(
-    tokens: list[Token],
-    start: int,
-    end: int,
-    delimiter_pairs: dict[int, int],
-) -> int | None:
-    cursor = _parse_metadata_atom(tokens, start, end, delimiter_pairs)
-    if cursor is None or cursor == end or tokens[cursor].value != ":":
-        return cursor
-    return _parse_metadata_atom(tokens, cursor + 1, end, delimiter_pairs)
-
-
-def _metadata_container_is_valid(
-    tokens: list[Token],
-    opening: int,
-    closing: int,
-    delimiter_pairs: dict[int, int],
-) -> bool:
-    cursor = opening + 1
-    if cursor == closing:
-        return True
-
-    is_dictionary = tokens[opening].value == "{"
-    while cursor < closing:
-        if is_dictionary:
-            if tokens[cursor].kind not in {"identifier", "string"}:
-                return False
-            cursor += 1
-            if cursor < closing and tokens[cursor].value == "=":
-                cursor = _parse_metadata_value(
-                    tokens, cursor + 1, closing, delimiter_pairs
-                )
-                if cursor is None:
-                    return False
-        else:
-            cursor = _parse_metadata_value(
-                tokens, cursor, closing, delimiter_pairs
-            )
-            if cursor is None:
-                return False
-
-        if cursor == closing:
-            return True
-        if tokens[cursor].value != ",":
-            return False
-        cursor += 1
-        if cursor == closing:
-            return False
-    return False
-
-
-def _metadata_structure_is_valid(
-    tokens: list[Token],
-    start: int,
-    end: int,
-    delimiter_pairs: dict[int, int],
-) -> bool:
-    if start >= end or any(token.kind == "ssa" for token in tokens[start:end]):
-        return False
-
-    paired_closings = frozenset(delimiter_pairs.values())
-    for index in range(start, end):
-        token = tokens[index]
-        if token.value in OPENING_DELIMITERS:
-            closing = delimiter_pairs.get(index)
-            if closing is None or closing >= end:
-                return False
-        elif (
-            token.value in CLOSING_DELIMITERS
-            and not (
-                token.value == ">"
-                and index > start
-                and tokens[index - 1].value == "-"
-            )
-            and index not in paired_closings
-        ):
-            return False
-
-    return _parse_metadata_value(tokens, start, end, delimiter_pairs) == end
-
-
 def _unsigned_integer_is_valid(token: Token) -> bool:
     if token.kind != "number":
         return False
@@ -560,14 +421,10 @@ def _parse_location_instance(
     if first.kind == "identifier" and first.value == "fused":
         cursor = start + 1
         if cursor < end and tokens[cursor].value == "<":
-            metadata_closing = delimiter_pairs.get(cursor)
-            if metadata_closing is None or metadata_closing >= end:
-                return None
-            if not _metadata_structure_is_valid(
-                tokens, cursor + 1, metadata_closing, delimiter_pairs
-            ):
-                return None
-            cursor = metadata_closing + 1
+            # Fused metadata is the full MLIR attribute grammar.  The pure
+            # scanner has no authoritative parser result, so it must not try
+            # to recognize an open-ended subset and silently trust it.
+            return None
         if cursor >= end or tokens[cursor].value != "[":
             return None
         fused_closing = delimiter_pairs.get(cursor)
@@ -731,6 +588,39 @@ def _location_context(
     return contexts, diagnostics
 
 
+def _parser_validated_location_context(
+    tokens: list[Token], source_map: SourceMap
+) -> tuple[list[bool], list[dict[str, object]]]:
+    """Mark complete loc(...) spans after the pinned parser accepted the text."""
+    delimiter_pairs = _delimiter_pairs(tokens)
+    contexts = [False] * len(tokens)
+    diagnostics: list[dict[str, object]] = []
+    for index, token in enumerate(tokens):
+        if (
+            token.kind != "identifier"
+            or token.value != "loc"
+            or index + 1 >= len(tokens)
+            or tokens[index + 1].value != "("
+        ):
+            continue
+        opening = index + 1
+        closing = delimiter_pairs.get(opening)
+        if closing is None:
+            line, column = source_map.location(token.offset)
+            diagnostics.append(
+                _diagnostic(
+                    "malformed_location",
+                    line,
+                    column,
+                    "unclosed location expression",
+                )
+            )
+            continue
+        for context_index in range(opening + 1, closing):
+            contexts[context_index] = True
+    return contexts, diagnostics
+
+
 def _record_operation(
     operation: str,
     line: int,
@@ -746,16 +636,22 @@ def _record_operation(
 
 def _scan_operations(
     text: str,
+    *,
+    parser_validated: bool = False,
+    initial_diagnostics: tuple[dict[str, object], ...] = (),
 ) -> tuple[
     dict[str, int],
     dict[str, dict[str, int]],
     list[dict[str, object]],
 ]:
     source_map = SourceMap(text)
-    tokens, diagnostics = _tokenize(text, source_map)
+    tokens, tokenizer_diagnostics = _tokenize(text, source_map)
+    diagnostics = [*initial_diagnostics, *tokenizer_diagnostics]
     attribute_contexts = _attribute_context(tokens)
-    location_contexts, location_diagnostics = _location_context(
-        tokens, source_map
+    location_contexts, location_diagnostics = (
+        _parser_validated_location_context(tokens, source_map)
+        if parser_validated
+        else _location_context(tokens, source_map)
     )
     diagnostics.extend(location_diagnostics)
     counts: dict[str, int] = {}
@@ -866,8 +762,17 @@ def _canonical_json(payload: dict[str, object]) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
 
 
-def build_report(text: str) -> dict[str, object]:
-    prohibited_ops, first_locations, scanner_diagnostics = _scan_operations(text)
+def _build_report(
+    text: str,
+    *,
+    parser_validated: bool,
+    initial_diagnostics: tuple[dict[str, object], ...] = (),
+) -> dict[str, object]:
+    prohibited_ops, first_locations, scanner_diagnostics = _scan_operations(
+        text,
+        parser_validated=parser_validated,
+        initial_diagnostics=initial_diagnostics,
+    )
     report: dict[str, object] = {
         "schema_version": 2,
         "status": "blocked"
@@ -881,19 +786,81 @@ def build_report(text: str) -> dict[str, object]:
     return report
 
 
+def build_report(text: str) -> dict[str, object]:
+    """Build a fail-closed report without trusting complex location metadata."""
+    return _build_report(text, parser_validated=False)
+
+
+def build_report_from_parser_validated_text(text: str) -> dict[str, object]:
+    """Build a report for text already accepted by the pinned MLIR parser."""
+    return _build_report(text, parser_validated=True)
+
+
+def _validate_with_pinned_parser(
+    text: str, mlir_opt: str | None
+) -> dict[str, object] | None:
+    if mlir_opt is None:
+        return _diagnostic(
+            "mlir_parser_unavailable",
+            1,
+            1,
+            "pinned MLIR parser is not configured",
+        )
+    try:
+        parsed = subprocess.run(
+            [mlir_opt, "-o", os.devnull],
+            input=text.encode("utf-8"),
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return _diagnostic(
+            "mlir_parser_unavailable",
+            1,
+            1,
+            "pinned MLIR parser could not be executed",
+        )
+    if parsed.returncode != 0:
+        return _diagnostic(
+            "mlir_parser_rejected",
+            1,
+            1,
+            "pinned MLIR parser rejected input",
+        )
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Report prohibited operations at the SCF-to-Calyx boundary."
     )
     parser.add_argument("input", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument(
+        "--mlir-opt",
+        default=os.environ.get("CALYX_PREFLIGHT_MLIR_OPT"),
+        help=(
+            "pinned mlir-opt executable; defaults to "
+            "CALYX_PREFLIGHT_MLIR_OPT"
+        ),
+    )
     parser.add_argument("--require-clean", action="store_true")
     args = parser.parse_args()
 
     if not args.input.is_file():
         raise SystemExit(f"missing input MLIR: {args.input}")
 
-    report = build_report(args.input.read_text(encoding="utf-8"))
+    text = args.input.read_text(encoding="utf-8")
+    parser_diagnostic = _validate_with_pinned_parser(text, args.mlir_opt)
+    if parser_diagnostic is None:
+        report = build_report_from_parser_validated_text(text)
+    else:
+        report = _build_report(
+            text,
+            parser_validated=False,
+            initial_diagnostics=(parser_diagnostic,),
+        )
     args.output.write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )

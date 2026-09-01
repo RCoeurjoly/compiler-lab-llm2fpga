@@ -243,6 +243,8 @@ class RepresentativeCoreNoHandshakeSvTest(unittest.TestCase):
         self.assertIn("calyx_float_frontier_report.py", pipeline)
         self.assertIn("float-frontier.json", pipeline)
         self.assertIn("CALYX_PREFLIGHT_REPORT", pipeline)
+        self.assertIn("CALYX_PREFLIGHT_MLIR_OPT", pipeline)
+        self.assertIn("${mlir}/bin/mlir-opt", pipeline)
         self.assertIn("calyx_preflight_report.py", pipeline)
         self.assertIn("pre-calyx-legality.json", pipeline)
         self.assertIn("--manifest-json", pipeline)

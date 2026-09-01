@@ -54,20 +54,33 @@ without SSA result assignments and quoted generic operation names, including
 multiple and nested operations on one line and legal trivia in result groups
 such as `%r: 1 =`. It decodes MLIR two-digit hex escapes before
 classification, skips whitespace and `//` comment trivia, and tracks explicit
-attribute dictionaries and structurally valid location expressions so
-attribute keys, attribute strings, quoted symbol names, and valid `loc(...)`
-strings do not enter the census. Location recognition follows the pinned MLIR
-21.1.2 builtin grammar recursively: name and file locations (including line,
-column, range, decimal, and hexadecimal forms), unknown locations, resolved
-named and numeric aliases, callsites, and fused locations with optional
-structured metadata. Fused elements, name children, callsites, and metadata
-locations may nest without turning their strings into operations. A malformed
-or unclosed location, unresolved/non-location alias, overflowing source
-coordinate, malformed fused list, or malformed metadata value emits a
-deterministic `malformed_location` diagnostic and does not suppress its tokens
-from the operation scan. These data contexts are excluded without suppressing
-neighboring, result-bearing, or region-nested generic operations. It retains
-exact counts for `arith.uitofp`, `memref.collapse_shape`,
+attribute dictionaries so attribute keys, attribute strings, and quoted
+symbol names do not enter the census.
+
+Location handling has an explicit trust boundary. The CLI first sends the
+exact input text to pinned `mlir-opt` 21.1.2. Only after that authoritative
+parse succeeds does the scanner treat each balanced, complete `loc(...)` span
+as data. Thus arbitrary builtin, distinct, and dialect-extensible fused
+metadata remains data without a Python reimplementation of MLIR's full
+attribute grammar. The census still runs on the original text and retains its
+original source locations. Parser rejection or an unavailable parser adds a
+deterministic blocking diagnostic, then uses the conservative scanner so
+operation-shaped strings inside or after malformed locations remain visible.
+
+The pure `build_report(text)` API performs no subprocess work. It recognizes a
+bounded builtin subset: name/file/range locations, `unknown`, resolved named
+and numeric aliases, callsites, and fused locations without metadata. Complex
+fused metadata is never trusted in this unvalidated mode; it emits
+`malformed_location` and its tokens remain visible. The explicit
+`build_report_from_parser_validated_text(text)` interface has the precondition
+that the same complete text was accepted by the pinned parser.
+
+The CLI requires the parser through `--mlir-opt` or
+`CALYX_PREFLIGHT_MLIR_OPT`. The registered Calyx derivation exports the exact
+`${mlir}/bin/mlir-opt` store path, making that runtime dependency pinned and
+non-ambient. These contexts are excluded without suppressing neighboring,
+result-bearing, or region-nested generic operations. The checker retains exact
+counts for `arith.uitofp`, `memref.collapse_shape`,
 `memref.copy`, `memref.expand_shape`, and `memref.reinterpret_cast` while also
 prohibiting `arith.negf`, `math.floor`, and `math.absi`.
 
@@ -88,10 +101,11 @@ operations, comment/attribute/symbol/location string false positives,
 neighboring true generic operations, balanced-malformed and unclosed location
 wrappers, nested malformed callsite locations, deterministic bytes, exact
 first locations, the schema-v2 key set, and independent self-hash
-reconstruction. A pinned-parser corpus exercises 21 accepted builtin-location
-and metadata combinations plus eight rejected malformed, unbalanced,
-overflow, and alias mutations; a compact parser-accepted fixture confirms that
-result-bearing and region-nested generic operations adjacent to a fused
-location remain visible.
-Existing callers use the checker's exit status rather than parsing schema-v1
-fields, so no coupled caller change is required for this task.
+reconstruction. A pinned-parser corpus exercises 23 accepted builtin-location
+and metadata combinations—including distinct and an LLVM dialect attribute—
+plus nine rejected malformed, unbalanced, overflow, alias, and arbitrary
+metadata mutations. Compact parser-accepted and parser-rejected fixtures
+confirm that result-bearing and region-nested generic operations outside or
+after fused location syntax remain visible. The Calyx-stage caller continues
+to use the checker's exit status; its only coupled change is supplying the
+pinned parser path.

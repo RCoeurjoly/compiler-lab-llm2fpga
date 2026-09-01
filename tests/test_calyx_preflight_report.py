@@ -1,5 +1,7 @@
+import importlib.util
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -10,8 +12,15 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REPORT = REPO_ROOT / "scripts" / "pipeline" / "calyx_preflight_report.py"
+REPORT_SPEC = importlib.util.spec_from_file_location(
+    "calyx_preflight_report_under_test", REPORT
+)
+assert REPORT_SPEC is not None and REPORT_SPEC.loader is not None
+REPORT_MODULE = importlib.util.module_from_spec(REPORT_SPEC)
+sys.modules[REPORT_SPEC.name] = REPORT_MODULE
+REPORT_SPEC.loader.exec_module(REPORT_MODULE)
 
-VALID_LOCATION_CORPUS = {
+PURE_LOCATION_CORPUS = {
     "name": 'module { func.func @main() { return } } loc("math.floor")\n',
     "file_line": (
         'module { func.func @main() { return } } loc("math.floor":7)\n'
@@ -61,6 +70,9 @@ VALID_LOCATION_CORPUS = {
     "empty_fused": (
         "module { func.func @main() { return } } loc(fused[])\n"
     ),
+}
+
+PARSER_VALIDATED_LOCATION_CORPUS = {
     "fused_string_metadata": (
         'module { func.func @main() { return } } '
         'loc(fused<"math.floor">['
@@ -89,12 +101,25 @@ VALID_LOCATION_CORPUS = {
         "module { func.func @main() { return } } "
         "loc(fused<#metadata>[unknown])\n"
     ),
+    "fused_distinct_metadata": (
+        'module { func.func @main() { return } } '
+        'loc(fused<distinct[0]<"math.floor">>[unknown])\n'
+    ),
+    "fused_dialect_metadata": (
+        "module { func.func @main() { return } } "
+        "loc(fused<#llvm.access_group<id = distinct[0]<>>>[unknown])\n"
+    ),
     "nested": (
         '#source = loc("math.floor":7:11)\n'
         'module { func.func @main() { return } } '
         'loc(callsite(fused<"metadata">[#source, unknown] at '
         '"caller"(fused["mystery.operation", unknown])))\n'
     ),
+}
+
+VALID_LOCATION_CORPUS = {
+    **PURE_LOCATION_CORPUS,
+    **PARSER_VALIDATED_LOCATION_CORPUS,
 }
 
 MALFORMED_LOCATION_CORPUS = {
@@ -129,6 +154,11 @@ MALFORMED_LOCATION_CORPUS = {
         "#source = 42 : i64\n"
         "module { func.func @main() { return } } loc(#source)\n"
     ),
+    "invalid_arbitrary_metadata": (
+        "module { func.func @main() { return } } "
+        'loc(fused<bogus("math.floor"() '
+        '"mystery.operation"())>[unknown])\n'
+    ),
 }
 
 LOCATION_NEIGHBORING_OPERATIONS = (
@@ -147,8 +177,28 @@ LOCATION_NEIGHBORING_OPERATIONS = (
 
 
 class CalyxPreflightReportTest(unittest.TestCase):
+    def pinned_mlir_opt(self) -> str:
+        mlir_opt = shutil.which("mlir-opt")
+        if mlir_opt is None:
+            self.skipTest("mlir-opt is available in the pinned Nix environment")
+        return mlir_opt
+
     def run_report(
         self, mlir: str, *, require_clean: bool = False
+    ) -> tuple[int, dict[str, object] | None, str, bytes | None]:
+        report = REPORT_MODULE.build_report(mlir)
+        output = (
+            json.dumps(report, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        rc = 1 if require_clean and report["status"] == "blocked" else 0
+        return rc, report, "", output
+
+    def run_cli_report(
+        self,
+        mlir: str,
+        *,
+        mlir_opt: str | None,
+        require_clean: bool = False,
     ) -> tuple[int, dict[str, object] | None, str, bytes | None]:
         with tempfile.TemporaryDirectory() as tmp:
             input_path = Path(tmp) / "input.mlir"
@@ -157,9 +207,15 @@ class CalyxPreflightReportTest(unittest.TestCase):
             cmd = [sys.executable, str(REPORT), str(input_path), str(output_path)]
             if require_clean:
                 cmd.append("--require-clean")
+            env = os.environ.copy()
+            if mlir_opt is None:
+                env.pop("CALYX_PREFLIGHT_MLIR_OPT", None)
+            else:
+                env["CALYX_PREFLIGHT_MLIR_OPT"] = mlir_opt
             result = subprocess.run(
                 cmd,
                 check=False,
+                env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -177,9 +233,7 @@ class CalyxPreflightReportTest(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def test_pinned_mlir_parser_accepts_complete_builtin_location_corpus(self) -> None:
-        mlir_opt = shutil.which("mlir-opt")
-        if mlir_opt is None:
-            self.skipTest("mlir-opt is available in the pinned Nix environment")
+        mlir_opt = self.pinned_mlir_opt()
 
         version = subprocess.run(
             [mlir_opt, "--version"],
@@ -224,8 +278,8 @@ class CalyxPreflightReportTest(unittest.TestCase):
         )
         self.assertEqual(parsed.returncode, 0, parsed.stderr)
 
-    def test_valid_builtin_locations_and_their_strings_are_data(self) -> None:
-        for name, mlir in VALID_LOCATION_CORPUS.items():
+    def test_pure_api_accepts_only_bounded_builtin_locations_as_data(self) -> None:
+        for name, mlir in PURE_LOCATION_CORPUS.items():
             with self.subTest(location=name):
                 rc, report, stderr, _ = self.run_report(
                     mlir, require_clean=True
@@ -238,6 +292,125 @@ class CalyxPreflightReportTest(unittest.TestCase):
                 self.assertEqual(report["first_locations"], {})
                 self.assertEqual(report["scanner_diagnostics"], [])
                 self.assert_valid_self_hash(report)
+
+    def test_cli_uses_pinned_parser_to_authorize_complex_location_metadata(self) -> None:
+        mlir_opt = self.pinned_mlir_opt()
+
+        for name, mlir in PARSER_VALIDATED_LOCATION_CORPUS.items():
+            with self.subTest(location=name):
+                rc, report, stderr, _ = self.run_cli_report(
+                    mlir, mlir_opt=mlir_opt, require_clean=True
+                )
+
+                self.assertEqual(rc, 0, stderr)
+                self.assertIsNotNone(report)
+                self.assertEqual(report["status"], "ok")
+                self.assertEqual(report["prohibited_ops"], {})
+                self.assertEqual(report["first_locations"], {})
+                self.assertEqual(report["scanner_diagnostics"], [])
+                self.assert_valid_self_hash(report)
+
+    def test_pure_api_refuses_unvalidated_arbitrary_location_metadata(self) -> None:
+        mlir = MALFORMED_LOCATION_CORPUS["invalid_arbitrary_metadata"]
+        rc, report, stderr, _ = self.run_report(mlir, require_clean=True)
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertEqual(
+            [diagnostic["kind"] for diagnostic in report["scanner_diagnostics"]],
+            ["malformed_location", "unknown_operation"],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_parser_rejection_blocks_without_hiding_metadata_operations(self) -> None:
+        mlir_opt = self.pinned_mlir_opt()
+        mlir = MALFORMED_LOCATION_CORPUS["invalid_arbitrary_metadata"]
+
+        rc, report, stderr, output = self.run_cli_report(
+            mlir, mlir_opt=mlir_opt, require_clean=True
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertEqual(
+            [diagnostic["kind"] for diagnostic in report["scanner_diagnostics"]],
+            [
+                "mlir_parser_rejected",
+                "malformed_location",
+                "unknown_operation",
+            ],
+        )
+        self.assertEqual(
+            report["scanner_diagnostics"][0]["message"],
+            "pinned MLIR parser rejected input",
+        )
+        self.assert_valid_self_hash(report)
+
+        rc2, report2, stderr2, output2 = self.run_cli_report(
+            mlir, mlir_opt=mlir_opt, require_clean=True
+        )
+        self.assertEqual(rc2, 1, stderr2)
+        self.assertEqual(report2, report)
+        self.assertEqual(output2, output)
+
+    def test_parser_rejection_keeps_operations_outside_and_after_location_visible(self) -> None:
+        mlir = (
+            "module { func.func @main(%arg0: f32) -> f32 { "
+            '%0 = "math.floor"(%arg0) : (f32) -> f32 '
+            "return %0 : f32 } } "
+            'loc(fused<bogus("metadata")>[unknown])\n'
+            '"mystery.operation"() : () -> ()\n'
+        )
+        rc, report, stderr, _ = self.run_cli_report(
+            mlir, mlir_opt=self.pinned_mlir_opt(), require_clean=True
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertEqual(
+            [diagnostic["kind"] for diagnostic in report["scanner_diagnostics"]],
+            [
+                "mlir_parser_rejected",
+                "malformed_location",
+                "unknown_operation",
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_missing_pinned_parser_is_a_deterministic_blocker(self) -> None:
+        mlir = "module { func.func @main() { return } }\n"
+
+        rc, report, stderr, output = self.run_cli_report(
+            mlir, mlir_opt=None, require_clean=True
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "mlir_parser_unavailable",
+                    "line": 1,
+                    "column": 1,
+                    "message": "pinned MLIR parser is not configured",
+                }
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
+        rc2, report2, stderr2, output2 = self.run_cli_report(
+            mlir, mlir_opt=None, require_clean=True
+        )
+        self.assertEqual(rc2, 1, stderr2)
+        self.assertEqual(report2, report)
+        self.assertEqual(output2, output)
 
     def test_malformed_fused_locations_block_without_hiding_operations(self) -> None:
         mlir = (
@@ -345,9 +518,11 @@ class CalyxPreflightReportTest(unittest.TestCase):
         )
         self.assert_valid_self_hash(report)
 
-    def test_fused_location_boundary_keeps_nested_generic_operations_visible(self) -> None:
-        rc, report, stderr, _ = self.run_report(
-            LOCATION_NEIGHBORING_OPERATIONS, require_clean=True
+    def test_validated_fused_location_keeps_nested_generic_operations_visible(self) -> None:
+        rc, report, stderr, _ = self.run_cli_report(
+            LOCATION_NEIGHBORING_OPERATIONS,
+            mlir_opt=self.pinned_mlir_opt(),
+            require_clean=True,
         )
 
         self.assertEqual(rc, 1, stderr)
