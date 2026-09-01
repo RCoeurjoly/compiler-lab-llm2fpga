@@ -14,6 +14,7 @@
 #include "mlir/Tools/Plugins/PassPlugin.h"
 
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/CheckedArithmetic.h"
 
 #include <optional>
@@ -316,11 +317,19 @@ struct LowerStaticMemRefViewsForCalyxPass
   }
 
   void runOnOperation() final {
-    materializeDenseResourceMemRefGlobals(getOperation());
+    ModuleOp module = getOperation();
+    llvm::DenseSet<StringAttr> signatureProtectedFunctions;
+    collectSignatureProtectedFunctions(module, signatureProtectedFunctions);
+
+    materializeDenseResourceMemRefGlobals(module);
     DenseMap<StringAttr, MemRefType> flattenedGlobals;
-    flattenStaticIdentityMemRefGlobals(getOperation(), flattenedGlobals);
-    updateGetGlobalTypes(getOperation(), flattenedGlobals);
-    getOperation().walk([&](func::FuncOp funcOp) { runOnFunction(funcOp); });
+    flattenStaticIdentityMemRefGlobals(module, flattenedGlobals);
+    updateGetGlobalTypes(module, flattenedGlobals);
+    module.walk([&](func::FuncOp funcOp) {
+      runOnFunction(funcOp,
+                    signatureProtectedFunctions.contains(
+                        funcOp.getSymNameAttr()));
+    });
   }
 
   void getDependentDialects(DialectRegistry &registry) const final {
@@ -329,6 +338,21 @@ struct LowerStaticMemRefViewsForCalyxPass
   }
 
 private:
+  void collectSignatureProtectedFunctions(
+      ModuleOp module,
+      llvm::DenseSet<StringAttr> &signatureProtectedFunctions) {
+    auto protectDefinedCallee = [&](StringRef symbol) {
+      auto callee = module.lookupSymbol<func::FuncOp>(symbol);
+      if (callee && !callee.isExternal())
+        signatureProtectedFunctions.insert(callee.getSymNameAttr());
+    };
+    module.walk(
+        [&](func::CallOp call) { protectDefinedCallee(call.getCallee()); });
+    module.walk([&](func::ConstantOp constant) {
+      protectDefinedCallee(constant.getValue());
+    });
+  }
+
   void materializeDenseResourceMemRefGlobals(ModuleOp module) {
     module.walk([&](memref::GlobalOp global) {
       std::optional<Attribute> initialValue = global.getInitialValue();
@@ -378,12 +402,13 @@ private:
     });
   }
 
-  void runOnFunction(func::FuncOp funcOp) {
+  void runOnFunction(func::FuncOp funcOp, bool protectSignature) {
     if (funcOp.isExternal())
       return;
 
     DenseMap<Value, StaticMemRefView> argumentViews;
-    flattenStaticIdentityMemRefArguments(funcOp, argumentViews);
+    if (!protectSignature)
+      flattenStaticIdentityMemRefArguments(funcOp, argumentViews);
 
     SmallVector<memref::LoadOp> loads;
     SmallVector<memref::StoreOp> stores;

@@ -65,6 +65,22 @@ proof, while direct loads/stores remained rewriteable; those two controls were
 green and distinguish the missing root seed from the already-correct recursive
 and access-rewrite behavior.
 
+## Review round 2: internal call boundaries
+
+Review found that the root proof was still function-local. A caller containing
+an unhandled call correctly retained its rank-two argument, but an internal
+callee with an unused or safely loaded rank-two argument independently
+flattened its signature. Because this pass does not update `func.call`
+operands/types, the result failed verification: the call supplied
+`memref<64x64xi64>` to a callee changed to `memref<4096xi64>`.
+
+Strict round-2 RED ran the expanded 24-test suite against the round-1 plugin.
+Exactly five tests failed: unused callee before caller, safely-used callee after
+caller, one shared callee with multiple callers, a `func.constant` indirect
+symbol use, and a mixed module that also contains an uncalled eligible
+function. The recursive/self-call control and all prior 18 controls stayed
+green, isolating cross-function signature mutation from local root protection.
+
 ## Narrow implementation
 
 The identity-layout collapse path is unchanged and remains first. The new
@@ -89,6 +105,16 @@ repeats until no additional root becomes protected. Loads, stores, and fully
 resolvable view/copy chains stay rewriteable. `memref.dim`, typed calls,
 returns/escapes, and unknown users protect the root. Batch removal preserves
 order-independent convergence when a protected root invalidates a copy peer.
+
+Before any per-function lowering, the pass now collects defined internal
+function symbols referenced by direct `func.call` operations or by
+`func.constant` address-taking for indirect calls. Signature flattening is
+skipped for those functions; their callers continue to protect operands as
+unhandled direct/transitive root users. The collection happens before mutation,
+so callee/caller source order, multiple callers, and recursion cannot affect
+the decision. External declarations were already immutable. An unreferenced
+top-level function is not in the protection set and remains eligible for the
+exact flattening behavior.
 
 ## Complete affine proofs
 
@@ -138,6 +164,14 @@ output has neither view operation nor `memref.copy`.
 - Protection propagates across a collapsed-copy dependency: a direct
   rank-sensitive target user protects both target and source roots, leaving
   both chains and `memref.copy` explicit.
+- Defined internal callees retain rank-two memref signatures for unused and
+  safely-used arguments in either source order; all resulting direct calls
+  parse with matching operand and callee types.
+- Shared multi-caller and recursive/self-call boundaries remain rank-consistent.
+- `func.constant` references protect address-taken internal functions before an
+  indirect call is canonicalized.
+- An unrelated unreferenced exact function in the same module still flattens
+  to `memref<4096xi64>` and removes its subview/collapse chain.
 - The pre-existing identity-layout collapse control still lowers exactly.
 - The prior 15-test subview suite retains recursive absolute reinterpret
   semantics, copy-protection fixpoint behavior in both directions/orders,
@@ -146,17 +180,17 @@ output has neither view operation nor `memref.copy`.
 ## GREEN and plugin identity
 
 - build: `nix build .#llm2fpgaMlirPasses -L` — exit 0;
-- focused suite: 18 tests — `OK`;
-- prescribed combined collapse/subview suite: 33 tests — `OK`;
+- focused suite: 24 tests — `OK`;
+- prescribed combined collapse/subview suite: 39 tests — `OK`;
 - three relevant static-memref/pass integration assertions — `OK`;
 - output:
-  `/nix/store/56y2lxxivg9aalx8hn82cwymdgqmhq3n-llm2fpga-mlir-passes-0.1.0`;
-- plugin bytes: `21,720,080`;
+  `/nix/store/5xilqb0sarmxdycyh0b75pn5vm8v9nih-llm2fpga-mlir-passes-0.1.0`;
+- plugin bytes: `21,726,160`;
 - plugin SHA-256:
-  `81d0c95cdbcc852f347b6cebb80d65da359cbbc488b4af2b829f1eb8125a87d0`.
+  `7d7b8962565ed8177a5ea6b2648f88232d7ef11c74c5ed4b0fc4902fede01e5f`.
 
-The fix-round digest differs from both the reviewed predecessor and initial
-Task 1 plugin digests.
+The round-2 digest differs from the predecessor and both earlier Task 1 plugin
+digests.
 
 ## Residual risks and non-claims
 
@@ -168,6 +202,9 @@ Task 1 plugin digests.
   post-parser adversarial mismatch surface.
 - Unknown direct/transitive root users conservatively retain the ranked root;
   supporting another safe user requires an explicit rewrite and proof.
+- Defined internal functions referenced by direct or constant-backed indirect
+  calls conservatively retain memref signatures until a separate
+  interprocedural call/signature rewrite is designed.
 - Full-artifact replay and selection of the next compiler frontier remain Task
   2 scope. No claim is made about new full-artifact blocker counts or Calyx
   eligibility.

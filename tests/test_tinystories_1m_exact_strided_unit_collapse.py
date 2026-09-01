@@ -213,6 +213,132 @@ DIRECT_USER_COPY_DEPENDENCY_CONTROL = """module {
 }
 """
 
+INTERNAL_UNUSED_CALLEE_FIRST_CONTROL = """module {
+  func.func private @consume_internal(%arg: memref<64x64xi64>) {
+    return
+  }
+
+  func.func @direct_internal_call(
+      %source: memref<64x64xi64>, %i: index) -> i64 {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    func.call @consume_internal(%source) : (memref<64x64xi64>) -> ()
+    return %loaded : i64
+  }
+}
+"""
+
+INTERNAL_SAFE_CALLEE_LAST_CONTROL = """module {
+  func.func @call_safely_used_internal(
+      %source: memref<64x64xi64>, %i: index) -> (i64, i64) {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    %callee_value = func.call @safely_used_internal(%source, %i)
+      : (memref<64x64xi64>, index) -> i64
+    return %loaded, %callee_value : i64, i64
+  }
+
+  func.func private @safely_used_internal(
+      %arg: memref<64x64xi64>, %i: index) -> i64 {
+    %value = memref.load %arg[%i, %i] : memref<64x64xi64>
+    return %value : i64
+  }
+}
+"""
+
+MULTI_CALLER_INTERNAL_CONTROL = """module {
+  func.func @first_internal_caller(
+      %source: memref<64x64xi64>, %i: index) -> i64 {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    func.call @shared_internal(%source) : (memref<64x64xi64>) -> ()
+    return %loaded : i64
+  }
+
+  func.func private @shared_internal(%arg: memref<64x64xi64>) {
+    return
+  }
+
+  func.func @second_internal_caller(
+      %source: memref<64x64xi64>, %i: index) -> i64 {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    func.call @shared_internal(%source) : (memref<64x64xi64>) -> ()
+    return %loaded : i64
+  }
+}
+"""
+
+RECURSIVE_INTERNAL_CONTROL = """module {
+  func.func private @recursive_internal(
+      %source: memref<64x64xi64>, %i: index) -> i64 {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    %recursive = func.call @recursive_internal(%source, %i)
+      : (memref<64x64xi64>, index) -> i64
+    %sum = arith.addi %loaded, %recursive : i64
+    return %sum : i64
+  }
+}
+"""
+
+INDIRECT_INTERNAL_CONTROL = """module {
+  func.func private @indirect_internal(%arg: memref<64x64xi64>) {
+    return
+  }
+
+  func.func @indirect_internal_caller(
+      %source: memref<64x64xi64>, %i: index) -> i64 {
+    %callee = func.constant @indirect_internal
+      : (memref<64x64xi64>) -> ()
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    func.call_indirect %callee(%source) : (memref<64x64xi64>) -> ()
+    return %loaded : i64
+  }
+}
+"""
+
+CALLED_AND_UNCALLED_CONTROL = """module {
+  func.func private @called_boundary(%arg: memref<64x64xi64>) {
+    return
+  }
+
+  func.func @boundary_caller(%source: memref<64x64xi64>) {
+    func.call @called_boundary(%source) : (memref<64x64xi64>) -> ()
+    return
+  }
+
+  func.func @uncalled_exact(
+      %source: memref<64x64xi64>, %i: index) -> i64 {
+    %sub = memref.subview %source[0, 0] [64, 1] [1, 1]
+      : memref<64x64xi64> to memref<64x1xi64, strided<[64, 1]>>
+    %flat = memref.collapse_shape %sub [[0, 1]]
+      : memref<64x1xi64, strided<[64, 1]>> into memref<64xi64, strided<[64]>>
+    %loaded = memref.load %flat[%i] : memref<64xi64, strided<[64]>>
+    return %loaded : i64
+  }
+}
+"""
+
 COLLAPSED_COPY_CONTROL = """module {
   func.func @collapsed_copy(%source: memref<64x64xi64>, %target: memref<64x64xi64>) {
     %source_sub = memref.subview %source[0, 7] [64, 1] [1, 1]
@@ -338,6 +464,16 @@ def _entry_arguments(generic_ir: str) -> list[str]:
     if not match:
         raise AssertionError("generic post-pass IR has no entry block arguments")
     return re.findall(r"(%[A-Za-z0-9_]+)\s*:", match.group(1))
+
+
+def _function_type(generic_ir: str, symbol: str) -> str:
+    match = re.search(
+        rf'function_type = (.*?), sym_name = "{re.escape(symbol)}"',
+        generic_ir,
+    )
+    if not match:
+        raise AssertionError(f"missing generic function type for @{symbol}")
+    return match.group(1)
 
 
 def _affine_accesses(
@@ -751,6 +887,98 @@ class ExactStridedUnitCollapseTest(unittest.TestCase):
         self.assertNotIn("memref<4096xi64>", output)
         self.assertIn("value = 64 : index", output)
         self.assertNotIn("value = 4096 : index", output)
+
+    def test_internal_unused_callee_before_caller_retains_ranked_boundary(
+        self,
+    ) -> None:
+        output = self.assert_passes(INTERNAL_UNUSED_CALLEE_FIRST_CONTROL)
+        self.assertEqual(
+            _function_type(output, "consume_internal"),
+            "(memref<64x64xi64>) -> ()",
+        )
+        self.assertEqual(
+            _function_type(output, "direct_internal_call"),
+            "(memref<64x64xi64>, index) -> i64",
+        )
+        self.assertIn("memref.subview", output)
+        self.assertIn("memref.collapse_shape", output)
+
+    def test_internal_safely_used_callee_after_caller_retains_ranked_boundary(
+        self,
+    ) -> None:
+        output = self.assert_passes(INTERNAL_SAFE_CALLEE_LAST_CONTROL)
+        self.assertEqual(
+            _function_type(output, "safely_used_internal"),
+            "(memref<64x64xi64>, index) -> i64",
+        )
+        self.assertEqual(
+            _function_type(output, "call_safely_used_internal"),
+            "(memref<64x64xi64>, index) -> (i64, i64)",
+        )
+        self.assertIn("memref.subview", output)
+        self.assertIn("memref.collapse_shape", output)
+
+    def test_multiple_internal_callers_retain_one_ranked_callee_boundary(
+        self,
+    ) -> None:
+        output = self.assert_passes(MULTI_CALLER_INTERNAL_CONTROL)
+        for symbol in (
+            "first_internal_caller",
+            "second_internal_caller",
+        ):
+            self.assertEqual(
+                _function_type(output, symbol),
+                "(memref<64x64xi64>, index) -> i64",
+            )
+        self.assertEqual(
+            _function_type(output, "shared_internal"),
+            "(memref<64x64xi64>) -> ()",
+        )
+        self.assertEqual(output.count('"func.call"'), 2)
+        self.assertEqual(output.count('"memref.subview"'), 2)
+        self.assertEqual(output.count('"memref.collapse_shape"'), 2)
+
+    def test_recursive_internal_function_retains_ranked_boundary(self) -> None:
+        output = self.assert_passes(RECURSIVE_INTERNAL_CONTROL)
+        self.assertEqual(
+            _function_type(output, "recursive_internal"),
+            "(memref<64x64xi64>, index) -> i64",
+        )
+        self.assertIn("func.call", output)
+        self.assertIn("memref.subview", output)
+        self.assertIn("memref.collapse_shape", output)
+
+    def test_indirect_internal_symbol_use_retains_ranked_boundary(self) -> None:
+        output = self.assert_passes(INDIRECT_INTERNAL_CONTROL)
+        self.assertEqual(
+            _function_type(output, "indirect_internal"),
+            "(memref<64x64xi64>) -> ()",
+        )
+        self.assertEqual(
+            _function_type(output, "indirect_internal_caller"),
+            "(memref<64x64xi64>, index) -> i64",
+        )
+        self.assertIn("memref.subview", output)
+        self.assertIn("memref.collapse_shape", output)
+
+    def test_unreferenced_function_remains_eligible_in_module_with_calls(
+        self,
+    ) -> None:
+        output = self.assert_passes(CALLED_AND_UNCALLED_CONTROL)
+        self.assertEqual(
+            _function_type(output, "called_boundary"),
+            "(memref<64x64xi64>) -> ()",
+        )
+        self.assertEqual(
+            _function_type(output, "boundary_caller"),
+            "(memref<64x64xi64>) -> ()",
+        )
+        self.assertEqual(
+            _function_type(output, "uncalled_exact"),
+            "(memref<4096xi64>, index) -> i64",
+        )
+        self.assertEqual(output.count('"memref.subview"'), 0)
+        self.assertEqual(output.count('"memref.collapse_shape"'), 0)
 
 
 if __name__ == "__main__":
