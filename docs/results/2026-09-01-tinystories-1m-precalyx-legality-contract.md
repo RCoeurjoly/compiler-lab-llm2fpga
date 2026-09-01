@@ -54,11 +54,13 @@ without SSA result assignments and quoted generic operation names, including
 multiple and nested operations on one line and legal trivia in result groups
 such as `%r: 1 =`. It decodes MLIR two-digit hex escapes before
 classification, skips whitespace and `//` comment trivia, and tracks explicit
-attribute dictionaries and location parentheses so attribute keys, attribute
-strings, quoted symbol names, and `loc(...)` strings do not enter the census.
-These data contexts are excluded without suppressing neighboring result-bearing
-or region-nested generic operations. It retains exact counts for
-`arith.uitofp`, `memref.collapse_shape`,
+attribute dictionaries and structurally valid location expressions so
+attribute keys, attribute strings, quoted symbol names, and valid `loc(...)`
+strings do not enter the census. A malformed or unclosed location emits a
+deterministic `malformed_location` diagnostic and does not suppress its tokens
+from the operation scan. These data contexts are excluded without suppressing
+neighboring, result-bearing, or region-nested generic operations. It retains
+exact counts for `arith.uitofp`, `memref.collapse_shape`,
 `memref.copy`, `memref.expand_shape`, and `memref.reinterpret_cast` while also
 prohibiting `arith.negf`, `math.floor`, and `math.absi`.
 
@@ -76,7 +78,9 @@ SSA result lists and result-group trivia, escaped names, comments between a
 generic name and operands, multiple and nested same-line operations, multiline
 attribute keys, malformed zero-result operations, unknown quoted and custom
 operations, comment/attribute/symbol/location string false positives,
-neighboring true generic operations, deterministic bytes, exact first
-locations, the schema-v2 key set, and independent self-hash reconstruction.
+neighboring true generic operations, balanced-malformed and unclosed location
+wrappers, nested malformed callsite locations, deterministic bytes, exact
+first locations, the schema-v2 key set, and independent self-hash
+reconstruction.
 Existing callers use the checker's exit status rather than parsing schema-v1
 fields, so no coupled caller change is required for this task.

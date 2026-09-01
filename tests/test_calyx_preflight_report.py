@@ -293,6 +293,114 @@ class CalyxPreflightReportTest(unittest.TestCase):
         self.assertEqual(report["scanner_diagnostics"], [])
         self.assert_valid_self_hash(report)
 
+    def test_malformed_balanced_location_cannot_hide_generic_operations(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            'loc("safe" %0 = "math.floor"(%arg0) : (f32) -> f32)\n'
+            'loc("safe" "mystery.operation"() : () -> ())\n',
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 1, "column": 17}},
+        )
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "malformed_location",
+                    "line": 1,
+                    "column": 1,
+                    "message": "malformed location expression",
+                },
+                {
+                    "kind": "malformed_location",
+                    "line": 2,
+                    "column": 1,
+                    "message": "malformed location expression",
+                },
+                {
+                    "kind": "unknown_operation",
+                    "line": 2,
+                    "column": 12,
+                    "message": "unknown quoted operation: mystery.operation",
+                },
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_unclosed_location_cannot_hide_nested_generic_operations(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            'loc("safe"\n'
+            '%0 = "scf.execute_region"() ({\n'
+            '  %1 = "math.floor"(%arg0) : (f32) -> f32\n'
+            '  "mystery.operation"() : () -> ()\n'
+            '}) : () -> f32\n',
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {"math.floor": 1})
+        self.assertEqual(
+            report["first_locations"],
+            {"math.floor": {"line": 3, "column": 8}},
+        )
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "malformed_location",
+                    "line": 1,
+                    "column": 1,
+                    "message": "unclosed location expression",
+                },
+                {
+                    "kind": "unknown_operation",
+                    "line": 4,
+                    "column": 3,
+                    "message": "unknown quoted operation: mystery.operation",
+                },
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
+    def test_malformed_callsite_location_cannot_hide_unknown_operation(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            'loc(callsite("safe" at "caller" '
+            '"mystery.operation"() : () -> ()))\n',
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 1, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["first_locations"], {})
+        self.assertEqual(
+            report["scanner_diagnostics"],
+            [
+                {
+                    "kind": "malformed_location",
+                    "line": 1,
+                    "column": 1,
+                    "message": "malformed location expression",
+                },
+                {
+                    "kind": "unknown_operation",
+                    "line": 1,
+                    "column": 33,
+                    "message": "unknown quoted operation: mystery.operation",
+                },
+            ],
+        )
+        self.assert_valid_self_hash(report)
+
     def test_counts_multiple_and_nested_operations_on_one_line(self) -> None:
         mlir = (
             "module { func.func @main(%arg0: i32, %arg1: f32) -> f32 { "

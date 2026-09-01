@@ -277,22 +277,133 @@ def _attribute_context(tokens: list[Token]) -> list[bool]:
     return contexts
 
 
-def _location_context(tokens: list[Token]) -> list[bool]:
-    contexts: list[bool] = []
-    parentheses: list[bool] = []
-    for index, token in enumerate(tokens):
-        contexts.append(any(parentheses))
-        if token.value == "(":
-            previous = tokens[index - 1] if index else None
-            is_location = bool(
-                previous is not None
-                and previous.kind == "identifier"
-                and previous.value == "loc"
+def _parse_location_instance(
+    tokens: list[Token],
+    start: int,
+    end: int,
+    parenthesis_pairs: dict[int, int],
+) -> int | None:
+    if start >= end:
+        return None
+
+    first = tokens[start]
+    if first.kind == "string":
+        cursor = start + 1
+        if (
+            cursor + 3 < end
+            and tokens[cursor].value == ":"
+            and tokens[cursor + 1].kind == "number"
+            and tokens[cursor + 2].value == ":"
+            and tokens[cursor + 3].kind == "number"
+        ):
+            return cursor + 4
+        if cursor < end and tokens[cursor].value == "(":
+            nested_closing = parenthesis_pairs.get(cursor)
+            if nested_closing is None or nested_closing >= end:
+                return None
+            nested_end = _parse_location_instance(
+                tokens, cursor + 1, nested_closing, parenthesis_pairs
             )
-            parentheses.append(is_location or any(parentheses))
-        elif token.value == ")" and parentheses:
-            parentheses.pop()
-    return contexts
+            if nested_end != nested_closing:
+                return None
+            return nested_closing + 1
+        return cursor
+
+    if first.kind == "identifier" and first.value == "unknown":
+        return start + 1
+
+    if first.kind == "identifier" and first.value == "callsite":
+        opening = start + 1
+        if opening >= end or tokens[opening].value != "(":
+            return None
+        closing = parenthesis_pairs.get(opening)
+        if closing is None or closing >= end:
+            return None
+        caller_end = _parse_location_instance(
+            tokens, opening + 1, closing, parenthesis_pairs
+        )
+        if caller_end is None or tokens[caller_end].value != "at":
+            return None
+        callee_end = _parse_location_instance(
+            tokens, caller_end + 1, closing, parenthesis_pairs
+        )
+        return closing + 1 if callee_end == closing else None
+
+    if (
+        first.value == "#"
+        and start + 1 < end
+        and tokens[start + 1].kind == "identifier"
+    ):
+        return start + 2
+
+    return None
+
+
+def _location_structure_is_valid(
+    tokens: list[Token],
+    start: int,
+    end: int,
+    parenthesis_pairs: dict[int, int],
+) -> bool:
+    if any(
+        token.kind == "ssa" or token.value in {"{", "}", "="}
+        for token in tokens[start:end]
+    ):
+        return False
+    return (
+        _parse_location_instance(tokens, start, end, parenthesis_pairs) == end
+    )
+
+
+def _location_context(
+    tokens: list[Token], source_map: SourceMap
+) -> tuple[list[bool], list[dict[str, object]]]:
+    parenthesis_pairs: dict[int, int] = {}
+    open_parentheses: list[int] = []
+    for index, token in enumerate(tokens):
+        if token.value == "(":
+            open_parentheses.append(index)
+        elif token.value == ")" and open_parentheses:
+            parenthesis_pairs[open_parentheses.pop()] = index
+
+    contexts = [False] * len(tokens)
+    diagnostics: list[dict[str, object]] = []
+    for index, token in enumerate(tokens):
+        if (
+            token.kind != "identifier"
+            or token.value != "loc"
+            or index + 1 >= len(tokens)
+            or tokens[index + 1].value != "("
+        ):
+            continue
+        opening = index + 1
+        closing = parenthesis_pairs.get(opening)
+        line, column = source_map.location(token.offset)
+        if closing is None:
+            diagnostics.append(
+                _diagnostic(
+                    "malformed_location",
+                    line,
+                    column,
+                    "unclosed location expression",
+                )
+            )
+            continue
+        if not _location_structure_is_valid(
+            tokens, opening + 1, closing, parenthesis_pairs
+        ):
+            diagnostics.append(
+                _diagnostic(
+                    "malformed_location",
+                    line,
+                    column,
+                    "malformed location expression",
+                )
+            )
+            continue
+        for context_index in range(opening + 1, closing):
+            contexts[context_index] = True
+    return contexts, diagnostics
 
 
 def _record_operation(
@@ -318,7 +429,10 @@ def _scan_operations(
     source_map = SourceMap(text)
     tokens, diagnostics = _tokenize(text, source_map)
     attribute_contexts = _attribute_context(tokens)
-    location_contexts = _location_context(tokens)
+    location_contexts, location_diagnostics = _location_context(
+        tokens, source_map
+    )
+    diagnostics.extend(location_diagnostics)
     counts: dict[str, int] = {}
     first_locations: dict[str, dict[str, int]] = {}
 
