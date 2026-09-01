@@ -18,7 +18,7 @@ ALIAS = "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf"
 C22_INPUT = ROOT / "artifacts/comparison/tinystories-1m-exact-frontier-determinism-flat-scf/run-1/flat.scf.mlir"
 CHECKER_SOURCE = ROOT / "scripts/pipeline/calyx_preflight_report.py"
 C22_SHA256 = "66c78e412ade3262c4eb0f61b5776e9c765fb434fdbb53d09cbba7e724ff2fc6"
-PLUGIN_SHA256 = "da138b78750abcdcc7f5f467d0991b1e2eb9cf04708186a6b4f0dd8e14df2c6e"
+PLUGIN_SHA256 = "901fd383935d5af48e616eb881ae1b72408f4cb26dfbef94ea7be3049d61760f"
 MLIR_OPT_SHA256 = "3da93261c9b6f698539bec86f3606598d8b3ed61a18095eaa03cde87f7140912"
 CHECKER_SOURCE_SHA256 = "3957d6cfc6da168f9a5c1cb6f1013c172eff3c83f42be6266265009c84ad0839"
 NORMALIZED_SHA256 = "e669a26338fbcf055266db29d6351228b78314d11ea3687751cb7f2045552d77"
@@ -126,6 +126,7 @@ def _validate_legality(legality: dict[str, Any], authority: Mapping[str, str]) -
     _require(isinstance(prohibited, dict) and isinstance(diagnostics, list), "legality census malformed")
     _require(prohibited.get("math.floor", 0) == 0, "math.floor successor frontier mismatch")
     _require(prohibited.get("arith.negf", 0) == 0, "arith.negf successor frontier mismatch")
+    _require(prohibited.get("math.absi", 0) == 0, "math.absi successor frontier mismatch")
     _require(legality.get("status") == ("blocked" if prohibited or diagnostics else "ok"), "legality status mismatch")
     validation = legality.get("parser_validation")
     _require(isinstance(validation, dict) and validation.get("identity_status") == "verified" and validation.get("input_status") == "accepted", "parser validation mismatch")

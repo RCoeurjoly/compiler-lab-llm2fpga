@@ -20,7 +20,7 @@ SHARED_PIPELINE = ROOT / "nix/pipeline.nix"
 VERIFIER = ROOT / "scripts/pipeline/verify_tinystories_1m_exact_normalized_registration.py"
 NORMALIZED_SHA256 = "e669a26338fbcf055266db29d6351228b78314d11ea3687751cb7f2045552d77"
 C22_SHA256 = "66c78e412ade3262c4eb0f61b5776e9c765fb434fdbb53d09cbba7e724ff2fc6"
-PLUGIN_SHA256 = "da138b78750abcdcc7f5f467d0991b1e2eb9cf04708186a6b4f0dd8e14df2c6e"
+PLUGIN_SHA256 = "901fd383935d5af48e616eb881ae1b72408f4cb26dfbef94ea7be3049d61760f"
 NORMALIZATION_PIPELINE = (
     "builtin.module(llm2fpga-lower-static-memref-views-for-calyx,canonicalize,cse)"
 )
@@ -157,18 +157,20 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
             manifest["calyx_authorized"], legality["status"] == "ok"
         )
 
-    def test_preparation_replay_eliminates_floor_but_keeps_residuals_blocked(self) -> None:
-        """A replayed NegF successor must not authorize any backend route."""
+    def test_preparation_replay_eliminates_the_three_carried_math_frontiers(self) -> None:
+        """A stale plugin authority or retained i64 Absi must fail this successor."""
         manifest = self._manifest()
         legality = json.loads((self.output / "pre-calyx-legality.json").read_text())
         self.assertEqual(legality["prohibited_ops"].get("math.floor", 0), 0)
         self.assertEqual(legality["prohibited_ops"].get("arith.negf", 0), 0)
-        self.assertTrue(
-            legality["prohibited_ops"] or legality["scanner_diagnostics"],
-            "the successor frontier must remain measured before Calyx authorization",
-        )
-        self.assertEqual(legality["status"], "blocked")
-        self.assertFalse(manifest["calyx_authorized"])
+        self.assertEqual(legality["prohibited_ops"].get("math.absi", 0), 0)
+        if legality["prohibited_ops"] or legality["scanner_diagnostics"]:
+            self.assertEqual(legality["status"], "blocked")
+            self.assertFalse(manifest["calyx_authorized"])
+            self.assertTrue(legality["first_locations"])
+        else:
+            self.assertEqual(legality["status"], "ok")
+            self.assertTrue(manifest["calyx_authorized"])
 
     def test_manifest_commands_do_not_cross_the_precalyx_boundary(self) -> None:
         """Replacing preparation with Calyx/SV/synthesis/board work must fail."""
@@ -207,7 +209,7 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
                 "llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-negf-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx",
                 "llm2fpga-lower-negf-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-i1-uitofp-for-calyx",
             )),
-            (("preparation", "legality", "status"), "ok"),
+            (("preparation", "legality", "status"), "blocked"),
         ):
             candidate = json.loads(json.dumps(manifest))
             cursor = candidate
