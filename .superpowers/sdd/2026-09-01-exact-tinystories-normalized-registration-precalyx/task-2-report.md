@@ -23,3 +23,26 @@ unused process-unreferenced Nix shell scratch directory were cleared. Nix
 temporary/cache activity was redirected to `/dev/shm`.
 
 Commit: recorded with this Task 2 change.
+
+## Fix round 1: authority and replay hardening
+
+Review found that a coherent parser-clean replacement and a manifest-selected
+checker stub could make the old verifier accept `calyx_authorized: true`. The
+verifier now resolves c22, plugin, pinned `mlir-opt`, commands, the tracked
+checker, and Nix-materialized checker from the flake-owned derivation
+authority—not from the bundle manifest. It verifies tracked/materialized
+checker bytes after the three parser-identity substitutions, then replays both
+normalization and the exact no-scout preparation pipeline in `/dev/shm` and
+byte-compares each result to the candidate bundle before replaying the bound
+checker.
+
+New REDs constructed both coherent attacks in temporary bundles. Both were
+accepted by the old verifier and are rejected by the hardened verifier. The
+test suite also creates and removes a small real evidence-only fixture beside
+the retained evidence, proving the exact package `drvPath` is unchanged while
+preserving the file-scoped input closure. Focused Task 2 tests: 8/8; Task 1
+schema-v3 checker tests: 59/59; `nix flake check --no-build` passed.
+
+The authentic package and its frontier remain unchanged: blocked,
+`math.floor` 1376 at 422:18, `arith.negf` 1369, `math.absi` 1156, and
+`calyx_authorized: false`; no backend action ran.

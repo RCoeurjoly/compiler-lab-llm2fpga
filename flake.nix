@@ -451,12 +451,15 @@
           mlirPasses = llm2fpgaMlirPasses;
           c22Input = exactTinyStoriesC22Input;
           preflightScript = exactTinyStoriesPreflight;
+          preflightSource = exactTinyStoriesPreflightSource;
           expectedC22Sha256 =
             "66c78e412ade3262c4eb0f61b5776e9c765fb434fdbb53d09cbba7e724ff2fc6";
           expectedPluginSha256 =
             "79c0ab56022ce6c91279bca8aefeea7251a1eb19c92675f6df7b90265fb0d738";
           expectedNormalizedSha256 =
             "e669a26338fbcf055266db29d6351228b78314d11ea3687751cb7f2045552d77";
+          expectedPreflightSourceSha256 =
+            "3957d6cfc6da168f9a5c1cb6f1013c172eff3c83f42be6266265009c84ad0839";
         };
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
         noHandshakeLinalgToScf =

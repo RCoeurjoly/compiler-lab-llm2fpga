@@ -38,5 +38,12 @@ normalized hashes; a false legality status; and an altered preparation
 pipeline. The derivation-input test confirms that the full evidence directory
 is not an input source.
 
+The verifier independently resolves the c22 input, reviewed plugin, pinned
+parser, exact MLIR commands, tracked checker source, and Nix-materialized
+checker; manifest values are only claims checked against that authority. It
+replays normalization and preparation into `/dev/shm` and byte-compares both
+artifacts before accepting the legality receipt. Coherent parser-clean and
+checker-stub temporary-bundle attacks are rejected.
+
 No Calyx or downstream hardware action is implied. A later plan may address
 only the recorded `math.floor` frontier.

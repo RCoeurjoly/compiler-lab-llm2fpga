@@ -1,5 +1,6 @@
-{ pkgs, mlir, mlirPasses, python, c22Input, preflightScript
-, expectedC22Sha256, expectedPluginSha256, expectedNormalizedSha256 }:
+{ pkgs, mlir, mlirPasses, python, c22Input, preflightScript, preflightSource
+, expectedC22Sha256, expectedPluginSha256, expectedNormalizedSha256
+, expectedPreflightSourceSha256 }:
 let
   normalizationPipeline =
     "builtin.module(llm2fpga-lower-static-memref-views-for-calyx,canonicalize,cse)";
@@ -9,6 +10,21 @@ let
 in
 pkgs.runCommand "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf" {
   nativeBuildInputs = [ pkgs.coreutils mlir mlirPasses python ];
+  passthru.registrationAuthority = {
+    c22_input = toString c22Input;
+    c22_sha256 = expectedC22Sha256;
+    plugin = plugin;
+    plugin_sha256 = expectedPluginSha256;
+    mlir_opt = "${mlir}/bin/mlir-opt";
+    mlir_opt_sha256 = builtins.hashFile "sha256" "${mlir}/bin/mlir-opt";
+    mlir_version = pkgs.lib.getVersion mlir;
+    checker_source = toString preflightSource;
+    checker_source_sha256 = expectedPreflightSourceSha256;
+    checker = toString preflightScript;
+    python = "${python}/bin/python3";
+    normalization_pipeline = normalizationPipeline;
+    preparation_pipeline = preparationPipeline;
+  };
 } ''
   set -euo pipefail
   mkdir -p "$out"

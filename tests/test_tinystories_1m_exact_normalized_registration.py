@@ -6,7 +6,9 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -45,6 +47,10 @@ def _canonical(value: object) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
 
 
+def _binding(path: Path) -> dict[str, object]:
+    return {"path": path.name, "bytes": path.stat().st_size, "sha256": _sha256(path)}
+
+
 class ExactNormalizedRegistrationTest(unittest.TestCase):
     """The production change that breaks these tests is a detached/unsafe stage."""
 
@@ -76,6 +82,24 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
+
+    def _copy_bundle(self, temporary: Path) -> Path:
+        bundle = temporary / "bundle"
+        bundle.mkdir()
+        for name in ("flat.scf.mlir", "pre-calyx.mlir", "pre-calyx-legality.json", "manifest.json"):
+            target = bundle / name
+            shutil.copy2(self.output / name, target)
+            target.chmod(0o600)
+        return bundle
+
+    def _drv_path(self) -> str:
+        return subprocess.run(
+            ["nix", "eval", "--raw", f".#${ALIAS}.drvPath".replace("$", "")],
+            cwd=ROOT,
+            check=True,
+            stdout=subprocess.PIPE,
+            text=True,
+        ).stdout.strip()
 
     def test_registered_package_replays_the_exact_normalized_artifact(self) -> None:
         """Removing the flake alias/module or changing a bound hash must fail."""
@@ -143,6 +167,76 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
             with self.assertRaises(ValueError, msg="mutation should be rejected: " + ".".join(path)):
                 verifier.validate_manifest(candidate, self.output)
 
+    def test_verifier_rejects_coherent_clean_prepared_replacement(self) -> None:
+        """Replacing preparation output with parser-clean MLIR must fail replay."""
+        verifier = self._verifier_module()
+        with tempfile.TemporaryDirectory(prefix="exact-prepared-forgery-", dir="/dev/shm") as raw:
+            bundle = self._copy_bundle(Path(raw))
+            manifest = json.loads((bundle / "manifest.json").read_text())
+            commands = manifest["commands"]
+            prepared = bundle / "pre-calyx.mlir"
+            prepared.write_text("module {}\n", encoding="utf-8")
+            legality = bundle / "pre-calyx-legality.json"
+            completed = subprocess.run(
+                [
+                    commands["preflight"][0], commands["preflight"][1], str(prepared),
+                    str(legality), "--mlir-opt", commands["preflight"][-1],
+                ],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertEqual(completed.returncode, 0)
+            receipt = json.loads(legality.read_text())
+            self.assertEqual(receipt["status"], "ok")
+            manifest["preparation"]["output"] = _binding(prepared)
+            manifest["preparation"]["legality"] = {
+                "path": legality.name,
+                "sha256": _sha256(legality),
+                "status": receipt["status"],
+                "receipt_sha256": receipt["sha256"],
+            }
+            manifest["calyx_authorized"] = True
+            (bundle / "manifest.json").write_text(json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n")
+            with self.assertRaises(ValueError):
+                verifier.verify_output(bundle)
+
+    def test_verifier_rejects_coherent_resigned_receipt_from_stub_checker(self) -> None:
+        """A manifest-selected checker stub cannot turn the blocked bundle clean."""
+        verifier = self._verifier_module()
+        with tempfile.TemporaryDirectory(prefix="exact-checker-forgery-", dir="/dev/shm") as raw:
+            bundle = self._copy_bundle(Path(raw))
+            manifest = json.loads((bundle / "manifest.json").read_text())
+            authentic = json.loads((bundle / "pre-calyx-legality.json").read_text())
+            forged = {
+                "schema_version": 3,
+                "status": "ok",
+                "prohibited_ops": {},
+                "first_locations": {},
+                "scanner_diagnostics": [],
+                "parser_validation": authentic["parser_validation"],
+            }
+            forged["sha256"] = hashlib.sha256(_canonical(forged)).hexdigest()
+            legality = bundle / "pre-calyx-legality.json"
+            legality.write_text(json.dumps(forged, sort_keys=True) + "\n")
+            stub = Path(raw) / "false_clean_checker.py"
+            stub.write_text(
+                "from pathlib import Path\nimport sys\n"
+                + "Path(sys.argv[2]).write_text(" + repr(json.dumps(forged, sort_keys=True) + "\n") + ")\n",
+                encoding="utf-8",
+            )
+            manifest["commands"]["preflight"][1] = str(stub)
+            manifest["preparation"]["legality"] = {
+                "path": legality.name,
+                "sha256": _sha256(legality),
+                "status": "ok",
+                "receipt_sha256": forged["sha256"],
+            }
+            manifest["calyx_authorized"] = True
+            (bundle / "manifest.json").write_text(json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n")
+            with self.assertRaises(ValueError):
+                verifier.verify_output(bundle)
+
     def test_derivation_source_closure_excludes_the_evidence_directory(self) -> None:
         """An evidence-only mutation must not be an input to the derivation."""
         derivation = subprocess.run(
@@ -164,6 +258,18 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
         source_names = "\n".join(payload["inputs"]["srcs"])
         self.assertIn("tinystories-1m-exact-c22-input", source_names)
         self.assertNotIn("rank1-copy-extension-evidence", source_names)
+
+    def test_evidence_only_mutation_does_not_change_the_exact_drv(self) -> None:
+        """An isolated evidence-only mutation must not perturb the file-scoped stage."""
+        evidence_only = ROOT / "artifacts/comparison/tinystories-1m-exact-rank1-copy-extension-evidence" / (
+            f"task-2-evidence-only-{os.getpid()}.json"
+        )
+        before = self._drv_path()
+        try:
+            evidence_only.write_text('{"task":"2","evidence_only":true}\n', encoding="utf-8")
+            self.assertEqual(before, self._drv_path())
+        finally:
+            evidence_only.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
