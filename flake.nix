@@ -455,7 +455,7 @@
           expectedC22Sha256 =
             "66c78e412ade3262c4eb0f61b5776e9c765fb434fdbb53d09cbba7e724ff2fc6";
           expectedPluginSha256 =
-            "79c0ab56022ce6c91279bca8aefeea7251a1eb19c92675f6df7b90265fb0d738";
+            "ec7aa6d4ad5f33696e9599ad23390209bb705cbea78af6ea759daba8d7c767ac";
           expectedNormalizedSha256 =
             "e669a26338fbcf055266db29d6351228b78314d11ea3687751cb7f2045552d77";
           expectedPreflightSourceSha256 =

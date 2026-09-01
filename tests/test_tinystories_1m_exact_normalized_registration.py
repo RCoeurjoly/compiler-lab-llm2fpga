@@ -19,7 +19,7 @@ MODULE = ROOT / "nix/exact-tinystories-normalized.nix"
 VERIFIER = ROOT / "scripts/pipeline/verify_tinystories_1m_exact_normalized_registration.py"
 NORMALIZED_SHA256 = "e669a26338fbcf055266db29d6351228b78314d11ea3687751cb7f2045552d77"
 C22_SHA256 = "66c78e412ade3262c4eb0f61b5776e9c765fb434fdbb53d09cbba7e724ff2fc6"
-PLUGIN_SHA256 = "79c0ab56022ce6c91279bca8aefeea7251a1eb19c92675f6df7b90265fb0d738"
+PLUGIN_SHA256 = "ec7aa6d4ad5f33696e9599ad23390209bb705cbea78af6ea759daba8d7c767ac"
 NORMALIZATION_PIPELINE = (
     "builtin.module(llm2fpga-lower-static-memref-views-for-calyx,canonicalize,cse)"
 )
@@ -135,6 +135,18 @@ class ExactNormalizedRegistrationTest(unittest.TestCase):
         self.assertEqual(
             manifest["calyx_authorized"], legality["status"] == "ok"
         )
+
+    def test_preparation_replay_eliminates_floor_but_keeps_residuals_blocked(self) -> None:
+        """A replayed floor successor must not authorize any backend route."""
+        manifest = self._manifest()
+        legality = json.loads((self.output / "pre-calyx-legality.json").read_text())
+        self.assertEqual(legality["prohibited_ops"].get("math.floor", 0), 0)
+        self.assertTrue(
+            legality["prohibited_ops"] or legality["scanner_diagnostics"],
+            "the successor frontier must remain measured before Calyx authorization",
+        )
+        self.assertEqual(legality["status"], "blocked")
+        self.assertFalse(manifest["calyx_authorized"])
 
     def test_manifest_commands_do_not_cross_the_precalyx_boundary(self) -> None:
         """Replacing preparation with Calyx/SV/synthesis/board work must fail."""
