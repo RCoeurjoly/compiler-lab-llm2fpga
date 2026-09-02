@@ -102,6 +102,35 @@ let
         --out "$out" ${exactSerialGemvArgs} >/dev/null
     '';
 
+  # A deliberately bounded compiler-owned Calyx handoff for one legalized
+  # serial-GEMV descriptor.  Full-model composition remains a later task: this
+  # derivation proves the component/invoke, Calyx export, and SV parser path
+  # without returning to the scalarized SCF route.
+  mkExactSerialGemvCalyxDerivation = { name, descriptor }:
+    pkgs.runCommand "${name}-exact-serial-gemv-calyx" {
+      buildInputs = [ python circt calyxTool yosysPkg ];
+    } ''
+      set -euo pipefail
+      timeout 1800 ${python}/bin/python3 \
+        ${pipelineScripts}/lower_exact_serial_gemv_to_calyx.py \
+        --input ${descriptor} \
+        --output "$out/model.calyx.mlir" \
+        --trace "$out/ordered-address-data-trace.json" \
+        --provenance "$out/provenance.json"
+      timeout 1800 ${circt}/bin/circt-opt "$out/model.calyx.mlir" \
+        -o "$out/parsed.calyx.mlir"
+      timeout 1800 ${circt}/bin/circt-translate --export-calyx \
+        "$out/parsed.calyx.mlir" -o "$out/model.futil"
+      timeout 1800 ${calyxTool}/bin/calyx "$out/model.futil" \
+        -l ${calyxTool}/share/calyx -b verilog --synthesis --nested \
+        -d papercut -o "$out/model.sv"
+      timeout 1800 ${yosysPkg}/bin/yosys -q -p \
+        "read_verilog -sv $out/model.sv; hierarchy -check; stat" \
+        >"$out/yosys-stat.txt"
+      test -s "$out/ordered-address-data-trace.json"
+      test -s "$out/model.sv"
+    '';
+
   mkMlirOpStatsDerivation = { name, stageName, tool, input }:
     pkgs.runCommand "${name}-${stageName}.stats" { } ''
       ${pkgs.bash}/bin/bash ${pipelineScripts}/mlir_op_stats.sh \
