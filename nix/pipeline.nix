@@ -2,7 +2,8 @@
 , pipelineScripts, compilePyTorch, svProvenanceReport, noHandshakeLinalgToScf
 , noHandshakeScfToFlatScf, noHandshakeScfToCalyx, noHandshakeLinalgToLlvm
 , calyxToSvNoHandshake, calyxToHwSvNoHandshake, flatScfBlockerReport, mlirPasses
-, circtPasses, tosaToLinalgMlir ? mlir }:
+, circtPasses, tosaToLinalgMlir ? mlir, torchMlirPasses ? null
+, exactSerialGemvModelNames ? [ ] }:
 let
   stageNames = [
     "hf-snapshot"
@@ -82,12 +83,23 @@ let
     '';
 
   mkTorchStage = { name, pytorchExported, pytorchToolchain ? [ ] }:
-    pkgs.runCommand "${name}-torch.mlir" { buildInputs = pytorchToolchain; } ''
+    let
+      exactSerialGemv = builtins.elem name exactSerialGemvModelNames;
+      exactSerialGemvArgs = if !exactSerialGemv then "" else
+        if torchMlirPasses == null then
+          throw "exact serial-GEMV model ${name} requires torchMlirPasses"
+        else "--torch-mlir-opt ${torchMlirOpt} "
+          + "--pass-plugin ${torchMlirPasses}/lib/LLM2FPGATorchMLIRPasses.so "
+          + "--custom-op-library ${../TinyStories/serial_gemv_boundary.py}";
+    in pkgs.runCommand "${name}-torch.mlir" {
+      buildInputs = pytorchToolchain
+        ++ pkgs.lib.optionals exactSerialGemv [ torchMlirPasses ];
+    } ''
       set -euo pipefail
       export PYTHONPATH="${torchMlir}/${python.sitePackages}:${torchMlir}/${python.sitePackages}/torch_mlir:''${PYTHONPATH:-}"
       python ${compilePyTorch} \
         --exported-program-dir ${pytorchExported} \
-        --out "$out" >/dev/null
+        --out "$out" ${exactSerialGemvArgs} >/dev/null
     '';
 
   mkMlirOpStatsDerivation = { name, stageName, tool, input }:

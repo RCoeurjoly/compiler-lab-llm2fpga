@@ -17,6 +17,7 @@ in stdenv.mkDerivation {
   src = torchMlirSrc;
   patches = [
     ./patches/torch-mlir/legalize-bitwise-right-shift-tensor-scalar.patch
+    ./patches/torch-mlir/link-torch-mlir-opt-shared-mlir.patch
   ];
 
   nativeBuildInputs =
@@ -62,6 +63,7 @@ in stdenv.mkDerivation {
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=$out \
         -DLLVM_ENABLE_ASSERTIONS=ON \
+        -DMLIR_LINK_MLIR_DYLIB=ON \
         -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
         -DMLIR_TABLEGEN_EXE=${tblgen}/bin/mlir-tblgen \
         -DLLVM_DIR=${llvmDev}/lib/cmake/llvm \

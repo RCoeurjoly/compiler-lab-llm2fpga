@@ -181,6 +181,12 @@
             mlir = mlirForTorchMlir;
             llvmPackages = torchMlirLlvmPackages;
           };
+        llm2fpgaExactSerialGemvTorchMlirPasses =
+          pkgsLlvm21.callPackage ./nix/torch-mlir-passes.nix {
+            mlir = mlirForTorchMlir;
+            llvmPackages = torchMlirLlvmPackages;
+            inherit torchMlir;
+          };
         llm2fpgaCirctPasses = pkgs.callPackage ./nix/circt-passes.nix {
           inherit circt;
           mlir = circtMlir;
@@ -762,6 +768,8 @@
           circtPasses = llm2fpgaCirctPasses;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
+          torchMlirPasses = llm2fpgaExactSerialGemvTorchMlirPasses;
+          exactSerialGemvModelNames = [ "tiny-stories-1m-kev-gpt-exact" ];
         };
         modelRegistry = import ./nix/models.nix {
           inherit (pipelineLib) registerModel;
@@ -803,6 +811,8 @@
           circtPasses = llm2fpgaCirctPasses;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
+          torchMlirPasses = llm2fpgaExactSerialGemvTorchMlirPasses;
+          exactSerialGemvModelNames = [ "tiny-stories-1m-kev-gpt-exact" ];
         };
         modelRegistryTosa = import ./nix/models.nix {
           registerModel = pipelineLibTosa.registerTosaModel;
@@ -2814,8 +2824,8 @@ PY
       in {
         packages = {
           inherit circt mlir torchMlir yosysPkg modelRegistryJson
-            llm2fpgaMlirPasses llm2fpgaTorchMlirPasses llm2fpgaCirctPasses
-            calyx;
+            llm2fpgaMlirPasses llm2fpgaTorchMlirPasses
+            llm2fpgaExactSerialGemvTorchMlirPasses llm2fpgaCirctPasses calyx;
           "rc-math-exp-paper-screen" = rcMathExpPaperScreen;
           "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf" =
             exactTinyStoriesNormalized;
