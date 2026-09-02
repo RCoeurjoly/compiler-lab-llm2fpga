@@ -24,7 +24,7 @@ Timebox evidence:
 - final live observation: 2026-09-02T15:47:57+02:00
 - `circt-opt` PID 2530919 at final live observation: elapsed `1-00:01:13`, CPU `1-01:55:49`, 107% CPU, RSS 841,240 KB
 - high-water RSS from `/proc/2530919/status`: 943,228 KB
-- output directory materialized after external SIGTERM with `manifest.json` and a zero-byte `lower-scf-to-calyx.log`
+- the deadline was exceeded; the live process was subsequently terminated by external SIGTERM, after which the output directory materialized with `manifest.json` and a zero-byte `lower-scf-to-calyx.log`
 - candidate, model artifact, and partial artifact: not present
 - stage manifest after termination: `status: failed`, `exit_code: -15`, `first_diagnostic: "circt-opt exited with status -15"`
 
@@ -32,12 +32,12 @@ The `exit_code: -15` is treated as termination evidence only. It is not a compil
 
 ## Artifacts
 
-- signed timebox evidence: `artifacts/comparison/tinystories-1m-exact-calyx-timebox-evidence.json`
-  - evidence self-hash: `73e9eb6d43cf3945c7e6600adbfaf150ecdaf26c67381ba2ffbd5ee08d25b827`
-  - file SHA-256: `3f2e704e76d0b38ad9c11dc5b958fcd322aaebbadf82a3a96501dd7996be4738`
+- self-hashed recorded timebox evidence: `artifacts/comparison/tinystories-1m-exact-calyx-timebox-evidence.json`
+  - evidence self-hash: `4aedbfc48e566959c24bac988ac0ead0498992b9633ec3fcc45c3daf46af5557`
+  - file SHA-256: `29f1541f7da566036023808f348e409ddc697f2086d9c1067563506864008d48`
 - canonical frontier receipt: `artifacts/comparison/tinystories-1m-exact-calyx-frontier.json`
-  - receipt self-hash: `3cfff3b6c854c3632bc05b1e7d307c31a4b2dfdd0125fb6a6e0d9104411606de`
-  - file SHA-256: `a690bb8eaaa0570747d5ef9e0c56f1a2594017887d79d658fb36ca455f3e6442`
+  - receipt self-hash: `9eefb86da7b8d0bd97967512d0e5d91cf06782407d11c502f0b0a63bf03be1a6`
+  - file SHA-256: `c0cc8932f867a6b863a89719ae58f7577e8be1a2e5fbfccbbb3e1bb17c2586fc`
 
 ## Verification
 
@@ -68,4 +68,4 @@ Bounded reducer work is not applicable to this result. There is no CIRCT compile
 
 Do not replace exact model semantics with generic associative/vector reductions. Any future compact path should preserve the exact `serial_gemv_accumulate` contract: ascending input-index signed i64 MAC with two's-complement wrap, followed by per-output Q8.24 scale/rounding and the 97 activation Q/DQ boundaries. A compact pattern must emit traceable GEMV boundary witnesses.
 
-The viable next path is not a CIRCT workaround: isolated `torch.export` can retain a custom exact GEMV boundary as a `torch.operator` in raw Torch-MLIR, but the pinned backend rejects illegal `torch.operator`. A future implementation should use an out-of-tree Torch-MLIR-ABI-matched pre-backend legalizer before the fixed backend pipeline, then preserve the boundary through Linalg/SCF/Calyx as an explicit component/invoke.
+This result establishes only the bounded scalability frontier and the exact semantic guardrails for a separately authorized follow-up. It does not select or implement that follow-up architecture.

@@ -159,6 +159,13 @@ sys.exit(0)
         self.manifest_path = self.bundle / "manifest.json"
         self._write_failed_manifest()
 
+        self.timebox_output = self.root / "timebox-output"
+        self.timebox_output.mkdir()
+        self.timebox_log = self.timebox_output / "lower-scf-to-calyx.log"
+        self.timebox_log.write_bytes(b"")
+        self.timebox_manifest_path = self.timebox_output / "manifest.json"
+        self._write_timebox_stage_manifest()
+
     def _base_manifest(self) -> dict[str, object]:
         return {
             "schema": "tinystories-1m-exact-calyx-stage-v1",
@@ -193,17 +200,62 @@ sys.exit(0)
     def _write_failed_manifest(self) -> None:
         self._write_manifest(self._base_manifest())
 
+    def _base_timebox_stage_manifest(self) -> dict[str, object]:
+        return {
+            "schema": "tinystories-1m-exact-calyx-stage-v1",
+            "stage": "calyx",
+            "status": "failed",
+            "artifact_accepted": False,
+            "first_diagnostic": "circt-opt exited with status -15",
+            "exit_code": -15,
+            "parse_exit_code": None,
+            "command": [
+                str(self.tool),
+                str(self.input),
+                "--lower-scf-to-calyx=top-level-function=main",
+                "-o",
+                str(self.timebox_output / ".candidate.calyx.mlir"),
+            ],
+            "input": _binding(self.input),
+            "log": _binding(self.timebox_log),
+            "circt_opt": {
+                **_binding(self.tool),
+                "version_exit_code": 0,
+                "version": "fake-circt-opt 1.0",
+            },
+            "derivation": str(self.timebox_output),
+            "artifact": None,
+            "partial_artifact": None,
+        }
+
+    def _write_timebox_stage_manifest(
+        self, manifest: dict[str, object] | None = None
+    ) -> None:
+        if manifest is None:
+            manifest = self._base_timebox_stage_manifest()
+        self.timebox_manifest_path.write_bytes(
+            _canonical_json(_signed(manifest)) + b"\n"
+        )
+
     def _mutate_manifest(self, mutator) -> None:
         manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
         mutator(manifest)
         self._write_manifest(manifest)
 
     def _timebox_evidence(self) -> dict[str, object]:
-        candidate = self.root / ".candidate.calyx.mlir"
-        model = self.root / "model.calyx.mlir"
+        candidate = self.timebox_output / ".candidate.calyx.mlir"
+        model = self.timebox_output / "model.calyx.mlir"
+        partial = self.timebox_output / "partial.calyx.mlir"
+        command = [
+            str(self.tool),
+            str(self.input),
+            "--lower-scf-to-calyx=top-level-function=main",
+            "-o",
+            str(candidate),
+        ]
         return {
             "schema": "tinystories-1m-exact-calyx-timebox-evidence-v1",
-            "status": "terminated_at_deadline",
+            "status": "deadline_exceeded_subsequently_terminated",
             "frontier": "calyx_scalability_frontier",
             "start_time": "2026-09-01T15:46:46+02:00",
             "deadline_time": "2026-09-02T15:46:46+02:00",
@@ -211,13 +263,7 @@ sys.exit(0)
             "elapsed_wall_seconds": 86400.0,
             "elapsed_cpu_seconds": 90030.0,
             "max_rss_kb": 820000,
-            "command": [
-                str(self.tool),
-                str(self.input),
-                "--lower-scf-to-calyx=top-level-function=main",
-                "-o",
-                str(candidate),
-            ],
+            "command": command,
             "input": _binding(self.input),
             "circt_opt": {
                 **_binding(self.tool),
@@ -227,11 +273,13 @@ sys.exit(0)
             "no_output_observation": {
                 "candidate": {"path": str(candidate), "exists": False},
                 "model_artifact": {"path": str(model), "exists": False},
+                "partial_artifact": {"path": str(partial), "exists": False},
             },
             "processes": [
                 {
                     "role": "nix",
                     "pid": 2530843,
+                    "ppid": 4767,
                     "stat": "Ssl",
                     "elapsed": "24:00:00",
                     "time": "00:00:00",
@@ -241,26 +289,44 @@ sys.exit(0)
                 {
                     "role": "runner",
                     "pid": 2530918,
+                    "ppid": 2530914,
                     "stat": "S",
                     "elapsed": "24:00:00",
                     "time": "00:00:00",
                     "rss_kb": 19628,
-                    "command": "python3 run_exact_tinystories_calyx.py",
+                    "command": (
+                        "python3 run_exact_tinystories_calyx.py "
+                        f"--input {self.input} "
+                        f"--output {self.timebox_output} "
+                        f"--circt-opt {self.tool}"
+                    ),
                 },
                 {
                     "role": "circt-opt",
                     "pid": 2530919,
+                    "ppid": 2530918,
                     "stat": "Rl",
                     "elapsed": "24:00:00",
                     "time": "25:00:30",
                     "rss_kb": 820000,
-                    "command": "circt-opt pre-calyx.mlir --lower-scf-to-calyx=top-level-function=main",
+                    "command": " ".join(command),
                 },
             ],
             "termination": {
                 "signal": "SIGTERM",
-                "target_pids": [2530919, 2530918, 2530843],
+                "target_pids": [2530919],
                 "sent_at": "2026-09-02T15:46:50+02:00",
+            },
+            "nix_stage_after_termination": {
+                "output_path": str(self.timebox_output),
+                "result_symlink": str(self.timebox_output),
+                "status": "failed",
+                "exit_code": -15,
+                "first_diagnostic": "circt-opt exited with status -15",
+                "artifact": None,
+                "partial_artifact": None,
+                "manifest": _binding(self.timebox_manifest_path),
+                "log": _binding(self.timebox_log),
             },
         }
 
@@ -371,6 +437,10 @@ sys.exit(0)
         self.assertEqual(result["schema"], "tinystories-1m-exact-calyx-scalability-frontier-v1")
         self.assertEqual(result["status"], "calyx_scalability_frontier")
         self.assertEqual(result["frontier"], "calyx_scalability_frontier")
+        self.assertEqual(
+            result["primary"]["status"],
+            "deadline_exceeded_subsequently_terminated",
+        )
         self.assertIsNone(result["first_diagnostic"])
         self.assertIsNone(result["replay"])
         self.assertEqual(result["primary"]["evidence"]["self_sha256"], evidence["sha256"])
@@ -382,6 +452,15 @@ sys.exit(0)
         self.assertEqual(result["primary"]["no_output_observation"]["candidate"]["exists"], False)
         unsigned = {key: value for key, value in result.items() if key != "sha256"}
         self.assertEqual(result["sha256"], _sha256(_canonical_json(unsigned)))
+
+    def test_rejects_legacy_terminated_at_deadline_status(self) -> None:
+        """Accepting the old status would falsely say termination happened at deadline."""
+        evidence = self._timebox_evidence()
+        evidence["status"] = "terminated_at_deadline"
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox status mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
 
     def test_rejects_timebox_with_mutated_command(self) -> None:
         """Letting a timebox bind a different pass would break provenance."""
@@ -408,6 +487,129 @@ sys.exit(0)
         evidence_path = self._write_timebox_evidence(evidence)
 
         with self.assertRaisesRegex(ValueError, "timebox candidate output was observed"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_candidate_path_not_derived_from_command(self) -> None:
+        """Trusting an arbitrary no-output path would leave command output unbound."""
+        evidence = self._timebox_evidence()
+        evidence["no_output_observation"]["candidate"]["path"] = str(
+            self.timebox_output / "forged.calyx.mlir"
+        )
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox candidate output path mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_model_path_not_derived_from_command_output_dir(self) -> None:
+        """Binding any absent model path would miss a produced model in the real output."""
+        evidence = self._timebox_evidence()
+        evidence["no_output_observation"]["model_artifact"]["path"] = str(
+            self.root / "other-output" / "model.calyx.mlir"
+        )
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox model artifact path mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_partial_path_not_derived_from_command_output_dir(self) -> None:
+        """Omitting the partial path would permit an unbound rejected candidate."""
+        evidence = self._timebox_evidence()
+        evidence["no_output_observation"]["partial_artifact"]["path"] = str(
+            self.root / "other-output" / "partial.calyx.mlir"
+        )
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox partial artifact path mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_with_circt_process_command_not_matching_primary(self) -> None:
+        """A live unrelated circt-opt process must not satisfy primary-run evidence."""
+        evidence = self._timebox_evidence()
+        evidence["processes"][2]["command"] = "circt-opt forged.mlir --canonicalize"
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox circt-opt process command mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_with_runner_command_not_matching_output_dir(self) -> None:
+        """The runner process must bind the same input, output directory, and tool."""
+        evidence = self._timebox_evidence()
+        evidence["processes"][1]["command"] = (
+            "python3 run_exact_tinystories_calyx.py "
+            f"--input {self.input} "
+            f"--output {self.root / 'forged-output'} "
+            f"--circt-opt {self.tool}"
+        )
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox runner process command mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_termination_target_without_observed_circt_pid(self) -> None:
+        """A SIGTERM target that skips the observed circt-opt PID is not this frontier."""
+        evidence = self._timebox_evidence()
+        evidence["termination"]["target_pids"] = [2530918]
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(
+            ValueError, "timebox termination target does not include circt-opt process"
+        ):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_with_materialized_stage_output_mismatch(self) -> None:
+        """The post-termination bundle must be the command-derived output directory."""
+        evidence = self._timebox_evidence()
+        evidence["nix_stage_after_termination"]["output_path"] = str(
+            self.root / "forged-output"
+        )
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox stage output path mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_with_materialized_stage_success_claim(self) -> None:
+        """A successful materialized stage contradicts a scalability-frontier receipt."""
+        evidence = self._timebox_evidence()
+        evidence["nix_stage_after_termination"].update(
+            {
+                "status": "ok",
+                "exit_code": 0,
+                "first_diagnostic": None,
+                "artifact": {
+                    "path": "model.calyx.mlir",
+                    "bytes": 1,
+                    "sha256": (
+                        "6e340b9cffb37a989ca544e6bb780a2c78901d3fb337387"
+                        "68511a30617afa01d"
+                    ),
+                },
+            }
+        )
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox stage status mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_with_materialized_stage_partial_claim(self) -> None:
+        """A partial post-termination artifact is a rejected candidate, not this receipt."""
+        evidence = self._timebox_evidence()
+        evidence["nix_stage_after_termination"]["partial_artifact"] = {
+            "path": "partial.calyx.mlir",
+            "bytes": 1,
+            "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+        }
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox stage partial artifact mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_with_materialized_stage_log_hash_mismatch(self) -> None:
+        """The materialized zero-byte log must be bound, not just described."""
+        evidence = self._timebox_evidence()
+        evidence["nix_stage_after_termination"]["log"]["sha256"] = "0" * 64
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox stage log SHA-256 mismatch"):
             self.module.verify_timebox_evidence(evidence_path, self.predecessor)
 
     def test_rejects_timebox_with_invalid_termination_signal(self) -> None:

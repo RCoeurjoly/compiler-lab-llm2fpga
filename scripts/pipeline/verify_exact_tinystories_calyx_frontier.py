@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import tempfile
 from typing import Any
@@ -47,6 +48,7 @@ SCALABILITY_FRONTIER_SCHEMA = (
     "tinystories-1m-exact-calyx-scalability-frontier-v1"
 )
 SCALABILITY_FRONTIER = "calyx_scalability_frontier"
+TIMEBOX_STATUS = "deadline_exceeded_subsequently_terminated"
 
 
 def _canonical_json(value: object) -> bytes:
@@ -483,7 +485,7 @@ def _compare_replay(
 
 def _validate_timebox_command(
     command: object, predecessor: Path, tool: Path
-) -> tuple[list[object], str]:
+) -> tuple[list[object], Path, Path]:
     if not isinstance(command, list) or len(command) != 5:
         raise ValueError("timebox command mismatch")
     if not all(isinstance(item, str) for item in command):
@@ -500,22 +502,23 @@ def _validate_timebox_command(
     ]
     if normalized[:4] != expected:
         raise ValueError("timebox command mismatch")
-    output_path = str(command[4])
-    if not output_path:
-        raise ValueError("timebox command mismatch")
-    return command, output_path
+    candidate_output = Path(str(command[4]))
+    if candidate_output.name != ".candidate.calyx.mlir":
+        raise ValueError("timebox command output path mismatch")
+    return command, candidate_output.resolve(), candidate_output.parent.resolve()
 
 
 def _validate_no_output_observation(
-    evidence: dict[str, Any]
+    evidence: dict[str, Any], candidate_output: Path, output_dir: Path
 ) -> dict[str, dict[str, object]]:
     observations = evidence.get("no_output_observation")
     if not isinstance(observations, dict):
         raise ValueError("timebox no-output observation is missing")
     validated: dict[str, dict[str, object]] = {}
-    for key, description in (
-        ("candidate", "candidate output"),
-        ("model_artifact", "model artifact output"),
+    for key, description, expected_path in (
+        ("candidate", "candidate output", candidate_output),
+        ("model_artifact", "model artifact", output_dir / "model.calyx.mlir"),
+        ("partial_artifact", "partial artifact", output_dir / "partial.calyx.mlir"),
     ):
         observation = observations.get(key)
         if not isinstance(observation, dict):
@@ -523,23 +526,25 @@ def _validate_no_output_observation(
         path = observation.get("path")
         if not isinstance(path, str) or not path:
             raise ValueError(f"timebox {description} path is missing")
+        if Path(path).resolve() != expected_path.resolve():
+            raise ValueError(f"timebox {description} path mismatch")
         exists = observation.get("exists")
         if exists is not False:
             raise ValueError(f"timebox {description} was observed")
-        if Path(path).exists():
+        if expected_path.exists():
             raise ValueError(f"timebox {description} exists on disk")
-        validated[key] = {"path": path, "exists": False}
+        validated[key] = {"path": str(expected_path), "exists": False}
     return validated
 
 
 def _validate_timebox_processes(
-    evidence: dict[str, Any], max_rss_kb: int
-) -> list[dict[str, object]]:
+    evidence: dict[str, Any], max_rss_kb: int, primary_command: list[object],
+    candidate_output: Path, output_dir: Path
+) -> dict[str, dict[str, object]]:
     processes = evidence.get("processes")
     if not isinstance(processes, list):
         raise ValueError("timebox process observations are missing")
-    validated = []
-    roles: set[str] = set()
+    validated: dict[str, dict[str, object]] = {}
     largest_observed_rss = 0
     for process in processes:
         if not isinstance(process, dict):
@@ -548,8 +553,8 @@ def _validate_timebox_processes(
         if not isinstance(role, str) or not role:
             raise ValueError("timebox process role is invalid")
         pid = _require_positive_int(process.get("pid"), "timebox process pid")
-        command = process.get("command")
-        if not isinstance(command, str) or not command:
+        process_command = process.get("command")
+        if not isinstance(process_command, str) or not process_command:
             raise ValueError("timebox process command is invalid")
         stat = process.get("stat")
         elapsed = process.get("elapsed")
@@ -558,28 +563,46 @@ def _validate_timebox_processes(
             raise ValueError("timebox process state is invalid")
         rss_kb = _require_positive_int(process.get("rss_kb"), "timebox process RSS")
         largest_observed_rss = max(largest_observed_rss, rss_kb)
-        roles.add(role)
-        validated.append(
-            {
-                "role": role,
-                "pid": pid,
-                "stat": stat,
-                "elapsed": elapsed,
-                "time": cpu_time,
-                "rss_kb": rss_kb,
-                "command": command,
-            }
-        )
+        if role in validated:
+            raise ValueError("timebox process role is duplicated")
+        ppid = _require_positive_int(process.get("ppid"), "timebox process ppid")
+        validated[role] = {
+            "role": role, "pid": pid, "ppid": ppid, "stat": stat,
+            "elapsed": elapsed, "time": cpu_time, "rss_kb": rss_kb,
+            "command": process_command,
+        }
     required_roles = {"nix", "runner", "circt-opt"}
-    if not required_roles.issubset(roles):
+    if set(validated) != required_roles:
         raise ValueError("timebox process observations are incomplete")
     if max_rss_kb < largest_observed_rss:
         raise ValueError("timebox max RSS is below observed process RSS")
+    circt = validated["circt-opt"]
+    runner = validated["runner"]
+    if circt["ppid"] != runner["pid"]:
+        raise ValueError("timebox circt-opt parent PID mismatch")
+    if shlex.split(str(circt["command"])) != primary_command:
+        raise ValueError("timebox circt-opt process command mismatch")
+    runner_argv = shlex.split(str(runner["command"]))
+    expected_runner_args = {
+        "--input": str(Path(str(primary_command[1])).resolve()),
+        "--output": str(output_dir),
+        "--circt-opt": str(Path(str(primary_command[0])).resolve()),
+    }
+    for option, expected_value in expected_runner_args.items():
+        try:
+            index = runner_argv.index(option)
+            observed_value = str(Path(runner_argv[index + 1]).resolve())
+        except (ValueError, IndexError):
+            raise ValueError("timebox runner process command mismatch") from None
+        if observed_value != expected_value:
+            raise ValueError("timebox runner process command mismatch")
+    if str(candidate_output) not in str(circt["command"]):
+        raise ValueError("timebox circt-opt process command mismatch")
     return validated
 
 
 def _validate_timebox_termination(
-    evidence: dict[str, Any], deadline: datetime
+    evidence: dict[str, Any], deadline: datetime, circt_pid: int
 ) -> dict[str, object]:
     termination = evidence.get("termination")
     if not isinstance(termination, dict):
@@ -594,6 +617,8 @@ def _validate_timebox_termination(
         _require_positive_int(pid, "timebox termination target pid")
         for pid in target_pids
     ]
+    if circt_pid not in validated_pids:
+        raise ValueError("timebox termination target does not include circt-opt process")
     source = termination.get("source", "agent")
     if source not in {"agent", "external_user"}:
         raise ValueError("timebox termination source mismatch")
@@ -623,6 +648,41 @@ def _validate_timebox_termination(
     return result
 
 
+def _validate_timebox_stage(
+    evidence: dict[str, Any], output_dir: Path, command: list[object]
+) -> dict[str, object]:
+    stage = evidence.get("nix_stage_after_termination")
+    if not isinstance(stage, dict):
+        raise ValueError("timebox stage receipt is missing")
+    for key in ("output_path", "result_symlink"):
+        value = stage.get(key)
+        if not isinstance(value, str) or Path(value).resolve() != output_dir:
+            raise ValueError("timebox stage output path mismatch")
+    if stage.get("status") != "failed" or stage.get("exit_code") != -15:
+        raise ValueError("timebox stage status mismatch")
+    if stage.get("first_diagnostic") != "circt-opt exited with status -15":
+        raise ValueError("timebox stage diagnostic mismatch")
+    if stage.get("artifact") is not None:
+        raise ValueError("timebox stage artifact mismatch")
+    if stage.get("partial_artifact") is not None:
+        raise ValueError("timebox stage partial artifact mismatch")
+    manifest = _require_binding(stage.get("manifest"), output_dir / "manifest.json", "timebox stage manifest")
+    log = _require_binding(stage.get("log"), output_dir / "lower-scf-to-calyx.log", "timebox stage log")
+    manifest_object = _read_object(output_dir / "manifest.json", "timebox stage manifest")
+    if manifest_object.get("sha256") != _self_hash(manifest_object):
+        raise ValueError("timebox stage manifest self-hash mismatch")
+    if manifest_object.get("derivation") != str(output_dir):
+        raise ValueError("timebox stage derivation mismatch")
+    if manifest_object.get("command") != command:
+        raise ValueError("timebox stage command mismatch")
+    if manifest_object.get("status") != "failed" or manifest_object.get("exit_code") != -15:
+        raise ValueError("timebox stage status mismatch")
+    if manifest_object.get("artifact") is not None or manifest_object.get("partial_artifact") is not None:
+        raise ValueError("timebox stage artifact mismatch")
+    return {"output_path": str(output_dir), "manifest": manifest, "log": log,
+            "status": "failed", "exit_code": -15}
+
+
 def verify_timebox_evidence(evidence_path: Path, predecessor: Path) -> dict[str, object]:
     """Authenticate a 24h Calyx lowering timebox as a scalability frontier."""
     evidence_path = evidence_path.resolve()
@@ -633,7 +693,7 @@ def verify_timebox_evidence(evidence_path: Path, predecessor: Path) -> dict[str,
         raise ValueError("timebox evidence self-hash mismatch")
     if evidence.get("schema") != TIMEBOX_EVIDENCE_SCHEMA:
         raise ValueError("timebox evidence schema mismatch")
-    if evidence.get("status") != "terminated_at_deadline":
+    if evidence.get("status") != TIMEBOX_STATUS:
         raise ValueError("timebox status mismatch")
     if evidence.get("frontier") != SCALABILITY_FRONTIER:
         raise ValueError("timebox frontier mismatch")
@@ -642,7 +702,7 @@ def verify_timebox_evidence(evidence_path: Path, predecessor: Path) -> dict[str,
     tool, tool_binding = _validate_tool(
         command if isinstance(command, list) else [], evidence.get("circt_opt")
     )
-    validated_command, candidate_output_path = _validate_timebox_command(
+    validated_command, candidate_output_path, output_dir = _validate_timebox_command(
         command, predecessor, tool
     )
     input_binding = _require_binding(
@@ -671,9 +731,16 @@ def verify_timebox_evidence(evidence_path: Path, predecessor: Path) -> dict[str,
         evidence.get("elapsed_cpu_seconds"), "timebox elapsed CPU seconds"
     )
     max_rss_kb = _require_positive_int(evidence.get("max_rss_kb"), "timebox max RSS")
-    no_output_observation = _validate_no_output_observation(evidence)
-    processes = _validate_timebox_processes(evidence, max_rss_kb)
-    termination = _validate_timebox_termination(evidence, deadline)
+    no_output_observation = _validate_no_output_observation(
+        evidence, candidate_output_path, output_dir
+    )
+    processes = _validate_timebox_processes(
+        evidence, max_rss_kb, validated_command, candidate_output_path, output_dir
+    )
+    termination = _validate_timebox_termination(
+        evidence, deadline, int(processes["circt-opt"]["pid"])
+    )
+    stage = _validate_timebox_stage(evidence, output_dir, validated_command)
 
     evidence_receipt = {
         **_binding(evidence_path),
@@ -696,12 +763,13 @@ def verify_timebox_evidence(evidence_path: Path, predecessor: Path) -> dict[str,
             "elapsed_cpu_seconds": elapsed_cpu_seconds,
             "max_rss_kb": max_rss_kb,
             "command": validated_command,
-            "candidate_output_path": candidate_output_path,
+            "candidate_output_path": str(candidate_output_path),
             "input": input_binding,
             "tool": {**tool_binding, "canonical_path": str(tool.resolve())},
             "no_output_observation": no_output_observation,
-            "processes": processes,
+            "processes": list(processes.values()),
             "termination": termination,
+            "nix_stage_after_termination": stage,
         },
         "stage": None,
         "replay": None,
