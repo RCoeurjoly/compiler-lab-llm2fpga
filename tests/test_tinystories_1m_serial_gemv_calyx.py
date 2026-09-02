@@ -122,7 +122,7 @@ class ExactSerialGemvCalyxTest(unittest.TestCase):
     def test_reproducer_is_generated_and_parseable_when_circt_is_available(self) -> None:
         lowerer = _load_lowerer()
         expected = lowerer.lower_descriptor_text(_descriptor()).mlir
-        self.assertTrue(FIXTURE.is_file())
+        self.assertEqual(FIXTURE.read_text(encoding="utf-8"), expected)
         circt_opt = lowerer.find_circt_opt()
         if circt_opt is None:
             self.skipTest("circt-opt is not available outside the Nix development shell")
