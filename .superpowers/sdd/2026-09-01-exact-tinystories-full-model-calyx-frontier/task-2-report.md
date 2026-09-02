@@ -1,30 +1,93 @@
 # Task 2 Report: Exact TinyStories Calyx Frontier
 
-## Progress ledger
+## Status
 
-- 2026-09-02T10:10:17+02:00: recovery is active in `/home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler` on branch `codex/exact-tinystories-compiler`.
-- The inherited primary build remains authoritative and active: `nix` PID 2530843, runner PID 2530918, and `circt-opt` PID 2530919 are still live on the exact authenticated command for `.#tiny-stories-1m-kev-gpt-exact-calyx-frontier`.
-- Latest live-process snapshot: `nix` elapsed 18:23:35, runner alive, `circt-opt` elapsed 18:23:34, CPU 20:01:14, RSS 853732 KB.
-- The explicit autonomous ruling received during recovery is to preserve the primary run until the 24h wall-clock deadline of 2026-09-02T15:46:46+02:00, measured from its 2026-09-01T15:46:46+02:00 start. If it exits first, Task 2 proceeds from that exact result. If it remains live at the deadline, recheck PID and command identity, terminate only that exact process tree, preserve accessible logs/state, and classify the result as a deterministic 24h timebox/scalability frontier.
-- The recovered Task 2 verifier and test are being committed independently before the primary result so the authenticated replay/test infrastructure is preserved under repo policy.
-- A later autonomous ruling clarified that a deadline termination is not a compiler diagnostic and must not be represented as `compiler_frontier`. The verifier now has a separate `calyx_scalability_frontier` receipt path for signed 24h timebox evidence, binding the original command/input/tool, start and deadline timestamps, wall/CPU/RSS observations, no-output observations, process identity snapshots, and the termination signal.
+Task 2 completed as a deterministic 24h Calyx scalability frontier. The exact full-model `--lower-scf-to-calyx=top-level-function=main` run did not produce a candidate or compiler diagnostic before the explicit wall-clock deadline.
 
-## Scaling/root-cause evidence to bind after deadline if needed
+The final receipt is intentionally not `compiler_frontier`. The only terminal condition was external SIGTERM after the 24h timebox, so the final canonical receipt is `calyx_scalability_frontier` with `first_diagnostic: null` and `replay: null`.
 
-- Exact pre-Calyx input: 15,748,461 bytes, 293,972 lines.
-- Operation-scale counts supplied during monitoring: 42,558 `scf.for`, 102,229 `arith.`, 106,621 `memref.`, one function, zero `scf.if`, zero `linalg`.
-- Loop-shape analysis supplied during monitoring: 42,558 loops normalize to 274 structural forms. The largest repeated forms are 4,155 vector-add inner loops, 2,040 i64 multiply/store loops over 1024x16384, 2,016 i64 multiply/store loops over 256x4096, and 1,600 select/store loops.
-- Live-resource observation at approximately 18.5h: `circt-opt` remained CPU-active at roughly 108% CPU and about 820 MiB RSS with no candidate output observed. This supports a compiler-scaling frontier rather than a transport or I/O failure if the run reaches the 24h timebox.
+## Process timeline
 
-## Recovered verifier/test state
+- 2026-09-01T15:46:46+02:00: inherited primary build start.
+- 2026-09-02T10:10:17+02:00: recovery resumed in `/home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler` on branch `codex/exact-tinystories-compiler`.
+- 2026-09-02T15:46:46+02:00: explicit 24h deadline.
+- 2026-09-02T15:46:57+02:00: full PID/command identity was rechecked after the deadline; `nix` PID 2530843, runner PID 2530918, and `circt-opt` PID 2530919 were still live on the exact authenticated command.
+- 2026-09-02T15:47:57+02:00: last live post-deadline snapshot before blocked agent-side termination: `circt-opt` PID 2530919 elapsed `1-00:01:13`, CPU `1-01:55:49`, 107% CPU, RSS 841,240 KB.
+- 2026-09-02T18:24:13+02:00: recovery observed the process tree gone after user-side termination. The `result` symlink resolved to `/nix/store/2ir0cwyca2b9g3gfxmzwbqmchyvvlsnr-tiny-stories-1m-kev-gpt-exact-calyx-frontier`.
 
-- `scripts/pipeline/verify_exact_tinystories_calyx_frontier.py` authenticates the predecessor exact normalized flat-SCF package, validates the Calyx-stage receipt, independently replays the pinned `circt-opt --lower-scf-to-calyx=top-level-function=main` command, compares the stable diagnostic/log/artifact binding, and emits a canonical self-hashed frontier receipt.
-- `scripts/pipeline/verify_exact_tinystories_calyx_frontier.py` also authenticates signed 24h timebox evidence with a distinct `tinystories-1m-exact-calyx-scalability-frontier-v1` receipt. That path intentionally has no compiler diagnostic and no replay claim.
-- `tests/test_exact_tinystories_calyx_frontier.py` covers provenance mutation rejection, canonical replay receipts, coherent forged-manifest rejection, valid artifact acceptance, recovered minimization sidecar binding for bounded reduction evidence, and RED/GREEN mutation coverage for the new timebox scalability-frontier evidence path.
+## Authenticated command and inputs
 
-## Pending primary-result work
+Primary command:
 
-- Capture the exact primary result without rerunning it.
-- Run the independent replay verifier against the authoritative bundle or record the 24h timebox/scalability frontier evidence if the explicit deadline is reached.
-- Attempt bounded reduction only if the exact result is a stable compiler failure where reduction is applicable.
-- Write final artifact JSON, result documentation, and replace this progress ledger with the complete Task 2 report before the final Task 2 commit.
+```text
+/nix/store/b9p48l2nrw1c6zncc6f86jd9nr611x7z-circt-1.144.0g20260331_5dc62fe/bin/circt-opt /nix/store/c10d1w5amnb82m695zrdgbclfzkdy3wy-tiny-stories-1m-kev-gpt-exact-normalized-flat-scf/pre-calyx.mlir --lower-scf-to-calyx=top-level-function=main -o /nix/store/2ir0cwyca2b9g3gfxmzwbqmchyvvlsnr-tiny-stories-1m-kev-gpt-exact-calyx-frontier/.candidate.calyx.mlir
+```
+
+- predecessor package: `/nix/store/c10d1w5amnb82m695zrdgbclfzkdy3wy-tiny-stories-1m-kev-gpt-exact-normalized-flat-scf`
+- `pre-calyx.mlir`: 15,748,461 bytes, 293,972 lines, SHA-256 `54a7df3fec336c5418d3562441a3f9affe45702eb107b89092bc2f7b53afca31`
+- predecessor legality receipt self-hash: `451628dba61ea805b09007e89b2135d00dcd93cf225ed4d6d9625a05a598de30`
+- `circt-opt`: `/nix/store/b9p48l2nrw1c6zncc6f86jd9nr611x7z-circt-1.144.0g20260331_5dc62fe/bin/circt-opt`, SHA-256 `087732aac4608ed45effd1d7a81e032791e40a2a11ffff1a75b7031cb69eb2c7`
+
+## Timebox evidence
+
+Final pre-termination state:
+
+- `nix` PID 2530843: elapsed `1-00:01:14`, RSS 38,260 KB
+- runner PID 2530918: elapsed `1-00:01:13`, RSS 19,628 KB
+- `circt-opt` PID 2530919: elapsed `1-00:01:13`, CPU `1-01:55:49`, 107% CPU, RSS 841,240 KB
+- `/proc/2530919/status`: 5 threads, no tracer, no swap, VmHWM 943,228 KB
+- `/proc/2530919/io`: permission denied
+- output directory, candidate, model artifact, and manifest were not visible at the pre-termination check
+
+Post-termination materialized store:
+
+- output package: `/nix/store/2ir0cwyca2b9g3gfxmzwbqmchyvvlsnr-tiny-stories-1m-kev-gpt-exact-calyx-frontier`
+- files: `manifest.json` and zero-byte `lower-scf-to-calyx.log`
+- no `.candidate.calyx.mlir`, `model.calyx.mlir`, or `partial.calyx.mlir`
+- stage manifest: `status: failed`, `exit_code: -15`, `first_diagnostic: "circt-opt exited with status -15"`
+
+`exit_code: -15` is bound as SIGTERM evidence. It is not treated as a CIRCT compiler diagnostic.
+
+## Artifacts
+
+- `artifacts/comparison/tinystories-1m-exact-calyx-timebox-evidence.json`
+  - schema: `tinystories-1m-exact-calyx-timebox-evidence-v1`
+  - status: `terminated_at_deadline`
+  - self-hash: `73e9eb6d43cf3945c7e6600adbfaf150ecdaf26c67381ba2ffbd5ee08d25b827`
+  - file SHA-256: `3f2e704e76d0b38ad9c11dc5b958fcd322aaebbadf82a3a96501dd7996be4738`
+- `artifacts/comparison/tinystories-1m-exact-calyx-frontier.json`
+  - schema: `tinystories-1m-exact-calyx-scalability-frontier-v1`
+  - status: `calyx_scalability_frontier`
+  - frontier: `calyx_scalability_frontier`
+  - self-hash: `3cfff3b6c854c3632bc05b1e7d307c31a4b2dfdd0125fb6a6e0d9104411606de`
+  - file SHA-256: `a690bb8eaaa0570747d5ef9e0c56f1a2594017887d79d658fb36ca455f3e6442`
+
+## Verifier/test work recovered
+
+- `scripts/pipeline/verify_exact_tinystories_calyx_frontier.py` authenticates the predecessor exact normalized flat-SCF package, validates normal Calyx-stage receipts, independently replays valid compiler-success/compiler-diagnostic bundles, and emits canonical self-hashed receipts.
+- The same verifier now has a separate signed-evidence path for `calyx_scalability_frontier` so a 24h deadline termination cannot be misclassified as a compiler diagnostic.
+- `tests/test_exact_tinystories_calyx_frontier.py` includes mutation coverage for provenance, forged manifests, valid Calyx artifact acceptance, minimization sidecars, timebox command/input/no-output/termination binding, and external-user SIGTERM observation.
+
+## Root-cause evidence
+
+The authenticated input is a single-function exact model with 42,558 `scf.for` lines, 102,229 `arith.` lines, 106,621 `memref.` lines, zero `scf.if`, and zero `linalg.`. Loop-shape analysis supplied during recovery found those loops normalize to 274 structural forms, dominated by repeated vector-add, i64 multiply/store, and select/store patterns.
+
+At the deadline `circt-opt` was still CPU-active with bounded memory and no candidate output. That pattern supports a compiler-scaling frontier, not a transport, Nix, or I/O failure.
+
+## Reduction
+
+Bounded reduction is not applicable. No CIRCT compiler diagnostic was produced before the deadline and no rejected candidate exists to minimize.
+
+## Verification
+
+- `nix develop -c python -m unittest tests/test_exact_tinystories_calyx_stage.py tests/test_exact_tinystories_calyx_frontier.py -v`: 34 tests passed.
+- `nix develop -c python scripts/pipeline/verify_exact_tinystories_calyx_frontier.py --timebox-evidence artifacts/comparison/tinystories-1m-exact-calyx-timebox-evidence.json --predecessor /nix/store/c10d1w5amnb82m695zrdgbclfzkdy3wy-tiny-stories-1m-kev-gpt-exact-normalized-flat-scf --output /tmp/tinystories-calyx-frontier-replay.json`: passed.
+- `cmp artifacts/comparison/tinystories-1m-exact-calyx-frontier.json /tmp/tinystories-calyx-frontier-replay.json`: passed byte-for-byte.
+- `git diff --check`: passed.
+- `nix flake check --no-build`: passed; Nix reported `all checks passed`.
+
+## Next-path constraints
+
+- Do not change the CIRCT path as part of Task 2.
+- Any future compact lowering must preserve exact `serial_gemv_accumulate`: ascending input-index signed i64 MAC with two's-complement wrap, followed by per-output Q8.24 scale/rounding and the 97 activation Q/DQ boundaries.
+- Isolated `torch.export` and raw Torch-MLIR can retain a custom exact GEMV `torch.operator`, but pinned Torch-MLIR currently rejects it as illegal in the fixed backend pipeline. The viable next path is an out-of-tree Torch-MLIR-ABI-matched pre-backend legalizer that preserves the boundary through Linalg/SCF/Calyx as an explicit component/invoke.

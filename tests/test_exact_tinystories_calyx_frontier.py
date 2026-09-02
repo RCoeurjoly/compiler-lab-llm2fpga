@@ -419,6 +419,25 @@ sys.exit(0)
         with self.assertRaisesRegex(ValueError, "timebox termination signal mismatch"):
             self.module.verify_timebox_evidence(evidence_path, self.predecessor)
 
+    def test_accepts_timebox_with_externally_observed_termination(self) -> None:
+        """Requiring agent-sent time would force a false timestamp for user SIGTERM."""
+        evidence = self._timebox_evidence()
+        evidence["termination"] = {
+            "signal": "SIGTERM",
+            "target_pids": [2530919],
+            "source": "external_user",
+            "observed_gone_at": "2026-09-02T18:24:13+02:00",
+        }
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        result = self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+        self.assertEqual(result["primary"]["termination"]["source"], "external_user")
+        self.assertEqual(
+            result["primary"]["termination"]["observed_gone_at"],
+            "2026-09-02T18:24:13+02:00",
+        )
+
     def test_rejects_mutated_input_hash(self) -> None:
         """Trusting the declared input hash would permit predecessor substitution."""
         self._mutate_manifest(lambda value: value["input"].update(sha256="0" * 64))

@@ -594,11 +594,33 @@ def _validate_timebox_termination(
         _require_positive_int(pid, "timebox termination target pid")
         for pid in target_pids
     ]
+    source = termination.get("source", "agent")
+    if source not in {"agent", "external_user"}:
+        raise ValueError("timebox termination source mismatch")
     sent_at_text = termination.get("sent_at")
-    sent_at = _parse_timestamp(sent_at_text, "timebox termination sent_at")
-    if sent_at < deadline:
-        raise ValueError("timebox termination preceded deadline")
-    return {"signal": signal, "target_pids": validated_pids, "sent_at": sent_at_text}
+    observed_gone_at_text = termination.get("observed_gone_at")
+    if sent_at_text is not None:
+        sent_at = _parse_timestamp(sent_at_text, "timebox termination sent_at")
+        if sent_at < deadline:
+            raise ValueError("timebox termination preceded deadline")
+    elif observed_gone_at_text is not None:
+        observed_gone_at = _parse_timestamp(
+            observed_gone_at_text, "timebox termination observed_gone_at"
+        )
+        if observed_gone_at < deadline:
+            raise ValueError("timebox termination observation preceded deadline")
+    else:
+        raise ValueError("timebox termination timestamp is missing")
+    result: dict[str, object] = {
+        "signal": signal,
+        "target_pids": validated_pids,
+        "source": source,
+    }
+    if sent_at_text is not None:
+        result["sent_at"] = sent_at_text
+    if observed_gone_at_text is not None:
+        result["observed_gone_at"] = observed_gone_at_text
+    return result
 
 
 def verify_timebox_evidence(evidence_path: Path, predecessor: Path) -> dict[str, object]:
