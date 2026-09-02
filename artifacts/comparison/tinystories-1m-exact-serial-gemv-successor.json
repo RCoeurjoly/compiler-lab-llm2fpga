@@ -23,13 +23,13 @@
     },
     "preservation": "Task 1--3 source authority is validated in place and never rewritten"
   },
-  "receipt_sha256": "5d4067ffdb886500a2fa686c3a1bc4916485ef3a5175d3dda64ed201c75eba29",
+  "receipt_sha256": "ec9985628911a28374d9b304e7896e61d1dc9635612e74311d6667eef470f7db",
   "schema": "tinystories-1m-exact-serial-gemv-successor-v1",
   "status": "post_boundary_generation_matched",
   "successor": {
-    "adapter_sha256": "7814e1e15a5e82cb3a44873ef9a04ebb143f888d0d18f59414f1b58521f4e0c8",
+    "adapter_sha256": "5f2dfa10c54134e44a31f89608b562aea33ef39deacfcd62eadac1f0fda94892",
     "boundary_sha256": "a3e0c9f5ccd56fcd530174e2e15747008344b8e32384e508611c793008037b14",
-    "export_receipt_sha256": "570cbe1d76fcb456db801a7885e595c4c9d8b58a6c825bd43d24b26a8915c54e"
+    "export_receipt_sha256": "3d19e756bb9d188b28e6dd5b89c53c3d29fd8e7b44a8a2da2408f47ccb534eb1"
   },
   "verification": {
     "all_adapter_gemvs_cross_boundary": true,

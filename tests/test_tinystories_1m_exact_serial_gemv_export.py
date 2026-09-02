@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import ast
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -24,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROBE = ROOT / "scripts/pipeline/probe_exact_serial_gemv_export.py"
 ADAPTER = ROOT / "TinyStories/model_adapter_exact_package.py"
 CONTRACT = ROOT / "artifacts/reference/tinystories-1m-exact-input-contract.json"
+GENERATION_ARTIFACT = ROOT / "artifacts/reference/tinystories-1m-exact-generation.json"
 MODEL_PATH = Path(
     "/home/roland/.cache/huggingface/hub/"
     "models--roneneldan--TinyStories-1M/snapshots/"
@@ -128,15 +130,40 @@ class ExactSerialGemvExportTest(unittest.TestCase):
         ]
         self.assertEqual(direct_calls, [])
 
-    def test_unvalidated_successor_loading_rejects_constructed_proof(self) -> None:
+    def test_successor_loader_accepts_validated_immutable_artifact_path(self) -> None:
         import TinyStories.model_adapter_exact_package as adapter
 
-        with self.assertRaisesRegex(ExactModelError, "successor_predecessor_unverified"):
-            adapter.load_successor_exact_model(CONTRACT, Path("/nonexistent"), MODEL_PATH, object())
-        with self.assertRaisesRegex(ExactModelError, "successor_predecessor_unverified"):
-            adapter._ValidatedFrozenGenerationProof(object())
-        with self.assertRaisesRegex(ExactModelError, "successor_predecessor_unverified"):
-            adapter._validated_frozen_generation_proof(Path("/nonexistent"))
+        with self.assertRaises(ExactModelError) as caught:
+            adapter.load_successor_exact_model(
+                CONTRACT, Path("/nonexistent-package"), MODEL_PATH, GENERATION_ARTIFACT
+            )
+        self.assertEqual(caught.exception.code, "package_identity_mismatch")
+
+    def test_successor_loader_rejects_untrusted_artifact_paths_before_loading(self) -> None:
+        import TinyStories.model_adapter_exact_package as adapter
+
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary_path = Path(temporary)
+            forged_copy = temporary_path / GENERATION_ARTIFACT.name
+            forged_copy.write_bytes(GENERATION_ARTIFACT.read_bytes())
+            candidates = {
+                "forged-copy": forged_copy,
+                "nonexistent": temporary_path / "missing-generation.json",
+                "mismatched-existing-artifact": CONTRACT,
+            }
+            for label, artifact_path in candidates.items():
+                with self.subTest(label=label):
+                    with self.assertRaisesRegex(
+                        ExactModelError, "successor_predecessor_unverified"
+                    ):
+                        adapter.load_successor_exact_model(
+                            Path("/must-not-be-read"),
+                            Path("/must-not-be-read"),
+                            Path("/must-not-be-read"),
+                            artifact_path,
+                        )
+
+    def test_ordinary_loader_rejects_historical_selection_mismatch(self) -> None:
         package = Path(json.loads(CONTRACT.read_text(encoding="utf-8"))["package"]["origin"])
         with self.assertRaisesRegex(ExactModelError, "accepted selection authority differs"):
             load_exact_model(CONTRACT, package, MODEL_PATH)

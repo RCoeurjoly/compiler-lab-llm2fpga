@@ -118,25 +118,17 @@ def _require(condition: bool, code: str, message: str) -> None:
         raise ExactModelError(code, message)
 
 
-_FROZEN_GENERATION_PROOF_SEAL = object()
-
-
-class _ValidatedFrozenGenerationProof:
-    """Unforgeable-in-normal-use capability minted after frozen-artifact validation."""
-
-    __slots__ = ("_seal",)
-
-    def __init__(self, seal: object) -> None:
-        _require(seal is _FROZEN_GENERATION_PROOF_SEAL,
-                 "successor_predecessor_unverified", "invalid frozen-generation proof")
-        self._seal = seal
-
-
-def _validated_frozen_generation_proof(artifact_path: Path) -> _ValidatedFrozenGenerationProof:
-    """Validate the immutable predecessor artifact before minting a successor capability."""
+def _validate_frozen_generation_artifact(artifact_path: Path) -> None:
+    """Validate the exact immutable predecessor artifact in its historical location."""
 
     expected_artifact = _repo_root() / FROZEN_GENERATION_ARTIFACT_RELATIVE
-    _require(Path(artifact_path).resolve() == expected_artifact.resolve(),
+    try:
+        supplied_artifact = Path(artifact_path)
+    except TypeError as error:
+        raise ExactModelError(
+            "successor_predecessor_unverified", "invalid frozen-generation artifact path"
+        ) from error
+    _require(supplied_artifact.resolve() == expected_artifact.resolve(),
              "successor_predecessor_unverified", "unexpected frozen-generation artifact path")
     verifier_path = _repo_root() / FROZEN_GENERATION_VERIFIER_RELATIVE
     spec = importlib.util.spec_from_file_location("tinystories_frozen_generation_verifier", verifier_path)
@@ -149,15 +141,6 @@ def _validated_frozen_generation_proof(artifact_path: Path) -> _ValidatedFrozenG
         module.validate_artifact(artifact, _repo_root())
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
         raise ExactModelError("successor_predecessor_unverified", str(error)) from error
-
-    return _ValidatedFrozenGenerationProof(_FROZEN_GENERATION_PROOF_SEAL)
-
-
-def _require_valid_frozen_generation_proof(proof: object) -> _ValidatedFrozenGenerationProof:
-    _require(isinstance(proof, _ValidatedFrozenGenerationProof)
-             and proof._seal is _FROZEN_GENERATION_PROOF_SEAL,
-             "successor_predecessor_unverified", "frozen generation artifact was not validated")
-    return proof
 
 
 def _repo_root() -> Path:
@@ -560,13 +543,12 @@ def _validate_fixed_logits_oracle(oracle: Mapping[str, Any], contract: Mapping[s
 
 
 def _authenticate_inputs(contract_path: Path, package_path: Path, *,
-                         predecessor_proof: _ValidatedFrozenGenerationProof | None = None) -> tuple[
+                         historical_generation_artifact_path: Path | None = None) -> tuple[
     dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], torch.Tensor,
     dict[str, str],
 ]:
-    validated_predecessor_proof = (
-        None if predecessor_proof is None else _require_valid_frozen_generation_proof(predecessor_proof)
-    )
+    if historical_generation_artifact_path is not None:
+        _validate_frozen_generation_artifact(historical_generation_artifact_path)
     contract = _load_json(contract_path, "exact-input contract")
     audit_path = contract_path.with_name(AUDIT_NAME)
     audit = _load_json(audit_path, "exact-input audit")
@@ -625,7 +607,7 @@ def _authenticate_inputs(contract_path: Path, package_path: Path, *,
     selection_path = _repo_root() / str(selection.get("path", ""))
     _require(selection_path.is_file() and (
         selection.get("sha256") == _sha256(selection_path)
-        or validated_predecessor_proof is not None
+        or historical_generation_artifact_path is not None
     ),
              "model_identity_mismatch", "accepted selection authority differs")
 
@@ -1056,18 +1038,15 @@ class ExactModelBundle:
 
 
 def _load_exact_model(contract_path: Path, package_path: Path, model_path: Path, *,
-                      predecessor_proof: _ValidatedFrozenGenerationProof | None = None) -> ExactModelBundle:
+                      historical_generation_artifact_path: Path | None = None) -> ExactModelBundle:
     """Materialize the exact model after the caller-selected identity gate."""
 
     contract_path = Path(contract_path)
     package_path = Path(package_path)
     model_path = Path(model_path)
-    validated_predecessor_proof = (
-        None if predecessor_proof is None else _require_valid_frozen_generation_proof(predecessor_proof)
-    )
     contract, audit, profile, certificate, oracle, oracle_logits, package_location = _authenticate_inputs(
         contract_path, package_path,
-        predecessor_proof=validated_predecessor_proof,
+        historical_generation_artifact_path=historical_generation_artifact_path,
     )
     manifest = _load_json(package_path / "manifest.json", "package manifest")
     reference_adapter._validate_config(model_path, manifest)
@@ -1134,18 +1113,22 @@ def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) 
 
 
 def load_successor_exact_model(
-    contract_path: Path, package_path: Path, model_path: Path, predecessor_proof: object
+    contract_path: Path,
+    package_path: Path,
+    model_path: Path,
+    historical_generation_artifact_path: Path,
 ) -> ExactModelBundle:
-    """Load a post-boundary successor only after frozen-artifact validation.
+    """Load a post-boundary successor after validating its historical artifact.
 
-    The opaque proof cannot be constructed by a normal API caller. All
-    package, arithmetic, certificate, and oracle identity gates remain
-    mandatory after it authorizes the historical-selection exception.
+    Validation is deliberately the first operation. All package, arithmetic,
+    certificate, and oracle identity gates remain mandatory after the exact
+    frozen artifact authorizes the historical-selection exception.
     """
 
+    _validate_frozen_generation_artifact(historical_generation_artifact_path)
     return _load_exact_model(
         contract_path, package_path, model_path,
-        predecessor_proof=_require_valid_frozen_generation_proof(predecessor_proof),
+        historical_generation_artifact_path=historical_generation_artifact_path,
     )
 
 

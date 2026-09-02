@@ -21,7 +21,6 @@ if str(ROOT) not in sys.path:
 
 from TinyStories.model_adapter_exact_package import (
     GEMV_NAMES,
-    _validated_frozen_generation_proof,
     export_exact_program,
     exported_program_identity,
     load_successor_exact_model,
@@ -113,7 +112,7 @@ def _load_generation_verifier() -> Any:
     return module
 
 
-def _verify_frozen_generation_artifact() -> tuple[dict[str, Any], object]:
+def _verify_frozen_generation_artifact() -> dict[str, Any]:
     artifact = json.loads(GENERATION_ARTIFACT.read_text(encoding="utf-8"))
     verifier = _load_generation_verifier()
     verifier.validate_artifact(artifact, ROOT)
@@ -124,15 +123,17 @@ def _verify_frozen_generation_artifact() -> tuple[dict[str, Any], object]:
         "historical_task_1": artifact["identity"]["task_1"],
         "historical_task_2": artifact["identity"]["task_2"],
         "status": "matched",
-    }, _validated_frozen_generation_proof(GENERATION_ARTIFACT)
+    }
 
 
-def _verify_successor_generation(predecessor_proof: object) -> dict[str, Any]:
+def _verify_successor_generation(historical_generation_artifact_path: Path) -> dict[str, Any]:
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
     package = Path(contract["package"]["origin"])
     if not package.is_dir() or not MODEL_PATH.is_dir():
         raise ValueError("frozen package/model inputs unavailable for successor verification")
-    bundle = load_successor_exact_model(CONTRACT, package, MODEL_PATH, predecessor_proof)
+    bundle = load_successor_exact_model(
+        CONTRACT, package, MODEL_PATH, historical_generation_artifact_path
+    )
     prompt = list(bundle.contract["reference"]["prompt_tokens"])
     expected_tokens = list(bundle.contract["reference"]["tokens"])
     with torch.no_grad():
@@ -172,12 +173,12 @@ def build_successor_receipt() -> dict[str, Any]:
     or reinterpret any historical Task 1--3 source identity.
     """
 
-    historical_generation, predecessor_proof = _verify_frozen_generation_artifact()
+    historical_generation = _verify_frozen_generation_artifact()
     coverage = _adapter_boundary_coverage()
     if not coverage["all_adapter_gemvs_cross_boundary"]:
         raise ValueError("adapter GEMV path bypasses serial boundary")
     export_receipt = build_receipt()
-    successor_generation = _verify_successor_generation(predecessor_proof)
+    successor_generation = _verify_successor_generation(GENERATION_ARTIFACT)
     receipt: dict[str, Any] = {
         "schema": "tinystories-1m-exact-serial-gemv-successor-v1",
         "status": "post_boundary_generation_matched",
