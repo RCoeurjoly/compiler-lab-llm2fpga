@@ -192,6 +192,68 @@ that arbitrary tensor semantics can be lowered mechanically into efficient RTL.
 Any chosen change must be tied to the exact frontier, preserve the authenticated
 input contract, and pass a before/after regression at that boundary.
 
+## Approved bounded serial-GEMV salvage route
+
+The authenticated full-model experiment established a `calyx_scalability_frontier`:
+the generic SCF-to-Calyx route produced neither a diagnostic nor a candidate after
+24 hours. This does not prove that CIRCT cannot lower the model. It does prove that
+the exported scalarized form is not an acceptable development route. The next
+experiment is therefore a bounded compiler architecture change, not another run of
+the same route.
+
+The compiler may introduce one explicit `llm2fpga.serial_gemv` boundary at every
+call currently implemented by `serial_gemv_accumulate`. Its semantic contract is
+fixed by the executable oracle:
+
+- W8 per-output-channel weight codes and the existing activation Q/DQ boundaries;
+- one output accumulator per output row, with input indices visited in ascending
+  order;
+- signed 64-bit two's-complement wrapping multiply-accumulate;
+- existing Q16.16 values, Q8.24 scales, rounding, bias, and output Q/DQ behavior;
+- exact boundary values and hashes for the frozen prompt and all 16 generated
+  tokens.
+
+The eager implementation remains the oracle. `torch.export` must retain this as a
+compiler-owned custom operation, and the raw Torch-MLIR import must retain the
+operation as an explicit boundary. A pass plugin built against the *pinned
+Torch-MLIR* ABI, before the fixed Torch backend legalization, is the only permitted
+legalization point. It must convert only this operation and its statically proven
+shapes into the compiler's defined serial-GEMV representation. It must reject every
+other custom operator or dynamic shape.
+
+The downstream compiler must lower that representation into a defined Calyx
+component and `calyx.invoke` site. The component is generated from this declared
+contract and compiler source; it may not import, wrap, instantiate, or copy
+kev-gpt RTL. Its storage/interface realization is an implementation decision that
+must be evidenced by the first bounded stage artifact.
+
+This route deliberately does not promise arbitrary PyTorch support, vectorized
+GEMV, DDR3, PCIe, a Representative Core substitution, or board inference before
+the compiler stages are valid. It is a test of whether the compiler architecture
+can preserve exact TinyStories semantics while expressing the serial structure that
+the generic scalarized route erased.
+
+### Fast-learning gates
+
+Every development-stage command has a 30-minute wall-clock limit and must produce
+either a nonempty hash-bound artifact or a deterministic useful diagnostic. A
+full exact-model build has a 2-hour wall-clock limit. Timeout receipts bind input,
+tool, command, output paths, process identities, termination, and materialized
+stage state; no later stage may run after a failed gate. An unbounded compiler run
+is prohibited.
+
+The semantic gates are ordered:
+
+1. eager oracle versus exported custom-boundary hashes for the frozen token step;
+2. raw Torch-MLIR boundary presence and legalizer output contract;
+3. Linalg/SCF preservation of the compiler-owned call;
+4. defined Calyx component/invoke and serial MAC trace equivalence;
+5. generated SystemVerilog syntax, synthesis, and provenance closure;
+6. full frozen 16-token equivalence only after stages 1--5 pass.
+
+Failure at any gate is new evidence for the salvage/cut-loss decision. It is not
+permission to weaken quantization, arithmetic, ordering, or provenance.
+
 ## Validation ladder
 
 1. **Identity gate:** exact source, package, tokenizer, and semantics are
