@@ -19,6 +19,8 @@ from typing import Any, Callable, Mapping
 
 import torch
 
+from TinyStories.serial_gemv_boundary import serial_gemv
+
 
 def _load_reference_adapter() -> Any:
     path = Path(__file__).with_name("model_adapter_reference_package.py")
@@ -725,7 +727,7 @@ class _ExactFixedPointModel(torch.nn.Module):
         input_scale = self._activation_scale(f"{module}.input")
         input_codes, input_dequantized = activation_qdq(flattened, input_scale)
         scaled_input = input_codes * input_scale
-        accumulator = serial_gemv_accumulate(scaled_input, self._buffer("code", weight))
+        accumulator = serial_gemv(scaled_input, self._buffer("code", weight))
         real_q16 = round_shift_signed(
             accumulator * self._buffer("scale", weight), 2 * Q_SCALE - Q_VALUE
         )
