@@ -36,18 +36,26 @@ input count, so the schedule is ascending `k = 0 .. K-1` for each output.
 - The same complete Calyx-to-SV/Yosys sequence passed for 256x64 and 64x256
   declarations.  It is capped at 1,800 seconds per command in the new Nix
   helper `mkExactSerialGemvCalyxDerivation`.
+- The required 50,257x64 declared-shape gate passed in a clean bounded run:
+  lowerer 24 seconds, CIRCT parse under one second, Calyx export under one
+  second, native Calyx SV emission under one second, and Yosys syntax/stat
+  under one second.  The generated trace-summary SHA-256 is
+  `585dbc6f29729e008122a52e6c7fb0c9827c2af0e67e00c149c6a80c66e91ba4`;
+  generated SV SHA-256 is
+  `af7b58a3c859e0585224a4810e7e72151c55c928d806e3e7abf5d8d9968c6a82`.
 - `timeout 1800 nix develop -c python -m unittest
   tests/test_tinystories_1m_serial_gemv_calyx.py -v`: PASS, 5/5.
 - `nix flake check --no-build -L`: PASS.
 
-## Bounded large-shape note
+## Bounded large-shape repair
 
-The initial 50,257x64 end-to-end check exposed the diagnostic trace itself as
-the problem: a list of 3,216,448 Python dictionaries is not an acceptable
-development artifact.  That path was replaced with the streaming canonical
-hash above.  The full LM-head Calyx-to-SV/Yosys execution was deliberately not
-represented as passed in this task report; full-model composition and its
-provenance closure are Task 4.  No full-model compiler run was left active.
+The initial 50,257x64 check exposed the diagnostic trace itself as the problem:
+a list of 3,216,448 Python dictionaries is not an acceptable development
+artifact.  That path was replaced with the streaming canonical hash above, then
+the exact large-head component was rerun through the full bounded
+Calyx-to-SV/Yosys gate successfully.  This remains one descriptor component;
+full-model composition and provenance closure are Task 4.  No full-model
+compiler run was started.
 
 ## Scope retained
 
