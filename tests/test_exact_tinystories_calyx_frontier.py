@@ -129,10 +129,16 @@ sys.exit(0)
         old_receipt = self.module.EXPECTED_RECEIPT_SELF_SHA256
         old_tool_path = self.module.EXPECTED_CIRCT_OPT_PATH
         old_tool = self.module.EXPECTED_CIRCT_OPT_SHA256
+        old_runner_python = self.module.TIMEBOX_RUNNER_PYTHON
+        old_runner_script = self.module.TIMEBOX_RUNNER_SCRIPT
+        self.runner_python = str(self.root / "python3")
+        self.runner_script = str(self.root / "run_exact_tinystories_calyx.py")
         self.module.EXPECTED_PREPARED_SHA256 = self.input_sha256
         self.module.EXPECTED_RECEIPT_SELF_SHA256 = self.receipt_self_sha256
         self.module.EXPECTED_CIRCT_OPT_PATH = str(self.tool)
         self.module.EXPECTED_CIRCT_OPT_SHA256 = self.tool_sha256
+        self.module.TIMEBOX_RUNNER_PYTHON = self.runner_python
+        self.module.TIMEBOX_RUNNER_SCRIPT = self.runner_script
         self.addCleanup(
             lambda: setattr(self.module, "EXPECTED_PREPARED_SHA256", old_prepared)
         )
@@ -144,6 +150,12 @@ sys.exit(0)
         )
         self.addCleanup(
             lambda: setattr(self.module, "EXPECTED_CIRCT_OPT_SHA256", old_tool)
+        )
+        self.addCleanup(
+            lambda: setattr(self.module, "TIMEBOX_RUNNER_PYTHON", old_runner_python)
+        )
+        self.addCleanup(
+            lambda: setattr(self.module, "TIMEBOX_RUNNER_SCRIPT", old_runner_script)
         )
 
         self.bundle = self.root / "bundle"
@@ -295,7 +307,7 @@ sys.exit(0)
                     "time": "00:00:00",
                     "rss_kb": 19628,
                     "command": (
-                        "python3 run_exact_tinystories_calyx.py "
+                        f"{self.runner_python} {self.runner_script} "
                         f"--input {self.input} "
                         f"--output {self.timebox_output} "
                         f"--circt-opt {self.tool}"
@@ -549,7 +561,7 @@ sys.exit(0)
         """Matching options alone must not turn an arbitrary program into the runner."""
         evidence = self._timebox_evidence()
         evidence["processes"][1]["command"] = (
-            "forged-python run_exact_tinystories_calyx.py "
+            "/tmp/forged/python3 /tmp/forged/run_exact_tinystories_calyx.py "
             f"--input {self.input} --output {self.timebox_output} "
             f"--circt-opt {self.tool}"
         )

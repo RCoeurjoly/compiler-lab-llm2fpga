@@ -52,6 +52,12 @@ TIMEBOX_STATUS = "deadline_exceeded_subsequently_terminated"
 TIMEBOX_NIX_COMMAND = (
     "nix build .#tiny-stories-1m-kev-gpt-exact-calyx-frontier -L"
 )
+TIMEBOX_RUNNER_PYTHON = (
+    "/nix/store/00x3abm7y8j13i6n4sahvbar99irkc7d-python3-3.11.14/bin/python3"
+)
+TIMEBOX_RUNNER_SCRIPT = (
+    "/nix/store/vymaql750g6imc5k3bhfjgxhfc67pdri-run_exact_tinystories_calyx.py"
+)
 
 
 def _canonical_json(value: object) -> bytes:
@@ -593,11 +599,7 @@ def _validate_timebox_processes(
     if shlex.split(str(circt["command"])) != primary_command:
         raise ValueError("timebox circt-opt process command mismatch")
     runner_argv = shlex.split(str(runner["command"]))
-    if (
-        len(runner_argv) < 2
-        or Path(runner_argv[0]).name != "python3"
-        or not runner_argv[1].endswith("run_exact_tinystories_calyx.py")
-    ):
+    if runner_argv[:2] != [TIMEBOX_RUNNER_PYTHON, TIMEBOX_RUNNER_SCRIPT]:
         raise ValueError("timebox runner process command mismatch")
     expected_runner_args = {
         "--input": str(Path(str(primary_command[1])).resolve()),
