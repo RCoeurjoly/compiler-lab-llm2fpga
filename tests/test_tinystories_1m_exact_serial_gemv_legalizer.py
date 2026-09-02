@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import importlib.util
+import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -25,6 +29,19 @@ CMAKE = ROOT / "tools/torch-mlir-passes/CMakeLists.txt"
 PACKAGE = ROOT / "nix/torch-mlir-passes.nix"
 COMPILE_PYTORCH = ROOT / "scripts/compile-pytorch.py"
 PIPELINE = ROOT / "nix/pipeline.nix"
+MODELS = ROOT / "nix/models.nix"
+SUCCESSOR_ADAPTER = ROOT / "TinyStories/model_adapter_exact_serial_gemv_successor.py"
+SUCCESSOR_VERIFIER = ROOT / "scripts/pipeline/verify_exact_serial_gemv_successor_torch.py"
+SUCCESSOR_STAGE_RECEIPT = (
+    ROOT / "artifacts/comparison/tinystories-1m-exact-serial-gemv-torch.json"
+)
+TASK1_SUCCESSOR_RECEIPT = (
+    ROOT / "artifacts/comparison/tinystories-1m-exact-serial-gemv-successor.json"
+)
+SUCCESSOR_MODEL = "tiny-stories-1m-kev-gpt-exact-serial-gemv-successor"
+HISTORICAL_MODEL_BLOCK_SHA256 = (
+    "f51745f3ab9e15d2377c89853dc7403f472fecc1c4c56a992d470a46a122b62d"
+)
 PASS_PIPELINE = "builtin.module(llm2fpga-legalize-exact-serial-gemv)"
 FIXED_BACKEND_PIPELINE = (
     "builtin.module(llm2fpga-legalize-exact-serial-gemv,"
@@ -181,8 +198,123 @@ class ExactSerialGemvLegalizerTest(unittest.TestCase):
         self.assertIn("--torch-mlir-opt ${torchMlirOpt}", pipeline)
         self.assertIn("--pass-plugin ${torchMlirPasses}", pipeline)
         self.assertIn("--custom-op-library ${../TinyStories/serial_gemv_boundary.py}", pipeline)
-        self.assertIn('"tiny-stories-1m-kev-gpt-exact"', flake)
+        self.assertIn(f'"{SUCCESSOR_MODEL}"', flake)
         self.assertIn("llm2fpgaExactSerialGemvTorchMlirPasses", flake)
+
+    def test_registered_successor_is_distinct_and_preserves_historical_model_bytes(self) -> None:
+        models = MODELS.read_text(encoding="utf-8")
+        historical_start = models.index(
+            '  "tiny-stories-1m-kev-gpt-exact" = registerModel {'
+        )
+        historical_end = models.index(
+            '  "tinystories-w8a8" = registerModel {', historical_start
+        )
+        historical_block = models[historical_start:historical_end]
+        self.assertEqual(
+            hashlib.sha256(historical_block.encode()).hexdigest(),
+            HISTORICAL_MODEL_BLOCK_SHA256,
+        )
+
+        system = {
+            "x86_64": "x86_64-linux",
+            "aarch64": "aarch64-linux",
+        }.get(platform.machine())
+        self.assertIsNotNone(system, f"unsupported test architecture: {platform.machine()}")
+        evaluated = subprocess.run(
+            [
+                "nix",
+                "eval",
+                "--raw",
+                f".#packages.{system}.{SUCCESSOR_MODEL}-pytorch-exported.name",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=1800,
+        )
+        self.assertEqual(evaluated.returncode, 0, evaluated.stdout + evaluated.stderr)
+        self.assertEqual(evaluated.stdout, f"{SUCCESSOR_MODEL}-pytorch-exported")
+        self.assertTrue(SUCCESSOR_ADAPTER.is_file())
+
+    def test_successor_authority_binds_task1_receipt_and_rejects_mutation(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "exact_serial_gemv_successor_verifier", SUCCESSOR_VERIFIER
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader if spec else None)
+        verifier = importlib.util.module_from_spec(spec)
+        assert spec and spec.loader
+        spec.loader.exec_module(verifier)
+
+        authority = verifier.verify_successor_authority(ROOT)
+        self.assertEqual(
+            authority["task1_successor_receipt"]["file_sha256"],
+            "d6c71ad94ccb0e00c2edb0dfbc3a2004d9e21bf1a30984b9df57570c04415dee",
+        )
+        self.assertEqual(
+            authority["task1_successor_receipt"]["receipt_sha256"],
+            "ec9985628911a28374d9b304e7896e61d1dc9635612e74311d6667eef470f7db",
+        )
+        self.assertEqual(authority["changed_sources"]["exact_adapter"]["sha256"],
+                         "5f2dfa10c54134e44a31f89608b562aea33ef39deacfcd62eadac1f0fda94892")
+        self.assertEqual(authority["changed_sources"]["serial_gemv_boundary"]["sha256"],
+                         "a3e0c9f5ccd56fcd530174e2e15747008344b8e32384e508611c793008037b14")
+
+        with tempfile.TemporaryDirectory(prefix="mutated-successor-authority-") as temporary:
+            mutation_root = Path(temporary)
+            receipt_path = mutation_root / TASK1_SUCCESSOR_RECEIPT.relative_to(ROOT)
+            receipt_path.parent.mkdir(parents=True)
+            receipt = json.loads(TASK1_SUCCESSOR_RECEIPT.read_text(encoding="utf-8"))
+            receipt["verification"]["successor_exported_operator_count"] = 48
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            for source in (
+                ROOT / "TinyStories/model_adapter_exact_package.py",
+                ROOT / "TinyStories/serial_gemv_boundary.py",
+                ROOT / "artifacts/reference/tinystories-1m-exact-generation.json",
+            ):
+                destination = mutation_root / source.relative_to(ROOT)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+            with self.assertRaisesRegex(ValueError, "Task 1 successor receipt"):
+                verifier.verify_successor_authority(mutation_root)
+
+    def test_committed_successor_stage_receipt_verifies_post_legalizer_result(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "exact_serial_gemv_successor_verifier", SUCCESSOR_VERIFIER
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader if spec else None)
+        verifier = importlib.util.module_from_spec(spec)
+        assert spec and spec.loader
+        spec.loader.exec_module(verifier)
+        receipt = json.loads(SUCCESSOR_STAGE_RECEIPT.read_text(encoding="utf-8"))
+        result = verifier.validate_artifact(receipt, ROOT)
+        self.assertEqual(result["model"], SUCCESSOR_MODEL)
+        self.assertEqual(result["timeout_seconds"], 1800)
+        self.assertEqual(result["legalizer"]["status"], "completed")
+        self.assertNotEqual(result["result"]["frontier"], "identity_frontier")
+
+        with tempfile.TemporaryDirectory(prefix="mutated-successor-torch-") as temporary:
+            mutation = json.loads(json.dumps(receipt))
+            output = Path(mutation["result"]["output"]["path"])
+            mutated_output = Path(temporary) / "torch.mlir"
+            mutated_output.write_text(
+                output.read_text(encoding="utf-8").replace(
+                    '"llm2fpga.serial_gemv"', '"llm2fpga.corrupted_gemv"', 1
+                ),
+                encoding="utf-8",
+            )
+            mutation["result"]["output"] = {
+                "path": str(mutated_output),
+                "bytes": mutated_output.stat().st_size,
+                "sha256": hashlib.sha256(mutated_output.read_bytes()).hexdigest(),
+            }
+            mutation["receipt_sha256"] = verifier.canonical_sha256({
+                key: value for key, value in mutation.items()
+                if key != "receipt_sha256"
+            })
+            with self.assertRaisesRegex(ValueError, "Torch artifact legalization census"):
+                verifier.validate_artifact(mutation, ROOT)
 
     def test_raw_boundary_becomes_exact_builtin_tensor_descriptor(self) -> None:
         result = _run_module(FIXTURE.read_text(encoding="utf-8"))
@@ -271,6 +403,18 @@ class ExactSerialGemvLegalizerTest(unittest.TestCase):
 
     def test_unknown_custom_operator_is_rejected(self) -> None:
         self.assert_contract_rejected(_module(operator="torch.example.unknown"))
+
+    def test_builtin_torch_operator_is_preserved_for_the_fixed_backend(self) -> None:
+        source = _module(operator="torch.aten.bitwise_right_shift.Tensor_Scalar")
+        result = _run_module(source)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            result.output_text.count(
+                'torch.operator "torch.aten.bitwise_right_shift.Tensor_Scalar"'
+            ),
+            1,
+        )
+        self.assertNotIn("exact_serial_gemv_contract", result.stderr)
 
     def test_dynamic_dimension_is_rejected(self) -> None:
         self.assert_contract_rejected(

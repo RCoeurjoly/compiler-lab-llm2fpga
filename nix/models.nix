@@ -229,6 +229,71 @@ in {
     '';
   };
 
+  "tiny-stories-1m-kev-gpt-exact-serial-gemv-successor" = registerModel {
+    key = "tiny-stories-1m-kev-gpt-exact-serial-gemv-successor";
+    name = "tiny-stories-1m-kev-gpt-exact-serial-gemv-successor";
+    description =
+      "Successor exact TinyStories-1M export authorized by the frozen Task 1--3 artifact and serial-GEMV successor receipt.";
+    source = {
+      type = "authenticated-exact-package-successor";
+      predecessor = "tiny-stories-1m-kev-gpt-exact";
+      model_id = tinyStories1m.modelId;
+      inherit (tinyStories1m) revision;
+      adapter = "TinyStories/model_adapter_exact_serial_gemv_successor.py";
+      successor_adapter_sha256 = "e403b516600d3247e5cc66ef3541f541239c1db0858cafe29b23529463c19a7a";
+      exact_adapter_sha256 = "5f2dfa10c54134e44a31f89608b562aea33ef39deacfcd62eadac1f0fda94892";
+      serial_gemv_boundary_sha256 = "a3e0c9f5ccd56fcd530174e2e15747008344b8e32384e508611c793008037b14";
+      task_1_successor_receipt_file_sha256 = "d6c71ad94ccb0e00c2edb0dfbc3a2004d9e21bf1a30984b9df57570c04415dee";
+      task_1_successor_receipt_sha256 = "ec9985628911a28374d9b304e7896e61d1dc9635612e74311d6667eef470f7db";
+      task_3_generation_file_sha256 = "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3";
+      task_3_generation_artifact_sha256 = "9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3";
+      package_path = exactTinyStoriesPackage;
+      package_source = "kev-gpt-src@df1fc45b2ffcb26fddc19cfd57621e7eedf6153f";
+      backend_overrides = [ ];
+    };
+    allowHwExterns = true;
+    slangPerFileExternModules = true;
+    inherit fpPrimsSv;
+    hfSnapshot = tinyStories1m.snapshot;
+    pytorchToolchain = [ pythonWithTinyStories torchMlir ];
+    pytorchExportedBuildInputs = [ pythonWithTinyStories ];
+    pytorchExportedCommand = ''
+      package="${exactTinyStoriesPackage}"
+      contract_source="${../artifacts/reference/tinystories-1m-exact-input-contract.json}"
+      audit="${../artifacts/reference/tinystories-1m-exact-input-audit.json}"
+      contract_dir="$TMPDIR/exact-successor-inputs"
+      mkdir -p "$contract_dir"
+      cp "$contract_source" "$contract_dir/tinystories-1m-exact-input-contract.json"
+      cp "$audit" "$contract_dir/tinystories-1m-exact-input-audit.json"
+      contract="$contract_dir/tinystories-1m-exact-input-contract.json"
+
+      adapter_root="$TMPDIR/exact-successor-adapter-root"
+      mkdir -p "$adapter_root/TinyStories" "$adapter_root/artifacts/comparison" \
+        "$adapter_root/scripts/comparison" "$adapter_root/scripts/pipeline" \
+        "$adapter_root/docs/superpowers/specs" "$adapter_root/tests"
+      cp ${tinyStories1m.sourceDir}/*.py "$adapter_root/TinyStories/"
+      cp -r ${../artifacts/reference} "$adapter_root/artifacts/reference"
+      cp ${../artifacts/comparison/tinystories-1m-exact-serial-gemv-successor.json} \
+        "$adapter_root/artifacts/comparison/tinystories-1m-exact-serial-gemv-successor.json"
+      cp ${../scripts/comparison}/*.py "$adapter_root/scripts/comparison/"
+      cp ${../scripts/pipeline/verify_exact_serial_gemv_successor_torch.py} \
+        "$adapter_root/scripts/pipeline/verify_exact_serial_gemv_successor_torch.py"
+      cp ${../tests/test_tinystories_1m_exact_generation.py} \
+        "$adapter_root/tests/test_tinystories_1m_exact_generation.py"
+      cp ${../docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md} \
+        "$adapter_root/docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md"
+      export PYTHONPATH="$adapter_root:${tinyStories1m.sourceDir}:''${PYTHONPATH:-}"
+      adapter="$adapter_root/TinyStories/model_adapter_exact_serial_gemv_successor.py"
+      ${pythonWithTinyStories}/bin/python ${materializePyTorchExported} \
+        --adapter "$adapter" --contract "$contract" --package "$package" \
+        --model-path ${tinyStories1m.snapshot} --out-dir "$out"
+      ${pythonWithTinyStories}/bin/python \
+        "$adapter_root/scripts/pipeline/verify_exact_serial_gemv_successor_torch.py" \
+        write-export --root "$adapter_root" --exported-dir "$out" \
+        --output "$out/exact-serial-gemv-successor-provenance.json" >/dev/null
+    '';
+  };
+
   "tiny-stories-1m-kev-gpt-exact" = registerModel {
     key = "tiny-stories-1m-kev-gpt-exact";
     name = "tiny-stories-1m-kev-gpt-exact";

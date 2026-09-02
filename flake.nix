@@ -769,7 +769,9 @@
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
           torchMlirPasses = llm2fpgaExactSerialGemvTorchMlirPasses;
-          exactSerialGemvModelNames = [ "tiny-stories-1m-kev-gpt-exact" ];
+          exactSerialGemvModelNames = [
+            "tiny-stories-1m-kev-gpt-exact-serial-gemv-successor"
+          ];
         };
         modelRegistry = import ./nix/models.nix {
           inherit (pipelineLib) registerModel;
@@ -812,7 +814,9 @@
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
           torchMlirPasses = llm2fpgaExactSerialGemvTorchMlirPasses;
-          exactSerialGemvModelNames = [ "tiny-stories-1m-kev-gpt-exact" ];
+          exactSerialGemvModelNames = [
+            "tiny-stories-1m-kev-gpt-exact-serial-gemv-successor"
+          ];
         };
         modelRegistryTosa = import ./nix/models.nix {
           registerModel = pipelineLibTosa.registerTosaModel;

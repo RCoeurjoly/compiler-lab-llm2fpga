@@ -85,6 +85,8 @@ struct LegalizeExactSerialGemvPass
 
     for (Operation *op : rawOperators) {
       auto name = op->getAttrOfType<StringAttr>("name");
+      if (name && name.getValue().starts_with("torch.aten."))
+        continue;
       if (!name || name.getValue() != kExactOperator) {
         emitContractError(op, "unknown_custom_operator");
         signalPassFailure();
