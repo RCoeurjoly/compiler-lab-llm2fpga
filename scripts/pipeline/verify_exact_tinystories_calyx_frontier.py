@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import hashlib
 import json
 from pathlib import Path
@@ -41,6 +42,11 @@ DEFAULT_REPRODUCER_DIR = (
     / "reproducers/tinystories-1m-exact-calyx-frontier"
 )
 MINIMIZATION_SCHEMA = "tinystories-1m-exact-calyx-minimization-v1"
+TIMEBOX_EVIDENCE_SCHEMA = "tinystories-1m-exact-calyx-timebox-evidence-v1"
+SCALABILITY_FRONTIER_SCHEMA = (
+    "tinystories-1m-exact-calyx-scalability-frontier-v1"
+)
+SCALABILITY_FRONTIER = "calyx_scalability_frontier"
 
 
 def _canonical_json(value: object) -> bytes:
@@ -117,6 +123,30 @@ def _require_reproducer_binding(
     if not isinstance(recorded_path, str) or Path(recorded_path).name != recorded_path:
         raise ValueError(f"{description} path mismatch")
     return _require_binding(declared, reproducer_dir / recorded_path, description)
+
+
+def _parse_timestamp(value: object, description: str) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError(f"{description} timestamp is missing")
+    try:
+        timestamp = datetime.fromisoformat(value)
+    except ValueError as error:
+        raise ValueError(f"{description} timestamp is invalid") from error
+    if timestamp.tzinfo is None:
+        raise ValueError(f"{description} timestamp must include timezone")
+    return timestamp
+
+
+def _require_number(value: object, description: str) -> float:
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{description} is invalid")
+    return float(value)
+
+
+def _require_positive_int(value: object, description: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise ValueError(f"{description} is invalid")
+    return value
 
 
 def _validate_predecessor(predecessor: Path) -> dict[str, object]:
@@ -451,6 +481,219 @@ def _compare_replay(
         )
 
 
+def _validate_timebox_command(
+    command: object, predecessor: Path, tool: Path
+) -> tuple[list[object], str]:
+    if not isinstance(command, list) or len(command) != 5:
+        raise ValueError("timebox command mismatch")
+    if not all(isinstance(item, str) for item in command):
+        raise ValueError("timebox command mismatch")
+    expected = [
+        str(tool.resolve()),
+        str((predecessor / "pre-calyx.mlir").resolve()),
+        LOWERING_OPTION,
+        "-o",
+    ]
+    normalized = [
+        str(Path(item).resolve()) if index in (0, 1) else item
+        for index, item in enumerate(command)
+    ]
+    if normalized[:4] != expected:
+        raise ValueError("timebox command mismatch")
+    output_path = str(command[4])
+    if not output_path:
+        raise ValueError("timebox command mismatch")
+    return command, output_path
+
+
+def _validate_no_output_observation(
+    evidence: dict[str, Any]
+) -> dict[str, dict[str, object]]:
+    observations = evidence.get("no_output_observation")
+    if not isinstance(observations, dict):
+        raise ValueError("timebox no-output observation is missing")
+    validated: dict[str, dict[str, object]] = {}
+    for key, description in (
+        ("candidate", "candidate output"),
+        ("model_artifact", "model artifact output"),
+    ):
+        observation = observations.get(key)
+        if not isinstance(observation, dict):
+            raise ValueError(f"timebox {description} observation is missing")
+        path = observation.get("path")
+        if not isinstance(path, str) or not path:
+            raise ValueError(f"timebox {description} path is missing")
+        exists = observation.get("exists")
+        if exists is not False:
+            raise ValueError(f"timebox {description} was observed")
+        if Path(path).exists():
+            raise ValueError(f"timebox {description} exists on disk")
+        validated[key] = {"path": path, "exists": False}
+    return validated
+
+
+def _validate_timebox_processes(
+    evidence: dict[str, Any], max_rss_kb: int
+) -> list[dict[str, object]]:
+    processes = evidence.get("processes")
+    if not isinstance(processes, list):
+        raise ValueError("timebox process observations are missing")
+    validated = []
+    roles: set[str] = set()
+    largest_observed_rss = 0
+    for process in processes:
+        if not isinstance(process, dict):
+            raise ValueError("timebox process observation is invalid")
+        role = process.get("role")
+        if not isinstance(role, str) or not role:
+            raise ValueError("timebox process role is invalid")
+        pid = _require_positive_int(process.get("pid"), "timebox process pid")
+        command = process.get("command")
+        if not isinstance(command, str) or not command:
+            raise ValueError("timebox process command is invalid")
+        stat = process.get("stat")
+        elapsed = process.get("elapsed")
+        cpu_time = process.get("time")
+        if not all(isinstance(value, str) and value for value in (stat, elapsed, cpu_time)):
+            raise ValueError("timebox process state is invalid")
+        rss_kb = _require_positive_int(process.get("rss_kb"), "timebox process RSS")
+        largest_observed_rss = max(largest_observed_rss, rss_kb)
+        roles.add(role)
+        validated.append(
+            {
+                "role": role,
+                "pid": pid,
+                "stat": stat,
+                "elapsed": elapsed,
+                "time": cpu_time,
+                "rss_kb": rss_kb,
+                "command": command,
+            }
+        )
+    required_roles = {"nix", "runner", "circt-opt"}
+    if not required_roles.issubset(roles):
+        raise ValueError("timebox process observations are incomplete")
+    if max_rss_kb < largest_observed_rss:
+        raise ValueError("timebox max RSS is below observed process RSS")
+    return validated
+
+
+def _validate_timebox_termination(
+    evidence: dict[str, Any], deadline: datetime
+) -> dict[str, object]:
+    termination = evidence.get("termination")
+    if not isinstance(termination, dict):
+        raise ValueError("timebox termination is missing")
+    signal = termination.get("signal")
+    if signal not in {"SIGTERM", "SIGKILL"}:
+        raise ValueError("timebox termination signal mismatch")
+    target_pids = termination.get("target_pids")
+    if not isinstance(target_pids, list) or not target_pids:
+        raise ValueError("timebox termination targets are missing")
+    validated_pids = [
+        _require_positive_int(pid, "timebox termination target pid")
+        for pid in target_pids
+    ]
+    sent_at_text = termination.get("sent_at")
+    sent_at = _parse_timestamp(sent_at_text, "timebox termination sent_at")
+    if sent_at < deadline:
+        raise ValueError("timebox termination preceded deadline")
+    return {"signal": signal, "target_pids": validated_pids, "sent_at": sent_at_text}
+
+
+def verify_timebox_evidence(evidence_path: Path, predecessor: Path) -> dict[str, object]:
+    """Authenticate a 24h Calyx lowering timebox as a scalability frontier."""
+    evidence_path = evidence_path.resolve()
+    predecessor = predecessor.resolve()
+    predecessor_binding = _validate_predecessor(predecessor)
+    evidence = _read_object(evidence_path, "timebox evidence")
+    if evidence.get("sha256") != _self_hash(evidence):
+        raise ValueError("timebox evidence self-hash mismatch")
+    if evidence.get("schema") != TIMEBOX_EVIDENCE_SCHEMA:
+        raise ValueError("timebox evidence schema mismatch")
+    if evidence.get("status") != "terminated_at_deadline":
+        raise ValueError("timebox status mismatch")
+    if evidence.get("frontier") != SCALABILITY_FRONTIER:
+        raise ValueError("timebox frontier mismatch")
+
+    command = evidence.get("command")
+    tool, tool_binding = _validate_tool(
+        command if isinstance(command, list) else [], evidence.get("circt_opt")
+    )
+    validated_command, candidate_output_path = _validate_timebox_command(
+        command, predecessor, tool
+    )
+    input_binding = _require_binding(
+        evidence.get("input"), predecessor / "pre-calyx.mlir", "timebox input"
+    )
+    if input_binding["sha256"] != EXPECTED_PREPARED_SHA256:
+        raise ValueError("timebox input SHA-256 mismatch")
+
+    start = _parse_timestamp(evidence.get("start_time"), "timebox start")
+    deadline = _parse_timestamp(evidence.get("deadline_time"), "timebox deadline")
+    observed_at_text = evidence.get("observed_at")
+    observed_at = _parse_timestamp(observed_at_text, "timebox observed_at")
+    if deadline <= start:
+        raise ValueError("timebox deadline precedes start")
+    elapsed_wall_seconds = _require_number(
+        evidence.get("elapsed_wall_seconds"), "timebox elapsed wall seconds"
+    )
+    expected_wall_seconds = (deadline - start).total_seconds()
+    if abs(elapsed_wall_seconds - expected_wall_seconds) > 0.001:
+        raise ValueError("timebox elapsed wall seconds mismatch")
+    if elapsed_wall_seconds < 24 * 60 * 60:
+        raise ValueError("timebox deadline is shorter than 24h")
+    if observed_at < deadline:
+        raise ValueError("timebox observation preceded deadline")
+    elapsed_cpu_seconds = _require_number(
+        evidence.get("elapsed_cpu_seconds"), "timebox elapsed CPU seconds"
+    )
+    max_rss_kb = _require_positive_int(evidence.get("max_rss_kb"), "timebox max RSS")
+    no_output_observation = _validate_no_output_observation(evidence)
+    processes = _validate_timebox_processes(evidence, max_rss_kb)
+    termination = _validate_timebox_termination(evidence, deadline)
+
+    evidence_receipt = {
+        **_binding(evidence_path),
+        "self_sha256": evidence["sha256"],
+    }
+    receipt: dict[str, object] = {
+        "schema": SCALABILITY_FRONTIER_SCHEMA,
+        "status": SCALABILITY_FRONTIER,
+        "frontier": SCALABILITY_FRONTIER,
+        "first_diagnostic": None,
+        "predecessor": predecessor_binding,
+        "primary": {
+            "evidence": evidence_receipt,
+            "status": evidence["status"],
+            "frontier": evidence["frontier"],
+            "start_time": evidence["start_time"],
+            "deadline_time": evidence["deadline_time"],
+            "observed_at": observed_at_text,
+            "elapsed_wall_seconds": elapsed_wall_seconds,
+            "elapsed_cpu_seconds": elapsed_cpu_seconds,
+            "max_rss_kb": max_rss_kb,
+            "command": validated_command,
+            "candidate_output_path": candidate_output_path,
+            "input": input_binding,
+            "tool": {**tool_binding, "canonical_path": str(tool.resolve())},
+            "no_output_observation": no_output_observation,
+            "processes": processes,
+            "termination": termination,
+        },
+        "stage": None,
+        "replay": None,
+        "calyx_artifact": None,
+        "rejected_candidate": None,
+        "minimization": {
+            "status": "not_applicable",
+            "reason": "no compiler diagnostic was produced before the 24h timebox",
+        },
+    }
+    receipt["sha256"] = _self_hash(receipt)
+    return receipt
+
+
 def verify_bundle(bundle: Path, predecessor: Path) -> dict[str, object]:
     """Authenticate one stage bundle and independently replay its exact command."""
     bundle = bundle.resolve()
@@ -545,11 +788,16 @@ def verify_bundle(bundle: Path, predecessor: Path) -> dict[str, object]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bundle", type=Path, required=True)
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--bundle", type=Path)
+    input_group.add_argument("--timebox-evidence", type=Path)
     parser.add_argument("--predecessor", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    receipt = verify_bundle(args.bundle, args.predecessor)
+    if args.timebox_evidence is not None:
+        receipt = verify_timebox_evidence(args.timebox_evidence, args.predecessor)
+    else:
+        receipt = verify_bundle(args.bundle, args.predecessor)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(_canonical_json(receipt) + b"\n")
 

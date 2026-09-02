@@ -198,6 +198,77 @@ sys.exit(0)
         mutator(manifest)
         self._write_manifest(manifest)
 
+    def _timebox_evidence(self) -> dict[str, object]:
+        candidate = self.root / ".candidate.calyx.mlir"
+        model = self.root / "model.calyx.mlir"
+        return {
+            "schema": "tinystories-1m-exact-calyx-timebox-evidence-v1",
+            "status": "terminated_at_deadline",
+            "frontier": "calyx_scalability_frontier",
+            "start_time": "2026-09-01T15:46:46+02:00",
+            "deadline_time": "2026-09-02T15:46:46+02:00",
+            "observed_at": "2026-09-02T15:46:46+02:00",
+            "elapsed_wall_seconds": 86400.0,
+            "elapsed_cpu_seconds": 90030.0,
+            "max_rss_kb": 820000,
+            "command": [
+                str(self.tool),
+                str(self.input),
+                "--lower-scf-to-calyx=top-level-function=main",
+                "-o",
+                str(candidate),
+            ],
+            "input": _binding(self.input),
+            "circt_opt": {
+                **_binding(self.tool),
+                "version_exit_code": 0,
+                "version": "fake-circt-opt 1.0",
+            },
+            "no_output_observation": {
+                "candidate": {"path": str(candidate), "exists": False},
+                "model_artifact": {"path": str(model), "exists": False},
+            },
+            "processes": [
+                {
+                    "role": "nix",
+                    "pid": 2530843,
+                    "stat": "Ssl",
+                    "elapsed": "24:00:00",
+                    "time": "00:00:00",
+                    "rss_kb": 38260,
+                    "command": "nix build .#tiny-stories-1m-kev-gpt-exact-calyx-frontier -L",
+                },
+                {
+                    "role": "runner",
+                    "pid": 2530918,
+                    "stat": "S",
+                    "elapsed": "24:00:00",
+                    "time": "00:00:00",
+                    "rss_kb": 19628,
+                    "command": "python3 run_exact_tinystories_calyx.py",
+                },
+                {
+                    "role": "circt-opt",
+                    "pid": 2530919,
+                    "stat": "Rl",
+                    "elapsed": "24:00:00",
+                    "time": "25:00:30",
+                    "rss_kb": 820000,
+                    "command": "circt-opt pre-calyx.mlir --lower-scf-to-calyx=top-level-function=main",
+                },
+            ],
+            "termination": {
+                "signal": "SIGTERM",
+                "target_pids": [2530919, 2530918, 2530843],
+                "sent_at": "2026-09-02T15:46:50+02:00",
+            },
+        }
+
+    def _write_timebox_evidence(self, evidence: dict[str, object]) -> Path:
+        path = self.root / "timebox-evidence.json"
+        path.write_bytes(_canonical_json(_signed(evidence)) + b"\n")
+        return path
+
     def _point_verifier_at_reproducer_dir(self, path: Path) -> None:
         had_attribute = hasattr(self.module, "DEFAULT_REPRODUCER_DIR")
         old_value = getattr(self.module, "DEFAULT_REPRODUCER_DIR", None)
@@ -289,6 +360,64 @@ sys.exit(0)
         self.assertEqual(result["status"], "complete")
         self.assertIsNone(result["first_diagnostic"])
         self.assertEqual(result["calyx_artifact"]["sha256"], _sha256(artifact.read_bytes()))
+
+    def test_timebox_receipt_is_scalability_frontier_not_compiler_frontier(self) -> None:
+        """Misclassifying a deadline kill as a compiler diagnostic hides scaling."""
+        evidence = self._timebox_evidence()
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        result = self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+        self.assertEqual(result["schema"], "tinystories-1m-exact-calyx-scalability-frontier-v1")
+        self.assertEqual(result["status"], "calyx_scalability_frontier")
+        self.assertEqual(result["frontier"], "calyx_scalability_frontier")
+        self.assertIsNone(result["first_diagnostic"])
+        self.assertIsNone(result["replay"])
+        self.assertEqual(result["primary"]["evidence"]["self_sha256"], evidence["sha256"])
+        self.assertEqual(result["primary"]["evidence"]["sha256"], _sha256(evidence_path.read_bytes()))
+        self.assertEqual(result["primary"]["elapsed_wall_seconds"], 86400.0)
+        self.assertEqual(result["primary"]["elapsed_cpu_seconds"], 90030.0)
+        self.assertEqual(result["primary"]["max_rss_kb"], 820000)
+        self.assertEqual(result["primary"]["termination"]["signal"], "SIGTERM")
+        self.assertEqual(result["primary"]["no_output_observation"]["candidate"]["exists"], False)
+        unsigned = {key: value for key, value in result.items() if key != "sha256"}
+        self.assertEqual(result["sha256"], _sha256(_canonical_json(unsigned)))
+
+    def test_rejects_timebox_with_mutated_command(self) -> None:
+        """Letting a timebox bind a different pass would break provenance."""
+        evidence = self._timebox_evidence()
+        evidence["command"][2] = "--canonicalize"
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox command mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_with_mutated_input_binding(self) -> None:
+        """Trusting declared timebox input bytes would permit route substitution."""
+        evidence = self._timebox_evidence()
+        evidence["input"]["sha256"] = "0" * 64
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox input SHA-256 mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_with_output_claim(self) -> None:
+        """A scalability frontier must not claim a missing compiler artifact."""
+        evidence = self._timebox_evidence()
+        evidence["no_output_observation"]["candidate"]["exists"] = True
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox candidate output was observed"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_with_invalid_termination_signal(self) -> None:
+        """Dropping the real deadline termination signal would weaken the boundary."""
+        evidence = self._timebox_evidence()
+        evidence["termination"]["signal"] = "SIGUSR1"
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox termination signal mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
 
     def test_rejects_mutated_input_hash(self) -> None:
         """Trusting the declared input hash would permit predecessor substitution."""
