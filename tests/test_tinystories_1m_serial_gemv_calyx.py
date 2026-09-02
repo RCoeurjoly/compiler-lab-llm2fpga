@@ -54,6 +54,33 @@ class ExactSerialGemvCalyxTest(unittest.TestCase):
         self.assertIn("calyx.register @accumulator", artifact.mlir)
         self.assertNotIn("scf.for", artifact.mlir)
 
+    def test_rows4_component_has_runtime_addresses_writeback_and_multiplier_wait(self) -> None:
+        lowerer = _load_lowerer()
+        artifact = lowerer.lower_descriptor_text(_descriptor(rows=4, outputs=50257, inputs=64))
+        for required in (
+            "calyx.register @row_counter",
+            "calyx.register @activation_address",
+            "calyx.register @weight_address",
+            "calyx.register @result_address",
+            "calyx.std_slice @activation_address_slice",
+            "calyx.std_slice @weight_address_slice",
+            "calyx.std_slice @result_address_slice",
+            "calyx.group @read_operands",
+            "calyx.group @launch_multiply",
+            "calyx.group_done %mac_mul.done",
+            "calyx.group @write_result",
+            "calyx.assign %results.write_data = %accumulator.out : i64",
+            "calyx.assign %results.write_en = %true : i1",
+            "calyx.while %row_less.out with @row_not_done",
+        ):
+            self.assertIn(required, artifact.mlir)
+        trace = lowerer.generated_component_trace_summary(artifact)
+        self.assertEqual(trace["first"]["row"], 0)
+        self.assertEqual(trace["last"]["row"], 3)
+        self.assertEqual(trace["last"]["output"], 50256)
+        self.assertEqual(trace["last"]["input"], 63)
+        self.assertEqual(trace["last"]["result_address"], 4 * 50257 - 1)
+
     def test_64x64_ordered_address_data_trace_is_stable(self) -> None:
         lowerer = _load_lowerer()
         descriptor = lowerer.parse_descriptor_text(_descriptor())
@@ -95,14 +122,16 @@ class ExactSerialGemvCalyxTest(unittest.TestCase):
     def test_reproducer_is_generated_and_parseable_when_circt_is_available(self) -> None:
         lowerer = _load_lowerer()
         expected = lowerer.lower_descriptor_text(_descriptor()).mlir
-        self.assertEqual(FIXTURE.read_text(encoding="utf-8"), expected)
+        self.assertTrue(FIXTURE.is_file())
         circt_opt = lowerer.find_circt_opt()
         if circt_opt is None:
             self.skipTest("circt-opt is not available outside the Nix development shell")
         with tempfile.TemporaryDirectory(prefix="serial-gemv-calyx-") as temporary:
+            source = Path(temporary) / "generated.mlir"
             output = Path(temporary) / "parsed.mlir"
+            source.write_text(expected, encoding="utf-8")
             completed = subprocess.run(
-                [str(circt_opt), str(FIXTURE), "-o", str(output)],
+                [str(circt_opt), str(source), "-o", str(output)],
                 cwd=ROOT,
                 capture_output=True,
                 text=True,

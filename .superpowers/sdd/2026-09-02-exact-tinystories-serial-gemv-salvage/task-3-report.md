@@ -2,6 +2,19 @@
 
 ## Outcome
 
+### Review repair round 1 (in progress)
+
+The initial component was structurally valid but did not drive its memory
+addresses/writeback or represent all descriptor rows.  The generator now emits
+runtime row, output, and input-index loops; flat activation/weight/result
+address registers and width slices; operand-read completion; an explicit
+`std_mult_pipe` completion group before wrapping i64 accumulation; and result
+data/write enable/address assignments.  A new rows=4, outputs=50,257,
+inputs=64 regression checks all of those emitted operations and the emitted
+control-bound trace summary.  This repair is not yet a completed provenance
+gate: the next step is to export the declared-shape validation through flake
+and bind the resulting artifact/receipt rather than relying on a manual run.
+
 Implemented the bounded descriptor-to-Calyx lowerer.  It consumes only one
 static legalized `llm2fpga.serial_gemv` descriptor, requires
 `mac_order = "ascending_i64_wrap"`, and emits a compiler-generated wrapper
