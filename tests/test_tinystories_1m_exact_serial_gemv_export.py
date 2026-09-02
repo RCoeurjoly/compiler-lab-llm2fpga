@@ -128,10 +128,15 @@ class ExactSerialGemvExportTest(unittest.TestCase):
         ]
         self.assertEqual(direct_calls, [])
 
-    def test_unvalidated_successor_loading_has_no_public_bypass(self) -> None:
+    def test_unvalidated_successor_loading_rejects_constructed_proof(self) -> None:
         import TinyStories.model_adapter_exact_package as adapter
 
-        self.assertFalse(hasattr(adapter, "load_successor_exact_model"))
+        with self.assertRaisesRegex(ExactModelError, "successor_predecessor_unverified"):
+            adapter.load_successor_exact_model(CONTRACT, Path("/nonexistent"), MODEL_PATH, object())
+        with self.assertRaisesRegex(ExactModelError, "successor_predecessor_unverified"):
+            adapter._ValidatedFrozenGenerationProof(object())
+        with self.assertRaisesRegex(ExactModelError, "successor_predecessor_unverified"):
+            adapter._validated_frozen_generation_proof(Path("/nonexistent"))
         package = Path(json.loads(CONTRACT.read_text(encoding="utf-8"))["package"]["origin"])
         with self.assertRaisesRegex(ExactModelError, "accepted selection authority differs"):
             load_exact_model(CONTRACT, package, MODEL_PATH)

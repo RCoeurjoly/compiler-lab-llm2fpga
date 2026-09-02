@@ -65,6 +65,8 @@ REACHABLE_CERTIFICATE_RELATIVE = Path("artifacts/reference/tinystories-1m-exact-
 REACHABLE_CERTIFICATE_SHA256 = "35c64f4aacecca9e6a0df3635f16ba8f5cc3af770f683cb19781c62b1b456464"
 FIXED_LOGITS_ORACLE_RELATIVE = Path("artifacts/reference/tinystories-1m-fixed-logits-oracle.json")
 FIXED_LOGITS_ORACLE_SHA256 = "258bbcc081a5166b8f302ff6d736730f1743d7fa448413bae6c3774b9f5ff533"
+FROZEN_GENERATION_ARTIFACT_RELATIVE = Path("artifacts/reference/tinystories-1m-exact-generation.json")
+FROZEN_GENERATION_VERIFIER_RELATIVE = Path("scripts/comparison/verify_tinystories_1m_exact_generation.py")
 
 QDQ_BOUNDARY_NAMES: tuple[str, ...] = tuple(
     name
@@ -114,6 +116,48 @@ class ExactModelError(ValueError):
 def _require(condition: bool, code: str, message: str) -> None:
     if not condition:
         raise ExactModelError(code, message)
+
+
+_FROZEN_GENERATION_PROOF_SEAL = object()
+
+
+class _ValidatedFrozenGenerationProof:
+    """Unforgeable-in-normal-use capability minted after frozen-artifact validation."""
+
+    __slots__ = ("_seal",)
+
+    def __init__(self, seal: object) -> None:
+        _require(seal is _FROZEN_GENERATION_PROOF_SEAL,
+                 "successor_predecessor_unverified", "invalid frozen-generation proof")
+        self._seal = seal
+
+
+def _validated_frozen_generation_proof(artifact_path: Path) -> _ValidatedFrozenGenerationProof:
+    """Validate the immutable predecessor artifact before minting a successor capability."""
+
+    expected_artifact = _repo_root() / FROZEN_GENERATION_ARTIFACT_RELATIVE
+    _require(Path(artifact_path).resolve() == expected_artifact.resolve(),
+             "successor_predecessor_unverified", "unexpected frozen-generation artifact path")
+    verifier_path = _repo_root() / FROZEN_GENERATION_VERIFIER_RELATIVE
+    spec = importlib.util.spec_from_file_location("tinystories_frozen_generation_verifier", verifier_path)
+    _require(spec is not None and spec.loader is not None,
+             "successor_predecessor_unverified", "frozen generation verifier unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        artifact = json.loads(expected_artifact.read_text(encoding="utf-8"))
+        module.validate_artifact(artifact, _repo_root())
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
+        raise ExactModelError("successor_predecessor_unverified", str(error)) from error
+
+    return _ValidatedFrozenGenerationProof(_FROZEN_GENERATION_PROOF_SEAL)
+
+
+def _require_valid_frozen_generation_proof(proof: object) -> _ValidatedFrozenGenerationProof:
+    _require(isinstance(proof, _ValidatedFrozenGenerationProof)
+             and proof._seal is _FROZEN_GENERATION_PROOF_SEAL,
+             "successor_predecessor_unverified", "frozen generation artifact was not validated")
+    return proof
 
 
 def _repo_root() -> Path:
@@ -516,10 +560,13 @@ def _validate_fixed_logits_oracle(oracle: Mapping[str, Any], contract: Mapping[s
 
 
 def _authenticate_inputs(contract_path: Path, package_path: Path, *,
-                         allow_historical_selection_mismatch: bool = False) -> tuple[
+                         predecessor_proof: _ValidatedFrozenGenerationProof | None = None) -> tuple[
     dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], torch.Tensor,
     dict[str, str],
 ]:
+    validated_predecessor_proof = (
+        None if predecessor_proof is None else _require_valid_frozen_generation_proof(predecessor_proof)
+    )
     contract = _load_json(contract_path, "exact-input contract")
     audit_path = contract_path.with_name(AUDIT_NAME)
     audit = _load_json(audit_path, "exact-input audit")
@@ -578,7 +625,7 @@ def _authenticate_inputs(contract_path: Path, package_path: Path, *,
     selection_path = _repo_root() / str(selection.get("path", ""))
     _require(selection_path.is_file() and (
         selection.get("sha256") == _sha256(selection_path)
-        or allow_historical_selection_mismatch
+        or validated_predecessor_proof is not None
     ),
              "model_identity_mismatch", "accepted selection authority differs")
 
@@ -1009,15 +1056,18 @@ class ExactModelBundle:
 
 
 def _load_exact_model(contract_path: Path, package_path: Path, model_path: Path, *,
-                      allow_historical_selection_mismatch: bool) -> ExactModelBundle:
+                      predecessor_proof: _ValidatedFrozenGenerationProof | None = None) -> ExactModelBundle:
     """Materialize the exact model after the caller-selected identity gate."""
 
     contract_path = Path(contract_path)
     package_path = Path(package_path)
     model_path = Path(model_path)
+    validated_predecessor_proof = (
+        None if predecessor_proof is None else _require_valid_frozen_generation_proof(predecessor_proof)
+    )
     contract, audit, profile, certificate, oracle, oracle_logits, package_location = _authenticate_inputs(
         contract_path, package_path,
-        allow_historical_selection_mismatch=allow_historical_selection_mismatch,
+        predecessor_proof=validated_predecessor_proof,
     )
     manifest = _load_json(package_path / "manifest.json", "package manifest")
     reference_adapter._validate_config(model_path, manifest)
@@ -1079,24 +1129,23 @@ def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) 
     """Authenticate all current identities, materialize integers, and construct the exact model."""
 
     return _load_exact_model(
-        contract_path, package_path, model_path, allow_historical_selection_mismatch=False
+        contract_path, package_path, model_path
     )
 
 
-def _load_successor_exact_model(
-    contract_path: Path, package_path: Path, model_path: Path
+def load_successor_exact_model(
+    contract_path: Path, package_path: Path, model_path: Path, predecessor_proof: object
 ) -> ExactModelBundle:
-    """Load a post-boundary successor while preserving historical authority bytes.
+    """Load a post-boundary successor only after frozen-artifact validation.
 
-    The historical selection document is already content-mismatched in this
-    checkout.  This entry point is intentionally limited to successor
-    verification after the frozen generation artifact has been validated;
-    all package, arithmetic, certificate, and oracle identity gates remain
-    mandatory.
+    The opaque proof cannot be constructed by a normal API caller. All
+    package, arithmetic, certificate, and oracle identity gates remain
+    mandatory after it authorizes the historical-selection exception.
     """
 
     return _load_exact_model(
-        contract_path, package_path, model_path, allow_historical_selection_mismatch=True
+        contract_path, package_path, model_path,
+        predecessor_proof=_require_valid_frozen_generation_proof(predecessor_proof),
     )
 
 
