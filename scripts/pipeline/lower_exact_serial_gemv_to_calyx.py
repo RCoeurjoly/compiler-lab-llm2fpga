@@ -467,12 +467,17 @@ def main() -> None:
     artifact = lower_descriptor_text(args.input.read_text(encoding="utf-8"))
     descriptor = parse_descriptor_text(args.input.read_text(encoding="utf-8"))
     provenance = dict(artifact.provenance)
-    provenance["generated_component_trace"] = generated_component_trace_summary(artifact)
+    generated_trace = generated_component_trace_summary(artifact)
+    provenance["generated_component_trace"] = generated_trace
     args.output.write_text(artifact.mlir, encoding="utf-8")
     trace_summary = {
         "schema": "llm2fpga-exact-serial-gemv-address-data-trace-v1",
+        "descriptor": provenance["descriptor"],
         "entry_count": descriptor.rows * descriptor.outputs * descriptor.inputs,
         "sha256": stream_trace_sha256(descriptor),
+        "emitted_control_sha256": generated_trace["emitted_control_sha256"],
+        "first": generated_trace["first"],
+        "last": generated_trace["last"],
     }
     args.trace.write_text(json.dumps(trace_summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     args.provenance.write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8")

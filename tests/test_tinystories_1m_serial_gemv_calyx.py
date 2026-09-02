@@ -20,12 +20,21 @@ ROOT = Path(__file__).resolve().parents[1]
 LOWERER = ROOT / "scripts/pipeline/lower_exact_serial_gemv_to_calyx.py"
 FIXTURE = ROOT / "reproducers/tinystories-1m-exact-serial-gemv/calyx-component.mlir"
 REFERENCE_RTL = ROOT / "TinyStories" / "rtl"
+GATE_VERIFIER = ROOT / "scripts/pipeline/verify_exact_serial_gemv_calyx_gate.py"
 
 
 def _load_lowerer():
     spec = importlib.util.spec_from_file_location("serial_gemv_calyx", LOWERER)
     if spec is None or spec.loader is None:
         raise AssertionError("serial-GEMV Calyx lowerer is missing")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_gate_verifier():
+    spec = importlib.util.spec_from_file_location("serial_gemv_gate", GATE_VERIFIER)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -80,6 +89,21 @@ class ExactSerialGemvCalyxTest(unittest.TestCase):
         self.assertEqual(trace["last"]["output"], 50256)
         self.assertEqual(trace["last"]["input"], 63)
         self.assertEqual(trace["last"]["result_address"], 4 * 50257 - 1)
+
+    def test_gate_recomputes_trace_control_binding_from_calyx(self) -> None:
+        lowerer = _load_lowerer()
+        verifier = _load_gate_verifier()
+        artifact = lowerer.lower_descriptor_text(_descriptor())
+        expected = lowerer.generated_component_trace_summary(artifact)
+        with tempfile.TemporaryDirectory(prefix="serial-gemv-control-") as temporary:
+            path = Path(temporary) / "model.calyx.mlir"
+            path.write_text(artifact.mlir, encoding="utf-8")
+            self.assertEqual(verifier.emitted_trace_summary(path), {
+                "descriptor": artifact.provenance["descriptor"], **expected
+            })
+            path.write_text(artifact.mlir.replace("@read_operands", "@mutated_read_operands", 1), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "runtime control"):
+                verifier.emitted_trace_summary(path)
 
     def test_64x64_ordered_address_data_trace_is_stable(self) -> None:
         lowerer = _load_lowerer()

@@ -21,6 +21,10 @@ That gate is now exported as
 binds Calyx MLIR, parsed MLIR, Futil, SV, Yosys stats, trace summary, and
 provenance for 1x64x64, 1x256x64, 1x64x256, and actual 4x50257x64.  The
 receipt is generated and independently verified inside the Nix derivation.
+Repair round 2 binds each trace's emitted-control SHA-256 and first/last
+schedule bounds to a recomputation from `model.calyx.mlir`; changing either
+the Calyx control path or those trace claims and recomputing only the receipt
+self-hash is rejected.
 
 Implemented the bounded descriptor-to-Calyx lowerer.  It consumes only one
 static legalized `llm2fpga.serial_gemv` descriptor, requires
