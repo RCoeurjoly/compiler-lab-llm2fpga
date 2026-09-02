@@ -316,6 +316,62 @@ class ExactSerialGemvLegalizerTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Torch artifact legalization census"):
                 verifier.validate_artifact(mutation, ROOT)
 
+    def test_stage_receipt_input_must_match_validated_export_manifest(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "exact_serial_gemv_successor_verifier", SUCCESSOR_VERIFIER
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader if spec else None)
+        verifier = importlib.util.module_from_spec(spec)
+        assert spec and spec.loader
+        spec.loader.exec_module(verifier)
+        receipt = json.loads(SUCCESSOR_STAGE_RECEIPT.read_text(encoding="utf-8"))
+
+        mutations = (
+            (
+                "exported program path",
+                "exported_program",
+                "path",
+                receipt["input"]["exported_program"]["path"] + ".mutated",
+            ),
+            (
+                "exported program hash",
+                "exported_program",
+                "sha256",
+                "0" * 64,
+            ),
+            (
+                "exported program byte count",
+                "exported_program",
+                "bytes",
+                receipt["input"]["exported_program"]["bytes"] + 1,
+            ),
+            (
+                "serial GEMV operator count",
+                None,
+                "serial_gemv_operator_count",
+                receipt["input"]["serial_gemv_operator_count"] - 1,
+            ),
+        )
+        for label, section, field, replacement in mutations:
+            with self.subTest(label=label):
+                mutation = json.loads(json.dumps(receipt))
+                target = mutation["input"]
+                if section is not None:
+                    target = target[section]
+                target[field] = replacement
+                mutation["receipt_sha256"] = verifier.canonical_sha256(
+                    {
+                        key: value
+                        for key, value in mutation.items()
+                        if key != "receipt_sha256"
+                    }
+                )
+                with self.assertRaisesRegex(
+                    ValueError, "successor Torch-stage input"
+                ):
+                    verifier.validate_artifact(mutation, ROOT)
+
     def test_raw_boundary_becomes_exact_builtin_tensor_descriptor(self) -> None:
         result = _run_module(FIXTURE.read_text(encoding="utf-8"))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

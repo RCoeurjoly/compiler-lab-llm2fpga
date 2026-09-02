@@ -70,12 +70,12 @@
     "status": "completed"
   },
   "model": "tiny-stories-1m-kev-gpt-exact-serial-gemv-successor",
-  "receipt_sha256": "73af04682b3c2be546a24a47972719d59f2d7dd6d20b10f252b6c0693bd0d08f",
+  "receipt_sha256": "1b85ff43d8b16650d1ec4020e46fee57bd88cd14d081a7630ccd2c88928d3e7b",
   "registered_route": {
     "authority_and_stage_verifier": {
-      "bytes": 21610,
+      "bytes": 22040,
       "path": "scripts/pipeline/verify_exact_serial_gemv_successor_torch.py",
-      "sha256": "519089ec1df5825cb7896d991dd716203f2da9310e40e68fa4e047548f78ee7e"
+      "sha256": "58728f3a0da6ce6c2c5343c9b58b75b2fe1fc46fa5fcdbd9923b6b13c377dcd6"
     },
     "legalizer": {
       "bytes": 6382,

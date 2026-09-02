@@ -416,7 +416,9 @@ def validate_artifact(value: dict[str, Any], root: Path) -> dict[str, Any]:
             f"compiler {label} binding mismatch",
         )
 
-    exported_binding = value.get("input", {}).get("successor_export_manifest")
+    stage_input = value.get("input")
+    require(isinstance(stage_input, dict), "successor Torch-stage input missing")
+    exported_binding = stage_input.get("successor_export_manifest")
     require(isinstance(exported_binding, dict), "successor export manifest binding missing")
     exported_manifest_path = Path(str(exported_binding.get("path", "")))
     require(
@@ -425,8 +427,14 @@ def validate_artifact(value: dict[str, Any], root: Path) -> dict[str, Any]:
         and sha256_file(exported_manifest_path) == exported_binding.get("sha256"),
         "successor export manifest file binding mismatch",
     )
-    validate_export_manifest(
+    export_manifest = validate_export_manifest(
         load_object(exported_manifest_path, "successor export manifest"), root
+    )
+    require(
+        stage_input.get("exported_program") == export_manifest.get("exported_program")
+        and stage_input.get("serial_gemv_operator_count")
+        == export_manifest.get("serial_gemv_operator_count"),
+        "successor Torch-stage input differs from validated export manifest",
     )
 
     legalizer = value.get("legalizer")
