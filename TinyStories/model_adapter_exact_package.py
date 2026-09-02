@@ -1083,7 +1083,7 @@ def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) 
     )
 
 
-def load_successor_exact_model(
+def _load_successor_exact_model(
     contract_path: Path, package_path: Path, model_path: Path
 ) -> ExactModelBundle:
     """Load a post-boundary successor while preserving historical authority bytes.

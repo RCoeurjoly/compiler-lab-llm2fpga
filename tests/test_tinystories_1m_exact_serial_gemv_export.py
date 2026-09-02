@@ -5,19 +5,30 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import ast
+import json
 import unittest
 from pathlib import Path
 
 import torch
 from torch._subclasses.fake_tensor import FakeTensorMode
 
-from TinyStories.model_adapter_exact_package import serial_gemv_accumulate
+from TinyStories.model_adapter_exact_package import (
+    ExactModelError,
+    load_exact_model,
+    serial_gemv_accumulate,
+)
 from TinyStories.serial_gemv_boundary import ascending_i64_wrapping_mac, serial_gemv
 
 
 ROOT = Path(__file__).resolve().parents[1]
 PROBE = ROOT / "scripts/pipeline/probe_exact_serial_gemv_export.py"
 ADAPTER = ROOT / "TinyStories/model_adapter_exact_package.py"
+CONTRACT = ROOT / "artifacts/reference/tinystories-1m-exact-input-contract.json"
+MODEL_PATH = Path(
+    "/home/roland/.cache/huggingface/hub/"
+    "models--roneneldan--TinyStories-1M/snapshots/"
+    "77f1b168e219585646439073245fe87e56b3023e"
+)
 
 
 def _codes(rows: int, columns: int) -> torch.Tensor:
@@ -116,6 +127,14 @@ class ExactSerialGemvExportTest(unittest.TestCase):
             and node.func.id == "serial_gemv_accumulate"
         ]
         self.assertEqual(direct_calls, [])
+
+    def test_unvalidated_successor_loading_has_no_public_bypass(self) -> None:
+        import TinyStories.model_adapter_exact_package as adapter
+
+        self.assertFalse(hasattr(adapter, "load_successor_exact_model"))
+        package = Path(json.loads(CONTRACT.read_text(encoding="utf-8"))["package"]["origin"])
+        with self.assertRaisesRegex(ExactModelError, "accepted selection authority differs"):
+            load_exact_model(CONTRACT, package, MODEL_PATH)
 
     def test_probe_receipt_binds_eager_export_and_frozen_boundary(self) -> None:
         probe = _load_probe()

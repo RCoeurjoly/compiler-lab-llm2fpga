@@ -21,9 +21,9 @@ if str(ROOT) not in sys.path:
 
 from TinyStories.model_adapter_exact_package import (
     GEMV_NAMES,
+    _load_successor_exact_model,
     export_exact_program,
     exported_program_identity,
-    load_successor_exact_model,
 )
 from TinyStories.serial_gemv_boundary import serial_gemv
 
@@ -131,7 +131,7 @@ def _verify_successor_generation() -> dict[str, Any]:
     package = Path(contract["package"]["origin"])
     if not package.is_dir() or not MODEL_PATH.is_dir():
         raise ValueError("frozen package/model inputs unavailable for successor verification")
-    bundle = load_successor_exact_model(CONTRACT, package, MODEL_PATH)
+    bundle = _load_successor_exact_model(CONTRACT, package, MODEL_PATH)
     prompt = list(bundle.contract["reference"]["prompt_tokens"])
     expected_tokens = list(bundle.contract["reference"]["tokens"])
     with torch.no_grad():
