@@ -21,12 +21,12 @@
 
 **Files:** Create TinyStories/serial_gemv_boundary.py, tests/test_tinystories_1m_exact_serial_gemv_export.py, scripts/pipeline/probe_exact_serial_gemv_export.py. Modify TinyStories/model_adapter_exact_package.py.
 
-**Interfaces:** Input is signed-i64 rank-2 scaled activation R×K and W8 codes M×K; output is signed-i64 R×M. Exported name is llm2fpga.serial_gemv.default. Receipt binds eager/export output hashes, exported-program hash, operator count, and frozen GEMV boundary hashes.
+**Interfaces:** Input is signed-i64 rank-2 scaled activation R×K and W8 codes M×K; output is signed-i64 R×M. Exported name is llm2fpga.serial_gemv.default. Export receipt binds eager/export output hashes, exported-program hash, operator count, and frozen GEMV boundary hashes. A separate post-boundary successor receipt binds the changed adapter and proves frozen generation artifacts still match; it never rewrites Task 1--3 historical authority.
 
-- [ ] Write red tests for 64×64, 256×64, 64×256, non-i64 rejection, rank rejection, eager/boundary equality, and exactly one exported operator.
+- [ ] Write red tests for 64×64, 256×64, 64×256, and 50,257×64; non-i64 rejection; rank rejection; eager/boundary equality; every adapter GEMV call site; and exactly one exported operator per fixture.
 - [ ] Run nix develop -c python -m unittest tests/test_tinystories_1m_exact_serial_gemv_export.py -v. Expected: boundary absent.
 - [ ] Implement torch.library.custom_op llm2fpga::serial_gemv. Its eager body moves the present serial loop verbatim into ascending_i64_wrapping_mac; its fake body returns R×M. Change only the adapter call site.
-- [ ] Run export tests plus exact eager-generation verification, write receipt, commit feat: export exact serial GEMV boundary.
+- [ ] Run export tests plus post-boundary exact-generation successor verification, write both receipts, commit feat: export exact serial GEMV boundary.
 
 ### Task 2: Pinned Torch-MLIR legalizer
 
@@ -74,4 +74,3 @@
 
 - Tasks 1–5 cover oracle preservation, ABI-matched legalization, compiler-generated Calyx, bounded provenance/SV, and frozen-token auditing.
 - The only custom boundary is rank-2 signed-i64 llm2fpga.serial_gemv with fixed shapes and ascending_i64_wrap. No task permits scope drift.
-
