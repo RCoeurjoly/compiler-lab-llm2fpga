@@ -15,6 +15,13 @@ control-bound trace summary.  This repair is not yet a completed provenance
 gate: the next step is to export the declared-shape validation through flake
 and bind the resulting artifact/receipt rather than relying on a manual run.
 
+That gate is now exported as
+`.#tinystories-1m-exact-serial-gemv-calyx-gate`.  Its self-hashed receipt
+(`3ff6cc04079e8eea3989eb8b8b9fec3972a71ba113dbf24129ef5ca31f92efe2`)
+binds Calyx MLIR, parsed MLIR, Futil, SV, Yosys stats, trace summary, and
+provenance for 1x64x64, 1x256x64, 1x64x256, and actual 4x50257x64.  The
+receipt is generated and independently verified inside the Nix derivation.
+
 Implemented the bounded descriptor-to-Calyx lowerer.  It consumes only one
 static legalized `llm2fpga.serial_gemv` descriptor, requires
 `mac_order = "ascending_i64_wrap"`, and emits a compiler-generated wrapper
