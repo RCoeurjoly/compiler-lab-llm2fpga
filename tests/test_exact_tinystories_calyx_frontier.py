@@ -545,6 +545,28 @@ sys.exit(0)
         with self.assertRaisesRegex(ValueError, "timebox runner process command mismatch"):
             self.module.verify_timebox_evidence(evidence_path, self.predecessor)
 
+    def test_rejects_timebox_with_unbound_runner_executable(self) -> None:
+        """Matching options alone must not turn an arbitrary program into the runner."""
+        evidence = self._timebox_evidence()
+        evidence["processes"][1]["command"] = (
+            "forged-python run_exact_tinystories_calyx.py "
+            f"--input {self.input} --output {self.timebox_output} "
+            f"--circt-opt {self.tool}"
+        )
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox runner process command mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_with_duplicate_process_pid(self) -> None:
+        """One PID cannot attest to two independently observed process roles."""
+        evidence = self._timebox_evidence()
+        evidence["processes"][0]["pid"] = evidence["processes"][2]["pid"]
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox process PID is duplicated"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
     def test_rejects_timebox_termination_target_without_observed_circt_pid(self) -> None:
         """A SIGTERM target that skips the observed circt-opt PID is not this frontier."""
         evidence = self._timebox_evidence()
@@ -552,8 +574,17 @@ sys.exit(0)
         evidence_path = self._write_timebox_evidence(evidence)
 
         with self.assertRaisesRegex(
-            ValueError, "timebox termination target does not include circt-opt process"
+            ValueError, "timebox termination targets mismatch"
         ):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_termination_target_with_unrelated_pid(self) -> None:
+        """A termination claim must name precisely the observed compiler process."""
+        evidence = self._timebox_evidence()
+        evidence["termination"]["target_pids"] = [2530919, 999999]
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox termination targets mismatch"):
             self.module.verify_timebox_evidence(evidence_path, self.predecessor)
 
     def test_rejects_timebox_with_materialized_stage_output_mismatch(self) -> None:
@@ -610,6 +641,21 @@ sys.exit(0)
         evidence_path = self._write_timebox_evidence(evidence)
 
         with self.assertRaisesRegex(ValueError, "timebox stage log SHA-256 mismatch"):
+            self.module.verify_timebox_evidence(evidence_path, self.predecessor)
+
+    def test_rejects_timebox_with_forged_materialized_stage_diagnostic(self) -> None:
+        """A re-self-hashed stage manifest cannot turn SIGTERM into a compiler error."""
+        stage = json.loads(self.timebox_manifest_path.read_text(encoding="utf-8"))
+        stage["first_diagnostic"] = "error: forged compiler diagnostic"
+        stage["log"] = {"path": "forged.log", "bytes": 0, "sha256": "0" * 64}
+        self._write_timebox_stage_manifest(stage)
+        evidence = self._timebox_evidence()
+        evidence["nix_stage_after_termination"]["manifest"] = _binding(
+            self.timebox_manifest_path
+        )
+        evidence_path = self._write_timebox_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "timebox stage diagnostic mismatch"):
             self.module.verify_timebox_evidence(evidence_path, self.predecessor)
 
     def test_rejects_timebox_with_invalid_termination_signal(self) -> None:

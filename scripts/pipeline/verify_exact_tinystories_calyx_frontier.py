@@ -49,6 +49,9 @@ SCALABILITY_FRONTIER_SCHEMA = (
 )
 SCALABILITY_FRONTIER = "calyx_scalability_frontier"
 TIMEBOX_STATUS = "deadline_exceeded_subsequently_terminated"
+TIMEBOX_NIX_COMMAND = (
+    "nix build .#tiny-stories-1m-kev-gpt-exact-calyx-frontier -L"
+)
 
 
 def _canonical_json(value: object) -> bytes:
@@ -545,6 +548,7 @@ def _validate_timebox_processes(
     if not isinstance(processes, list):
         raise ValueError("timebox process observations are missing")
     validated: dict[str, dict[str, object]] = {}
+    observed_pids: set[int] = set()
     largest_observed_rss = 0
     for process in processes:
         if not isinstance(process, dict):
@@ -553,6 +557,9 @@ def _validate_timebox_processes(
         if not isinstance(role, str) or not role:
             raise ValueError("timebox process role is invalid")
         pid = _require_positive_int(process.get("pid"), "timebox process pid")
+        if pid in observed_pids:
+            raise ValueError("timebox process PID is duplicated")
+        observed_pids.add(pid)
         process_command = process.get("command")
         if not isinstance(process_command, str) or not process_command:
             raise ValueError("timebox process command is invalid")
@@ -578,11 +585,20 @@ def _validate_timebox_processes(
         raise ValueError("timebox max RSS is below observed process RSS")
     circt = validated["circt-opt"]
     runner = validated["runner"]
+    nix = validated["nix"]
+    if nix["command"] != TIMEBOX_NIX_COMMAND:
+        raise ValueError("timebox nix process command mismatch")
     if circt["ppid"] != runner["pid"]:
         raise ValueError("timebox circt-opt parent PID mismatch")
     if shlex.split(str(circt["command"])) != primary_command:
         raise ValueError("timebox circt-opt process command mismatch")
     runner_argv = shlex.split(str(runner["command"]))
+    if (
+        len(runner_argv) < 2
+        or Path(runner_argv[0]).name != "python3"
+        or not runner_argv[1].endswith("run_exact_tinystories_calyx.py")
+    ):
+        raise ValueError("timebox runner process command mismatch")
     expected_runner_args = {
         "--input": str(Path(str(primary_command[1])).resolve()),
         "--output": str(output_dir),
@@ -617,8 +633,8 @@ def _validate_timebox_termination(
         _require_positive_int(pid, "timebox termination target pid")
         for pid in target_pids
     ]
-    if circt_pid not in validated_pids:
-        raise ValueError("timebox termination target does not include circt-opt process")
+    if validated_pids != [circt_pid]:
+        raise ValueError("timebox termination targets mismatch")
     source = termination.get("source", "agent")
     if source not in {"agent", "external_user"}:
         raise ValueError("timebox termination source mismatch")
@@ -649,7 +665,8 @@ def _validate_timebox_termination(
 
 
 def _validate_timebox_stage(
-    evidence: dict[str, Any], output_dir: Path, command: list[object]
+    evidence: dict[str, Any], output_dir: Path, command: list[object],
+    predecessor: Path, tool: Path
 ) -> dict[str, object]:
     stage = evidence.get("nix_stage_after_termination")
     if not isinstance(stage, dict):
@@ -673,10 +690,26 @@ def _validate_timebox_stage(
         raise ValueError("timebox stage manifest self-hash mismatch")
     if manifest_object.get("derivation") != str(output_dir):
         raise ValueError("timebox stage derivation mismatch")
+    if manifest_object.get("schema") != "tinystories-1m-exact-calyx-stage-v1":
+        raise ValueError("timebox stage schema mismatch")
+    if manifest_object.get("stage") != "calyx":
+        raise ValueError("timebox stage name mismatch")
     if manifest_object.get("command") != command:
         raise ValueError("timebox stage command mismatch")
+    if manifest_object.get("input") != _binding(predecessor / "pre-calyx.mlir"):
+        raise ValueError("timebox stage input mismatch")
+    if manifest_object.get("circt_opt") != evidence.get("circt_opt"):
+        raise ValueError("timebox stage tool mismatch")
     if manifest_object.get("status") != "failed" or manifest_object.get("exit_code") != -15:
         raise ValueError("timebox stage status mismatch")
+    if manifest_object.get("artifact_accepted") is not False:
+        raise ValueError("timebox stage acceptance mismatch")
+    if manifest_object.get("first_diagnostic") != "circt-opt exited with status -15":
+        raise ValueError("timebox stage diagnostic mismatch")
+    if manifest_object.get("parse_exit_code") is not None:
+        raise ValueError("timebox stage parse status mismatch")
+    if manifest_object.get("log") != _binding(output_dir / "lower-scf-to-calyx.log"):
+        raise ValueError("timebox stage log mismatch")
     if manifest_object.get("artifact") is not None or manifest_object.get("partial_artifact") is not None:
         raise ValueError("timebox stage artifact mismatch")
     return {"output_path": str(output_dir), "manifest": manifest, "log": log,
@@ -740,7 +773,9 @@ def verify_timebox_evidence(evidence_path: Path, predecessor: Path) -> dict[str,
     termination = _validate_timebox_termination(
         evidence, deadline, int(processes["circt-opt"]["pid"])
     )
-    stage = _validate_timebox_stage(evidence, output_dir, validated_command)
+    stage = _validate_timebox_stage(
+        evidence, output_dir, validated_command, predecessor, tool
+    )
 
     evidence_receipt = {
         **_binding(evidence_path),
