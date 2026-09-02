@@ -389,6 +389,7 @@
           "hw_clean_to_sv_mlir.sh"
           "hw_to_hw_clean.sh"
           "linalg_to_cf.sh"
+          "lower_exact_serial_gemv_to_calyx.py"
           "mlir_op_stats.sh"
           "normalize_calyx_for_export.py"
           "normalize_futil_float_constants.py"
@@ -398,6 +399,7 @@
           "torch_to_linalg.sh"
           "tosa_to_linalg.sh"
           "verify_calyx_f32_constant_bits.py"
+          "verify_exact_serial_gemv_calyx_gate.py"
           "write_fp_primitive_blackboxes.py"
           "write_rtlil_stage_stat_report.py"
           "write_utilization_report.py"
@@ -2830,6 +2832,41 @@ PY
           inherit circt mlir torchMlir yosysPkg modelRegistryJson
             llm2fpgaMlirPasses llm2fpgaTorchMlirPasses
             llm2fpgaExactSerialGemvTorchMlirPasses llm2fpgaCirctPasses calyx;
+          "tinystories-1m-exact-serial-gemv-calyx-gate" =
+            let
+              descriptor = rows: outputs: inputs: pkgs.writeText
+                "serial-gemv-${toString rows}x${toString outputs}x${toString inputs}.mlir" ''
+                  %0 = "llm2fpga.serial_gemv"(%input, %weights) {inputs = ${toString inputs} : i64, mac_order = "ascending_i64_wrap", outputs = ${toString outputs} : i64, rows = ${toString rows} : i64} : (tensor<${toString rows}x${toString inputs}xi64>, tensor<${toString outputs}x${toString inputs}xi64>) -> tensor<${toString rows}x${toString outputs}xi64>
+                '';
+              small = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "exact-serial-gemv-1x64x64";
+                descriptor = descriptor 1 64 64;
+              };
+              expand = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "exact-serial-gemv-1x256x64";
+                descriptor = descriptor 1 256 64;
+              };
+              contract = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "exact-serial-gemv-1x64x256";
+                descriptor = descriptor 1 64 256;
+              };
+              actual = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "exact-serial-gemv-4x50257x64";
+                descriptor = descriptor 4 50257 64;
+              };
+            in pkgs.runCommand "tinystories-1m-exact-serial-gemv-calyx-gate" {
+              buildInputs = [ python ];
+            } ''
+              mkdir -p "$out"
+              ${python}/bin/python3 ${pipelineScripts}/verify_exact_serial_gemv_calyx_gate.py \
+                --write --receipt "$out/receipt.json" \
+                --gate 1x64x64=${small} --gate 1x256x64=${expand} \
+                --gate 1x64x256=${contract} --gate 4x50257x64=${actual}
+              ${python}/bin/python3 ${pipelineScripts}/verify_exact_serial_gemv_calyx_gate.py \
+                --receipt "$out/receipt.json" \
+                --gate 1x64x64=${small} --gate 1x256x64=${expand} \
+                --gate 1x64x256=${contract} --gate 4x50257x64=${actual}
+            '';
           "rc-math-exp-paper-screen" = rcMathExpPaperScreen;
           "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf" =
             exactTinyStoriesNormalized;

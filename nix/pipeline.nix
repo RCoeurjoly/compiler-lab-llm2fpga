@@ -111,6 +111,7 @@ let
       buildInputs = [ python circt calyxTool yosysPkg ];
     } ''
       set -euo pipefail
+      mkdir -p "$out"
       timeout 1800 ${python}/bin/python3 \
         ${pipelineScripts}/lower_exact_serial_gemv_to_calyx.py \
         --input ${descriptor} \
@@ -124,7 +125,7 @@ let
       timeout 1800 ${calyxTool}/bin/calyx "$out/model.futil" \
         -l ${calyxTool}/share/calyx -b verilog --synthesis --nested \
         -d papercut -o "$out/model.sv"
-      timeout 1800 ${yosysPkg}/bin/yosys -q -p \
+      timeout 1800 ${yosysPkg}/bin/yosys -p \
         "read_verilog -sv $out/model.sv; hierarchy -check; stat" \
         >"$out/yosys-stat.txt"
       test -s "$out/ordered-address-data-trace.json"
@@ -653,6 +654,7 @@ let
         }) stageNames);
       }) registry));
 in {
+  inherit mkExactSerialGemvCalyxDerivation;
   inherit registerModel registerTosaModel registerTosaNoHandshakeModel
     registerNoHandshakeModel;
   inherit pipelineStagePackagesFromRegistry;
