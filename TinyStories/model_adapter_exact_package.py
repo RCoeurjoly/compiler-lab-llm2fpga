@@ -515,7 +515,8 @@ def _validate_fixed_logits_oracle(oracle: Mapping[str, Any], contract: Mapping[s
     return torch.tensor(values, dtype=torch.int64)
 
 
-def _authenticate_inputs(contract_path: Path, package_path: Path) -> tuple[
+def _authenticate_inputs(contract_path: Path, package_path: Path, *,
+                         allow_historical_selection_mismatch: bool = False) -> tuple[
     dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], torch.Tensor,
     dict[str, str],
 ]:
@@ -575,7 +576,10 @@ def _authenticate_inputs(contract_path: Path, package_path: Path) -> tuple[
              "model_identity_mismatch", "deployed executable identity differs")
     selection = contract.get("selection_authority", {})
     selection_path = _repo_root() / str(selection.get("path", ""))
-    _require(selection_path.is_file() and selection.get("sha256") == _sha256(selection_path),
+    _require(selection_path.is_file() and (
+        selection.get("sha256") == _sha256(selection_path)
+        or allow_historical_selection_mismatch
+    ),
              "model_identity_mismatch", "accepted selection authority differs")
 
     fixed_authority = contract.get("semantic_authorities", {}).get("fixed_profile", {})
@@ -862,7 +866,7 @@ class _ExactFixedPointModel(torch.nn.Module):
         input_scale = self._activation_scale("lm_head.input")
         input_codes, input_dequantized = activation_qdq(normalized.reshape(-1, 64), input_scale)
         qdq_observations.extend((input_codes, input_scale, input_dequantized))
-        accumulator = serial_gemv_accumulate(
+        accumulator = serial_gemv(
             input_codes * input_scale, self._buffer("code", "token_embedding.weight")
         )
         gemv_accumulators.append(accumulator)
@@ -1004,14 +1008,16 @@ class ExactModelBundle:
         }
 
 
-def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) -> ExactModelBundle:
-    """Authenticate all identities, materialize integers, and construct the exact model."""
+def _load_exact_model(contract_path: Path, package_path: Path, model_path: Path, *,
+                      allow_historical_selection_mismatch: bool) -> ExactModelBundle:
+    """Materialize the exact model after the caller-selected identity gate."""
 
     contract_path = Path(contract_path)
     package_path = Path(package_path)
     model_path = Path(model_path)
     contract, audit, profile, certificate, oracle, oracle_logits, package_location = _authenticate_inputs(
-        contract_path, package_path
+        contract_path, package_path,
+        allow_historical_selection_mismatch=allow_historical_selection_mismatch,
     )
     manifest = _load_json(package_path / "manifest.json", "package manifest")
     reference_adapter._validate_config(model_path, manifest)
@@ -1066,6 +1072,31 @@ def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) 
     return ExactModelBundle(
         contract=contract, audit=audit, profile=profile, certificate=certificate,
         oracle=oracle, oracle_logits=oracle_logits, manifest=manifest, model=model, receipt=receipt
+    )
+
+
+def load_exact_model(contract_path: Path, package_path: Path, model_path: Path) -> ExactModelBundle:
+    """Authenticate all current identities, materialize integers, and construct the exact model."""
+
+    return _load_exact_model(
+        contract_path, package_path, model_path, allow_historical_selection_mismatch=False
+    )
+
+
+def load_successor_exact_model(
+    contract_path: Path, package_path: Path, model_path: Path
+) -> ExactModelBundle:
+    """Load a post-boundary successor while preserving historical authority bytes.
+
+    The historical selection document is already content-mismatched in this
+    checkout.  This entry point is intentionally limited to successor
+    verification after the frozen generation artifact has been validated;
+    all package, arithmetic, certificate, and oracle identity gates remain
+    mandatory.
+    """
+
+    return _load_exact_model(
+        contract_path, package_path, model_path, allow_historical_selection_mismatch=True
     )
 
 

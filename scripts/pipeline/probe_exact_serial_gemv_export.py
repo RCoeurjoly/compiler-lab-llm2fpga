@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -17,11 +19,27 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from TinyStories.model_adapter_exact_package import exported_program_identity
+from TinyStories.model_adapter_exact_package import (
+    GEMV_NAMES,
+    export_exact_program,
+    exported_program_identity,
+    load_successor_exact_model,
+)
 from TinyStories.serial_gemv_boundary import serial_gemv
 
 
 RECEIPT = ROOT / "artifacts/comparison/tinystories-1m-exact-serial-gemv-export.json"
+SUCCESSOR_RECEIPT = ROOT / "artifacts/comparison/tinystories-1m-exact-serial-gemv-successor.json"
+GENERATION_ARTIFACT = ROOT / "artifacts/reference/tinystories-1m-exact-generation.json"
+ADAPTER = ROOT / "TinyStories/model_adapter_exact_package.py"
+BOUNDARY = ROOT / "TinyStories/serial_gemv_boundary.py"
+GENERATION_VERIFIER = ROOT / "scripts/comparison/verify_tinystories_1m_exact_generation.py"
+CONTRACT = ROOT / "artifacts/reference/tinystories-1m-exact-input-contract.json"
+MODEL_PATH = Path(
+    "/home/roland/.cache/huggingface/hub/"
+    "models--roneneldan--TinyStories-1M/snapshots/"
+    "77f1b168e219585646439073245fe87e56b3023e"
+)
 
 
 def canonical_sha256(value: object) -> str:
@@ -56,13 +74,138 @@ def _operator_count(exported: torch.export.ExportedProgram) -> int:
 
 def _frozen_boundary_sha256() -> dict[str, str]:
     return {
-        "adapter": hashlib.sha256(
-            (ROOT / "TinyStories/model_adapter_exact_package.py").read_bytes()
-        ).hexdigest(),
-        "boundary": hashlib.sha256(
-            (ROOT / "TinyStories/serial_gemv_boundary.py").read_bytes()
-        ).hexdigest(),
+        "adapter": hashlib.sha256(ADAPTER.read_bytes()).hexdigest(),
+        "boundary": hashlib.sha256(BOUNDARY.read_bytes()).hexdigest(),
     }
+
+
+def _adapter_boundary_coverage() -> dict[str, int | bool]:
+    """Prove the two executable GEMV routes use the boundary, never the old helper."""
+
+    tree = ast.parse(ADAPTER.read_text(encoding="utf-8"), filename=str(ADAPTER))
+    direct_helper_calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "serial_gemv_accumulate"
+    ]
+    boundary_calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "serial_gemv"
+    ]
+    return {
+        "all_adapter_gemvs_cross_boundary": not direct_helper_calls and len(boundary_calls) == 2,
+        "direct_serial_helper_call_count": len(direct_helper_calls),
+        "boundary_call_site_count": len(boundary_calls),
+        "runtime_gemv_operation_count": len(GEMV_NAMES),
+    }
+
+
+def _load_generation_verifier() -> Any:
+    spec = importlib.util.spec_from_file_location("exact_generation_verifier", GENERATION_VERIFIER)
+    if spec is None or spec.loader is None:
+        raise ValueError(f"unable to load frozen generation verifier: {GENERATION_VERIFIER}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _verify_frozen_generation_artifact() -> dict[str, Any]:
+    artifact = json.loads(GENERATION_ARTIFACT.read_text(encoding="utf-8"))
+    verifier = _load_generation_verifier()
+    verifier.validate_artifact(artifact, ROOT)
+    return {
+        "path": str(GENERATION_ARTIFACT.relative_to(ROOT)),
+        "file_sha256": hashlib.sha256(GENERATION_ARTIFACT.read_bytes()).hexdigest(),
+        "artifact_sha256": artifact["artifact_sha256"],
+        "historical_task_1": artifact["identity"]["task_1"],
+        "historical_task_2": artifact["identity"]["task_2"],
+        "status": "matched",
+    }
+
+
+def _verify_successor_generation() -> dict[str, Any]:
+    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    package = Path(contract["package"]["origin"])
+    if not package.is_dir() or not MODEL_PATH.is_dir():
+        raise ValueError("frozen package/model inputs unavailable for successor verification")
+    bundle = load_successor_exact_model(CONTRACT, package, MODEL_PATH)
+    prompt = list(bundle.contract["reference"]["prompt_tokens"])
+    expected_tokens = list(bundle.contract["reference"]["tokens"])
+    with torch.no_grad():
+        eager_logits = bundle.model(torch.tensor([prompt], dtype=torch.int64))[0, -1]
+    prompt_logits_matched = torch.equal(eager_logits, bundle.oracle_logits)
+    exported = export_exact_program(bundle)
+    exported_operator_count = _operator_count(exported)
+    if exported_operator_count != len(GEMV_NAMES):
+        raise ValueError("successor export does not contain one boundary per GEMV")
+    generated: list[int] = []
+    token_ids = list(prompt)
+    with torch.no_grad():
+        for _ in expected_tokens:
+            logits = bundle.model(torch.tensor([token_ids], dtype=torch.int64))
+            next_token = int(torch.argmax(logits[0, -1]))
+            generated.append(next_token)
+            token_ids.append(next_token)
+    if not prompt_logits_matched or generated != expected_tokens:
+        raise ValueError("post-boundary successor generation differs from frozen artifact")
+    return {
+        "prompt_logits": "matched",
+        "tokens": "matched",
+        "token_count": len(generated),
+        "tokens_sha256": canonical_sha256(generated),
+        "exported_operator_count": exported_operator_count,
+        "export_verification": bundle.export_verification,
+    }
+
+
+def build_successor_receipt() -> dict[str, Any]:
+    """Bind the changed adapter to the immutable Task 1--3 generation authority.
+
+    The historical artifact remains validated in place.  The new adapter is
+    verified compositionally: every one of its two GEMV execution routes
+    dispatches to the custom boundary, whose eager and exported contracts are
+    separately bound by the export receipt.  This deliberately does not alter
+    or reinterpret any historical Task 1--3 source identity.
+    """
+
+    historical_generation = _verify_frozen_generation_artifact()
+    coverage = _adapter_boundary_coverage()
+    if not coverage["all_adapter_gemvs_cross_boundary"]:
+        raise ValueError("adapter GEMV path bypasses serial boundary")
+    export_receipt = build_receipt()
+    successor_generation = _verify_successor_generation()
+    receipt: dict[str, Any] = {
+        "schema": "tinystories-1m-exact-serial-gemv-successor-v1",
+        "status": "post_boundary_generation_matched",
+        "historical_authority": {
+            "generation": historical_generation,
+            "preservation": "Task 1--3 source authority is validated in place and never rewritten",
+        },
+        "successor": {
+            "adapter_sha256": hashlib.sha256(ADAPTER.read_bytes()).hexdigest(),
+            "boundary_sha256": hashlib.sha256(BOUNDARY.read_bytes()).hexdigest(),
+            "export_receipt_sha256": export_receipt["receipt_sha256"],
+        },
+        "verification": {
+            "frozen_generation_artifact": historical_generation["status"],
+            **coverage,
+            "boundary_eager_export_status": (
+                "matched" if export_receipt["eager_output_sha256"]
+                == export_receipt["export_output_sha256"] else "mismatch"
+            ),
+            "successor_prompt_logits": successor_generation["prompt_logits"],
+            "successor_tokens": successor_generation["tokens"],
+            "successor_token_count": successor_generation["token_count"],
+            "successor_tokens_sha256": successor_generation["tokens_sha256"],
+            "successor_exported_operator_count": successor_generation["exported_operator_count"],
+            "successor_export_verification": successor_generation["export_verification"],
+        },
+    }
+    receipt["receipt_sha256"] = canonical_sha256(receipt)
+    return receipt
 
 
 def build_receipt() -> dict[str, Any]:
@@ -96,11 +239,17 @@ def build_receipt() -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=RECEIPT)
+    parser.add_argument("--successor-output", type=Path, default=SUCCESSOR_RECEIPT)
     args = parser.parse_args()
     receipt = build_receipt()
+    successor = build_successor_receipt()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps(receipt, sort_keys=True))
+    args.successor_output.parent.mkdir(parents=True, exist_ok=True)
+    args.successor_output.write_text(
+        json.dumps(successor, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(json.dumps({"export": receipt, "successor": successor}, sort_keys=True))
 
 
 if __name__ == "__main__":

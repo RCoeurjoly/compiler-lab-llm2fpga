@@ -3,7 +3,7 @@
   "export_output_sha256": "3052200ada2f7c2fc8f882b9c6a2c6355cd2036f4ad121ac850315b9e7e374e6",
   "exported_program_sha256": "08f1736bff472e2c5f51bf77e82225bc351e0e136116378dd30f9075cedeeca4",
   "frozen_boundary_sha256": {
-    "adapter": "769c15c089806f5d0769648df6833870d9c4b5f5c33e6c842b0f6a4795243eae",
+    "adapter": "064c73127a3ad97d1fe7ee2cfc1d666995b120be394406b70f14b57b669e7b51",
     "boundary": "a3e0c9f5ccd56fcd530174e2e15747008344b8e32384e508611c793008037b14"
   },
   "input": {
@@ -31,6 +31,6 @@
       64
     ]
   },
-  "receipt_sha256": "c49bff26a4921b56ebae808390559ac0514debabfbcdf768afa3a9b34729c12a",
+  "receipt_sha256": "244340e7aa252993ae1d19bb0ebf7fd9825e96763a42ac2ec32922dced62fb04",
   "schema": "tinystories-1m-exact-serial-gemv-export-v1"
 }
