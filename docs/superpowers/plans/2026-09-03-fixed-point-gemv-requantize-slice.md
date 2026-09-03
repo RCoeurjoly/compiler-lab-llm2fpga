@@ -12,6 +12,8 @@
 
 - Exact TinyStories-1M fixed-point contract; no RC as acceptance, DDR3, PCIe, generic SCF, or copied RTL.
 - Each command is capped at 1800 seconds; semantic authority is frozen PyTorch.
+- First quit point: at most three attempts, each a 30-minute development window plus one 30-minute end-to-end gate; require exact schema output and matching Calyx trace without special cases.
+- On quit, write a reproducible evidence report with fixtures, source hashes, commands/timings, first mismatch, retained artifacts, and recommendation.
 
 ### Task 1: Capture and verify contract fixture
 

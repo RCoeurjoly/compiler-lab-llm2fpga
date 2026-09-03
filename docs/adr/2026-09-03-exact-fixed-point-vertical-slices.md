@@ -36,3 +36,7 @@ If the first slice passes, the real
 `GEMV -> bias/clamp -> GELU -> requantization -> GEMV` crossing has at most
 two attempts under the same one-hour cap. Needing a schema redesign there is a
 second quit point: do not continue incremental compiler expansion.
+
+Any quit-point decision requires a concise reproducible report containing the
+fixture and source hashes, bounded commands and timings, first mismatching
+checkpoint, retained artifacts, and a one-page recommendation.
