@@ -84,3 +84,8 @@ supplementary edge cases.
 for semantic values and tokens. The reference accelerator is a secondary
 reference for architecture, schedule, memory layout, and performance; it never
 overrides a semantic checkpoint.
+
+**Quit point**: A precommitted, evidence-based condition that ends a salvage
+route rather than permitting indefinite infrastructure work. A quit point is
+evaluated against its stated acceptance gates and cannot be bypassed with
+model-specific special cases.
