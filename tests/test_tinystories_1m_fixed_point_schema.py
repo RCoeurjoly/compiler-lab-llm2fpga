@@ -39,6 +39,20 @@ class FixedPointSchemaTest(unittest.TestCase):
         schema = plugin.build_schema(FIXTURE)
         self.assertEqual(plugin.evaluate_schema(schema, FIXTURE), plugin.fixture_output_hashes(FIXTURE))
 
+    def test_forged_mlir_attribute_and_operand_are_rejected(self):
+        plugin = load_plugin()
+        schema = plugin.build_schema(FIXTURE)
+        for old, new in (("nearest_ties_away_from_zero", "toward_zero"), ("%acc, %output_scale", "%acc, %input_scale")):
+            forged = {**schema, "mlir": schema["mlir"].replace(old, new, 1)}
+            with self.subTest(old=old):
+                with self.assertRaisesRegex(ValueError, "requantize|self-hash|scale operand"):
+                    plugin.verify_schema(forged, FIXTURE)
+
+    def test_wrong_incoming_mlir_is_rejected(self):
+        plugin = load_plugin()
+        with self.assertRaisesRegex(ValueError, "incoming MLIR"):
+            plugin.build_schema(FIXTURE, "module { %x = \"arith.constant\"() : () -> i64 }")
+
 
 if __name__ == "__main__":
     unittest.main()
