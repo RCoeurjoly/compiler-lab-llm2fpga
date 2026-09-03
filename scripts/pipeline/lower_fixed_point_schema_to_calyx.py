@@ -302,6 +302,215 @@ def generate_one_output_kernel(schema_path: Path, fixture_path: Path) -> CalyxAr
     )
 
 
+def _full_gemv_kernel_futil() -> str:
+    """Emit the exact 4x64x64 row-major accumulator checkpoint kernel.
+
+    The three explicit counters are hardware state, not lowering-time loop
+    expansion.  They establish the required row/output/k traversal and keep
+    the Task-1 signed-MAC datapath unchanged.
+    """
+    return '''// Generated Task-2 exact fixed-point backend gate.
+// Hardware traversal is row=0..3, output=0..63, k=0..63 in that order.
+import "primitives/core.futil";
+import "primitives/binary_operators.futil";
+import "primitives/memories/seq.futil";
+
+component main(@go go: 1) -> (@done done: 1) {
+  cells {
+    @external activation = seq_mem_d1(8, 256, 8);
+    @external input_scale = seq_mem_d1(64, 64, 6);
+    @external weights = seq_mem_d1(8, 4096, 12);
+    @external accumulator_trace = seq_mem_d1(64, 256, 8);
+    accumulator = std_reg(64);
+    row_counter = std_reg(3);
+    output_counter = std_reg(7);
+    k_counter = std_reg(7);
+    row_lt = std_lt(3);
+    output_lt = std_lt(7);
+    k_lt = std_lt(7);
+    increment_row = std_add(3);
+    increment_output = std_add(7);
+    increment_k = std_add(7);
+    activation_row_pad = std_pad(3, 8);
+    activation_row_shift = std_lsh(8);
+    activation_k_pad = std_pad(7, 8);
+    activation_address = std_add(8);
+    input_scale_address = std_slice(7, 6);
+    weight_output_pad = std_pad(7, 12);
+    weight_output_shift = std_lsh(12);
+    weight_k_pad = std_pad(7, 12);
+    weight_address = std_add(12);
+    trace_row_pad = std_pad(3, 8);
+    trace_row_shift = std_lsh(8);
+    trace_output_pad = std_pad(7, 8);
+    trace_address = std_add(8);
+    activation_signed = std_signext(8, 64);
+    weight_signed = std_signext(8, 64);
+    activation_scale = std_smult_pipe(64);
+    mac = std_smult_pipe(64);
+    add = std_sadd(64);
+  }
+  wires {
+    group init_row {
+      row_counter.in = 3'd0;
+      row_counter.write_en = 1'd1;
+      init_row[done] = row_counter.done;
+    }
+    group init_output {
+      output_counter.in = 7'd0;
+      output_counter.write_en = 1'd1;
+      init_output[done] = output_counter.done;
+    }
+    group init_accumulator_and_k {
+      accumulator.in = 64'd0;
+      accumulator.write_en = 1'd1;
+      k_counter.in = 7'd0;
+      k_counter.write_en = 1'd1;
+      init_accumulator_and_k[done] = accumulator.done & k_counter.done ? 1'd1;
+    }
+    group read_operands {
+      activation_row_pad.in = row_counter.out;
+      activation_row_shift.left = activation_row_pad.out;
+      activation_row_shift.right = 8'd6;
+      activation_k_pad.in = k_counter.out;
+      activation_address.left = activation_row_shift.out;
+      activation_address.right = activation_k_pad.out;
+      input_scale_address.in = k_counter.out;
+      weight_output_pad.in = output_counter.out;
+      weight_output_shift.left = weight_output_pad.out;
+      weight_output_shift.right = 12'd6;
+      weight_k_pad.in = k_counter.out;
+      weight_address.left = weight_output_shift.out;
+      weight_address.right = weight_k_pad.out;
+      activation.addr0 = activation_address.out;
+      activation.content_en = 1'd1;
+      input_scale.addr0 = input_scale_address.out;
+      input_scale.content_en = 1'd1;
+      weights.addr0 = weight_address.out;
+      weights.content_en = 1'd1;
+      read_operands[done] = (activation.done & input_scale.done & weights.done) ? 1'd1;
+    }
+    group scale_activation {
+      activation_signed.in = activation.read_data;
+      activation_scale.left = activation_signed.out;
+      activation_scale.right = input_scale.read_data;
+      activation_scale.go = 1'd1;
+      scale_activation[done] = activation_scale.done;
+    }
+    group multiply {
+      weight_signed.in = weights.read_data;
+      mac.left = activation_scale.out;
+      mac.right = weight_signed.out;
+      mac.go = 1'd1;
+      multiply[done] = mac.done;
+    }
+    group accumulate {
+      add.left = accumulator.out;
+      add.right = mac.out;
+      accumulator.in = add.out;
+      accumulator.write_en = 1'd1;
+      accumulate[done] = accumulator.done;
+    }
+    group increment_k_counter {
+      increment_k.left = k_counter.out;
+      increment_k.right = 7'd1;
+      k_counter.in = increment_k.out;
+      k_counter.write_en = 1'd1;
+      increment_k_counter[done] = k_counter.done;
+    }
+    group write_accumulator_trace {
+      trace_row_pad.in = row_counter.out;
+      trace_row_shift.left = trace_row_pad.out;
+      trace_row_shift.right = 8'd6;
+      trace_output_pad.in = output_counter.out;
+      trace_address.left = trace_row_shift.out;
+      trace_address.right = trace_output_pad.out;
+      accumulator_trace.addr0 = trace_address.out;
+      accumulator_trace.content_en = 1'd1;
+      accumulator_trace.write_data = accumulator.out;
+      accumulator_trace.write_en = 1'd1;
+      write_accumulator_trace[done] = accumulator_trace.done;
+    }
+    group increment_output_counter {
+      increment_output.left = output_counter.out;
+      increment_output.right = 7'd1;
+      output_counter.in = increment_output.out;
+      output_counter.write_en = 1'd1;
+      increment_output_counter[done] = output_counter.done;
+    }
+    group increment_row_counter {
+      increment_row.left = row_counter.out;
+      increment_row.right = 3'd1;
+      row_counter.in = increment_row.out;
+      row_counter.write_en = 1'd1;
+      increment_row_counter[done] = row_counter.done;
+    }
+    comb group row_condition {
+      row_lt.left = row_counter.out;
+      row_lt.right = 3'd4;
+    }
+    comb group output_condition {
+      output_lt.left = output_counter.out;
+      output_lt.right = 7'd64;
+    }
+    comb group k_condition {
+      k_lt.left = k_counter.out;
+      k_lt.right = 7'd64;
+    }
+  }
+  control {
+    seq {
+      init_row;
+      while row_lt.out with row_condition {
+        init_output;
+        while output_lt.out with output_condition {
+          init_accumulator_and_k;
+          while k_lt.out with k_condition {
+            seq { read_operands; scale_activation; multiply; accumulate; increment_k_counter; }
+          }
+          write_accumulator_trace;
+          increment_output_counter;
+        }
+        increment_row_counter;
+      }
+    }
+  }
+}
+'''
+
+
+def generate_full_gemv_kernel(schema_path: Path, fixture_path: Path) -> CalyxArtifact:
+    """Authenticate inputs and generate all 256 Task-2 accumulator checkpoints."""
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    fixture = _checked_one_output_fixture(schema, fixture_path)
+    return CalyxArtifact(
+        futil=_full_gemv_kernel_futil(),
+        provenance={
+            "generated": "fixed-schema-to-calyx-full-gemv-sv-v1",
+            "schema_receipt_sha256": schema["receipt_sha256"],
+            "fixture_receipt_sha256": fixture["receipt_sha256"],
+            "authority": {
+                "schema": schema,
+                "schema_receipt_sha256": schema["receipt_sha256"],
+                "fixture": _fixture_authority(fixture),
+            },
+            "memory_shapes": {
+                "activation": [256, 8],
+                "input_scale": [64, 64],
+                "weights": [4096, 8],
+                "accumulator_trace": [256, 64],
+            },
+            "kernel": {
+                "rows": 4,
+                "outputs_per_row": 64,
+                "ordered_macs_per_output": 64,
+                "traversal": "row-major-row-output-k",
+                "accumulator": "signed_i64_twos_complement_wrap",
+            },
+        },
+    )
+
+
 def _calyx_install() -> Path:
     completed = subprocess.run(
         ["nix", "build", "--no-link", "--print-out-paths", ".#calyx"],
@@ -380,6 +589,162 @@ int main(int argc, char** argv) {{
 '''
 
 
+def _generated_full_gemv_harness(fixture: dict[str, Any]) -> str:
+    """Generate a harness that reads and hashes every simulator trace word."""
+    activation = [value for row in fixture["tensors"]["activation_codes_i8"]["values"] for value in row]
+    input_scale = fixture["tensors"]["input_scale_q8_24"]["values"]
+    weights = [value for row in fixture["tensors"]["weight_codes_i8"]["values"] for value in row]
+    return f'''// Generated harness: fixture values are preload data, never an output oracle.
+#include "Vmain.h"
+#include "Vmain___024root.h"
+#include "verilated.h"
+
+#include <cstdint>
+#include <iomanip>
+#include <iostream>
+
+static const std::int64_t kActivation[256] = {{{_cpp_values(activation)}}};
+static const std::int64_t kInputScale[64] = {{{_cpp_values(input_scale)}}};
+static const std::int64_t kWeights[4096] = {{{_cpp_values(weights)}}};
+
+static std::uint32_t rotr(std::uint32_t value, std::uint32_t count) {{
+  return (value >> count) | (value << (32 - count));
+}}
+
+class Sha256 {{
+ public:
+  Sha256() : bit_count_(0), used_(0) {{
+    state_[0] = 0x6a09e667U; state_[1] = 0xbb67ae85U;
+    state_[2] = 0x3c6ef372U; state_[3] = 0xa54ff53aU;
+    state_[4] = 0x510e527fU; state_[5] = 0x9b05688cU;
+    state_[6] = 0x1f83d9abU; state_[7] = 0x5be0cd19U;
+  }}
+
+  void update(std::uint8_t byte) {{
+    block_[used_++] = byte;
+    bit_count_ += 8;
+    if (used_ == 64) {{ transform(); used_ = 0; }}
+  }}
+
+  void final(std::uint8_t digest[32]) {{
+    block_[used_++] = 0x80;
+    if (used_ > 56) {{
+      while (used_ < 64) block_[used_++] = 0;
+      transform();
+      used_ = 0;
+    }}
+    while (used_ < 56) block_[used_++] = 0;
+    for (unsigned i = 0; i < 8; ++i)
+      block_[63 - i] = static_cast<std::uint8_t>(bit_count_ >> (8 * i));
+    transform();
+    for (unsigned i = 0; i < 8; ++i) {{
+      digest[4 * i] = static_cast<std::uint8_t>(state_[i] >> 24);
+      digest[4 * i + 1] = static_cast<std::uint8_t>(state_[i] >> 16);
+      digest[4 * i + 2] = static_cast<std::uint8_t>(state_[i] >> 8);
+      digest[4 * i + 3] = static_cast<std::uint8_t>(state_[i]);
+    }}
+  }}
+
+ private:
+  void transform() {{
+    static const std::uint32_t constants[64] = {{
+      0x428a2f98U,0x71374491U,0xb5c0fbcfU,0xe9b5dba5U,0x3956c25bU,0x59f111f1U,0x923f82a4U,0xab1c5ed5U,
+      0xd807aa98U,0x12835b01U,0x243185beU,0x550c7dc3U,0x72be5d74U,0x80deb1feU,0x9bdc06a7U,0xc19bf174U,
+      0xe49b69c1U,0xefbe4786U,0x0fc19dc6U,0x240ca1ccU,0x2de92c6fU,0x4a7484aaU,0x5cb0a9dcU,0x76f988daU,
+      0x983e5152U,0xa831c66dU,0xb00327c8U,0xbf597fc7U,0xc6e00bf3U,0xd5a79147U,0x06ca6351U,0x14292967U,
+      0x27b70a85U,0x2e1b2138U,0x4d2c6dfcU,0x53380d13U,0x650a7354U,0x766a0abbU,0x81c2c92eU,0x92722c85U,
+      0xa2bfe8a1U,0xa81a664bU,0xc24b8b70U,0xc76c51a3U,0xd192e819U,0xd6990624U,0xf40e3585U,0x106aa070U,
+      0x19a4c116U,0x1e376c08U,0x2748774cU,0x34b0bcb5U,0x391c0cb3U,0x4ed8aa4aU,0x5b9cca4fU,0x682e6ff3U,
+      0x748f82eeU,0x78a5636fU,0x84c87814U,0x8cc70208U,0x90befffaU,0xa4506cebU,0xbef9a3f7U,0xc67178f2U
+    }};
+    std::uint32_t words[64];
+    for (unsigned i = 0; i < 16; ++i)
+      words[i] = (static_cast<std::uint32_t>(block_[4 * i]) << 24) |
+                 (static_cast<std::uint32_t>(block_[4 * i + 1]) << 16) |
+                 (static_cast<std::uint32_t>(block_[4 * i + 2]) << 8) |
+                 static_cast<std::uint32_t>(block_[4 * i + 3]);
+    for (unsigned i = 16; i < 64; ++i) {{
+      const std::uint32_t s0 = rotr(words[i - 15], 7) ^ rotr(words[i - 15], 18) ^ (words[i - 15] >> 3);
+      const std::uint32_t s1 = rotr(words[i - 2], 17) ^ rotr(words[i - 2], 19) ^ (words[i - 2] >> 10);
+      words[i] = words[i - 16] + s0 + words[i - 7] + s1;
+    }}
+    std::uint32_t a = state_[0], b = state_[1], c = state_[2], d = state_[3];
+    std::uint32_t e = state_[4], f = state_[5], g = state_[6], h = state_[7];
+    for (unsigned i = 0; i < 64; ++i) {{
+      const std::uint32_t s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const std::uint32_t choose = (e & f) ^ ((~e) & g);
+      const std::uint32_t temp1 = h + s1 + choose + constants[i] + words[i];
+      const std::uint32_t s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const std::uint32_t majority = (a & b) ^ (a & c) ^ (b & c);
+      const std::uint32_t temp2 = s0 + majority;
+      h = g; g = f; f = e; e = d + temp1;
+      d = c; c = b; b = a; a = temp1 + temp2;
+    }}
+    state_[0] += a; state_[1] += b; state_[2] += c; state_[3] += d;
+    state_[4] += e; state_[5] += f; state_[6] += g; state_[7] += h;
+  }}
+
+  std::uint32_t state_[8];
+  std::uint64_t bit_count_;
+  std::uint8_t block_[64];
+  unsigned used_;
+}};
+
+static void tick(Vmain& model) {{
+  model.clk = 0;
+  model.eval();
+  model.clk = 1;
+  model.eval();
+}}
+
+int main(int argc, char** argv) {{
+  Verilated::commandArgs(argc, argv);
+  Vmain model;
+  auto* root = model.rootp;
+  for (unsigned i = 0; i < 256; ++i) {{
+    root->main__DOT__activation__DOT__mem[i] = static_cast<std::uint8_t>(kActivation[i]);
+    root->main__DOT__accumulator_trace__DOT__mem[i] = 0;
+  }}
+  for (unsigned i = 0; i < 64; ++i)
+    root->main__DOT__input_scale__DOT__mem[i] = static_cast<std::uint64_t>(kInputScale[i]);
+  for (unsigned i = 0; i < 4096; ++i)
+    root->main__DOT__weights__DOT__mem[i] = static_cast<std::uint8_t>(kWeights[i]);
+  model.reset = 1;
+  model.go = 0;
+  for (unsigned i = 0; i < 3; ++i) tick(model);
+  model.reset = 0;
+  model.go = 1;
+  unsigned cycles = 0;
+  while (!model.done && cycles < 300000) {{
+    tick(model);
+    ++cycles;
+  }}
+  std::int64_t trace[256];
+  Sha256 hash;
+  for (unsigned i = 0; i < 256; ++i) {{
+    trace[i] = static_cast<std::int64_t>(root->main__DOT__accumulator_trace__DOT__mem[i]);
+    const std::uint64_t raw = static_cast<std::uint64_t>(trace[i]);
+    for (unsigned byte = 0; byte < 8; ++byte)
+      hash.update(static_cast<std::uint8_t>(raw >> (8 * byte)));
+  }}
+  std::uint8_t digest[32];
+  hash.final(digest);
+  const bool complete = model.done && cycles > 4 * 64 * 64;
+  std::cout << "{{\\\"status\\\":\\\"" << (complete ? "ok" : "mismatch")
+            << "\\\",\\\"accumulator_trace_i64\\\":[";
+  for (unsigned i = 0; i < 256; ++i) {{
+    if (i) std::cout << ',';
+    std::cout << trace[i];
+  }}
+  std::cout << "],\\\"trace_sha256\\\":\\\"";
+  for (unsigned i = 0; i < 32; ++i)
+    std::cout << std::hex << std::setfill('0') << std::setw(2) << static_cast<unsigned>(digest[i]);
+  std::cout << std::dec << "\\\",\\\"cycles\\\":" << cycles << "}}\\n";
+  return complete ? 0 : 1;
+}}
+'''
+
+
 def run_generated_sv(artifact: CalyxArtifact, fixture_path: Path, row: int, output: int) -> dict[str, int]:
     """Compile and execute the generated SV, returning its observed trace word."""
     if artifact.provenance.get("generated") != "fixed-schema-to-calyx-one-output-sv-v1":
@@ -448,6 +813,98 @@ def run_generated_sv(artifact: CalyxArtifact, fixture_path: Path, row: int, outp
         "executable": str(executable),
     }
     return {"accumulator_i64": observed["accumulator_i64"], "cycles": observed["cycles"]}
+
+
+def run_full_gemv_sv(artifact: CalyxArtifact, fixture_path: Path) -> dict[str, object]:
+    """Compile and observe all 256 row-major checkpoints from generated SV."""
+    if artifact.provenance.get("generated") != "fixed-schema-to-calyx-full-gemv-sv-v1":
+        raise ValueError("unrecognized full-GEMV generated-SV artifact provenance")
+    authority = artifact.provenance.get("authority")
+    if not isinstance(authority, dict) or not isinstance(authority.get("schema"), dict):
+        raise ValueError("generated-SV schema authority binding is missing")
+    schema = authority["schema"]
+    fixture = _checked_one_output_fixture(schema, fixture_path)
+    if (
+        authority.get("schema_receipt_sha256") != schema.get("receipt_sha256")
+        or artifact.provenance.get("schema_receipt_sha256") != schema.get("receipt_sha256")
+    ):
+        raise ValueError("generated-SV schema authority mismatch")
+    if (
+        artifact.provenance.get("fixture_receipt_sha256") != fixture.get("receipt_sha256")
+        or authority.get("fixture") != _fixture_authority(fixture)
+    ):
+        raise ValueError("generated-SV fixture authority mismatch")
+
+    artifact_dir = Path(tempfile.mkdtemp(prefix="fixed-point-calyx-full-gemv-sv-"))
+    futil_path = artifact_dir / "full-gemv.futil"
+    sv_path = artifact_dir / "main.sv"
+    harness_path = artifact_dir / "harness.cpp"
+    futil_path.write_text(artifact.futil, encoding="utf-8")
+    harness_path.write_text(_generated_full_gemv_harness(fixture), encoding="utf-8")
+    calyx = _calyx_install()
+    calyx_run = subprocess.run(
+        [str(calyx / "bin/calyx"), str(futil_path), "-l", str(calyx / "share/calyx"), "-b", "verilog", "-o", str(sv_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if calyx_run.returncode != 0 or not sv_path.is_file():
+        raise RuntimeError(f"Calyx-to-SV failed: {calyx_run.stderr.strip()}")
+    synthesis_sv_path = artifact_dir / "main-synthesis.sv"
+    synthesis_run = subprocess.run(
+        [str(calyx / "bin/calyx"), str(futil_path), "-l", str(calyx / "share/calyx"), "--synthesis", "--disable-verify", "-b", "verilog", "-o", str(synthesis_sv_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if synthesis_run.returncode != 0 or not synthesis_sv_path.is_file():
+        raise RuntimeError(f"Calyx synthesis-to-SV failed: {synthesis_run.stderr.strip()}")
+    verilator_dir = artifact_dir / "verilator"
+    verilator_run = subprocess.run(
+        ["verilator", "--cc", "--exe", "--build", "--top-module", "main", "--public-flat-rw", "--Mdir", str(verilator_dir), "-CFLAGS", "-std=c++17", "-o", "fixed_point_full_gemv_harness", str(sv_path), str(harness_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    executable = verilator_dir / "fixed_point_full_gemv_harness"
+    if verilator_run.returncode != 0 or not executable.is_file():
+        raise RuntimeError(f"Verilator build failed: {verilator_run.stderr.strip()}")
+    simulated = subprocess.run([str(executable)], text=True, capture_output=True, check=False, timeout=600)
+    if simulated.returncode != 0:
+        raise RuntimeError(f"generated-SV harness failed: {simulated.stdout.strip()} {simulated.stderr.strip()}")
+    try:
+        observed = json.loads(next(line for line in reversed(simulated.stdout.splitlines()) if line.startswith("{")))
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"generated-SV harness did not emit JSON: {simulated.stdout!r}") from error
+    except StopIteration as error:
+        raise RuntimeError(f"generated-SV harness did not emit JSON: {simulated.stdout!r}") from error
+    trace = observed.get("accumulator_trace_i64")
+    if (
+        observed.get("status") != "ok"
+        or not isinstance(trace, list)
+        or len(trace) != 256
+        or not all(isinstance(value, int) for value in trace)
+        or not isinstance(observed.get("trace_sha256"), str)
+        or len(observed["trace_sha256"]) != 64
+        or not isinstance(observed.get("cycles"), int)
+    ):
+        raise RuntimeError(f"generated-SV full trace observation is invalid: {observed}")
+    artifact.provenance["generated_sv_artifacts"] = {
+        "directory": str(artifact_dir),
+        "futil": str(futil_path),
+        "sv": str(sv_path),
+        "synthesis_sv": str(synthesis_sv_path),
+        "harness": str(harness_path),
+        "executable": str(executable),
+    }
+    return {
+        "accumulator_trace_i64": trace,
+        "trace_sha256": observed["trace_sha256"],
+        "cycles": observed["cycles"],
+    }
 
 
 def ordered_value_trace(artifact: CalyxArtifact, fixture_path: Path) -> dict[str, Any]:

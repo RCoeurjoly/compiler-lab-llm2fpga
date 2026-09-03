@@ -25,6 +25,24 @@ def load_lowerer():
 
 
 class FixedPointSchemaCalyxTest(unittest.TestCase):
+    def test_generated_sv_observes_full_row_major_accumulator_trace(self):
+        """Catches a generated-SV kernel that omits a row/output checkpoint."""
+        lowerer = load_lowerer()
+        observed = lowerer.run_full_gemv_sv(
+            lowerer.generate_full_gemv_kernel(SCHEMA, FIXTURE), FIXTURE
+        )
+        fixture = json.loads(FIXTURE.read_text())
+        expected = [
+            value
+            for row in fixture["tensors"]["gemv_accumulator_i64"]["values"]
+            for value in row
+        ]
+        self.assertEqual(observed["accumulator_trace_i64"], expected)
+        self.assertEqual(
+            observed["trace_sha256"],
+            fixture["tensors"]["gemv_accumulator_i64"]["little_endian_int64_sha256"],
+        )
+
     def test_generated_sv_rejects_post_generation_fixture_mutation(self):
         lowerer = load_lowerer()
         artifact = lowerer.generate_one_output_kernel(SCHEMA, FIXTURE)
