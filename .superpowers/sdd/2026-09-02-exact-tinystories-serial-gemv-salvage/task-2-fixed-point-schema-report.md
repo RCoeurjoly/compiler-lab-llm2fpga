@@ -19,7 +19,7 @@ operation binds the exact output-scale identity and explicit attributes:
 
 `artifacts/reference/tinystories-1m-fixed-point-gemv-requantize-schema.json`
 has receipt SHA-256
-`b5a522f11b2ee63851f7388d2b941677629b487af0204605b1af6585d15f77ff`.
+`d276a23dc80cb6c9db978d16a4f348bde816ded149c02b8cab7e4a2364397d76`.
 Its companion `.mlir` is generic operation text, not a new compiled dialect.
 
 The evaluator reconstructs input QDQ, exact serial GEMV, weight rescale, and
@@ -30,3 +30,14 @@ saturation/width rejection, forged MLIR attribute/scale-operand rejection,
 wrong incoming-MLIR rejection, and output-hash equality.  The verifier parses
 the emitted generic MLIR and recomputes its contract-hash attribute; it also
 binds and verifies every Task 1 raw code/scale/weight/accumulator/output hash.
+
+Repair round 2 replaces the former textual matching with a structural parser
+for the supported one-line generic-MLIR subset.  It follows
+`fixed.requantize(%acc, %output_scale)` to its defining operations and requires
+each fixture producer—activation, input scale, weights, weight scale, and
+output scale—to carry the immutable Task 1 receipt SHA-256, tensor name, raw
+little-endian SHA-256, and raw byte count.  The authoritative raw payloads
+remain in that self-hashed Task 1 fixture, so these values bind the emitted
+SSA producers to both fixture identity and payload.  Regression tests recompute
+the outer schema receipt hash after a forged defining-operation or operand
+substitution; structural provenance validation still rejects it.

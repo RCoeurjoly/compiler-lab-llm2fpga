@@ -53,6 +53,20 @@ class FixedPointSchemaTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "incoming MLIR"):
             plugin.build_schema(FIXTURE, "module { %x = \"arith.constant\"() : () -> i64 }")
 
+    def test_substituted_fixture_producer_and_wrong_fixture_operand_are_rejected(self):
+        plugin = load_plugin()
+        schema = plugin.build_schema(FIXTURE)
+        forged_producer = {**schema, "mlir": schema["mlir"].replace('tensor = "output_scale_q8_24"', 'tensor = "weight_scale_q8_24"', 1)}
+        forged_operand = {**schema, "mlir": schema["mlir"].replace('%acc, %output_scale', '%acc, %weight_scale', 1)}
+        for forged in (forged_producer, forged_operand):
+            # An attacker can recompute the outer receipt hash.  The verifier
+            # must still reject the structural SSA/provenance substitution.
+            forged["receipt_sha256"] = plugin.canonical(
+                {key: value for key, value in forged.items() if key != "receipt_sha256"}
+            )
+            with self.assertRaisesRegex(ValueError, "producer|operand|fixture"):
+                plugin.verify_schema(forged, FIXTURE)
+
 
 if __name__ == "__main__":
     unittest.main()
