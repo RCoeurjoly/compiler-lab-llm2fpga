@@ -30,6 +30,14 @@ class CompositionTest(unittest.TestCase):
    directory=Path(directory); map_=directory/"callsites.json"; calyx=directory/"model.mlir"
    sv=directory/"model.sv"; yosys=directory/"yosys.txt"
    map_.write_text(json.dumps(mapping));calyx.write_text(mlir);sv.write_text("module top; endmodule\n");yosys.write_text("ok\n")
-   with self.assertRaisesRegex(ValueError,"49 callsites"):
+   with self.assertRaisesRegex(ValueError,"exactly match"):
+    load_verifier().build(TORCH,map_,calyx,sv,yosys)
+ def test_offset_mutation_is_rejected_against_authenticated_torch(self):
+  if not TORCH.is_file(): self.skipTest("portable Torch artifact unavailable")
+  mlir,mapping=load().compose(TORCH.read_text());mapping["callsites"][0]["source_offset"]+=1
+  with tempfile.TemporaryDirectory() as directory:
+   directory=Path(directory); map_=directory/"callsites.json";calyx=directory/"model.mlir";sv=directory/"model.sv";yosys=directory/"yosys.txt"
+   map_.write_text(json.dumps(mapping));calyx.write_text(mlir);sv.write_text("module top; endmodule\n");yosys.write_text("ok\n")
+   with self.assertRaisesRegex(ValueError,"exactly match"):
     load_verifier().build(TORCH,map_,calyx,sv,yosys)
 if __name__=="__main__":unittest.main()

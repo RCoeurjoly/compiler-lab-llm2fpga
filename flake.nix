@@ -2937,9 +2937,21 @@ PY
                 # below as an explicit command dependency so the sandbox closes
                 # over the immutable exported Torch MLIR without trying to
                 # execute MLIR as shell code.
-                buildInputs = [ python circt calyx yosysPkg ];
+                buildInputs = [ python circt calyx yosysPkg pkgs.coreutils ];
               } ''
                 mkdir -p "$out"
+                start="$(${pkgs.coreutils}/bin/date +%s%N)"
+                ${python}/bin/python3 --version > "$out/tools.txt"
+                ${circt}/bin/circt-opt --version >> "$out/tools.txt"
+                ${circt}/bin/circt-translate --version >> "$out/tools.txt"
+                ${calyx}/bin/calyx --version >> "$out/tools.txt"
+                ${yosysPkg}/bin/yosys -V >> "$out/tools.txt"
+                printf '%s\n' \
+                  '${python}/bin/python3 compose_exact_serial_gemv_calyx.py --torch <portable-torch> --output model.calyx.mlir --map callsites.json' \
+                  '${circt}/bin/circt-opt model.calyx.mlir -o parsed.mlir' \
+                  '${circt}/bin/circt-translate --export-calyx parsed.mlir -o model.futil' \
+                  '${calyx}/bin/calyx -b verilog --synthesis --nested -d papercut -o model.sv' \
+                  '${yosysPkg}/bin/yosys -p read_verilog/hierarchy/stat' > "$out/commands.txt"
                 timeout 1800 ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/compose_exact_serial_gemv_calyx.py \
                   --torch ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
                   --output "$out/model.calyx.mlir" --map "$out/callsites.json"
@@ -2947,9 +2959,11 @@ PY
                 timeout 1800 ${circt}/bin/circt-translate --export-calyx "$out/parsed.mlir" -o "$out/model.futil"
                 timeout 1800 ${calyx}/bin/calyx "$out/model.futil" -l ${calyx}/share/calyx -b verilog --synthesis --nested -d papercut -o "$out/model.sv"
                 timeout 1800 ${yosysPkg}/bin/yosys -p "read_verilog -sv $out/model.sv; hierarchy -check; stat" > "$out/yosys.txt"
+                end="$(${pkgs.coreutils}/bin/date +%s%N)"
+                printf '%s\n' "$(( (end - start) / 1000000 ))" > "$out/elapsed.txt"
                 timeout 1800 ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_composition.py write \
                   --torch ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
-                  --map "$out/callsites.json" --calyx "$out/model.calyx.mlir" --sv "$out/model.sv" --yosys "$out/yosys.txt" --receipt "$out/receipt.json"
+                  --map "$out/callsites.json" --calyx "$out/model.calyx.mlir" --sv "$out/model.sv" --yosys "$out/yosys.txt" --commands "$out/commands.txt" --tools "$out/tools.txt" --elapsed "$out/elapsed.txt" --receipt "$out/receipt.json"
               '';
             in pkgs.runCommand "tiny-stories-1m-exact-serial-gemv-sv" {
               buildInputs = [ python portableTorch composition ];
@@ -2963,6 +2977,8 @@ PY
                 --portable-torch-output ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
                 --calyx-receipt ${composition}/receipt.json \
                 --composition-sv ${composition}/model.sv --composition-yosys ${composition}/yosys.txt \
+                --composition-map ${composition}/callsites.json --composition-calyx ${composition}/model.calyx.mlir \
+                --task3-gate-receipt ${gate}/receipt.json \
                 --output "$out/frontier.json"
               ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_frontier.py \
                 --root ${sourceRoot} --receipt "$out/frontier.json"

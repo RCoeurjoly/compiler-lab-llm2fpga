@@ -195,17 +195,28 @@ def _verify_calyx_gate(receipt: Path) -> dict:
                 raise FrontierError("Calyx gate output binding mismatch")
     return value
 
-def _verify_calyx_composition(receipt: Path) -> dict:
+def _verify_calyx_composition(*, root: Path, receipt: Path, torch: Path, map_: Path,
+                              calyx: Path, sv: Path, yosys: Path) -> dict:
     value = json.loads(receipt.read_text(encoding="utf-8"))
+    without = {key: item for key, item in value.items() if key != "receipt_sha256"}
+    if value.get("receipt_sha256") != canonical_sha256(without):
+        raise FrontierError("Calyx composition receipt self-hash mismatch")
     if value.get("schema") != "llm2fpga-exact-serial-gemv-composition-v1" or value.get("callsite_count") != 49 or value.get("invoke_count") != 49:
         raise FrontierError("Calyx composition must bind 49 callsites/invokes")
+    module = load_module(root, "scripts/pipeline/verify_exact_serial_gemv_composition.py", "exact_frontier_composition")
+    metadata = {name: receipt.parent / f"{name}.txt" for name in ("commands", "tools", "elapsed")}
+    if not all(path.is_file() for path in metadata.values()):
+        raise FrontierError("composition command/tool/elapsed provenance missing")
+    if module.build(torch, map_, calyx, sv, yosys, **metadata) != value:
+        raise FrontierError("Calyx composition verifier rejects receipt/artifact bindings")
     return value
 
 
 def run_composition(*, root: Path, export_receipt: Path, portable_torch_receipt: Path,
                     portable_exported_dir: Path, portable_torch_output: Path, calyx_receipt: Path,
                     task3_root: Path | None = None, composition_sv: Path | None = None,
-                    composition_yosys: Path | None = None) -> dict:
+                    composition_yosys: Path | None = None, composition_map: Path | None = None,
+                    composition_calyx: Path | None = None, task3_gate_receipt: Path | None = None) -> dict:
     # Keep the prior receipts as stage artifacts.  Their own verifiers establish
     # their transitive authority; this runner establishes ordering and closure.
     task3_root = (task3_root or root).resolve()
@@ -213,14 +224,32 @@ def run_composition(*, root: Path, export_receipt: Path, portable_torch_receipt:
         commit=TASK3_COMMIT, tree=TASK3_TREE)
 
     def calyx() -> None:
-        gate = _verify_calyx_composition(calyx_receipt)
+        if not all((composition_sv, composition_yosys, composition_map, composition_calyx, task3_gate_receipt)):
+            raise FrontierError("missing authenticated Calyx composition/gate inputs")
+        _verify_calyx_gate(task3_gate_receipt)
+        gate = _verify_calyx_composition(root=root, receipt=calyx_receipt,
+            torch=portable_torch_output, map_=composition_map, calyx=composition_calyx,
+            sv=composition_sv, yosys=composition_yosys)
         torch = json.loads(portable_torch_receipt.read_text(encoding="utf-8"))
         count = torch.get("legalizer", {}).get("legalized_serial_gemv_operator_count")
         if count != 49:
             raise FrontierError("Torch receipt does not bind 49 legalized serial-GEMV boundaries")
         if gate["callsite_count"] != count:
             raise FrontierError("Calyx composition callsite count differs from Torch")
+        # The current generated wrapper deliberately gives each boundary fresh
+        # memories.  It has no Torch SSA activation/weight/result dataflow nor
+        # non-GEMV operations, therefore it is a diagnostic map only—not a
+        # TinyStories composition.
+        raise FrontierError("verified diagnostic: 49-callsite map lacks Torch SSA/non-GEMV dataflow composition")
 
+    compiler_inputs = [
+        root / "scripts/pipeline/compose_exact_serial_gemv_calyx.py",
+        root / "scripts/pipeline/verify_exact_serial_gemv_composition.py",
+        calyx_receipt, composition_map, composition_calyx, composition_sv,
+        composition_yosys,
+        calyx_receipt.parent / "commands.txt", calyx_receipt.parent / "tools.txt",
+        calyx_receipt.parent / "elapsed.txt", task3_gate_receipt,
+    ]
     receipt = run_stages(
         root=root,
         stages=(
@@ -231,7 +260,7 @@ def run_composition(*, root: Path, export_receipt: Path, portable_torch_receipt:
             Stage("calyx", calyx_receipt, calyx, ("verify-calyx-composition", str(calyx_receipt))),
             Stage("sv", composition_sv, lambda: None, ("emit-systemverilog",)),
             Stage("synthesis", composition_yosys, lambda: None, ("yosys-stat",)),
-        ), compiler_closure=([composition_sv] if composition_sv else ()),
+        ), compiler_closure=tuple(path for path in compiler_inputs if path is not None),
     )
     receipt["predecessors"] = {"task3": task3_identity}
     receipt["sources"]["portable_torch_verifier"] = binding(
@@ -250,6 +279,9 @@ def main() -> None:
     parser.add_argument("--calyx-receipt", type=Path, required=True)
     parser.add_argument("--composition-sv", type=Path, required=True)
     parser.add_argument("--composition-yosys", type=Path, required=True)
+    parser.add_argument("--composition-map", type=Path, required=True)
+    parser.add_argument("--composition-calyx", type=Path, required=True)
+    parser.add_argument("--task3-gate-receipt", type=Path, required=True)
     parser.add_argument("--task3-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -259,6 +291,8 @@ def main() -> None:
         portable_exported_dir=args.portable_exported_dir, portable_torch_output=args.portable_torch_output,
         calyx_receipt=args.calyx_receipt, task3_root=args.task3_root,
         composition_sv=args.composition_sv, composition_yosys=args.composition_yosys,
+        composition_map=args.composition_map, composition_calyx=args.composition_calyx,
+        task3_gate_receipt=args.task3_gate_receipt,
     )
     args.output.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(receipt["result"], sort_keys=True))
