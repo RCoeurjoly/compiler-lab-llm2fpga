@@ -86,3 +86,41 @@ compiler run was started.
 No DDR3, PCIe, Representative Core, arbitrary-PyTorch route, generic SCF path,
 or reference-derived RTL was added.  This is a structural compiler-stage
 artifact, not a claim of frozen 16-token or board inference equivalence.
+
+## Fixed-point GEMV/requantize follow-on: diagnostic (2026-09-03)
+
+This section records the distinct Task 3 follow-on from
+`docs/superpowers/plans/2026-09-03-fixed-point-gemv-requantize-slice.md`.
+It must not be confused with the descriptor-only structural gate above.
+
+`scripts/pipeline/lower_fixed_point_schema_to_calyx.py` consumes the approved
+Task 2 schema receipt only through `verify_schema`.  That structurally binds
+the Task 1 fixture, five raw producer bindings, the exact 4x64/64x64 shapes,
+and `nearest_ties_away_from_zero` / signed / saturating i8 requantization.
+The generated Futil has explicit activation, weight, input-scale,
+weight-scale, output-scale, and result memories plus accumulator, multiply,
+add, and named `load_activation`, `gemv_step`, and `requantize` control.
+
+TDD passed:
+
+- the red test first failed because the new lowerer did not exist;
+- `tests/test_tinystories_1m_fixed_point_schema_calyx.py` now passes 2/2;
+- its ordered value trace reproduces all 256 captured accumulator values and
+  both captured requantized arrays; and
+- a forged `toward_zero` rounding rule is rejected before lowering.
+
+The bounded compiler gate also passed using the dynamically resolved pinned
+`.#calyx` package: Calyx 0.7.1 exported generated Futil to `main.sv` (39,397
+bytes) and Yosys 0.66 accepted it with
+`read_verilog -sv; hierarchy -top main -check; stat`.
+
+This is intentionally a **diagnostic, not a semantic-Calyx success**.  The
+ordered value trace is an exact schema oracle, not output observed from an SV
+simulation.  The generated control currently reads one memory operand pair;
+it does not yet materialize all fixture loads, the 4x64x64 ordered MAC loop,
+wide signed requantization, saturation, or result-memory writeback.  A
+Verilator/Calyx simulation would therefore have no valid fixture result to
+compare and was not run or claimed.  The first functional frontier is to
+lower those actual logical-SSA dataflows without reducing the widened
+fixed-point arithmetic to the available 64-bit primitive.  No SCF, copied RTL,
+DDR3, PCIe, or Representative Core path was introduced.
