@@ -45,3 +45,8 @@ vertical-slice milestone.
 **Micro-fixture**: A deliberately smaller instance of a contract slice used
 for fast compiler and RTL iteration. It cannot by itself establish exact-model
 support; it must be paired with a passing contract slice.
+
+**Contract pass**: A project-owned, narrowly scoped compiler pass that
+preserves or lowers an exact executable-model semantic contract. Established
+upstream passes may be used as utilities, but they do not substitute for a
+contract pass at a contract-critical transformation.
