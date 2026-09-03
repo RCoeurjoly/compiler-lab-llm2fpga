@@ -1,6 +1,7 @@
 """TDD contract for lowering the authenticated fixed-point schema to Calyx."""
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import sys
@@ -25,6 +26,61 @@ def load_lowerer():
 
 
 class FixedPointSchemaCalyxTest(unittest.TestCase):
+    def test_generated_sv_composed_slice_matches_all_fixture_checkpoints(self):
+        """Catches any non-hardware GEMV/requantize handoff or partial result."""
+        lowerer = load_lowerer()
+        receipt = lowerer.run_composed_slice_sv(SCHEMA, FIXTURE)
+        fixture = json.loads(FIXTURE.read_text())
+        schema = json.loads(SCHEMA.read_text())
+        self.assertEqual(
+            receipt["schema"],
+            "llm2fpga-fixed-point-gemv-requantize-generated-sv-v1",
+        )
+        self.assertEqual(receipt["fixture_receipt_sha256"], fixture["receipt_sha256"])
+        self.assertEqual(receipt["schema_receipt_sha256"], schema["receipt_sha256"])
+        self.assertEqual(
+            receipt["accumulator_trace_sha256"],
+            fixture["tensors"]["gemv_accumulator_i64"]["little_endian_int64_sha256"],
+        )
+        self.assertEqual(
+            receipt["requantized_codes_sha256"],
+            fixture["tensors"]["requantized_codes_i8"]["little_endian_int64_sha256"],
+        )
+        self.assertEqual(
+            receipt["requantized_q16_16_sha256"],
+            fixture["tensors"]["requantized_q16_16"]["little_endian_int64_sha256"],
+        )
+        self.assertEqual(
+            receipt["checkpoints"],
+            {"accumulator_i64": 256, "requantized_codes_i8": 256, "requantized_q16_16": 256},
+        )
+        self.assertEqual(
+            receipt["execution"],
+            {
+                "calyx_components": 1,
+                "simulator_runs": 1,
+                "accumulator_handoff": "accumulator_trace_external_memory",
+                "host_intermediate": False,
+            },
+        )
+        unsigned = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
+        self.assertEqual(
+            receipt["receipt_sha256"],
+            hashlib.sha256(
+                json.dumps(unsigned, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+            ).hexdigest(),
+        )
+        for artifact in receipt["generated_artifacts"].values():
+            path = Path(artifact["path"])
+            self.assertTrue(path.is_file())
+            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), artifact["sha256"])
+        futil = Path(receipt["generated_artifacts"]["futil"]["path"]).read_text()
+        harness = Path(receipt["generated_artifacts"]["harness"]["path"]).read_text()
+        self.assertEqual(futil.count("component main("), 1)
+        self.assertNotIn("@external accumulator_input", futil)
+        self.assertIn("accumulator_trace.addr0 = entry_address.out", futil)
+        self.assertNotIn("kAccumulator", harness)
+
     def test_generated_sv_observes_exact_requantized_fixture_values(self):
         """Catches software-supplied or arithmetically inexact result memories."""
         lowerer = load_lowerer()

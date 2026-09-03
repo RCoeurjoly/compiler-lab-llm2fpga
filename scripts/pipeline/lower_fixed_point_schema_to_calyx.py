@@ -790,6 +790,93 @@ def generate_requantize_kernel(schema_path: Path, fixture_path: Path) -> CalyxAr
     )
 
 
+def _futil_component_sections(futil: str) -> tuple[str, str, str]:
+    """Extract cells, wires, and control from one generated main component."""
+    cells_marker = "  cells {\n"
+    wires_marker = "  }\n  wires {\n"
+    control_marker = "  }\n  control {\n"
+    cells_start = futil.index(cells_marker) + len(cells_marker)
+    wires_start = futil.index(wires_marker, cells_start)
+    control_start = futil.index(control_marker, wires_start)
+    component_end = futil.rindex("\n  }\n}\n")
+    return (
+        futil[cells_start:wires_start],
+        futil[wires_start + len(wires_marker):control_start],
+        futil[control_start + len(control_marker):component_end],
+    )
+
+
+def _composed_slice_kernel_futil() -> str:
+    """Compose Task-2 GEMV and Task-3 requantization in one Calyx control."""
+    gemv_cells, gemv_wires, gemv_control = _futil_component_sections(
+        _full_gemv_kernel_futil()
+    )
+    requant_cells, requant_wires, requant_control = _futil_component_sections(
+        _requantize_kernel_futil()
+    )
+    accumulator_input = "    @external accumulator_input = seq_mem_d1(64, 256, 8);\n"
+    if accumulator_input not in requant_cells:
+        raise ValueError("requantization accumulator ABI is missing")
+    requant_cells = requant_cells.replace(accumulator_input, "", 1)
+    requant_wires = requant_wires.replace("accumulator_input", "accumulator_trace")
+    return f'''// Generated Task-4 exact fixed-point composed backend gate.
+// The Task-2 GEMV trace memory is the Task-3 requantizer input memory:
+// no host or software transfer occurs between the two controls.
+import "primitives/core.futil";
+import "primitives/binary_operators.futil";
+import "primitives/memories/seq.futil";
+
+component main(@go go: 1) -> (@done done: 1) {{
+  cells {{
+{gemv_cells}{requant_cells}  }}
+  wires {{
+{gemv_wires}{requant_wires}  }}
+  control {{
+    seq {{
+{gemv_control}
+{requant_control}
+    }}
+  }}
+}}
+'''
+
+
+def generate_composed_slice_kernel(schema_path: Path, fixture_path: Path) -> CalyxArtifact:
+    """Authenticate inputs and bind GEMV trace directly to requantization."""
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    fixture = _checked_requantize_fixture(schema, fixture_path)
+    return CalyxArtifact(
+        futil=_composed_slice_kernel_futil(),
+        provenance={
+            "generated": "fixed-schema-to-calyx-composed-slice-sv-v1",
+            "schema_receipt_sha256": schema["receipt_sha256"],
+            "fixture_receipt_sha256": fixture["receipt_sha256"],
+            "authority": {
+                "schema": schema,
+                "schema_receipt_sha256": schema["receipt_sha256"],
+                "fixture": _fixture_authority(fixture),
+            },
+            "memory_shapes": {
+                "activation": [256, 8],
+                "input_scale": [64, 64],
+                "weights": [4096, 8],
+                "accumulator_trace": [256, 64],
+                "weight_scale": [64, 64],
+                "output_scale": [64, 64],
+                "codes_i8": [256, 8],
+                "q16_16": [256, 64],
+            },
+            "composition": {
+                "gemv": "fixed-schema-to-calyx-full-gemv-sv-v1",
+                "requantize": "fixed-schema-to-calyx-requantize-sv-v1",
+                "handoff": "accumulator_trace_external_memory",
+                "host_intermediate": False,
+                "calyx_control": "single_main_sequential_gemv_then_requantize",
+            },
+        },
+    )
+
+
 def _calyx_install() -> Path:
     completed = subprocess.run(
         ["nix", "build", "--no-link", "--print-out-paths", ".#calyx"],
@@ -1089,6 +1176,85 @@ int main(int argc, char** argv) {{
 '''
 
 
+def _generated_composed_slice_harness(fixture: dict[str, Any]) -> str:
+    """Generate one harness with no expected or intermediate output arrays."""
+    activation = [value for row in fixture["tensors"]["activation_codes_i8"]["values"] for value in row]
+    input_scale = fixture["tensors"]["input_scale_q8_24"]["values"]
+    weights = [value for row in fixture["tensors"]["weight_codes_i8"]["values"] for value in row]
+    weight_scale = fixture["tensors"]["weight_scale_q8_24"]["values"]
+    output_scale = fixture["tensors"]["output_scale_q8_24"]["values"]
+    return f'''// Generated harness: only authenticated GEMV/scaling inputs are preloaded.
+// Accumulators and both requantized memories are observed after one SV execution.
+#include "Vmain.h"
+#include "Vmain___024root.h"
+#include "verilated.h"
+
+#include <cstdint>
+#include <iostream>
+
+static const std::int64_t kActivation[256] = {{{_cpp_values(activation)}}};
+static const std::int64_t kInputScale[64] = {{{_cpp_values(input_scale)}}};
+static const std::int64_t kWeights[4096] = {{{_cpp_values(weights)}}};
+static const std::int64_t kWeightScale[64] = {{{_cpp_values(weight_scale)}}};
+static const std::int64_t kOutputScale[64] = {{{_cpp_values(output_scale)}}};
+
+static void tick(Vmain& model) {{
+  model.clk = 0;
+  model.eval();
+  model.clk = 1;
+  model.eval();
+}}
+
+int main(int argc, char** argv) {{
+  Verilated::commandArgs(argc, argv);
+  Vmain model;
+  auto* root = model.rootp;
+  for (unsigned i = 0; i < 256; ++i) {{
+    root->main__DOT__activation__DOT__mem[i] = static_cast<std::uint8_t>(kActivation[i]);
+    root->main__DOT__accumulator_trace__DOT__mem[i] = 0;
+    root->main__DOT__codes_i8__DOT__mem[i] = 0;
+    root->main__DOT__q16_16__DOT__mem[i] = 0;
+  }}
+  for (unsigned i = 0; i < 64; ++i) {{
+    root->main__DOT__input_scale__DOT__mem[i] = static_cast<std::uint64_t>(kInputScale[i]);
+    root->main__DOT__weight_scale__DOT__mem[i] = static_cast<std::uint64_t>(kWeightScale[i]);
+    root->main__DOT__output_scale__DOT__mem[i] = static_cast<std::uint64_t>(kOutputScale[i]);
+  }}
+  for (unsigned i = 0; i < 4096; ++i)
+    root->main__DOT__weights__DOT__mem[i] = static_cast<std::uint8_t>(kWeights[i]);
+  model.reset = 1;
+  model.go = 0;
+  for (unsigned i = 0; i < 3; ++i) tick(model);
+  model.reset = 0;
+  model.go = 1;
+  unsigned cycles = 0;
+  while (!model.done && cycles < 400000) {{
+    tick(model);
+    ++cycles;
+  }}
+  const bool complete = model.done && cycles > 4 * 64 * 64 + 256;
+  std::cout << "{{\\\"status\\\":\\\"" << (complete ? "ok" : "mismatch")
+            << "\\\",\\\"accumulator_trace_i64\\\":[";
+  for (unsigned i = 0; i < 256; ++i) {{
+    if (i) std::cout << ',';
+    std::cout << static_cast<std::int64_t>(root->main__DOT__accumulator_trace__DOT__mem[i]);
+  }}
+  std::cout << "],\\\"codes_i8\\\":[";
+  for (unsigned i = 0; i < 256; ++i) {{
+    if (i) std::cout << ',';
+    std::cout << static_cast<int>(static_cast<std::int8_t>(root->main__DOT__codes_i8__DOT__mem[i]));
+  }}
+  std::cout << "],\\\"q16_16\\\":[";
+  for (unsigned i = 0; i < 256; ++i) {{
+    if (i) std::cout << ',';
+    std::cout << static_cast<std::int64_t>(root->main__DOT__q16_16__DOT__mem[i]);
+  }}
+  std::cout << "],\\\"cycles\\\":" << cycles << "}}\\n";
+  return complete ? 0 : 1;
+}}
+'''
+
+
 def run_generated_sv(artifact: CalyxArtifact, fixture_path: Path, row: int, output: int) -> dict[str, int]:
     """Compile and execute the generated SV, returning its observed trace word."""
     if artifact.provenance.get("generated") != "fixed-schema-to-calyx-one-output-sv-v1":
@@ -1331,6 +1497,235 @@ def run_requantize_sv(artifact: CalyxArtifact, fixture_path: Path) -> dict[str, 
         "cycles": observed["cycles"],
     }
     return {"codes_i8": codes, "q16_16": q16}
+
+
+def _canonical_sha256(value: object) -> str:
+    encoded = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _little_endian_i64_sha256(values: list[int]) -> str:
+    digest = hashlib.sha256()
+    for value in values:
+        digest.update(int(value).to_bytes(8, byteorder="little", signed=True))
+    return digest.hexdigest()
+
+
+def _artifact_record(path: Path) -> dict[str, str]:
+    return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
+def _require_exact_checkpoints(
+    name: str, observed: list[int], expected: list[int]
+) -> None:
+    if observed == expected:
+        return
+    mismatch = next(
+        (
+            (index, actual, wanted)
+            for index, (actual, wanted) in enumerate(zip(observed, expected))
+            if actual != wanted
+        ),
+        None,
+    )
+    if mismatch is None:
+        raise RuntimeError(
+            f"generated-SV composed {name} length mismatch: "
+            f"observed {len(observed)}, expected {len(expected)}"
+        )
+    index, actual, wanted = mismatch
+    raise RuntimeError(
+        f"generated-SV composed {name} mismatch at checkpoint {index}: "
+        f"observed {actual}, expected {wanted}"
+    )
+
+
+def run_composed_slice_sv(schema_path: Path, fixture_path: Path) -> dict[str, object]:
+    """Run GEMV then requantization in one generated Calyx/SV execution."""
+    artifact = generate_composed_slice_kernel(schema_path, fixture_path)
+    authority = artifact.provenance["authority"]
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    fixture = _checked_requantize_fixture(schema, fixture_path)
+    if (
+        authority.get("schema") != schema
+        or authority.get("schema_receipt_sha256") != schema.get("receipt_sha256")
+        or artifact.provenance.get("schema_receipt_sha256") != schema.get("receipt_sha256")
+    ):
+        raise ValueError("composed generated-SV schema authority mismatch")
+    if (
+        artifact.provenance.get("fixture_receipt_sha256") != fixture.get("receipt_sha256")
+        or authority.get("fixture") != _fixture_authority(fixture)
+    ):
+        raise ValueError("composed generated-SV fixture authority mismatch")
+
+    # Nix develop sets TMPDIR to a per-invocation directory that is removed on
+    # exit.  Keep the receipt's generated paths stable and inspectable across
+    # invocations instead of binding its self-hash to that transient directory.
+    artifact_dir = Path("/tmp/llm2fpga-fixed-point-gemv-requantize-generated-sv-v1")
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    futil_path = artifact_dir / "composed.futil"
+    sv_path = artifact_dir / "main.sv"
+    synthesis_sv_path = artifact_dir / "main-synthesis.sv"
+    harness_path = artifact_dir / "harness.cpp"
+    futil_path.write_text(artifact.futil, encoding="utf-8")
+    harness_path.write_text(_generated_composed_slice_harness(fixture), encoding="utf-8")
+    calyx = _calyx_install()
+    calyx_command = [
+        str(calyx / "bin/calyx"),
+        str(futil_path),
+        "-l",
+        str(calyx / "share/calyx"),
+        "-d",
+        "cell-share",
+        "-b",
+        "verilog",
+        "-o",
+        str(sv_path),
+    ]
+    calyx_run = subprocess.run(
+        calyx_command, text=True, capture_output=True, check=False, timeout=600
+    )
+    if calyx_run.returncode != 0 or not sv_path.is_file():
+        raise RuntimeError(f"composed Calyx-to-SV failed: {calyx_run.stderr.strip()}")
+    synthesis_command = [
+        str(calyx / "bin/calyx"),
+        str(futil_path),
+        "-l",
+        str(calyx / "share/calyx"),
+        "-d",
+        "cell-share",
+        "--synthesis",
+        "--disable-verify",
+        "-b",
+        "verilog",
+        "-o",
+        str(synthesis_sv_path),
+    ]
+    synthesis_run = subprocess.run(
+        synthesis_command, text=True, capture_output=True, check=False, timeout=600
+    )
+    if synthesis_run.returncode != 0 or not synthesis_sv_path.is_file():
+        raise RuntimeError(
+            f"composed Calyx synthesis-to-SV failed: {synthesis_run.stderr.strip()}"
+        )
+    verilator_dir = artifact_dir / "verilator"
+    executable = verilator_dir / "fixed_point_composed_slice_harness"
+    verilator_run = subprocess.run(
+        [
+            "verilator",
+            "--cc",
+            "--exe",
+            "--build",
+            "--top-module",
+            "main",
+            "--public-flat-rw",
+            "--Mdir",
+            str(verilator_dir),
+            "-CFLAGS",
+            "-std=c++17",
+            "-o",
+            executable.name,
+            str(sv_path),
+            str(harness_path),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if verilator_run.returncode != 0 or not executable.is_file():
+        raise RuntimeError(f"composed Verilator build failed: {verilator_run.stderr.strip()}")
+    simulated = subprocess.run(
+        [str(executable)], text=True, capture_output=True, check=False, timeout=600
+    )
+    if simulated.returncode != 0:
+        raise RuntimeError(
+            "generated-SV composed harness failed: "
+            f"{simulated.stdout.strip()} {simulated.stderr.strip()}"
+        )
+    try:
+        observed = json.loads(
+            next(line for line in reversed(simulated.stdout.splitlines()) if line.startswith("{"))
+        )
+    except (json.JSONDecodeError, StopIteration) as error:
+        raise RuntimeError(
+            f"generated-SV composed harness did not emit JSON: {simulated.stdout!r}"
+        ) from error
+    trace = observed.get("accumulator_trace_i64")
+    codes = observed.get("codes_i8")
+    q16 = observed.get("q16_16")
+    if (
+        observed.get("status") != "ok"
+        or not isinstance(trace, list)
+        or len(trace) != 256
+        or not all(isinstance(value, int) for value in trace)
+        or not isinstance(codes, list)
+        or len(codes) != 256
+        or not all(isinstance(value, int) and -128 <= value <= 127 for value in codes)
+        or not isinstance(q16, list)
+        or len(q16) != 256
+        or not all(isinstance(value, int) for value in q16)
+        or not isinstance(observed.get("cycles"), int)
+    ):
+        raise RuntimeError(f"generated-SV composed observation is invalid: {observed}")
+
+    flatten = lambda rows: [value for row in rows for value in row]
+    expected_trace = flatten(fixture["tensors"]["gemv_accumulator_i64"]["values"])
+    expected_codes = flatten(fixture["tensors"]["requantized_codes_i8"]["values"])
+    expected_q16 = flatten(fixture["tensors"]["requantized_q16_16"]["values"])
+    _require_exact_checkpoints("accumulator trace", trace, expected_trace)
+    _require_exact_checkpoints("requantized i8 codes", codes, expected_codes)
+    _require_exact_checkpoints("requantized Q16.16 values", q16, expected_q16)
+
+    trace_sha256 = _little_endian_i64_sha256(trace)
+    codes_sha256 = _little_endian_i64_sha256(codes)
+    q16_sha256 = _little_endian_i64_sha256(q16)
+    for name, actual, record in (
+        ("accumulator trace", trace_sha256, fixture["tensors"]["gemv_accumulator_i64"]),
+        ("requantized i8 codes", codes_sha256, fixture["tensors"]["requantized_codes_i8"]),
+        ("requantized Q16.16 values", q16_sha256, fixture["tensors"]["requantized_q16_16"]),
+    ):
+        if actual != record["little_endian_int64_sha256"]:
+            raise RuntimeError(f"generated-SV composed {name} hash mismatch")
+
+    generated_artifacts = {
+        "futil": _artifact_record(futil_path),
+        "sv": _artifact_record(sv_path),
+        "synthesis_sv": _artifact_record(synthesis_sv_path),
+        "harness": _artifact_record(harness_path),
+    }
+    receipt: dict[str, object] = {
+        "schema": "llm2fpga-fixed-point-gemv-requantize-generated-sv-v1",
+        "fixture_receipt_sha256": fixture["receipt_sha256"],
+        "schema_receipt_sha256": schema["receipt_sha256"],
+        "accumulator_trace_sha256": trace_sha256,
+        "requantized_codes_sha256": codes_sha256,
+        "requantized_q16_16_sha256": q16_sha256,
+        "checkpoints": {
+            "accumulator_i64": len(trace),
+            "requantized_codes_i8": len(codes),
+            "requantized_q16_16": len(q16),
+        },
+        "execution": {
+            "calyx_components": 1,
+            "simulator_runs": 1,
+            "accumulator_handoff": "accumulator_trace_external_memory",
+            "host_intermediate": False,
+        },
+        "cycles": observed["cycles"],
+        "generated_artifacts": generated_artifacts,
+        "calyx_compile_policy": {
+            "disabled_passes": ["cell-share"],
+            "reason": "preserve Task-3 staged requantizer latches in composed main",
+        },
+    }
+    receipt["receipt_sha256"] = _canonical_sha256(receipt)
+    unsigned = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
+    if receipt["receipt_sha256"] != _canonical_sha256(unsigned):
+        raise RuntimeError("generated-SV composed receipt self-hash mismatch")
+    return receipt
 
 
 def ordered_value_trace(artifact: CalyxArtifact, fixture_path: Path) -> dict[str, Any]:

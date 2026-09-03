@@ -1,0 +1,45 @@
+{
+  "accumulator_trace_sha256": "adbdd50407f9c1555052ed6662dcf189d2ec3a67370535acd696976eae530705",
+  "calyx_compile_policy": {
+    "disabled_passes": [
+      "cell-share"
+    ],
+    "reason": "preserve Task-3 staged requantizer latches in composed main"
+  },
+  "checkpoints": {
+    "accumulator_i64": 256,
+    "requantized_codes_i8": 256,
+    "requantized_q16_16": 256
+  },
+  "cycles": 220968,
+  "execution": {
+    "accumulator_handoff": "accumulator_trace_external_memory",
+    "calyx_components": 1,
+    "host_intermediate": false,
+    "simulator_runs": 1
+  },
+  "fixture_receipt_sha256": "d30d469ecc0c7a679c097577affd12afe9cb2fc250a252caeaba141cdeb55771",
+  "generated_artifacts": {
+    "futil": {
+      "path": "/tmp/llm2fpga-fixed-point-gemv-requantize-generated-sv-v1/composed.futil",
+      "sha256": "98c705079f253f52abbc303c7aaae6474d7355edbf768aa09afaf73c2aaa154f"
+    },
+    "harness": {
+      "path": "/tmp/llm2fpga-fixed-point-gemv-requantize-generated-sv-v1/harness.cpp",
+      "sha256": "317e15f38e908494d0d16560f40d5dfda0fdb4a3ec721071d2b1967ae3648608"
+    },
+    "sv": {
+      "path": "/tmp/llm2fpga-fixed-point-gemv-requantize-generated-sv-v1/main.sv",
+      "sha256": "3c330c6ea15c47e661bfa212e84f067dd66d768b4126fd0c76d2dc0119c4898f"
+    },
+    "synthesis_sv": {
+      "path": "/tmp/llm2fpga-fixed-point-gemv-requantize-generated-sv-v1/main-synthesis.sv",
+      "sha256": "bf46cb268bfd232ab2f91277aa799bc9afd51564620e86fdfdaa0b0821f9be88"
+    }
+  },
+  "receipt_sha256": "1faf1efcc575e5a3e24e887bdb2416ce7e00f65233637128f18ea4ad3797d38a",
+  "requantized_codes_sha256": "d7c0c2acf0353354be11944a395bea34e05771db3c25c3588cff83e97624402f",
+  "requantized_q16_16_sha256": "a8d503384a8d862802d4b85ee462129a3d838f9eabf088c3b10c5710c3263d95",
+  "schema": "llm2fpga-fixed-point-gemv-requantize-generated-sv-v1",
+  "schema_receipt_sha256": "d276a23dc80cb6c9db978d16a4f348bde816ded149c02b8cab7e4a2364397d76"
+}
