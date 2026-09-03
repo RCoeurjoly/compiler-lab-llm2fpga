@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,13 @@ ROOT = Path(__file__).resolve().parents[2]
 class CalyxArtifact:
     futil: str
     provenance: dict[str, Any]
+
+
+def _canonical_sha256(value: object) -> str:
+    encoded = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _capture_module():
@@ -510,3 +518,1252 @@ def run_gelu_sv(
         "little_endian_int64_sha256": _little_endian_i64_sha256(values),
         "cycles": observed["cycles"],
     }
+
+
+COMPOSED_SCHEMA = "tinystories-1m-fixed-point-mlp-crossing-generated-sv-v1"
+COMPOSED_FIXTURE_SCHEMA = "tinystories-1m-fixed-point-mlp-crossing-slice-v1"
+COMPOSED_ARTIFACT_DIRECTORY = Path(
+    "/tmp/llm2fpga-tinystories-1m-fixed-point-mlp-crossing-generated-sv-v1"
+)
+
+COMPOSED_SOURCE_MEMORIES = (
+    "c_fc_input_codes_i8",
+    "c_fc_input_scale_q8_24",
+    "c_fc_weight_codes_i8",
+    "c_fc_weight_scale_q8_24",
+    "c_fc_bias_q16_16",
+    "c_fc_output_scale_q8_24",
+    "gelu_lut_q12",
+    "c_proj_input_scale_q8_24",
+    "c_proj_weight_codes_i8",
+    "c_proj_weight_scale_q8_24",
+    "c_proj_bias_q16_16",
+    "c_proj_output_scale_q8_24",
+)
+
+COMPOSED_CHECKPOINT_MEMORIES = (
+    "c_fc_input_q16_16",
+    "c_fc_accumulator_i64",
+    "c_fc_post_weight_rescale_bias_q16_16",
+    "c_fc_output_codes_i8",
+    "c_fc_output_q16_16",
+    "gelu_output_q16_16",
+    "c_proj_input_codes_i8",
+    "c_proj_input_q16_16",
+    "c_proj_accumulator_i64",
+    "c_proj_post_weight_rescale_bias_q16_16",
+    "c_proj_output_codes_i8",
+    "c_proj_output_q16_16",
+)
+
+
+def _checked_composed_fixture(fixture_path: Path) -> dict[str, Any]:
+    """Authenticate the exact MLP schema and every generated-memory binding."""
+    fixture = _capture_module().verify_fixture(fixture_path)
+    if fixture.get("schema") != COMPOSED_FIXTURE_SCHEMA:
+        raise ValueError("composed MLP fixture schema authority mismatch")
+    if fixture.get("slice") != {
+        "layer": 0,
+        "c_fc": {"rows": 4, "inputs": 64, "outputs": 256},
+        "c_proj": {"rows": 4, "inputs": 256, "outputs": 64},
+        "observation_indices": {
+            "c_fc_qdq": [24, 30],
+            "c_fc_accumulator": 4,
+            "gelu_nonlinear": 3,
+            "c_proj_qdq": [30, 36],
+            "c_proj_accumulator": 5,
+        },
+    }:
+        raise ValueError("composed MLP slice authority mismatch")
+    expected_arithmetic = {
+        "activation_codes": "signed_int8_saturated",
+        "activation_qdq": "signed_int8_saturated_nearest_ties_away_from_zero",
+        "gelu": "exact_q12_8192_entry_lut_linear_interpolation",
+        "gemv": "ascending_input_index_signed_int64_twos_complement_wrap",
+        "post_weight_rescale": "signed_magnitude_half_up_shift_32_plus_q16.16_bias",
+        "scale_format": "unsigned_q8.24_int64_tensor",
+        "value_format": "signed_q16.16_int64_tensor",
+    }
+    if fixture.get("arithmetic") != expected_arithmetic:
+        raise ValueError("composed MLP arithmetic authority mismatch")
+    expected_shapes = {
+        "c_fc_input_codes_i8": [4, 64],
+        "c_fc_input_scale_q8_24": [64],
+        "c_fc_input_q16_16": [4, 64],
+        "c_fc_accumulator_i64": [4, 256],
+        "c_fc_post_weight_rescale_bias_q16_16": [4, 256],
+        "c_fc_output_codes_i8": [4, 256],
+        "c_fc_output_scale_q8_24": [256],
+        "c_fc_output_q16_16": [4, 256],
+        "gelu_input_q16_16": [4, 256],
+        "gelu_output_q16_16": [4, 256],
+        "gelu_lut_q12": [8192],
+        "c_proj_input_codes_i8": [4, 256],
+        "c_proj_input_scale_q8_24": [256],
+        "c_proj_input_q16_16": [4, 256],
+        "c_proj_accumulator_i64": [4, 64],
+        "c_proj_post_weight_rescale_bias_q16_16": [4, 64],
+        "c_proj_output_codes_i8": [4, 64],
+        "c_proj_output_scale_q8_24": [64],
+        "c_proj_output_q16_16": [4, 64],
+        "c_fc_weight_codes_i8": [256, 64],
+        "c_fc_weight_scale_q8_24": [256],
+        "c_fc_bias_q16_16": [256],
+        "c_proj_weight_codes_i8": [64, 256],
+        "c_proj_weight_scale_q8_24": [64],
+        "c_proj_bias_q16_16": [64],
+    }
+    for name, shape in expected_shapes.items():
+        record = fixture["tensors"].get(name)
+        expected_bytes = 8
+        for dimension in shape:
+            expected_bytes *= dimension
+        if (
+            not isinstance(record, dict)
+            or record.get("shape") != shape
+            or record.get("dtype") != "int64"
+            or record.get("bytes") != expected_bytes
+            or record.get("fixture_receipt_sha256")
+            != fixture["tensor_fixture_receipt_sha256"]
+        ):
+            raise ValueError(f"composed MLP memory contract mismatch: {name}")
+    if (
+        fixture["tensors"]["c_fc_output_q16_16"]["little_endian_int64_sha256"]
+        != fixture["tensors"]["gelu_input_q16_16"]["little_endian_int64_sha256"]
+    ):
+        raise ValueError("c_fc-to-GELU direct-memory fixture boundary mismatch")
+    return fixture
+
+
+def _composed_schema_authority(fixture: dict[str, Any]) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "schema": COMPOSED_FIXTURE_SCHEMA,
+        "layer": 0,
+        "prompt_tokens": fixture["prompt_tokens"],
+        "c_fc": {"rows": 4, "inputs": 64, "outputs": 256},
+        "gelu": "exact_q12_8192_entry_lut_linear_interpolation",
+        "c_proj": {"rows": 4, "inputs": 256, "outputs": 64},
+        "arithmetic": fixture["arithmetic"],
+        "source_memories": list(COMPOSED_SOURCE_MEMORIES),
+        "checkpoint_memories": list(COMPOSED_CHECKPOINT_MEMORIES),
+        "handoffs": [
+            "c_fc_output_q16_16_to_gelu",
+            "gelu_output_q16_16_to_c_proj_input_qdq",
+        ],
+    }
+    payload["receipt_sha256"] = _canonical_sha256(payload)
+    return payload
+
+
+def _dequantize_phase(
+    prefix: str,
+    codes: str,
+    scales: str,
+    result: str,
+    count: int,
+    channels: int,
+) -> tuple[list[str], list[str], str]:
+    count_width = count.bit_length()
+    address_width = (count - 1).bit_length()
+    channel_width = (channels - 1).bit_length()
+    cells = [
+        f"{prefix}_entry_counter = std_reg({count_width});",
+        f"{prefix}_entry_lt = std_lt({count_width});",
+        f"{prefix}_increment_entry = std_add({count_width});",
+        f"{prefix}_entry_address = std_slice({count_width}, {address_width});",
+        f"{prefix}_channel_address = std_slice({count_width}, {channel_width});",
+        f"{prefix}_code_signed = std_signext(8, 64);",
+        f"{prefix}_product = std_smult_pipe(64);",
+        f"{prefix}_negative = std_slt(64);",
+        f"{prefix}_negate = std_ssub(64);",
+        f"{prefix}_absolute = std_mux(64);",
+        f"{prefix}_bias = std_sadd(64);",
+        f"{prefix}_shift = std_rsh(64);",
+        f"{prefix}_rounded_negate = std_ssub(64);",
+        f"{prefix}_rounded = std_mux(64);",
+    ]
+    wires = [
+        f"""{prefix}_entry_address.in = {prefix}_entry_counter.out;
+    {prefix}_channel_address.in = {prefix}_entry_counter.out;
+    group {prefix}_init_entry {{
+      {prefix}_entry_counter.in = {count_width}'d0;
+      {prefix}_entry_counter.write_en = 1'd1;
+      {prefix}_init_entry[done] = {prefix}_entry_counter.done;
+    }}
+    group {prefix}_read {{
+      {codes}.addr0 = {prefix}_entry_address.out;
+      {codes}.content_en = 1'd1;
+      {scales}.addr0 = {prefix}_channel_address.out;
+      {scales}.content_en = 1'd1;
+      {prefix}_read[done] = ({codes}.done & {scales}.done) ? 1'd1;
+    }}
+    group {prefix}_multiply {{
+      {prefix}_code_signed.in = {codes}.read_data;
+      {prefix}_product.left = {prefix}_code_signed.out;
+      {prefix}_product.right = {scales}.read_data;
+      {prefix}_product.go = 1'd1;
+      {prefix}_multiply[done] = {prefix}_product.done;
+    }}
+    group {prefix}_round_and_write {{
+      {prefix}_negative.left = {prefix}_product.out;
+      {prefix}_negative.right = 64'd0;
+      {prefix}_negate.left = 64'd0;
+      {prefix}_negate.right = {prefix}_product.out;
+      {prefix}_absolute.cond = {prefix}_negative.out;
+      {prefix}_absolute.tru = {prefix}_negate.out;
+      {prefix}_absolute.fal = {prefix}_product.out;
+      {prefix}_bias.left = {prefix}_absolute.out;
+      {prefix}_bias.right = 64'd128;
+      {prefix}_shift.left = {prefix}_bias.out;
+      {prefix}_shift.right = 64'd8;
+      {prefix}_rounded_negate.left = 64'd0;
+      {prefix}_rounded_negate.right = {prefix}_shift.out;
+      {prefix}_rounded.cond = {prefix}_negative.out;
+      {prefix}_rounded.tru = {prefix}_rounded_negate.out;
+      {prefix}_rounded.fal = {prefix}_shift.out;
+      {result}.addr0 = {prefix}_entry_address.out;
+      {result}.content_en = 1'd1;
+      {result}.write_data = {prefix}_rounded.out;
+      {result}.write_en = 1'd1;
+      {prefix}_round_and_write[done] = {result}.done;
+    }}
+    group {prefix}_increment_entry_counter {{
+      {prefix}_increment_entry.left = {prefix}_entry_counter.out;
+      {prefix}_increment_entry.right = {count_width}'d1;
+      {prefix}_entry_counter.in = {prefix}_increment_entry.out;
+      {prefix}_entry_counter.write_en = 1'd1;
+      {prefix}_increment_entry_counter[done] = {prefix}_entry_counter.done;
+    }}
+    comb group {prefix}_entry_condition {{
+      {prefix}_entry_lt.left = {prefix}_entry_counter.out;
+      {prefix}_entry_lt.right = {count_width}'d{count};
+    }}"""
+    ]
+    control = f"""      {prefix}_init_entry;
+      while {prefix}_entry_lt.out with {prefix}_entry_condition {{
+        seq {{ {prefix}_read; {prefix}_multiply; {prefix}_round_and_write; {prefix}_increment_entry_counter; }}
+      }}"""
+    return cells, wires, control
+
+
+def _gemv_phase(
+    prefix: str,
+    codes: str,
+    scales: str,
+    weights: str,
+    accumulator_trace: str,
+    rows: int,
+    inputs: int,
+    outputs: int,
+) -> tuple[list[str], list[str], str]:
+    row_width = rows.bit_length()
+    output_width = outputs.bit_length()
+    k_width = inputs.bit_length()
+    input_address_width = (rows * inputs - 1).bit_length()
+    weight_address_width = (outputs * inputs - 1).bit_length()
+    trace_address_width = (rows * outputs - 1).bit_length()
+    input_shift = (inputs - 1).bit_length()
+    trace_shift = (outputs - 1).bit_length()
+    cells = [
+        f"{prefix}_accumulator = std_reg(64);",
+        f"{prefix}_row_counter = std_reg({row_width});",
+        f"{prefix}_output_counter = std_reg({output_width});",
+        f"{prefix}_k_counter = std_reg({k_width});",
+        f"{prefix}_row_lt = std_lt({row_width});",
+        f"{prefix}_output_lt = std_lt({output_width});",
+        f"{prefix}_k_lt = std_lt({k_width});",
+        f"{prefix}_increment_row = std_add({row_width});",
+        f"{prefix}_increment_output = std_add({output_width});",
+        f"{prefix}_increment_k = std_add({k_width});",
+        f"{prefix}_input_row_pad = std_pad({row_width}, {input_address_width});",
+        f"{prefix}_input_row_shift = std_lsh({input_address_width});",
+        f"{prefix}_input_k_pad = std_pad({k_width}, {input_address_width});",
+        f"{prefix}_input_address = std_add({input_address_width});",
+        f"{prefix}_scale_address = std_slice({k_width}, {(inputs - 1).bit_length()});",
+        f"{prefix}_weight_output_pad = std_pad({output_width}, {weight_address_width});",
+        f"{prefix}_weight_output_shift = std_lsh({weight_address_width});",
+        f"{prefix}_weight_k_pad = std_pad({k_width}, {weight_address_width});",
+        f"{prefix}_weight_address = std_add({weight_address_width});",
+        f"{prefix}_trace_row_pad = std_pad({row_width}, {trace_address_width});",
+        f"{prefix}_trace_row_shift = std_lsh({trace_address_width});",
+        f"{prefix}_trace_output_pad = std_pad({output_width}, {trace_address_width});",
+        f"{prefix}_trace_address = std_add({trace_address_width});",
+        f"{prefix}_code_signed = std_signext(8, 64);",
+        f"{prefix}_weight_signed = std_signext(8, 64);",
+        f"{prefix}_activation_scale = std_smult_pipe(64);",
+        f"{prefix}_mac = std_smult_pipe(64);",
+        f"{prefix}_add = std_sadd(64);",
+    ]
+    wires = [
+        f"""group {prefix}_init_row {{
+      {prefix}_row_counter.in = {row_width}'d0;
+      {prefix}_row_counter.write_en = 1'd1;
+      {prefix}_init_row[done] = {prefix}_row_counter.done;
+    }}
+    group {prefix}_init_output {{
+      {prefix}_output_counter.in = {output_width}'d0;
+      {prefix}_output_counter.write_en = 1'd1;
+      {prefix}_init_output[done] = {prefix}_output_counter.done;
+    }}
+    group {prefix}_init_accumulator_and_k {{
+      {prefix}_accumulator.in = 64'd0;
+      {prefix}_accumulator.write_en = 1'd1;
+      {prefix}_k_counter.in = {k_width}'d0;
+      {prefix}_k_counter.write_en = 1'd1;
+      {prefix}_init_accumulator_and_k[done] = ({prefix}_accumulator.done & {prefix}_k_counter.done) ? 1'd1;
+    }}
+    group {prefix}_read_operands {{
+      {prefix}_input_row_pad.in = {prefix}_row_counter.out;
+      {prefix}_input_row_shift.left = {prefix}_input_row_pad.out;
+      {prefix}_input_row_shift.right = {input_address_width}'d{input_shift};
+      {prefix}_input_k_pad.in = {prefix}_k_counter.out;
+      {prefix}_input_address.left = {prefix}_input_row_shift.out;
+      {prefix}_input_address.right = {prefix}_input_k_pad.out;
+      {prefix}_scale_address.in = {prefix}_k_counter.out;
+      {prefix}_weight_output_pad.in = {prefix}_output_counter.out;
+      {prefix}_weight_output_shift.left = {prefix}_weight_output_pad.out;
+      {prefix}_weight_output_shift.right = {weight_address_width}'d{input_shift};
+      {prefix}_weight_k_pad.in = {prefix}_k_counter.out;
+      {prefix}_weight_address.left = {prefix}_weight_output_shift.out;
+      {prefix}_weight_address.right = {prefix}_weight_k_pad.out;
+      {codes}.addr0 = {prefix}_input_address.out;
+      {codes}.content_en = 1'd1;
+      {scales}.addr0 = {prefix}_scale_address.out;
+      {scales}.content_en = 1'd1;
+      {weights}.addr0 = {prefix}_weight_address.out;
+      {weights}.content_en = 1'd1;
+      {prefix}_read_operands[done] = ({codes}.done & {scales}.done & {weights}.done) ? 1'd1;
+    }}
+    group {prefix}_scale_activation {{
+      {prefix}_code_signed.in = {codes}.read_data;
+      {prefix}_activation_scale.left = {prefix}_code_signed.out;
+      {prefix}_activation_scale.right = {scales}.read_data;
+      {prefix}_activation_scale.go = 1'd1;
+      {prefix}_scale_activation[done] = {prefix}_activation_scale.done;
+    }}
+    group {prefix}_multiply {{
+      {prefix}_weight_signed.in = {weights}.read_data;
+      {prefix}_mac.left = {prefix}_activation_scale.out;
+      {prefix}_mac.right = {prefix}_weight_signed.out;
+      {prefix}_mac.go = 1'd1;
+      {prefix}_multiply[done] = {prefix}_mac.done;
+    }}
+    group {prefix}_accumulate {{
+      {prefix}_add.left = {prefix}_accumulator.out;
+      {prefix}_add.right = {prefix}_mac.out;
+      {prefix}_accumulator.in = {prefix}_add.out;
+      {prefix}_accumulator.write_en = 1'd1;
+      {prefix}_accumulate[done] = {prefix}_accumulator.done;
+    }}
+    group {prefix}_increment_k_counter {{
+      {prefix}_increment_k.left = {prefix}_k_counter.out;
+      {prefix}_increment_k.right = {k_width}'d1;
+      {prefix}_k_counter.in = {prefix}_increment_k.out;
+      {prefix}_k_counter.write_en = 1'd1;
+      {prefix}_increment_k_counter[done] = {prefix}_k_counter.done;
+    }}
+    group {prefix}_write_accumulator {{
+      {prefix}_trace_row_pad.in = {prefix}_row_counter.out;
+      {prefix}_trace_row_shift.left = {prefix}_trace_row_pad.out;
+      {prefix}_trace_row_shift.right = {trace_address_width}'d{trace_shift};
+      {prefix}_trace_output_pad.in = {prefix}_output_counter.out;
+      {prefix}_trace_address.left = {prefix}_trace_row_shift.out;
+      {prefix}_trace_address.right = {prefix}_trace_output_pad.out;
+      {accumulator_trace}.addr0 = {prefix}_trace_address.out;
+      {accumulator_trace}.content_en = 1'd1;
+      {accumulator_trace}.write_data = {prefix}_accumulator.out;
+      {accumulator_trace}.write_en = 1'd1;
+      {prefix}_write_accumulator[done] = {accumulator_trace}.done;
+    }}
+    group {prefix}_increment_output_counter {{
+      {prefix}_increment_output.left = {prefix}_output_counter.out;
+      {prefix}_increment_output.right = {output_width}'d1;
+      {prefix}_output_counter.in = {prefix}_increment_output.out;
+      {prefix}_output_counter.write_en = 1'd1;
+      {prefix}_increment_output_counter[done] = {prefix}_output_counter.done;
+    }}
+    group {prefix}_increment_row_counter {{
+      {prefix}_increment_row.left = {prefix}_row_counter.out;
+      {prefix}_increment_row.right = {row_width}'d1;
+      {prefix}_row_counter.in = {prefix}_increment_row.out;
+      {prefix}_row_counter.write_en = 1'd1;
+      {prefix}_increment_row_counter[done] = {prefix}_row_counter.done;
+    }}
+    comb group {prefix}_row_condition {{
+      {prefix}_row_lt.left = {prefix}_row_counter.out;
+      {prefix}_row_lt.right = {row_width}'d{rows};
+    }}
+    comb group {prefix}_output_condition {{
+      {prefix}_output_lt.left = {prefix}_output_counter.out;
+      {prefix}_output_lt.right = {output_width}'d{outputs};
+    }}
+    comb group {prefix}_k_condition {{
+      {prefix}_k_lt.left = {prefix}_k_counter.out;
+      {prefix}_k_lt.right = {k_width}'d{inputs};
+    }}"""
+    ]
+    control = f"""      {prefix}_init_row;
+      while {prefix}_row_lt.out with {prefix}_row_condition {{
+        seq {{
+          {prefix}_init_output;
+          while {prefix}_output_lt.out with {prefix}_output_condition {{
+            seq {{
+              {prefix}_init_accumulator_and_k;
+              while {prefix}_k_lt.out with {prefix}_k_condition {{
+                seq {{ {prefix}_read_operands; {prefix}_scale_activation; {prefix}_multiply; {prefix}_accumulate; {prefix}_increment_k_counter; }}
+              }}
+              {prefix}_write_accumulator;
+              {prefix}_increment_output_counter;
+            }}
+          }}
+          {prefix}_increment_row_counter;
+        }}
+      }}"""
+    return cells, wires, control
+
+
+def _activation_qdq_phase(
+    prefix: str,
+    values_q16: str,
+    scales_q24: str,
+    codes_i8: str,
+    dequantized_q16: str,
+    count: int,
+    channels: int,
+) -> tuple[list[str], list[str], str]:
+    count_width = count.bit_length()
+    address_width = (count - 1).bit_length()
+    channel_width = (channels - 1).bit_length()
+    cells = [
+        f"{prefix}_entry_counter = std_reg({count_width});",
+        f"{prefix}_entry_lt = std_lt({count_width});",
+        f"{prefix}_increment_entry = std_add({count_width});",
+        f"{prefix}_entry_address = std_slice({count_width}, {address_width});",
+        f"{prefix}_channel_address = std_slice({count_width}, {channel_width});",
+        f"{prefix}_numerator_lshift = std_lsh(64);",
+        f"{prefix}_numerator_negative = std_slt(64);",
+        f"{prefix}_numerator = std_reg(64);",
+        f"{prefix}_negative_flag = std_reg(1);",
+        f"{prefix}_numerator_negate = std_ssub(64);",
+        f"{prefix}_numerator_abs = std_mux(64);",
+        f"{prefix}_scale_half_bits = std_bit_slice(64, 1, 63, 63);",
+        f"{prefix}_scale_half = std_pad(63, 64);",
+        f"{prefix}_numerator_bias = std_sadd(64);",
+        f"{prefix}_divide = std_div_pipe(64);",
+        f"{prefix}_quotient_negate = std_ssub(64);",
+        f"{prefix}_rounded_code = std_mux(64);",
+        f"{prefix}_negative_128 = std_ssub(64);",
+        f"{prefix}_code_lt_min = std_slt(64);",
+        f"{prefix}_code_gt_max = std_sgt(64);",
+        f"{prefix}_low_clamp = std_mux(64);",
+        f"{prefix}_saturated_code = std_mux(64);",
+        f"{prefix}_code_slice = std_slice(64, 8);",
+        f"{prefix}_code_reg = std_reg(64);",
+        f"{prefix}_dequant_product = std_smult_pipe(64);",
+        f"{prefix}_dequant_negative = std_slt(64);",
+        f"{prefix}_dequant_negate = std_ssub(64);",
+        f"{prefix}_dequant_abs = std_mux(64);",
+        f"{prefix}_dequant_bias = std_sadd(64);",
+        f"{prefix}_dequant_shift = std_rsh(64);",
+        f"{prefix}_rounded_dequant_negate = std_ssub(64);",
+        f"{prefix}_rounded_dequant = std_mux(64);",
+    ]
+    wires = [
+        f"""{prefix}_entry_address.in = {prefix}_entry_counter.out;
+    {prefix}_channel_address.in = {prefix}_entry_counter.out;
+    group {prefix}_init_entry {{
+      {prefix}_entry_counter.in = {count_width}'d0;
+      {prefix}_entry_counter.write_en = 1'd1;
+      {prefix}_init_entry[done] = {prefix}_entry_counter.done;
+    }}
+    group {prefix}_read_inputs {{
+      {values_q16}.addr0 = {prefix}_entry_address.out;
+      {values_q16}.content_en = 1'd1;
+      {scales_q24}.addr0 = {prefix}_channel_address.out;
+      {scales_q24}.content_en = 1'd1;
+      {prefix}_read_inputs[done] = ({values_q16}.done & {scales_q24}.done) ? 1'd1;
+    }}
+    group {prefix}_latch_numerator {{
+      {prefix}_numerator_lshift.left = {values_q16}.read_data;
+      {prefix}_numerator_lshift.right = 64'd8;
+      {prefix}_numerator_negative.left = {prefix}_numerator_lshift.out;
+      {prefix}_numerator_negative.right = 64'd0;
+      {prefix}_numerator.in = {prefix}_numerator_lshift.out;
+      {prefix}_numerator.write_en = 1'd1;
+      {prefix}_negative_flag.in = {prefix}_numerator_negative.out;
+      {prefix}_negative_flag.write_en = 1'd1;
+      {prefix}_latch_numerator[done] = ({prefix}_numerator.done & {prefix}_negative_flag.done) ? 1'd1;
+    }}
+    group {prefix}_divide_code {{
+      {prefix}_numerator_negate.left = 64'd0;
+      {prefix}_numerator_negate.right = {prefix}_numerator.out;
+      {prefix}_numerator_abs.cond = {prefix}_negative_flag.out;
+      {prefix}_numerator_abs.tru = {prefix}_numerator_negate.out;
+      {prefix}_numerator_abs.fal = {prefix}_numerator.out;
+      {prefix}_scale_half_bits.in = {scales_q24}.read_data;
+      {prefix}_scale_half.in = {prefix}_scale_half_bits.out;
+      {prefix}_numerator_bias.left = {prefix}_numerator_abs.out;
+      {prefix}_numerator_bias.right = {prefix}_scale_half.out;
+      {prefix}_divide.left = {prefix}_numerator_bias.out;
+      {prefix}_divide.right = {scales_q24}.read_data;
+      {prefix}_divide.go = 1'd1;
+      {prefix}_divide_code[done] = {prefix}_divide.done;
+    }}
+    group {prefix}_clamp_and_write_code {{
+      {prefix}_quotient_negate.left = 64'd0;
+      {prefix}_quotient_negate.right = {prefix}_divide.out_quotient;
+      {prefix}_rounded_code.cond = {prefix}_negative_flag.out;
+      {prefix}_rounded_code.tru = {prefix}_quotient_negate.out;
+      {prefix}_rounded_code.fal = {prefix}_divide.out_quotient;
+      {prefix}_negative_128.left = 64'd0;
+      {prefix}_negative_128.right = 64'd128;
+      {prefix}_code_lt_min.left = {prefix}_rounded_code.out;
+      {prefix}_code_lt_min.right = {prefix}_negative_128.out;
+      {prefix}_code_gt_max.left = {prefix}_rounded_code.out;
+      {prefix}_code_gt_max.right = 64'd127;
+      {prefix}_low_clamp.cond = {prefix}_code_lt_min.out;
+      {prefix}_low_clamp.tru = {prefix}_negative_128.out;
+      {prefix}_low_clamp.fal = {prefix}_rounded_code.out;
+      {prefix}_saturated_code.cond = {prefix}_code_gt_max.out;
+      {prefix}_saturated_code.tru = 64'd127;
+      {prefix}_saturated_code.fal = {prefix}_low_clamp.out;
+      {prefix}_code_slice.in = {prefix}_saturated_code.out;
+      {prefix}_code_reg.in = {prefix}_saturated_code.out;
+      {prefix}_code_reg.write_en = 1'd1;
+      {codes_i8}.addr0 = {prefix}_entry_address.out;
+      {codes_i8}.content_en = 1'd1;
+      {codes_i8}.write_data = {prefix}_code_slice.out;
+      {codes_i8}.write_en = 1'd1;
+      {prefix}_clamp_and_write_code[done] = ({prefix}_code_reg.done & {codes_i8}.done) ? 1'd1;
+    }}
+    group {prefix}_multiply_dequant {{
+      {prefix}_dequant_product.left = {prefix}_code_reg.out;
+      {prefix}_dequant_product.right = {scales_q24}.read_data;
+      {prefix}_dequant_product.go = 1'd1;
+      {prefix}_multiply_dequant[done] = {prefix}_dequant_product.done;
+    }}
+    group {prefix}_round_and_write_dequant {{
+      {prefix}_dequant_negative.left = {prefix}_dequant_product.out;
+      {prefix}_dequant_negative.right = 64'd0;
+      {prefix}_dequant_negate.left = 64'd0;
+      {prefix}_dequant_negate.right = {prefix}_dequant_product.out;
+      {prefix}_dequant_abs.cond = {prefix}_dequant_negative.out;
+      {prefix}_dequant_abs.tru = {prefix}_dequant_negate.out;
+      {prefix}_dequant_abs.fal = {prefix}_dequant_product.out;
+      {prefix}_dequant_bias.left = {prefix}_dequant_abs.out;
+      {prefix}_dequant_bias.right = 64'd128;
+      {prefix}_dequant_shift.left = {prefix}_dequant_bias.out;
+      {prefix}_dequant_shift.right = 64'd8;
+      {prefix}_rounded_dequant_negate.left = 64'd0;
+      {prefix}_rounded_dequant_negate.right = {prefix}_dequant_shift.out;
+      {prefix}_rounded_dequant.cond = {prefix}_dequant_negative.out;
+      {prefix}_rounded_dequant.tru = {prefix}_rounded_dequant_negate.out;
+      {prefix}_rounded_dequant.fal = {prefix}_dequant_shift.out;
+      {dequantized_q16}.addr0 = {prefix}_entry_address.out;
+      {dequantized_q16}.content_en = 1'd1;
+      {dequantized_q16}.write_data = {prefix}_rounded_dequant.out;
+      {dequantized_q16}.write_en = 1'd1;
+      {prefix}_round_and_write_dequant[done] = {dequantized_q16}.done;
+    }}
+    group {prefix}_increment_entry_counter {{
+      {prefix}_increment_entry.left = {prefix}_entry_counter.out;
+      {prefix}_increment_entry.right = {count_width}'d1;
+      {prefix}_entry_counter.in = {prefix}_increment_entry.out;
+      {prefix}_entry_counter.write_en = 1'd1;
+      {prefix}_increment_entry_counter[done] = {prefix}_entry_counter.done;
+    }}
+    comb group {prefix}_entry_condition {{
+      {prefix}_entry_lt.left = {prefix}_entry_counter.out;
+      {prefix}_entry_lt.right = {count_width}'d{count};
+    }}"""
+    ]
+    control = f"""      {prefix}_init_entry;
+      while {prefix}_entry_lt.out with {prefix}_entry_condition {{
+        seq {{
+          {prefix}_read_inputs;
+          {prefix}_latch_numerator;
+          {prefix}_divide_code;
+          {prefix}_clamp_and_write_code;
+          {prefix}_multiply_dequant;
+          {prefix}_round_and_write_dequant;
+          {prefix}_increment_entry_counter;
+        }}
+      }}"""
+    return cells, wires, control
+
+
+def _requantize_phase(
+    prefix: str,
+    accumulators: str,
+    weight_scales: str,
+    biases: str,
+    output_scales: str,
+    post_q16: str,
+    codes_i8: str,
+    dequantized_q16: str,
+    count: int,
+    channels: int,
+) -> tuple[list[str], list[str], str]:
+    count_width = count.bit_length()
+    address_width = (count - 1).bit_length()
+    channel_width = (channels - 1).bit_length()
+    cells = [
+        f"{prefix}_entry_counter = std_reg({count_width});",
+        f"{prefix}_entry_lt = std_lt({count_width});",
+        f"{prefix}_increment_entry = std_add({count_width});",
+        f"{prefix}_entry_address = std_slice({count_width}, {address_width});",
+        f"{prefix}_channel_address = std_slice({count_width}, {channel_width});",
+        f"{prefix}_real_product = std_smult_pipe(64);",
+        f"{prefix}_product_negative = std_slt(64);",
+        f"{prefix}_product_negate = std_ssub(64);",
+        f"{prefix}_product_abs = std_mux(64);",
+        f"{prefix}_product_bias = std_sadd(64);",
+        f"{prefix}_product_shift = std_rsh(64);",
+        f"{prefix}_rounded_product_negate = std_ssub(64);",
+        f"{prefix}_rounded_product = std_mux(64);",
+        f"{prefix}_real_q16 = std_reg(64);",
+        f"{prefix}_bias_add = std_sadd(64);",
+        f"{prefix}_post_q16 = std_reg(64);",
+    ]
+    qdq_cells, qdq_wires, qdq_control = _activation_qdq_phase(
+        f"{prefix}_qdq",
+        post_q16,
+        output_scales,
+        codes_i8,
+        dequantized_q16,
+        count,
+        channels,
+    )
+    # The Q/DQ phase owns its own traversal. The rescale phase first populates
+    # post_q16 for all entries; the second traversal consumes that hardware memory.
+    cells.extend(qdq_cells)
+    wires = [
+        f"""{prefix}_entry_address.in = {prefix}_entry_counter.out;
+    {prefix}_channel_address.in = {prefix}_entry_counter.out;
+    group {prefix}_init_entry {{
+      {prefix}_entry_counter.in = {count_width}'d0;
+      {prefix}_entry_counter.write_en = 1'd1;
+      {prefix}_init_entry[done] = {prefix}_entry_counter.done;
+    }}
+    group {prefix}_read_inputs {{
+      {accumulators}.addr0 = {prefix}_entry_address.out;
+      {accumulators}.content_en = 1'd1;
+      {weight_scales}.addr0 = {prefix}_channel_address.out;
+      {weight_scales}.content_en = 1'd1;
+      {biases}.addr0 = {prefix}_channel_address.out;
+      {biases}.content_en = 1'd1;
+      {prefix}_read_inputs[done] = ({accumulators}.done & {weight_scales}.done & {biases}.done) ? 1'd1;
+    }}
+    group {prefix}_multiply_real {{
+      {prefix}_real_product.left = {accumulators}.read_data;
+      {prefix}_real_product.right = {weight_scales}.read_data;
+      {prefix}_real_product.go = 1'd1;
+      {prefix}_multiply_real[done] = {prefix}_real_product.done;
+    }}
+    group {prefix}_round_real {{
+      {prefix}_product_negative.left = {prefix}_real_product.out;
+      {prefix}_product_negative.right = 64'd0;
+      {prefix}_product_negate.left = 64'd0;
+      {prefix}_product_negate.right = {prefix}_real_product.out;
+      {prefix}_product_abs.cond = {prefix}_product_negative.out;
+      {prefix}_product_abs.tru = {prefix}_product_negate.out;
+      {prefix}_product_abs.fal = {prefix}_real_product.out;
+      {prefix}_product_bias.left = {prefix}_product_abs.out;
+      {prefix}_product_bias.right = 64'd2147483648;
+      {prefix}_product_shift.left = {prefix}_product_bias.out;
+      {prefix}_product_shift.right = 64'd32;
+      {prefix}_rounded_product_negate.left = 64'd0;
+      {prefix}_rounded_product_negate.right = {prefix}_product_shift.out;
+      {prefix}_rounded_product.cond = {prefix}_product_negative.out;
+      {prefix}_rounded_product.tru = {prefix}_rounded_product_negate.out;
+      {prefix}_rounded_product.fal = {prefix}_product_shift.out;
+      {prefix}_real_q16.in = {prefix}_rounded_product.out;
+      {prefix}_real_q16.write_en = 1'd1;
+      {prefix}_round_real[done] = {prefix}_real_q16.done;
+    }}
+    group {prefix}_add_bias_and_write {{
+      {prefix}_bias_add.left = {prefix}_real_q16.out;
+      {prefix}_bias_add.right = {biases}.read_data;
+      {prefix}_post_q16.in = {prefix}_bias_add.out;
+      {prefix}_post_q16.write_en = 1'd1;
+      {post_q16}.addr0 = {prefix}_entry_address.out;
+      {post_q16}.content_en = 1'd1;
+      {post_q16}.write_data = {prefix}_bias_add.out;
+      {post_q16}.write_en = 1'd1;
+      {prefix}_add_bias_and_write[done] = ({prefix}_post_q16.done & {post_q16}.done) ? 1'd1;
+    }}
+    group {prefix}_increment_entry_counter {{
+      {prefix}_increment_entry.left = {prefix}_entry_counter.out;
+      {prefix}_increment_entry.right = {count_width}'d1;
+      {prefix}_entry_counter.in = {prefix}_increment_entry.out;
+      {prefix}_entry_counter.write_en = 1'd1;
+      {prefix}_increment_entry_counter[done] = {prefix}_entry_counter.done;
+    }}
+    comb group {prefix}_entry_condition {{
+      {prefix}_entry_lt.left = {prefix}_entry_counter.out;
+      {prefix}_entry_lt.right = {count_width}'d{count};
+    }}""",
+        *qdq_wires,
+    ]
+    control = f"""      {prefix}_init_entry;
+      while {prefix}_entry_lt.out with {prefix}_entry_condition {{
+        seq {{
+          {prefix}_read_inputs;
+          {prefix}_multiply_real;
+          {prefix}_round_real;
+          {prefix}_add_bias_and_write;
+          {prefix}_increment_entry_counter;
+        }}
+      }}
+{qdq_control}"""
+    return cells, wires, control
+
+
+def _component_sections(futil: str) -> tuple[str, str, str]:
+    cells_marker = "  cells {\n"
+    wires_marker = "  }\n  wires {\n"
+    control_marker = "  }\n  control {\n"
+    cells_start = futil.index(cells_marker) + len(cells_marker)
+    wires_start = futil.index(wires_marker, cells_start)
+    control_start = futil.index(control_marker, wires_start)
+    component_end = futil.rindex("\n  }\n}\n")
+    return (
+        futil[cells_start:wires_start],
+        futil[wires_start + len(wires_marker):control_start],
+        futil[control_start + len(control_marker):component_end],
+    )
+
+
+def _gelu_phase() -> tuple[list[str], list[str], str]:
+    """Namespace the already-proven exact GELU kernel for direct handoff."""
+    cells_text, wires_text, control_text = _component_sections(_gelu_kernel_futil())
+    external_lines = (
+        "    @external gelu_input_q16_16 = seq_mem_d1(64, 1024, 10);\n",
+        "    @external gelu_lut_q12 = seq_mem_d1(64, 8192, 13);\n",
+        "    @external gelu_q16_16 = seq_mem_d1(64, 1024, 10);\n",
+    )
+    for line in external_lines:
+        if line not in cells_text:
+            raise ValueError("proven GELU memory ABI changed")
+        cells_text = cells_text.replace(line, "", 1)
+
+    cell_names = re.findall(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=", cells_text, re.MULTILINE)
+    group_names = re.findall(
+        r"^\s*(?:comb\s+)?group\s+([A-Za-z_][A-Za-z0-9_]*)",
+        wires_text,
+        re.MULTILINE,
+    )
+    replacements = {
+        "gelu_input_q16_16": "c_fc_output_q16_16",
+        "gelu_q16_16": "gelu_output_q16_16",
+    }
+    replacements.update({name: f"gelu_{name}" for name in cell_names + group_names})
+    for old in sorted(replacements, key=len, reverse=True):
+        replacement = replacements[old]
+        cells_text = re.sub(rf"\b{re.escape(old)}\b", replacement, cells_text)
+        wires_text = re.sub(rf"\b{re.escape(old)}\b", replacement, wires_text)
+        control_text = re.sub(rf"\b{re.escape(old)}\b", replacement, control_text)
+    cells = [line.strip() for line in cells_text.splitlines() if line.strip()]
+    return cells, [wires_text.strip()], control_text.strip()
+
+
+def _indent_lines(lines: list[str], spaces: int) -> str:
+    prefix = " " * spaces
+    return "\n".join(
+        prefix + line if line else "" for item in lines for line in item.splitlines()
+    )
+
+
+def _composed_mlp_kernel_futil() -> str:
+    """Emit one exact MLP-crossing `main` with only hardware-memory handoff."""
+    memory_cells = [
+        "@external c_fc_input_codes_i8 = seq_mem_d1(8, 256, 8);",
+        "@external c_fc_input_scale_q8_24 = seq_mem_d1(64, 64, 6);",
+        "@external c_fc_input_q16_16 = seq_mem_d1(64, 256, 8);",
+        "@external c_fc_weight_codes_i8 = seq_mem_d1(8, 16384, 14);",
+        "@external c_fc_weight_scale_q8_24 = seq_mem_d1(64, 256, 8);",
+        "@external c_fc_bias_q16_16 = seq_mem_d1(64, 256, 8);",
+        "@external c_fc_accumulator_i64 = seq_mem_d1(64, 1024, 10);",
+        "@external c_fc_post_weight_rescale_bias_q16_16 = seq_mem_d1(64, 1024, 10);",
+        "@external c_fc_output_scale_q8_24 = seq_mem_d1(64, 256, 8);",
+        "@external c_fc_output_codes_i8 = seq_mem_d1(8, 1024, 10);",
+        "@external c_fc_output_q16_16 = seq_mem_d1(64, 1024, 10);",
+        "@external gelu_lut_q12 = seq_mem_d1(64, 8192, 13);",
+        "@external gelu_output_q16_16 = seq_mem_d1(64, 1024, 10);",
+        "@external c_proj_input_scale_q8_24 = seq_mem_d1(64, 256, 8);",
+        "@external c_proj_input_codes_i8 = seq_mem_d1(8, 1024, 10);",
+        "@external c_proj_input_q16_16 = seq_mem_d1(64, 1024, 10);",
+        "@external c_proj_weight_codes_i8 = seq_mem_d1(8, 16384, 14);",
+        "@external c_proj_weight_scale_q8_24 = seq_mem_d1(64, 64, 6);",
+        "@external c_proj_bias_q16_16 = seq_mem_d1(64, 64, 6);",
+        "@external c_proj_accumulator_i64 = seq_mem_d1(64, 256, 8);",
+        "@external c_proj_post_weight_rescale_bias_q16_16 = seq_mem_d1(64, 256, 8);",
+        "@external c_proj_output_scale_q8_24 = seq_mem_d1(64, 64, 6);",
+        "@external c_proj_output_codes_i8 = seq_mem_d1(8, 256, 8);",
+        "@external c_proj_output_q16_16 = seq_mem_d1(64, 256, 8);",
+    ]
+    phases = [
+        _dequantize_phase(
+            "c_fc_input_dequant",
+            "c_fc_input_codes_i8",
+            "c_fc_input_scale_q8_24",
+            "c_fc_input_q16_16",
+            256,
+            64,
+        ),
+        _gemv_phase(
+            "c_fc_gemv",
+            "c_fc_input_codes_i8",
+            "c_fc_input_scale_q8_24",
+            "c_fc_weight_codes_i8",
+            "c_fc_accumulator_i64",
+            4,
+            64,
+            256,
+        ),
+        _requantize_phase(
+            "c_fc_requant",
+            "c_fc_accumulator_i64",
+            "c_fc_weight_scale_q8_24",
+            "c_fc_bias_q16_16",
+            "c_fc_output_scale_q8_24",
+            "c_fc_post_weight_rescale_bias_q16_16",
+            "c_fc_output_codes_i8",
+            "c_fc_output_q16_16",
+            1024,
+            256,
+        ),
+        _gelu_phase(),
+        _activation_qdq_phase(
+            "c_proj_input_qdq",
+            "gelu_output_q16_16",
+            "c_proj_input_scale_q8_24",
+            "c_proj_input_codes_i8",
+            "c_proj_input_q16_16",
+            1024,
+            256,
+        ),
+        _gemv_phase(
+            "c_proj_gemv",
+            "c_proj_input_codes_i8",
+            "c_proj_input_scale_q8_24",
+            "c_proj_weight_codes_i8",
+            "c_proj_accumulator_i64",
+            4,
+            256,
+            64,
+        ),
+        _requantize_phase(
+            "c_proj_requant",
+            "c_proj_accumulator_i64",
+            "c_proj_weight_scale_q8_24",
+            "c_proj_bias_q16_16",
+            "c_proj_output_scale_q8_24",
+            "c_proj_post_weight_rescale_bias_q16_16",
+            "c_proj_output_codes_i8",
+            "c_proj_output_q16_16",
+            256,
+            64,
+        ),
+    ]
+    phase_cells = [cell for cells, _, _ in phases for cell in cells]
+    phase_wires = [wire for _, wires, _ in phases for wire in wires]
+    phase_controls = [control for _, _, control in phases]
+    futil = f'''// Generated exact TinyStories-1M block-0 MLP crossing.
+// All mutable checkpoints are produced and handed off through memories in this main.
+import "primitives/core.futil";
+import "primitives/binary_operators.futil";
+import "primitives/memories/seq.futil";
+
+component main(@go go: 1) -> (@done done: 1) {{
+  cells {{
+{_indent_lines(memory_cells + phase_cells, 4)}
+  }}
+  wires {{
+{_indent_lines(phase_wires, 4)}
+  }}
+  control {{
+    seq {{
+{_indent_lines(phase_controls, 0)}
+    }}
+  }}
+}}
+'''
+    if len(re.findall(r"(?m)^component\s+main\b", futil)) != 1:
+        raise ValueError("composed MLP generator did not emit exactly one main")
+    return futil
+
+
+def generate_composed_mlp_kernel(fixture_path: Path) -> CalyxArtifact:
+    fixture = _checked_composed_fixture(fixture_path)
+    futil = _composed_mlp_kernel_futil()
+    return CalyxArtifact(
+        futil=futil,
+        provenance={
+            "generated": COMPOSED_SCHEMA,
+            "fixture_receipt_sha256": fixture["receipt_sha256"],
+            "tensor_fixture_receipt_sha256": fixture[
+                "tensor_fixture_receipt_sha256"
+            ],
+            "fixture_authority": _fixture_authority(fixture),
+            "schema_authority": _composed_schema_authority(fixture),
+            "futil_sha256": hashlib.sha256(futil.encode("utf-8")).hexdigest(),
+            "component_count": 1,
+            "host_preload_memories": list(COMPOSED_SOURCE_MEMORIES),
+            "checkpoint_memories": list(COMPOSED_CHECKPOINT_MEMORIES),
+            "calyx_disabled_passes": ["cell-share"],
+            "composition": {
+                "c_fc_to_gelu": "c_fc_output_q16_16_hardware_memory",
+                "gelu_to_c_proj": "gelu_output_q16_16_hardware_memory",
+                "host_intermediate": False,
+            },
+        },
+    )
+
+
+def _flatten_tensor_values(fixture: dict[str, Any], name: str) -> list[int]:
+    values = fixture["tensors"][name]["values"]
+    if not isinstance(values, list):
+        raise ValueError(f"fixture tensor values are not an array: {name}")
+    if values and isinstance(values[0], list):
+        return [int(value) for row in values for value in row]
+    return [int(value) for value in values]
+
+
+def _cpp_print_memory(
+    json_name: str, memory: str, count: int, *, signed_i8: bool = False
+) -> str:
+    expression = f"root->main__DOT__{memory}__DOT__mem[i]"
+    if signed_i8:
+        expression = (
+            "static_cast<std::int64_t>(static_cast<std::int8_t>("
+            + expression
+            + "))"
+        )
+    else:
+        expression = f"static_cast<std::int64_t>({expression})"
+    return f'''  std::cout << ",\\\"{json_name}\\\":[";
+  for (unsigned i = 0; i < {count}; ++i) {{
+    if (i) std::cout << ',';
+    std::cout << {expression};
+  }}
+  std::cout << ']';'''
+
+
+def _generated_composed_mlp_harness(fixture: dict[str, Any]) -> str:
+    """Preload immutable sources, zero outputs, and observe only hardware state."""
+    source_arrays = (
+        ("CFcInputCodes", "c_fc_input_codes_i8"),
+        ("CFcInputScale", "c_fc_input_scale_q8_24"),
+        ("CFcWeights", "c_fc_weight_codes_i8"),
+        ("CFcWeightScale", "c_fc_weight_scale_q8_24"),
+        ("CFcBias", "c_fc_bias_q16_16"),
+        ("CFcOutputScale", "c_fc_output_scale_q8_24"),
+        ("GeluLut", "gelu_lut_q12"),
+        ("CProjInputScale", "c_proj_input_scale_q8_24"),
+        ("CProjWeights", "c_proj_weight_codes_i8"),
+        ("CProjWeightScale", "c_proj_weight_scale_q8_24"),
+        ("CProjBias", "c_proj_bias_q16_16"),
+        ("CProjOutputScale", "c_proj_output_scale_q8_24"),
+    )
+    declarations = []
+    preload_groups = []
+    cpp_names: list[str] = []
+    for cpp_suffix, tensor_name in source_arrays:
+        values = _flatten_tensor_values(fixture, tensor_name)
+        cpp_name = f"k{cpp_suffix}"
+        cpp_names.append(cpp_name)
+        declarations.append(
+            f"static const std::int64_t {cpp_name}[{len(values)}] = "
+            f"{{{_cpp_values(values)}}};"
+        )
+        cast = "std::uint8_t" if tensor_name.endswith("codes_i8") else "std::uint64_t"
+        preload_groups.append(
+            f"  for (unsigned i = 0; i < {len(values)}; ++i)\n"
+            f"    root->main__DOT__{tensor_name}__DOT__mem[i] = "
+            f"static_cast<{cast}>({cpp_name}[i]);"
+        )
+    checkpoint_counts = {
+        name: fixture["tensors"][name]["bytes"] // 8
+        for name in COMPOSED_CHECKPOINT_MEMORIES
+    }
+    zero_groups = [
+        f"  for (unsigned i = 0; i < {count}; ++i)\n"
+        f"    root->main__DOT__{name}__DOT__mem[i] = 0;"
+        for name, count in checkpoint_counts.items()
+    ]
+    print_groups = [
+        _cpp_print_memory(
+            name,
+            name,
+            count,
+            signed_i8=name.endswith("codes_i8"),
+        )
+        for name, count in checkpoint_counts.items()
+    ]
+    harness = f'''// Generated direct-memory MLP crossing harness.
+// Static arrays below are exactly the authenticated immutable source memories.
+#include "Vmain.h"
+#include "Vmain___024root.h"
+#include "verilated.h"
+
+#include <cstdint>
+#include <iostream>
+
+{chr(10).join(declarations)}
+
+static void tick(Vmain& model) {{
+  model.clk = 0;
+  model.eval();
+  model.clk = 1;
+  model.eval();
+}}
+
+int main(int argc, char** argv) {{
+  Verilated::commandArgs(argc, argv);
+  Vmain model;
+  auto* root = model.rootp;
+{chr(10).join(preload_groups)}
+{chr(10).join(zero_groups)}
+  model.reset = 1;
+  model.go = 0;
+  for (unsigned i = 0; i < 3; ++i) tick(model);
+  model.reset = 0;
+  model.go = 1;
+  unsigned cycles = 0;
+  while (!model.done && cycles < 10000000) {{
+    tick(model);
+    ++cycles;
+  }}
+  const bool complete = model.done && cycles > 131072;
+  std::cout << "{{\\\"status\\\":\\\"" << (complete ? "ok" : "timeout")
+            << "\\\",\\\"cycles\\\":" << cycles;
+{chr(10).join(print_groups)}
+  std::cout << "}}\\n";
+  return complete ? 0 : 1;
+}}
+'''
+    found_arrays = re.findall(
+        r"^static const std::int64_t\s+(k[A-Za-z0-9_]+)\[",
+        harness,
+        re.MULTILINE,
+    )
+    if found_arrays != cpp_names:
+        raise ValueError("composed MLP harness source preload whitelist mismatch")
+    for name in COMPOSED_CHECKPOINT_MEMORIES:
+        assignment = rf"main__DOT__{re.escape(name)}__DOT__mem\[i\]\s*=\s*([^;]+);"
+        assigned = re.findall(assignment, harness)
+        if assigned != ["0"]:
+            raise ValueError(f"host writes composed checkpoint memory: {name}")
+    return harness
+
+
+def _artifact_record(path: Path) -> dict[str, object]:
+    data = path.read_bytes()
+    return {
+        "path": str(path),
+        "bytes": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+    }
+
+
+def _require_exact_checkpoint(
+    name: str, observed: list[int], fixture: dict[str, Any]
+) -> dict[str, object]:
+    expected = _flatten_tensor_values(fixture, name)
+    if len(observed) != len(expected):
+        raise RuntimeError(
+            f"generated-SV composed {name} length mismatch: "
+            f"{len(observed)} != {len(expected)}"
+        )
+    for index, (actual, wanted) in enumerate(zip(observed, expected, strict=True)):
+        if actual != wanted:
+            raise RuntimeError(
+                f"generated-SV composed {name} mismatch at checkpoint {index}: "
+                f"observed {actual}, expected {wanted}"
+            )
+    digest = _little_endian_i64_sha256(observed)
+    expected_digest = fixture["tensors"][name]["little_endian_int64_sha256"]
+    if digest != expected_digest:
+        raise RuntimeError(f"generated-SV composed {name} hash mismatch")
+    return {"count": len(observed), "little_endian_int64_sha256": digest}
+
+
+def run_composed_mlp_sv(fixture_path: Path) -> dict[str, object]:
+    """Compile and observe the complete direct-memory MLP crossing once."""
+    artifact = generate_composed_mlp_kernel(fixture_path)
+    fixture = _checked_composed_fixture(fixture_path)
+    if (
+        artifact.provenance.get("fixture_receipt_sha256")
+        != fixture["receipt_sha256"]
+        or artifact.provenance.get("tensor_fixture_receipt_sha256")
+        != fixture["tensor_fixture_receipt_sha256"]
+        or artifact.provenance.get("fixture_authority")
+        != _fixture_authority(fixture)
+        or artifact.provenance.get("schema_authority")
+        != _composed_schema_authority(fixture)
+    ):
+        raise ValueError("composed generated-SV fixture/schema authority mismatch")
+    if artifact.provenance.get("futil_sha256") != hashlib.sha256(
+        artifact.futil.encode("utf-8")
+    ).hexdigest():
+        raise ValueError("composed generated-SV Futil authority mismatch")
+
+    artifact_dir = COMPOSED_ARTIFACT_DIRECTORY
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    futil_path = artifact_dir / "mlp-crossing.futil"
+    sv_path = artifact_dir / "main.sv"
+    synthesis_sv_path = artifact_dir / "main-synthesis.sv"
+    harness_path = artifact_dir / "harness.cpp"
+    futil_path.write_text(artifact.futil, encoding="utf-8")
+    harness_path.write_text(_generated_composed_mlp_harness(fixture), encoding="utf-8")
+
+    calyx = _calyx_install()
+    common = [
+        str(calyx / "bin/calyx"),
+        str(futil_path),
+        "-l",
+        str(calyx / "share/calyx"),
+        "-d",
+        "cell-share",
+    ]
+    simulator_command = [*common, "-b", "verilog", "-o", str(sv_path)]
+    simulator_compile = subprocess.run(
+        simulator_command,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if simulator_compile.returncode != 0 or not sv_path.is_file():
+        raise RuntimeError(
+            f"composed MLP Calyx-to-SV failed: {simulator_compile.stderr.strip()}"
+        )
+    synthesis_command = [
+        *common,
+        "--synthesis",
+        "--disable-verify",
+        "-b",
+        "verilog",
+        "-o",
+        str(synthesis_sv_path),
+    ]
+    synthesis_compile = subprocess.run(
+        synthesis_command,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if synthesis_compile.returncode != 0 or not synthesis_sv_path.is_file():
+        raise RuntimeError(
+            "composed MLP Calyx synthesis-to-SV failed: "
+            f"{synthesis_compile.stderr.strip()}"
+        )
+
+    verilator_dir = artifact_dir / "verilator"
+    executable = verilator_dir / "fixed_point_mlp_crossing_harness"
+    verilator_command = [
+        "verilator",
+        "--cc",
+        "--exe",
+        "--build",
+        "--top-module",
+        "main",
+        "--public-flat-rw",
+        "--Mdir",
+        str(verilator_dir),
+        "-CFLAGS",
+        "-std=c++17",
+        "-o",
+        executable.name,
+        str(sv_path),
+        str(harness_path),
+    ]
+    verilator_compile = subprocess.run(
+        verilator_command,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if verilator_compile.returncode != 0 or not executable.is_file():
+        raise RuntimeError(
+            f"composed MLP Verilator build failed: {verilator_compile.stderr.strip()}"
+        )
+    simulated = subprocess.run(
+        [str(executable)],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if simulated.returncode != 0:
+        raise RuntimeError(
+            "generated-SV composed MLP harness failed: "
+            f"{simulated.stdout.strip()} {simulated.stderr.strip()}"
+        )
+    try:
+        observed = json.loads(
+            next(
+                line
+                for line in reversed(simulated.stdout.splitlines())
+                if line.startswith("{")
+            )
+        )
+    except (json.JSONDecodeError, StopIteration) as error:
+        raise RuntimeError(
+            "generated-SV composed MLP harness did not emit JSON: "
+            f"{simulated.stdout!r}"
+        ) from error
+    if observed.get("status") != "ok" or not isinstance(observed.get("cycles"), int):
+        raise RuntimeError(f"generated-SV composed MLP observation is invalid: {observed}")
+
+    observed_receipts: dict[str, object] = {}
+    for name in COMPOSED_CHECKPOINT_MEMORIES:
+        values = observed.get(name)
+        if not isinstance(values, list) or not all(
+            isinstance(value, int) for value in values
+        ):
+            raise RuntimeError(f"generated-SV composed MLP checkpoint invalid: {name}")
+        observed_receipts[name] = _require_exact_checkpoint(name, values, fixture)
+
+    generated_artifacts = {
+        "futil": _artifact_record(futil_path),
+        "sv": _artifact_record(sv_path),
+        "synthesis_sv": _artifact_record(synthesis_sv_path),
+        "harness": _artifact_record(harness_path),
+    }
+    receipt: dict[str, object] = {
+        "schema": COMPOSED_SCHEMA,
+        "fixture_receipt_sha256": fixture["receipt_sha256"],
+        "tensor_fixture_receipt_sha256": fixture[
+            "tensor_fixture_receipt_sha256"
+        ],
+        "fixture_authority": _fixture_authority(fixture),
+        "schema_authority": _composed_schema_authority(fixture),
+        "execution": {
+            "component_count": 1,
+            "simulator_runs": 1,
+            "host_intermediate": False,
+            "cycles": observed["cycles"],
+            "traversal": "c_fc_input_qdq_then_row_output_ascending_k_then_gelu_then_c_proj_input_qdq_then_row_output_ascending_k",
+            "c_fc_to_gelu_handoff": "c_fc_output_q16_16_hardware_memory",
+            "gelu_to_c_proj_handoff": "gelu_output_q16_16_hardware_memory",
+            "host_preload_memories": list(COMPOSED_SOURCE_MEMORIES),
+        },
+        "observed": observed_receipts,
+        "generated_artifacts": generated_artifacts,
+        "calyx_compile_policy": {
+            "disabled_passes": ["cell-share"],
+            "reason": "preserve explicitly staged fixed-point arithmetic latches",
+            "simulator_command": simulator_command,
+            "synthesis_command": synthesis_command,
+            "same_futil_sha256": generated_artifacts["futil"]["sha256"],
+        },
+    }
+    receipt["receipt_sha256"] = _canonical_sha256(receipt)
+    unsigned = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
+    if receipt["receipt_sha256"] != _canonical_sha256(unsigned):
+        raise RuntimeError("generated-SV composed MLP receipt self-hash mismatch")
+    return receipt

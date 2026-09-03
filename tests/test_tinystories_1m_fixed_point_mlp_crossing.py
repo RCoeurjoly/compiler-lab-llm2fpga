@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "artifacts/reference/tinystories-1m-fixed-point-mlp-crossing-slice.json"
 CAPTURE = ROOT / "TinyStories/capture_fixed_point_mlp_crossing_slice.py"
 LOWERER = ROOT / "scripts/pipeline/lower_fixed_point_mlp_crossing_to_calyx.py"
+RUNNER = ROOT / "scripts/pipeline/run_fixed_point_mlp_crossing_sv.py"
+SV_RECEIPT = ROOT / "artifacts/reference/tinystories-1m-fixed-point-mlp-crossing-sv-receipt.json"
 
 EXPECTED_SHAPES = {
     "c_fc_input_codes_i8": [4, 64],
@@ -65,6 +67,17 @@ def load_lowerer():
     return module
 
 
+def load_runner():
+    spec = importlib.util.spec_from_file_location(
+        "fixed_point_mlp_crossing_runner", RUNNER
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def tensor_values(name: str) -> list[int]:
     rows = json.loads(FIXTURE.read_text(encoding="utf-8"))["tensors"][name][
         "values"
@@ -80,6 +93,84 @@ def canonical(value: object) -> str:
 
 
 class FixedPointMlpCrossingTest(unittest.TestCase):
+    def test_yosys_066_stat_format_reports_generated_main(self):
+        """Catches rejection of Yosys 0.66's count-first stat format."""
+        stat = """=== main ===
+=== design hierarchy ===
+        24 memories
+   1282048 memory bits
+       2812 cells
+"""
+        self.assertEqual(
+            load_runner()._validate_yosys_stat(stat),
+            {"cells": 2812, "memories": 24, "memory_bits": 1282048},
+        )
+
+    def test_one_generated_sv_main_matches_every_mlp_checkpoint(self):
+        """Catches host-staged or arithmetically inexact MLP composition."""
+        lowerer = load_lowerer()
+        receipt = lowerer.run_composed_mlp_sv(FIXTURE)
+        fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
+
+        self.assertEqual(receipt["schema"], "tinystories-1m-fixed-point-mlp-crossing-generated-sv-v1")
+        self.assertEqual(receipt["fixture_receipt_sha256"], fixture["receipt_sha256"])
+        self.assertEqual(receipt["schema_authority"]["schema"], fixture["schema"])
+        schema_unsigned = {
+            key: value
+            for key, value in receipt["schema_authority"].items()
+            if key != "receipt_sha256"
+        }
+        self.assertEqual(
+            receipt["schema_authority"]["receipt_sha256"],
+            canonical(schema_unsigned),
+        )
+        self.assertEqual(receipt["execution"]["component_count"], 1)
+        self.assertEqual(receipt["execution"]["simulator_runs"], 1)
+        self.assertFalse(receipt["execution"]["host_intermediate"])
+
+        checkpoint_tensors = [
+            "c_fc_input_q16_16",
+            "c_fc_accumulator_i64",
+            "c_fc_post_weight_rescale_bias_q16_16",
+            "c_fc_output_codes_i8",
+            "c_fc_output_q16_16",
+            "gelu_output_q16_16",
+            "c_proj_input_codes_i8",
+            "c_proj_input_q16_16",
+            "c_proj_accumulator_i64",
+            "c_proj_post_weight_rescale_bias_q16_16",
+            "c_proj_output_codes_i8",
+            "c_proj_output_q16_16",
+        ]
+        self.assertEqual(set(receipt["observed"]), set(checkpoint_tensors))
+        for name in checkpoint_tensors:
+            self.assertEqual(
+                receipt["observed"][name]["little_endian_int64_sha256"],
+                fixture["tensors"][name]["little_endian_int64_sha256"],
+                name,
+            )
+            self.assertEqual(
+                receipt["observed"][name]["count"],
+                fixture["tensors"][name]["bytes"] // 8,
+                name,
+            )
+
+        unsigned = {
+            key: value for key, value in receipt.items() if key != "receipt_sha256"
+        }
+        self.assertEqual(receipt["receipt_sha256"], canonical(unsigned))
+        self.assertGreater(receipt["execution"]["cycles"], 131072)
+        self.assertEqual(
+            receipt["calyx_compile_policy"]["disabled_passes"], ["cell-share"]
+        )
+        self.assertEqual(
+            set(receipt["generated_artifacts"]),
+            {"futil", "sv", "synthesis_sv", "harness"},
+        )
+        self.assertTrue(SV_RECEIPT.is_file(), "missing generated-SV MLP receipt")
+        committed_receipt = json.loads(SV_RECEIPT.read_text(encoding="utf-8"))
+        self.assertEqual(committed_receipt, receipt)
+
     def test_generated_sv_observes_exact_fixed_gelu(self):
         """Catches inexact GELU arithmetic or an omitted hardware checkpoint."""
         lowerer = load_lowerer()
