@@ -24,6 +24,16 @@ def load_lowerer():
 
 
 class FixedPointSchemaCalyxTest(unittest.TestCase):
+    def test_generated_sv_observes_first_64_mac_accumulator(self):
+        lowerer = load_lowerer()
+        artifact = lowerer.generate_one_output_kernel(SCHEMA, FIXTURE)
+        observed = lowerer.run_generated_sv(artifact, FIXTURE, row=0, output=0)
+        expected = json.loads(FIXTURE.read_text())[
+            "tensors"
+        ]["gemv_accumulator_i64"]["values"][0][0]
+        self.assertEqual(observed["accumulator_i64"], expected)
+        self.assertGreater(observed["cycles"], 64)
+
     def test_schema_lowers_to_explicit_memories_and_ordered_fixture_trace(self):
         lowerer = load_lowerer()
         artifact = lowerer.lower_schema(SCHEMA, FIXTURE)
