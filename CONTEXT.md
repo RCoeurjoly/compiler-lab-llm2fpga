@@ -74,3 +74,8 @@ port, or lifetime. Storage assignment is a separate lowering decision.
 contract slice may expand: bit-exact output tensors and per-stage hashes match
 the frozen checkpoint, and the generated-Calyx ordered-value trace matches the
 same checkpoint.
+
+**Captured contract fixture**: A frozen tensor checkpoint captured at a named
+boundary of the exact executable model during the frozen prompt run. It is the
+primary input/output fixture for a contract slice; synthetic tensors are only
+supplementary edge cases.
