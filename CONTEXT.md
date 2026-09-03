@@ -36,3 +36,12 @@ _Avoid_: Final error, downstream failure
 
 **Resource baseline**: Measured implementation data used to compare area,
 timing, memory, and throughput; it is not itself a functional specification.
+
+**Contract slice**: A minimal compiler graph cut derived from the exact
+executable model, retaining its real tensor shapes, quantization constants,
+and observable checkpoints. It is the functional acceptance target for a
+vertical-slice milestone.
+
+**Micro-fixture**: A deliberately smaller instance of a contract slice used
+for fast compiler and RTL iteration. It cannot by itself establish exact-model
+support; it must be paired with a passing contract slice.
