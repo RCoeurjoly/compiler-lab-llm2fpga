@@ -60,3 +60,8 @@ requantization, and storage/control semantics have been made explicit.
 whose attributes fully specify exact arithmetic behavior. For example,
 `fixed.requantize` records scale, rounding, signedness, saturation, and result
 width; its lowerer must implement those recorded primitive semantics exactly.
+
+**Fixed-point schema**: The initial representation of `llm2fpga.fixed` using
+existing MLIR operations and project-owned attributes, verified and transformed
+by an out-of-tree plugin. It avoids a CIRCT rebuild while the contract evolves;
+the schema may later become a compiled dialect without changing semantics.
