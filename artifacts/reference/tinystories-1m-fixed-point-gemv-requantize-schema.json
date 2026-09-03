@@ -1,0 +1,45 @@
+{
+  "expected_output_hashes": {
+    "gemv_accumulator_i64": {
+      "bytes": 2048,
+      "little_endian_int64_sha256": "adbdd50407f9c1555052ed6662dcf189d2ec3a67370535acd696976eae530705"
+    },
+    "requantized_codes_i8": {
+      "bytes": 2048,
+      "little_endian_int64_sha256": "d7c0c2acf0353354be11944a395bea34e05771db3c25c3588cff83e97624402f"
+    },
+    "requantized_q16_16": {
+      "bytes": 2048,
+      "little_endian_int64_sha256": "a8d503384a8d862802d4b85ee462129a3d838f9eabf088c3b10c5710c3263d95"
+    }
+  },
+  "fixture_receipt_sha256": "d30d469ecc0c7a679c097577affd12afe9cb2fc250a252caeaba141cdeb55771",
+  "gemv": {
+    "accumulator": "signed_i64_twos_complement_wrap",
+    "inputs": 64,
+    "outputs": 64,
+    "rows": 4
+  },
+  "logical_ssa": {
+    "accumulator": "tensor<4x64xi64>",
+    "activation": "tensor<4x64xi64>",
+    "input_scale": "tensor<64xi64>",
+    "requantized": "tensor<4x64xi64>",
+    "weight": "tensor<64x64xi64>",
+    "weight_scale": "tensor<64xi64>"
+  },
+  "mlir": "module {\n  %activation = \"fixed.fixture_input\"() : () -> tensor<4x64xi64>\n  %input_scale = \"fixed.fixture_scale\"() : () -> tensor<64xi64>\n  %weight = \"fixed.fixture_weight\"() : () -> tensor<64x64xi64>\n  %weight_scale = \"fixed.fixture_scale\"() : () -> tensor<64xi64>\n  %acc = \"fixed.gemv\"(%activation, %input_scale, %weight, %weight_scale) {accumulator = \"signed_i64_twos_complement_wrap\", rows = 4 : i64, inputs = 64 : i64, outputs = 64 : i64} : (tensor<4x64xi64>, tensor<64xi64>, tensor<64x64xi64>, tensor<64xi64>) -> tensor<4x64xi64>\n  %result = \"fixed.requantize\"(%acc) {scale = \"PER_CHANNEL_Q8_24\", rounding = \"nearest_ties_away_from_zero\", signedness = \"signed\", saturation = [-128, 127], width = 8 : i64} : (tensor<4x64xi64>) -> tensor<4x64xi64>\n}",
+  "receipt_sha256": "8e6339dab7fdd23171645f668ce293bb1e7ecdfc2a60f4f88677b8736af90bc9",
+  "requantize": {
+    "rounding": "nearest_ties_away_from_zero",
+    "saturation": [
+      -128,
+      127
+    ],
+    "scale": "5f03987f540507d246c4ab94e3e2176d254e68e06049aa0cdfe3466519c9b7f8",
+    "scale_format": "per_channel_unsigned_q8_24_i64",
+    "signedness": "signed",
+    "width": 8
+  },
+  "schema": "llm2fpga-fixed-point-gemv-requantize-schema-v1"
+}
