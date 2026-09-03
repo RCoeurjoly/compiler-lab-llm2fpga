@@ -1,0 +1,18 @@
+{
+  "schema": "llm2fpga-exact-serial-gemv-frontier-pointer-v1",
+  "status": "verified_diagnostic",
+  "receipt": {
+    "path": "/nix/store/qamrib4lj1nncdwlc5f5wirh8jf0idky-tiny-stories-1m-exact-serial-gemv-sv/frontier.json",
+    "sha256": "ab2c6bf06a0846f6664822dd0405c40fc0cad6eccd7952e986952d67191ec134",
+    "receipt_sha256": "f622e3ccab6d4ba432a8164bbedb5607b13df6c8bcd64ff4960edd90aae14ed4"
+  },
+  "result": {
+    "status": "failure",
+    "stage": "calyx",
+    "frontier": "calyx_frontier",
+    "diagnostic": "full-model Calyx composition absent: Torch has 49 boundaries; Calyx receipt has 4 descriptor gates"
+  },
+  "completed_stages": ["export", "legalize"],
+  "skipped_stages": ["sv", "synthesis"],
+  "portable_torch_receipt_sha256": "36e706f4ac36a2fbcd35033def1c0e78e3b939b9829f2d23b288fcb2aac4eee2"
+}

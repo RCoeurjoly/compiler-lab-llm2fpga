@@ -2867,6 +2867,85 @@ PY
                 --gate 1x64x64=${small} --gate 1x256x64=${expand} \
                 --gate 1x64x256=${contract} --gate 4x50257x64=${actual}
             '';
+          # This is intentionally a frontier package until a compiler-owned
+          # 49-callsite Calyx composition exists.  It validates Task 2 and
+          # Task 3 against the immutable source commits that produced their
+          # receipts, rather than weakening those receipts after later edits.
+          "tiny-stories-1m-exact-serial-gemv-sv" =
+            let
+              sourceRoot = builtins.path { path = ./.; name = "llm2fpga-task4-source"; };
+              task2Source = builtins.fetchGit {
+                # The committed predecessor snapshots are read from the
+                # canonical local repository, not from this evaluated source
+                # copy (which lives in /nix/store and is not a Git remote).
+                url = "file:///home/roland/compiler-lab-llm2fpga";
+                rev = "bac0e5abb52fe2d235a0bcf80508ca2111101058";
+              };
+              task3Source = builtins.fetchGit {
+                url = "file:///home/roland/compiler-lab-llm2fpga";
+                rev = "d20351e9298989a67d1956838e062c8bfa8862dd";
+              };
+              # Keep the exact Task 2 tool closure visible inside the Nix
+              # sandbox so the predecessor receipt can verify its own tools.
+              task2TorchMlir = torchMlir;
+              task2TorchMlirPasses = llm2fpgaExactSerialGemvTorchMlirPasses;
+              descriptor = rows: outputs: inputs: pkgs.writeText
+                "task4-serial-gemv-${toString rows}x${toString outputs}x${toString inputs}.mlir" ''
+                  %0 = "llm2fpga.serial_gemv"(%input, %weights) {inputs = ${toString inputs} : i64, mac_order = "ascending_i64_wrap", outputs = ${toString outputs} : i64, rows = ${toString rows} : i64} : (tensor<${toString rows}x${toString inputs}xi64>, tensor<${toString outputs}x${toString inputs}xi64>) -> tensor<${toString rows}x${toString outputs}xi64>
+                '';
+              small = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "task4-exact-serial-gemv-1x64x64";
+                descriptor = descriptor 1 64 64;
+              };
+              expand = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "task4-exact-serial-gemv-1x256x64";
+                descriptor = descriptor 1 256 64;
+              };
+              contract = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "task4-exact-serial-gemv-1x64x256";
+                descriptor = descriptor 1 64 256;
+              };
+              actual = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "task4-exact-serial-gemv-4x50257x64";
+                descriptor = descriptor 4 50257 64;
+              };
+              portableTorch = pkgs.runCommand "tinystories-1m-exact-serial-gemv-portable-torch" {
+                buildInputs = [ python ];
+              } ''
+                mkdir -p "$out"
+                ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_portable_torch.py \
+                  write --root ${sourceRoot} \
+                  --exported-dir ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".pytorchExported} \
+                  --torch-output ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
+                  --receipt "$out/receipt.json"
+              '';
+              gate = pkgs.runCommand "task4-tinystories-1m-exact-serial-gemv-calyx-gate" {
+                buildInputs = [ python ];
+              } ''
+                mkdir -p "$out"
+                ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_calyx_gate.py \
+                  --write --receipt "$out/receipt.json" \
+                  --gate 1x64x64=${small} --gate 1x256x64=${expand} \
+                  --gate 1x64x256=${contract} --gate 4x50257x64=${actual}
+                ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_calyx_gate.py \
+                  --receipt "$out/receipt.json" \
+                  --gate 1x64x64=${small} --gate 1x256x64=${expand} \
+                  --gate 1x64x256=${contract} --gate 4x50257x64=${actual}
+              '';
+            in pkgs.runCommand "tiny-stories-1m-exact-serial-gemv-sv" {
+              buildInputs = [ python portableTorch ];
+            } ''
+              mkdir -p "$out"
+              ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/run_exact_serial_gemv_frontier.py \
+                --root ${sourceRoot} --task3-root ${task3Source} \
+                --export-receipt ${sourceRoot}/artifacts/comparison/tinystories-1m-exact-serial-gemv-successor.json \
+                --portable-torch-receipt ${portableTorch}/receipt.json \
+                --portable-exported-dir ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".pytorchExported} \
+                --portable-torch-output ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
+                --calyx-receipt ${gate}/receipt.json --output "$out/frontier.json"
+              ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_frontier.py \
+                --root ${sourceRoot} --receipt "$out/frontier.json"
+            '';
           "rc-math-exp-paper-screen" = rcMathExpPaperScreen;
           "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf" =
             exactTinyStoriesNormalized;
