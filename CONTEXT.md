@@ -65,3 +65,7 @@ width; its lowerer must implement those recorded primitive semantics exactly.
 existing MLIR operations and project-owned attributes, verified and transformed
 by an out-of-tree plugin. It avoids a CIRCT rebuild while the contract evolves;
 the schema may later become a compiled dialect without changing semantics.
+
+**Logical fixed-point value**: An SSA value in the fixed-point schema that
+denotes exact arithmetic dataflow without committing to a physical memory,
+port, or lifetime. Storage assignment is a separate lowering decision.
