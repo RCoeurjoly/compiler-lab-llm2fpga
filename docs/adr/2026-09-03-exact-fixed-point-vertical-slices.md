@@ -24,4 +24,5 @@ growth before one exact checkpoint passes. The first quit point is three
 bounded attempts at the captured exact `GEMV -> requantization` slice. Each
 attempt must produce both bit-exact schema output and a matching
 generated-Calyx trace. A result that needs model-specific escape hatches is a
-failure, not an acceptance.
+failure, not an acceptance. An attempt is at most a 30-minute development
+window followed by one 30-minute end-to-end build/simulation gate.
