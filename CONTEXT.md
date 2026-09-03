@@ -55,3 +55,8 @@ contract pass at a contract-critical transformation.
 representation that carries exact fixed-point values and their dataflow between
 contract operations. It is lowered to Calyx only after arithmetic, lookup,
 requantization, and storage/control semantics have been made explicit.
+
+**Fixed-point contract operation**: A semantic `llm2fpga.fixed` operation
+whose attributes fully specify exact arithmetic behavior. For example,
+`fixed.requantize` records scale, rounding, signedness, saturation, and result
+width; its lowerer must implement those recorded primitive semantics exactly.
