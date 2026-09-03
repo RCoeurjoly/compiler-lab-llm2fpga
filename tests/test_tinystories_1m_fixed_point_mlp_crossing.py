@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "artifacts/reference/tinystories-1m-fixed-point-mlp-crossing-slice.json"
 CAPTURE = ROOT / "TinyStories/capture_fixed_point_mlp_crossing_slice.py"
+LOWERER = ROOT / "scripts/pipeline/lower_fixed_point_mlp_crossing_to_calyx.py"
 
 EXPECTED_SHAPES = {
     "c_fc_input_codes_i8": [4, 64],
@@ -50,6 +52,26 @@ def load_capture():
     return module
 
 
+def load_lowerer():
+    if not LOWERER.is_file():
+        raise AssertionError("missing fixed-point MLP crossing Calyx lowerer")
+    spec = importlib.util.spec_from_file_location(
+        "fixed_point_mlp_crossing_calyx", LOWERER
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def tensor_values(name: str) -> list[int]:
+    rows = json.loads(FIXTURE.read_text(encoding="utf-8"))["tensors"][name][
+        "values"
+    ]
+    return [value for row in rows for value in row]
+
+
 def canonical(value: object) -> str:
     encoded = json.dumps(
         value, sort_keys=True, separators=(",", ":"), allow_nan=False
@@ -58,6 +80,54 @@ def canonical(value: object) -> str:
 
 
 class FixedPointMlpCrossingTest(unittest.TestCase):
+    def test_generated_sv_observes_exact_fixed_gelu(self):
+        """Catches inexact GELU arithmetic or an omitted hardware checkpoint."""
+        lowerer = load_lowerer()
+        artifact = lowerer.generate_gelu_kernel(FIXTURE)
+        observed = lowerer.run_gelu_sv(artifact, FIXTURE)
+        fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        self.assertEqual(observed["gelu_q16_16"], tensor_values("gelu_output_q16_16"))
+        self.assertEqual(
+            observed["little_endian_int64_sha256"],
+            fixture["tensors"]["gelu_output_q16_16"][
+                "little_endian_int64_sha256"
+            ],
+        )
+        self.assertEqual(
+            artifact.provenance["host_preload_memories"],
+            ["gelu_input_q16_16", "gelu_lut_q12"],
+        )
+        self.assertEqual(
+            artifact.provenance["calyx_disabled_passes"], ["cell-share"]
+        )
+        harness = Path(
+            artifact.provenance["generated_sv_artifacts"]["harness"]
+        ).read_text(encoding="utf-8")
+        preload_arrays = [
+            line
+            for line in harness.splitlines()
+            if line.startswith("static const std::int64_t k")
+        ]
+        self.assertEqual(len(preload_arrays), 2)
+        self.assertTrue(any("kGeluInput[1024]" in line for line in preload_arrays))
+        self.assertTrue(any("kGeluLut[8192]" in line for line in preload_arrays))
+        self.assertNotIn("kExpected", harness)
+        self.assertNotIn("kGeluOutput", harness)
+        self.assertNotIn("c_fc", artifact.futil)
+        self.assertNotIn("c_proj", artifact.futil)
+
+    def test_gelu_sv_rejects_post_generation_fixture_mutation(self):
+        """Catches a runner that trusts only generation-time fixture authority."""
+        lowerer = load_lowerer()
+        artifact = lowerer.generate_gelu_kernel(FIXTURE)
+        mutated = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        mutated["tensors"]["gelu_input_q16_16"]["values"][0][0] += 1
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_path = Path(directory) / "mutated-fixture.json"
+            fixture_path.write_text(json.dumps(mutated), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "fixture.*hash|fixture.*authority"):
+                lowerer.run_gelu_sv(artifact, fixture_path)
+
     def test_mlp_fixture_replays_every_boundary(self):
         self.assertTrue(CAPTURE.is_file(), "missing authenticated MLP capture module")
         self.assertTrue(FIXTURE.is_file(), "missing authenticated MLP fixture")
