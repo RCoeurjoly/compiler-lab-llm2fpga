@@ -191,6 +191,27 @@ def _checked_one_output_fixture(schema: dict[str, Any], fixture_path: Path) -> d
     return fixture
 
 
+def _checked_requantize_fixture(schema: dict[str, Any], fixture_path: Path) -> dict[str, Any]:
+    """Authenticate every standalone requantization memory at time of use."""
+    fixture = _checked_one_output_fixture(schema, fixture_path)
+    expected = {
+        "gemv_accumulator_i64": ([4, 64], 2048),
+        "weight_scale_q8_24": ([64], 512),
+        "output_scale_q8_24": ([64], 512),
+        "requantized_codes_i8": ([4, 64], 2048),
+        "requantized_q16_16": ([4, 64], 2048),
+    }
+    for name, (shape, byte_count) in expected.items():
+        record = fixture["tensors"][name]
+        if record["shape"] != shape or record["bytes"] != byte_count:
+            raise ValueError(f"requantization kernel fixture memory shape mismatch: {name}")
+        values = torch.tensor(record["values"], dtype=torch.int64).contiguous()
+        raw = values.numpy().astype("<i8", copy=False).tobytes()
+        if len(raw) != byte_count or hashlib.sha256(raw).hexdigest() != record["little_endian_int64_sha256"]:
+            raise ValueError(f"requantization kernel fixture tensor bytes/hash mismatch: {name}")
+    return fixture
+
+
 def _one_output_kernel_futil() -> str:
     """Emit the fixed row-0/output-0, ordered 64-MAC Calyx kernel."""
     read_groups: list[str] = []
@@ -511,6 +532,264 @@ def generate_full_gemv_kernel(schema_path: Path, fixture_path: Path) -> CalyxArt
     )
 
 
+def _requantize_kernel_futil() -> str:
+    """Emit the standalone exact 256-entry requantization datapath."""
+    return '''// Generated Task-3 exact fixed-point backend gate.
+// Q8.24 accumulator-scale products round to Q16.16 by signed-magnitude
+// half-up shift 32; output codes use signed-magnitude half-up division,
+// signed i8 saturation, then signed-magnitude half-up dequantization shift 8.
+import "primitives/core.futil";
+import "primitives/binary_operators.futil";
+import "primitives/memories/seq.futil";
+
+component main(@go go: 1) -> (@done done: 1) {
+  cells {
+    @external accumulator_input = seq_mem_d1(64, 256, 8);
+    @external weight_scale = seq_mem_d1(64, 64, 6);
+    @external output_scale = seq_mem_d1(64, 64, 6);
+    @external codes_i8 = seq_mem_d1(8, 256, 8);
+    @external q16_16 = seq_mem_d1(64, 256, 8);
+
+    entry_counter = std_reg(9);
+    entry_lt = std_lt(9);
+    increment_entry = std_add(9);
+    entry_address = std_slice(9, 8);
+    output_address = std_slice(9, 6);
+
+    real_product = std_smult_pipe(64);
+    product_negative = std_slt(64);
+    product_negate = std_ssub(64);
+    product_abs = std_mux(64);
+    product_bias = std_sadd(64);
+    product_shift = std_rsh(64);
+    rounded_product_negate = std_ssub(64);
+    rounded_product = std_mux(64);
+    real_q16 = std_reg(64);
+
+    real_lshift = std_lsh(64);
+    numerator_negative = std_slt(64);
+    numerator_reg = std_reg(64);
+    numerator_negative_reg = std_reg(1);
+    numerator_negate = std_ssub(64);
+    numerator_abs = std_mux(64);
+    output_scale_half_bits = std_bit_slice(64, 1, 63, 63);
+    output_scale_half = std_pad(63, 64);
+    numerator_bias = std_sadd(64);
+    code_divide = std_div_pipe(64);
+    quotient_negate = std_ssub(64);
+    rounded_code = std_mux(64);
+    negative_128 = std_ssub(64);
+    code_lt_min = std_slt(64);
+    code_gt_max = std_sgt(64);
+    code_low_clamp = std_mux(64);
+    saturated_code = std_mux(64);
+    code_i8_slice = std_slice(64, 8);
+    saturated_code_reg = std_reg(64);
+
+    dequant_product = std_smult_pipe(64);
+    dequant_negative = std_slt(64);
+    dequant_negate = std_ssub(64);
+    dequant_abs = std_mux(64);
+    dequant_bias = std_sadd(64);
+    dequant_shift = std_rsh(64);
+    rounded_dequant_negate = std_ssub(64);
+    rounded_dequant = std_mux(64);
+  }
+  wires {
+    entry_address.in = entry_counter.out;
+    output_address.in = entry_counter.out;
+
+    group init_entry {
+      entry_counter.in = 9'd0;
+      entry_counter.write_en = 1'd1;
+      init_entry[done] = entry_counter.done;
+    }
+    group read_inputs {
+      accumulator_input.addr0 = entry_address.out;
+      accumulator_input.content_en = 1'd1;
+      weight_scale.addr0 = output_address.out;
+      weight_scale.content_en = 1'd1;
+      output_scale.addr0 = output_address.out;
+      output_scale.content_en = 1'd1;
+      read_inputs[done] = (accumulator_input.done & weight_scale.done & output_scale.done) ? 1'd1;
+    }
+    group multiply_real {
+      real_product.left = accumulator_input.read_data;
+      real_product.right = weight_scale.read_data;
+      real_product.go = 1'd1;
+      multiply_real[done] = real_product.done;
+    }
+    group round_real {
+      product_negative.left = real_product.out;
+      product_negative.right = 64'd0;
+      product_negate.left = 64'd0;
+      product_negate.right = real_product.out;
+      product_abs.cond = product_negative.out;
+      product_abs.tru = product_negate.out;
+      product_abs.fal = real_product.out;
+      product_bias.left = product_abs.out;
+      product_bias.right = 64'd2147483648;
+      product_shift.left = product_bias.out;
+      product_shift.right = 64'd32;
+      rounded_product_negate.left = 64'd0;
+      rounded_product_negate.right = product_shift.out;
+      rounded_product.cond = product_negative.out;
+      rounded_product.tru = rounded_product_negate.out;
+      rounded_product.fal = product_shift.out;
+      real_q16.in = rounded_product.out;
+      real_q16.write_en = 1'd1;
+      round_real[done] = real_q16.done;
+    }
+    group latch_numerator {
+      real_lshift.left = real_q16.out;
+      real_lshift.right = 64'd8;
+      numerator_negative.left = real_lshift.out;
+      numerator_negative.right = 64'd0;
+      numerator_reg.in = real_lshift.out;
+      numerator_reg.write_en = 1'd1;
+      numerator_negative_reg.in = numerator_negative.out;
+      numerator_negative_reg.write_en = 1'd1;
+      latch_numerator[done] = (numerator_reg.done & numerator_negative_reg.done) ? 1'd1;
+    }
+    group divide_code {
+      numerator_negate.left = 64'd0;
+      numerator_negate.right = numerator_reg.out;
+      numerator_abs.cond = numerator_negative_reg.out;
+      numerator_abs.tru = numerator_negate.out;
+      numerator_abs.fal = numerator_reg.out;
+      output_scale_half_bits.in = output_scale.read_data;
+      output_scale_half.in = output_scale_half_bits.out;
+      numerator_bias.left = numerator_abs.out;
+      numerator_bias.right = output_scale_half.out;
+      code_divide.left = numerator_bias.out;
+      code_divide.right = output_scale.read_data;
+      code_divide.go = 1'd1;
+      divide_code[done] = code_divide.done;
+    }
+    group clamp_and_write_code {
+      quotient_negate.left = 64'd0;
+      quotient_negate.right = code_divide.out_quotient;
+      rounded_code.cond = numerator_negative_reg.out;
+      rounded_code.tru = quotient_negate.out;
+      rounded_code.fal = code_divide.out_quotient;
+      negative_128.left = 64'd0;
+      negative_128.right = 64'd128;
+      code_lt_min.left = rounded_code.out;
+      code_lt_min.right = negative_128.out;
+      code_gt_max.left = rounded_code.out;
+      code_gt_max.right = 64'd127;
+      code_low_clamp.cond = code_lt_min.out;
+      code_low_clamp.tru = negative_128.out;
+      code_low_clamp.fal = rounded_code.out;
+      saturated_code.cond = code_gt_max.out;
+      saturated_code.tru = 64'd127;
+      saturated_code.fal = code_low_clamp.out;
+      code_i8_slice.in = saturated_code.out;
+      saturated_code_reg.in = saturated_code.out;
+      saturated_code_reg.write_en = 1'd1;
+      codes_i8.addr0 = entry_address.out;
+      codes_i8.content_en = 1'd1;
+      codes_i8.write_data = code_i8_slice.out;
+      codes_i8.write_en = 1'd1;
+      clamp_and_write_code[done] = (saturated_code_reg.done & codes_i8.done) ? 1'd1;
+    }
+    group multiply_dequant {
+      dequant_product.left = saturated_code_reg.out;
+      dequant_product.right = output_scale.read_data;
+      dequant_product.go = 1'd1;
+      multiply_dequant[done] = dequant_product.done;
+    }
+    group round_and_write_dequant {
+      dequant_negative.left = dequant_product.out;
+      dequant_negative.right = 64'd0;
+      dequant_negate.left = 64'd0;
+      dequant_negate.right = dequant_product.out;
+      dequant_abs.cond = dequant_negative.out;
+      dequant_abs.tru = dequant_negate.out;
+      dequant_abs.fal = dequant_product.out;
+      dequant_bias.left = dequant_abs.out;
+      dequant_bias.right = 64'd128;
+      dequant_shift.left = dequant_bias.out;
+      dequant_shift.right = 64'd8;
+      rounded_dequant_negate.left = 64'd0;
+      rounded_dequant_negate.right = dequant_shift.out;
+      rounded_dequant.cond = dequant_negative.out;
+      rounded_dequant.tru = rounded_dequant_negate.out;
+      rounded_dequant.fal = dequant_shift.out;
+      q16_16.addr0 = entry_address.out;
+      q16_16.content_en = 1'd1;
+      q16_16.write_data = rounded_dequant.out;
+      q16_16.write_en = 1'd1;
+      round_and_write_dequant[done] = q16_16.done;
+    }
+    group increment_entry_counter {
+      increment_entry.left = entry_counter.out;
+      increment_entry.right = 9'd1;
+      entry_counter.in = increment_entry.out;
+      entry_counter.write_en = 1'd1;
+      increment_entry_counter[done] = entry_counter.done;
+    }
+    comb group entry_condition {
+      entry_lt.left = entry_counter.out;
+      entry_lt.right = 9'd256;
+    }
+  }
+  control {
+    seq {
+      init_entry;
+      while entry_lt.out with entry_condition {
+        seq {
+          read_inputs;
+          multiply_real;
+          round_real;
+          latch_numerator;
+          divide_code;
+          clamp_and_write_code;
+          multiply_dequant;
+          round_and_write_dequant;
+          increment_entry_counter;
+        }
+      }
+    }
+  }
+}
+'''
+
+
+def generate_requantize_kernel(schema_path: Path, fixture_path: Path) -> CalyxArtifact:
+    """Authenticate inputs and generate the standalone Task-3 hardware gate."""
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    fixture = _checked_requantize_fixture(schema, fixture_path)
+    return CalyxArtifact(
+        futil=_requantize_kernel_futil(),
+        provenance={
+            "generated": "fixed-schema-to-calyx-requantize-sv-v1",
+            "schema_receipt_sha256": schema["receipt_sha256"],
+            "fixture_receipt_sha256": fixture["receipt_sha256"],
+            "authority": {
+                "schema": schema,
+                "schema_receipt_sha256": schema["receipt_sha256"],
+                "fixture": _fixture_authority(fixture),
+            },
+            "memory_shapes": {
+                "accumulator_input": [256, 64],
+                "weight_scale": [64, 64],
+                "output_scale": [64, 64],
+                "codes_i8": [256, 8],
+                "q16_16": [256, 64],
+            },
+            "kernel": {
+                "entries": 256,
+                "product": "signed_i64_twos_complement_wrap",
+                "real_q16_16": "signed_magnitude_half_up_shift_32",
+                "code": "signed_magnitude_half_up_divide_then_saturate_i8",
+                "dequantized_q16_16": "signed_magnitude_half_up_shift_8",
+                "requantize_attributes": schema["requantize"],
+            },
+        },
+    )
+
+
 def _calyx_install() -> Path:
     completed = subprocess.run(
         ["nix", "build", "--no-link", "--print-out-paths", ".#calyx"],
@@ -745,6 +1024,71 @@ int main(int argc, char** argv) {{
 '''
 
 
+def _generated_requantize_harness(fixture: dict[str, Any]) -> str:
+    """Generate a harness that supplies only authenticated datapath inputs."""
+    accumulators = [value for row in fixture["tensors"]["gemv_accumulator_i64"]["values"] for value in row]
+    weight_scale = fixture["tensors"]["weight_scale_q8_24"]["values"]
+    output_scale = fixture["tensors"]["output_scale_q8_24"]["values"]
+    return f'''// Generated harness: only authenticated input memories are preloaded.
+#include "Vmain.h"
+#include "Vmain___024root.h"
+#include "verilated.h"
+
+#include <cstdint>
+#include <iostream>
+
+static const std::int64_t kAccumulator[256] = {{{_cpp_values(accumulators)}}};
+static const std::int64_t kWeightScale[64] = {{{_cpp_values(weight_scale)}}};
+static const std::int64_t kOutputScale[64] = {{{_cpp_values(output_scale)}}};
+
+static void tick(Vmain& model) {{
+  model.clk = 0;
+  model.eval();
+  model.clk = 1;
+  model.eval();
+}}
+
+int main(int argc, char** argv) {{
+  Verilated::commandArgs(argc, argv);
+  Vmain model;
+  auto* root = model.rootp;
+  for (unsigned i = 0; i < 256; ++i) {{
+    root->main__DOT__accumulator_input__DOT__mem[i] = static_cast<std::uint64_t>(kAccumulator[i]);
+    root->main__DOT__codes_i8__DOT__mem[i] = 0;
+    root->main__DOT__q16_16__DOT__mem[i] = 0;
+  }}
+  for (unsigned i = 0; i < 64; ++i) {{
+    root->main__DOT__weight_scale__DOT__mem[i] = static_cast<std::uint64_t>(kWeightScale[i]);
+    root->main__DOT__output_scale__DOT__mem[i] = static_cast<std::uint64_t>(kOutputScale[i]);
+  }}
+  model.reset = 1;
+  model.go = 0;
+  for (unsigned i = 0; i < 3; ++i) tick(model);
+  model.reset = 0;
+  model.go = 1;
+  unsigned cycles = 0;
+  while (!model.done && cycles < 100000) {{
+    tick(model);
+    ++cycles;
+  }}
+  const bool complete = model.done && cycles > 256;
+  std::cout << "{{\\\"status\\\":\\\"" << (complete ? "ok" : "mismatch")
+            << "\\\",\\\"codes_i8\\\":[";
+  for (unsigned i = 0; i < 256; ++i) {{
+    if (i) std::cout << ',';
+    std::cout << static_cast<int>(static_cast<std::int8_t>(root->main__DOT__codes_i8__DOT__mem[i]));
+  }}
+  std::cout << "],\\\"q16_16\\\":[";
+  for (unsigned i = 0; i < 256; ++i) {{
+    if (i) std::cout << ',';
+    std::cout << static_cast<std::int64_t>(root->main__DOT__q16_16__DOT__mem[i]);
+  }}
+  std::cout << "],\\\"cycles\\\":" << cycles << "}}\\n";
+  return complete ? 0 : 1;
+}}
+'''
+
+
 def run_generated_sv(artifact: CalyxArtifact, fixture_path: Path, row: int, output: int) -> dict[str, int]:
     """Compile and execute the generated SV, returning its observed trace word."""
     if artifact.provenance.get("generated") != "fixed-schema-to-calyx-one-output-sv-v1":
@@ -905,6 +1249,88 @@ def run_full_gemv_sv(artifact: CalyxArtifact, fixture_path: Path) -> dict[str, o
         "trace_sha256": observed["trace_sha256"],
         "cycles": observed["cycles"],
     }
+
+
+def run_requantize_sv(artifact: CalyxArtifact, fixture_path: Path) -> dict[str, list[int]]:
+    """Compile and observe both standalone requantization result memories."""
+    if artifact.provenance.get("generated") != "fixed-schema-to-calyx-requantize-sv-v1":
+        raise ValueError("unrecognized requantization generated-SV artifact provenance")
+    authority = artifact.provenance.get("authority")
+    if not isinstance(authority, dict) or not isinstance(authority.get("schema"), dict):
+        raise ValueError("requantization generated-SV schema authority binding is missing")
+    schema = authority["schema"]
+    fixture = _checked_requantize_fixture(schema, fixture_path)
+    if (
+        authority.get("schema_receipt_sha256") != schema.get("receipt_sha256")
+        or artifact.provenance.get("schema_receipt_sha256") != schema.get("receipt_sha256")
+    ):
+        raise ValueError("requantization generated-SV schema authority mismatch")
+    if (
+        artifact.provenance.get("fixture_receipt_sha256") != fixture.get("receipt_sha256")
+        or authority.get("fixture") != _fixture_authority(fixture)
+    ):
+        raise ValueError("requantization generated-SV fixture authority mismatch")
+
+    artifact_dir = Path(tempfile.mkdtemp(prefix="fixed-point-calyx-requantize-sv-"))
+    futil_path = artifact_dir / "requantize.futil"
+    sv_path = artifact_dir / "main.sv"
+    harness_path = artifact_dir / "harness.cpp"
+    futil_path.write_text(artifact.futil, encoding="utf-8")
+    harness_path.write_text(_generated_requantize_harness(fixture), encoding="utf-8")
+    calyx = _calyx_install()
+    # Cell sharing across these explicitly latched rounding stages creates
+    # mux-level combinational cycles in emitted SV; keep this gate unshared.
+    calyx_run = subprocess.run(
+        [str(calyx / "bin/calyx"), str(futil_path), "-l", str(calyx / "share/calyx"), "-d", "cell-share", "-b", "verilog", "-o", str(sv_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if calyx_run.returncode != 0 or not sv_path.is_file():
+        raise RuntimeError(f"Calyx-to-SV failed: {calyx_run.stderr.strip()}")
+    verilator_dir = artifact_dir / "verilator"
+    verilator_run = subprocess.run(
+        ["verilator", "--cc", "--exe", "--build", "--top-module", "main", "--public-flat-rw", "--Mdir", str(verilator_dir), "-CFLAGS", "-std=c++17", "-o", "fixed_point_requantize_harness", str(sv_path), str(harness_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    executable = verilator_dir / "fixed_point_requantize_harness"
+    if verilator_run.returncode != 0 or not executable.is_file():
+        raise RuntimeError(f"Verilator build failed: {verilator_run.stderr.strip()}")
+    simulated = subprocess.run([str(executable)], text=True, capture_output=True, check=False, timeout=600)
+    if simulated.returncode != 0:
+        raise RuntimeError(f"generated-SV requantization harness failed: {simulated.stdout.strip()} {simulated.stderr.strip()}")
+    try:
+        observed = json.loads(next(line for line in reversed(simulated.stdout.splitlines()) if line.startswith("{")))
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"generated-SV requantization harness did not emit JSON: {simulated.stdout!r}") from error
+    except StopIteration as error:
+        raise RuntimeError(f"generated-SV requantization harness did not emit JSON: {simulated.stdout!r}") from error
+    codes = observed.get("codes_i8")
+    q16 = observed.get("q16_16")
+    if (
+        observed.get("status") != "ok"
+        or not isinstance(codes, list)
+        or len(codes) != 256
+        or not all(isinstance(value, int) and -128 <= value <= 127 for value in codes)
+        or not isinstance(q16, list)
+        or len(q16) != 256
+        or not all(isinstance(value, int) for value in q16)
+        or not isinstance(observed.get("cycles"), int)
+    ):
+        raise RuntimeError(f"generated-SV requantization observation is invalid: {observed}")
+    artifact.provenance["generated_sv_artifacts"] = {
+        "directory": str(artifact_dir),
+        "futil": str(futil_path),
+        "sv": str(sv_path),
+        "harness": str(harness_path),
+        "executable": str(executable),
+        "cycles": observed["cycles"],
+    }
+    return {"codes_i8": codes, "q16_16": q16}
 
 
 def ordered_value_trace(artifact: CalyxArtifact, fixture_path: Path) -> dict[str, Any]:

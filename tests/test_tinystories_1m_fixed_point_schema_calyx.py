@@ -25,6 +25,36 @@ def load_lowerer():
 
 
 class FixedPointSchemaCalyxTest(unittest.TestCase):
+    def test_generated_sv_observes_exact_requantized_fixture_values(self):
+        """Catches software-supplied or arithmetically inexact result memories."""
+        lowerer = load_lowerer()
+        observed = lowerer.run_requantize_sv(
+            lowerer.generate_requantize_kernel(SCHEMA, FIXTURE), FIXTURE
+        )
+        fixture = json.loads(FIXTURE.read_text())
+        flatten = lambda rows: [value for row in rows for value in row]
+        self.assertEqual(set(observed), {"codes_i8", "q16_16"})
+        self.assertEqual(
+            observed["codes_i8"],
+            flatten(fixture["tensors"]["requantized_codes_i8"]["values"]),
+        )
+        self.assertEqual(
+            observed["q16_16"],
+            flatten(fixture["tensors"]["requantized_q16_16"]["values"]),
+        )
+
+    def test_requantize_sv_rejects_post_generation_fixture_mutation(self):
+        """Catches a runner that trusts generation-time fixture authority."""
+        lowerer = load_lowerer()
+        artifact = lowerer.generate_requantize_kernel(SCHEMA, FIXTURE)
+        mutated = json.loads(FIXTURE.read_text())
+        mutated["tensors"]["gemv_accumulator_i64"]["values"][0][0] += 1
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_path = Path(directory) / "mutated-fixture.json"
+            fixture_path.write_text(json.dumps(mutated), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "fixture.*hash|fixture.*authority"):
+                lowerer.run_requantize_sv(artifact, fixture_path)
+
     def test_generated_sv_observes_full_row_major_accumulator_trace(self):
         """Catches a generated-SV kernel that omits a row/output checkpoint."""
         lowerer = load_lowerer()
@@ -94,10 +124,20 @@ class FixedPointSchemaCalyxTest(unittest.TestCase):
 
     def test_altered_rounding_rule_is_rejected_before_lowering(self):
         lowerer = load_lowerer()
-        altered = json.loads(SCHEMA.read_text())
-        altered["requantize"]["rounding"] = "toward_zero"
-        with self.assertRaisesRegex(ValueError, "requantize|rounding"):
-            lowerer.lower_schema_receipt(altered, FIXTURE)
+        for field, value in (
+            ("rounding", "toward_zero"),
+            ("signedness", "unsigned"),
+            ("saturation", [-127, 127]),
+            ("width", 16),
+        ):
+            with self.subTest(field=field):
+                altered = json.loads(SCHEMA.read_text())
+                altered["requantize"][field] = value
+                with tempfile.TemporaryDirectory() as directory:
+                    schema_path = Path(directory) / "altered-schema.json"
+                    schema_path.write_text(json.dumps(altered), encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, "requantize|rounding"):
+                        lowerer.generate_requantize_kernel(schema_path, FIXTURE)
 
 
 if __name__ == "__main__":
