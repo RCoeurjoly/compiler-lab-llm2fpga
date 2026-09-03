@@ -31,3 +31,8 @@ Reaching this quit point abandons only the serial-GEMV compiler-salvage route.
 Its receipts, artifacts, and a concise evidence report are retained; the wider
 LLM2FPGA completion strategy is decided separately rather than silently
 redefined.
+
+If the first slice passes, the real
+`GEMV -> bias/clamp -> GELU -> requantization -> GEMV` crossing has at most
+two attempts under the same one-hour cap. Needing a schema redesign there is a
+second quit point: do not continue incremental compiler expansion.
