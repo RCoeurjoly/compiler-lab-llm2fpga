@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -24,6 +25,17 @@ def load_lowerer():
 
 
 class FixedPointSchemaCalyxTest(unittest.TestCase):
+    def test_generated_sv_rejects_post_generation_fixture_mutation(self):
+        lowerer = load_lowerer()
+        artifact = lowerer.generate_one_output_kernel(SCHEMA, FIXTURE)
+        mutated = json.loads(FIXTURE.read_text())
+        mutated["tensors"]["activation_codes_i8"]["values"][0][0] += 1
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_path = Path(directory) / "mutated-fixture.json"
+            fixture_path.write_text(json.dumps(mutated), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "fixture.*hash|fixture.*authority"):
+                lowerer.run_generated_sv(artifact, fixture_path, row=0, output=0)
+
     def test_generated_sv_observes_first_64_mac_accumulator(self):
         lowerer = load_lowerer()
         artifact = lowerer.generate_one_output_kernel(SCHEMA, FIXTURE)

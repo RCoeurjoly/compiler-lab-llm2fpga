@@ -136,15 +136,31 @@ def lower_schema(schema_path: Path, fixture_path: Path) -> CalyxArtifact:
     return lower_schema_receipt(json.loads(schema_path.read_text(encoding="utf-8")), fixture_path)
 
 
-def _checked_one_output_fixture(schema_path: Path, fixture_path: Path) -> dict[str, Any]:
-    """Authenticate the Task-1 fixture and its Task-2 schema receipt.
+def _fixture_authority(fixture: dict[str, Any]) -> dict[str, Any]:
+    """Return the complete fixture binding consumed by the generated harness."""
+    return {
+        "receipt_sha256": fixture["receipt_sha256"],
+        "tensors": {
+            name: {
+                "shape": record["shape"],
+                "dtype": record["dtype"],
+                "bytes": record["bytes"],
+                "canonical_sha256": record["canonical_sha256"],
+                "little_endian_int64_sha256": record["little_endian_int64_sha256"],
+            }
+            for name, record in sorted(fixture["tensors"].items())
+        },
+    }
+
+
+def _checked_one_output_fixture(schema: dict[str, Any], fixture_path: Path) -> dict[str, Any]:
+    """Authenticate the Task-1 fixture against its verified Task-2 schema.
 
     The narrow generated kernel has three full-shaped external memories.  Check
     their exact authenticated byte records before emitting either Futil or a
     simulator harness so a compatible-looking, but different, fixture cannot
     be substituted.
     """
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
     plugin = _schema_plugin()
     plugin.verify_schema(schema, fixture_path)
 
@@ -267,14 +283,19 @@ component main(@go go: 1) -> (@done done: 1) {{
 
 def generate_one_output_kernel(schema_path: Path, fixture_path: Path) -> CalyxArtifact:
     """Authenticate inputs and generate the single observed 64-MAC gate."""
-    fixture = _checked_one_output_fixture(schema_path, fixture_path)
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    fixture = _checked_one_output_fixture(schema, fixture_path)
     return CalyxArtifact(
         futil=_one_output_kernel_futil(),
         provenance={
             "generated": "fixed-schema-to-calyx-one-output-sv-v1",
             "schema_receipt_sha256": schema["receipt_sha256"],
             "fixture_receipt_sha256": fixture["receipt_sha256"],
+            "authority": {
+                "schema": schema,
+                "schema_receipt_sha256": schema["receipt_sha256"],
+                "fixture": _fixture_authority(fixture),
+            },
             "memory_shapes": {"activation": [256, 8], "input_scale": [64, 64], "weights": [4096, 8], "accumulator_trace": [256, 64]},
             "kernel": {"row": 0, "output": 0, "ordered_macs": 64, "accumulator": "signed_i64_twos_complement_wrap"},
         },
@@ -365,17 +386,21 @@ def run_generated_sv(artifact: CalyxArtifact, fixture_path: Path, row: int, outp
         raise ValueError("unrecognized one-output generated-SV artifact provenance")
     if (row, output) != (0, 0):
         raise ValueError("Task-1 one-output kernel only supports row=0 and output=0")
-    schema_receipt = artifact.provenance.get("schema_receipt_sha256")
-    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
-    if fixture.get("receipt_sha256") != artifact.provenance.get("fixture_receipt_sha256"):
-        raise ValueError("generated-SV fixture authority mismatch")
-    if not isinstance(schema_receipt, str) or len(schema_receipt) != 64:
+    authority = artifact.provenance.get("authority")
+    if not isinstance(authority, dict) or not isinstance(authority.get("schema"), dict):
+        raise ValueError("generated-SV schema authority binding is missing")
+    schema = authority["schema"]
+    fixture = _checked_one_output_fixture(schema, fixture_path)
+    if (
+        authority.get("schema_receipt_sha256") != schema.get("receipt_sha256")
+        or artifact.provenance.get("schema_receipt_sha256") != schema.get("receipt_sha256")
+    ):
         raise ValueError("generated-SV schema authority mismatch")
-    activation = fixture["tensors"]["activation_codes_i8"]["values"]
-    input_scale = fixture["tensors"]["input_scale_q8_24"]["values"]
-    weights = fixture["tensors"]["weight_codes_i8"]["values"]
-    if len(activation) != 4 or any(len(values) != 64 for values in activation) or len(input_scale) != 64 or len(weights) != 64 or any(len(values) != 64 for values in weights):
-        raise ValueError("generated-SV fixture memory shape mismatch")
+    if (
+        artifact.provenance.get("fixture_receipt_sha256") != fixture.get("receipt_sha256")
+        or authority.get("fixture") != _fixture_authority(fixture)
+    ):
+        raise ValueError("generated-SV fixture authority mismatch")
 
     artifact_dir = Path(tempfile.mkdtemp(prefix="fixed-point-calyx-sv-"))
     futil_path = artifact_dir / "one-output.futil"
