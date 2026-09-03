@@ -18,10 +18,11 @@ Its callsite map has four exact reusable descriptor shapes:
 - `50257 x 64`
 
 No generic SCF lowering or reference RTL is used.  The composition receipt
-binds the Torch input, callsite map, Calyx MLIR, SV, Yosys report, actual
-command list, tool-version list, and elapsed-time record by byte count and
-SHA-256.  The final frontier also binds the generator/verifier and Task 3 gate
-in its compiler closure.
+binds the Torch input, callsite map, and compiler-owned Calyx composition by
+byte count and SHA-256.  The dataflow adequacy check runs immediately after
+that generation; because it proves the absence of required dataflow, no
+translation, SV, Yosys, command, tool-version, or elapsed-time artifact is
+accepted.  The final frontier binds the generator/verifier and Task 3 gate.
 
 ## Portable provenance and Nix closure
 
@@ -37,24 +38,24 @@ The current diagnostic derivation is:
 
 Its verified immutable output is:
 
-`/nix/store/mkl5svq1vv32ljqkq1f1cqj9fmdn97am-tiny-stories-1m-exact-serial-gemv-sv`
+`/nix/store/m048sw8xsvyv2h0cm8ar2cp3jx64ixxg-tiny-stories-1m-exact-serial-gemv-sv`
 
 The frontier receipt SHA-256 is
-`8f6263181aa6b408051c3f8c937d87583392d6a30f52910e143eb359caee4987`.
+The result is a `calyx_frontier` diagnostic with empty SV/synthesis stages.
 The composition receipt SHA-256 is
-`9fc160b1709d30099ee51f89b950cb0cecb28973f4116bb8245d0f72a4e87f0a`.
+`27786630afe38d576cd8479ca36e5b7b53cede6acbf27b5a7c3d9fd11630603c`.
 
 ## Verification
 
-- 8 Python tests passed, including red/green mutations that reject a four-gate
+- 9 Python tests passed, including red/green mutations that reject a four-gate
   map and a changed source offset against the 49-callsite Torch boundary.
 - `timeout 7200 nix build --no-link -L .#tiny-stories-1m-exact-serial-gemv-sv`
   passed.
 - Both composition and final frontier receipts independently verified.
 - `timeout 1800 nix flake check --no-build -L` passed.
 
-The Calyx exporter warning about non-interface memory ports is additional
-evidence that the prior SV/Yosys output must not be promoted.  The current
-frontier receipt records `calyx_frontier` and leaves SV/synthesis empty.  A
-future repair must preserve actual Torch dataflow and non-GEMV semantics before
-any SV/Yosys or inference claim.
+The accepted composition output contains only `callsites.json`,
+`model.calyx.mlir`, and `receipt.json`; the integration regression proves the
+absence of parsed MLIR, Futil, SV, Yosys, commands, tools, and elapsed-time
+files.  A future repair must preserve actual Torch dataflow and non-GEMV
+semantics before any translation, SV/Yosys, or inference claim.

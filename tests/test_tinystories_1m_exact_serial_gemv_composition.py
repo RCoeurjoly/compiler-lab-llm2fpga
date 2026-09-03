@@ -40,4 +40,14 @@ class CompositionTest(unittest.TestCase):
    map_.write_text(json.dumps(mapping));calyx.write_text(mlir);sv.write_text("module top; endmodule\n");yosys.write_text("ok\n")
    with self.assertRaisesRegex(ValueError,"exactly match"):
     load_verifier().build(TORCH,map_,calyx,sv,yosys)
+ def test_dataflow_diagnostic_has_no_translation_or_synthesis_artifacts(self):
+  if not TORCH.is_file(): self.skipTest("portable Torch artifact unavailable")
+  mlir,mapping=load().compose(TORCH.read_text())
+  with tempfile.TemporaryDirectory() as directory:
+   directory=Path(directory);map_=directory/"callsites.json";calyx=directory/"model.calyx.mlir"
+   map_.write_text(json.dumps(mapping));calyx.write_text(mlir)
+   receipt=load_verifier().diagnostic(TORCH,map_,calyx)
+   self.assertEqual(receipt["status"],"diagnostic")
+   self.assertFalse(set(receipt) & {"sv","yosys","commands","tools","elapsed"})
+   self.assertFalse(any((directory/name).exists() for name in ("parsed.mlir","model.futil","model.sv","yosys.txt","commands.txt","tools.txt","elapsed.txt")))
 if __name__=="__main__":unittest.main()
