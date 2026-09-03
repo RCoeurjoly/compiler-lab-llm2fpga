@@ -195,10 +195,17 @@ def _verify_calyx_gate(receipt: Path) -> dict:
                 raise FrontierError("Calyx gate output binding mismatch")
     return value
 
+def _verify_calyx_composition(receipt: Path) -> dict:
+    value = json.loads(receipt.read_text(encoding="utf-8"))
+    if value.get("schema") != "llm2fpga-exact-serial-gemv-composition-v1" or value.get("callsite_count") != 49 or value.get("invoke_count") != 49:
+        raise FrontierError("Calyx composition must bind 49 callsites/invokes")
+    return value
+
 
 def run_composition(*, root: Path, export_receipt: Path, portable_torch_receipt: Path,
                     portable_exported_dir: Path, portable_torch_output: Path, calyx_receipt: Path,
-                    task3_root: Path | None = None) -> dict:
+                    task3_root: Path | None = None, composition_sv: Path | None = None,
+                    composition_yosys: Path | None = None) -> dict:
     # Keep the prior receipts as stage artifacts.  Their own verifiers establish
     # their transitive authority; this runner establishes ordering and closure.
     task3_root = (task3_root or root).resolve()
@@ -206,18 +213,13 @@ def run_composition(*, root: Path, export_receipt: Path, portable_torch_receipt:
         commit=TASK3_COMMIT, tree=TASK3_TREE)
 
     def calyx() -> None:
-        gate = _verify_calyx_gate(calyx_receipt)
+        gate = _verify_calyx_composition(calyx_receipt)
         torch = json.loads(portable_torch_receipt.read_text(encoding="utf-8"))
         count = torch.get("legalizer", {}).get("legalized_serial_gemv_operator_count")
         if count != 49:
             raise FrontierError("Torch receipt does not bind 49 legalized serial-GEMV boundaries")
-        # Task 3 has only descriptor-shape gates.  No callsite-to-component map
-        # exists, therefore there is no full-model Calyx program that could
-        # honestly become an SV source at this point.
-        raise FrontierError(
-            f"full-model Calyx composition absent: Torch has {count} boundaries; "
-            f"Calyx receipt has {len(gate['gates'])} descriptor gates"
-        )
+        if gate["callsite_count"] != count:
+            raise FrontierError("Calyx composition callsite count differs from Torch")
 
     receipt = run_stages(
         root=root,
@@ -227,9 +229,9 @@ def run_composition(*, root: Path, export_receipt: Path, portable_torch_receipt:
                 lambda: _verify_portable_torch(root, portable_torch_receipt, portable_exported_dir, portable_torch_output),
                 ("verify-portable-successor-torch", str(portable_torch_receipt))),
             Stage("calyx", calyx_receipt, calyx, ("verify-calyx-composition", str(calyx_receipt))),
-            Stage("sv", None, lambda: None, ("emit-systemverilog",)),
-            Stage("synthesis", None, lambda: None, ("yosys-stat",)),
-        ),
+            Stage("sv", composition_sv, lambda: None, ("emit-systemverilog",)),
+            Stage("synthesis", composition_yosys, lambda: None, ("yosys-stat",)),
+        ), compiler_closure=([composition_sv] if composition_sv else ()),
     )
     receipt["predecessors"] = {"task3": task3_identity}
     receipt["sources"]["portable_torch_verifier"] = binding(
@@ -246,6 +248,8 @@ def main() -> None:
     parser.add_argument("--portable-exported-dir", type=Path, required=True)
     parser.add_argument("--portable-torch-output", type=Path, required=True)
     parser.add_argument("--calyx-receipt", type=Path, required=True)
+    parser.add_argument("--composition-sv", type=Path, required=True)
+    parser.add_argument("--composition-yosys", type=Path, required=True)
     parser.add_argument("--task3-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -254,6 +258,7 @@ def main() -> None:
         portable_torch_receipt=args.portable_torch_receipt,
         portable_exported_dir=args.portable_exported_dir, portable_torch_output=args.portable_torch_output,
         calyx_receipt=args.calyx_receipt, task3_root=args.task3_root,
+        composition_sv=args.composition_sv, composition_yosys=args.composition_yosys,
     )
     args.output.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(receipt["result"], sort_keys=True))

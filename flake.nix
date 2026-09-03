@@ -2932,8 +2932,27 @@ PY
                   --gate 1x64x64=${small} --gate 1x256x64=${expand} \
                   --gate 1x64x256=${contract} --gate 4x50257x64=${actual}
               '';
+              composition = pkgs.runCommand "tinystories-1m-exact-serial-gemv-composition" {
+                # torchStage is a data file, not a setup hook.  It is retained
+                # below as an explicit command dependency so the sandbox closes
+                # over the immutable exported Torch MLIR without trying to
+                # execute MLIR as shell code.
+                buildInputs = [ python circt calyx yosysPkg ];
+              } ''
+                mkdir -p "$out"
+                timeout 1800 ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/compose_exact_serial_gemv_calyx.py \
+                  --torch ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
+                  --output "$out/model.calyx.mlir" --map "$out/callsites.json"
+                timeout 1800 ${circt}/bin/circt-opt "$out/model.calyx.mlir" -o "$out/parsed.mlir"
+                timeout 1800 ${circt}/bin/circt-translate --export-calyx "$out/parsed.mlir" -o "$out/model.futil"
+                timeout 1800 ${calyx}/bin/calyx "$out/model.futil" -l ${calyx}/share/calyx -b verilog --synthesis --nested -d papercut -o "$out/model.sv"
+                timeout 1800 ${yosysPkg}/bin/yosys -p "read_verilog -sv $out/model.sv; hierarchy -check; stat" > "$out/yosys.txt"
+                timeout 1800 ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_composition.py write \
+                  --torch ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
+                  --map "$out/callsites.json" --calyx "$out/model.calyx.mlir" --sv "$out/model.sv" --yosys "$out/yosys.txt" --receipt "$out/receipt.json"
+              '';
             in pkgs.runCommand "tiny-stories-1m-exact-serial-gemv-sv" {
-              buildInputs = [ python portableTorch ];
+              buildInputs = [ python portableTorch composition ];
             } ''
               mkdir -p "$out"
               ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/run_exact_serial_gemv_frontier.py \
@@ -2942,7 +2961,9 @@ PY
                 --portable-torch-receipt ${portableTorch}/receipt.json \
                 --portable-exported-dir ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".pytorchExported} \
                 --portable-torch-output ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
-                --calyx-receipt ${gate}/receipt.json --output "$out/frontier.json"
+                --calyx-receipt ${composition}/receipt.json \
+                --composition-sv ${composition}/model.sv --composition-yosys ${composition}/yosys.txt \
+                --output "$out/frontier.json"
               ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_frontier.py \
                 --root ${sourceRoot} --receipt "$out/frontier.json"
             '';
