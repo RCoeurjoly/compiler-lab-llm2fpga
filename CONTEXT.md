@@ -50,3 +50,8 @@ support; it must be paired with a passing contract slice.
 preserves or lowers an exact executable-model semantic contract. Established
 upstream passes may be used as utilities, but they do not substitute for a
 contract pass at a contract-critical transformation.
+
+**Fixed-point SSA IR**: The project-owned `llm2fpga.fixed` intermediate
+representation that carries exact fixed-point values and their dataflow between
+contract operations. It is lowered to Calyx only after arithmetic, lookup,
+requantization, and storage/control semantics have been made explicit.
