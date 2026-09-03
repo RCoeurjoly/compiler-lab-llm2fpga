@@ -79,3 +79,8 @@ same checkpoint.
 boundary of the exact executable model during the frozen prompt run. It is the
 primary input/output fixture for a contract slice; synthetic tensors are only
 supplementary edge cases.
+
+**Reference hierarchy**: The frozen exact PyTorch contract is authoritative
+for semantic values and tokens. The reference accelerator is a secondary
+reference for architecture, schedule, memory layout, and performance; it never
+overrides a semantic checkpoint.
