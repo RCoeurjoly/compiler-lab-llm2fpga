@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Verify `artifacts/reference/tinystories-1m-fixed-point-gemv-requantize-slice.json` and `artifacts/reference/tinystories-1m-fixed-point-gemv-requantize-schema.json` before generation.
-- Execute ascending `k=0..63` signed 64-bit wrapping MACs, Q8.24/Q16.16 boundaries, signed-magnitude half-up rounding, and signed i8 saturation.
+- At each ascending `k=0..63`, form `signed_i8(activation_codes_i8[row][k]) * input_scale_q8_24[k]`, multiply that signed scaled value by `signed_i8(weight_codes_i8[output][k])`, then perform the signed 64-bit wrapping accumulator update. Do not use rounded `activation_q16_16` as the MAC operand. Apply Q8.24/Q16.16 boundaries, signed-magnitude half-up rounding, and signed i8 saturation only as specified by the fixture/schema.
 - Generated-SV observations, not `ordered_value_trace` or Python recomputation, are the gate evidence.
 - A development stage is capped at 30 minutes and a complete gate at two hours.
 - Do not claim full-model/token, board, DDR3, PCIe, Representative Core, generic-SCF, arbitrary-PyTorch, or copied-kev-gpt results.
@@ -57,8 +57,10 @@ Expected: FAIL because `generate_one_output_kernel` or `run_generated_sv` is abs
 
 ```python
 # Futil control invariant:
-# seq { init_acc; while k < 64 { read activation[row][k] and weight[output][k];
-#                                acc = wrap_i64(acc + signed_i8(a)*signed_i8(w));
+# seq { init_acc; while k < 64 { read activation_code[row][k], input_scale[k],
+#                                and weight[output][k];
+#                                scaled = signed_i8(code) * input_scale_q8_24;
+#                                acc = wrap_i64(acc + scaled * signed_i8(weight));
 #                                k = k + 1; }
 #       accumulator_trace[0] = acc; }
 # Harness: preload fixture arrays, clock until done, read trace[0] by
@@ -117,7 +119,8 @@ Expected: FAIL because the full-kernel generator/runner is absent.
 
 ```text
 for row = 0..3, output = 0..63, k = 0..63 in that exact nesting/order:
-  acc := wrap_i64(acc + signed_i8(activation[row][k]) * signed_i8(weight[output][k]))
+  scaled := signed_i8(activation_code[row][k]) * input_scale_q8_24[k]
+  acc := wrap_i64(acc + scaled * signed_i8(weight_code[output][k]))
 after each k-loop: trace[row * 64 + output] := acc
 ```
 

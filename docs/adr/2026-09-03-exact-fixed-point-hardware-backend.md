@@ -37,8 +37,12 @@ or Yosys structural pass alone is not acceptance.
 - The authenticated eager PyTorch fixture remains semantic authority; expected
   source, prompt, tensor names, byte lengths, and SHA-256 values are validated
   before lowering.
-- Generated hardware performs ascending `k=0..63` signed 64-bit wrapping MACs.
-  Q8.24/Q16.16 rules and per-output scales come solely from the verified schema.
+- For each ascending `k=0..63`, generated hardware forms
+  `signed_i8(activation_code[row][k]) * input_scale_q8_24[k]` and accumulates
+  that signed scaled value times `signed_i8(weight_code[output][k])` with
+  signed 64-bit two's-complement wrapping. It must not substitute rounded
+  `activation_q16_16` values for this accumulator boundary. Q8.24/Q16.16
+  rules and per-output scales come solely from the verified schema.
 - Requantization is signed-magnitude half-up rounding then signed i8
   saturation. Any other rounding, width, or saturation is rejected first.
 - No claim concerns full-model/token inference, boards, DDR3, PCIe,
