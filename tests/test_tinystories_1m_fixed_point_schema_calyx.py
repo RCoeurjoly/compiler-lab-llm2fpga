@@ -41,6 +41,17 @@ class FixedPointSchemaCalyxTest(unittest.TestCase):
         self.assertEqual(trace["requantized_codes_i8"], flatten(fixture["tensors"]["requantized_codes_i8"]["values"]))
         self.assertEqual(trace["requantized_q16_16"], flatten(fixture["tensors"]["requantized_q16_16"]["values"]))
 
+    def test_observed_trace_rejects_altered_signed_datapath(self):
+        lowerer = load_lowerer()
+        artifact = lowerer.lower_schema(SCHEMA, FIXTURE)
+        observed = lowerer.observed_value_trace(artifact, FIXTURE)
+        self.assertEqual(observed, lowerer.ordered_value_trace(artifact, FIXTURE))
+        altered = type(artifact)(
+            artifact.futil.replace("std_smult_pipe", "std_mult_pipe", 1), artifact.provenance
+        )
+        with self.assertRaisesRegex(ValueError, "signed datapath"):
+            lowerer.observed_value_trace(altered, FIXTURE)
+
     def test_altered_rounding_rule_is_rejected_before_lowering(self):
         lowerer = load_lowerer()
         altered = json.loads(SCHEMA.read_text())

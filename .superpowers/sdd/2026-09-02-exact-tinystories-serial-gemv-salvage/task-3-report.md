@@ -124,3 +124,21 @@ compare and was not run or claimed.  The first functional frontier is to
 lower those actual logical-SSA dataflows without reducing the widened
 fixed-point arithmetic to the available 64-bit primitive.  No SCF, copied RTL,
 DDR3, PCIe, or Representative Core path was introduced.
+
+## Fixed-point Attempt 2: cap diagnostic (2026-09-03)
+
+Attempt 2 did not claim an SV result.  Its added RED contract,
+`test_observed_trace_rejects_altered_signed_datapath`, requires an
+SV-produced `observed_value_trace` and rejects replacement of the signed MAC
+primitive with the unsigned primitive.  It fails because the current lowerer
+has no observed-SV trace path.  This is intentional evidence, not a passing
+schema-oracle substitution.
+
+The pinned toolchain has `std_smult_pipe`, `std_sdiv_pipe`, `std_srsh`, and
+`seq_mem_d1`; fixture maxima also show the scaled output product fits signed
+i64 (36-bit accumulator times 16-bit weight scale).  Thus the first
+unimplemented boundary is compiler generation of: authenticated external-memory
+fixture loads, all 16,384 ordered MAC reads/multiplies/accumulates, signed
+half-up magnitude division/sign restoration/i8 saturation, result and trace
+memory writes, and the generated-SV testbench that compares those observations
+to Task 1.  No primitive absence or width overflow was found.
