@@ -26,3 +26,8 @@ attempt must produce both bit-exact schema output and a matching
 generated-Calyx trace. A result that needs model-specific escape hatches is a
 failure, not an acceptance. An attempt is at most a 30-minute development
 window followed by one 30-minute end-to-end build/simulation gate.
+
+Reaching this quit point abandons only the serial-GEMV compiler-salvage route.
+Its receipts, artifacts, and a concise evidence report are retained; the wider
+LLM2FPGA completion strategy is decided separately rather than silently
+redefined.
