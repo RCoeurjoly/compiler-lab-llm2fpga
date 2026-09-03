@@ -69,3 +69,8 @@ the schema may later become a compiled dialect without changing semantics.
 **Logical fixed-point value**: An SSA value in the fixed-point schema that
 denotes exact arithmetic dataflow without committing to a physical memory,
 port, or lifetime. Storage assignment is a separate lowering decision.
+
+**Vertical-slice acceptance gate**: The mandatory pair of proofs before a
+contract slice may expand: bit-exact output tensors and per-stage hashes match
+the frozen checkpoint, and the generated-Calyx ordered-value trace matches the
+same checkpoint.
