@@ -24,6 +24,12 @@ class FixedPointGemvRequantizeSliceTest(unittest.TestCase):
         capture.verify_fixture(FIXTURE)
         capture.verify_eager_replay(FIXTURE)
 
+    def test_fixture_has_independent_gemv_requantization_replay_inputs(self):
+        capture = load_capture()
+        value = capture.verify_fixture(FIXTURE)
+        self.assertTrue({"activation_codes_i8", "input_scale_q8_24", "output_scale_q8_24", "weight_codes_i8", "weight_scale_q8_24"} <= set(value["tensors"]))
+        capture.verify_fixed_point_replay(FIXTURE)
+
 
 if __name__ == "__main__":
     unittest.main()
