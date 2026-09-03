@@ -142,3 +142,13 @@ fixture loads, all 16,384 ordered MAC reads/multiplies/accumulates, signed
 half-up magnitude division/sign restoration/i8 saturation, result and trace
 memory writes, and the generated-SV testbench that compares those observations
 to Task 1.  No primitive absence or width overflow was found.
+
+## Fixed-point Attempt 3: partial generated-SV interface
+
+The generator now emits external activation, weight, scale, result, and
+accumulator-trace memories, with `std_smult_pipe` and `std_sadd` wired for a
+signed MAC and the MAC boundary written to `accumulator_trace`.  The pinned
+Calyx-to-SV/Yosys gate passes for this interface.  It remains a diagnostic:
+only one MAC boundary is scheduled and there is still no 16,384-step schedule,
+requantization/writeback chain, or generated-SV fixture testbench; therefore
+the red observed-trace test remains authoritative and no output is claimed.

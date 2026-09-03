@@ -63,15 +63,16 @@ import "primitives/memories/seq.futil";
 component main(@go go: 1) -> (@done done: 1) {
   cells {
     // Logical SSA storage: %activation, %weight, %output_scale, %result.
-    activation = seq_mem_d1(64, 256, 8);
-    weights = seq_mem_d1(64, 4096, 12);
-    input_scale = seq_mem_d1(64, 64, 6);
-    weight_scale = seq_mem_d1(64, 64, 6);
-    output_scale = seq_mem_d1(64, 64, 6);
+    @external activation = seq_mem_d1(64, 256, 8);
+    @external weights = seq_mem_d1(64, 4096, 12);
+    @external input_scale = seq_mem_d1(64, 64, 6);
+    @external weight_scale = seq_mem_d1(64, 64, 6);
+    @external output_scale = seq_mem_d1(64, 64, 6);
     accumulator = std_reg(64);
-    result = seq_mem_d1(64, 256, 8);
-    mac = std_mult_pipe(64);
-    add = std_add(64);
+    @external result = seq_mem_d1(64, 256, 8);
+    @external accumulator_trace = seq_mem_d1(64, 256, 8);
+    mac = std_smult_pipe(64);
+    add = std_sadd(64);
   }
   wires {
     // Fixture values are loaded through these compiler-owned logical memories.
@@ -95,6 +96,10 @@ component main(@go go: 1) -> (@done done: 1) {
       add.right = mac.out;
       accumulator.in = add.out;
       accumulator.write_en = 1'd1;
+      accumulator_trace.addr0 = 8'd0;
+      accumulator_trace.content_en = 1'd1;
+      accumulator_trace.write_data = add.out;
+      accumulator_trace.write_en = 1'd1;
       gemv_step[done] = mac.done;
     }
     // The named boundary is emitted only after the authenticated schema has
