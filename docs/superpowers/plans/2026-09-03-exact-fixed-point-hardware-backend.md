@@ -175,8 +175,9 @@ Expected: FAIL because the generated requantization kernel/runner is absent.
 
 ```python
 # Generated logic accepts only schema attrs:
-# real_q16_16 = signed_magnitude_half_up_shift(acc * weight_scale_q8_24, 16)
-# code_i8 = saturate_i8(signed_magnitude_half_up_divide(real_q16_16, output_scale_q8_24))
+# real_q16_16 = signed_magnitude_half_up_shift(acc * weight_scale_q8_24, 32)
+# code_i8 = saturate_i8(signed_magnitude_half_up_divide(real_q16_16 << 8, output_scale_q8_24))
+# dequantized_q16_16 = signed_magnitude_half_up_shift(code_i8 * output_scale_q8_24, 8)
 ```
 
 Reject an unknown width, rounding mode, signedness, or saturation policy before
