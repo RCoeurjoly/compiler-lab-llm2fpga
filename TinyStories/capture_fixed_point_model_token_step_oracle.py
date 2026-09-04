@@ -32,6 +32,13 @@ SCHEMA = "tinystories-1m-fixed-point-model-token-step-oracle-v1"
 STATUS = "authenticated_exact_two_token_model_oracle"
 PROMPT_TOKENS = [7454, 2402, 257, 640]
 STEP_COUNT = 2
+EXPECTED_STEP_SHA256 = (
+    "d65e41b23585938ce5118128adeaf05612bcdf9772fcf9170f16d659c2d7beae",
+    "ad18da108b924945d908b12f58494904080af984224e536a6b17d6f8d3dbd8c4",
+)
+EXPECTED_MODEL_CONFIG_SHA256 = (
+    "ff74c30d5ebb5ab1da0f2ea479adf7197c504b42b5522a858c334ab91ed4958c"
+)
 MODEL_CONTRACT = {
     "name": "TinyStories-1M",
     "architecture": "gpt_neo",
@@ -87,7 +94,6 @@ IDENTITY_KEYS = {
     "model_config_sha256",
     "exact_adapter_sha256",
     "capture_source_sha256",
-    "exact_model_receipt_sha256",
 }
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DEFAULT_CONTRACT = ROOT / "artifacts/reference/tinystories-1m-exact-input-contract.json"
@@ -543,7 +549,6 @@ def build_oracle(
             "model_config_sha256": _sha256(Path(model_path) / "config.json"),
             "exact_adapter_sha256": _sha256(Path(exact_adapter.__file__)),
             "capture_source_sha256": _sha256(Path(__file__)),
-            "exact_model_receipt_sha256": bundle.receipt["receipt_sha256"],
         },
         "model_contract": MODEL_CONTRACT,
         "arithmetic_contract": ARITHMETIC_CONTRACT,
@@ -653,13 +658,14 @@ def verify_oracle_fixture(
         and identity["package_weights_sha256"] == contract["package"]["sha256"]
         and identity["package_scales_sha256"]
         == contract["package"]["files"]["scales.bin"]["sha256"]
+        and identity["model_config_sha256"] == EXPECTED_MODEL_CONFIG_SHA256
         and all(SHA256.fullmatch(str(value)) is not None for value in identity.values()),
         "provenance_identity_mismatch",
         "authenticated component identity differs",
     )
     if DEFAULT_MODEL.is_dir():
         _require(
-            identity["model_config_sha256"] == _sha256(DEFAULT_MODEL / "config.json"),
+            _sha256(DEFAULT_MODEL / "config.json") == EXPECTED_MODEL_CONFIG_SHA256,
             "provenance_identity_mismatch",
             "model config identity differs",
         )
@@ -869,6 +875,11 @@ def verify_oracle_fixture(
             step["boundary_order"] == fixture["boundary_contract"]["order"],
             "boundary_order_mismatch",
             str(index),
+        )
+        _require(
+            step["step_sha256"] == EXPECTED_STEP_SHA256[index],
+            "semantic_authority_mismatch",
+            f"step {index} differs from the pinned exact-model replay",
         )
     _require(
         steps[1]["feedback_token"] == steps[0]["selected_token"]["value"],

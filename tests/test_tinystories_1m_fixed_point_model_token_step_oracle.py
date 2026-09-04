@@ -45,6 +45,15 @@ def canonical_sha256(value: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def rehash_for_current_capture(fixture: dict) -> None:
+    fixture["identity"]["capture_source_sha256"] = hashlib.sha256(
+        CAPTURE.read_bytes()
+    ).hexdigest()
+    fixture["artifact_sha256"] = canonical_sha256(
+        {key: value for key, value in fixture.items() if key != "artifact_sha256"}
+    )
+
+
 def load_capture():
     if not CAPTURE.is_file():
         raise AssertionError("missing model-level token-step oracle capture")
@@ -147,6 +156,75 @@ class TinyStories1MModelTokenStepOracleUnitTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "model_boundary_disconnected"):
             self.capture.verify_oracle_fixture(changed)
 
+    def test_fixture_validator_rejects_coherently_rehashed_connected_boundary(self) -> None:
+        fixture = json.loads(ORACLE.read_text(encoding="utf-8"))
+        changed = copy.deepcopy(fixture)
+        blocks = changed["steps"][0]["transformer_blocks"]
+        corrupted = copy.deepcopy(blocks[3]["output"])
+        corrupted["sha256"] = "0" * 64
+        corrupted["little_endian_int64_sha256"] = "1" * 64
+        blocks[3]["output"] = corrupted
+        blocks[4]["input"] = copy.deepcopy(corrupted)
+        for block_index in (3, 4):
+            blocks[block_index]["boundary_sha256"] = canonical_sha256(
+                {
+                    key: value
+                    for key, value in blocks[block_index].items()
+                    if key != "boundary_sha256"
+                }
+            )
+        changed["steps"][0]["step_sha256"] = canonical_sha256(
+            {
+                key: value
+                for key, value in changed["steps"][0].items()
+                if key != "step_sha256"
+            }
+        )
+        rehash_for_current_capture(changed)
+
+        with self.assertRaisesRegex(ValueError, "semantic_authority_mismatch"):
+            self.capture.verify_oracle_fixture(changed)
+
+    def test_fixture_validator_rejects_rehashed_greedy_metadata(self) -> None:
+        fixture = json.loads(ORACLE.read_text(encoding="utf-8"))
+        changed = copy.deepcopy(fixture)
+        selected = changed["steps"][0]["selected_token"]
+        selected["tie_breaking"] = "largest_token_id_among_equal_maxima"
+        selected["selection_sha256"] = canonical_sha256(
+            {
+                "value": selected["value"],
+                "tie_count": selected["tie_count"],
+                "tie_breaking": selected["tie_breaking"],
+            }
+        )
+        changed["steps"][0]["step_sha256"] = canonical_sha256(
+            {
+                key: value
+                for key, value in changed["steps"][0].items()
+                if key != "step_sha256"
+            }
+        )
+        rehash_for_current_capture(changed)
+
+        with self.assertRaisesRegex(ValueError, "semantic_authority_mismatch"):
+            self.capture.verify_oracle_fixture(changed)
+
+    def test_fixture_validator_rejects_rehashed_selection_hash(self) -> None:
+        fixture = json.loads(ORACLE.read_text(encoding="utf-8"))
+        changed = copy.deepcopy(fixture)
+        changed["steps"][0]["selected_token"]["selection_sha256"] = "0" * 64
+        changed["steps"][0]["step_sha256"] = canonical_sha256(
+            {
+                key: value
+                for key, value in changed["steps"][0].items()
+                if key != "step_sha256"
+            }
+        )
+        rehash_for_current_capture(changed)
+
+        with self.assertRaisesRegex(ValueError, "semantic_authority_mismatch"):
+            self.capture.verify_oracle_fixture(changed)
+
     def test_fixture_validator_rejects_rehashed_capture_source_identity(self) -> None:
         fixture = json.loads(ORACLE.read_text(encoding="utf-8"))
         changed = copy.deepcopy(fixture)
@@ -157,6 +235,24 @@ class TinyStories1MModelTokenStepOracleUnitTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "provenance_identity_mismatch"):
             self.capture.verify_oracle_fixture(changed)
+
+    def test_fixture_validator_rejects_rehashed_model_config_without_cache(self) -> None:
+        fixture = json.loads(ORACLE.read_text(encoding="utf-8"))
+        changed = copy.deepcopy(fixture)
+        changed["identity"]["model_config_sha256"] = "0" * 64
+        rehash_for_current_capture(changed)
+        original_model = self.capture.DEFAULT_MODEL
+        self.capture.DEFAULT_MODEL = ROOT / "absent-authenticated-model-cache"
+        self.addCleanup(setattr, self.capture, "DEFAULT_MODEL", original_model)
+
+        with self.assertRaisesRegex(ValueError, "provenance_identity_mismatch"):
+            self.capture.verify_oracle_fixture(changed)
+
+    def test_fixture_validator_accepts_portable_identity_without_path_receipt(self) -> None:
+        fixture = json.loads(ORACLE.read_text(encoding="utf-8"))
+
+        self.assertNotIn("exact_model_receipt_sha256", fixture["identity"])
+        self.capture.verify_oracle_fixture(fixture)
 
 
 @unittest.skipUnless(

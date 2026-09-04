@@ -11,8 +11,7 @@
     "package_scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
     "model_config_sha256": "ff74c30d5ebb5ab1da0f2ea479adf7197c504b42b5522a858c334ab91ed4958c",
     "exact_adapter_sha256": "5f2dfa10c54134e44a31f89608b562aea33ef39deacfcd62eadac1f0fda94892",
-    "capture_source_sha256": "6b14f7d991ec650537be58e9a782c38ab4cf40377d982776493fb3d17bf3db5b",
-    "exact_model_receipt_sha256": "390d255afd37fd77708aa4f5d98198a7a349aab01c532ebee7b38c758a125809"
+    "capture_source_sha256": "a9d2a55f2ceaf6e4331e89f8591d9fe8b05bd791a88bb8091aa3c301fcb9b5bc"
   },
   "model_contract": {
     "name": "TinyStories-1M",
@@ -813,5 +812,5 @@
     "rtl_generated": false,
     "board_executed": false
   },
-  "artifact_sha256": "d89168e8760d6e2a748219dc789d2662f3b82f2ae5fc4582e95986774c2e6233"
+  "artifact_sha256": "21d81973460a053c71d903b594f2cf00c3154457750fb0e91cd63278345be506"
 }
