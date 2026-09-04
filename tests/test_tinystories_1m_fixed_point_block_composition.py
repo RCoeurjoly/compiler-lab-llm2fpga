@@ -125,6 +125,47 @@ def reseal_block_fixture(fixture: dict) -> None:
 
 
 class BlockCompositionTest(unittest.TestCase):
+    def test_receipt_justifies_cell_share_exception_with_exact_simulation_failure(self):
+        """Catches an inherited waiver lacking exact complete-block evidence."""
+        lowerer = load_lowerer()
+        receipt = json.loads(SV_RECEIPT.read_text(encoding="utf-8"))
+        lowerer.validate_composed_block_receipt(
+            receipt,
+            BLOCK_FIXTURE,
+            ATTENTION_FIXTURE,
+            MLP_FIXTURE,
+            verify_artifacts=False,
+        )
+        policy = receipt["calyx_compile_policy"]
+
+        self.assertEqual(
+            policy.get("reason"),
+            "disable cell-share because default sharing makes the exact "
+            "complete-block non-synthesis simulation SV contain circular "
+            "combinational logic at main.gelu_input_abs_out; Verilator 5.022 "
+            "rejects it as UNOPTFLAT, while synthesis SV passes Yosys with only "
+            "expected undriven external-memory write_data warnings",
+        )
+        self.assertEqual(
+            policy.get("exception_evidence"),
+            {
+                "futil_sha256": "ab0ec932bf4a76c97df3beb11dd71a5309fe65e2bd36492ce18dc63f009622c2",
+                "default_cell_share_simulation_sv": {
+                    "calyx_mode": "-b verilog (without --synthesis)",
+                    "verilator": "5.022",
+                    "result": "rejected",
+                    "diagnostic_class": "UNOPTFLAT circular combinational logic",
+                    "first_signal": "main.gelu_input_abs_out",
+                },
+                "default_cell_share_synthesis_sv": {
+                    "calyx_mode": "--synthesis --disable-verify -b verilog",
+                    "yosys": "0.66",
+                    "post_techmap_loop_diagnostics": 0,
+                    "expected_undriven_external_memory_write_data_bits": 1840,
+                },
+            },
+        )
+
     def test_complete_block_receipt_binds_all_linked_authority(self):
         """Catches incomplete provenance or synthesis detached from simulation."""
         lowerer = load_lowerer()

@@ -3,7 +3,23 @@
     "disabled_passes": [
       "cell-share"
     ],
-    "reason": "preserve explicitly staged fixed-point arithmetic latches",
+    "exception_evidence": {
+      "default_cell_share_simulation_sv": {
+        "calyx_mode": "-b verilog (without --synthesis)",
+        "diagnostic_class": "UNOPTFLAT circular combinational logic",
+        "first_signal": "main.gelu_input_abs_out",
+        "result": "rejected",
+        "verilator": "5.022"
+      },
+      "default_cell_share_synthesis_sv": {
+        "calyx_mode": "--synthesis --disable-verify -b verilog",
+        "expected_undriven_external_memory_write_data_bits": 1840,
+        "post_techmap_loop_diagnostics": 0,
+        "yosys": "0.66"
+      },
+      "futil_sha256": "ab0ec932bf4a76c97df3beb11dd71a5309fe65e2bd36492ce18dc63f009622c2"
+    },
+    "reason": "disable cell-share because default sharing makes the exact complete-block non-synthesis simulation SV contain circular combinational logic at main.gelu_input_abs_out; Verilator 5.022 rejects it as UNOPTFLAT, while synthesis SV passes Yosys with only expected undriven external-memory write_data warnings",
     "same_futil_sha256": "ab0ec932bf4a76c97df3beb11dd71a5309fe65e2bd36492ce18dc63f009622c2",
     "simulator_command": [
       "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/bin/calyx",
@@ -1627,7 +1643,7 @@
     },
     "record_count": 84
   },
-  "receipt_sha256": "8e640b2e68ab1d447a85545222d8a7104f20a6bd5c339dbc8aff92877bb8521d",
+  "receipt_sha256": "f6243fc8c2e0a8bff0c7ff192d52465fd9052825bc73f6fad2f8bfdf19f23384",
   "schema": "tinystories-1m-fixed-point-block-composition-generated-sv-v1",
   "schema_authority": {
     "attention_fixture_schema": "tinystories-1m-fixed-point-attention-crossing-slice-v1",

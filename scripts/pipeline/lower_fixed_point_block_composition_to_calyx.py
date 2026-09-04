@@ -17,6 +17,13 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 BLOCK_SCHEMA = "tinystories-1m-fixed-point-block-composition-generated-sv-v1"
 BLOCK_FIXTURE_SCHEMA = "tinystories-1m-fixed-point-block-composition-slice-v1"
+CELL_SHARE_EXCEPTION_REASON = (
+    "disable cell-share because default sharing makes the exact complete-block "
+    "non-synthesis simulation SV contain circular combinational logic at "
+    "main.gelu_input_abs_out; Verilator 5.022 rejects it as UNOPTFLAT, while "
+    "synthesis SV passes Yosys with only expected undriven external-memory "
+    "write_data warnings"
+)
 ARTIFACT_DIRECTORY = Path(
     "/tmp/llm2fpga-tinystories-1m-fixed-point-block-composition-generated-sv-v1"
 )
@@ -664,6 +671,25 @@ def _calyx_common_command(futil_path: Path) -> list[str]:
     ]
 
 
+def _cell_share_exception_evidence(futil_sha256: str) -> dict[str, object]:
+    return {
+        "futil_sha256": futil_sha256,
+        "default_cell_share_simulation_sv": {
+            "calyx_mode": "-b verilog (without --synthesis)",
+            "verilator": "5.022",
+            "result": "rejected",
+            "diagnostic_class": "UNOPTFLAT circular combinational logic",
+            "first_signal": "main.gelu_input_abs_out",
+        },
+        "default_cell_share_synthesis_sv": {
+            "calyx_mode": "--synthesis --disable-verify -b verilog",
+            "yosys": "0.66",
+            "post_techmap_loop_diagnostics": 0,
+            "expected_undriven_external_memory_write_data_bits": 1840,
+        },
+    }
+
+
 def _validate_yosys_stat(stdout: str) -> dict[str, int]:
     if "=== main ===" not in stdout or "=== design hierarchy ===" not in stdout:
         raise RuntimeError("Yosys stat did not report the generated main hierarchy")
@@ -1012,7 +1038,10 @@ def validate_composed_block_receipt(
     )
     expected_policy = {
         "disabled_passes": ["cell-share"],
-        "reason": "preserve explicitly staged fixed-point arithmetic latches",
+        "reason": CELL_SHARE_EXCEPTION_REASON,
+        "exception_evidence": _cell_share_exception_evidence(
+            generated_artifacts["futil"]["sha256"]
+        ),
         "simulator_command": [
             *common,
             "-b",
@@ -1200,7 +1229,10 @@ def run_composed_block_sv(
         "generated_artifacts": generated_artifacts,
         "calyx_compile_policy": {
             "disabled_passes": ["cell-share"],
-            "reason": "preserve explicitly staged fixed-point arithmetic latches",
+            "reason": CELL_SHARE_EXCEPTION_REASON,
+            "exception_evidence": _cell_share_exception_evidence(
+                generated_artifacts["futil"]["sha256"]
+            ),
             "simulator_command": simulator_command,
             "synthesis_command": synthesis_command,
             "same_futil_sha256": generated_artifacts["futil"]["sha256"],
