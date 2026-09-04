@@ -174,6 +174,30 @@ class TokenStepTest(unittest.TestCase):
                 verify_artifacts=False,
             )
 
+    def test_post_transaction_reset_restarts_from_initial_input_state(self):
+        lowerer = load_lowerer()
+        receipt = json.loads(SV_RECEIPT.read_text(encoding="utf-8"))
+        lowerer.validate_token_step_receipt(
+            receipt,
+            BLOCK_FIXTURE,
+            ATTENTION_FIXTURE,
+            MLP_FIXTURE,
+            verify_artifacts=False,
+        )
+        restart = receipt["reset"]["post_transaction_restart"]
+
+        self.assertTrue(restart["reselected_initial_state"])
+        self.assertTrue(restart["reproduced_transaction_0"])
+        self.assertEqual(
+            restart["input_state_sha256"],
+            receipt["transactions"][0]["input_state_sha256"],
+        )
+        self.assertEqual(
+            restart["output_state_sha256"],
+            receipt["transactions"][0]["output_state_sha256"],
+        )
+        self.assertGreater(restart["cycles"], 131072)
+
     def test_generated_harness_has_no_expected_or_feedback_preload(self):
         lowerer = load_lowerer()
         artifact = lowerer.generate_token_step_kernel(

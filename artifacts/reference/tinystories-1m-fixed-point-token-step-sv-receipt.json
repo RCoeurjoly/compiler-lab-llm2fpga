@@ -134,7 +134,8 @@
       "input_state_q16_16"
     ],
     "simulator_runs": 1,
-    "transaction_count": 2
+    "transaction_count": 2,
+    "verification_invocations": 3
   },
   "fixture_authorities": {
     "attention": {
@@ -1136,9 +1137,9 @@
       "sha256": "3f6294e66eb24ef4f9ba67f72d4c4c0b6dd2cb4ede3dd9983055a4acb886cd50"
     },
     "harness": {
-      "bytes": 248963,
+      "bytes": 250197,
       "path": "/tmp/llm2fpga-tinystories-1m-fixed-point-token-step-generated-sv-v1/harness.cpp",
-      "sha256": "0819cd3039a215454b5a23ef010ac8fa6a02756976037cbd478393cf16c8a0d1"
+      "sha256": "2b71550e2b24e5822e03230a6932f2d7c3fd795d8ea8dca59d7d36b04fb8e747"
     },
     "sv": {
       "bytes": 1575868,
@@ -1157,12 +1158,21 @@
     "start": "request_when_idle",
     "valid": "qualifies_input_state_capture"
   },
-  "receipt_sha256": "5c9c02fb47956dbf9943a585059048ed72e58130ef482a4b58b50301069d29eb",
+  "receipt_sha256": "0d63ebd9583848dca8044d706af3e5cf728baa5cc51330de2a40490a75082253",
   "reset": {
     "asserted_cycles": 3,
     "idle_start_isolated": true,
     "invalid_input_isolated": true,
-    "isolated": true
+    "isolated": true,
+    "post_transaction_restart": {
+      "asserted_cycles": 3,
+      "cycles": 2890418,
+      "input_state_sha256": "1d6a6b51026506667795de7fd0c4b5d94646aa066b4f7cfe37e69b28829bbcde",
+      "isolated": true,
+      "output_state_sha256": "61a7016bc7936ae32cefdf8153cf4560454c662e6c0ea6351144f3a5b377bedf",
+      "reproduced_transaction_0": true,
+      "reselected_initial_state": true
+    }
   },
   "schema": "tinystories-1m-fixed-point-token-step-generated-sv-v1",
   "synthesis": {

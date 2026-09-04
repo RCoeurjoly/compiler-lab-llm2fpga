@@ -551,14 +551,42 @@ int main(int argc, char** argv) {{
   }}
   if (!model.done) return 3;
   const auto second_output = read_state(root, true);
-  const bool complete = reset_isolated && idle_isolated && invalid_isolated;
+
+  model.start = 0;
+  model.valid = 0;
+  tick(model);
+  tick(model);
+  model.reset = 1;
+  for (unsigned i = 0; i < 3; ++i) tick(model);
+  const bool post_reset_isolated = !model.done;
+  model.reset = 0;
+  tick(model);
+  const auto restart_input = read_state(root, false);
+  model.start = 1;
+  model.valid = 1;
+  unsigned restart_cycles = 0;
+  while (!model.done && restart_cycles < 10000000) {{
+    tick(model);
+    ++restart_cycles;
+  }}
+  if (!model.done) return 4;
+  const auto restart_output = read_state(root, true);
+  const bool restart_reselected_initial = restart_input == first_input;
+  const bool restart_reproduced_first = restart_output == first_output;
+  const bool complete = reset_isolated && idle_isolated && invalid_isolated &&
+    post_reset_isolated && restart_reselected_initial &&
+    restart_reproduced_first;
 
   std::cout << "{{\\\"status\\\":\\\"" << (complete ? "ok" : "isolation-failed")
             << "\\\",\\\"reset_isolated\\\":" << (reset_isolated ? "true" : "false")
             << ",\\\"idle_isolated\\\":" << (idle_isolated ? "true" : "false")
             << ",\\\"invalid_isolated\\\":" << (invalid_isolated ? "true" : "false")
+            << ",\\\"post_reset_isolated\\\":" << (post_reset_isolated ? "true" : "false")
+            << ",\\\"restart_reselected_initial\\\":" << (restart_reselected_initial ? "true" : "false")
+            << ",\\\"restart_reproduced_first\\\":" << (restart_reproduced_first ? "true" : "false")
             << ",\\\"first_cycles\\\":" << first_cycles
             << ",\\\"second_cycles\\\":" << second_cycles
+            << ",\\\"restart_cycles\\\":" << restart_cycles
             << ",\\\"first_input\\\":";
   print_vector(first_input);
   std::cout << ",\\\"first_output\\\":";
@@ -567,6 +595,10 @@ int main(int argc, char** argv) {{
   print_vector(second_input);
   std::cout << ",\\\"second_output\\\":";
   print_vector(second_output);
+  std::cout << ",\\\"restart_input\\\":";
+  print_vector(restart_input);
+  std::cout << ",\\\"restart_output\\\":";
+  print_vector(restart_output);
   std::cout << "}}\\n";
   return complete ? 0 : 1;
 }}
@@ -647,13 +679,45 @@ def _validate_receipt(
     if transactions[1]["input_state_sha256"] != transactions[0]["output_state_sha256"]:
         raise ValueError("token-step feedback hash mismatch")
     reset = receipt.get("reset")
-    if reset != {
-        "asserted_cycles": 3,
-        "isolated": True,
-        "idle_start_isolated": True,
-        "invalid_input_isolated": True,
+    if not isinstance(reset, dict) or set(reset) != {
+        "asserted_cycles",
+        "isolated",
+        "idle_start_isolated",
+        "invalid_input_isolated",
+        "post_transaction_restart",
     }:
         raise ValueError("token-step reset/isolation evidence mismatch")
+    if (
+        reset.get("asserted_cycles") != 3
+        or reset.get("isolated") is not True
+        or reset.get("idle_start_isolated") is not True
+        or reset.get("invalid_input_isolated") is not True
+    ):
+        raise ValueError("token-step reset/isolation evidence mismatch")
+    restart = reset.get("post_transaction_restart")
+    if not isinstance(restart, dict) or set(restart) != {
+        "asserted_cycles",
+        "isolated",
+        "reselected_initial_state",
+        "reproduced_transaction_0",
+        "input_state_sha256",
+        "output_state_sha256",
+        "cycles",
+    }:
+        raise ValueError("token-step post-transaction reset evidence mismatch")
+    if (
+        restart.get("asserted_cycles") != 3
+        or restart.get("isolated") is not True
+        or restart.get("reselected_initial_state") is not True
+        or restart.get("reproduced_transaction_0") is not True
+        or restart.get("input_state_sha256")
+        != transactions[0]["input_state_sha256"]
+        or restart.get("output_state_sha256")
+        != transactions[0]["output_state_sha256"]
+        or not isinstance(restart.get("cycles"), int)
+        or restart["cycles"] <= 131072
+    ):
+        raise ValueError("token-step post-transaction reset evidence mismatch")
     execution = receipt.get("execution")
     if not isinstance(execution, dict) or execution.get("component_count") != 1:
         raise ValueError("token-step execution component mismatch")
@@ -661,6 +725,7 @@ def _validate_receipt(
         "component_count",
         "simulator_runs",
         "transaction_count",
+        "verification_invocations",
         "cycles",
         "host_preload_memories",
         "hardware_owned_memories",
@@ -669,7 +734,11 @@ def _validate_receipt(
         "host_expected_output_preload",
     }:
         raise ValueError("token-step execution field set mismatch")
-    if execution.get("simulator_runs") != 1 or execution.get("transaction_count") != 2:
+    if (
+        execution.get("simulator_runs") != 1
+        or execution.get("transaction_count") != 2
+        or execution.get("verification_invocations") != 3
+    ):
         raise ValueError("token-step execution transaction mismatch")
     cycles = execution.get("cycles")
     if (
@@ -855,7 +924,7 @@ def run_token_step_sv(
     if verilated.returncode != 0 or not executable.is_file():
         raise RuntimeError(f"token-step Verilator build failed: {verilated.stderr.strip()}")
     simulated = subprocess.run(
-        [str(executable)], text=True, capture_output=True, check=False, timeout=900
+        [str(executable)], text=True, capture_output=True, check=False, timeout=1200
     )
     if simulated.returncode != 0:
         raise RuntimeError(
@@ -874,6 +943,8 @@ def run_token_step_sv(
     first_output = _validate_state(raw.get("first_output"), "first output")
     second_input = _validate_state(raw.get("second_input"), "second input")
     second_output = _validate_state(raw.get("second_output"), "second output")
+    restart_input = _validate_state(raw.get("restart_input"), "restart input")
+    restart_output = _validate_state(raw.get("restart_output"), "restart output")
     observed_transactions = [
         {
             "index": 0,
@@ -890,6 +961,10 @@ def run_token_step_sv(
         raise RuntimeError("token-step second input is not committed first output")
     if observed_transactions != artifact.provenance["expected_transactions"]:
         raise RuntimeError("token-step generated-SV state differs from fixed-point oracle")
+    if restart_input != first_input or restart_output != first_output:
+        raise RuntimeError(
+            "token-step post-transaction reset did not restart from input state"
+        )
 
     synthesized = subprocess.run(
         synthesis_command, text=True, capture_output=True, check=False, timeout=600
@@ -941,12 +1016,22 @@ def run_token_step_sv(
             "isolated": raw["reset_isolated"],
             "idle_start_isolated": raw["idle_isolated"],
             "invalid_input_isolated": raw["invalid_isolated"],
+            "post_transaction_restart": {
+                "asserted_cycles": 3,
+                "isolated": raw["post_reset_isolated"],
+                "reselected_initial_state": raw["restart_reselected_initial"],
+                "reproduced_transaction_0": raw["restart_reproduced_first"],
+                "input_state_sha256": _little_endian_i64_sha256(restart_input),
+                "output_state_sha256": _little_endian_i64_sha256(restart_output),
+                "cycles": raw["restart_cycles"],
+            },
         },
         "transactions": observed_transactions,
         "execution": {
             "component_count": 1,
             "simulator_runs": 1,
             "transaction_count": 2,
+            "verification_invocations": 3,
             "cycles": [raw["first_cycles"], raw["second_cycles"]],
             "host_preload_memories": artifact.provenance["host_preload_memories"],
             "hardware_owned_memories": artifact.provenance[

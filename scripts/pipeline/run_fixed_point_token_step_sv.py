@@ -110,6 +110,9 @@ def main() -> int:
                 "receipt_sha256": receipt["receipt_sha256"],
                 "transactions": receipt["transactions"],
                 "cycles": receipt["execution"]["cycles"],
+                "post_transaction_restart": receipt["reset"][
+                    "post_transaction_restart"
+                ],
                 "yosys": receipt["synthesis"],
             },
             sort_keys=True,
