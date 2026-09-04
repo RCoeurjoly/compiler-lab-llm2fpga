@@ -1,0 +1,54 @@
+{
+  "actual_catalogue_records": 461,
+  "catalog_sha256": "c2f4a91129647048fa2f5fdd66d05e4541f7e8e91ff7572c3333733c8b627485",
+  "compiler_lab_commit": "b649357cce33f39c35bac1d4b707996bff1380d3",
+  "compiler_lab_remote": "git@github.com:RCoeurjoly/compiler-lab-llm2fpga.git",
+  "expected_records": 461,
+  "generated_at_utc": "2026-08-05T22:17:07.409528+00:00",
+  "input_sha256": {
+    "LLM-inference-on-FPGA-papers/data/catalog.json": "c2f4a91129647048fa2f5fdd66d05e4541f7e8e91ff7572c3333733c8b627485",
+    "LLM-inference-on-FPGA-papers/data/survey.csv": "2082df529ed6e4c3b0ad5c602f6a8e466c976bf11d0f82f9a80b2072c17cf1a3",
+    "survey/config/scope.yaml": "22164396b853b17deed440217ba4cdd465616b1d2b65a4067abd127fed7c86b3",
+    "survey/data/manual_overrides.csv": "b263351fb1466140c6c1d864071afa4fbe4108db2b4dcc29106a79546a022ce2",
+    "survey/data/route_vocabulary.csv": "0843f174213914c5293cffe51eaaee2e2823d8715528ccfba94776fe889c0f9e",
+    "survey/protocol.md": "7ec619fa52e3b83a24a4f4b25bc656de8bd9895b2c9d70b3688e98fc7e656a62"
+  },
+  "llm2fpga_commit": "5cae9d4c339e151affa43ee0f471da3ba289f3d0",
+  "llm2fpga_remote": "git@github.com:RCoeurjoly/LLM2FPGA.git",
+  "papers_commit": "95fd9b9a509f275dd3cfdb3360b33dbcca7429f0",
+  "papers_remote": "git@github.com:RCoeurjoly/LLM-inference-on-FPGA-papers.git",
+  "protocol_record_count": 459,
+  "repositories": {
+    "compiler_lab": {
+      "commit": "b649357cce33f39c35bac1d4b707996bff1380d3",
+      "path": ".",
+      "remote": "git@github.com:RCoeurjoly/compiler-lab-llm2fpga.git"
+    },
+    "llm2fpga": {
+      "commit": "5cae9d4c339e151affa43ee0f471da3ba289f3d0",
+      "path": "../../../LLM2FPGA",
+      "remote": "git@github.com:RCoeurjoly/LLM2FPGA.git"
+    },
+    "papers": {
+      "commit": "95fd9b9a509f275dd3cfdb3360b33dbcca7429f0",
+      "path": "LLM-inference-on-FPGA-papers",
+      "remote": "git@github.com:RCoeurjoly/LLM-inference-on-FPGA-papers.git"
+    }
+  },
+  "schema_version": 1,
+  "tool_versions": {
+    "git": "git version 2.53.0",
+    "nix": "nix (Nix) 2.33.3",
+    "python": "3.11.14",
+    "python_packages": {
+      "pandas": "2.3.1",
+      "pyarrow": "20.0.0",
+      "pyyaml": "6.0.3",
+      "rapidfuzz": "3.14.1",
+      "requests": "2.32.5",
+      "requests-cache": "1.2.1",
+      "tabulate": "0.9.0",
+      "unidecode": "1.4.0"
+    }
+  }
+}

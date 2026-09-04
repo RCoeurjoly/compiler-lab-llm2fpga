@@ -1,0 +1,86 @@
+{
+  "actual_stage": "SOURCE_CLOSURE",
+  "artifact_commit": "",
+  "artifact_sha256": "",
+  "budget_hours": 16,
+  "command_results": [
+    {
+      "command": "sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv",
+      "exit_code": 0,
+      "index": 1
+    },
+    {
+      "command": "if test -d /tmp/llm2fpga-task6-r8-receipt-source/.git; then git -C /tmp/llm2fpga-task6-r8-receipt-source fetch --quiet origin e21dafa4d877c1dc7846f9e0b60c05a995d033eb; else git clone --filter=blob:none --no-checkout https://github.com/JoshuaLandgraf/cascade.git /tmp/llm2fpga-task6-r8-receipt-source; fi && git -C /tmp/llm2fpga-task6-r8-receipt-source checkout --detach e21dafa4d877c1dc7846f9e0b60c05a995d033eb && git -C /tmp/llm2fpga-task6-r8-receipt-source rev-parse HEAD && git -C /tmp/llm2fpga-task6-r8-receipt-source status --short",
+      "exit_code": 0,
+      "index": 2
+    },
+    {
+      "command": "python3 -c \"from pathlib import Path; d=Path('/tmp/llm2fpga-task6-r8-receipt-source')/'share/cascade/de10'; qsf=(d/'DE10_NANO_SoC_GHRD.qsf').read_text(); needed=['soc_system/synthesis/soc_system.qip']; referenced=[p for p in needed if p in qsf]; missing=[p for p in referenced if not (d/p).is_file()]; print('r8_qsf_references='+','.join(referenced)); print('r8_qsys_source_present='+str((d/'soc_system.qsys').is_file()).lower()); print('r8_missing_required_files='+','.join(missing)); print('r8_source_closure_complete='+str(not missing).lower())\"",
+      "exit_code": 0,
+      "index": 3
+    },
+    {
+      "command": "cmake -S /tmp/llm2fpga-task6-r8-receipt-source -B /tmp/llm2fpga-task6-r8-receipt-build -DCMAKE_BUILD_TYPE=Release && cmake --build /tmp/llm2fpga-task6-r8-receipt-build -j2",
+      "exit_code": 1,
+      "index": 4
+    },
+    {
+      "command": "nix develop -c yosys -p 'read_verilog -I /tmp/llm2fpga-task6-r8-receipt-source /tmp/llm2fpga-task6-r8-receipt-source/share/cascade/test/benchmark/adpcm/adpcm.v; hierarchy -check -top test; proc; check'",
+      "exit_code": 1,
+      "index": 5
+    },
+    {
+      "command": "python3 -c \"from pathlib import Path; t=(Path('/tmp/llm2fpga-task6-r8-receipt-source')/'experiments/README.md').read_text().lower(); print('r8_causal_lm_interface='+str('causal' in t and 'decode' in t).lower()); print('r8_declared_workload=fpga_virtualization')\"",
+      "exit_code": 0,
+      "index": 6
+    }
+  ],
+  "commands_sha256": "12f5a7149cca2a06e4cadf1341de82ab1646121abc852a19baf9c000be43551f",
+  "complete_elaboratable_rtl": false,
+  "decision": "INELIGIBLE",
+  "environment_manifest": {
+    "artifact_inventory_sha256": "4e06aed7708955484b2eb609034c822aec62acc47f3594fec901ae95d503b301",
+    "cwd_policy": "repository-relative commands",
+    "deep_review_sha256": "239c996d4f79364b3c261bf601a7a211104b2b60396ad8b4e00e00d7d7d472f5",
+    "platform": "Linux-7.0.0-28-generic-x86_64-with-glibc2.40",
+    "protocol_sha256": "7ec619fa52e3b83a24a4f4b25bc656de8bd9895b2c9d70b3688e98fc7e656a62",
+    "python": "3.11.14",
+    "repository_audit_sha256": "be15ec353621597b379bd60bc859e8b95298cbf041b0a27ed49ae611a9b5c2e6"
+  },
+  "evidence_files": [],
+  "executed_commands": [
+    "sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv",
+    "if test -d /tmp/llm2fpga-task6-r8-receipt-source/.git; then git -C /tmp/llm2fpga-task6-r8-receipt-source fetch --quiet origin e21dafa4d877c1dc7846f9e0b60c05a995d033eb; else git clone --filter=blob:none --no-checkout https://github.com/JoshuaLandgraf/cascade.git /tmp/llm2fpga-task6-r8-receipt-source; fi && git -C /tmp/llm2fpga-task6-r8-receipt-source checkout --detach e21dafa4d877c1dc7846f9e0b60c05a995d033eb && git -C /tmp/llm2fpga-task6-r8-receipt-source rev-parse HEAD && git -C /tmp/llm2fpga-task6-r8-receipt-source status --short",
+    "python3 -c \"from pathlib import Path; d=Path('/tmp/llm2fpga-task6-r8-receipt-source')/'share/cascade/de10'; qsf=(d/'DE10_NANO_SoC_GHRD.qsf').read_text(); needed=['soc_system/synthesis/soc_system.qip']; referenced=[p for p in needed if p in qsf]; missing=[p for p in referenced if not (d/p).is_file()]; print('r8_qsf_references='+','.join(referenced)); print('r8_qsys_source_present='+str((d/'soc_system.qsys').is_file()).lower()); print('r8_missing_required_files='+','.join(missing)); print('r8_source_closure_complete='+str(not missing).lower())\"",
+    "cmake -S /tmp/llm2fpga-task6-r8-receipt-source -B /tmp/llm2fpga-task6-r8-receipt-build -DCMAKE_BUILD_TYPE=Release && cmake --build /tmp/llm2fpga-task6-r8-receipt-build -j2",
+    "nix develop -c yosys -p 'read_verilog -I /tmp/llm2fpga-task6-r8-receipt-source /tmp/llm2fpga-task6-r8-receipt-source/share/cascade/test/benchmark/adpcm/adpcm.v; hierarchy -check -top test; proc; check'",
+    "python3 -c \"from pathlib import Path; t=(Path('/tmp/llm2fpga-task6-r8-receipt-source')/'experiments/README.md').read_text().lower(); print('r8_causal_lm_interface='+str('causal' in t and 'decode' in t).lower()); print('r8_declared_workload=fpga_virtualization')\""
+  ],
+  "execution_provenance": {},
+  "expected_stage": "M2_STATEFUL_DECODE",
+  "failure_code": "F_SOURCE_MISSING",
+  "failure_detail": "The exact Cascade checkout is accessible and includes soc_system.qsys, but its DE10 Quartus project references the absent generated soc_system/synthesis/soc_system.qip hierarchy. The source requires vendor Qsys generation to produce that input. The later CMake and Yosys checks are retained as diagnostics; causal-LM coverage is not reached.",
+  "fixture": "M0-operators",
+  "frozen_tolerance": {
+    "fixed_point_lsb": 1,
+    "floating_absolute": 1e-05,
+    "floating_relative": 0.0001,
+    "integer": "identical"
+  },
+  "generated_rtl_paths": [],
+  "lint_evidence": [
+    "stderr.log#command-5"
+  ],
+  "m2_evidence": {},
+  "next_bounded_action": "Provide the generated DE10 QIP hierarchy or a reproducible, replaceable generation path before attempting fallback-route evaluation.",
+  "receipt_schema_version": 2,
+  "route_family": "CPU_FPGA_FALLBACK",
+  "route_id": "R8",
+  "route_title": "Cascade CPU/FPGA fallback control",
+  "simulation_evidence": [],
+  "source_commit": "e21dafa4d877c1dc7846f9e0b60c05a995d033eb",
+  "source_evidence": "survey/build/repository_audit.csv#repository_audit_id=REPO-PF-E9C1300B04E80B95",
+  "source_sha256": "5b3101bd5b9edfc09d115057f560b04cdecf886822f20ed4cbac3d322be41ef0",
+  "status": "STOPPED",
+  "synthesis_evidence": []
+}

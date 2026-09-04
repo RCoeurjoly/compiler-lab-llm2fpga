@@ -1,0 +1,73 @@
+===== command 1: git rev-parse HEAD && nix --version && nix develop -c bash -c 'python --version; circt-opt --version; mlir-opt --version; verilator --version; yosys -V' =====
+warning: Git tree '/home/roland/compiler-lab-llm2fpga/.worktrees/llm2fpga-survey' is dirty
+===== command 2: git diff --quiet 433592c448f8b19a30dd046a1ec726b09a86d892..HEAD -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && git diff --quiet -- . ':(exclude)survey/**' ':(exclude).superpowers/**' ':(exclude)tests/test_survey_*' && printf 'compiler_scope_equivalent=true\n' =====
+===== command 3: nix build .#tinystories-representative-core-w4a8-pytorch-exported --no-link --print-out-paths -L =====
+warning: Git tree '/home/roland/compiler-lab-llm2fpga/.worktrees/llm2fpga-survey' is dirty
+===== command 4: nix build .#tinystories-representative-core-w4a8-linalg --no-link --print-out-paths -L =====
+warning: Git tree '/home/roland/compiler-lab-llm2fpga/.worktrees/llm2fpga-survey' is dirty
+===== command 5: nix develop -c python -m unittest tests.test_torch_mlir_fingerprint tests.test_pipeline_clarity -v =====
+warning: Git tree '/home/roland/compiler-lab-llm2fpga/.worktrees/llm2fpga-survey' is dirty
+test_fingerprint_derives_normalized_signatures_and_edges (tests.test_torch_mlir_fingerprint.TorchMlirFingerprintTest.test_fingerprint_derives_normalized_signatures_and_edges) ... ok
+test_qualification_accepts_coverage_and_tenfold_gates (tests.test_torch_mlir_fingerprint.TorchMlirFingerprintTest.test_qualification_accepts_coverage_and_tenfold_gates) ... ok
+test_qualification_rejects_missing_edge_even_when_ops_exist (tests.test_torch_mlir_fingerprint.TorchMlirFingerprintTest.test_qualification_rejects_missing_edge_even_when_ops_exist) ... ok
+test_build_input_names_describe_their_scope (tests.test_pipeline_clarity.PipelineClarityTest.test_build_input_names_describe_their_scope) ... ok
+test_compiler_stage_scripts_are_under_pipeline (tests.test_pipeline_clarity.PipelineClarityTest.test_compiler_stage_scripts_are_under_pipeline) ... ok
+test_current_baseline_records_fixed_layernorm_frontier (tests.test_pipeline_clarity.PipelineClarityTest.test_current_baseline_records_fixed_layernorm_frontier) ... ok
+test_current_baseline_records_historical_direct_linalg_frontier (tests.test_pipeline_clarity.PipelineClarityTest.test_current_baseline_records_historical_direct_linalg_frontier) ... ok
+test_current_baseline_records_representative_core_w4a8_blocker (tests.test_pipeline_clarity.PipelineClarityTest.test_current_baseline_records_representative_core_w4a8_blocker) ... ok
+test_docs_describe_current_baseline_without_local_provenance (tests.test_pipeline_clarity.PipelineClarityTest.test_docs_describe_current_baseline_without_local_provenance) ... ok
+test_no_accelerator_manifest_contract_remains (tests.test_pipeline_clarity.PipelineClarityTest.test_no_accelerator_manifest_contract_remains) ... ok
+test_no_orphan_lsq_pipeline_script_remains (tests.test_pipeline_clarity.PipelineClarityTest.test_no_orphan_lsq_pipeline_script_remains) ... ok
+test_pipeline_contract_documents_allowed_transforms (tests.test_pipeline_clarity.PipelineClarityTest.test_pipeline_contract_documents_allowed_transforms) ... ok
+test_pipeline_registry_has_no_stale_extension_points (tests.test_pipeline_clarity.PipelineClarityTest.test_pipeline_registry_has_no_stale_extension_points) ... ok
+test_pytorch_export_command_is_required (tests.test_pipeline_clarity.PipelineClarityTest.test_pytorch_export_command_is_required) ... ok
+test_pytorch_export_materializer_is_single_purpose (tests.test_pipeline_clarity.PipelineClarityTest.test_pytorch_export_materializer_is_single_purpose) ... ok
+test_read_the_repo_doc_points_to_core_files_in_order (tests.test_pipeline_clarity.PipelineClarityTest.test_read_the_repo_doc_points_to_core_files_in_order) ... ok
+test_torch_mlir_compiler_accepts_exported_program_only (tests.test_pipeline_clarity.PipelineClarityTest.test_torch_mlir_compiler_accepts_exported_program_only) ... ok
+test_torch_mlir_stage_consumes_exported_program_only (tests.test_pipeline_clarity.PipelineClarityTest.test_torch_mlir_stage_consumes_exported_program_only) ... ok
+test_unused_patch_stacks_are_archived_not_active (tests.test_pipeline_clarity.PipelineClarityTest.test_unused_patch_stacks_are_archived_not_active) ... FAIL
+
+======================================================================
+FAIL: test_unused_patch_stacks_are_archived_not_active (tests.test_pipeline_clarity.PipelineClarityTest.test_unused_patch_stacks_are_archived_not_active)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/roland/compiler-lab-llm2fpga/.worktrees/llm2fpga-survey/tests/test_pipeline_clarity.py", line 103, in test_unused_patch_stacks_are_archived_not_active
+    self.assertFalse((REPO_ROOT / "patches").exists())
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 19 tests in 0.234s
+
+FAILED (failures=1)
+===== command 6: nix build github:NixOS/nixpkgs/b134951a4c9f3c995fd7be05f3243f8ecd65d798#python311Packages.pytest --no-link =====
+===== command 7: PYTHONPATH=/nix/store/wiivwk558q3nj8xnzyc901dsc5c8fqf4-python3.11-pytest-8.1.1/lib/python3.11/site-packages:/nix/store/g48903rpbx6czj8fdmjckxsn7ns4xi3b-python3.11-pluggy-1.4.0/lib/python3.11/site-packages:/nix/store/x86vbwafzpwk6nhcpgvfbyyma9ajp1b8-python3.11-iniconfig-2.0.0/lib/python3.11/site-packages:/nix/store/dkphwn70lhdmazrl4zdnj63gy0yw4qfj-python3.11-packaging-24.0/lib/python3.11/site-packages nix develop -c python -m pytest -q =====
+warning: Git tree '/home/roland/compiler-lab-llm2fpga/.worktrees/llm2fpga-survey' is dirty
+===== command 8: nix develop -c python -m py_compile tests/test_rc_observable_driver.py =====
+warning: Git tree '/home/roland/compiler-lab-llm2fpga/.worktrees/llm2fpga-survey' is dirty
+  File "tests/test_rc_observable_driver.py", line 136
+    )
+    ^
+SyntaxError: f-string expression part cannot include a backslash
+===== command 9: nix build .#tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-calyx-native-sv --no-link --print-out-paths -L =====
+warning: Git tree '/home/roland/compiler-lab-llm2fpga/.worktrees/llm2fpga-survey' is dirty
+this derivation will be built:
+  /nix/store/iw646y9harkn0sb3lpgg304sxd7dvhzm-tinystories-representative-core-w4a8-integer-calyx-native-sv.drv
+building '/nix/store/iw646y9harkn0sb3lpgg304sxd7dvhzm-tinystories-representative-core-w4a8-integer-calyx-native-sv.drv'...
+tinystories-representative-core-w4a8-integer-calyx-native-sv> python3: can't open file '/nix/store/verify_calyx_f32_constant_bits.py': [Errno 2] No such file or directory
+error: Cannot build '/nix/store/iw646y9harkn0sb3lpgg304sxd7dvhzm-tinystories-representative-core-w4a8-integer-calyx-native-sv.drv'.
+       Reason: builder failed with exit code 2.
+       Output paths:
+         /nix/store/5l91vlwpy6nrpg17b56cw1hicy3qzal9-tinystories-representative-core-w4a8-integer-calyx-native-sv
+       Last 1 log lines:
+       > python3: can't open file '/nix/store/verify_calyx_f32_constant_bits.py': [Errno 2] No such file or directory
+       For full logs, run:
+         nix log /nix/store/iw646y9harkn0sb3lpgg304sxd7dvhzm-tinystories-representative-core-w4a8-integer-calyx-native-sv.drv
+===== command 10: sha256sum /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv && wc -c /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv =====
+===== command 11: nix develop -c verilator --lint-only --timing --Wno-fatal --top-module main /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv =====
+warning: Git tree '/home/roland/compiler-lab-llm2fpga/.worktrees/llm2fpga-survey' is dirty
+%Error: /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv:257790:124267: Too many preprocessor tokens on a line (>40000); perhaps recursive `define
+%Error: /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv:257790:124265: syntax error, unexpected end of file, expecting ',' or ';'
+%Error: Cannot continue
+===== command 12: nix develop -c yosys -p 'read_verilog -sv /nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv; hierarchy -check -top main; synth -top main; stat' =====
+warning: Git tree '/home/roland/compiler-lab-llm2fpga/.worktrees/llm2fpga-survey' is dirty
+/nix/store/b8pwl1r7jq05hn5pphj4zxyg67c3zxjs-xv720lfw0g2mywl7lksp66f81gwamaha-tinystories-w8a8-rc-polynomial-exp-calyx-native-sv/sv/main.sv:727: ERROR: syntax error, unexpected TOK_DEFAULT

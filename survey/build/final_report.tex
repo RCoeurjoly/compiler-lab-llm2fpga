@@ -1,0 +1,25 @@
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\pdfinfo{/Title (Executable LLM2FPGA survey evidence report) /CreationDate (D:19700101000000Z) /ModDate (D:19700101000000Z)}
+\pdftrailerid{<4C4C4D32465047415F53555256455931>}
+\sloppy
+\title{Executable LLM2FPGA Survey Evidence Report}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+\section{Question, scope, and amendment}
+The frozen protocol reconciles 459 to 461 source records without changing the study question or eligibility rules. Evidence: \path{survey/protocol.md#lines=5-17}, \path{survey/config/scope.yaml}, \path{LLM-inference-on-FPGA-papers/data/catalog.json}, and \path{survey/build/provenance.json}.
+\section{Methods and corpus}
+Every record is retained in \path{survey/build/records_normalized.csv}; duplicate lineage is in \path{survey/build/duplicate_groups.csv}; and controlled decisions are in \path{survey/data/screening_decisions.csv}. The final corpus is 461 source records, 456 unique works, and 5 duplicate manifestations. Final counts are A=30, B=57, C=75, D=68, X=231, with 230 included records and 231 exclusions; see \path{survey/build/final_flow_counts.json}.
+\section{Review and audit}
+The final grouping has 226 project families and the bounded review has 36 reviewed project-family/control rows. Evidence: \path{survey/build/project_families.csv}, \path{survey/build/deep_review.csv}, \path{survey/build/artifact_inventory.csv}, and \path{survey/build/repository_audit.csv}.
+\section{Compatibility and MLIR/CIRCT}
+R1--R8 receipts are validated before reporting. R1 stops at RTL generation rather than passing RTL; see \path{survey/compatibility/R1-mlir-circt/manifest.json}, \path{survey/compatibility/R1-mlir-circt/commands.sh}, and \path{survey/compatibility/R1-mlir-circt/stderr.log}. The source-faithful MLIR/CIRCT catalog is 3 projects x 20 canonical transformations = 60 assessed cells; see \path{survey/build/mlir_circt_stage_matrix.csv}. H1 --- unsupported for the current route. H2 --- bounded/partial support only. H3 --- inconclusive. Evidence: \path{survey/build/mlir_circt_stage_matrix.md#lines=90-94}.
+\section{Selection result and limits}
+The decision matrix at \path{survey/build/decision_matrix_scored.csv} yields NO\_PRIMARY\_ROUTE\_PASSED. Primary route: none. R1 is the ineligible next evidence-gathering route; R2 is an ineligible different-family hypothesis. The route selection rationale is \path{survey/build/route_selection.md}. The target board remains unspecified, and no route is claimed as an eligible end-to-end causal-LM implementation.
+\section{Reproduction}
+Run \texttt{nix develop -c python -m unittest discover -s tests -p 'test\_survey\_*.py' -v}, then \texttt{nix develop -c python survey/scripts/build\_report.py --root . --out survey/build}. The pinned \path{flake.nix} and \path{flake.lock} development shell supplies the declared pdflatex command rather than a host-profile TeX installation. The renderer validates every evidence path, renders Mermaid source, invokes pdflatex twice, and records the transcript and PDF SHA-256.
+\end{document}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "source_sha256": {
+    "survey/scripts/audit_repositories.py": "1a73e93e11a137997c3832bb7701c65b253ba60a227534790992aed4bc04c65e",
+    "survey/scripts/build_report.py": "854607ebf9badf03a428687f1d9ed2a44d62c7e5e3f6c6d09bcc94480ec54344",
+    "survey/scripts/common.py": "365c82e57c8c58824e873ce61855e797506cd255994c30d2d69c0eac72bb8dbb",
+    "survey/scripts/finalize_screening.py": "ab0342db8ce3012246e859458b88c2d0b8cdaaa643da293e41a4708d74184632",
+    "survey/scripts/make_figures.py": "13392e66506762b1df7ff90f7d04c4964fc9efae3edf9a8ddbfe08f39a5b2d55",
+    "survey/scripts/mlir_stage_matrix.py": "18305eb72131324c241d0af762b0f1d3ae43391c354dde67cd6224e896dd880e",
+    "survey/scripts/run_compatibility.py": "cc5f97649f37671164b3cf634ebbf0c9cfbc1d3042a8bbd680124bf6b58abbfe",
+    "survey/scripts/select_deep_review.py": "f4451bae71db8d69988765a0730f650917e4ca983b4b423576014d38c52cecec"
+  }
+}

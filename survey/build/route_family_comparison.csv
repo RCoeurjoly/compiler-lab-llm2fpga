@@ -1,0 +1,7 @@
+route_family,corpus_primary_families,reviewed_families
+MLIR_CIRCT,3,2
+PARAMETERIZED_RTL,23,2
+HLS,45,5
+DATAFLOW,74,15
+OVERLAY,22,6
+CPU_FPGA_FALLBACK,21,6

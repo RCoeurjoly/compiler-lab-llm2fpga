@@ -121,6 +121,29 @@
         });
         inherit (llvmPackages) mlir;
         python = pkgsLlvm21.python311;
+        surveyPythonPackages = ps:
+          with ps; [
+            pandas
+            pyarrow
+            pyyaml
+            rapidfuzz
+            unidecode
+            requests
+            requests-cache
+            tabulate
+          ];
+        surveyPython = python.withPackages surveyPythonPackages;
+        # D16 renders a portable PDF from the survey evidence package. Keep
+        # pdflatex in the pinned Nix development environment rather than
+        # accepting a host-profile TeX installation.
+        surveyTex = pkgs.texlive.combined.scheme-small;
+        surveyPhase1 = pkgs.writeShellApplication {
+          name = "survey-phase1";
+          runtimeInputs = [ surveyPython ];
+          text = ''
+            exec python ${./survey/scripts/phase1_map.py} "$@"
+          '';
+        };
 
         torchao = python.pkgs.buildPythonPackage rec {
           pname = "torchao";
@@ -136,8 +159,9 @@
           doCheck = false;
           pythonImportsCheck = [ "torchao" ];
         };
-        pythonWithTinyStories =
-          python.withPackages (ps: [ ps.torch ps.packaging ps.transformers ]);
+        pythonWithTinyStories = python.withPackages
+          (ps: [ ps.torch ps.packaging ps.transformers ]
+            ++ surveyPythonPackages ps);
         pythonWithTinyStoriesTorchAO = python.withPackages
           (ps: [ ps.torch ps.packaging ps.transformers torchao ]);
 
@@ -2829,7 +2853,8 @@ PY
           '';
       in {
         packages = {
-          inherit circt mlir torchMlir yosysPkg modelRegistryJson
+          inherit circt mlir torchMlir yosysPkg modelRegistryJson surveyPython
+            surveyPhase1
             llm2fpgaMlirPasses llm2fpgaTorchMlirPasses
             llm2fpgaExactSerialGemvTorchMlirPasses llm2fpgaCirctPasses calyx;
           "tinystories-1m-exact-serial-gemv-calyx-gate" =
@@ -3132,8 +3157,20 @@ PY
             yosysPkg
             yosysSlang
             pythonWithTinyStories
+            surveyPhase1
+            surveyTex
             pkgs.verilator
           ];
+          shellHook = ''
+            export SURVEY_DECLARED_TEXLIVE="${surveyTex}"
+          '';
+        };
+
+        devShells.survey = pkgs.mkShell {
+          packages = [ surveyPython surveyPhase1 surveyTex pkgs.git pkgs.nix ];
+          shellHook = ''
+            export SURVEY_DECLARED_TEXLIVE="${surveyTex}"
+          '';
         };
 
         formatter = pkgs.nixfmt-classic;

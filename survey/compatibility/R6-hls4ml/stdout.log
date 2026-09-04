@@ -1,0 +1,7 @@
+===== command 1: sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv =====
+7ec619fa52e3b83a24a4f4b25bc656de8bd9895b2c9d70b3688e98fc7e656a62  survey/protocol.md
+239c996d4f79364b3c261bf601a7a211104b2b60396ad8b4e00e00d7d7d472f5  survey/build/deep_review.csv
+4e06aed7708955484b2eb609034c822aec62acc47f3594fec901ae95d503b301  survey/build/artifact_inventory.csv
+be15ec353621597b379bd60bc859e8b95298cbf041b0a27ed49ae611a9b5c2e6  survey/build/repository_audit.csv
+===== command 2: python3 -c "import csv,json; r=next(x for x in csv.DictReader(open('survey/build/artifact_inventory.csv')) if x['project_family_id']=='PF-3DBBE522B68ECE13'); print(json.dumps({k:r[k] for k in ('artifact_claim_state','artifact_kind','observed_status','licence_state','failure_code','limitations')},sort_keys=True))" =====
+{"artifact_claim_state": "not_reported", "artifact_kind": "none_reported", "failure_code": "NO_PROJECT_ARTIFACT_REPORTED", "licence_state": "unavailable", "limitations": "No project artifact URL was attributed by the frozen paper audit", "observed_status": "negative_evidence"}

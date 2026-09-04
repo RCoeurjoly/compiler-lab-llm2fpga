@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -u
+
+sha256sum survey/protocol.md survey/build/deep_review.csv survey/build/artifact_inventory.csv survey/build/repository_audit.csv
+python3 -c "import csv,json; r=next(x for x in csv.DictReader(open('survey/build/artifact_inventory.csv')) if x['project_family_id']=='PF-3DBBE522B68ECE13'); print(json.dumps({k:r[k] for k in ('artifact_claim_state','artifact_kind','observed_status','licence_state','failure_code','limitations')},sort_keys=True))"
