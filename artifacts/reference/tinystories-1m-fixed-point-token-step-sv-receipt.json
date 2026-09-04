@@ -1,0 +1,1205 @@
+{
+  "block_datapath": {
+    "unchanged_futil_sha256": "ab0ec932bf4a76c97df3beb11dd71a5309fe65e2bd36492ce18dc63f009622c2",
+    "wrapper_relationship": "state_capture_then_exact_block_then_state_commit"
+  },
+  "calyx_compile_policy": {
+    "disabled_passes": [
+      "cell-share"
+    ],
+    "same_futil_sha256": "3f6294e66eb24ef4f9ba67f72d4c4c0b6dd2cb4ede3dd9983055a4acb886cd50",
+    "simulator_command": [
+      "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/bin/calyx",
+      "/tmp/llm2fpga-tinystories-1m-fixed-point-token-step-generated-sv-v1/token-step.futil",
+      "-l",
+      "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/share/calyx",
+      "-d",
+      "cell-share",
+      "-b",
+      "verilog",
+      "-o",
+      "/tmp/llm2fpga-tinystories-1m-fixed-point-token-step-generated-sv-v1/main.sv"
+    ],
+    "synthesis_command": [
+      "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/bin/calyx",
+      "/tmp/llm2fpga-tinystories-1m-fixed-point-token-step-generated-sv-v1/token-step.futil",
+      "-l",
+      "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/share/calyx",
+      "-d",
+      "cell-share",
+      "--synthesis",
+      "--disable-verify",
+      "-b",
+      "verilog",
+      "-o",
+      "/tmp/llm2fpga-tinystories-1m-fixed-point-token-step-generated-sv-v1/main-synthesis.sv"
+    ]
+  },
+  "execution": {
+    "component_count": 1,
+    "cycles": [
+      2890419,
+      2890418
+    ],
+    "direct_handoff": "transaction_0.output_state_q16_16_to_transaction_1.block_input_q16_16",
+    "hardware_owned_memories": [
+      "ln1_output_q16_16",
+      "q_input_codes_i8",
+      "q_input_q16_16",
+      "q_accumulator_i64",
+      "q_post_weight_rescale_bias_q16_16",
+      "q_output_codes_i8",
+      "q_output_q16_16",
+      "k_input_codes_i8",
+      "k_input_q16_16",
+      "k_accumulator_i64",
+      "k_post_weight_rescale_bias_q16_16",
+      "k_output_codes_i8",
+      "k_output_q16_16",
+      "v_input_codes_i8",
+      "v_input_q16_16",
+      "v_accumulator_i64",
+      "v_post_weight_rescale_bias_q16_16",
+      "v_output_codes_i8",
+      "v_output_q16_16",
+      "attention_score_q8",
+      "attention_maximum_q8",
+      "attention_delta_q8",
+      "attention_exp_q1_20",
+      "attention_denominator_q1_20",
+      "attention_numerator_q17_36",
+      "attention_context_heads_q16_16",
+      "attention_context_q16_16",
+      "out_input_codes_i8",
+      "out_input_q16_16",
+      "out_accumulator_i64",
+      "out_post_weight_rescale_bias_q16_16",
+      "out_output_codes_i8",
+      "out_output_q16_16",
+      "attention_residual_q16_16",
+      "ln2_output_q16_16",
+      "c_fc_input_codes_i8",
+      "c_fc_input_q16_16",
+      "c_fc_accumulator_i64",
+      "c_fc_post_weight_rescale_bias_q16_16",
+      "c_fc_output_codes_i8",
+      "c_fc_output_q16_16",
+      "gelu_output_q16_16",
+      "c_proj_input_codes_i8",
+      "c_proj_input_q16_16",
+      "c_proj_accumulator_i64",
+      "c_proj_post_weight_rescale_bias_q16_16",
+      "c_proj_output_codes_i8",
+      "c_proj_output_q16_16",
+      "block_output_q16_16",
+      "block_input_q16_16",
+      "output_state_q16_16"
+    ],
+    "host_expected_output_preload": false,
+    "host_intermediate": false,
+    "host_preload_memories": [
+      "attention_exp_lut_q1_20",
+      "c_fc_bias_q16_16",
+      "c_fc_input_scale_q8_24",
+      "c_fc_output_scale_q8_24",
+      "c_fc_weight_codes_i8",
+      "c_fc_weight_scale_q8_24",
+      "c_proj_bias_q16_16",
+      "c_proj_input_scale_q8_24",
+      "c_proj_output_scale_q8_24",
+      "c_proj_weight_codes_i8",
+      "c_proj_weight_scale_q8_24",
+      "gelu_lut_q12",
+      "k_input_scale_q8_24",
+      "k_output_scale_q8_24",
+      "k_weight_codes_i8",
+      "k_weight_scale_q8_24",
+      "ln1_beta_q16_16",
+      "ln1_gamma_q16_16",
+      "ln2_beta_q16_16",
+      "ln2_gamma_q16_16",
+      "out_bias_q16_16",
+      "out_input_scale_q8_24",
+      "out_output_scale_q8_24",
+      "out_weight_codes_i8",
+      "out_weight_scale_q8_24",
+      "q_input_scale_q8_24",
+      "q_output_scale_q8_24",
+      "q_weight_codes_i8",
+      "q_weight_scale_q8_24",
+      "v_input_scale_q8_24",
+      "v_output_scale_q8_24",
+      "v_weight_codes_i8",
+      "v_weight_scale_q8_24",
+      "input_state_q16_16"
+    ],
+    "simulator_runs": 1,
+    "transaction_count": 2,
+    "verification_invocations": 3
+  },
+  "fixture_authorities": {
+    "attention": {
+      "identity": {
+        "adapter_sha256": "5f2dfa10c54134e44a31f89608b562aea33ef39deacfcd62eadac1f0fda94892",
+        "capture_sha256": "7411854c32c74cd220de503b08d3e066aa458a17fe3804f3bd2bcc333d2bc159",
+        "contract_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+        "linked_mlp_fixture_file_sha256": "2e9852cd4f0a7eb0afc090678378b5c041253abfd8923cf164793b12d5f9f365",
+        "model_config_sha256": "ff74c30d5ebb5ab1da0f2ea479adf7197c504b42b5522a858c334ab91ed4958c",
+        "package_manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+        "package_receipt_sha256": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
+        "package_scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+        "package_weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+        "successor_generation_receipt_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3"
+      },
+      "receipt_sha256": "3c64d7802a8808c850eb35bd02dc451a063b36d090e4a3ff70c77ac4cbfe12bf",
+      "schema": "tinystories-1m-fixed-point-attention-crossing-slice-v1",
+      "tensor_fixture_receipt_sha256": "eb266e6683f17794ea73dc601b25da5806d58a468035a9efe4b5effbcd450cb0",
+      "tensors": {
+        "attention_context_heads_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "8f48e630496f999ef156b4e4ce19167cf3c219720ffa341f3f4d59369cb5908d",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "98caa25575176da4a9573eaf9a6e0dac066a825cc0afd4441797a64b5896cdf2",
+          "semantic": "causal_attention_per_head_context_q16_16",
+          "shape": [
+            4,
+            16,
+            4
+          ]
+        },
+        "attention_context_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "de6a4c3d215f18814eda53c35bb142d7e3f532a1c7dcb45c5bfd8e53d24d8cc0",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "98caa25575176da4a9573eaf9a6e0dac066a825cc0afd4441797a64b5896cdf2",
+          "semantic": "causal_attention_concatenated_context_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "attention_delta_q8": {
+          "bytes": 2048,
+          "canonical_sha256": "a6f7b9e59cb62dc98010f245435f7b0d031b38d93c684e28263262ad294710ec",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "be9a0c87f619eb18154b67bb3a9fc56f40fbd85f1c43d2605a06e55805cce311",
+          "semantic": "causal_attention_clamped_delta_q8_future_slots_zero",
+          "shape": [
+            4,
+            16,
+            4
+          ]
+        },
+        "attention_denominator_q1_20": {
+          "bytes": 512,
+          "canonical_sha256": "2d8429fcd4d9ef6a900f58eba3a6e9e954fa77178c7acc09507f56edd317e0db",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "8b585b557cee8787c57b0e811b932f4e42852723501fd769656be5c82d3bd7dd",
+          "semantic": "causal_attention_probability_denominator_q1_20",
+          "shape": [
+            4,
+            16
+          ]
+        },
+        "attention_exp_lut_q1_20": {
+          "bytes": 32768,
+          "canonical_sha256": "53ca4aab0e190c1a791ab738e289f5c83f3f5233f1a6ddc77542dc6e06c3088e",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "2c34dcd95e6ce9a955fa48dbac85bd4f207942f80d918a5eaf987fc338b25bc5",
+          "semantic": "exact_attention_exp_lut_q1_20",
+          "shape": [
+            4096
+          ]
+        },
+        "attention_exp_q1_20": {
+          "bytes": 2048,
+          "canonical_sha256": "36eb12c6015dc9cc06a92d0be84b8a4c68c6ac745a4b9f8092b8d0876f7cbf2f",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "7b10f6334c50e0f4575fc2fe493706cbc3f356f06eaed0c582c26309b3e973c1",
+          "semantic": "causal_attention_exp_q1_20_future_slots_zero",
+          "shape": [
+            4,
+            16,
+            4
+          ]
+        },
+        "attention_maximum_q8": {
+          "bytes": 512,
+          "canonical_sha256": "f6ccf79a7e6d9244acfe214854784f7816e556eea1c90770270b6e54de9a5d56",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "af6aee01ce0d4b286f840c659385f6a052e33f94c352026bc6debe155634ca14",
+          "semantic": "causal_attention_row_maximum_q8",
+          "shape": [
+            4,
+            16
+          ]
+        },
+        "attention_numerator_q17_36": {
+          "bytes": 2048,
+          "canonical_sha256": "ce9d5e09a3d6cffa707f5c878b7a958d92efa528448882a9e9186a32c04b58d6",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "5fb731839d8c3f0cbeeb83db1484e043d81f4eee45a16b43a620663e2ef1cb6c",
+          "semantic": "causal_attention_value_numerator_q17_36",
+          "shape": [
+            4,
+            16,
+            4
+          ]
+        },
+        "attention_residual_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "c9ace54dd1d03fefd0e884efc7a31cb4ba9e17a4e02865d234e90ce100402d16",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "f2ac68fb4fac9728751defb246cc22e99c6489d901473e2433719962468ab1c6",
+          "semantic": "block_0_attention_residual_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "attention_score_q8": {
+          "bytes": 2048,
+          "canonical_sha256": "cd7544523d94144bfdd16253815b7c87c8e8302c820fae3faa7b66dc57676105",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "73f3e16d748d5055344f3ac7279f38d01aa4e4d3a1d1d05e7e82419592834e7f",
+          "semantic": "causal_attention_score_q8_future_slots_zero",
+          "shape": [
+            4,
+            16,
+            4
+          ]
+        },
+        "block_input_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "e632f136d221f73940477949305b5edbfc5c64ea0652f811b817a96efc65fe84",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "1d6a6b51026506667795de7fd0c4b5d94646aa066b4f7cfe37e69b28829bbcde",
+          "semantic": "block_0_input_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "c_fc_input_codes_i8": {
+          "bytes": 2048,
+          "canonical_sha256": "bec198ee995e0378c658958101473e5a77d4bce9e179fa2768f32e067b5010f0",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "1f1b1a25d0da45eb29bece776b4bbf68aa580adf018cd4e0eab719b3bcd8505a",
+          "semantic": "c_fc_input_signed_int8_codes",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "c_fc_input_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "2b70d0dc63945634d7620287dd05be73d11d9c9c4cba9b485f74084cdf00a572",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "d3d6340a836e6a324ee5fb73cabf732b57038000596d5577adb6e985d967393a",
+          "semantic": "c_fc_input_dequantized_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "c_fc_input_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "0986748f8e26a2c7e4b5a9193ad553faca5394f2d94d2381fa80609e9e7f735e",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "758ff503e11e484865dc3ef7e06e2788c74976f698a6a01c879a1b9954683956",
+          "semantic": "c_fc_input_per_channel_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "k_accumulator_i64": {
+          "bytes": 2048,
+          "canonical_sha256": "b0856d9442dfbe6c0d6feef6f6faac21c33442f4d36d6e46339062e28d9969e7",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "b8ff33499e2856cb10511e6012a8b280001e85b0e04d63d7b2021385bc65c957",
+          "semantic": "key_exact_serial_accumulator_i64",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "k_input_codes_i8": {
+          "bytes": 2048,
+          "canonical_sha256": "1be65e1c12834ac40c3a970ad400cb2f0ce70a3522306dc6e6943241f1c30684",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "92d664a3d3992c2c6332c54a0731328d9a394b6bd06a96c08060d7b0efa72c76",
+          "semantic": "key_input_signed_int8_codes",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "k_input_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "0c37f01e0203eacf541aee571ed0ebbab53f3d7b01c2e4006103a72ab134575e",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "1f6c1e32fab4ec6b612c7083071fa5aae7b1d3ad3b742e5e5050e070346b63db",
+          "semantic": "key_input_dequantized_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "k_input_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "df2b48646825332ab6fc74ce8036b258e89633cc5f6f1a3973c17e15e0549db5",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "63a6fb3e25b3b8ffed7030d5f9fdf096afb6b44fd73ce74c32b6adcd5ca47045",
+          "semantic": "key_input_per_channel_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "k_output_codes_i8": {
+          "bytes": 2048,
+          "canonical_sha256": "145cd828f092c857a068fa704cf923315dbd53db50cdea6df7425cc7882f5540",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "023b26d317b2b8c2c3eb18192c3ce9068fbe835450c11198f3d61d422ec2c794",
+          "semantic": "key_output_signed_int8_codes",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "k_output_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "410a72aca5a49501c304d9cf818a7d262b5076d853a7e8560bd64c7b84433e3a",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "430ed392f26f19d5954e26f17e95dbc34ae519e02169815c7785a722bade1968",
+          "semantic": "key_output_dequantized_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "k_output_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "dcfacf8711cf96b7d0e4404938f73a38fdac8ae759b6510080ddcd4c7b4429fa",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "b65ad424c7775f3ea8b7027f16242aa0bb72889fd4404d3146c082ac2edb9fa7",
+          "semantic": "key_output_per_channel_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "k_post_weight_rescale_bias_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "ead03a3035cd0e7a52211a3a40e11a8d39591e603a5ae53215cf16be7f8b68b8",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "1f1383a969ea319974a127a1006561acd7d37dbbb97799ab1b40991cccf8860e",
+          "semantic": "key_post_weight_rescale_plus_optional_bias_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "k_weight_codes_i8": {
+          "bytes": 32768,
+          "canonical_sha256": "8c3a9149c7a63bc6d7abadcd2bea0ae8c28c555321508bf346e328d4153ed6b4",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "1f6b22f9a063ba7413a3bf633b810ff0e3419193bf1a721767a36fbd7cdbb330",
+          "semantic": "key_weight_signed_int8_codes",
+          "shape": [
+            64,
+            64
+          ]
+        },
+        "k_weight_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "3df106c4d770dc0ee7da935d140bd467402386cb233db045dcfedfdbb46cdf04",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "3c8bf12185ee2fc85f41d8ac6fdf6f3d745ebb3ec6c77bce665705fde5382d9f",
+          "semantic": "key_weight_per_output_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "ln1_beta_q16_16": {
+          "bytes": 512,
+          "canonical_sha256": "2779d2733ebce68c975c6c3c9f0c30eea1943f2a08f040fd77d9087ffcdfe551",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "b538543ef6d50609804071eae0bfb7a4fd91dc025a9eceffaef6e1204684db33",
+          "semantic": "block_0_ln1_beta_q16_16",
+          "shape": [
+            64
+          ]
+        },
+        "ln1_gamma_q16_16": {
+          "bytes": 512,
+          "canonical_sha256": "e475e4c1800d8273f6c3423a0c5de31810c30215e3d2153ba13e4e51a11ea615",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "9fbeb8209b11075018454683fd26033d79f6e6aeb51c2c1bb83b1d49a4805048",
+          "semantic": "block_0_ln1_gamma_q16_16",
+          "shape": [
+            64
+          ]
+        },
+        "ln1_output_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "95f2ecba090cae738c1b9dc9fc1b6abc5fd28385ee7e92f99e75583fb6ba9bb0",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "31f31df11ae9bf6e0ccf1df09b98157a8723c4684c5ce96c673683687bb0ef34",
+          "semantic": "block_0_ln1_output_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "ln2_beta_q16_16": {
+          "bytes": 512,
+          "canonical_sha256": "3642221e7200b9290750cd7cb8a984742e3c2d14dc8f3e6b533f7686dc81ac4f",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "fc2310ac54949cb40f93bf750edce97c0db36b3fe69736ffd1a2c74295df9878",
+          "semantic": "block_0_ln2_beta_q16_16",
+          "shape": [
+            64
+          ]
+        },
+        "ln2_gamma_q16_16": {
+          "bytes": 512,
+          "canonical_sha256": "27717f2bc0d1f6b5bca601472f976cd3684439afeb0d0267ee60e30579683f86",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "a9b331bdc3bbe443ef3f7af785887722b5279ce4a10317c7a29d0579ecc38f48",
+          "semantic": "block_0_ln2_gamma_q16_16",
+          "shape": [
+            64
+          ]
+        },
+        "ln2_output_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "f630cd725ca2e381035ea31c2b37881f20a6af925e07c6013c30862a75741541",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "cca05461f4502ea40bf81f7c41959f7c39b4b7778ef8265b087dac0a77ee74f5",
+          "semantic": "block_0_ln2_output_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "out_accumulator_i64": {
+          "bytes": 2048,
+          "canonical_sha256": "57e6f412ed5d24013a7dc4ec1b547a791c64c3ba44bd6a9003c0a3af36614a8b",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "35ea56f6494429748a6debaf16e1bae2ffbcdeafe4acbede8f065eb65259088f",
+          "semantic": "attention_output_exact_serial_accumulator_i64",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "out_bias_q16_16": {
+          "bytes": 512,
+          "canonical_sha256": "b5337fcfd17dd72415abbbd01655889a07f5dd6f4bfdd5aee2583ac46db9ac98",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "c82d5c0da3b18fda0d2bdcc3228f53a360d8dc612964c7f8187a5da81213a721",
+          "semantic": "attention_output_projection_bias_q16_16",
+          "shape": [
+            64
+          ]
+        },
+        "out_input_codes_i8": {
+          "bytes": 2048,
+          "canonical_sha256": "ad2b7b383fff1cfde2f534c5a0bef4e1bd743cb9297e1cecdd30562afabc3469",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "8b6c508a6c8f02b59a4d707a91a5683be22cf679e638dbbc9cb0b21dc6a35496",
+          "semantic": "attention_output_input_signed_int8_codes",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "out_input_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "a02da9cd02817442631b831f473ac62ab1bc7da391957d77dd403352677be786",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "866a8345482acd9e02081bd732679590afd2bce7af291efdbd0ec1840b7fb4e4",
+          "semantic": "attention_output_input_dequantized_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "out_input_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "29e1797c4e1a8e81ddd41a3f2762c46741ec7d11789f6bcf55f981f555204526",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "1cff06fdf34e3de9f2d4b82e829f2c31526266b13f4112d719862613e2c10f8e",
+          "semantic": "attention_output_input_per_channel_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "out_output_codes_i8": {
+          "bytes": 2048,
+          "canonical_sha256": "286dfb737893fe302abd91ee51a4e4d692553d588efdaf1db4dcb6b1a49e5575",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "3472c587a3a3afa60c0669296deb6954156f622c768e09e318d959f49b004434",
+          "semantic": "attention_output_output_signed_int8_codes",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "out_output_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "660d4d23473a76fb55a5170756741270de7f71a325f927d848072a08ffa2fc21",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "29705aebe1b7a5278756361071929c4f041068a71d412639cfac9150b9c90651",
+          "semantic": "attention_output_output_dequantized_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "out_output_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "a037f0ca6dfcf521b62564b603c5bc5d365a35abf8bcdcad4012c08a4c075bd2",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "5ff69e72724c8e443f1fcba713ed95bc4b27c17e1e74ca22fb2391884d8753ad",
+          "semantic": "attention_output_output_per_channel_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "out_post_weight_rescale_bias_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "4db52d54d322c6fc2c168670973eb8877ed638e9881c406686664999d1f4fa54",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "9bdf3794d803b24953925d408913082aece923dde696900314bf500696b924a0",
+          "semantic": "attention_output_post_weight_rescale_plus_optional_bias_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "out_weight_codes_i8": {
+          "bytes": 32768,
+          "canonical_sha256": "b96e088c2fe459977b16a0a8519e0dfb2bb4dd2f418ce96232f7ad880349ae90",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "1eb33dc767093fef5bfc1bf5156feaf5ae08f02c631b50fb13d8eaace4b0faf1",
+          "semantic": "attention_output_weight_signed_int8_codes",
+          "shape": [
+            64,
+            64
+          ]
+        },
+        "out_weight_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "851480953542646c854c9b75a1706f42ee993cbf9a6c1c83573a07dd0fcbcfbd",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "053562ea3181d7949d7610acd2edee9a5c8e38b2c0b105a5ff09608fa5f6d031",
+          "semantic": "attention_output_weight_per_output_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "q_accumulator_i64": {
+          "bytes": 2048,
+          "canonical_sha256": "ec236ea81b86d4603215a70e0b105a81b5806a42ef0fa36d7797b358df367764",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "adbdd50407f9c1555052ed6662dcf189d2ec3a67370535acd696976eae530705",
+          "semantic": "query_exact_serial_accumulator_i64",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "q_input_codes_i8": {
+          "bytes": 2048,
+          "canonical_sha256": "4f7c53322f7c099cb3f63d3a353849796ae3fa6f073faa70570bb9472289dc27",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "92d664a3d3992c2c6332c54a0731328d9a394b6bd06a96c08060d7b0efa72c76",
+          "semantic": "query_input_signed_int8_codes",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "q_input_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "1776891281a76645167357df3793a169abb13c782135d322395d592e79186891",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "1f6c1e32fab4ec6b612c7083071fa5aae7b1d3ad3b742e5e5050e070346b63db",
+          "semantic": "query_input_dequantized_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "q_input_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "af5ef2d380ccbb8d4081b72dcd2ac379199760cc98d8f6ab0547b6c6baf4fef3",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "63a6fb3e25b3b8ffed7030d5f9fdf096afb6b44fd73ce74c32b6adcd5ca47045",
+          "semantic": "query_input_per_channel_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "q_output_codes_i8": {
+          "bytes": 2048,
+          "canonical_sha256": "19a0f1220f88b08ee856803fe420dc710b43af39765d6ccb235a8603736d4dc9",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "d7c0c2acf0353354be11944a395bea34e05771db3c25c3588cff83e97624402f",
+          "semantic": "query_output_signed_int8_codes",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "q_output_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "a6c7ddc9b59442f886b25d3344d92f632f9ad7d768e1a707c4e57a0d2d50428c",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "a8d503384a8d862802d4b85ee462129a3d838f9eabf088c3b10c5710c3263d95",
+          "semantic": "query_output_dequantized_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "q_output_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "179748a25434449a1df765300ce44211b0c522da79913d38c69e4b9b77ffd347",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "5f03987f540507d246c4ab94e3e2176d254e68e06049aa0cdfe3466519c9b7f8",
+          "semantic": "query_output_per_channel_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "q_post_weight_rescale_bias_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "63e5d50b1efc54715cfde30106ad9d8305683b478df69971ab6572c3ac8d872d",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "6a2828ed91949353359862fc82d11f569010ce90046f0c580d6f0ed7394c9fe9",
+          "semantic": "query_post_weight_rescale_plus_optional_bias_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "q_weight_codes_i8": {
+          "bytes": 32768,
+          "canonical_sha256": "c50b247638eecdb2c3d653b9cec89f6aff127b8151d42cebb048e43580b05275",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "5eacb7c0be2c1df9e02db31cab6f8f116cbc71127b1435ac337866db2fa4dc70",
+          "semantic": "query_weight_signed_int8_codes",
+          "shape": [
+            64,
+            64
+          ]
+        },
+        "q_weight_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "1d4b33b7d9957781aacde9fae9aa76d20e0537fefd02219461dfdbfe71234f51",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "91f38849c27ba0eafe7b657a4331a2548fa5408b097c5d4a455963c51e6a89c8",
+          "semantic": "query_weight_per_output_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "v_accumulator_i64": {
+          "bytes": 2048,
+          "canonical_sha256": "6f85584de169ad81f902f9694062813ae8f1990e1d463ee23c3005c5448cbdd3",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "1e298612082676612e1939e3850bbea2530d75bb69f49b401038fcbd5a03ee4c",
+          "semantic": "value_exact_serial_accumulator_i64",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "v_input_codes_i8": {
+          "bytes": 2048,
+          "canonical_sha256": "f6887621146fa1ff3738afb1f4f2f069dffd40393dfb74451f36fd8911670782",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "92d664a3d3992c2c6332c54a0731328d9a394b6bd06a96c08060d7b0efa72c76",
+          "semantic": "value_input_signed_int8_codes",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "v_input_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "a61e296cbf35acd381078392b2d50e76899f77fe78eeb702015bf9e830de6d25",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "1f6c1e32fab4ec6b612c7083071fa5aae7b1d3ad3b742e5e5050e070346b63db",
+          "semantic": "value_input_dequantized_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "v_input_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "8a597bc0c903a4151fb6451e180c2ba0b7ff9dd68f231326d1380f32a3ff1698",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "63a6fb3e25b3b8ffed7030d5f9fdf096afb6b44fd73ce74c32b6adcd5ca47045",
+          "semantic": "value_input_per_channel_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "v_output_codes_i8": {
+          "bytes": 2048,
+          "canonical_sha256": "7df73bff9fdd69c31ce52b40bb9a0fbcafdb6d19e7bfb4d2f579fc257d851889",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "a9503655000887ad94ff1383e4367106b572095dfc3cc90cb0dcff0b12ec5e61",
+          "semantic": "value_output_signed_int8_codes",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "v_output_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "0c47e3dddf47317255deed23dd541e0eec136a3801f9dc1f35a1d7af6f4ac6cf",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "6c13b7ddd9b9b58e5890d291c48c93dcbc98ff1545dc6860c53a822e800b13ca",
+          "semantic": "value_output_dequantized_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "v_output_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "89651bbf42ad9f91a4f0cac98651cb6a6d9ec1a26c4e171e137e5cbb554fd6e9",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "3160a3f81960e2a6c2f154d63e092fbc82b2d2f55251f92d20c9614c476c0ddd",
+          "semantic": "value_output_per_channel_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "v_post_weight_rescale_bias_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "c703537d9425e288be75a27df67b26979f1c110afa97d6ccb3ac96f242e8fb63",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "024bd613ca8e3f3b52b34941da8f91adec44cd62217ed60ef7f7f4b928eeca8f",
+          "semantic": "value_post_weight_rescale_plus_optional_bias_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "v_weight_codes_i8": {
+          "bytes": 32768,
+          "canonical_sha256": "5361f719ddc96524e175b3ec60dd9e87289a12c9fafe73b47784eea2207e81a2",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "e79f6ce915538f43e52b1ef38de99a6195d4c423c2325833960fa9472030e744",
+          "semantic": "value_weight_signed_int8_codes",
+          "shape": [
+            64,
+            64
+          ]
+        },
+        "v_weight_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "dc089460047e9be90bb6c244bc8ba53b8672e7057edb1ea371dbd3e450cd49d7",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "2c91d4addc8686de3735cd1f0f8226c707730d55d7b86ce26e1438e81dac3a1a",
+          "semantic": "value_weight_per_output_q8_24_scale",
+          "shape": [
+            64
+          ]
+        }
+      }
+    },
+    "block": {
+      "identity": {
+        "adapter_sha256": "5f2dfa10c54134e44a31f89608b562aea33ef39deacfcd62eadac1f0fda94892",
+        "attention_fixture_file_sha256": "403f6ecb1e69c721a1f3267405032b3ff9f3b0029d1dafcfcb90d5d6f2928bd3",
+        "capture_sha256": "b802c9869c67fe2b3462f972492cf3fe0fd7148cf74ea745a58d1081b19b87c3",
+        "contract_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+        "mlp_fixture_file_sha256": "2e9852cd4f0a7eb0afc090678378b5c041253abfd8923cf164793b12d5f9f365",
+        "model_config_sha256": "ff74c30d5ebb5ab1da0f2ea479adf7197c504b42b5522a858c334ab91ed4958c",
+        "package_manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+        "package_receipt_sha256": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
+        "package_scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+        "package_weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+        "successor_generation_receipt_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3"
+      },
+      "receipt_sha256": "658d68e6ca2c0284994f47610edf24690ca4f6f59e9d0467981563bb29629edf",
+      "schema": "tinystories-1m-fixed-point-block-composition-slice-v1",
+      "tensor_fixture_receipt_sha256": "957ce3a789977c6601db1c05b8b6a9f46a51c32c4fdcd7e2ccfda3aa82064a95",
+      "tensors": {
+        "block_output_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "762fe81857a2460b50c9375a56ef8378b7938d8f7fcfc7ec16bd73fefa063ef4",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "61a7016bc7936ae32cefdf8153cf4560454c662e6c0ea6351144f3a5b377bedf",
+          "semantic": "block_0_output_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        }
+      }
+    },
+    "mlp": {
+      "identity": {
+        "adapter_sha256": "5f2dfa10c54134e44a31f89608b562aea33ef39deacfcd62eadac1f0fda94892",
+        "capture_sha256": "ad9a7aa3cc00634e0acaa5751352bcd670605c95393783f28be0d89e401fb072",
+        "contract_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+        "model_config_sha256": "ff74c30d5ebb5ab1da0f2ea479adf7197c504b42b5522a858c334ab91ed4958c",
+        "package_manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+        "package_receipt_sha256": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
+        "package_scales_sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155",
+        "package_weights_sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+        "successor_generation_receipt_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3"
+      },
+      "receipt_sha256": "f50213dfb09e139d85b8fe6c8f11bd143dea69661246106b8506a103a593f9f2",
+      "schema": "tinystories-1m-fixed-point-mlp-crossing-slice-v1",
+      "tensor_fixture_receipt_sha256": "664d2ff8e9c5d8ac733117f7d6487e5c12944ebba9dfd28c27b645e5a99786c0",
+      "tensors": {
+        "c_fc_accumulator_i64": {
+          "bytes": 8192,
+          "canonical_sha256": "b0269d11a255ca7f7f179a45a94b38fd6f4c611693feb73f7c2741ac1b893952",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "36c1f367ecb3ba3de99fd8b2bb313f1046be6ad196744342301103cdeed6a1b7",
+          "semantic": "c_fc_exact_serial_accumulator_i64",
+          "shape": [
+            4,
+            256
+          ]
+        },
+        "c_fc_bias_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "0fac63ec6ac73fb47ff94dbd4c5dffb780df7186095ab711ea5bcf1a9b913d26",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "3a12c4cb66e2d4ad3130517281d08885d0c10c4c5ae0dbe3eb259278960b35cb",
+          "semantic": "c_fc_bias_q16_16",
+          "shape": [
+            256
+          ]
+        },
+        "c_fc_input_codes_i8": {
+          "bytes": 2048,
+          "canonical_sha256": "bec198ee995e0378c658958101473e5a77d4bce9e179fa2768f32e067b5010f0",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "1f1b1a25d0da45eb29bece776b4bbf68aa580adf018cd4e0eab719b3bcd8505a",
+          "semantic": "c_fc_input_signed_int8_codes",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "c_fc_input_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "2b70d0dc63945634d7620287dd05be73d11d9c9c4cba9b485f74084cdf00a572",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "d3d6340a836e6a324ee5fb73cabf732b57038000596d5577adb6e985d967393a",
+          "semantic": "c_fc_input_dequantized_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "c_fc_input_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "0986748f8e26a2c7e4b5a9193ad553faca5394f2d94d2381fa80609e9e7f735e",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "758ff503e11e484865dc3ef7e06e2788c74976f698a6a01c879a1b9954683956",
+          "semantic": "c_fc_input_per_channel_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "c_fc_output_codes_i8": {
+          "bytes": 8192,
+          "canonical_sha256": "8c591bdadd44ac340e3dab5a809f74e5f8e201c0ae1f2f0c45c371b487a338ac",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "b83a36131a4d68134b4a6e3a18b1d591f2439052a115ec8e131154de767ec97a",
+          "semantic": "c_fc_output_signed_int8_codes",
+          "shape": [
+            4,
+            256
+          ]
+        },
+        "c_fc_output_q16_16": {
+          "bytes": 8192,
+          "canonical_sha256": "f8341f9b3d302def903538f6dc801310dd24c491226b3de5c80251595c86db6c",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "ef68cadf887aefd0b76994499cd8705376f2686b01296c92f7b87d2c1ad3bdcf",
+          "semantic": "c_fc_output_dequantized_q16_16",
+          "shape": [
+            4,
+            256
+          ]
+        },
+        "c_fc_output_scale_q8_24": {
+          "bytes": 2048,
+          "canonical_sha256": "e061c121379fbb21d5d50aee0a54e89a7188c9c98df7b1f8897775029fa588d5",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "4ff1d77a941b0968f5d44d14618e9b9dc13e4408275b85a336db1964988846c0",
+          "semantic": "c_fc_output_per_channel_q8_24_scale",
+          "shape": [
+            256
+          ]
+        },
+        "c_fc_post_weight_rescale_bias_q16_16": {
+          "bytes": 8192,
+          "canonical_sha256": "7a0e75256204020a7cd6ba9a97563101f2c0b1a08cde47251087bf2a621e6c10",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "921ae2cae3aa6dd7d9ecc834e63fce2ce44ae93f5afdd3df9cd930ac24a688e1",
+          "semantic": "c_fc_post_weight_rescale_plus_bias_q16_16",
+          "shape": [
+            4,
+            256
+          ]
+        },
+        "c_fc_weight_codes_i8": {
+          "bytes": 131072,
+          "canonical_sha256": "4b53345dfbd45addbced6b6b307f909c9afb95fdff2fe7ff7742c3af4343ce3d",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "062560e9983a297c5496547ce9b2b449075829023a6ac6c5b41b7e1ef058846f",
+          "semantic": "c_fc_weight_signed_int8_codes",
+          "shape": [
+            256,
+            64
+          ]
+        },
+        "c_fc_weight_scale_q8_24": {
+          "bytes": 2048,
+          "canonical_sha256": "eec0f19fbf6ac25afe7d8a63ef84f42f98ad1d187c7688b1abff8079f07df9f1",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "3086c40a5f39cc85e9f5cd7022b5e8c3726862f43ed609f86708d1e41603a6ab",
+          "semantic": "c_fc_weight_per_output_q8_24_scale",
+          "shape": [
+            256
+          ]
+        },
+        "c_proj_accumulator_i64": {
+          "bytes": 2048,
+          "canonical_sha256": "04327ff5af05efe12dd0bc0f2366a200f4d7407a2123a7f0f5e308d39975064a",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "f81e12b5ecc0bdacede1b1195b4b7a3fdf58e96be789303d07d0141e66f4fab5",
+          "semantic": "c_proj_exact_serial_accumulator_i64",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "c_proj_bias_q16_16": {
+          "bytes": 512,
+          "canonical_sha256": "bfac4434aaf578315995137172ca9f240497847a7e5a3da2917074fd902db942",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "f9ce964284355ce02fe67fdc28dcbd5d230e703161e2a7a9c0fd7b8c0432da79",
+          "semantic": "c_proj_bias_q16_16",
+          "shape": [
+            64
+          ]
+        },
+        "c_proj_input_codes_i8": {
+          "bytes": 8192,
+          "canonical_sha256": "884c7b7bd9900e6aa98d8737c3a218f71cb40ac33c69c1946265028f40ab5de5",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "8e3779d5a472c3b213cada16257b20b21f2a4502d4ca864cdb67b69c4f846896",
+          "semantic": "c_proj_input_signed_int8_codes",
+          "shape": [
+            4,
+            256
+          ]
+        },
+        "c_proj_input_q16_16": {
+          "bytes": 8192,
+          "canonical_sha256": "97d926427e7872c98441563145be01f36631614af53d49597c9e176e5414b066",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "6690273a09ad34bd2b83031247374cf2f34c39303120e09b21a151142409a9ec",
+          "semantic": "c_proj_input_dequantized_q16_16",
+          "shape": [
+            4,
+            256
+          ]
+        },
+        "c_proj_input_scale_q8_24": {
+          "bytes": 2048,
+          "canonical_sha256": "e9b260b3d94f8f27748f654e9f28da7bfb786cb3e267f70dbbd3d82c471f73c1",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "cbcca4a8146bc8240c0701cbb7735d5b21fb1a1172ef8baadab89893cd8c45f8",
+          "semantic": "c_proj_input_per_channel_q8_24_scale",
+          "shape": [
+            256
+          ]
+        },
+        "c_proj_output_codes_i8": {
+          "bytes": 2048,
+          "canonical_sha256": "82b8ff1963a632bdf0264f9f488ec53913f97feb68e2b93c2175d9656ef8758f",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "9bc77a3c260d40705d4dc521c0ece2694b57112ba5dc2009a95df08e0c306f95",
+          "semantic": "c_proj_output_signed_int8_codes",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "c_proj_output_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "536d150b1454a13e98e9864f6cd0f132d66c53fc3971e72eff51f532f867629c",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "d99bb50bc6936de3ea6b1cdea822295824964dddeb8c9f0f934ca2d9f379ec57",
+          "semantic": "c_proj_output_dequantized_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "c_proj_output_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "effcd49e7facec211def8971be4d27983ffb02afab88fefd802f3e7755049fee",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "4e69a3b5bf0a60e011716778b1b14f4d92ec368ad1b22591749482a76b805a0c",
+          "semantic": "c_proj_output_per_channel_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "c_proj_post_weight_rescale_bias_q16_16": {
+          "bytes": 2048,
+          "canonical_sha256": "959bf8e0404ac6cbcb071961240afe50ecd1da2818bb08b17e5dc3f14903798b",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "7e7d87bf094ec87b0a164f5acf141e2013a5be3bfecfe9fca8c70b99b1c461c1",
+          "semantic": "c_proj_post_weight_rescale_plus_bias_q16_16",
+          "shape": [
+            4,
+            64
+          ]
+        },
+        "c_proj_weight_codes_i8": {
+          "bytes": 131072,
+          "canonical_sha256": "3279e97b0063e5a94aeeb2c12b29d833889d6f8623f9d0f1295a4a75307cc345",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "fb6f5bbab280aa8dfd6a68f71f42085ac9ea5c8b7447586d714ae1492a9ae32d",
+          "semantic": "c_proj_weight_signed_int8_codes",
+          "shape": [
+            64,
+            256
+          ]
+        },
+        "c_proj_weight_scale_q8_24": {
+          "bytes": 512,
+          "canonical_sha256": "1d422460da7cb982518703551d999ca087293de964dd05cb6bd299f321e36c3d",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "be2e8777d0138abf9d1a387264a0aa447d44ece8afa91e6dcc333cfe220c90d2",
+          "semantic": "c_proj_weight_per_output_q8_24_scale",
+          "shape": [
+            64
+          ]
+        },
+        "gelu_input_q16_16": {
+          "bytes": 8192,
+          "canonical_sha256": "37297aba4e89e25b6bfea76caa4f3c4150982d1ae589df95adb19b632774f2eb",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "ef68cadf887aefd0b76994499cd8705376f2686b01296c92f7b87d2c1ad3bdcf",
+          "semantic": "block_0_fixed_gelu_input_q16_16",
+          "shape": [
+            4,
+            256
+          ]
+        },
+        "gelu_lut_q12": {
+          "bytes": 65536,
+          "canonical_sha256": "d37824347eacba38adfc5b8f0ffbdaf7f26a98f8ca6db25a5d741eceea680054",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "f0051fd04e31d4cbd5f5abfbffdd82beeb07e28bbb7275300a4065ee9a3f64e5",
+          "semantic": "exact_fixed_gelu_lookup_table_q12",
+          "shape": [
+            8192
+          ]
+        },
+        "gelu_output_q16_16": {
+          "bytes": 8192,
+          "canonical_sha256": "3a8cdf030c1620bfeb77036a74bbd6f2836c1430c2f3b48a1f938dac4b9a4d76",
+          "dtype": "int64",
+          "little_endian_int64_sha256": "edbf713393646b9d30aeb31798f1d8d786234e2835c95bd6abbdc496a2654258",
+          "semantic": "block_0_fixed_gelu_output_q16_16",
+          "shape": [
+            4,
+            256
+          ]
+        }
+      }
+    }
+  },
+  "generated_artifacts": {
+    "futil": {
+      "bytes": 248276,
+      "path": "/tmp/llm2fpga-tinystories-1m-fixed-point-token-step-generated-sv-v1/token-step.futil",
+      "sha256": "3f6294e66eb24ef4f9ba67f72d4c4c0b6dd2cb4ede3dd9983055a4acb886cd50"
+    },
+    "harness": {
+      "bytes": 250197,
+      "path": "/tmp/llm2fpga-tinystories-1m-fixed-point-token-step-generated-sv-v1/harness.cpp",
+      "sha256": "2b71550e2b24e5822e03230a6932f2d7c3fd795d8ea8dca59d7d36b04fb8e747"
+    },
+    "sv": {
+      "bytes": 1575868,
+      "path": "/tmp/llm2fpga-tinystories-1m-fixed-point-token-step-generated-sv-v1/main.sv",
+      "sha256": "7a8812da29580e8160ae5a4a7bdea17ab6f868bdd7e9e19765d5c3c3dc561ebc"
+    },
+    "synthesis_sv": {
+      "bytes": 1539718,
+      "path": "/tmp/llm2fpga-tinystories-1m-fixed-point-token-step-generated-sv-v1/main-synthesis.sv",
+      "sha256": "cfc3acbeee343c148827f85c9a1584f51c8cc6409eec19fa22d71bc3bf2130f9"
+    }
+  },
+  "interface": {
+    "done": "asserted_after_output_state_commit",
+    "reset": "clears_control_and_transaction_count",
+    "start": "request_when_idle",
+    "valid": "qualifies_input_state_capture"
+  },
+  "receipt_sha256": "0d63ebd9583848dca8044d706af3e5cf728baa5cc51330de2a40490a75082253",
+  "reset": {
+    "asserted_cycles": 3,
+    "idle_start_isolated": true,
+    "invalid_input_isolated": true,
+    "isolated": true,
+    "post_transaction_restart": {
+      "asserted_cycles": 3,
+      "cycles": 2890418,
+      "input_state_sha256": "1d6a6b51026506667795de7fd0c4b5d94646aa066b4f7cfe37e69b28829bbcde",
+      "isolated": true,
+      "output_state_sha256": "61a7016bc7936ae32cefdf8153cf4560454c662e6c0ea6351144f3a5b377bedf",
+      "reproduced_transaction_0": true,
+      "reselected_initial_state": true
+    }
+  },
+  "schema": "tinystories-1m-fixed-point-token-step-generated-sv-v1",
+  "synthesis": {
+    "command": [
+      "yosys",
+      "-p",
+      "read_verilog -sv /tmp/llm2fpga-tinystories-1m-fixed-point-token-step-generated-sv-v1/main-synthesis.sv; hierarchy -check -top main; stat"
+    ],
+    "resources": {
+      "cells": 11445,
+      "memories": 86,
+      "memory_bits": 2248704
+    },
+    "same_futil_sha256": "3f6294e66eb24ef4f9ba67f72d4c4c0b6dd2cb4ede3dd9983055a4acb886cd50",
+    "status": "passed",
+    "synthesis_sv_sha256": "cfc3acbeee343c148827f85c9a1584f51c8cc6409eec19fa22d71bc3bf2130f9"
+  },
+  "transactions": [
+    {
+      "index": 0,
+      "input_state_sha256": "1d6a6b51026506667795de7fd0c4b5d94646aa066b4f7cfe37e69b28829bbcde",
+      "output_state_sha256": "61a7016bc7936ae32cefdf8153cf4560454c662e6c0ea6351144f3a5b377bedf"
+    },
+    {
+      "index": 1,
+      "input_state_sha256": "61a7016bc7936ae32cefdf8153cf4560454c662e6c0ea6351144f3a5b377bedf",
+      "output_state_sha256": "1b3793b7e63dfcefdee13e333b233df8ad234d0e4692cb90934d11aab82fe433"
+    }
+  ]
+}
