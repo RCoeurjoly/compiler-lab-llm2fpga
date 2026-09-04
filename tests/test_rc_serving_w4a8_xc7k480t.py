@@ -1,0 +1,342 @@
+import json
+import gzip
+import hashlib
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "scripts" / "pipeline" / "write_w4a8_xc7_evidence.py"
+MODULE = ROOT / "nix" / "rc-serving-w4a8-xc7k480t.nix"
+SNAPSHOT_MANIFEST = ROOT / "artifacts" / "w4a8-xc7k480t-sv-snapshots.json"
+CANONICAL_RESULTS = ROOT / "docs" / "results" / "2026-08-14-w4a8-three-phase-equivalence.json"
+KEY = "tinystories-w4a8-rc-serving-mask10-vocab6-width2"
+DEFAULT_TIME = object()
+GNU_TIME_FIXTURE = """\
+\tUser time (seconds): 1.25
+\tSystem time (seconds): 0.50
+\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:02.00
+\tMaximum resident set size (kbytes): 123456
+"""
+CANONICAL_SNAPSHOTS = {
+    "prefill-8": (
+        "prefill-8-main.sv.gz",
+        "1657b663c6b3631c94fb2fe25d4ba0612acd57ad3664bc93fdb43884c8d28004",
+    ),
+    "decode-8": (
+        "decode-8-main.sv.gz",
+        "62255f24c12c11b699c972b824fb2cb4119d94f733d57124117b9c00a5e18fa6",
+    ),
+    "decode-9": (
+        "decode-9-main.sv.gz",
+        "1285316e5d743067a69447879fd51e3834c08e86344696bfb4854b6f879e7207",
+    ),
+}
+
+
+def write(path: Path, text: str) -> Path:
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def run_parser(work: Path, *, yosys_status: str, nextpnr_status: str,
+               yosys_stat: str | None = None, nextpnr_log: str = "",
+               fasm: str | None = None, yosys_time: object = DEFAULT_TIME,
+               nextpnr_time: object = DEFAULT_TIME) -> dict[str, object]:
+    source = write(work / "source.sv", "module main; endmodule\n")
+    normalized = write(work / "normalized.sv", "module main; endmodule\n")
+    receipt = write(work / "normalization-receipt.json", '{"status":"ok"}\n')
+    yosys_status_path = write(work / "yosys-status.txt", yosys_status + "\n")
+    nextpnr_status_path = write(work / "nextpnr-status.txt", nextpnr_status + "\n")
+    yosys_log = write(work / "yosys.log", "Yosys fixture\n")
+    nextpnr_log_path = write(work / "nextpnr.log", nextpnr_log)
+    yosys_time_path = work / "yosys.time"
+    nextpnr_time_path = work / "nextpnr.time"
+    if yosys_time is not DEFAULT_TIME and yosys_time is not None:
+        write(yosys_time_path, yosys_time)
+    elif yosys_time is DEFAULT_TIME and yosys_status == "0":
+        write(yosys_time_path, GNU_TIME_FIXTURE)
+    if nextpnr_time is not DEFAULT_TIME and nextpnr_time is not None:
+        write(nextpnr_time_path, nextpnr_time)
+    elif nextpnr_time is DEFAULT_TIME and nextpnr_status == "0":
+        write(nextpnr_time_path, GNU_TIME_FIXTURE)
+    output = work / "result.json"
+    command = [
+        sys.executable, str(SCRIPT), "--phase", "prefill-8",
+        "--source", str(source), "--normalized", str(normalized),
+        "--normalization-receipt", str(receipt),
+        "--yosys-status", str(yosys_status_path), "--yosys-log", str(yosys_log),
+        "--yosys-time", str(yosys_time_path), "--nextpnr-status", str(nextpnr_status_path),
+        "--nextpnr-log", str(nextpnr_log_path), "--nextpnr-time", str(nextpnr_time_path),
+        "--out", str(output),
+    ]
+    if yosys_stat is not None:
+        command += ["--yosys-stat", str(write(work / "mapped-stat.json", yosys_stat))]
+    if fasm is not None:
+        command += ["--fasm", str(write(work / "design.fasm", fasm))]
+    subprocess.run(command, check=True)
+    return json.loads(output.read_text(encoding="utf-8"))
+
+
+class RcServingW4A8Xc7k480tTest(unittest.TestCase):
+    def test_generated_evidence_build_command_is_valid_bash(self) -> None:
+        package = f"{KEY}-prefill-8-xc7k480t-evidence"
+        with tempfile.TemporaryDirectory() as cache:
+            evaluated = subprocess.run(
+                ["nix", "derivation", "show", f".#{package}"],
+                cwd=ROOT,
+                env={**os.environ, "XDG_CACHE_HOME": cache},
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(evaluated.returncode, 0, evaluated.stderr)
+        derivation = next(iter(json.loads(evaluated.stdout)["derivations"].values()))
+        checked = subprocess.run(
+            ["bash", "-n"],
+            input=derivation["env"]["buildCommand"],
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        self.assertEqual(checked.stderr, "")
+
+    def test_snapshot_ingestion_rejects_corrupt_or_noncanonical_sv(self) -> None:
+        module = MODULE.read_text(encoding="utf-8")
+        match = re.search(
+            r"\} ''\n(?P<script>.*?  : > \"\$out/normalized\.sv\"\n)",
+            module,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        ingestion_prefix = match.group("script")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            canonical_sv = b"module main; endmodule\n"
+            valid_snapshot = work / "valid.sv.gz"
+            with gzip.open(valid_snapshot, "wb") as stream:
+                stream.write(canonical_sv)
+            corrupt_snapshot = write(work / "corrupt.sv.gz", "not gzip data\n")
+            canonical_sha256 = hashlib.sha256(canonical_sv).hexdigest()
+
+            cases = {
+                "valid canonical snapshot": (valid_snapshot, canonical_sha256, 0, True),
+                "corrupt gzip": (corrupt_snapshot, canonical_sha256, 1, False),
+                "noncanonical hash": (valid_snapshot, "0" * 64, 1, False),
+            }
+            for name, (snapshot, sha256, expected_status, expected_normalized) in cases.items():
+                with self.subTest(name=name):
+                    out = work / name.replace(" ", "-")
+                    script = ingestion_prefix.replace(
+                        "${sourceSvGz}", str(snapshot)
+                    ).replace("${sourceSha256}", sha256)
+                    completed = subprocess.run(
+                        ["bash", "-c", script],
+                        env={**os.environ, "out": str(out)},
+                        capture_output=True,
+                        text=True,
+                    )
+
+                    self.assertEqual(completed.returncode, expected_status)
+                    self.assertEqual((out / "normalized.sv").exists(), expected_normalized)
+
+    def test_parser_records_mapped_evidence_but_not_a_fit_without_pnr(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = run_parser(
+                Path(tmp),
+                yosys_status="0",
+                nextpnr_status="not-run: Yosys mapped JSON was unavailable",
+                yosys_stat=json.dumps({"modules": {"main": {"num_cells_by_type": {
+                    "LUT6": 12, "FDRE": 7, "DSP48E1": 2, "RAMB36E1": 1
+                }}}}),
+            )
+
+        self.assertEqual(payload["schema"], "llm2fpga.w4a8-xc7k480t-evidence.v1")
+        self.assertEqual(payload["fit"], "undetermined")
+        self.assertEqual(payload["failure"]["stage"], "nextpnr")
+        self.assertEqual(payload["resources"]["mapped"], {
+            "bram18": 0, "bram36": 1, "clb_ffs": 7, "clb_luts": 12, "dsp": 2,
+        })
+        self.assertEqual(payload["tools"]["yosys"]["time"], {
+            "status": "available",
+            "elapsed_seconds": 2.0,
+            "user_cpu_seconds": 1.25,
+            "system_cpu_seconds": 0.5,
+            "peak_rss_kbytes": 123456,
+        })
+        self.assertEqual(payload["tools"]["nextpnr"]["time"]["status"], "unavailable")
+        self.assertEqual(payload["provenance"]["phase"], "prefill-8")
+        self.assertEqual(len(payload["provenance"]["source_sha256"]), 64)
+        self.assertEqual(len(payload["provenance"]["normalized_sha256"]), 64)
+
+    def test_parser_preserves_yosys_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = run_parser(
+                Path(tmp), yosys_status="1", nextpnr_status="not-run: Yosys exited 1"
+            )
+
+        self.assertEqual(payload["fit"], "undetermined")
+        self.assertEqual(payload["failure"], {
+            "stage": "yosys", "diagnostic": "Yosys fixture",
+        })
+        self.assertEqual(payload["tools"]["nextpnr"]["status"], "not-run")
+        self.assertEqual(payload["tools"]["yosys"]["time"]["status"], "unavailable")
+        self.assertEqual(payload["tools"]["nextpnr"]["time"]["status"], "unavailable")
+
+    def test_parser_rejects_malformed_and_absent_time_receipts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = run_parser(
+                Path(tmp),
+                yosys_status="1",
+                nextpnr_status="0",
+                yosys_time="not a GNU time receipt\n",
+                nextpnr_time=None,
+                fasm="# FASM\n",
+            )
+
+        self.assertEqual(payload["tools"]["yosys"]["time"]["status"], "unavailable")
+        self.assertEqual(payload["tools"]["nextpnr"]["time"]["status"], "unavailable")
+
+    def test_parser_retains_indented_gnu_time_for_a_failed_tool(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = run_parser(
+                Path(tmp),
+                yosys_status="1",
+                nextpnr_status="not-run: Yosys exited 1",
+                yosys_time=GNU_TIME_FIXTURE,
+            )
+
+        self.assertEqual(payload["tools"]["yosys"]["time"], {
+            "status": "available",
+            "elapsed_seconds": 2.0,
+            "user_cpu_seconds": 1.25,
+            "system_cpu_seconds": 0.5,
+            "peak_rss_kbytes": 123456,
+        })
+
+    def test_parser_uses_escaped_yosys_main_without_counting_submodules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = run_parser(
+                Path(tmp),
+                yosys_status="0",
+                nextpnr_status="not-run: Yosys mapped JSON was unavailable",
+                yosys_stat=json.dumps({"modules": {
+                    "\\main": {"num_cells_by_type": {"LUT6": 12, "FDRE": 7}},
+                    "submodule": {"num_cells_by_type": {"LUT6": 99, "FDRE": 88}},
+                }}),
+            )
+
+        self.assertEqual(payload["resources"]["mapped"], {
+            "bram18": 0, "bram36": 0, "clb_ffs": 7, "clb_luts": 12, "dsp": 0,
+        })
+
+    def test_parser_records_successful_nextpnr_as_fit_with_timing(self) -> None:
+        log = """\
+Info: Annotating ports with timing budgets for target frequency 12.00 MHz
+Info: Device utilisation:
+Info:              SLICE_LUTX: 12/597200 0%
+Info:               SLICE_FFX: 7/597200 0%
+Info:                 DSP48E1: 2/1920 0%
+Info: Max frequency for clock 'clk': 34.50 MHz
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = run_parser(
+                Path(tmp), yosys_status="0", nextpnr_status="0", nextpnr_log=log,
+                fasm="# FASM\n",
+            )
+
+        self.assertEqual(payload["fit"], "fits")
+        self.assertEqual(payload["failure"], None)
+        self.assertEqual(payload["timing"]["status"], "available")
+        self.assertEqual(payload["resources"]["placed"]["clb_luts"]["used"], 12)
+        self.assertEqual(payload["resources"]["placed"]["dsp"]["available"], 1920)
+
+    def test_parser_records_over_capacity_nextpnr_failure_as_does_not_fit(self) -> None:
+        log = """\
+Info: Device utilisation:
+Info:              SLICE_LUTX: 776182/597200 129%
+ERROR: Failed to expand region (0, 0) |_> (309, 416) of 776182 SLICE_LUTXs
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = run_parser(
+                Path(tmp), yosys_status="0", nextpnr_status="255", nextpnr_log=log
+            )
+
+        self.assertEqual(payload["fit"], "does-not-fit")
+        self.assertEqual(payload["failure"]["stage"], "nextpnr")
+        self.assertIn("Failed to expand region", payload["failure"]["diagnostic"])
+        self.assertEqual(payload["timing"]["status"], "unavailable")
+
+    def test_nix_module_keeps_all_tool_outcomes_and_uses_xc7k480t_inputs(self) -> None:
+        source = MODULE.read_text(encoding="utf-8")
+        self.assertRegex(source, r'targetPart = "xc7k480tffg1156-1";')
+        self.assertRegex(source, r'targetChipdb = "xc7k480tffg1156\.bin";')
+        for required in (
+            "xc7k480tffg1156-1", "xc7k480tffg1156.bin",
+            "RAM64X1S", "RAM128X1S", "RAM64X1D", "RAM128X1D", "mapped.json",
+            "mapped-stat.json", "normalization-receipt.json", "result.json", "sha256sums.txt",
+            "yosys-status.txt", "yosys.log", "yosys.time", "nextpnr-status.txt",
+            "nextpnr.log", "nextpnr.time", "nextpnr-xilinx", "--chipdb", "--log",
+            "set +e", "${pkgs.time}/bin/time -v", "not-run",
+        ):
+            self.assertIn(required, source)
+        self.assertRegex(source, r"nextpnr_status=\$\?")
+        self.assertRegex(source, r"if \[ -s \"\$out/mapped\.json\" \]; then")
+        self.assertRegex(source, r"nextpnr-xilinx\s+--chipdb\s+\$\{chipdb\}")
+        self.assertIn("sourceSvGz", source)
+        self.assertIn("sourceSha256", source)
+        self.assertIn("gzip -dc ${sourceSvGz} > \"$out/source.sv\"", source)
+        self.assertNotIn("nativeSv", source)
+
+    def test_snapshots_are_deterministic_hash_bound_copies_of_canonical_sv(self) -> None:
+        manifest = json.loads(SNAPSHOT_MANIFEST.read_text(encoding="utf-8"))
+        canonical = json.loads(CANONICAL_RESULTS.read_text(encoding="utf-8"))
+        canonical_hashes = {
+            phase["phase"]: phase["sv_sha256"] for phase in canonical["phases"]
+        }
+
+        self.assertEqual(manifest["compression"], "gzip -n -9")
+        for phase, (name, sha256) in CANONICAL_SNAPSHOTS.items():
+            with self.subTest(phase=phase):
+                record = manifest["phases"][phase]
+                self.assertEqual(record["snapshot"], name)
+                self.assertEqual(record["source_sha256"], sha256)
+                self.assertEqual(record["source_sha256"], canonical_hashes[phase])
+                snapshot = SNAPSHOT_MANIFEST.parent / "w4a8-xc7k480t-sv" / name
+                self.assertEqual(
+                    hashlib.sha256(gzip.open(snapshot, "rb").read()).hexdigest(), sha256
+                )
+
+    def test_flake_exports_each_phase_evidence_package_from_its_native_sv_closure(self) -> None:
+        flake = (ROOT / "flake.nix").read_text(encoding="utf-8")
+        self.assertIn("rcServingW4A8Xc7Evidence", flake)
+        self.assertIn("fix_sv_synthesis_frontend.py", flake)
+        self.assertIn("write_w4a8_xc7_evidence.py", flake)
+        for phase, (snapshot, sha256) in CANONICAL_SNAPSHOTS.items():
+            package = f"{KEY}-{phase}-xc7k480t-evidence"
+            match = re.search(
+                rf'"{re.escape(package)}"\s*=\s*'
+                r'import ./nix/rc-serving-w4a8-xc7k480t\.nix \{(?P<body>.*?)\n\s*\};',
+                flake,
+                re.DOTALL,
+            )
+            self.assertIsNotNone(match)
+            body = match.group("body")
+            self.assertIn(f'phaseName = "{phase}";', body)
+            self.assertIn(
+                f"sourceSvGz = ./artifacts/w4a8-xc7k480t-sv/{snapshot};", body
+            )
+            self.assertIn(f'sourceSha256 = "{sha256}";', body)
+            self.assertIn("chipdb = task3MainLib.task3Toolchain.chipdb;", body)
+            self.assertIn("nextpnr = task3MainLib.task3Toolchain.nextpnr;", body)
+            self.assertNotIn("rcServingW4A8PipelinePackages.", body)
+
+
+if __name__ == "__main__":
+    unittest.main()

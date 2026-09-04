@@ -51,14 +51,14 @@ class CalyxMathLegalizationTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("llm2fpga-lower-scout-math-for-calyx", pipeline)
-        self.assertIn('name == "tinystories-w8a8"', pipeline)
+        self.assertIn('calyxMathProfile == "scout"', pipeline)
         self.assertIn("PassRegistration<LowerScoutMathForCalyxPass>", source)
         self.assertIn("math::ExpOp", source)
         self.assertIn("math::PowFOp", source)
         self.assertIn("math::TanhOp", source)
         self.assertIn("resource scout", source.lower())
 
-    def test_polynomial_exp_candidate_is_registered_but_not_canonical(self) -> None:
+    def test_polynomial_exp_candidate_is_registered_and_explicitly_profiled(self) -> None:
         pipeline = (ROOT / "nix" / "pipeline.nix").read_text(encoding="utf-8")
         source = (
             ROOT / "tools" / "mlir-passes" / "FoldConstantTruncFOps.cpp"
@@ -67,7 +67,8 @@ class CalyxMathLegalizationTest(unittest.TestCase):
         self.assertIn("llm2fpga-lower-polynomial-exp-for-calyx", source)
         self.assertIn("PassRegistration<LowerPolynomialExpForCalyxPass>", source)
         self.assertIn("fifth-order Taylor candidate", source)
-        self.assertNotIn("llm2fpga-lower-polynomial-exp-for-calyx", pipeline)
+        self.assertIn('calyxMathProfile == "equivalence-candidate"', pipeline)
+        self.assertIn("llm2fpga-lower-polynomial-exp-for-calyx", pipeline)
 
     def test_constant_fpowi_candidate_is_explicitly_opt_in(self) -> None:
         pipeline = (ROOT / "flake.nix").read_text(encoding="utf-8")

@@ -816,6 +816,145 @@
           inherit pkgs pythonWithTinyStoriesTorchAO tinyStories1m;
           sourceRoot = ./.;
         };
+        rcServingW4A8System = import ./nix/rc-serving-w4a8-system.nix {
+          inherit pkgs pythonWithTinyStoriesTorchAO tinyStories1m;
+          sourceRoot = ./.;
+        };
+        rcServingW4A8IntegratedSystem =
+          import ./nix/rc-serving-w4a8-integrated-system.nix {
+            inherit pkgs pythonWithTinyStoriesTorchAO tinyStories1m;
+            phaseOracle = rcServingW4A8System.frozenBundle;
+            sourceRoot = ./.;
+          };
+        rcServingW4A8IntegratedRegistry = {
+          "${rcServingW4A8IntegratedSystem.modelKey}" =
+            pipelineLib.registerNoHandshakeModel {
+              key = rcServingW4A8IntegratedSystem.modelKey;
+              name = rcServingW4A8IntegratedSystem.modelKey;
+              description =
+                "One wholesale stateful W4A8 serving compiler reference.";
+              source = {
+                type = "derived";
+                profile = "stateful-serving-w4a8-integrated";
+                quantization = "pt2e-static-w4a8";
+              };
+              allowHwExterns = true;
+              slangPerFileExternModules = true;
+              calyxMathProfile = "equivalence-candidate";
+              # The optimized nested backend exhausts 32 GiB RAM plus swap
+              # on this wholesale component.  This reference intentionally
+              # favors ugly, semantics-preserving low-optimization RTL.
+              calyxCompilePasses = [ "compile-repeat" "no-opt" ];
+              calyxEmitNested = false;
+              calyxSkipResourceReport = true;
+              inherit fpPrimsSv;
+              hfSnapshot = tinyStories1m.snapshot;
+              pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
+              pytorchExportedCommand = ''
+                ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/exported.pt2 "$out/exported.pt2"
+                ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/observation.json "$out/observation.json"
+                ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/readback-manifest.json "$out/readback-manifest.json"
+                ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/receipt.json "$out/integrated-receipt.json"
+              '';
+            };
+        };
+        rcServingW4A8IntegratedPipelinePackages =
+          pipelineLib.pipelineStagePackagesFromRegistry
+          rcServingW4A8IntegratedRegistry;
+        rcServingW4A8IntegratedShell = pkgs.runCommand
+          "tinystories-w4a8-rc-serving-integrated-shell"
+          { nativeBuildInputs = [ pythonWithTinyStoriesTorchAO ]; }
+          ''
+            set -euo pipefail
+            export PYTHONPATH="${./.}:''${PYTHONPATH:-}"
+            ${pythonWithTinyStoriesTorchAO}/bin/python \
+              ${./scripts/pipeline/generate_rc_serving_w4a8_integrated_shell.py} \
+              --manifest ${rcServingW4A8IntegratedSystem.pytorchExported}/readback-manifest.json \
+              --flat-scf ${rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-flat-scf"}/flat.scf.mlir \
+              --generated-sv ${rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx-native-sv"}/sv/main.sv \
+              --exported ${rcServingW4A8IntegratedSystem.pytorchExported}/exported.pt2 \
+              --out-dir "$out"
+            ln -s ${rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx-native-sv"}/sv/main.sv \
+              "$out/generated.sv"
+            printf '%s\n' "$out/generated.sv" "$out/reference-top.sv" > "$out/sources.f"
+          '';
+        rcServingW4A8Registry = builtins.listToAttrs (map (phase:
+          let
+            name = "${rcServingW4A8System.modelKey}-${phase.name}";
+          in {
+            inherit name;
+            value = pipelineLib.registerNoHandshakeModel {
+              key = name;
+              inherit name;
+              description =
+                "Tensor-cache ${phase.name} W4A8 serving phase compiler oracle.";
+              source = {
+                type = "derived";
+                profile = "stateful-serving-w4a8-tensor-cache-phase";
+                inherit (phase) name;
+                quantization = "pt2e-static-w4a8";
+              };
+              allowHwExterns = true;
+              slangPerFileExternModules = true;
+              # Use the nonlinear route already validated by the W8A8 RC
+              # equivalence campaign; this W4A8 phase fixture independently
+              # checks its logits and cache leaves.
+              calyxMathProfile = "equivalence-candidate";
+              inherit fpPrimsSv;
+              hfSnapshot = tinyStories1m.snapshot;
+              pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
+              pytorchExportedCommand = ''
+                ln -s ${phase.exported}/exported.pt2 "$out/exported.pt2"
+                ln -s ${phase.exported}/reference.json "$out/reference.json"
+                ln -s ${phase.exported}/w4a8-manifest.json "$out/w4a8-manifest.json"
+                ln -s ${phase.exported}/weights.bin "$out/weights.bin"
+              '';
+            };
+          }) [
+            { name = "prefill-8"; exported = rcServingW4A8System.prefill8PytorchExported; }
+            { name = "decode-8"; exported = rcServingW4A8System.decode8PytorchExported; }
+            { name = "decode-9"; exported = rcServingW4A8System.decode9PytorchExported; }
+          ]);
+        rcServingW4A8PipelinePackages =
+          pipelineLib.pipelineStagePackagesFromRegistry rcServingW4A8Registry;
+        rcServingW4A8Xc7Evidence = {
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-xc7k480t-evidence" =
+            import ./nix/rc-serving-w4a8-xc7k480t.nix {
+              inherit pkgs python yosysSlang;
+              yosys = yosysPkg;
+              nextpnr = task3MainLib.task3Toolchain.nextpnr;
+              chipdb = task3MainLib.task3Toolchain.chipdb;
+              normalizer = ./scripts/pipeline/fix_sv_synthesis_frontend.py;
+              evidenceWriter = ./scripts/pipeline/write_w4a8_xc7_evidence.py;
+              phaseName = "prefill-8";
+              sourceSvGz = ./artifacts/w4a8-xc7k480t-sv/prefill-8-main.sv.gz;
+              sourceSha256 = "1657b663c6b3631c94fb2fe25d4ba0612acd57ad3664bc93fdb43884c8d28004";
+            };
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-xc7k480t-evidence" =
+            import ./nix/rc-serving-w4a8-xc7k480t.nix {
+              inherit pkgs python yosysSlang;
+              yosys = yosysPkg;
+              nextpnr = task3MainLib.task3Toolchain.nextpnr;
+              chipdb = task3MainLib.task3Toolchain.chipdb;
+              normalizer = ./scripts/pipeline/fix_sv_synthesis_frontend.py;
+              evidenceWriter = ./scripts/pipeline/write_w4a8_xc7_evidence.py;
+              phaseName = "decode-8";
+              sourceSvGz = ./artifacts/w4a8-xc7k480t-sv/decode-8-main.sv.gz;
+              sourceSha256 = "62255f24c12c11b699c972b824fb2cb4119d94f733d57124117b9c00a5e18fa6";
+            };
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-xc7k480t-evidence" =
+            import ./nix/rc-serving-w4a8-xc7k480t.nix {
+              inherit pkgs python yosysSlang;
+              yosys = yosysPkg;
+              nextpnr = task3MainLib.task3Toolchain.nextpnr;
+              chipdb = task3MainLib.task3Toolchain.chipdb;
+              normalizer = ./scripts/pipeline/fix_sv_synthesis_frontend.py;
+              evidenceWriter = ./scripts/pipeline/write_w4a8_xc7_evidence.py;
+              phaseName = "decode-9";
+              sourceSvGz = ./artifacts/w4a8-xc7k480t-sv/decode-9-main.sv.gz;
+              sourceSha256 = "1285316e5d743067a69447879fd51e3834c08e86344696bfb4854b6f879e7207";
+            };
+        };
         modelRegistryNoHandshake = import ./nix/models.nix {
           registerModel = pipelineLib.registerNoHandshakeModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
@@ -3048,6 +3187,44 @@ PY
             rcServingSystem.decode8PytorchExported;
           "tinystories-w8a8-rc-serving-mask10-vocab6-width2-decode-9-pytorch-exported" =
             rcServingSystem.decode9PytorchExported;
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-frozen-bundle" =
+            rcServingW4A8System.frozenBundle;
+          "tinystories-w4a8-rc-serving-integrated-reference" =
+            rcServingW4A8IntegratedSystem.reference;
+          "tinystories-w4a8-rc-serving-integrated-pytorch-exported" =
+            rcServingW4A8IntegratedSystem.pytorchExported;
+          "tinystories-w4a8-rc-serving-integrated-flat-scf" =
+            rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-flat-scf";
+          "tinystories-w4a8-rc-serving-integrated-calyx" =
+            rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx";
+          "tinystories-w4a8-rc-serving-integrated-calyx-native-sv" =
+            rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx-native-sv";
+          "tinystories-w4a8-rc-serving-integrated-shell" =
+            rcServingW4A8IntegratedShell;
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-pytorch-exported" =
+            rcServingW4A8System.prefill8PytorchExported;
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-pytorch-exported" =
+            rcServingW4A8System.decode8PytorchExported;
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-pytorch-exported" =
+            rcServingW4A8System.decode9PytorchExported;
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-flat-scf" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-flat-scf";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-flat-scf" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-flat-scf";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-flat-scf" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-flat-scf";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv";
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv" =
+            rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv";
           "tinystories-w8a8-rc-nonlinear-slices" = quantizedRcNonlinearSlices;
           "tinystories-w8a8-rc-nonlinear-lowering-frontier" =
             quantizedRcNonlinearFrontier;
@@ -3120,6 +3297,7 @@ PY
           "tinystories-1m-package-aware-export" = packageAwareExport;
         }
           // quantizedLinalgDiagnosticPackages // pipelineAliasPackages
+          // rcServingW4A8Xc7Evidence
           // quantizedRepresentativeCoreStudyStagePackages;
 
         apps."rc-math-exp-paper-screen" = {

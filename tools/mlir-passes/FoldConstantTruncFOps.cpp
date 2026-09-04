@@ -430,7 +430,9 @@ private:
     SmallVector<memref::LoadOp> loads;
     SmallVector<memref::StoreOp> stores;
     SmallVector<memref::CopyOp> copies;
-    SmallVector<Operation *> viewOps;
+    // Keep all supported views in operation order so reverse cleanup also
+    // handles chains that mix subviews, casts, expands, and collapses.
+    SmallVector<Operation *> subviews;
     funcOp.walk([&](Operation *op) {
       if (auto load = dyn_cast<memref::LoadOp>(op))
         loads.push_back(load);
@@ -440,7 +442,7 @@ private:
         copies.push_back(copy);
       else if (isa<memref::ReinterpretCastOp, memref::ExpandShapeOp,
                    memref::CollapseShapeOp, memref::SubViewOp>(op))
-        viewOps.push_back(op);
+        subviews.push_back(op);
     });
 
     IRRewriter rewriter(funcOp.getContext());
@@ -451,7 +453,7 @@ private:
     for (memref::CopyOp copy : copies)
       rewriteCopy(copy, argumentViews, rewriter);
 
-    for (Operation *viewOp : llvm::reverse(viewOps)) {
+    for (Operation *viewOp : llvm::reverse(subviews)) {
       if (viewOp->use_empty())
         rewriter.eraseOp(viewOp);
     }
@@ -577,6 +579,9 @@ private:
       if (!sourceView)
         return std::nullopt;
 
+      // reinterpret_cast replaces the source descriptor metadata. Its offset
+      // is relative to the underlying allocation, not to the source view's
+      // existing offset.
       return StaticMemRefView{sourceView->base, offsets.front(),
                               SmallVector<int64_t>(resultType.getShape()),
                               SmallVector<int64_t>(strides)};
@@ -605,12 +610,14 @@ private:
                                 getIdentityStrides(resultType)};
 
       auto reassociation = collapse.getReassociationIndices();
+      if (reassociation.size() != 1)
+        return std::nullopt;
+      const ReassociationIndices &group = reassociation.front();
       if (sourceView->shape.size() != 2 ||
           sourceView->strides.size() != 2 || sourceView->shape[0] <= 0 ||
           sourceView->shape[1] != 1 || sourceView->strides[0] <= 0 ||
-          sourceView->strides[1] != 1 || reassociation.size() != 1 ||
-          reassociation.front().size() != 2 ||
-          reassociation.front()[0] != 0 || reassociation.front()[1] != 1 ||
+          sourceView->strides[1] != 1 || group.size() != 2 || group[0] != 0 ||
+          group[1] != 1 ||
           resultType.getRank() != 1 ||
           resultType.getShape().front() != sourceView->shape[0])
         return std::nullopt;
@@ -620,7 +627,7 @@ private:
       if (failed(resultType.getStridesAndOffset(resultStrides, resultOffset)) ||
           !isStatic(resultStrides) || ShapedType::isDynamic(resultOffset) ||
           resultStrides.size() != 1 ||
-          resultStrides.front() != sourceView->strides[0] ||
+          resultStrides.front() != sourceView->strides[group.front()] ||
           resultOffset != sourceView->offset)
         return std::nullopt;
 

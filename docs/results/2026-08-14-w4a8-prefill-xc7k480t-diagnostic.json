@@ -1,0 +1,72 @@
+{
+  "schema": "llm2fpga.w4a8-prefill-xc7k480t-diagnostic.v1",
+  "status": "phase-only-diagnostic",
+  "scope": {
+    "phase": "prefill-8",
+    "integrated_three_phase_design": false,
+    "fit_claim_applies_to": "prefill-8 compiler-generated RTL only",
+    "decode_8_synthesis": "cancelled after architectural scope correction",
+    "decode_9_synthesis": "not started"
+  },
+  "target": {
+    "part": "xc7k480tffg1156-1",
+    "chipdb": "/nix/store/6la31fg71mbjaw6wpwj2pddwbs93y2j7-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin",
+    "chipdb_sha256": "56c46da98f375b14e12cd6df44dede11b576eba33266cd5a8465fb6fe328baad",
+    "target_frequency_mhz": 12.0
+  },
+  "provenance": {
+    "evidence_store_path": "/nix/store/lqly4kzj5q2c3qqjx2z0svz7vcnr7j78-prefill-8-xc7k480t-evidence",
+    "source_sv_sha256": "1657b663c6b3631c94fb2fe25d4ba0612acd57ad3664bc93fdb43884c8d28004",
+    "normalized_sv_sha256": "042aca5e86b8dd72aaaace22d8aa0e521aa069874b90b9712bee42f718c4f36f",
+    "result_json_sha256": "4cfd6c76200da0cb3fdffc7ff3073eccfe626d5f5ec5ae7c9d4e88cd49063adc",
+    "mapped_stat_json_sha256": "1eba807c2dad8927e8ae37e686df565e435aff0168dcc4b5b57d93e22bf75c6c",
+    "mapped_json_sha256": "14335ec8534e7a59629c17387ea4c57ccb606b770646bd60853045e4d5f24dfb",
+    "nextpnr_json_sha256": "3d40efa99fe7cf2c18b4dfa53c6d7b88ffa659e2f08f580c9a36d8b723bd5845",
+    "normalization_repair_count": 2
+  },
+  "tools": {
+    "yosys": {
+      "version": "0.66",
+      "git_sha1": "7f8fdfd8d7bc08c749a2a969388d3425d4f369d5",
+      "exit_status": 0,
+      "elapsed_seconds": 4761.0,
+      "peak_rss_kib": 8602308
+    },
+    "nextpnr_xilinx": {
+      "version": "stable-backports",
+      "exit_status": 255,
+      "elapsed_seconds": 317.5,
+      "peak_rss_kib": 7134228
+    },
+    "outer_nix_build": {
+      "exit_status": 0,
+      "elapsed_seconds": 5111.0,
+      "peak_rss_kib": 390508,
+      "peak_rss_scope": "Nix client only; builder memory is recorded per tool above"
+    }
+  },
+  "resources": {
+    "mapped_yosys": {
+      "clb_luts": 531682,
+      "clb_ffs": 35681,
+      "bram18": 0,
+      "bram36": 0,
+      "dsp48e1": 251
+    },
+    "nextpnr_packed": {
+      "slice_lutx": { "used": 783671, "available": 597200, "percent": 131 },
+      "slice_ffx": { "used": 35681, "available": 597200, "percent": 5 },
+      "ramb18e1": { "used": 0, "available": 1910, "percent": 0 },
+      "ramb36e1": { "used": 0, "available": 955, "percent": 0 },
+      "dsp48e1": { "used": 251, "available": 1920, "percent": 13 }
+    }
+  },
+  "result": {
+    "fit": "does-not-fit",
+    "failure_stage": "placement",
+    "failure_diagnostic": "Failed to expand region (0, 0) |_> (309, 416) of 783671 SLICE_LUTXs",
+    "timing_status": "unavailable",
+    "critical_paths": [],
+    "timing_reason": "Legal placement and routing did not complete because packed LUT demand was 131% of device capacity."
+  }
+}

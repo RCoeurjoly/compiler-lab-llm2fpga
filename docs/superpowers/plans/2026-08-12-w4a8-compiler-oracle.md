@@ -27,8 +27,8 @@
 ## File structure
 
 - `TinyStories/rc_serving_w4a8_contract.py`: immutable W4A8 model key, arithmetic constants, phase ABI, and manifest validation.
-- `TinyStories/rc_serving_w4a8_source.py`: W4A8 quantized source-model construction and deterministic phase invocations.
-- `TinyStories/rc_serving_w4a8_export.py`: frozen tensor extraction, manifest creation, and direct phase export.
+- `TinyStories/rc_serving_w4a8_source.py`: deterministic source-model construction and phase invocation helpers.
+- `TinyStories/rc_serving_w4a8_export.py`: per-phase PT2E W4A8 conversion, converted-graph tensor extraction, cross-phase deduplication, and manifest creation.
 - `scripts/pipeline/materialize_rc_serving_w4a8.py`: command-line materializer only.
 - `nix/rc-serving-w4a8-system.nix`: model, export, lowering, simulation, exhaustive verification, and synthesis derivations.
 - `tests/test_rc_serving_w4a8_contract.py`: manifest and arithmetic contract tests.
@@ -110,7 +110,7 @@ git add TinyStories/rc_serving_w4a8_contract.py tests/test_rc_serving_w4a8_contr
 git commit -m "feat: freeze RC W4A8 arithmetic contract"
 ```
 
-### Task 2: Build and export the deterministic W4A8 source model
+### Task 2: Convert deterministic serving phases to W4A8 and freeze their tensors
 
 **Files:**
 - Create: `TinyStories/rc_serving_w4a8_source.py`
@@ -121,7 +121,7 @@ git commit -m "feat: freeze RC W4A8 arithmetic contract"
 
 **Interfaces:**
 - Consumes: `W4A8Manifest` and existing `ServingTrace`.
-- Produces: `build_w4a8_source_model(model_path: Path) -> torch.nn.Module`, `quantized_tensor_records(model) -> tuple[QuantizedTensorRecord, ...]`, and `materialize_w4a8_bundle(model_path, trace_path, out_dir) -> None`.
+- Produces: `build_w4a8_source_model(model_path: Path) -> torch.nn.Module`, `convert_w4a8_phase(model, invocation) -> torch.export.ExportedProgram`, `quantized_tensor_records(exported_phases) -> tuple[QuantizedTensorRecord, ...]`, and `materialize_w4a8_bundle(model_path, trace_path, out_dir) -> None`.
 
 - [ ] **Step 1: Test deterministic tensors and phase outputs**
 
@@ -135,12 +135,16 @@ def test_w4a8_materialization_is_byte_deterministic(tmp_path, monkeypatch):
     assert (first / "weights.bin").read_bytes() == (second / "weights.bin").read_bytes()
 
 def test_every_weight_is_signed_int4():
-    records = export.quantized_tensor_records(fake_model())
+    records = export.quantized_tensor_records(fake_converted_phases())
     assert records
     assert all(record.bits == 4 and record.signed for record in records)
 ```
 
-The fake model must include boundary values `-8`, `-1`, `0`, and `7`, plus one out-of-range case that expects `ValueError` rather than silent clipping.
+The fake converted programs must expose graph-referenced integer weight
+constants containing boundary values `-8`, `-1`, `0`, and `7`, plus one
+out-of-range case that expects `ValueError` rather than silent clipping. Add a
+second phase containing the same weight bytes and assert that the bundle stores
+one deduplicated tensor with both phase references.
 
 - [ ] **Step 2: Confirm the new tests fail**
 
@@ -150,7 +154,9 @@ Expected: FAIL because `rc_serving_w4a8_source` and `rc_serving_w4a8_export` do 
 
 - [ ] **Step 3: Implement quantization and deterministic materialization**
 
-Use the existing stateful model construction and PT2E static quantizer, setting:
+Build the deterministic FP source model, export each phase with its native cache
+inputs, then prepare, calibrate, and convert that exported phase using the PT2E
+static quantizer with:
 
 ```python
 os.environ["TINYSTORIES_PYTORCHAO_WEIGHT_BITS"] = "4"
@@ -158,7 +164,14 @@ os.environ["TINYSTORIES_PYTORCHAO_ACTIVATION_BITS"] = "8"
 torch.manual_seed(0)
 ```
 
-Pack adjacent signed nibbles as `(odd & 0xF) << 4 | (even & 0xF)`. Emit canonical sorted JSON with a trailing newline, `weights.bin`, per-phase `exported.pt2`, eager and exported logits, cache snapshots, and SHA-256s. Reject tensors outside `[-8, 7]`.
+Extract only graph-referenced integer weight constants plus their scale and zero
+point metadata from the converted programs. Do not infer weights from the FP
+source model's `state_dict`. Deduplicate constants across phases by semantic
+metadata and raw bytes, retaining all phase/node references in the manifest.
+Pack adjacent signed nibbles as `(odd & 0xF) << 4 | (even & 0xF)`. Emit canonical
+sorted JSON with a trailing newline, `weights.bin`, per-phase converted
+`exported.pt2`, FP-source and converted logits, cache snapshots, and SHA-256s.
+Reject tensors outside `[-8, 7]`.
 
 - [ ] **Step 4: Run export and regression tests**
 

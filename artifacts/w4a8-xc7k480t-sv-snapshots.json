@@ -1,0 +1,19 @@
+{
+  "schema": "llm2fpga.w4a8-xc7k480t-sv-snapshots.v1",
+  "compression": "gzip -n -9",
+  "canonical_results": "docs/results/2026-08-14-w4a8-three-phase-equivalence.json",
+  "phases": {
+    "prefill-8": {
+      "snapshot": "prefill-8-main.sv.gz",
+      "source_sha256": "1657b663c6b3631c94fb2fe25d4ba0612acd57ad3664bc93fdb43884c8d28004"
+    },
+    "decode-8": {
+      "snapshot": "decode-8-main.sv.gz",
+      "source_sha256": "62255f24c12c11b699c972b824fb2cb4119d94f733d57124117b9c00a5e18fa6"
+    },
+    "decode-9": {
+      "snapshot": "decode-9-main.sv.gz",
+      "source_sha256": "1285316e5d743067a69447879fd51e3834c08e86344696bfb4854b6f879e7207"
+    }
+  }
+}

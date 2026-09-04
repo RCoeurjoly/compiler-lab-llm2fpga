@@ -1,0 +1,98 @@
+{
+  "schema": "llm2fpga.w4a8-three-phase-equivalence.v1",
+  "status": "pass",
+  "scope": "compiler lowering through SystemVerilog and frozen-PT2E simulation equivalence",
+  "repair_commit": "d2eab81",
+  "frozen_oracle": {
+    "store_path": "/nix/store/24f8w7lgbz2v35kbhxh2jnddhjj02rcm-tinystories-w4a8-rc-serving-mask10-vocab6-width2-frozen-bundle",
+    "manifest_sha256": "97317502344a784f7c262bcb39f94270004204ad9ca387f2a4f325b53fc57bf9",
+    "weights_sha256": "8904168d8dafe0558e6a5c21d48be3a4961fd8b24c2b84d02b33663aa3165b64"
+  },
+  "simulation": {
+    "driver": "scripts/pipeline/run_rc_serving_w4a8_sv.py",
+    "verilator_version": "5.022",
+    "jobs": 4,
+    "atol": 0.0001
+  },
+  "phases": [
+    {
+      "phase": "prefill-8",
+      "status": "pass",
+      "native_sv_store_path": "/nix/store/xx13r1a2mijdymyifnpah8bwmj2rb3qy-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv",
+      "flat_scf_store_path": "/nix/store/g5r6di77i2s2wbfzslz7a041w510n5w5-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-flat-scf",
+      "exported_pt2e_store_path": "/nix/store/b6ywnhs5b1b8rx2ixp0dglj5a5dxh7gb-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-pytorch-exported",
+      "reference_sha256": "3188f16fa6f89b1ad772c205032cf632389aed4994f210ad4e64ca513ddc5191",
+      "sv_sha256": "1657b663c6b3631c94fb2fe25d4ba0612acd57ad3664bc93fdb43884c8d28004",
+      "divsqrt_repair_count": 1,
+      "nix_build_wall_seconds": 6503.0,
+      "cycles": 524816,
+      "compile_seconds": 412.659993860987,
+      "simulation_seconds": 580.660700779059,
+      "process_tree_peak_rss_kib": 15777248,
+      "estimated_external_bits": 69104,
+      "estimated_internal_bits": 5328,
+      "output_sha256_by_port": {
+        "32": "1e1751495a4cad0034fe16b815749e71537fce5224615d51f0cac35ba1ad9ed8",
+        "33": "89919a14be298c7b621bfbea413a173b166a1df54e16ee6f4b5b560b0c2e0470",
+        "34": "506b88f7965e551c62cb2145bdeeaa9ac5704eef00ddcf71b7258298869da6da",
+        "35": "6b2cde066041a4278251ac35e80da848841869686a209c8020d09a21495b8b4f",
+        "36": "146a45ceda43b4d646970a61d684481ab1aedb720dfb78c6e9e0b5cd509fcb0d"
+      }
+    },
+    {
+      "phase": "decode-8",
+      "status": "pass",
+      "native_sv_store_path": "/nix/store/vlza9rqig7yj6wasmb60yi0szan454b1-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv",
+      "flat_scf_store_path": "/nix/store/gvjg2jrjypsds2hl80vawfm236apjc9s-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-flat-scf",
+      "exported_pt2e_store_path": "/nix/store/lilf26wxc1n2d75lnv0yk2qhvnrp9f9l-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-pytorch-exported",
+      "reference_sha256": "7648395e9e349f135ea64b4ba0a52787af263ca38597656871fd414974d6cdf1",
+      "sv_sha256": "62255f24c12c11b699c972b824fb2cb4119d94f733d57124117b9c00a5e18fa6",
+      "divsqrt_repair_count": 1,
+      "nix_build_wall_seconds": 2643.87,
+      "cycles": 64044,
+      "compile_seconds": 348.6092670590151,
+      "simulation_seconds": 66.46930738305673,
+      "process_tree_peak_rss_kib": 11647584,
+      "estimated_external_bits": 20618,
+      "estimated_internal_bits": 3062,
+      "output_sha256_by_port": {
+        "32": "3ee0fc78b10d76b3ec11700f33f2dc8a4fd359aab98e9ef25b39611afb4e109e",
+        "33": "aaaf2a1d3cd30606e1c3fd5d674f32db47053ba7bf59253fa1ef0681c19c0d38",
+        "34": "b84fc8bd4be4e8ca5fd7d4f6687212ae8e3d6f90f87472a64e28e1cb8cef992d",
+        "35": "df8078a1387c99eb07312ff8850875fb31dcacb8e76af815de4b0f66ea7b9fc3",
+        "36": "2432491c0ce43027192cc58366fb23f3e04e515773c69d73bcae8d027f31a089"
+      }
+    },
+    {
+      "phase": "decode-9",
+      "status": "pass",
+      "native_sv_store_path": "/nix/store/xjgs6vissy8f803j48cgn1dp9pyv98vd-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv",
+      "flat_scf_store_path": "/nix/store/yzx93g7bnwhadavnzg27jwq1rhsrhag0-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-flat-scf",
+      "exported_pt2e_store_path": "/nix/store/9rp9k0vz4gqwg213640ayz5sc24vvjph-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-pytorch-exported",
+      "reference_sha256": "448cbcbc13ffd97b93ff1e157470d5347998986c681d31accb1c1c91406573ec",
+      "sv_sha256": "1285316e5d743067a69447879fd51e3834c08e86344696bfb4854b6f879e7207",
+      "divsqrt_repair_count": 1,
+      "nix_build_wall_seconds": 2608.86,
+      "cycles": 65852,
+      "compile_seconds": 347.7266312009888,
+      "simulation_seconds": 69.38373588095419,
+      "process_tree_peak_rss_kib": 11735320,
+      "estimated_external_bits": 21780,
+      "estimated_internal_bits": 3102,
+      "output_sha256_by_port": {
+        "32": "cb5bd32a289aba8b5644e536c2a6600b0587a0d7fbeb0838c2b5689fa27d4577",
+        "33": "2057919e2eb9b4f6cef6c1a8dc65ce611abab17056fc12377ec8861b5106af12",
+        "34": "d39bd665bf051288fec683fd91bb015e9be4584691011917dbe3bcd56ef82f11",
+        "35": "4ee37d3cc4e463d029860561fceea4ce174c045a21056632112ea5b66ca0bfba",
+        "36": "604a7407e185188844f2f084da3d76ef15c14291b2f43d1ccd99a73638c1bb12"
+      }
+    }
+  ],
+  "claims": {
+    "all_outputs_bit_exact": true,
+    "maximum_absolute_error": 0.0,
+    "mean_absolute_error": 0.0,
+    "mapped_fpga_utilization_claimed": false,
+    "fpga_fit_claimed": false
+  }
+}

@@ -1,0 +1,64 @@
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class RcServingW4A8IntegratedNixTest(unittest.TestCase):
+    def test_integrated_system_materializes_one_export(self) -> None:
+        source = (ROOT / "nix/rc-serving-w4a8-integrated-system.nix").read_text()
+        self.assertIn("materialize_rc_serving_w4a8_integrated.py", source)
+        self.assertIn("--phase-oracle", source)
+        self.assertIn("exportedProgramCount = 1", source)
+        self.assertIn("preferLocalBuild = true", source)
+        self.assertIn("allowSubstitutes = false", source)
+        self.assertNotIn("prefill8PytorchExported", source)
+        self.assertNotIn("decode8PytorchExported", source)
+        self.assertNotIn("decode9PytorchExported", source)
+        self.assertNotIn("rcServingW4A8Registry", source)
+
+    def test_flake_exports_integrated_reference_and_program(self) -> None:
+        source = (ROOT / "flake.nix").read_text()
+        self.assertIn("rcServingW4A8IntegratedSystem", source)
+        self.assertIn(
+            '"tinystories-w4a8-rc-serving-integrated-reference"', source
+        )
+        self.assertIn(
+            '"tinystories-w4a8-rc-serving-integrated-pytorch-exported"', source
+        )
+
+    def test_integrated_program_enters_one_wholesale_pipeline_route(self) -> None:
+        source = (ROOT / "flake.nix").read_text()
+        self.assertIn("rcServingW4A8IntegratedRegistry", source)
+        self.assertIn("rcServingW4A8IntegratedPipelinePackages", source)
+        self.assertEqual(
+            source.count('key = rcServingW4A8IntegratedSystem.modelKey;'), 1
+        )
+        for suffix in ("flat-scf", "calyx", "calyx-native-sv"):
+            self.assertIn(
+                f'"tinystories-w4a8-rc-serving-integrated-{suffix}"', source
+            )
+        integrated_block = source.split("rcServingW4A8IntegratedRegistry", 1)[1]
+        integrated_block = integrated_block.split("rcServingW4A8Registry", 1)[0]
+        self.assertIn(
+            'calyxCompilePasses = [ "compile-repeat" "no-opt" ]',
+            integrated_block,
+        )
+        self.assertIn("calyxEmitNested = false", integrated_block)
+        self.assertIn("calyxSkipResourceReport = true", integrated_block)
+        self.assertNotIn("PHASE_NAMES", integrated_block)
+        self.assertNotIn("map (phase", integrated_block)
+
+    def test_integrated_shell_consumes_the_one_wholesale_closure(self) -> None:
+        source = (ROOT / "flake.nix").read_text()
+        self.assertIn("rcServingW4A8IntegratedShell", source)
+        self.assertIn("generate_rc_serving_w4a8_integrated_shell.py", source)
+        self.assertIn("--flat-scf", source)
+        self.assertIn("--generated-sv", source)
+        self.assertIn("--exported", source)
+        self.assertIn('"tinystories-w4a8-rc-serving-integrated-shell"', source)
+
+
+if __name__ == "__main__":
+    unittest.main()

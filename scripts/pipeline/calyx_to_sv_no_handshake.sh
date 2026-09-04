@@ -144,9 +144,17 @@ if [[ "${CALYX_DISABLE_CELL_SHARE:-0}" == "1" ]]; then
   # default; the generated manifest records the selected mode below.
   calyx_disabled_pass_args+=(-d cell-share)
 fi
+calyx_pass_args=()
+if [[ -n "${CALYX_COMPILE_PASSES:-}" ]]; then
+  read -r -a requested_passes <<<"$CALYX_COMPILE_PASSES"
+  for pass_name in "${requested_passes[@]}"; do
+    calyx_pass_args+=(-p "$pass_name")
+  done
+fi
 "$calyx_bin" "$output_dir/model.futil" \
   -l "$calyx_lib" \
   -b verilog \
+  "${calyx_pass_args[@]}" \
   "${calyx_synthesis_args[@]}" \
   "${calyx_nested_args[@]}" \
   "${calyx_disabled_pass_args[@]}" \

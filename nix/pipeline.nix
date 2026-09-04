@@ -184,15 +184,24 @@ let
       test -f "$out/blockers.json"
     '';
 
-  mkScfToCalyxDerivation = { name, flatScf }:
+  mkScfToCalyxDerivation = { name, flatScf, calyxMathProfile ? "none" }:
     let
-      scoutMathPass = pkgs.lib.optionalString (name == "tinystories-w8a8")
-        ",llm2fpga-lower-scout-math-for-calyx";
+      mathPasses = if calyxMathProfile == "none" then ""
+        else if calyxMathProfile == "scout" then
+          ",llm2fpga-lower-scout-math-for-calyx,llm2fpga-lower-constant-fpowi-for-calyx"
+        else if calyxMathProfile == "equivalence-candidate" then
+          ",llm2fpga-lower-polynomial-exp-for-calyx,llm2fpga-lower-constant-fpowi-for-calyx,llm2fpga-lower-rational-tanh-for-calyx"
+        else throw "unsupported Calyx math profile: ${calyxMathProfile}";
     in pkgs.runCommand "${name}-calyx" { buildInputs = [ mlir circt python ]; } ''
       tmp_pre_calyx="$(mktemp /tmp/no_handshake_pre_calyx_XXXXXX.mlir)"
-      ${mlir}/bin/mlir-opt ${flatScf}/flat.scf.mlir \
+      tmp_zero_seed_fixed="$(mktemp /tmp/no_handshake_zero_seed_XXXXXX.mlir)"
+      mkdir -p "$out"
+      ${python}/bin/python3 ${pipelineScripts}/materialize_zero_seed_copies.py \
+        ${flatScf}/flat.scf.mlir "$tmp_zero_seed_fixed" \
+        "$out/zero-seed-materialization-receipt.json"
+      ${mlir}/bin/mlir-opt "$tmp_zero_seed_fixed" \
         --load-pass-plugin=${mlirPasses}/lib/LLM2FPGAMLIRPasses.so \
-        --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-negf-for-calyx${scoutMathPass},llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
+        --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-negf-for-calyx${mathPasses},llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
         -o "$tmp_pre_calyx"
       export CALYX_PREFLIGHT_REPORT=${calyxPreflightReport}
       ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
@@ -203,6 +212,7 @@ let
       test -f "$out/manifest.json"
       test -f "$out/float-frontier.json"
       test -f "$out/pre-calyx-legality.json"
+      test -f "$out/zero-seed-materialization-receipt.json"
       if ${pkgs.gnugrep}/bin/grep -q '"status":"ok"' "$out/manifest.json"; then
         test -f "$out/model.calyx.mlir"
       fi
@@ -214,13 +224,19 @@ let
         ${mlir}/bin/mlir-opt ${linalg} "$out"
     '';
 
-  mkCalyxNativeSvDerivation = { name, calyx }:
+  mkCalyxNativeSvDerivation = { name, calyx, calyxCompilePasses ? [ ]
+    , calyxEmitNested ? true, calyxSkipResourceReport ? false }:
     pkgs.runCommand "${name}-calyx-native-sv" {
       buildInputs = [ circt calyxTool python ];
     } ''
       export CALYX_NORMALIZE_FOR_EXPORT=${pipelineScripts}/normalize_calyx_for_export.py
       export CALYX_NORMALIZE_FUTIL_CONSTANTS=${pipelineScripts}/normalize_futil_float_constants.py
       export CALYX_FIX_FUTIL_FPTOSI_HANDSHAKE=${pipelineScripts}/fix_futil_fptosi_handshake.py
+      export CALYX_FIX_SV_DIVSQRT_HANDSHAKE=${pipelineScripts}/fix_sv_divsqrt_handshake.py
+      export CALYX_VERIFY_F32_CONSTANT_BITS=${pipelineScripts}/verify_calyx_f32_constant_bits.py
+      export CALYX_COMPILE_PASSES=${pkgs.lib.escapeShellArg (pkgs.lib.concatStringsSep " " calyxCompilePasses)}
+      export CALYX_EMIT_NESTED=${if calyxEmitNested then "1" else "0"}
+      export CALYX_SKIP_RESOURCE_REPORT=${if calyxSkipResourceReport then "1" else "0"}
       ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
         ${circt}/bin/circt-translate \
         ${calyxTool}/bin/calyx \
@@ -472,7 +488,9 @@ let
     , tosaFromTorch ? null, linalgFromStages ?
       ({ name, torch, ... }: mkLinalgDerivation { inherit name torch; })
     , allowHwExterns ? false, fpPrimsSv ? null
-    , slangPerFileExternModules ? false }:
+    , slangPerFileExternModules ? false, calyxMathProfile ? "none"
+    , calyxCompilePasses ? [ ], calyxEmitNested ? true
+    , calyxSkipResourceReport ? false }:
     let
       unavailable = stage: reason:
         mkUnavailableStage { inherit name stage reason; };
@@ -507,11 +525,12 @@ let
           inherit (self) scf;
         };
         calyx = mkScfToCalyxDerivation {
-          inherit name;
+          inherit name calyxMathProfile;
           flatScf = self."flat-scf";
         };
         "calyx-native-sv" = mkCalyxNativeSvDerivation {
-          inherit name;
+          inherit name calyxCompilePasses calyxEmitNested
+            calyxSkipResourceReport;
           inherit (self) calyx;
         };
         "calyx-hw-sv" = mkCalyxHwSvDerivation {
@@ -581,7 +600,9 @@ let
     , source ? { type = "local"; }, hfSnapshot ? null, pytorchToolchain ? [ ]
     , pytorchExportedCommand, pytorchExportedBuildInputs ? pytorchToolchain
     , allowHwExterns ? false, fpPrimsSv ? null
-    , slangPerFileExternModules ? false }:
+    , slangPerFileExternModules ? false, calyxMathProfile ? "none"
+    , calyxCompilePasses ? [ ], calyxEmitNested ? true
+    , calyxSkipResourceReport ? false }:
     let
       resolvedHfSnapshot = mkHfSnapshotDerivation { inherit name hfSnapshot; };
       resolvedPyTorchExported = mkPyTorchExportedDerivation {
@@ -601,7 +622,9 @@ let
         hfSnapshot = resolvedHfSnapshot;
         pytorchExported = resolvedPyTorchExported;
         torchStage = resolvedTorchStage;
-        inherit allowHwExterns fpPrimsSv slangPerFileExternModules;
+        inherit allowHwExterns fpPrimsSv slangPerFileExternModules
+          calyxMathProfile calyxCompilePasses calyxEmitNested
+          calyxSkipResourceReport;
       };
       model = {
         inherit key name description;
@@ -614,11 +637,25 @@ let
       metadata = mkModelMetadata key model;
     in model // { inherit metadata; };
 
+  withoutNoHandshakeCalyxOptions = pipelineArgs:
+    builtins.removeAttrs pipelineArgs [
+      "calyxMathProfile"
+      "calyxCompilePasses"
+      "calyxEmitNested"
+      "calyxSkipResourceReport"
+    ];
+
   registerModel = args:
-    registerPipelineModel (args // { pipelineFactory = mkPipeline; });
+    registerPipelineModel (args // {
+      pipelineFactory = pipelineArgs:
+        mkPipeline (withoutNoHandshakeCalyxOptions pipelineArgs);
+    });
 
   registerTosaModel = args:
-    registerPipelineModel (args // { pipelineFactory = mkTosaPipeline; });
+    registerPipelineModel (args // {
+      pipelineFactory = pipelineArgs:
+        mkTosaPipeline (withoutNoHandshakeCalyxOptions pipelineArgs);
+    });
 
   registerTosaNoHandshakeModel = args:
     registerPipelineModel (args // {

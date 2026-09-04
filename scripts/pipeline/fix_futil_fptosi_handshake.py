@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Repair stale-result capture around CIRCT-exported Calyx FP-to-int groups."""
+"""Repair stale-result capture around CIRCT-exported Calyx FP converters."""
 
 import re
 import sys
@@ -8,7 +8,8 @@ from pathlib import Path
 
 GROUP = re.compile(r"(?ms)^(\s*group\s+\w+\s*\{\n)(.*?^\s*\})")
 INPUT = re.compile(
-    r"(?m)^\s*(fptosi_\d+_reg)\.in\s*=\s*(std_fpToIntFN_\d+)\.out;\s*$"
+    r"(?m)^\s*((?:fptosi|sitofp)_\d+_reg)\.in\s*=\s*"
+    r"((?:std_fpToIntFN|std_intToFpFN)_\d+)\.out;\s*$"
 )
 
 
@@ -48,11 +49,15 @@ def main() -> int:
     gated_count = sum(
         1
         for line in fixed.splitlines()
-        if re.search(r"fptosi_\d+_reg\.write_en = std_fpToIntFN_\d+\.done;", line)
+        if re.search(
+            r"(?:fptosi|sitofp)_\d+_reg\.write_en = "
+            r"(?:std_fpToIntFN|std_intToFpFN)_\d+\.done;",
+            line,
+        )
     )
     Path(sys.argv[2]).write_text(fixed, encoding="utf-8")
     print(
-        f"checked {group_count} Calyx group(s); verified {gated_count} gated FP-to-int handshake(s)"
+        f"checked {group_count} Calyx group(s); verified {gated_count} gated FP conversion handshake(s)"
     )
     return 0
 
