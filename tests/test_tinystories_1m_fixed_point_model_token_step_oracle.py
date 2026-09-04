@@ -254,6 +254,30 @@ class TinyStories1MModelTokenStepOracleUnitTest(unittest.TestCase):
         self.assertNotIn("exact_model_receipt_sha256", fixture["identity"])
         self.capture.verify_oracle_fixture(fixture)
 
+    def test_fixture_validator_rejects_rehashed_boundary_contract_changes(self) -> None:
+        fixture = json.loads(ORACLE.read_text(encoding="utf-8"))
+        mutations = {
+            "transformer_block_count": 7,
+            "lm_head_weight_source": "untied_lm_head.weight",
+        }
+        for field, value in mutations.items():
+            with self.subTest(field=field):
+                changed = copy.deepcopy(fixture)
+                changed["boundary_contract"][field] = value
+                rehash_for_current_capture(changed)
+
+                with self.assertRaisesRegex(ValueError, "boundary_contract_mismatch"):
+                    self.capture.verify_oracle_fixture(changed)
+
+    def test_fixture_validator_rejects_rehashed_top_level_field_injection(self) -> None:
+        fixture = json.loads(ORACLE.read_text(encoding="utf-8"))
+        changed = copy.deepcopy(fixture)
+        changed["unauthenticated_extension"] = {"claim": "accepted"}
+        rehash_for_current_capture(changed)
+
+        with self.assertRaisesRegex(ValueError, "fixture_schema_mismatch"):
+            self.capture.verify_oracle_fixture(changed)
+
 
 @unittest.skipUnless(
     PACKAGE.is_dir() and MODEL.is_dir(), "authenticated package/model unavailable"

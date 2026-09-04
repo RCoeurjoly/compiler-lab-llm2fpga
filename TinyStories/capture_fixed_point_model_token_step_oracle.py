@@ -50,6 +50,33 @@ MODEL_CONTRACT = {
     "max_context": 32,
     "tie_word_embeddings": True,
 }
+BOUNDARY_ORDER = (
+    "embedding",
+    "transformer.h.0",
+    "transformer.h.1",
+    "transformer.h.2",
+    "transformer.h.3",
+    "transformer.h.4",
+    "transformer.h.5",
+    "transformer.h.6",
+    "transformer.h.7",
+    "transformer.ln_f",
+    "lm_head",
+    "greedy_selection",
+)
+FIXTURE_KEYS = {
+    "schema",
+    "status",
+    "scope",
+    "identity",
+    "model_contract",
+    "arithmetic_contract",
+    "token_contract",
+    "boundary_contract",
+    "steps",
+    "claims",
+    "artifact_sha256",
+}
 ARITHMETIC_CONTRACT = {
     "value_format": "signed Q16.16",
     "scale_format": "unsigned Q8.24",
@@ -177,6 +204,16 @@ def _buffer_record(value: torch.Tensor, semantic_dtype: str) -> dict[str, Any]:
 def _with_hash(value: Mapping[str, Any], field: str) -> dict[str, Any]:
     payload = dict(value)
     return {**payload, field: canonical_sha256(payload)}
+
+
+def _boundary_contract() -> dict[str, Any]:
+    return {
+        "order": list(BOUNDARY_ORDER),
+        "transformer_block_count": 8,
+        "tensor_hash": "canonical JSON over shape, semantic dtype, and exact int64 values",
+        "raw_hash": "SHA-256 over contiguous little-endian int64 bytes",
+        "lm_head_weight_source": "token_embedding.weight",
+    }
 
 
 def _load_generation_verifier(path: Path) -> Any:
@@ -381,9 +418,6 @@ def _capture_step(
         str(step_index),
     )
 
-    boundary_order = ["embedding"] + [
-        f"transformer.h.{index}" for index in range(MODEL_CONTRACT["n_layer"])
-    ] + ["transformer.ln_f", "lm_head", "greedy_selection"]
     step = {
         "step_index": step_index,
         "context_tokens": list(context_tokens),
@@ -404,7 +438,7 @@ def _capture_step(
             "canonical_step_sha256": predecessor_step["step_sha256"],
             "evidence_sha256": predecessor_step["evidence_sha256"],
         },
-        "boundary_order": boundary_order,
+        "boundary_order": list(BOUNDARY_ORDER),
     }
     return {**step, "step_sha256": canonical_sha256(step)}
 
@@ -532,9 +566,6 @@ def build_oracle(
         "feedback_rule": "append_previous_step_greedy_token_inside_orchestrator",
         "greedy_tie_break": "smallest_token_id_among_equal_maxima",
     }
-    boundary_names = ["embedding"] + [
-        f"transformer.h.{index}" for index in range(MODEL_CONTRACT["n_layer"])
-    ] + ["transformer.ln_f", "lm_head", "greedy_selection"]
     result: dict[str, Any] = {
         "schema": SCHEMA,
         "status": STATUS,
@@ -553,13 +584,7 @@ def build_oracle(
         "model_contract": MODEL_CONTRACT,
         "arithmetic_contract": ARITHMETIC_CONTRACT,
         "token_contract": token_contract,
-        "boundary_contract": {
-            "order": boundary_names,
-            "transformer_block_count": MODEL_CONTRACT["n_layer"],
-            "tensor_hash": "canonical JSON over shape, semantic dtype, and exact int64 values",
-            "raw_hash": "SHA-256 over contiguous little-endian int64 bytes",
-            "lm_head_weight_source": "token_embedding.weight",
-        },
+        "boundary_contract": _boundary_contract(),
         "steps": steps,
         "claims": {
             "authenticated_package_used": True,
@@ -633,6 +658,7 @@ def verify_oracle_fixture(
 ) -> None:
     """Validate schema, predecessor projection, self-hashes, and optional replay."""
 
+    _require_keys(fixture, FIXTURE_KEYS, "fixture_schema_mismatch")
     _require(
         fixture.get("schema") == SCHEMA and fixture.get("status") == STATUS,
         "fixture_identity_mismatch",
@@ -689,6 +715,13 @@ def verify_oracle_fixture(
         fixture.get("arithmetic_contract") == ARITHMETIC_CONTRACT,
         "arithmetic_contract_mismatch",
         "arithmetic",
+    )
+    boundary_contract = fixture.get("boundary_contract")
+    _require(
+        isinstance(boundary_contract, Mapping)
+        and boundary_contract == _boundary_contract(),
+        "boundary_contract_mismatch",
+        "exact ordered model boundary contract differs",
     )
 
     generation = _load_json(DEFAULT_GENERATION)
@@ -872,7 +905,7 @@ def verify_oracle_fixture(
             str(index),
         )
         _require(
-            step["boundary_order"] == fixture["boundary_contract"]["order"],
+            step["boundary_order"] == boundary_contract["order"],
             "boundary_order_mismatch",
             str(index),
         )
