@@ -1826,3 +1826,804 @@ def run_causal_attention_sv(
     artifact.provenance["observed_little_endian_int64_sha256"] = hashes
     artifact.provenance["cycles"] = raw["cycles"]
     return result
+
+
+COMPOSED_ATTENTION_SCHEMA = (
+    "tinystories-1m-fixed-point-attention-crossing-generated-sv-v1"
+)
+COMPOSED_ATTENTION_ARTIFACT_DIRECTORY = Path(
+    "/tmp/llm2fpga-tinystories-1m-fixed-point-attention-crossing-generated-sv-v1"
+)
+COMPOSED_ATTENTION_SOURCE_MEMORIES = tuple(
+    sorted(
+        (
+            *CAUSAL_SOURCE_MEMORIES,
+            "c_fc_input_scale_q8_24",
+            "ln2_beta_q16_16",
+            "ln2_gamma_q16_16",
+            "out_bias_q16_16",
+            "out_input_scale_q8_24",
+            "out_output_scale_q8_24",
+            "out_weight_codes_i8",
+            "out_weight_scale_q8_24",
+        )
+    )
+)
+COMPOSED_ATTENTION_COMPUTED_CHECKPOINTS = (
+    *CAUSAL_COMPUTED_CHECKPOINTS,
+    "out_input_codes_i8",
+    "out_input_q16_16",
+    "out_accumulator_i64",
+    "out_post_weight_rescale_bias_q16_16",
+    "out_output_codes_i8",
+    "out_output_q16_16",
+    "attention_residual_q16_16",
+    "ln2_output_q16_16",
+    "c_fc_input_codes_i8",
+    "c_fc_input_q16_16",
+)
+COMPOSED_ATTENTION_OBSERVED_TENSORS = tuple(
+    sorted(
+        (
+            *COMPOSED_ATTENTION_SOURCE_MEMORIES,
+            *COMPOSED_ATTENTION_COMPUTED_CHECKPOINTS,
+        )
+    )
+)
+
+
+def _canonical_sha256(value: object) -> str:
+    encoded = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _checked_composed_attention_fixtures(
+    fixture_path: Path, mlp_fixture_path: Path
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Authenticate the full attention fixture and its linked MLP authority."""
+    attention = _checked_causal_fixture(fixture_path)
+    mlp = _mlp_lowerer()._checked_composed_fixture(mlp_fixture_path)
+    additional_shapes = {
+        "out_input_codes_i8": [4, 64],
+        "out_input_scale_q8_24": [64],
+        "out_input_q16_16": [4, 64],
+        "out_accumulator_i64": [4, 64],
+        "out_post_weight_rescale_bias_q16_16": [4, 64],
+        "out_output_codes_i8": [4, 64],
+        "out_output_scale_q8_24": [64],
+        "out_output_q16_16": [4, 64],
+        "out_weight_codes_i8": [64, 64],
+        "out_weight_scale_q8_24": [64],
+        "out_bias_q16_16": [64],
+        "attention_residual_q16_16": [4, 64],
+        "ln2_gamma_q16_16": [64],
+        "ln2_beta_q16_16": [64],
+        "ln2_output_q16_16": [4, 64],
+        "c_fc_input_codes_i8": [4, 64],
+        "c_fc_input_scale_q8_24": [64],
+        "c_fc_input_q16_16": [4, 64],
+    }
+    for name, shape in additional_shapes.items():
+        record = attention["tensors"].get(name)
+        count = 1
+        for dimension in shape:
+            count *= dimension
+        if (
+            not isinstance(record, dict)
+            or record.get("shape") != shape
+            or record.get("dtype") != "int64"
+            or record.get("bytes") != count * 8
+            or record.get("fixture_receipt_sha256")
+            != attention["tensor_fixture_receipt_sha256"]
+        ):
+            raise ValueError(f"composed attention memory contract mismatch: {name}")
+    if set(attention["tensors"]) != set(COMPOSED_ATTENTION_OBSERVED_TENSORS):
+        raise ValueError("composed attention observed-memory schema is incomplete")
+
+    linked = attention.get("linked_mlp")
+    if not isinstance(linked, dict) or (
+        linked.get("schema") != mlp["schema"]
+        or linked.get("receipt_sha256") != mlp["receipt_sha256"]
+        or linked.get("tensor_fixture_receipt_sha256")
+        != mlp["tensor_fixture_receipt_sha256"]
+    ):
+        raise ValueError("composed attention linked MLP fixture authority mismatch")
+    for name in (
+        "c_fc_input_codes_i8",
+        "c_fc_input_scale_q8_24",
+        "c_fc_input_q16_16",
+    ):
+        attention_record = attention["tensors"][name]
+        mlp_record = mlp["tensors"][name]
+        linked_record = linked.get(name)
+        if not isinstance(linked_record, dict):
+            raise ValueError(f"missing linked MLP tensor authority: {name}")
+        for field in (
+            "shape",
+            "dtype",
+            "bytes",
+            "semantic",
+            "canonical_sha256",
+            "little_endian_int64_sha256",
+        ):
+            if (
+                linked_record.get(field) != mlp_record.get(field)
+                or attention_record.get(field) != mlp_record.get(field)
+            ):
+                raise ValueError(f"linked MLP tensor authority mismatch: {name}")
+        if attention_record.get("values") != mlp_record.get("values"):
+            raise ValueError(f"linked MLP tensor values mismatch: {name}")
+    return attention, mlp
+
+
+def _composed_attention_schema_authority(
+    attention: dict[str, Any], mlp: dict[str, Any]
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "schema": COMPOSED_ATTENTION_SCHEMA,
+        "attention_fixture_schema": attention["schema"],
+        "mlp_fixture_schema": mlp["schema"],
+        "layer": 0,
+        "prompt_tokens": attention["prompt_tokens"],
+        "rows": 4,
+        "heads": 16,
+        "head_width": 4,
+        "arithmetic": attention["arithmetic"],
+        "source_memories": list(COMPOSED_ATTENTION_SOURCE_MEMORIES),
+        "checkpoint_memories": list(COMPOSED_ATTENTION_COMPUTED_CHECKPOINTS),
+        "observed_memories": list(COMPOSED_ATTENTION_OBSERVED_TENSORS),
+        "handoffs": [
+            "ln1_output_q16_16_to_qkv_input_qdq",
+            "qkv_output_q16_16_to_causal_attention",
+            "attention_context_q16_16_to_out_input_qdq",
+            "out_output_q16_16_and_block_input_q16_16_to_attention_residual",
+            "attention_residual_q16_16_to_ln2",
+            "ln2_output_q16_16_to_c_fc_input_qdq",
+        ],
+    }
+    payload["receipt_sha256"] = _canonical_sha256(payload)
+    return payload
+
+
+def _residual_add_phase() -> tuple[list[str], list[str], str]:
+    """Add out-projection Q16.16 to the block input in hardware memory."""
+    cells = [
+        "attention_residual_counter = std_reg(9);",
+        "attention_residual_lt = std_lt(9);",
+        "attention_residual_increment = std_add(9);",
+        "attention_residual_address = std_slice(9, 8);",
+        "attention_residual_add = std_sadd(64);",
+    ]
+    wires = ["""attention_residual_address.in = attention_residual_counter.out;
+    group attention_residual_init_counter {
+      attention_residual_counter.in = 9'd0;
+      attention_residual_counter.write_en = 1'd1;
+      attention_residual_init_counter[done] = attention_residual_counter.done;
+    }
+    group attention_residual_read {
+      block_input_q16_16.addr0 = attention_residual_address.out;
+      block_input_q16_16.content_en = 1'd1;
+      out_output_q16_16.addr0 = attention_residual_address.out;
+      out_output_q16_16.content_en = 1'd1;
+      attention_residual_read[done] = (block_input_q16_16.done & out_output_q16_16.done) ? 1'd1;
+    }
+    group attention_residual_write {
+      attention_residual_add.left = block_input_q16_16.read_data;
+      attention_residual_add.right = out_output_q16_16.read_data;
+      attention_residual_q16_16.addr0 = attention_residual_address.out;
+      attention_residual_q16_16.content_en = 1'd1;
+      attention_residual_q16_16.write_data = attention_residual_add.out;
+      attention_residual_q16_16.write_en = 1'd1;
+      attention_residual_write[done] = attention_residual_q16_16.done;
+    }
+    group attention_residual_increment_counter {
+      attention_residual_increment.left = attention_residual_counter.out;
+      attention_residual_increment.right = 9'd1;
+      attention_residual_counter.in = attention_residual_increment.out;
+      attention_residual_counter.write_en = 1'd1;
+      attention_residual_increment_counter[done] = attention_residual_counter.done;
+    }
+    comb group attention_residual_condition {
+      attention_residual_lt.left = attention_residual_counter.out;
+      attention_residual_lt.right = 9'd256;
+    }"""]
+    control = """      attention_residual_init_counter;
+      while attention_residual_lt.out with attention_residual_condition {
+        seq { attention_residual_read; attention_residual_write; attention_residual_increment_counter; }
+      }"""
+    return cells, wires, control
+
+
+def _ln2_composed_phase() -> tuple[list[str], list[str], str]:
+    """Namespace the proven exact LayerNorm datapath for the ln_2 handoff."""
+    shared = _mlp_lowerer()
+    cells_text, wires_text, control_text = shared._component_sections(
+        _ln1_kernel_futil()
+    )
+    external_lines = (
+        "    @external block_input_q16_16 = seq_mem_d1(64, 256, 8);\n",
+        "    @external ln1_gamma_q16_16 = seq_mem_d1(64, 64, 6);\n",
+        "    @external ln1_beta_q16_16 = seq_mem_d1(64, 64, 6);\n",
+        "    @external ln1_q16_16 = seq_mem_d1(64, 256, 8);\n",
+    )
+    for line in external_lines:
+        if line not in cells_text:
+            raise ValueError("proven LayerNorm memory ABI changed")
+        cells_text = cells_text.replace(line, "", 1)
+    memory_replacements = {
+        "block_input_q16_16": "attention_residual_q16_16",
+        "ln1_gamma_q16_16": "ln2_gamma_q16_16",
+        "ln1_beta_q16_16": "ln2_beta_q16_16",
+        "ln1_q16_16": "ln2_output_q16_16",
+    }
+    for old, new in memory_replacements.items():
+        wires_text = re.sub(rf"\b{re.escape(old)}\b", new, wires_text)
+
+    cell_names = re.findall(
+        r"(?m)^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=", cells_text
+    )
+    group_names = re.findall(
+        r"(?m)^\s*(?:comb\s+)?group\s+([A-Za-z_][A-Za-z0-9_]*)",
+        wires_text,
+    )
+    replacements = {
+        name: f"ln2_{name}" for name in (*cell_names, *group_names)
+    }
+    for old in sorted(replacements, key=len, reverse=True):
+        replacement = replacements[old]
+        cells_text = re.sub(rf"\b{re.escape(old)}\b", replacement, cells_text)
+        wires_text = re.sub(rf"\b{re.escape(old)}\b", replacement, wires_text)
+        control_text = re.sub(
+            rf"\b{re.escape(old)}\b", replacement, control_text
+        )
+    return (
+        [line.strip() for line in cells_text.splitlines() if line.strip()],
+        [wires_text.strip()],
+        control_text.strip(),
+    )
+
+
+def _composed_attention_kernel_futil() -> str:
+    """Append only the approved attention-to-MLP phases to the Task 3 main."""
+    shared = _mlp_lowerer()
+    causal_futil = _causal_kernel_futil()
+    causal_cells, causal_wires, causal_control = shared._component_sections(
+        causal_futil
+    )
+    additional_memories = [
+        "@external out_input_codes_i8 = seq_mem_d1(8, 256, 8);",
+        "@external out_input_scale_q8_24 = seq_mem_d1(64, 64, 6);",
+        "@external out_input_q16_16 = seq_mem_d1(64, 256, 8);",
+        "@external out_weight_codes_i8 = seq_mem_d1(8, 4096, 12);",
+        "@external out_weight_scale_q8_24 = seq_mem_d1(64, 64, 6);",
+        "@external out_bias_q16_16 = seq_mem_d1(64, 64, 6);",
+        "@external out_accumulator_i64 = seq_mem_d1(64, 256, 8);",
+        "@external out_post_weight_rescale_bias_q16_16 = seq_mem_d1(64, 256, 8);",
+        "@external out_output_scale_q8_24 = seq_mem_d1(64, 64, 6);",
+        "@external out_output_codes_i8 = seq_mem_d1(8, 256, 8);",
+        "@external out_output_q16_16 = seq_mem_d1(64, 256, 8);",
+        "@external attention_residual_q16_16 = seq_mem_d1(64, 256, 8);",
+        "@external ln2_gamma_q16_16 = seq_mem_d1(64, 64, 6);",
+        "@external ln2_beta_q16_16 = seq_mem_d1(64, 64, 6);",
+        "@external ln2_output_q16_16 = seq_mem_d1(64, 256, 8);",
+        "@external c_fc_input_scale_q8_24 = seq_mem_d1(64, 64, 6);",
+        "@external c_fc_input_codes_i8 = seq_mem_d1(8, 256, 8);",
+        "@external c_fc_input_q16_16 = seq_mem_d1(64, 256, 8);",
+    ]
+    phases = [
+        shared._activation_qdq_phase(
+            "out_input_qdq",
+            "attention_context_q16_16",
+            "out_input_scale_q8_24",
+            "out_input_codes_i8",
+            "out_input_q16_16",
+            256,
+            64,
+        ),
+        shared._gemv_phase(
+            "out_gemv",
+            "out_input_codes_i8",
+            "out_input_scale_q8_24",
+            "out_weight_codes_i8",
+            "out_accumulator_i64",
+            4,
+            64,
+            64,
+        ),
+        shared._requantize_phase(
+            "out_requant",
+            "out_accumulator_i64",
+            "out_weight_scale_q8_24",
+            "out_bias_q16_16",
+            "out_output_scale_q8_24",
+            "out_post_weight_rescale_bias_q16_16",
+            "out_output_codes_i8",
+            "out_output_q16_16",
+            256,
+            64,
+        ),
+        _residual_add_phase(),
+        _ln2_composed_phase(),
+        shared._activation_qdq_phase(
+            "c_fc_input_qdq",
+            "ln2_output_q16_16",
+            "c_fc_input_scale_q8_24",
+            "c_fc_input_codes_i8",
+            "c_fc_input_q16_16",
+            256,
+            64,
+        ),
+    ]
+    phase_cells = [cell for cells, _, _ in phases for cell in cells]
+    phase_wires = [wire for _, wires, _ in phases for wire in wires]
+    phase_controls = [control for _, _, control in phases]
+    memory_cells = [
+        line.strip() for line in causal_cells.splitlines() if line.strip()
+    ]
+    futil = f'''// Generated exact TinyStories-1M block-0 attention crossing.
+// Task 3 semantics are retained, followed by out projection, residual, ln_2,
+// and the hardware-owned c_fc input Q/DQ boundary.
+import "primitives/core.futil";
+import "primitives/binary_operators.futil";
+import "primitives/memories/seq.futil";
+
+component main(@go go: 1) -> (@done done: 1) {{
+  cells {{
+{shared._indent_lines(memory_cells + additional_memories + phase_cells, 4)}
+  }}
+  wires {{
+{causal_wires.rstrip()}
+{shared._indent_lines(phase_wires, 4)}
+  }}
+  control {{
+    seq {{
+{causal_control.rstrip()}
+{shared._indent_lines(phase_controls, 0)}
+    }}
+  }}
+}}
+'''
+    if len(re.findall(r"(?m)^component\s+main\b", futil)) != 1:
+        raise ValueError("composed attention generator did not emit exactly one main")
+    required_direct_reads = (
+        "out_input_qdq_numerator_lshift.left = attention_context_q16_16.read_data;",
+        "attention_residual_add.right = out_output_q16_16.read_data;",
+        "ln2_sum_add.right = attention_residual_q16_16.read_data;",
+        "c_fc_input_qdq_numerator_lshift.left = ln2_output_q16_16.read_data;",
+    )
+    for statement in required_direct_reads:
+        if statement not in futil:
+            raise ValueError(f"missing direct generated-memory handoff: {statement}")
+    for name in COMPOSED_ATTENTION_COMPUTED_CHECKPOINTS:
+        if f"{name}.write_en = 1'd1" not in futil:
+            raise ValueError(f"composed checkpoint is not hardware-written: {name}")
+    return futil
+
+
+def generate_composed_attention_kernel(
+    fixture_path: Path, mlp_fixture_path: Path
+) -> CalyxArtifact:
+    attention, mlp = _checked_composed_attention_fixtures(
+        fixture_path, mlp_fixture_path
+    )
+    futil = _composed_attention_kernel_futil()
+    shared_path = ROOT / "scripts/pipeline/lower_fixed_point_mlp_crossing_to_calyx.py"
+    return CalyxArtifact(
+        futil=futil,
+        provenance={
+            "generated": COMPOSED_ATTENTION_SCHEMA,
+            "fixture_receipt_sha256": attention["receipt_sha256"],
+            "tensor_fixture_receipt_sha256": attention[
+                "tensor_fixture_receipt_sha256"
+            ],
+            "linked_mlp_receipt_sha256": mlp["receipt_sha256"],
+            "linked_mlp_tensor_fixture_receipt_sha256": mlp[
+                "tensor_fixture_receipt_sha256"
+            ],
+            "fixture_authority": _fixture_authority(attention),
+            "linked_mlp_fixture_authority": _mlp_lowerer()._fixture_authority(mlp),
+            "schema_authority": _composed_attention_schema_authority(attention, mlp),
+            "futil_sha256": hashlib.sha256(futil.encode("utf-8")).hexdigest(),
+            "shared_phase_generator_sha256": hashlib.sha256(
+                shared_path.read_bytes()
+            ).hexdigest(),
+            "component_count": 1,
+            "host_preload_memories": list(COMPOSED_ATTENTION_SOURCE_MEMORIES),
+            "hardware_owned_memories": list(
+                COMPOSED_ATTENTION_COMPUTED_CHECKPOINTS
+            ),
+            "observed_memories": list(COMPOSED_ATTENTION_OBSERVED_TENSORS),
+            "calyx_disabled_passes": ["cell-share"],
+            "host_intermediate": False,
+        },
+    )
+
+
+def _generated_composed_attention_harness(attention: dict[str, Any]) -> str:
+    """Preload sources, zero computed memories, and print all post-run words."""
+    declarations: list[str] = []
+    preload_groups: list[str] = []
+    cpp_names: list[str] = []
+    for index, name in enumerate(COMPOSED_ATTENTION_SOURCE_MEMORIES):
+        values = _flatten_tensor(attention, name)
+        cpp_name = f"kSource{index:02d}"
+        cpp_names.append(cpp_name)
+        declarations.append(
+            f"// {name}\nstatic const std::int64_t {cpp_name}[{len(values)}] = "
+            f"{{{_cpp_values(values)}}};"
+        )
+        cast = "std::uint8_t" if name.endswith("codes_i8") else "std::uint64_t"
+        preload_groups.append(
+            f"  for (unsigned i = 0; i < {len(values)}; ++i)\n"
+            f"    root->main__DOT__{name}__DOT__mem[i] = "
+            f"static_cast<{cast}>({cpp_name}[i]);"
+        )
+
+    zero_groups = [
+        f"  for (unsigned i = 0; i < "
+        f"{attention['tensors'][name]['bytes'] // 8}; ++i)\n"
+        f"    root->main__DOT__{name}__DOT__mem[i] = 0;"
+        for name in COMPOSED_ATTENTION_COMPUTED_CHECKPOINTS
+    ]
+    print_groups = [
+        _cpp_print_memory(
+            name,
+            attention["tensors"][name]["bytes"] // 8,
+            signed_i8=name.endswith("codes_i8"),
+        )
+        for name in COMPOSED_ATTENTION_OBSERVED_TENSORS
+    ]
+    harness = f'''// Generated source-only attention crossing harness.
+// All non-source memories are hardware-owned and begin at a non-oracle zero.
+#include "Vmain.h"
+#include "Vmain___024root.h"
+#include "verilated.h"
+
+#include <cstdint>
+#include <iostream>
+
+{chr(10).join(declarations)}
+
+static void tick(Vmain& model) {{
+  model.clk = 0;
+  model.eval();
+  model.clk = 1;
+  model.eval();
+}}
+
+int main(int argc, char** argv) {{
+  Verilated::commandArgs(argc, argv);
+  Vmain model;
+  auto* root = model.rootp;
+{chr(10).join(preload_groups)}
+{chr(10).join(zero_groups)}
+  model.reset = 1;
+  model.go = 0;
+  for (unsigned i = 0; i < 3; ++i) tick(model);
+  model.reset = 0;
+  model.go = 1;
+  unsigned cycles = 0;
+  while (!model.done && cycles < 10000000) {{
+    tick(model);
+    ++cycles;
+  }}
+  const bool complete = model.done && cycles > 256;
+  std::cout << "{{\\\"status\\\":\\\"" << (complete ? "ok" : "timeout")
+            << "\\\",\\\"cycles\\\":" << cycles;
+{chr(10).join(print_groups)}
+  std::cout << "}}\\n";
+  return complete ? 0 : 1;
+}}
+'''
+    found_arrays = re.findall(
+        r"^static const std::int64_t\s+(kSource[0-9]+)\[",
+        harness,
+        re.MULTILINE,
+    )
+    if found_arrays != cpp_names:
+        raise ValueError("composed attention source preload whitelist mismatch")
+    if "kExpected" in harness:
+        raise ValueError("composed attention harness contains an output oracle")
+    for name in COMPOSED_ATTENTION_COMPUTED_CHECKPOINTS:
+        assignment = rf"main__DOT__{re.escape(name)}__DOT__mem\[i\]\s*=\s*([^;]+);"
+        if re.findall(assignment, harness) != ["0"]:
+            raise ValueError(f"host writes composed attention checkpoint: {name}")
+    return harness
+
+
+def _artifact_record(path: Path) -> dict[str, object]:
+    data = path.read_bytes()
+    return {
+        "path": str(path),
+        "bytes": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+    }
+
+
+def _require_composed_checkpoint(
+    name: str, observed: list[int], attention: dict[str, Any]
+) -> dict[str, object]:
+    expected = _flatten_tensor(attention, name)
+    if len(observed) != len(expected):
+        raise RuntimeError(
+            f"generated-SV composed {name} length mismatch: "
+            f"{len(observed)} != {len(expected)}"
+        )
+    for index, (actual, wanted) in enumerate(zip(observed, expected, strict=True)):
+        if actual != wanted:
+            raise RuntimeError(
+                f"generated-SV composed {name} mismatch at checkpoint {index}: "
+                f"observed {actual}, expected {wanted}"
+            )
+    digest = _little_endian_i64_sha256(observed)
+    if digest != attention["tensors"][name]["little_endian_int64_sha256"]:
+        raise RuntimeError(f"generated-SV composed {name} hash mismatch")
+    return {"count": len(observed), "little_endian_int64_sha256": digest}
+
+
+def _validate_yosys_stat(stdout: str) -> dict[str, int]:
+    if "=== main ===" not in stdout or "=== design hierarchy ===" not in stdout:
+        raise RuntimeError("Yosys stat did not report the generated main hierarchy")
+    hierarchy = stdout.rsplit("=== design hierarchy ===", maxsplit=1)[1]
+    values: dict[str, int] = {}
+    for key, label in (
+        ("cells", "cells"),
+        ("memories", "memories"),
+        ("memory_bits", "memory bits"),
+    ):
+        match = re.search(rf"(?m)^\s*(\d+)\s+{re.escape(label)}\s*$", hierarchy)
+        if match is None:
+            raise RuntimeError(f"Yosys stat is missing hierarchy {label}")
+        values[key] = int(match.group(1))
+    if any(value <= 0 for value in values.values()):
+        raise RuntimeError("Yosys stat reported an empty generated hierarchy")
+    return values
+
+
+def run_composed_attention_sv(
+    fixture_path: Path, mlp_fixture_path: Path
+) -> dict[str, object]:
+    """Compile and exhaustively observe the one-main attention crossing."""
+    artifact = generate_composed_attention_kernel(fixture_path, mlp_fixture_path)
+    attention, mlp = _checked_composed_attention_fixtures(
+        fixture_path, mlp_fixture_path
+    )
+    shared_path = ROOT / "scripts/pipeline/lower_fixed_point_mlp_crossing_to_calyx.py"
+    if (
+        artifact.provenance.get("fixture_authority")
+        != _fixture_authority(attention)
+        or artifact.provenance.get("linked_mlp_fixture_authority")
+        != _mlp_lowerer()._fixture_authority(mlp)
+        or artifact.provenance.get("schema_authority")
+        != _composed_attention_schema_authority(attention, mlp)
+        or artifact.provenance.get("shared_phase_generator_sha256")
+        != hashlib.sha256(shared_path.read_bytes()).hexdigest()
+    ):
+        raise ValueError("composed attention fixture/schema authority mismatch")
+    futil_sha256 = hashlib.sha256(artifact.futil.encode("utf-8")).hexdigest()
+    if artifact.provenance.get("futil_sha256") != futil_sha256:
+        raise ValueError("composed attention Futil authority mismatch")
+
+    artifact_dir = COMPOSED_ATTENTION_ARTIFACT_DIRECTORY
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    futil_path = artifact_dir / "attention-crossing.futil"
+    sv_path = artifact_dir / "main.sv"
+    synthesis_sv_path = artifact_dir / "main-synthesis.sv"
+    harness_path = artifact_dir / "harness.cpp"
+    futil_path.write_text(artifact.futil, encoding="utf-8")
+    harness = _generated_composed_attention_harness(attention)
+    harness_path.write_text(harness, encoding="utf-8")
+
+    calyx = _calyx_install()
+    common = [
+        str(calyx / "bin/calyx"),
+        str(futil_path),
+        "-l",
+        str(calyx / "share/calyx"),
+        "-d",
+        "cell-share",
+    ]
+    simulator_command = [*common, "-b", "verilog", "-o", str(sv_path)]
+    simulator_compile = subprocess.run(
+        simulator_command,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if simulator_compile.returncode != 0 or not sv_path.is_file():
+        raise RuntimeError(
+            "composed attention Calyx-to-SV failed: "
+            f"{simulator_compile.stderr.strip()}"
+        )
+    synthesis_command = [
+        *common,
+        "--synthesis",
+        "--disable-verify",
+        "-b",
+        "verilog",
+        "-o",
+        str(synthesis_sv_path),
+    ]
+    synthesis_compile = subprocess.run(
+        synthesis_command,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if synthesis_compile.returncode != 0 or not synthesis_sv_path.is_file():
+        raise RuntimeError(
+            "composed attention Calyx synthesis-to-SV failed: "
+            f"{synthesis_compile.stderr.strip()}"
+        )
+
+    verilator_dir = artifact_dir / "verilator"
+    executable = verilator_dir / "fixed_point_attention_crossing_harness"
+    verilator_command = [
+        "verilator",
+        "--cc",
+        "--exe",
+        "--build",
+        "--top-module",
+        "main",
+        "--public-flat-rw",
+        "--Mdir",
+        str(verilator_dir),
+        "-CFLAGS",
+        "-std=c++17",
+        "-o",
+        executable.name,
+        str(sv_path),
+        str(harness_path),
+    ]
+    verilator_compile = subprocess.run(
+        verilator_command,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=900,
+    )
+    if verilator_compile.returncode != 0 or not executable.is_file():
+        raise RuntimeError(
+            f"composed attention Verilator build failed: {verilator_compile.stderr.strip()}"
+        )
+    simulated = subprocess.run(
+        [str(executable)],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if simulated.returncode != 0:
+        raise RuntimeError(
+            "generated-SV composed attention harness failed: "
+            f"{simulated.stdout.strip()} {simulated.stderr.strip()}"
+        )
+    try:
+        observed = json.loads(
+            next(
+                line
+                for line in reversed(simulated.stdout.splitlines())
+                if line.startswith("{")
+            )
+        )
+    except (json.JSONDecodeError, StopIteration) as error:
+        raise RuntimeError(
+            "generated-SV composed attention harness did not emit JSON: "
+            f"{simulated.stdout!r}"
+        ) from error
+    if observed.get("status") != "ok" or not isinstance(observed.get("cycles"), int):
+        raise RuntimeError(
+            f"generated-SV composed attention observation is invalid: {observed}"
+        )
+
+    checkpoint_receipts: dict[str, object] = {}
+    for name in COMPOSED_ATTENTION_OBSERVED_TENSORS:
+        values = observed.get(name)
+        if not isinstance(values, list) or not all(
+            isinstance(value, int) for value in values
+        ):
+            raise RuntimeError(f"generated-SV composed checkpoint invalid: {name}")
+        checkpoint_receipts[name] = _require_composed_checkpoint(
+            name, values, attention
+        )
+    for name in (
+        "c_fc_input_codes_i8",
+        "c_fc_input_scale_q8_24",
+        "c_fc_input_q16_16",
+    ):
+        digest = checkpoint_receipts[name]["little_endian_int64_sha256"]
+        if digest != mlp["tensors"][name]["little_endian_int64_sha256"]:
+            raise RuntimeError(f"generated-SV linked MLP checkpoint mismatch: {name}")
+
+    generated_artifacts = {
+        "futil": _artifact_record(futil_path),
+        "sv": _artifact_record(sv_path),
+        "synthesis_sv": _artifact_record(synthesis_sv_path),
+        "harness": _artifact_record(harness_path),
+    }
+    if generated_artifacts["futil"]["sha256"] != futil_sha256:
+        raise RuntimeError("written composed attention Futil hash mismatch")
+    yosys_command = [
+        "yosys",
+        "-p",
+        f"read_verilog -sv {synthesis_sv_path}; hierarchy -check -top main; stat",
+    ]
+    yosys = subprocess.run(
+        yosys_command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if yosys.returncode != 0:
+        raise RuntimeError(f"composed attention Yosys stat failed: {yosys.stderr.strip()}")
+    synthesis_resources = _validate_yosys_stat(yosys.stdout)
+
+    observed_receipt: dict[str, object] = {
+        "checkpoints": checkpoint_receipts,
+        "ln2_q16_16_sha256": checkpoint_receipts["ln2_output_q16_16"][
+            "little_endian_int64_sha256"
+        ],
+    }
+    for name in (
+        "c_fc_input_codes_i8",
+        "c_fc_input_scale_q8_24",
+        "c_fc_input_q16_16",
+    ):
+        observed_receipt[f"{name}_sha256"] = checkpoint_receipts[name][
+            "little_endian_int64_sha256"
+        ]
+    receipt: dict[str, object] = {
+        "schema": COMPOSED_ATTENTION_SCHEMA,
+        "fixture_receipt_sha256": attention["receipt_sha256"],
+        "tensor_fixture_receipt_sha256": attention[
+            "tensor_fixture_receipt_sha256"
+        ],
+        "linked_mlp_receipt_sha256": mlp["receipt_sha256"],
+        "linked_mlp_tensor_fixture_receipt_sha256": mlp[
+            "tensor_fixture_receipt_sha256"
+        ],
+        "fixture_authority": _fixture_authority(attention),
+        "linked_mlp_fixture_authority": _mlp_lowerer()._fixture_authority(mlp),
+        "schema_authority": _composed_attention_schema_authority(attention, mlp),
+        "execution": {
+            "component_count": 1,
+            "simulator_runs": 1,
+            "host_intermediate": False,
+            "cycles": observed["cycles"],
+            "host_preload_memories": list(COMPOSED_ATTENTION_SOURCE_MEMORIES),
+            "hardware_owned_memories": list(
+                COMPOSED_ATTENTION_COMPUTED_CHECKPOINTS
+            ),
+            "traversal": "task3_causal_then_out_projection_then_residual_then_ln2_then_c_fc_input_qdq",
+            "ln2_to_c_fc_handoff": "ln2_output_q16_16_hardware_memory",
+        },
+        "observed": observed_receipt,
+        "generated_artifacts": generated_artifacts,
+        "calyx_compile_policy": {
+            "disabled_passes": ["cell-share"],
+            "reason": "preserve explicitly staged fixed-point arithmetic latches",
+            "simulator_command": simulator_command,
+            "synthesis_command": synthesis_command,
+            "same_futil_sha256": generated_artifacts["futil"]["sha256"],
+        },
+        "synthesis": {
+            "status": "passed",
+            "same_futil_sha256": generated_artifacts["futil"]["sha256"],
+            "synthesis_sv_sha256": generated_artifacts["synthesis_sv"]["sha256"],
+            "command": yosys_command,
+            "resources": synthesis_resources,
+        },
+    }
+    receipt["receipt_sha256"] = _canonical_sha256(receipt)
+    unsigned = {
+        key: value for key, value in receipt.items() if key != "receipt_sha256"
+    }
+    if receipt["receipt_sha256"] != _canonical_sha256(unsigned):
+        raise RuntimeError("composed attention receipt self-hash mismatch")
+    return receipt

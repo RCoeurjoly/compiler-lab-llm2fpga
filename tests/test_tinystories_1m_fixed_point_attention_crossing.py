@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -112,6 +114,33 @@ CAUSAL_COMPUTED_CHECKPOINTS = [
     "attention_context_q16_16",
 ]
 
+COMPOSED_SOURCE_MEMORIES = sorted(
+    [
+        *CAUSAL_SOURCE_MEMORIES,
+        "c_fc_input_scale_q8_24",
+        "ln2_beta_q16_16",
+        "ln2_gamma_q16_16",
+        "out_bias_q16_16",
+        "out_input_scale_q8_24",
+        "out_output_scale_q8_24",
+        "out_weight_codes_i8",
+        "out_weight_scale_q8_24",
+    ]
+)
+COMPOSED_COMPUTED_CHECKPOINTS = [
+    *CAUSAL_COMPUTED_CHECKPOINTS,
+    "out_input_codes_i8",
+    "out_input_q16_16",
+    "out_accumulator_i64",
+    "out_post_weight_rescale_bias_q16_16",
+    "out_output_codes_i8",
+    "out_output_q16_16",
+    "attention_residual_q16_16",
+    "ln2_output_q16_16",
+    "c_fc_input_codes_i8",
+    "c_fc_input_q16_16",
+]
+
 
 def load_module(path: Path, name: str):
     if not path.is_file():
@@ -124,7 +153,96 @@ def load_module(path: Path, name: str):
     return module
 
 
+def canonical_sha256(value: object) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            value, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode("utf-8")
+    ).hexdigest()
+
+
 class AttentionCrossingTest(unittest.TestCase):
+    def test_one_generated_sv_main_matches_attention_and_mlp_boundary(self):
+        """Catches a missing or divergent hardware-owned attention-to-MLP path."""
+        lowerer = load_module(
+            ATTENTION_LOWERER, "fixed_point_attention_composed_lowerer"
+        )
+        receipt = lowerer.run_composed_attention_sv(
+            ATTENTION_FIXTURE, MLP_FIXTURE
+        )
+        attention = json.loads(ATTENTION_FIXTURE.read_text(encoding="utf-8"))
+        mlp = json.loads(MLP_FIXTURE.read_text(encoding="utf-8"))
+
+        self.assertEqual(receipt["execution"]["component_count"], 1)
+        self.assertFalse(receipt["execution"]["host_intermediate"])
+        self.assertEqual(
+            receipt["execution"]["host_preload_memories"],
+            COMPOSED_SOURCE_MEMORIES,
+        )
+        self.assertEqual(
+            set(receipt["observed"]["checkpoints"]), set(attention["tensors"])
+        )
+        for name, record in attention["tensors"].items():
+            self.assertEqual(
+                receipt["observed"]["checkpoints"][name][
+                    "little_endian_int64_sha256"
+                ],
+                record["little_endian_int64_sha256"],
+                name,
+            )
+        self.assertEqual(
+            receipt["observed"]["ln2_q16_16_sha256"],
+            attention["tensors"]["ln2_output_q16_16"][
+                "little_endian_int64_sha256"
+            ],
+        )
+        for name in (
+            "c_fc_input_codes_i8",
+            "c_fc_input_scale_q8_24",
+            "c_fc_input_q16_16",
+        ):
+            self.assertEqual(
+                receipt["observed"][f"{name}_sha256"],
+                mlp["tensors"][name]["little_endian_int64_sha256"],
+                name,
+            )
+
+        artifacts = receipt["generated_artifacts"]
+        futil = Path(artifacts["futil"]["path"]).read_text(encoding="utf-8")
+        harness = Path(artifacts["harness"]["path"]).read_text(encoding="utf-8")
+        self.assertEqual(futil.count("component main("), 1)
+        self.assertIn(
+            "c_fc_input_qdq_numerator_lshift.left = "
+            "ln2_output_q16_16.read_data;",
+            futil,
+        )
+        self.assertNotIn("kExpected", harness)
+        self.assertEqual(
+            len(
+                re.findall(
+                    r"^static const std::int64_t\s+kSource[0-9]+\[",
+                    harness,
+                    re.MULTILINE,
+                )
+            ),
+            len(COMPOSED_SOURCE_MEMORIES),
+        )
+        for name in COMPOSED_COMPUTED_CHECKPOINTS:
+            assignment = (
+                rf"main__DOT__{re.escape(name)}__DOT__mem\[i\]\s*=\s*([^;]+);"
+            )
+            self.assertEqual(re.findall(assignment, harness), ["0"], name)
+
+        self.assertEqual(
+            receipt["synthesis"]["same_futil_sha256"],
+            artifacts["futil"]["sha256"],
+        )
+        self.assertGreater(receipt["synthesis"]["resources"]["cells"], 0)
+        unsigned = {
+            key: value for key, value in receipt.items() if key != "receipt_sha256"
+        }
+        self.assertEqual(receipt["receipt_sha256"], canonical_sha256(unsigned))
+
     def test_generated_sv_observes_exact_qkv_and_causal_context(self):
         """Catches missing/wrong hardware checkpoints or fixture-seeded results."""
         lowerer = load_module(
