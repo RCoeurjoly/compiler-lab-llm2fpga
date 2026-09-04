@@ -28,6 +28,10 @@ BLOCK_CAPTURE = ROOT / "TinyStories/capture_fixed_point_block_composition_slice.
 BLOCK_LOWERER = (
     ROOT / "scripts/pipeline/lower_fixed_point_block_composition_to_calyx.py"
 )
+SV_RECEIPT = (
+    ROOT
+    / "artifacts/reference/tinystories-1m-fixed-point-block-composition-sv-receipt.json"
+)
 
 
 def load_capture():
@@ -121,6 +125,125 @@ def reseal_block_fixture(fixture: dict) -> None:
 
 
 class BlockCompositionTest(unittest.TestCase):
+    def test_complete_block_receipt_binds_all_linked_authority(self):
+        """Catches incomplete provenance or synthesis detached from simulation."""
+        lowerer = load_lowerer()
+        receipt = lowerer.run_composed_block_sv(
+            BLOCK_FIXTURE, ATTENTION_FIXTURE, MLP_FIXTURE
+        )
+        block = json.loads(BLOCK_FIXTURE.read_text(encoding="utf-8"))
+        attention = json.loads(ATTENTION_FIXTURE.read_text(encoding="utf-8"))
+        mlp = json.loads(MLP_FIXTURE.read_text(encoding="utf-8"))
+        expected_names = set(attention["tensors"]) | set(mlp["tensors"]) | {
+            "block_output_q16_16"
+        }
+
+        self.assertEqual(receipt["execution"]["component_count"], 1)
+        self.assertFalse(receipt["execution"]["host_intermediate"])
+        self.assertEqual(len(expected_names), 84)
+        self.assertEqual(set(receipt["observed"]["checkpoints"]), expected_names)
+        self.assertEqual(
+            receipt["observed"]["block_output_q16_16_sha256"],
+            block["tensors"]["block_output_q16_16"][
+                "little_endian_int64_sha256"
+            ],
+        )
+        self.assertEqual(
+            receipt["linked_fixtures"]["mlp_c_fc_input_q16_16_sha256"],
+            mlp["tensors"]["c_fc_input_q16_16"][
+                "little_endian_int64_sha256"
+            ],
+        )
+        self.assertEqual(
+            receipt["synthesis"]["same_futil_sha256"],
+            receipt["generated_artifacts"]["futil"]["sha256"],
+        )
+        unsigned = {
+            key: value for key, value in receipt.items() if key != "receipt_sha256"
+        }
+        self.assertEqual(receipt["receipt_sha256"], canonical_sha256(unsigned))
+        self.assertTrue(SV_RECEIPT.is_file())
+        self.assertEqual(
+            json.loads(SV_RECEIPT.read_text(encoding="utf-8")), receipt
+        )
+
+    def test_complete_block_receipt_rejects_tampering(self):
+        """Catches both ordinary edits and resealed checkpoint substitutions."""
+        lowerer = load_lowerer()
+        receipt = json.loads(SV_RECEIPT.read_text(encoding="utf-8"))
+        lowerer.validate_composed_block_receipt(
+            receipt,
+            BLOCK_FIXTURE,
+            ATTENTION_FIXTURE,
+            MLP_FIXTURE,
+            verify_artifacts=False,
+        )
+
+        changed_cycle = copy.deepcopy(receipt)
+        changed_cycle["execution"]["cycles"] += 1
+        with self.assertRaisesRegex(ValueError, "receipt self-hash mismatch"):
+            lowerer.validate_composed_block_receipt(
+                changed_cycle,
+                BLOCK_FIXTURE,
+                ATTENTION_FIXTURE,
+                MLP_FIXTURE,
+                verify_artifacts=False,
+            )
+
+        substituted_checkpoint = copy.deepcopy(receipt)
+        substituted_checkpoint["observed"]["checkpoints"][
+            "block_output_q16_16"
+        ]["little_endian_int64_sha256"] = "0" * 64
+        unsigned = {
+            key: value
+            for key, value in substituted_checkpoint.items()
+            if key != "receipt_sha256"
+        }
+        substituted_checkpoint["receipt_sha256"] = canonical_sha256(unsigned)
+        with self.assertRaisesRegex(ValueError, "observed records mismatch"):
+            lowerer.validate_composed_block_receipt(
+                substituted_checkpoint,
+                BLOCK_FIXTURE,
+                ATTENTION_FIXTURE,
+                MLP_FIXTURE,
+                verify_artifacts=False,
+            )
+
+    def test_receipt_memory_partition_and_artifacts_are_exact(self):
+        """Catches host checkpoint preloads or missing artifact hash bindings."""
+        lowerer = load_lowerer()
+        receipt = json.loads(SV_RECEIPT.read_text(encoding="utf-8"))
+        execution = receipt["execution"]
+        sources = set(execution["host_preload_memories"])
+        computed = set(execution["hardware_owned_memories"])
+
+        self.assertFalse(sources & computed)
+        self.assertEqual(len(sources), 34)
+        self.assertEqual(len(computed), 49)
+        self.assertEqual(len(execution["observed_records"]), 84)
+        self.assertEqual(
+            execution["direct_handoffs"],
+            [
+                "ln2_output_q16_16_to_c_fc_input_qdq",
+                "attention_residual_q16_16_and_c_proj_output_q16_16_to_block_output_q16_16",
+            ],
+        )
+        self.assertEqual(
+            set(receipt["generated_artifacts"]),
+            {"futil", "sv", "synthesis_sv", "harness"},
+        )
+        for record in receipt["generated_artifacts"].values():
+            self.assertTrue(Path(record["path"]).is_absolute())
+            self.assertGreater(record["bytes"], 0)
+            self.assertRegex(record["sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(
+            receipt["calyx_compile_policy"]["same_futil_sha256"],
+            receipt["generated_artifacts"]["futil"]["sha256"],
+        )
+        self.assertEqual(
+            receipt["calyx_compile_policy"]["disabled_passes"], ["cell-share"]
+        )
+
     def test_one_generated_main_observes_exact_complete_block(self):
         """Catches host composition or any divergent complete-block checkpoint."""
         lowerer = load_lowerer()

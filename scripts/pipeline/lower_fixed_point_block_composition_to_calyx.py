@@ -643,6 +643,89 @@ def _little_endian_i64_sha256(values: list[int]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _artifact_record(path: Path) -> dict[str, object]:
+    data = path.read_bytes()
+    return {
+        "path": str(path),
+        "bytes": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+    }
+
+
+def _calyx_common_command(futil_path: Path) -> list[str]:
+    calyx = _calyx_install()
+    return [
+        str(calyx / "bin/calyx"),
+        str(futil_path),
+        "-l",
+        str(calyx / "share/calyx"),
+        "-d",
+        "cell-share",
+    ]
+
+
+def _validate_yosys_stat(stdout: str) -> dict[str, int]:
+    if "=== main ===" not in stdout or "=== design hierarchy ===" not in stdout:
+        raise RuntimeError("Yosys stat did not report the generated main hierarchy")
+    hierarchy = stdout.rsplit("=== design hierarchy ===", maxsplit=1)[1]
+    resources: dict[str, int] = {}
+    for key, label in (
+        ("cells", "cells"),
+        ("memories", "memories"),
+        ("memory_bits", "memory bits"),
+    ):
+        match = re.search(rf"(?m)^\s*(\d+)\s+{re.escape(label)}\s*$", hierarchy)
+        if match is None:
+            raise RuntimeError(f"Yosys stat is missing hierarchy {label}")
+        resources[key] = int(match.group(1))
+    if any(value <= 0 for value in resources.values()):
+        raise RuntimeError("Yosys stat reported an empty generated hierarchy")
+    return resources
+
+
+def _linked_fixture_receipt(
+    block: dict[str, Any], attention: dict[str, Any], mlp: dict[str, Any]
+) -> dict[str, object]:
+    return {
+        "block_receipt_sha256": block["receipt_sha256"],
+        "block_tensor_fixture_receipt_sha256": block[
+            "tensor_fixture_receipt_sha256"
+        ],
+        "attention_receipt_sha256": attention["receipt_sha256"],
+        "attention_tensor_fixture_receipt_sha256": attention[
+            "tensor_fixture_receipt_sha256"
+        ],
+        "mlp_receipt_sha256": mlp["receipt_sha256"],
+        "mlp_tensor_fixture_receipt_sha256": mlp[
+            "tensor_fixture_receipt_sha256"
+        ],
+        "block_linked_attention_receipt_sha256": block["linked_attention"][
+            "receipt_sha256"
+        ],
+        "block_linked_mlp_receipt_sha256": block["linked_mlp"][
+            "receipt_sha256"
+        ],
+        "mlp_c_fc_input_q16_16_sha256": mlp["tensors"][
+            "c_fc_input_q16_16"
+        ]["little_endian_int64_sha256"],
+        "record_counts": {
+            "attention": len(attention["tensors"]),
+            "mlp": len(mlp["tensors"]),
+            "block": len(block["tensors"]),
+            "unique": len(
+                set(attention["tensors"])
+                | set(mlp["tensors"])
+                | set(block["tensors"])
+            ),
+        },
+        "identities": {
+            "block": block["identity"],
+            "attention": attention["identity"],
+            "mlp": mlp["identity"],
+        },
+    }
+
+
 def run_block_sv(
     artifact: CalyxArtifact,
     block_fixture: Path,
@@ -672,14 +755,8 @@ def run_block_sv(
     harness = _generated_harness(block, attention, mlp)
     harness_path.write_text(harness, encoding="utf-8")
 
-    calyx = _calyx_install()
     calyx_command = [
-        str(calyx / "bin/calyx"),
-        str(futil_path),
-        "-l",
-        str(calyx / "share/calyx"),
-        "-d",
-        "cell-share",
+        *_calyx_common_command(futil_path),
         "-b",
         "verilog",
         "-o",
@@ -790,3 +867,356 @@ def run_block_sv(
         result[name] = _reshape(values, record["shape"])
         hashes[name] = digest
     return result
+
+
+def _expected_checkpoint_receipts(
+    block: dict[str, Any],
+    attention: dict[str, Any],
+    mlp: dict[str, Any],
+    logical: tuple[str, ...],
+) -> dict[str, dict[str, object]]:
+    return {
+        name: {
+            "count": _record_for(name, block, attention, mlp)["bytes"] // 8,
+            "little_endian_int64_sha256": _record_for(
+                name, block, attention, mlp
+            )["little_endian_int64_sha256"],
+        }
+        for name in logical
+    }
+
+
+def _require_receipt_field(
+    actual: object, expected: object, label: str
+) -> None:
+    if actual != expected:
+        raise ValueError(f"complete-block receipt {label} mismatch")
+
+
+def validate_composed_block_receipt(
+    receipt: dict[str, object],
+    block_fixture: Path,
+    attention_fixture: Path,
+    mlp_fixture: Path,
+    *,
+    verify_artifacts: bool = True,
+) -> dict[str, object]:
+    """Authenticate a complete-block receipt against fixtures and artifacts."""
+    if not isinstance(receipt, dict):
+        raise ValueError("complete-block receipt must be an object")
+    supplied_self_hash = receipt.get("receipt_sha256")
+    unsigned = {
+        key: value for key, value in receipt.items() if key != "receipt_sha256"
+    }
+    if supplied_self_hash != _canonical_sha256(unsigned):
+        raise ValueError("complete-block receipt self-hash mismatch")
+
+    block, attention, mlp = _checked_fixtures(
+        block_fixture, attention_fixture, mlp_fixture
+    )
+    attention_lowerer = _attention_lowerer()
+    mlp_lowerer = _mlp_lowerer()
+    sources, computed, logical = _memory_contracts(
+        attention_lowerer, mlp_lowerer
+    )
+    if len(logical) != 84:
+        raise ValueError("complete-block receipt expected 84 unique records")
+
+    _require_receipt_field(receipt.get("schema"), BLOCK_SCHEMA, "schema")
+    _require_receipt_field(
+        receipt.get("fixture_authorities"),
+        {
+            "block": _fixture_authority(block),
+            "attention": _fixture_authority(attention),
+            "mlp": _fixture_authority(mlp),
+        },
+        "fixture authorities",
+    )
+    _require_receipt_field(
+        receipt.get("linked_fixtures"),
+        _linked_fixture_receipt(block, attention, mlp),
+        "linked fixtures",
+    )
+    _require_receipt_field(
+        receipt.get("schema_authority"),
+        _schema_authority(block, attention, mlp),
+        "schema authority",
+    )
+
+    expected_execution = {
+        "component_count": 1,
+        "simulator_runs": 1,
+        "host_intermediate": False,
+        "cycles": receipt.get("execution", {}).get("cycles")
+        if isinstance(receipt.get("execution"), dict)
+        else None,
+        "host_preload_memories": list(sources),
+        "hardware_owned_memories": list(computed),
+        "observed_records": list(logical),
+        "direct_handoffs": [
+            "ln2_output_q16_16_to_c_fc_input_qdq",
+            "attention_residual_q16_16_and_c_proj_output_q16_16_to_block_output_q16_16",
+        ],
+    }
+    execution = receipt.get("execution")
+    if not isinstance(execution, dict) or not isinstance(
+        execution.get("cycles"), int
+    ) or execution["cycles"] <= 131072:
+        raise ValueError("complete-block receipt cycle count is invalid")
+    expected_execution["cycles"] = execution["cycles"]
+    _require_receipt_field(execution, expected_execution, "execution")
+
+    expected_checkpoints = _expected_checkpoint_receipts(
+        block, attention, mlp, logical
+    )
+    expected_observed = {
+        "record_count": 84,
+        "checkpoints": expected_checkpoints,
+        "block_output_q16_16_sha256": expected_checkpoints[
+            "block_output_q16_16"
+        ]["little_endian_int64_sha256"],
+    }
+    _require_receipt_field(
+        receipt.get("observed"), expected_observed, "observed records"
+    )
+
+    generated_artifacts = receipt.get("generated_artifacts")
+    if not isinstance(generated_artifacts, dict) or set(generated_artifacts) != {
+        "futil",
+        "sv",
+        "synthesis_sv",
+        "harness",
+    }:
+        raise ValueError("complete-block receipt generated artifacts mismatch")
+    if verify_artifacts:
+        for name, record in generated_artifacts.items():
+            if not isinstance(record, dict) or not isinstance(
+                record.get("path"), str
+            ):
+                raise ValueError(f"complete-block receipt {name} artifact invalid")
+            path = Path(record["path"])
+            if not path.is_file() or _artifact_record(path) != record:
+                raise ValueError(
+                    f"complete-block receipt {name} artifact hash mismatch"
+                )
+        expected_futil = generate_block_kernel(
+            block_fixture, attention_fixture, mlp_fixture
+        ).futil.encode("utf-8")
+        if generated_artifacts["futil"]["sha256"] != hashlib.sha256(
+            expected_futil
+        ).hexdigest():
+            raise ValueError("complete-block receipt generated Futil mismatch")
+
+    common = _calyx_common_command(
+        Path(generated_artifacts["futil"]["path"])
+    )
+    expected_policy = {
+        "disabled_passes": ["cell-share"],
+        "reason": "preserve explicitly staged fixed-point arithmetic latches",
+        "simulator_command": [
+            *common,
+            "-b",
+            "verilog",
+            "-o",
+            generated_artifacts["sv"]["path"],
+        ],
+        "synthesis_command": [
+            *common,
+            "--synthesis",
+            "--disable-verify",
+            "-b",
+            "verilog",
+            "-o",
+            generated_artifacts["synthesis_sv"]["path"],
+        ],
+        "same_futil_sha256": generated_artifacts["futil"]["sha256"],
+    }
+    _require_receipt_field(
+        receipt.get("calyx_compile_policy"), expected_policy, "compiler arguments"
+    )
+
+    synthesis = receipt.get("synthesis")
+    if not isinstance(synthesis, dict):
+        raise ValueError("complete-block receipt synthesis evidence is invalid")
+    expected_yosys_command = [
+        "yosys",
+        "-p",
+        "read_verilog -sv "
+        f"{generated_artifacts['synthesis_sv']['path']}; "
+        "hierarchy -check -top main; stat",
+    ]
+    if (
+        synthesis.get("status") != "passed"
+        or synthesis.get("same_futil_sha256")
+        != generated_artifacts["futil"]["sha256"]
+        or synthesis.get("synthesis_sv_sha256")
+        != generated_artifacts["synthesis_sv"]["sha256"]
+        or synthesis.get("command") != expected_yosys_command
+        or not isinstance(synthesis.get("resources"), dict)
+        or set(synthesis["resources"]) != {"cells", "memories", "memory_bits"}
+        or any(
+            not isinstance(value, int) or value <= 0
+            for value in synthesis["resources"].values()
+        )
+    ):
+        raise ValueError("complete-block receipt synthesis evidence mismatch")
+    return receipt
+
+
+def run_composed_block_sv(
+    block_fixture: Path,
+    attention_fixture: Path,
+    mlp_fixture: Path,
+) -> dict[str, object]:
+    """Run the full generated-SV block gate and bind same-Futil synthesis."""
+    artifact = generate_block_kernel(
+        block_fixture, attention_fixture, mlp_fixture
+    )
+    observed = run_block_sv(
+        artifact, block_fixture, attention_fixture, mlp_fixture
+    )
+    block, attention, mlp = _checked_fixtures(
+        block_fixture, attention_fixture, mlp_fixture
+    )
+    expected_artifact = generate_block_kernel(
+        block_fixture, attention_fixture, mlp_fixture
+    )
+    if artifact != expected_artifact:
+        raise ValueError("complete-block authority changed during execution")
+
+    artifact_dir = ARTIFACT_DIRECTORY
+    futil_path = artifact_dir / "block-composition.futil"
+    sv_path = artifact_dir / "main.sv"
+    synthesis_sv_path = artifact_dir / "main-synthesis.sv"
+    harness_path = artifact_dir / "harness.cpp"
+    if futil_path.read_text(encoding="utf-8") != artifact.futil:
+        raise RuntimeError("complete-block written Futil changed after simulation")
+
+    common = _calyx_common_command(futil_path)
+    simulator_command = [
+        *common,
+        "-b",
+        "verilog",
+        "-o",
+        str(sv_path),
+    ]
+    synthesis_command = [
+        *common,
+        "--synthesis",
+        "--disable-verify",
+        "-b",
+        "verilog",
+        "-o",
+        str(synthesis_sv_path),
+    ]
+    synthesis_compile = subprocess.run(
+        synthesis_command,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if synthesis_compile.returncode != 0 or not synthesis_sv_path.is_file():
+        raise RuntimeError(
+            "complete-block Calyx synthesis-to-SV failed: "
+            f"{synthesis_compile.stderr.strip()}"
+        )
+
+    generated_artifacts = {
+        "futil": _artifact_record(futil_path),
+        "sv": _artifact_record(sv_path),
+        "synthesis_sv": _artifact_record(synthesis_sv_path),
+        "harness": _artifact_record(harness_path),
+    }
+    if generated_artifacts["futil"]["sha256"] != artifact.provenance[
+        "futil_sha256"
+    ]:
+        raise RuntimeError("complete-block same-Futil hash mismatch")
+
+    yosys_command = [
+        "yosys",
+        "-p",
+        f"read_verilog -sv {synthesis_sv_path}; hierarchy -check -top main; stat",
+    ]
+    yosys = subprocess.run(
+        yosys_command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if yosys.returncode != 0:
+        raise RuntimeError(f"complete-block Yosys stat failed: {yosys.stderr.strip()}")
+    synthesis_resources = _validate_yosys_stat(yosys.stdout)
+
+    attention_lowerer = _attention_lowerer()
+    mlp_lowerer = _mlp_lowerer()
+    sources, computed, logical = _memory_contracts(
+        attention_lowerer, mlp_lowerer
+    )
+    if len(logical) != 84 or set(logical) != set(
+        observed["little_endian_int64_sha256"]
+    ):
+        raise RuntimeError("complete-block observation record set mismatch")
+    checkpoint_receipts = {
+        name: {
+            "count": _record_for(name, block, attention, mlp)["bytes"] // 8,
+            "little_endian_int64_sha256": observed[
+                "little_endian_int64_sha256"
+            ][name],
+        }
+        for name in logical
+    }
+    receipt: dict[str, object] = {
+        "schema": BLOCK_SCHEMA,
+        "fixture_authorities": {
+            "block": _fixture_authority(block),
+            "attention": _fixture_authority(attention),
+            "mlp": _fixture_authority(mlp),
+        },
+        "linked_fixtures": _linked_fixture_receipt(block, attention, mlp),
+        "schema_authority": _schema_authority(block, attention, mlp),
+        "execution": {
+            "component_count": 1,
+            "simulator_runs": 1,
+            "host_intermediate": False,
+            "cycles": observed["cycles"],
+            "host_preload_memories": list(sources),
+            "hardware_owned_memories": list(computed),
+            "observed_records": list(logical),
+            "direct_handoffs": [
+                "ln2_output_q16_16_to_c_fc_input_qdq",
+                "attention_residual_q16_16_and_c_proj_output_q16_16_to_block_output_q16_16",
+            ],
+        },
+        "observed": {
+            "record_count": len(checkpoint_receipts),
+            "checkpoints": checkpoint_receipts,
+            "block_output_q16_16_sha256": checkpoint_receipts[
+                "block_output_q16_16"
+            ]["little_endian_int64_sha256"],
+        },
+        "generated_artifacts": generated_artifacts,
+        "calyx_compile_policy": {
+            "disabled_passes": ["cell-share"],
+            "reason": "preserve explicitly staged fixed-point arithmetic latches",
+            "simulator_command": simulator_command,
+            "synthesis_command": synthesis_command,
+            "same_futil_sha256": generated_artifacts["futil"]["sha256"],
+        },
+        "synthesis": {
+            "status": "passed",
+            "same_futil_sha256": generated_artifacts["futil"]["sha256"],
+            "synthesis_sv_sha256": generated_artifacts["synthesis_sv"]["sha256"],
+            "command": yosys_command,
+            "resources": synthesis_resources,
+        },
+    }
+    receipt["receipt_sha256"] = _canonical_sha256(receipt)
+    return validate_composed_block_receipt(
+        receipt,
+        block_fixture,
+        attention_fixture,
+        mlp_fixture,
+    )
