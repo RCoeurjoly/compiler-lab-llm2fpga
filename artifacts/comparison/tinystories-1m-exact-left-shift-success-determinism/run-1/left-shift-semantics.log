@@ -1,0 +1,8 @@
+[stdout]
+{
+  "fixture_self_hash": "672d34819f93db399e7e8faac4747f9bb88b690491c2683912fee9490ffca19c",
+  "invalid_case_count": 4,
+  "status": "accepted",
+  "valid_case_count": 6
+}
+[stderr]

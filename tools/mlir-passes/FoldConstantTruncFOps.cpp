@@ -10,10 +10,13 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Tools/Plugins/PassPlugin.h"
 
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/CheckedArithmetic.h"
 
 #include <optional>
 #include <cstdlib>
@@ -315,11 +318,19 @@ struct LowerStaticMemRefViewsForCalyxPass
   }
 
   void runOnOperation() final {
-    materializeDenseResourceMemRefGlobals(getOperation());
+    ModuleOp module = getOperation();
+    llvm::DenseSet<Operation *> signatureProtectedFunctions;
+    collectSignatureProtectedFunctions(module, signatureProtectedFunctions);
+
+    materializeDenseResourceMemRefGlobals(module);
     DenseMap<StringAttr, MemRefType> flattenedGlobals;
-    flattenStaticIdentityMemRefGlobals(getOperation(), flattenedGlobals);
-    updateGetGlobalTypes(getOperation(), flattenedGlobals);
-    getOperation().walk([&](func::FuncOp funcOp) { runOnFunction(funcOp); });
+    flattenStaticIdentityMemRefGlobals(module, flattenedGlobals);
+    updateGetGlobalTypes(module, flattenedGlobals);
+    module.walk([&](func::FuncOp funcOp) {
+      runOnFunction(
+          funcOp,
+          signatureProtectedFunctions.contains(funcOp.getOperation()));
+    });
   }
 
   void getDependentDialects(DialectRegistry &registry) const final {
@@ -328,6 +339,37 @@ struct LowerStaticMemRefViewsForCalyxPass
   }
 
 private:
+  void collectSignatureProtectedFunctions(
+      ModuleOp module,
+      llvm::DenseSet<Operation *> &signatureProtectedFunctions) {
+    SymbolTableCollection symbolTables;
+    auto protectDefinedCallee = [&](Operation *symbolUser,
+                                    SymbolRefAttr symbol) {
+      auto callee = symbolTables.lookupNearestSymbolFrom<func::FuncOp>(
+          symbolUser, symbol);
+      if (callee) {
+        if (!callee.isExternal())
+          signatureProtectedFunctions.insert(callee.getOperation());
+        return;
+      }
+
+      if (auto caller = symbolUser->getParentOfType<func::FuncOp>())
+        signatureProtectedFunctions.insert(caller.getOperation());
+    };
+    module.walk([&](func::CallOp call) {
+      if (auto symbol = call->getAttrOfType<SymbolRefAttr>("callee"))
+        protectDefinedCallee(call.getOperation(), symbol);
+      else if (auto caller = call->getParentOfType<func::FuncOp>())
+        signatureProtectedFunctions.insert(caller.getOperation());
+    });
+    module.walk([&](func::ConstantOp constant) {
+      if (auto symbol = constant->getAttrOfType<SymbolRefAttr>("value"))
+        protectDefinedCallee(constant.getOperation(), symbol);
+      else if (auto caller = constant->getParentOfType<func::FuncOp>())
+        signatureProtectedFunctions.insert(caller.getOperation());
+    });
+  }
+
   void materializeDenseResourceMemRefGlobals(ModuleOp module) {
     module.walk([&](memref::GlobalOp global) {
       std::optional<Attribute> initialValue = global.getInitialValue();
@@ -377,19 +419,18 @@ private:
     });
   }
 
-  void runOnFunction(func::FuncOp funcOp) {
+  void runOnFunction(func::FuncOp funcOp, bool protectSignature) {
     if (funcOp.isExternal())
       return;
 
     DenseMap<Value, StaticMemRefView> argumentViews;
-    flattenStaticIdentityMemRefArguments(funcOp, argumentViews);
+    if (!protectSignature)
+      flattenStaticIdentityMemRefArguments(funcOp, argumentViews);
 
     SmallVector<memref::LoadOp> loads;
     SmallVector<memref::StoreOp> stores;
     SmallVector<memref::CopyOp> copies;
-    SmallVector<memref::ReinterpretCastOp> casts;
-    SmallVector<memref::ExpandShapeOp> expands;
-    SmallVector<memref::CollapseShapeOp> collapses;
+    SmallVector<Operation *> viewOps;
     funcOp.walk([&](Operation *op) {
       if (auto load = dyn_cast<memref::LoadOp>(op))
         loads.push_back(load);
@@ -397,12 +438,9 @@ private:
         stores.push_back(store);
       else if (auto copy = dyn_cast<memref::CopyOp>(op))
         copies.push_back(copy);
-      else if (auto cast = dyn_cast<memref::ReinterpretCastOp>(op))
-        casts.push_back(cast);
-      else if (auto expand = dyn_cast<memref::ExpandShapeOp>(op))
-        expands.push_back(expand);
-      else if (auto collapse = dyn_cast<memref::CollapseShapeOp>(op))
-        collapses.push_back(collapse);
+      else if (isa<memref::ReinterpretCastOp, memref::ExpandShapeOp,
+                   memref::CollapseShapeOp, memref::SubViewOp>(op))
+        viewOps.push_back(op);
     });
 
     IRRewriter rewriter(funcOp.getContext());
@@ -413,37 +451,55 @@ private:
     for (memref::CopyOp copy : copies)
       rewriteCopy(copy, argumentViews, rewriter);
 
-    for (memref::ReinterpretCastOp cast : llvm::reverse(casts)) {
-      if (cast->use_empty())
-        rewriter.eraseOp(cast);
-    }
-    for (memref::ExpandShapeOp expand : llvm::reverse(expands)) {
-      if (expand->use_empty())
-        rewriter.eraseOp(expand);
-    }
-    for (memref::CollapseShapeOp collapse : llvm::reverse(collapses)) {
-      if (collapse->use_empty())
-        rewriter.eraseOp(collapse);
+    for (Operation *viewOp : llvm::reverse(viewOps)) {
+      if (viewOp->use_empty())
+        rewriter.eraseOp(viewOp);
     }
   }
 
   void flattenStaticIdentityMemRefArguments(
-      func::FuncOp funcOp, DenseMap<Value, StaticMemRefView> &argumentViews) {
+      func::FuncOp funcOp,
+      DenseMap<Value, StaticMemRefView> &argumentViews) {
     FunctionType functionType = funcOp.getFunctionType();
     SmallVector<Type> inputs(functionType.getInputs());
+    DenseMap<Value, StaticMemRefView> candidateViews;
+    for (auto [index, input] : llvm::enumerate(inputs)) {
+      auto memrefType = dyn_cast<MemRefType>(input);
+      if (!getFlattenedStaticIdentityMemRef(memrefType))
+        continue;
+      BlockArgument arg = funcOp.getArgument(index);
+      candidateViews[arg] = StaticMemRefView{
+          arg, 0, SmallVector<int64_t>(memrefType.getShape()),
+          getIdentityStrides(memrefType)};
+    }
+
+    while (true) {
+      SmallVector<Value> newlyProtectedArguments;
+      DenseMap<Value, bool> rewritableViewUses;
+      for (auto &candidate : candidateViews) {
+        Value argument = candidate.first;
+        if (canRewriteAllViewUses(argument, candidateViews,
+                                  rewritableViewUses))
+          continue;
+        newlyProtectedArguments.push_back(argument);
+      }
+      if (newlyProtectedArguments.empty())
+        break;
+      for (Value argument : newlyProtectedArguments)
+        candidateViews.erase(argument);
+    }
+
     bool changed = false;
 
     for (auto [index, input] : llvm::enumerate(inputs)) {
-      auto memrefType = dyn_cast<MemRefType>(input);
-      MemRefType flattenedType =
-          getFlattenedStaticIdentityMemRef(memrefType);
-      if (!flattenedType)
+      BlockArgument arg = funcOp.getArgument(index);
+      auto candidate = candidateViews.find(arg);
+      if (candidate == candidateViews.end())
         continue;
 
-      BlockArgument arg = funcOp.getArgument(index);
-      argumentViews[arg] = StaticMemRefView{
-          arg, 0, SmallVector<int64_t>(memrefType.getShape()),
-          getIdentityStrides(memrefType)};
+      auto memrefType = cast<MemRefType>(input);
+      MemRefType flattenedType = getFlattenedStaticIdentityMemRef(memrefType);
+      argumentViews[arg] = candidate->second;
       inputs[index] = flattenedType;
       arg.setType(flattenedType);
       changed = true;
@@ -462,9 +518,50 @@ private:
     if (argView != argViews.end())
       return argView->second;
 
+    if (auto subview = value.getDefiningOp<memref::SubViewOp>()) {
+      auto sourceView = getStaticView(subview.getSource(), argViews);
+      ArrayRef<int64_t> offsets = subview.getStaticOffsets();
+      ArrayRef<int64_t> sizes = subview.getStaticSizes();
+      ArrayRef<int64_t> strides = subview.getStaticStrides();
+      auto resultType = subview.getType();
+      if (!sourceView || !isStatic(offsets) || !isStatic(sizes) ||
+          !isStatic(strides) || !resultType.hasStaticShape() ||
+          sourceView->shape.size() != unsigned(resultType.getRank()) ||
+          offsets.size() != sourceView->shape.size() ||
+          sizes.size() != sourceView->shape.size() ||
+          strides.size() != sourceView->shape.size() ||
+          sourceView->strides.size() != sourceView->shape.size() ||
+          resultType.getShape() != sizes)
+        return std::nullopt;
+
+      int64_t composedOffset = sourceView->offset;
+      SmallVector<int64_t> composedStrides;
+      composedStrides.reserve(strides.size());
+      for (auto [offset, stride, sourceStride] :
+           llvm::zip_equal(offsets, strides, sourceView->strides)) {
+        std::optional<int64_t> nextOffset =
+            llvm::checkedMulAdd(offset, sourceStride, composedOffset);
+        std::optional<int64_t> composedStride =
+            llvm::checkedMul(stride, sourceStride);
+        if (!nextOffset || !composedStride)
+          return std::nullopt;
+        composedOffset = *nextOffset;
+        composedStrides.push_back(*composedStride);
+      }
+
+      SmallVector<int64_t> resultStrides;
+      int64_t resultOffset = 0;
+      if (failed(resultType.getStridesAndOffset(resultStrides, resultOffset)) ||
+          !isStatic(resultStrides) || ShapedType::isDynamic(resultOffset) ||
+          resultStrides != composedStrides || resultOffset != composedOffset)
+        return std::nullopt;
+
+      return StaticMemRefView{sourceView->base, composedOffset,
+                              SmallVector<int64_t>(sizes), composedStrides};
+    }
+
     if (auto cast = value.getDefiningOp<memref::ReinterpretCastOp>()) {
-      auto sourceType = dyn_cast<MemRefType>(cast.getSource().getType());
-      if (!sourceType)
+      if (!isa<MemRefType>(cast.getSource().getType()))
         return std::nullopt;
 
       ArrayRef<int64_t> offsets = cast.getStaticOffsets();
@@ -476,16 +573,11 @@ private:
       if (!resultType.hasStaticShape())
         return std::nullopt;
 
-      if (sourceType.getRank() <= 1)
-        return StaticMemRefView{cast.getSource(), offsets.front(),
-                                SmallVector<int64_t>(resultType.getShape()),
-                                SmallVector<int64_t>(strides)};
-
       auto sourceView = getStaticView(cast.getSource(), argViews);
       if (!sourceView)
         return std::nullopt;
 
-      return StaticMemRefView{sourceView->base, sourceView->offset + offsets.front(),
+      return StaticMemRefView{sourceView->base, offsets.front(),
                               SmallVector<int64_t>(resultType.getShape()),
                               SmallVector<int64_t>(strides)};
     }
@@ -504,12 +596,37 @@ private:
     if (auto collapse = value.getDefiningOp<memref::CollapseShapeOp>()) {
       auto sourceView = getStaticView(collapse.getSrc(), argViews);
       auto resultType = collapse.getResult().getType();
-      if (!sourceView || !resultType.hasStaticShape() ||
-          sourceView->strides != getIdentityStrides(sourceView->shape))
+      if (!sourceView || !resultType.hasStaticShape())
         return std::nullopt;
-      return StaticMemRefView{sourceView->base, sourceView->offset,
-                              SmallVector<int64_t>(resultType.getShape()),
-                              getIdentityStrides(resultType)};
+
+      if (sourceView->strides == getIdentityStrides(sourceView->shape))
+        return StaticMemRefView{sourceView->base, sourceView->offset,
+                                SmallVector<int64_t>(resultType.getShape()),
+                                getIdentityStrides(resultType)};
+
+      auto reassociation = collapse.getReassociationIndices();
+      if (sourceView->shape.size() != 2 ||
+          sourceView->strides.size() != 2 || sourceView->shape[0] <= 0 ||
+          sourceView->shape[1] != 1 || sourceView->strides[0] <= 0 ||
+          sourceView->strides[1] != 1 || reassociation.size() != 1 ||
+          reassociation.front().size() != 2 ||
+          reassociation.front()[0] != 0 || reassociation.front()[1] != 1 ||
+          resultType.getRank() != 1 ||
+          resultType.getShape().front() != sourceView->shape[0])
+        return std::nullopt;
+
+      SmallVector<int64_t> resultStrides;
+      int64_t resultOffset = 0;
+      if (failed(resultType.getStridesAndOffset(resultStrides, resultOffset)) ||
+          !isStatic(resultStrides) || ShapedType::isDynamic(resultOffset) ||
+          resultStrides.size() != 1 ||
+          resultStrides.front() != sourceView->strides[0] ||
+          resultOffset != sourceView->offset)
+        return std::nullopt;
+
+      return StaticMemRefView{
+          sourceView->base, sourceView->offset,
+          SmallVector<int64_t>(resultType.getShape()), resultStrides};
     }
 
     auto memrefType = dyn_cast<MemRefType>(value.getType());
@@ -518,6 +635,52 @@ private:
 
     return StaticMemRefView{value, 0, SmallVector<int64_t>(memrefType.getShape()),
                             SmallVector<int64_t>(memrefType.getRank(), 1)};
+  }
+
+  bool canRewriteAllViewUses(
+      Value value, const DenseMap<Value, StaticMemRefView> &argViews,
+      DenseMap<Value, bool> &cache) {
+    auto cached = cache.find(value);
+    if (cached != cache.end())
+      return cached->second;
+
+    for (OpOperand &use : value.getUses()) {
+      Operation *user = use.getOwner();
+      if (auto load = dyn_cast<memref::LoadOp>(user)) {
+        if (load.getMemRef() == value && getStaticView(value, argViews))
+          continue;
+        return false;
+      }
+      if (auto store = dyn_cast<memref::StoreOp>(user)) {
+        if (store.getMemRef() == value && getStaticView(value, argViews))
+          continue;
+        return false;
+      }
+      if (auto copy = dyn_cast<memref::CopyOp>(user)) {
+        auto sourceView = getStaticView(copy.getSource(), argViews);
+        auto targetView = getStaticView(copy.getTarget(), argViews);
+        if (sourceView && targetView && sourceView->shape == targetView->shape)
+          continue;
+        return false;
+      }
+
+      Value result;
+      if (auto subview = dyn_cast<memref::SubViewOp>(user))
+        result = subview.getResult();
+      else if (auto cast = dyn_cast<memref::ReinterpretCastOp>(user))
+        result = cast.getResult();
+      else if (auto expand = dyn_cast<memref::ExpandShapeOp>(user))
+        result = expand.getResult();
+      else if (auto collapse = dyn_cast<memref::CollapseShapeOp>(user))
+        result = collapse.getResult();
+      if (!result || !getStaticView(result, argViews) ||
+          !canRewriteAllViewUses(result, argViews, cache)) {
+        cache[value] = false;
+        return false;
+      }
+    }
+    cache[value] = true;
+    return true;
   }
 
   SmallVector<Value> getAccessIndices(OpBuilder &builder, Location loc,
@@ -571,9 +734,42 @@ private:
     if (!sourceView || !targetView || sourceView->shape != targetView->shape)
       return;
 
-    if (sourceView->base == copy.getSource() && targetView->base == copy.getTarget() &&
-        sourceView->shape.size() <= 1 && targetView->shape.size() <= 1)
-      return;
+    if (sourceView->base == copy.getSource() &&
+        targetView->base == copy.getTarget() &&
+        sourceView->shape.size() <= 1 && targetView->shape.size() <= 1) {
+      auto sourceAlloc = copy.getSource().getDefiningOp<memref::AllocOp>();
+      auto targetAlloc = copy.getTarget().getDefiningOp<memref::AllocOp>();
+      auto sourceType = dyn_cast<MemRefType>(copy.getSource().getType());
+      auto targetType = dyn_cast<MemRefType>(copy.getTarget().getType());
+      if (!sourceAlloc || !targetAlloc ||
+          sourceAlloc.getOperation() == targetAlloc.getOperation() ||
+          !sourceType || !targetType ||
+          sourceType.getRank() != 1 || targetType.getRank() != 1 ||
+          !sourceType.hasStaticShape() || !targetType.hasStaticShape() ||
+          sourceType.getShape().front() <= 0 ||
+          sourceType.getShape() != targetType.getShape() ||
+          sourceType.getElementType() != targetType.getElementType() ||
+          sourceView->offset != 0 || targetView->offset != 0 ||
+          sourceView->strides.size() != 1 ||
+          targetView->strides.size() != 1 ||
+          sourceView->strides.front() != 1 ||
+          targetView->strides.front() != 1)
+        return;
+
+      SmallVector<int64_t> sourceStrides;
+      SmallVector<int64_t> targetStrides;
+      int64_t sourceOffset = 0;
+      int64_t targetOffset = 0;
+      if (failed(sourceType.getStridesAndOffset(sourceStrides, sourceOffset)) ||
+          failed(targetType.getStridesAndOffset(targetStrides, targetOffset)) ||
+          !isStatic(sourceStrides) || !isStatic(targetStrides) ||
+          ShapedType::isDynamic(sourceOffset) ||
+          ShapedType::isDynamic(targetOffset) || sourceOffset != 0 ||
+          targetOffset != 0 || sourceStrides.size() != 1 ||
+          targetStrides.size() != 1 || sourceStrides.front() != 1 ||
+          targetStrides.front() != 1)
+        return;
+    }
 
     rewriter.setInsertionPoint(copy);
     SmallVector<Value> indices;
@@ -764,8 +960,8 @@ struct LowerExactMathForCalyxPass
     return "llm2fpga-lower-exact-math-for-calyx";
   }
   StringRef getDescription() const final {
-    return "Lower scalar f32 floor, ceil, and rsqrt to arithmetic supported by "
-           "SCF-to-Calyx.";
+    return "Lower scalar i64 absi, fused scalar f64 floor-to-i64, and scalar "
+           "f32 floor, ceil, and rsqrt to arithmetic supported by SCF-to-Calyx.";
   }
 
   void getDependentDialects(DialectRegistry &registry) const final {
@@ -773,13 +969,74 @@ struct LowerExactMathForCalyxPass
   }
 
   void runOnOperation() final {
+    SmallVector<math::AbsIOp> i64AbsI;
+    getOperation().walk([&](math::AbsIOp op) {
+      auto operandType = dyn_cast<IntegerType>(op.getOperand().getType());
+      auto resultType = dyn_cast<IntegerType>(op.getType());
+      if (operandType && resultType && operandType.isInteger(64) &&
+          resultType.isInteger(64))
+        i64AbsI.push_back(op);
+    });
+
+    SmallVector<math::FloorOp> f64FloorToI64;
+    getOperation().walk([&](math::FloorOp op) {
+      auto floatType = dyn_cast<FloatType>(op.getType());
+      if (!floatType || !floatType.isF64() || !op.getResult().hasOneUse())
+        return;
+
+      auto consumer = dyn_cast<arith::FPToSIOp>(*op.getResult().getUsers().begin());
+      auto intType = consumer ? dyn_cast<IntegerType>(consumer.getType())
+                              : IntegerType();
+      if (consumer && intType && intType.isInteger(64))
+        f64FloorToI64.push_back(op);
+    });
+
+    IRRewriter rewriter(getOperation().getContext());
+    for (math::AbsIOp absi : i64AbsI) {
+      Location loc = absi.getLoc();
+      auto i64 = rewriter.getI64Type();
+      rewriter.setInsertionPoint(absi);
+      Value shiftAmount = arith::ConstantOp::create(
+          rewriter, loc, i64, rewriter.getIntegerAttr(i64, 63));
+      Value sign =
+          arith::ShRSIOp::create(rewriter, loc, absi.getOperand(), shiftAmount);
+      Value flipped =
+          arith::XOrIOp::create(rewriter, loc, absi.getOperand(), sign);
+      Value result = arith::SubIOp::create(rewriter, loc, flipped, sign);
+      rewriter.replaceOp(absi, result);
+    }
+
+    for (math::FloorOp floor : f64FloorToI64) {
+      auto consumer = cast<arith::FPToSIOp>(*floor.getResult().getUsers().begin());
+      auto floatType = cast<FloatType>(floor.getType());
+      auto intType = cast<IntegerType>(consumer.getType());
+      Location loc = consumer.getLoc();
+      Value input = floor.getOperand();
+
+      rewriter.setInsertionPoint(consumer);
+      Value zero = arith::ConstantOp::create(
+          rewriter, loc, intType, rewriter.getIntegerAttr(intType, 0));
+      Value negativeOne = arith::ConstantOp::create(
+          rewriter, loc, intType, rewriter.getIntegerAttr(intType, -1));
+      Value truncI = arith::FPToSIOp::create(rewriter, loc, intType, input);
+      Value truncF =
+          arith::SIToFPOp::create(rewriter, loc, floatType, truncI);
+      Value below = arith::CmpFOp::create(
+          rewriter, loc, arith::CmpFPredicate::OLT, input, truncF);
+      Value adjustment =
+          arith::SelectOp::create(rewriter, loc, below, negativeOne, zero);
+      Value roundedI = arith::AddIOp::create(rewriter, loc, truncI, adjustment);
+
+      rewriter.replaceOp(consumer, roundedI);
+      rewriter.eraseOp(floor);
+    }
+
     SmallVector<Operation *> ops;
     getOperation().walk([&](Operation *op) {
       if (isa<math::FloorOp, math::CeilOp, math::RsqrtOp>(op))
         ops.push_back(op);
     });
 
-    IRRewriter rewriter(getOperation().getContext());
     for (Operation *op : ops) {
       auto floatType = dyn_cast<FloatType>(op->getResult(0).getType());
       if (!floatType || !floatType.isF32())
@@ -817,6 +1074,47 @@ struct LowerExactMathForCalyxPass
       Value roundedF =
           arith::SIToFPOp::create(rewriter, loc, floatType, roundedI);
       rewriter.replaceOp(op, roundedF);
+    }
+  }
+};
+
+struct LowerNegFForCalyxPass
+    : public PassWrapper<LowerNegFForCalyxPass, OperationPass<ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerNegFForCalyxPass)
+
+  StringRef getArgument() const final {
+    return "llm2fpga-lower-negf-for-calyx";
+  }
+  StringRef getDescription() const final {
+    return "Lower scalar f32 arith.negf by exactly toggling its sign bit.";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<arith::ArithDialect>();
+  }
+
+  void runOnOperation() final {
+    SmallVector<arith::NegFOp> ops;
+    getOperation().walk([&](arith::NegFOp op) {
+      auto inputType = dyn_cast<FloatType>(op.getOperand().getType());
+      auto resultType = dyn_cast<FloatType>(op.getType());
+      if (inputType && resultType && inputType.isF32() && resultType.isF32())
+        ops.push_back(op);
+    });
+
+    IRRewriter rewriter(getOperation().getContext());
+    for (arith::NegFOp op : ops) {
+      Location loc = op.getLoc();
+      auto f32 = rewriter.getF32Type();
+      auto i32 = rewriter.getI32Type();
+      rewriter.setInsertionPoint(op);
+      Value bits =
+          arith::BitcastOp::create(rewriter, loc, i32, op.getOperand());
+      Value signMask = arith::ConstantOp::create(
+          rewriter, loc, i32, rewriter.getIntegerAttr(i32, -2147483648));
+      Value flipped = arith::XOrIOp::create(rewriter, loc, bits, signMask);
+      Value result = arith::BitcastOp::create(rewriter, loc, f32, flipped);
+      rewriter.replaceOp(op, result);
     }
   }
 };
@@ -1106,6 +1404,8 @@ MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerRoundEvenForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerRoundEvenForCalyxPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerExactMathForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerExactMathForCalyxPass)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerNegFForCalyxPass)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerNegFForCalyxPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerI1UIToFPForCalyxPass)
 MLIR_DEFINE_EXPLICIT_TYPE_ID(LowerI1UIToFPForCalyxPass)
 MLIR_DECLARE_EXPLICIT_TYPE_ID(LowerScoutMathForCalyxPass)
@@ -1129,6 +1429,7 @@ extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo mlirGetPassPluginInfo() {
             PassRegistration<DropCalyxUnsupportedAssertOpsPass>();
             PassRegistration<LowerRoundEvenForCalyxPass>();
             PassRegistration<LowerExactMathForCalyxPass>();
+            PassRegistration<LowerNegFForCalyxPass>();
             PassRegistration<LowerI1UIToFPForCalyxPass>();
             PassRegistration<LowerScoutMathForCalyxPass>();
             PassRegistration<LowerPolynomialExpForCalyxPass>();

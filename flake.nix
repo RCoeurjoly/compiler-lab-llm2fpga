@@ -16,11 +16,15 @@
       url = "github:calyxir/calyx/5a4303847392609cad83dda6f4bdffc8cc0e5c89";
       flake = false;
     };
+    kev-gpt-src = {
+      url = "github:RCoeurjoly/kev-gpt/df1fc45b2ffcb26fddc19cfd57621e7eedf6153f";
+      flake = false;
+    };
     task3-main-pipeline.url = "path:./task3-main";
   };
 
   outputs = inputs@{ nixpkgs, nixpkgs-llvm21, nixpkgs-nix-eda, flake-utils
-    , circt-nix, nix-eda, ... }:
+    , circt-nix, nix-eda, kev-gpt-src, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
@@ -176,6 +180,12 @@
           pkgsLlvm21.callPackage ./nix/mlir-passes.nix {
             mlir = mlirForTorchMlir;
             llvmPackages = torchMlirLlvmPackages;
+          };
+        llm2fpgaExactSerialGemvTorchMlirPasses =
+          pkgsLlvm21.callPackage ./nix/torch-mlir-passes.nix {
+            mlir = mlirForTorchMlir;
+            llvmPackages = torchMlirLlvmPackages;
+            inherit torchMlir;
           };
         llm2fpgaCirctPasses = pkgs.callPackage ./nix/circt-passes.nix {
           inherit circt;
@@ -361,7 +371,108 @@
             exec ${python}/bin/python3 ${./scripts/pipeline/screen_fpga_llm_math_exp_corpus.py} "$@"
           '';
         };
-        pipelineScripts = ./scripts/pipeline;
+        pipelineRuntimeScriptBasenames = [
+          "calyx_float_frontier_report.py"
+          "calyx_preflight_report.py"
+          "calyx_to_sv_no_handshake.sh"
+          "cf_to_handshake.sh"
+          "compare_task3_representative_core_parity.py"
+          "externalize_large_memories.py"
+          "filter_rtlil_modules.py"
+          "fix_futil_fptosi_handshake.py"
+          "fix_sv_divsqrt_handshake.py"
+          "fix_sv_roundeven_overflow.py"
+          "gen_tiny_stories_selftest_top.py"
+          "handshake_to_hs_ext.sh"
+          "hs_ext_to_hw0.sh"
+          "hw0_to_hw.sh"
+          "hw_clean_to_sv_mlir.sh"
+          "hw_to_hw_clean.sh"
+          "linalg_to_cf.sh"
+          "lower_exact_serial_gemv_to_calyx.py"
+          "mlir_op_stats.sh"
+          "normalize_calyx_for_export.py"
+          "normalize_futil_float_constants.py"
+          "sv_mlir_to_sv.sh"
+          "sv_to_il.sh"
+          "sv_to_yosys_stat.sh"
+          "torch_to_linalg.sh"
+          "tosa_to_linalg.sh"
+          "verify_calyx_f32_constant_bits.py"
+          "verify_exact_serial_gemv_calyx_gate.py"
+          "write_fp_primitive_blackboxes.py"
+          "write_rtlil_stage_stat_report.py"
+          "write_utilization_report.py"
+        ];
+        pipelineRuntimeScriptEntries = builtins.readDir ./scripts/pipeline;
+        missingPipelineRuntimeScripts = builtins.filter
+          (name: !(builtins.hasAttr name pipelineRuntimeScriptEntries))
+          pipelineRuntimeScriptBasenames;
+        nonRegularPipelineRuntimeScripts = builtins.filter
+          (name: builtins.hasAttr name pipelineRuntimeScriptEntries
+            && builtins.getAttr name pipelineRuntimeScriptEntries != "regular")
+          pipelineRuntimeScriptBasenames;
+        pipelineRuntimeScripts =
+          assert pkgs.lib.assertMsg (missingPipelineRuntimeScripts == [ ])
+          "missing pipeline runtime script(s): ${builtins.concatStringsSep ", " missingPipelineRuntimeScripts}";
+          assert pkgs.lib.assertMsg (nonRegularPipelineRuntimeScripts == [ ])
+          "pipeline runtime script(s) must be a regular file: ${builtins.concatStringsSep ", " nonRegularPipelineRuntimeScripts}";
+          let runtimeScriptRoot = toString ./scripts/pipeline;
+          in builtins.path {
+            path = ./scripts/pipeline;
+            name = "llm2fpga-pipeline-runtime-scripts";
+            filter = path: type:
+              let pathString = toString path;
+              in pathString == runtimeScriptRoot ||
+              (type == "regular" && builtins.dirOf pathString == runtimeScriptRoot
+                && builtins.elem (builtins.baseNameOf pathString)
+                pipelineRuntimeScriptBasenames);
+          };
+        pipelineRuntimeSourceClosure = pkgs.runCommand
+          "pipeline-runtime-source-closure" {
+            passthru = {
+              runtimeSource = pipelineRuntimeScripts;
+              runtimeScriptBasenames = pipelineRuntimeScriptBasenames;
+            };
+          } ''
+            mkdir -p "$out"
+            cp -R ${pipelineRuntimeScripts}/. "$out/"
+          '';
+        pipelineScripts = pipelineRuntimeScripts;
+        exactTinyStoriesC22Input = builtins.path {
+          path = ./artifacts/comparison/tinystories-1m-exact-frontier-determinism-flat-scf/run-1/flat.scf.mlir;
+          name = "tinystories-1m-exact-c22-input";
+        };
+        exactTinyStoriesPreflightSource = builtins.path {
+          path = ./scripts/pipeline/calyx_preflight_report.py;
+          name = "tinystories-1m-exact-calyx-preflight-report.py";
+        };
+        exactTinyStoriesPreflight = pkgs.substituteAll {
+          src = exactTinyStoriesPreflightSource;
+          calyxPreflightMlirOptPath = "${mlir}/bin/mlir-opt";
+          calyxPreflightMlirOptVersion = pkgs.lib.getVersion mlir;
+          calyxPreflightMlirOptSha256 =
+            builtins.hashFile "sha256" "${mlir}/bin/mlir-opt";
+        };
+        exactTinyStoriesNormalized = import ./nix/exact-tinystories-normalized.nix {
+          inherit pkgs mlir python;
+          mlirPasses = llm2fpgaMlirPasses;
+          c22Input = exactTinyStoriesC22Input;
+          preflightScript = exactTinyStoriesPreflight;
+          preflightSource = exactTinyStoriesPreflightSource;
+          expectedC22Sha256 =
+            "66c78e412ade3262c4eb0f61b5776e9c765fb434fdbb53d09cbba7e724ff2fc6";
+          expectedPluginSha256 =
+            "901fd383935d5af48e616eb881ae1b72408f4cb26dfbef94ea7be3049d61760f";
+          expectedNormalizedSha256 =
+            "e669a26338fbcf055266db29d6351228b78314d11ea3687751cb7f2045552d77";
+          expectedPreflightSourceSha256 =
+            "3957d6cfc6da168f9a5c1cb6f1013c172eff3c83f42be6266265009c84ad0839";
+        };
+        exactTinyStoriesCalyx = import ./nix/exact-tinystories-calyx.nix {
+          inherit pkgs circt python;
+          predecessor = exactTinyStoriesNormalized;
+        };
         svProvenanceReport = ./scripts/diagnostics/sv_provenance_report.py;
         noHandshakeLinalgToScf =
           ./scripts/pipeline/linalg_to_scf_no_handshake.sh;
@@ -409,6 +520,168 @@
           sourceDir = ./TinyStories;
           adapterPy = ./TinyStories/model_adapter.py;
         };
+        exactTinyStoriesPackage = "${kev-gpt-src}/model_packages/tinystories-1m";
+
+        # This is deliberately a Nix-generated Python helper rather than a
+        # pipeline/backend change.  It closes the Task 1--3 provenance before
+        # the generic exported-program materializer is allowed to write
+        # exported.pt2, then records the exact inputs alongside that output.
+        exactPackageExportProvenance = pkgs.writeText
+          "tinystories-1m-exact-package-export-provenance.py" ''
+            from __future__ import annotations
+
+            import argparse
+            import hashlib
+            import json
+            from pathlib import Path
+
+
+            EXPECTED = {
+                "adapter": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e",
+                "contract": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+                "audit_file": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+                "audit_payload": "7d7a37d08df7e63bdb95063674fe5dc306058e51af8a11bbcd97a4cb2972a766",
+                "package_manifest": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+                "package_receipt": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
+                "task_2_file": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+                "task_2_artifact": "af1901917b52876a9b3343712b89928b272e5dd237cd491ddd9d462c56a52838",
+                "task_2_receipt": "5e56907e60c83c5d98b3c3fe88772b7dfba71e53a9435de548a9d54ea7497834",
+                "task_3_file": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+                "task_3_artifact": "9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3",
+                "task_3_result": "c18106f25030ec58dfd3abc5d75d774506aca65b655fc34b284076b1294f8644",
+            }
+
+
+            def sha256(path: Path) -> str:
+                digest = hashlib.sha256()
+                with path.open("rb") as stream:
+                    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                return digest.hexdigest()
+
+
+            def load_json(path: Path) -> dict[str, object]:
+                with path.open(encoding="utf-8") as stream:
+                    value = json.load(stream)
+                if not isinstance(value, dict):
+                    raise SystemExit(f"invalid JSON object: {path}")
+                return value
+
+
+            def require(condition: bool, label: str) -> None:
+                if not condition:
+                    raise SystemExit(f"exact package export provenance mismatch: {label}")
+
+
+            def verify(args: argparse.Namespace) -> dict[str, str]:
+                adapter = Path(args.adapter)
+                contract_path = Path(args.contract)
+                package = Path(args.package)
+                model_path = Path(args.model_path)
+                task_2_path = Path(args.task_2_artifact)
+                task_3_path = Path(args.generation_receipt)
+                audit_path = Path(args.audit)
+
+                require(adapter.is_file() and sha256(adapter) == EXPECTED["adapter"], "exact adapter")
+                require(contract_path.is_file() and sha256(contract_path) == EXPECTED["contract"], "Task 1 contract")
+                require(audit_path.is_file() and sha256(audit_path) == EXPECTED["audit_file"], "Task 1 audit")
+                require((model_path / "config.json").is_file()
+                        and (model_path / "pytorch_model.bin").is_file(), "model snapshot")
+
+                contract = load_json(contract_path)
+                audit = load_json(audit_path)
+                require(contract.get("status") == "authenticated"
+                        and contract.get("package", {}).get("manifest_sha256") == EXPECTED["package_manifest"],
+                        "Task 1 contract/package binding")
+                require(audit.get("status") == "authenticated" and audit.get("conflicts") == []
+                        and audit.get("sha256") == EXPECTED["audit_payload"], "Task 1 audit receipt")
+                expected_files = contract.get("package", {}).get("files")
+                require(isinstance(expected_files, dict)
+                        and audit.get("package", {}).get("files") == expected_files
+                        and package.is_dir()
+                        and {path.name for path in package.iterdir() if path.is_file()}
+                        == set(expected_files) | {"receipt.json"}, "canonical package file set")
+                for name, identity in expected_files.items():
+                    path = package / name
+                    require(isinstance(identity, dict) and path.is_file()
+                            and path.stat().st_size == identity.get("size")
+                            and sha256(path) == identity.get("sha256"), f"canonical package {name}")
+                receipt = load_json(package / "receipt.json")
+                require(sha256(package / "receipt.json") == EXPECTED["package_receipt"]
+                        and receipt.get("files") == expected_files
+                        and receipt.get("manifest_sha256") == EXPECTED["package_manifest"],
+                        "canonical package receipt")
+
+                require(task_2_path.is_file() and sha256(task_2_path) == EXPECTED["task_2_file"], "Task 2 artifact file")
+                task_2 = load_json(task_2_path)
+                require(task_2.get("status") == "exact_eager_export_and_independent_oracle_matched"
+                        and task_2.get("artifact_sha256") == EXPECTED["task_2_artifact"]
+                        and task_2.get("identity", {}).get("model_receipt_sha256") == EXPECTED["task_2_receipt"]
+                        and task_2.get("identity", {}).get("package", {}).get("files", {}).get("manifest.json", {}).get("sha256") == EXPECTED["package_manifest"],
+                        "Task 2 exact model artifact")
+
+                require(task_3_path.is_file() and sha256(task_3_path) == EXPECTED["task_3_file"], "Task 3 generation file")
+                task_3 = load_json(task_3_path)
+                require(task_3.get("status") == "exact_generation_matched"
+                        and task_3.get("artifact_sha256") == EXPECTED["task_3_artifact"]
+                        and task_3.get("generation", {}).get("result_sha256") == EXPECTED["task_3_result"]
+                        and task_3.get("identity", {}).get("task_2", {}).get("artifact_sha256") == EXPECTED["task_2_artifact"]
+                        and task_3.get("identity", {}).get("task_2", {}).get("model_receipt_sha256") == EXPECTED["task_2_receipt"],
+                        "Task 3 generation receipt")
+                return {
+                    "adapter_sha256": EXPECTED["adapter"],
+                    "contract_sha256": EXPECTED["contract"],
+                    "audit_file_sha256": EXPECTED["audit_file"],
+                    "audit_payload_sha256": EXPECTED["audit_payload"],
+                    "package_manifest_sha256": EXPECTED["package_manifest"],
+                    "package_receipt_sha256": EXPECTED["package_receipt"],
+                    "task_2_artifact_file_sha256": EXPECTED["task_2_file"],
+                    "task_2_artifact_sha256": EXPECTED["task_2_artifact"],
+                    "task_2_model_receipt_sha256": EXPECTED["task_2_receipt"],
+                    "task_3_generation_file_sha256": EXPECTED["task_3_file"],
+                    "task_3_generation_artifact_sha256": EXPECTED["task_3_artifact"],
+                    "task_3_generation_result_sha256": EXPECTED["task_3_result"],
+                }
+
+
+            def main() -> None:
+                parser = argparse.ArgumentParser()
+                parser.add_argument("action", choices=("verify", "write"))
+                parser.add_argument("--adapter", required=True)
+                parser.add_argument("--contract", required=True)
+                parser.add_argument("--audit", required=True)
+                parser.add_argument("--package", required=True)
+                parser.add_argument("--model-path", required=True)
+                parser.add_argument("--task-2-artifact", required=True)
+                parser.add_argument("--generation-receipt", required=True)
+                parser.add_argument("--out-dir")
+                args = parser.parse_args()
+                provenance = verify(args)
+                if args.action == "write":
+                    require(args.out_dir is not None, "provenance output directory")
+                    out_dir = Path(args.out_dir)
+                    exported = out_dir / "exported.pt2"
+                    require(exported.is_file(), "exported.pt2")
+                    provenance.update({
+                        "schema": "tinystories-1m-exact-pytorch-export-provenance-v1",
+                        "adapter": str(Path(args.adapter)),
+                        "contract": str(Path(args.contract)),
+                        "canonical_origin": str(load_json(Path(args.contract))["package"]["origin"]),
+                        "materialized_path": str(Path(args.package)),
+                        "content_alias_policy": "complete_authenticated_package_file_identity",
+                        "model_path": str(Path(args.model_path)),
+                        "exported_pt2_sha256": sha256(exported),
+                    })
+                    encoded = json.dumps(provenance, sort_keys=True, separators=(",", ":")).encode()
+                    provenance["provenance_sha256"] = hashlib.sha256(encoded).hexdigest()
+                    (out_dir / "exact-provenance-manifest.json").write_text(
+                        json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+                    )
+
+
+            if __name__ == "__main__":
+                main()
+          '';
 
         # The package is deliberately supplied at runtime.  It is an
         # authenticated local reference input, not a flake input and not a
@@ -497,13 +770,18 @@
           circtPasses = llm2fpgaCirctPasses;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
+          torchMlirPasses = llm2fpgaExactSerialGemvTorchMlirPasses;
+          exactSerialGemvModelNames = [
+            "tiny-stories-1m-kev-gpt-exact-serial-gemv-successor"
+          ];
         };
         modelRegistry = import ./nix/models.nix {
           inherit (pipelineLib) registerModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
-            tinyStories1m fpPrimsSv;
+            tinyStories1m fpPrimsSv exactTinyStoriesPackage;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
+          inherit exactPackageExportProvenance;
         };
         pipelineStagePackages =
           pipelineLib.pipelineStagePackagesFromRegistry modelRegistry;
@@ -517,9 +795,10 @@
         modelRegistryNoHandshake = import ./nix/models.nix {
           registerModel = pipelineLib.registerNoHandshakeModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO torchMlir
-            tinyStories1m fpPrimsSv;
+            tinyStories1m fpPrimsSv exactTinyStoriesPackage;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
+          inherit exactPackageExportProvenance;
         };
         pipelineStagePackagesNoHandshake =
           pipelineLib.pipelineStagePackagesFromRegistry
@@ -536,24 +815,30 @@
           circtPasses = llm2fpgaCirctPasses;
           inherit flatScfBlockerReport;
           compilePyTorch = ./scripts/compile-pytorch.py;
+          torchMlirPasses = llm2fpgaExactSerialGemvTorchMlirPasses;
+          exactSerialGemvModelNames = [
+            "tiny-stories-1m-kev-gpt-exact-serial-gemv-successor"
+          ];
         };
         modelRegistryTosa = import ./nix/models.nix {
           registerModel = pipelineLibTosa.registerTosaModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO
-            tinyStories1m fpPrimsSv;
+            tinyStories1m fpPrimsSv exactTinyStoriesPackage;
           inherit torchMlir;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
+          inherit exactPackageExportProvenance;
         };
         pipelineStagePackagesTosa =
           pipelineLibTosa.pipelineStagePackagesFromRegistry modelRegistryTosa;
         modelRegistryTosaNoHandshake = import ./nix/models.nix {
           registerModel = pipelineLibTosa.registerTosaNoHandshakeModel;
           inherit pythonWithTinyStories pythonWithTinyStoriesTorchAO
-            tinyStories1m fpPrimsSv;
+            tinyStories1m fpPrimsSv exactTinyStoriesPackage;
           inherit torchMlir;
           materializePyTorchExported =
             ./scripts/materialize-pytorch-exported.py;
+          inherit exactPackageExportProvenance;
         };
         pipelineStagePackagesTosaNoHandshake =
           pipelineLibTosa.pipelineStagePackagesFromRegistry
@@ -758,6 +1043,14 @@
             alias =
               "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake";
             model = "tinystories-representative-core-w4a8-integer";
+            frontend = "linalg";
+            backend = "calyx-native-sv";
+            packages = pipelineStagePackagesNoHandshake;
+            stages = noHandshakeLinalgStages;
+          }
+          {
+            alias = "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake";
+            model = "tiny-stories-1m-kev-gpt-exact";
             frontend = "linalg";
             backend = "calyx-native-sv";
             packages = pipelineStagePackagesNoHandshake;
@@ -2537,9 +2830,144 @@ PY
       in {
         packages = {
           inherit circt mlir torchMlir yosysPkg modelRegistryJson
-            llm2fpgaMlirPasses llm2fpgaTorchMlirPasses llm2fpgaCirctPasses
-            calyx;
+            llm2fpgaMlirPasses llm2fpgaTorchMlirPasses
+            llm2fpgaExactSerialGemvTorchMlirPasses llm2fpgaCirctPasses calyx;
+          "tinystories-1m-exact-serial-gemv-calyx-gate" =
+            let
+              descriptor = rows: outputs: inputs: pkgs.writeText
+                "serial-gemv-${toString rows}x${toString outputs}x${toString inputs}.mlir" ''
+                  %0 = "llm2fpga.serial_gemv"(%input, %weights) {inputs = ${toString inputs} : i64, mac_order = "ascending_i64_wrap", outputs = ${toString outputs} : i64, rows = ${toString rows} : i64} : (tensor<${toString rows}x${toString inputs}xi64>, tensor<${toString outputs}x${toString inputs}xi64>) -> tensor<${toString rows}x${toString outputs}xi64>
+                '';
+              small = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "exact-serial-gemv-1x64x64";
+                descriptor = descriptor 1 64 64;
+              };
+              expand = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "exact-serial-gemv-1x256x64";
+                descriptor = descriptor 1 256 64;
+              };
+              contract = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "exact-serial-gemv-1x64x256";
+                descriptor = descriptor 1 64 256;
+              };
+              actual = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "exact-serial-gemv-4x50257x64";
+                descriptor = descriptor 4 50257 64;
+              };
+            in pkgs.runCommand "tinystories-1m-exact-serial-gemv-calyx-gate" {
+              buildInputs = [ python ];
+            } ''
+              mkdir -p "$out"
+              ${python}/bin/python3 ${pipelineScripts}/verify_exact_serial_gemv_calyx_gate.py \
+                --write --receipt "$out/receipt.json" \
+                --gate 1x64x64=${small} --gate 1x256x64=${expand} \
+                --gate 1x64x256=${contract} --gate 4x50257x64=${actual}
+              ${python}/bin/python3 ${pipelineScripts}/verify_exact_serial_gemv_calyx_gate.py \
+                --receipt "$out/receipt.json" \
+                --gate 1x64x64=${small} --gate 1x256x64=${expand} \
+                --gate 1x64x256=${contract} --gate 4x50257x64=${actual}
+            '';
+          # This is intentionally a frontier package until a compiler-owned
+          # 49-callsite Calyx composition exists.  It validates Task 2 and
+          # Task 3 against the immutable source commits that produced their
+          # receipts, rather than weakening those receipts after later edits.
+          "tiny-stories-1m-exact-serial-gemv-sv" =
+            let
+              sourceRoot = builtins.path { path = ./.; name = "llm2fpga-task4-source"; };
+              task2Source = builtins.fetchGit {
+                # The committed predecessor snapshots are read from the
+                # canonical local repository, not from this evaluated source
+                # copy (which lives in /nix/store and is not a Git remote).
+                url = "file:///home/roland/compiler-lab-llm2fpga";
+                rev = "bac0e5abb52fe2d235a0bcf80508ca2111101058";
+              };
+              task3Source = builtins.fetchGit {
+                url = "file:///home/roland/compiler-lab-llm2fpga";
+                rev = "d20351e9298989a67d1956838e062c8bfa8862dd";
+              };
+              # Keep the exact Task 2 tool closure visible inside the Nix
+              # sandbox so the predecessor receipt can verify its own tools.
+              task2TorchMlir = torchMlir;
+              task2TorchMlirPasses = llm2fpgaExactSerialGemvTorchMlirPasses;
+              descriptor = rows: outputs: inputs: pkgs.writeText
+                "task4-serial-gemv-${toString rows}x${toString outputs}x${toString inputs}.mlir" ''
+                  %0 = "llm2fpga.serial_gemv"(%input, %weights) {inputs = ${toString inputs} : i64, mac_order = "ascending_i64_wrap", outputs = ${toString outputs} : i64, rows = ${toString rows} : i64} : (tensor<${toString rows}x${toString inputs}xi64>, tensor<${toString outputs}x${toString inputs}xi64>) -> tensor<${toString rows}x${toString outputs}xi64>
+                '';
+              small = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "task4-exact-serial-gemv-1x64x64";
+                descriptor = descriptor 1 64 64;
+              };
+              expand = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "task4-exact-serial-gemv-1x256x64";
+                descriptor = descriptor 1 256 64;
+              };
+              contract = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "task4-exact-serial-gemv-1x64x256";
+                descriptor = descriptor 1 64 256;
+              };
+              actual = pipelineLib.mkExactSerialGemvCalyxDerivation {
+                name = "task4-exact-serial-gemv-4x50257x64";
+                descriptor = descriptor 4 50257 64;
+              };
+              portableTorch = pkgs.runCommand "tinystories-1m-exact-serial-gemv-portable-torch" {
+                buildInputs = [ python ];
+              } ''
+                mkdir -p "$out"
+                ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_portable_torch.py \
+                  write --root ${sourceRoot} \
+                  --exported-dir ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".pytorchExported} \
+                  --torch-output ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
+                  --receipt "$out/receipt.json"
+              '';
+              gate = pkgs.runCommand "task4-tinystories-1m-exact-serial-gemv-calyx-gate" {
+                buildInputs = [ python ];
+              } ''
+                mkdir -p "$out"
+                ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_calyx_gate.py \
+                  --write --receipt "$out/receipt.json" \
+                  --gate 1x64x64=${small} --gate 1x256x64=${expand} \
+                  --gate 1x64x256=${contract} --gate 4x50257x64=${actual}
+                ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_calyx_gate.py \
+                  --receipt "$out/receipt.json" \
+                  --gate 1x64x64=${small} --gate 1x256x64=${expand} \
+                  --gate 1x64x256=${contract} --gate 4x50257x64=${actual}
+              '';
+              composition = pkgs.runCommand "tinystories-1m-exact-serial-gemv-composition" {
+                # torchStage is a data file, not a setup hook.  It is retained
+                # below as an explicit command dependency so the sandbox closes
+                # over the immutable exported Torch MLIR without trying to
+                # execute MLIR as shell code.
+                buildInputs = [ python ];
+              } ''
+                mkdir -p "$out"
+                timeout 1800 ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/compose_exact_serial_gemv_calyx.py \
+                  --torch ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
+                  --output "$out/model.calyx.mlir" --map "$out/callsites.json"
+                timeout 1800 ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_composition.py diagnose \
+                  --torch ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
+                  --map "$out/callsites.json" --calyx "$out/model.calyx.mlir" --receipt "$out/receipt.json"
+              '';
+            in pkgs.runCommand "tiny-stories-1m-exact-serial-gemv-sv" {
+              buildInputs = [ python portableTorch composition ];
+            } ''
+              mkdir -p "$out"
+              ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/run_exact_serial_gemv_frontier.py \
+                --root ${sourceRoot} --task3-root ${task3Source} \
+                --export-receipt ${sourceRoot}/artifacts/comparison/tinystories-1m-exact-serial-gemv-successor.json \
+                --portable-torch-receipt ${portableTorch}/receipt.json \
+                --portable-exported-dir ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".pytorchExported} \
+                --portable-torch-output ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
+                --calyx-receipt ${composition}/receipt.json \
+                --composition-map ${composition}/callsites.json --composition-calyx ${composition}/model.calyx.mlir \
+                --task3-gate-receipt ${gate}/receipt.json \
+                --output "$out/frontier.json"
+              ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_frontier.py \
+                --root ${sourceRoot} --receipt "$out/frontier.json"
+            '';
           "rc-math-exp-paper-screen" = rcMathExpPaperScreen;
+          "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf" =
+            exactTinyStoriesNormalized;
+          "tiny-stories-1m-kev-gpt-exact-calyx-frontier" = exactTinyStoriesCalyx;
           "calyx-float-library-selftest" = calyxFloatLibrarySelftest;
           "calyx-rc-basic-float-bindings-selftest" =
             calyxRcBasicFloatBindingsSelftest;
@@ -2684,6 +3112,7 @@ PY
 
         checks = {
           default = modelRegistryJson;
+          "pipeline-runtime-source-closure" = pipelineRuntimeSourceClosure;
           "calyx-float-library" = calyxFloatLibrarySelftest;
           "calyx-rc-basic-float-bindings" = calyxRcBasicFloatBindingsSelftest;
           "calyx-integer-library" = calyxIntegerLibrarySelftest;

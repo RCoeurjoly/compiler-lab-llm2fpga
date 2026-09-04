@@ -1,0 +1,91 @@
+{
+  "schema": "tinystories-1m-exact-frontier-determinism-bundles-v1",
+  "source_commit": "f26177ee480187dd1abf5ee9b1324c61bcceab02",
+  "canonical_files": [
+    "receipt.json",
+    "pytorch-exported-build.log",
+    "torch-mlir.log",
+    "compiler-import-capture.log"
+  ],
+  "runs": {
+    "run-1": {
+      "source_commit": "f26177ee480187dd1abf5ee9b1324c61bcceab02",
+      "commands": {
+        "pytorch-exported": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-pytorch-exported'",
+        "torch-mlir": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-torch'",
+        "compiler-import-capture": "TMPDIR=<capture-tmp> PYTHONPATH=/nix/store/swlkp7wlw75vv2i3l2f1dh8phnd33jqv-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages:/nix/store/swlkp7wlw75vv2i3l2f1dh8phnd33jqv-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages/torch_mlir /nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py --exported-program-dir /nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported --out <capture-tmp>/requested-torch.mlir"
+      },
+      "exit_codes": {
+        "pytorch-exported": 0,
+        "torch-mlir": 1,
+        "compiler-import-capture": 1
+      },
+      "receipt_self_hash": "af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b",
+      "files": {
+        "receipt.json": {
+          "bytes": 27255,
+          "sha256": "b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55"
+        },
+        "pytorch-exported-build.log": {
+          "bytes": 228,
+          "sha256": "993972ee373fbef7b0d334fc180f1277dc9b61698df7c3ed4aaa17a8c63b74e2"
+        },
+        "torch-mlir.log": {
+          "bytes": 6126,
+          "sha256": "1a0867e7081a0e850d2d30048d7e885f157b4d217fea473c789e5d175f485a29"
+        },
+        "compiler-import-capture.log": {
+          "bytes": 2732,
+          "sha256": "f4e06b290a99aa484117a472a360effa2faecad07c2cdc3fa35273349fdcf399"
+        }
+      },
+      "noncanonical_metadata": {
+        "receipt_captured_at": "2026-08-30T07:01:10.581853782+02:00",
+        "runtime_seconds_approximate": 122,
+        "canonical": false
+      }
+    },
+    "run-2": {
+      "source_commit": "f26177ee480187dd1abf5ee9b1324c61bcceab02",
+      "commands": {
+        "pytorch-exported": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-pytorch-exported'",
+        "torch-mlir": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-torch'",
+        "compiler-import-capture": "TMPDIR=<capture-tmp> PYTHONPATH=/nix/store/swlkp7wlw75vv2i3l2f1dh8phnd33jqv-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages:/nix/store/swlkp7wlw75vv2i3l2f1dh8phnd33jqv-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages/torch_mlir /nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py --exported-program-dir /nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported --out <capture-tmp>/requested-torch.mlir"
+      },
+      "exit_codes": {
+        "pytorch-exported": 0,
+        "torch-mlir": 1,
+        "compiler-import-capture": 1
+      },
+      "receipt_self_hash": "af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b",
+      "files": {
+        "receipt.json": {
+          "bytes": 27255,
+          "sha256": "b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55"
+        },
+        "pytorch-exported-build.log": {
+          "bytes": 228,
+          "sha256": "993972ee373fbef7b0d334fc180f1277dc9b61698df7c3ed4aaa17a8c63b74e2"
+        },
+        "torch-mlir.log": {
+          "bytes": 6126,
+          "sha256": "1a0867e7081a0e850d2d30048d7e885f157b4d217fea473c789e5d175f485a29"
+        },
+        "compiler-import-capture.log": {
+          "bytes": 2732,
+          "sha256": "f4e06b290a99aa484117a472a360effa2faecad07c2cdc3fa35273349fdcf399"
+        }
+      },
+      "noncanonical_metadata": {
+        "receipt_captured_at": "2026-08-30T07:04:35.013291348+02:00",
+        "runtime_seconds_approximate": 182,
+        "canonical": false
+      }
+    }
+  },
+  "expected_comparison": {
+    "byte_identical": true,
+    "receipt_file_sha256": "b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55",
+    "receipt_self_hash": "af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b"
+  }
+}

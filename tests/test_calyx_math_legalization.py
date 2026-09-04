@@ -1,5 +1,6 @@
 import unittest
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -9,15 +10,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class CalyxMathLegalizationTest(unittest.TestCase):
     def test_roundeven_lowering_preserves_negative_infinity(self) -> None:
-        circt_opt = os.environ.get("CIRCT_OPT")
+        mlir_opt = os.environ.get("MLIR_OPT") or shutil.which("mlir-opt")
         pass_plugin = os.environ.get("LLM2FPGA_MLIR_PASS_PLUGIN")
-        if not circt_opt or not pass_plugin:
-            self.skipTest("set CIRCT_OPT and LLM2FPGA_MLIR_PASS_PLUGIN")
+        if not mlir_opt or not pass_plugin:
+            self.skipTest("set MLIR_OPT and LLM2FPGA_MLIR_PASS_PLUGIN")
 
         fixture = ROOT / "reproducers" / "calyx-math-roundeven" / "nonfinite.mlir"
         completed = subprocess.run(
             [
-                circt_opt,
+                mlir_opt,
                 f"--load-pass-plugin={pass_plugin}",
                 "--pass-pipeline=builtin.module(llm2fpga-lower-roundeven-for-calyx,canonicalize)",
                 str(fixture),
@@ -40,6 +41,7 @@ class CalyxMathLegalizationTest(unittest.TestCase):
         self.assertIn("math::FloorOp", source)
         self.assertIn("math::CeilOp", source)
         self.assertIn("math::RsqrtOp", source)
+        self.assertIn("math::AbsIOp", source)
         self.assertIn("math::SqrtOp::create", source)
 
     def test_scout_approximations_are_explicit_and_opt_in(self) -> None:
@@ -86,6 +88,14 @@ class CalyxMathLegalizationTest(unittest.TestCase):
         self.assertIn("llm2fpga-lower-rational-tanh-for-calyx", pipeline)
         self.assertIn("PassRegistration<LowerRationalTanhForCalyxPass>", source)
         self.assertIn("gated rational candidate", source)
+
+    def test_scalar_f32_negf_legalization_is_registered(self) -> None:
+        source = (
+            ROOT / "tools" / "mlir-passes" / "FoldConstantTruncFOps.cpp"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("llm2fpga-lower-negf-for-calyx", source)
+        self.assertIn("PassRegistration<LowerNegFForCalyxPass>", source)
 
 
 if __name__ == "__main__":

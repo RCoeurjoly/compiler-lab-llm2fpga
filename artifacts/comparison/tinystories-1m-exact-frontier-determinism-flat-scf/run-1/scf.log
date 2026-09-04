@@ -1,0 +1,5 @@
+$ nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-scf'
+exit_code: 0
+--- stdout ---
+/nix/store/2y94p0s6m1hh5hghyddsbh249y4nqbzf-tiny-stories-1m-kev-gpt-exact-scf.mlir
+--- stderr ---

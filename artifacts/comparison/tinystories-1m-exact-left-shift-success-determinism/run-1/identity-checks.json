@@ -1,0 +1,41 @@
+{
+  "prior_receipts": [
+    {
+      "file_sha256": "b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55",
+      "path": "artifacts/comparison/tinystories-1m-exact-current-pipeline-frontier.json",
+      "preserved": true,
+      "self_sha256": "af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b"
+    },
+    {
+      "file_sha256": "5b40f13383c372b49d8e15a5aedfaab15c09ad4061aee96022481ae55424c313",
+      "path": "artifacts/comparison/tinystories-1m-exact-successor-frontier.json",
+      "preserved": true,
+      "self_sha256": "638ed427537be14fe53a0d5d694eb2c13bf09f56f8b0679fadd30dbb746b6822"
+    }
+  ],
+  "schema": "tinystories-1m-exact-left-shift-success-identities-v1",
+  "semantic_fixture": {
+    "file_sha256": "bf0f51e1417dc4034adbfe8ef8d38e673946b196255d0261559cba05a880ccd9",
+    "path": "artifacts/comparison/tinystories-1m-exact-left-shift-semantics.json",
+    "self_sha256": "672d34819f93db399e7e8faac4747f9bb88b690491c2683912fee9490ffca19c"
+  },
+  "task_identities": {
+    "task_1": {
+      "file_sha256": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+      "path": "artifacts/reference/tinystories-1m-exact-input-audit.json",
+      "payload_sha256": "7d7a37d08df7e63bdb95063674fe5dc306058e51af8a11bbcd97a4cb2972a766"
+    },
+    "task_2": {
+      "artifact_sha256": "af1901917b52876a9b3343712b89928b272e5dd237cd491ddd9d462c56a52838",
+      "file_sha256": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+      "model_receipt_sha256": "5e56907e60c83c5d98b3c3fe88772b7dfba71e53a9435de548a9d54ea7497834",
+      "path": "artifacts/reference/tinystories-1m-exact-package-model.json"
+    },
+    "task_3": {
+      "artifact_sha256": "9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3",
+      "file_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+      "path": "artifacts/reference/tinystories-1m-exact-generation.json",
+      "result_sha256": "c18106f25030ec58dfd3abc5d75d774506aca65b655fc34b284076b1294f8644"
+    }
+  }
+}

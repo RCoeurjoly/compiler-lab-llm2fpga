@@ -1,0 +1,737 @@
+{
+  "capture_tools": {
+    "classifier": {
+      "path": "scripts/pipeline/classify_tinystories_1m_exact_frontier.py",
+      "sha256": "98c5f9d30be27ece882ee28df5f7ded7866c558b5d6cc26de2e23378b6aebbb2"
+    },
+    "determinism_verifier": {
+      "path": "scripts/pipeline/verify_tinystories_1m_exact_frontier_determinism.py",
+      "sha256": "be9f03fdb2cad31cde4c0aade505c7de837f4d05e569c2855245e7a222e91296"
+    }
+  },
+  "claims": {
+    "backend_model_quantization_ddr_pcie_changed": false,
+    "board_inference": false,
+    "calyx_native_sv": false,
+    "functional_equivalence": false,
+    "resource_or_timing": false,
+    "syntax_validated": false,
+    "synthesis_validated": false
+  },
+  "diagnostic": "error: registered flat-scf stage completed with residuals; artifact remains rejected",
+  "frontier": "pre_calyx_frontier",
+  "frontier_evidence": {
+    "blockers": {
+      "bytes": 19257118,
+      "path": "reproducers/flat-scf/blockers.json",
+      "sha256": "2be1745e4a588c533b03d792439d5698c90b7ecd2bb9dba2c5294791d94576f9"
+    },
+    "kind": "control_manifest",
+    "manifest": {
+      "artifact": "flat.scf.mlir",
+      "blockers": "blockers.json",
+      "bytes": 118,
+      "path": "reproducers/flat-scf/minimal-reproducer.json",
+      "reason": null,
+      "sha256": "8b15b5aeffa19ed20975926fab100d28398863482eccb3fcd6840a65ed2df7cb",
+      "stage": "flat-scf",
+      "status": "completed-with-residuals"
+    },
+    "minimization": {
+      "reason": "control_manifest_is_minimal",
+      "status": "not_applicable"
+    },
+    "operation": null,
+    "residual_artifact": {
+      "bytes": 18933168,
+      "path": "reproducers/flat-scf/flat.scf.mlir",
+      "sha256": "66c78e412ade3262c4eb0f61b5776e9c765fb434fdbb53d09cbba7e724ff2fc6"
+    },
+    "types": null
+  },
+  "frozen_task_1_through_3_identities": {
+    "adapter_sha256": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e",
+    "contract_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+    "package_manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "task_1_audit_file_sha256": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+    "task_1_audit_payload_sha256": "7d7a37d08df7e63bdb95063674fe5dc306058e51af8a11bbcd97a4cb2972a766",
+    "task_2_artifact_file_sha256": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+    "task_2_artifact_sha256": "af1901917b52876a9b3343712b89928b272e5dd237cd491ddd9d462c56a52838",
+    "task_2_model_receipt_sha256": "5e56907e60c83c5d98b3c3fe88772b7dfba71e53a9435de548a9d54ea7497834",
+    "task_3_generation_artifact_sha256": "9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3",
+    "task_3_generation_file_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+    "task_3_generation_result_sha256": "c18106f25030ec58dfd3abc5d75d774506aca65b655fc34b284076b1294f8644"
+  },
+  "full_failing_input": {
+    "archive_bytes": 650187,
+    "archive_sha256": "239a25625c10160ccf4067291f0f787c51aa4c90542994b9dcc4abc70972d456",
+    "content_bytes": 14391514,
+    "content_sha256": "33dddf67a971dae530bbed92e655106c89994b398281752679d70015fe3f27c5",
+    "path": "reproducers/flat-scf/full-input.gz",
+    "source_artifact": "/nix/store/2y94p0s6m1hh5hghyddsbh249y4nqbzf-tiny-stories-1m-kev-gpt-exact-scf.mlir",
+    "source_stage": "scf"
+  },
+  "model": "tiny-stories-1m-kev-gpt-exact",
+  "pipeline_execution": {
+    "first_invalid_stage": "flat-scf",
+    "not_run": [
+      "calyx",
+      "calyx-native-sv"
+    ],
+    "registered_order": [
+      "pytorch-exported",
+      "torch",
+      "linalg",
+      "scf",
+      "flat-scf",
+      "calyx",
+      "calyx-native-sv"
+    ],
+    "stopped_after_first_invalid_stage": true
+  },
+  "pipeline_source_identity": {
+    "accepted_task4_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+    "critical_inputs": {
+      "TinyStories/model_adapter_exact_package.py": {
+        "authenticated_blob": "f592b78382902c45704bf09fa1ed69a52ffffedb",
+        "authenticated_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+        "authenticated_sha256": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e",
+        "derivation_store_path": "/nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories/model_adapter_exact_package.py",
+        "derivation_store_sha256": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e",
+        "evidence_blob": "f592b78382902c45704bf09fa1ed69a52ffffedb",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/TinyStories/model_adapter_exact_package.py",
+        "flake_archive_sha256": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e",
+        "task4_blob": "f592b78382902c45704bf09fa1ed69a52ffffedb",
+        "task4_sha256": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e",
+        "workspace_sha256": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e"
+      },
+      "artifacts/reference/tinystories-1m-exact-generation.json": {
+        "authenticated_blob": "35d1ec3f879eff6f4870db9f28cedf42f632d192",
+        "authenticated_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+        "authenticated_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+        "derivation_store_path": "/nix/store/pjlcfpfvmzj7p599jxw28pd9zfkicd33-tinystories-1m-exact-generation.json",
+        "derivation_store_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+        "evidence_blob": "35d1ec3f879eff6f4870db9f28cedf42f632d192",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/artifacts/reference/tinystories-1m-exact-generation.json",
+        "flake_archive_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+        "task4_blob": "35d1ec3f879eff6f4870db9f28cedf42f632d192",
+        "task4_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+        "workspace_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3"
+      },
+      "artifacts/reference/tinystories-1m-exact-input-audit.json": {
+        "authenticated_blob": "db7bae8a8dd69250913b6cb283ae329dd94b8268",
+        "authenticated_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+        "authenticated_sha256": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+        "derivation_store_path": "/nix/store/8fav9ilcx8zli67g9mqmh7c6cyc1i6n7-tinystories-1m-exact-input-audit.json",
+        "derivation_store_sha256": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+        "evidence_blob": "db7bae8a8dd69250913b6cb283ae329dd94b8268",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/artifacts/reference/tinystories-1m-exact-input-audit.json",
+        "flake_archive_sha256": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+        "task4_blob": "db7bae8a8dd69250913b6cb283ae329dd94b8268",
+        "task4_sha256": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+        "workspace_sha256": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd"
+      },
+      "artifacts/reference/tinystories-1m-exact-input-contract.json": {
+        "authenticated_blob": "17151b05f2e7ef75952c760b289fbe6ace310434",
+        "authenticated_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+        "authenticated_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+        "derivation_store_path": "/nix/store/g9kgm3x9x9a1zm29p0ksyz1x6vin9nq1-tinystories-1m-exact-input-contract.json",
+        "derivation_store_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+        "evidence_blob": "17151b05f2e7ef75952c760b289fbe6ace310434",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/artifacts/reference/tinystories-1m-exact-input-contract.json",
+        "flake_archive_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+        "task4_blob": "17151b05f2e7ef75952c760b289fbe6ace310434",
+        "task4_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+        "workspace_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c"
+      },
+      "artifacts/reference/tinystories-1m-exact-package-model.json": {
+        "authenticated_blob": "a857be11511e4a381b402becd4f3da82e0e8fb51",
+        "authenticated_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+        "authenticated_sha256": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+        "derivation_store_path": "/nix/store/j9wmaynxm5ji6q2y3l05xphi5hkdph46-tinystories-1m-exact-package-model.json",
+        "derivation_store_sha256": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+        "evidence_blob": "a857be11511e4a381b402becd4f3da82e0e8fb51",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/artifacts/reference/tinystories-1m-exact-package-model.json",
+        "flake_archive_sha256": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+        "task4_blob": "a857be11511e4a381b402becd4f3da82e0e8fb51",
+        "task4_sha256": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+        "workspace_sha256": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a"
+      },
+      "docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md": {
+        "authenticated_blob": "ae018afd6dfce7bb7da88806f84a1b6a14aae157",
+        "authenticated_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+        "authenticated_sha256": "99632d030170ceaf0194b8f41c1fa784f262bb82d4f33f35f5fe90f2b4926bfc",
+        "derivation_store_path": "/nix/store/jgs0mrhb9a4y50x88a24973fz1bpr42c-2026-08-28-reference-guided-tinystories-1m-compiler-design.md",
+        "derivation_store_sha256": "99632d030170ceaf0194b8f41c1fa784f262bb82d4f33f35f5fe90f2b4926bfc",
+        "evidence_blob": "ae018afd6dfce7bb7da88806f84a1b6a14aae157",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md",
+        "flake_archive_sha256": "99632d030170ceaf0194b8f41c1fa784f262bb82d4f33f35f5fe90f2b4926bfc",
+        "task4_blob": "ae018afd6dfce7bb7da88806f84a1b6a14aae157",
+        "task4_sha256": "99632d030170ceaf0194b8f41c1fa784f262bb82d4f33f35f5fe90f2b4926bfc",
+        "workspace_sha256": "99632d030170ceaf0194b8f41c1fa784f262bb82d4f33f35f5fe90f2b4926bfc"
+      },
+      "flake.lock": {
+        "authenticated_blob": "d718358ed339cd8b5c4bf325b91d0f2285e4a9c9",
+        "authenticated_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+        "authenticated_sha256": "fa2d8e33e0b2cecd26a1721c73f43d3eeb91939f0df37675700eba094bc316e3",
+        "evidence_blob": "d718358ed339cd8b5c4bf325b91d0f2285e4a9c9",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/flake.lock",
+        "flake_archive_sha256": "fa2d8e33e0b2cecd26a1721c73f43d3eeb91939f0df37675700eba094bc316e3",
+        "task4_blob": "d718358ed339cd8b5c4bf325b91d0f2285e4a9c9",
+        "task4_sha256": "fa2d8e33e0b2cecd26a1721c73f43d3eeb91939f0df37675700eba094bc316e3",
+        "workspace_sha256": "fa2d8e33e0b2cecd26a1721c73f43d3eeb91939f0df37675700eba094bc316e3"
+      },
+      "flake.nix": {
+        "authenticated_blob": "852545b78afdcc266752845df729cab430e0335a",
+        "authenticated_commit": "3314a70ac1cfe0e998f445162d1a2b5ae8398a20",
+        "authenticated_sha256": "ad46882d10466c057a4aa9d4f90353545e1ee04f9843bac815ec547f8b9afaa6",
+        "evidence_blob": "852545b78afdcc266752845df729cab430e0335a",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/flake.nix",
+        "flake_archive_sha256": "ad46882d10466c057a4aa9d4f90353545e1ee04f9843bac815ec547f8b9afaa6",
+        "task4_blob": "f467eae73ab0cd7cc295f0c4e6a0afad9b038bc5",
+        "task4_sha256": "8769896981bfffbfe2982949db9dc30fab9f2823800f6e10f518e41461706588",
+        "workspace_sha256": "ad46882d10466c057a4aa9d4f90353545e1ee04f9843bac815ec547f8b9afaa6"
+      },
+      "nix/models.nix": {
+        "authenticated_blob": "2a09589f65d9bb6c9a87112557ef5b3bcc748a20",
+        "authenticated_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+        "authenticated_sha256": "21ea58f22dc6d4e37cd956fcf3a24bcb4f7516526e82e67d083e4477a939f08a",
+        "evidence_blob": "2a09589f65d9bb6c9a87112557ef5b3bcc748a20",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/nix/models.nix",
+        "flake_archive_sha256": "21ea58f22dc6d4e37cd956fcf3a24bcb4f7516526e82e67d083e4477a939f08a",
+        "task4_blob": "2a09589f65d9bb6c9a87112557ef5b3bcc748a20",
+        "task4_sha256": "21ea58f22dc6d4e37cd956fcf3a24bcb4f7516526e82e67d083e4477a939f08a",
+        "workspace_sha256": "21ea58f22dc6d4e37cd956fcf3a24bcb4f7516526e82e67d083e4477a939f08a"
+      },
+      "nix/pipeline.nix": {
+        "authenticated_blob": "e892643bb0a5d569ad2d070a6aaf9dde1cf5de13",
+        "authenticated_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+        "authenticated_sha256": "92ee7a266f32516a7e86d8dfa8ea5a4cafb8e663408e7c9aa691162daa59fd8a",
+        "evidence_blob": "e892643bb0a5d569ad2d070a6aaf9dde1cf5de13",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/nix/pipeline.nix",
+        "flake_archive_sha256": "92ee7a266f32516a7e86d8dfa8ea5a4cafb8e663408e7c9aa691162daa59fd8a",
+        "task4_blob": "e892643bb0a5d569ad2d070a6aaf9dde1cf5de13",
+        "task4_sha256": "92ee7a266f32516a7e86d8dfa8ea5a4cafb8e663408e7c9aa691162daa59fd8a",
+        "workspace_sha256": "92ee7a266f32516a7e86d8dfa8ea5a4cafb8e663408e7c9aa691162daa59fd8a"
+      },
+      "scripts/compile-pytorch.py": {
+        "authenticated_blob": "7642c67851e1d83dc615d3c4f30cbdab1de2a688",
+        "authenticated_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+        "authenticated_sha256": "c668341ae81c944a9f4e092465e47619824532c6397a9f8797a01914747223d8",
+        "derivation_store_path": "/nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py",
+        "derivation_store_sha256": "c668341ae81c944a9f4e092465e47619824532c6397a9f8797a01914747223d8",
+        "evidence_blob": "7642c67851e1d83dc615d3c4f30cbdab1de2a688",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/scripts/compile-pytorch.py",
+        "flake_archive_sha256": "c668341ae81c944a9f4e092465e47619824532c6397a9f8797a01914747223d8",
+        "task4_blob": "7642c67851e1d83dc615d3c4f30cbdab1de2a688",
+        "task4_sha256": "c668341ae81c944a9f4e092465e47619824532c6397a9f8797a01914747223d8",
+        "workspace_sha256": "c668341ae81c944a9f4e092465e47619824532c6397a9f8797a01914747223d8"
+      },
+      "scripts/materialize-pytorch-exported.py": {
+        "authenticated_blob": "adbf5b542c12b04fba0b8f1041cb3a06bf6eff56",
+        "authenticated_commit": "7eed3592a661c0cb3c417dc59b29839266446b2d",
+        "authenticated_sha256": "430e3e9ae61ae35a0da1a83b5fca56ea82094b0a2553bbd90f7d8964cb452d95",
+        "derivation_store_path": "/nix/store/qwq830hflpbcq85iszygxzv0z4x897xs-materialize-pytorch-exported.py",
+        "derivation_store_sha256": "430e3e9ae61ae35a0da1a83b5fca56ea82094b0a2553bbd90f7d8964cb452d95",
+        "evidence_blob": "adbf5b542c12b04fba0b8f1041cb3a06bf6eff56",
+        "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source/scripts/materialize-pytorch-exported.py",
+        "flake_archive_sha256": "430e3e9ae61ae35a0da1a83b5fca56ea82094b0a2553bbd90f7d8964cb452d95",
+        "task4_blob": "adbf5b542c12b04fba0b8f1041cb3a06bf6eff56",
+        "task4_sha256": "430e3e9ae61ae35a0da1a83b5fca56ea82094b0a2553bbd90f7d8964cb452d95",
+        "workspace_sha256": "430e3e9ae61ae35a0da1a83b5fca56ea82094b0a2553bbd90f7d8964cb452d95"
+      }
+    },
+    "critical_inputs_clean": true,
+    "evidence_source_commit": "c22c5f8d85e453a56b185f6238970933f5b1d407",
+    "export_derivation": {
+      "attribute": "tiny-stories-1m-kev-gpt-exact-pytorch-exported",
+      "build_command": "set -euo pipefail\nmkdir -p \"$out\"\nln -s /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot \"$out/upstream\"\nexport PYTHONPATH=\"/nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories:${PYTHONPATH:-}\"\npackage=\"/nix/store/p05mqrwgczbd1zpww75f97xvnp109cl4-source/model_packages/tinystories-1m\"\ncontract_source=\"/nix/store/g9kgm3x9x9a1zm29p0ksyz1x6vin9nq1-tinystories-1m-exact-input-contract.json\"\naudit=\"/nix/store/8fav9ilcx8zli67g9mqmh7c6cyc1i6n7-tinystories-1m-exact-input-audit.json\"\ncontract_dir=\"$TMPDIR/exact-inputs\"\nmkdir -p \"$contract_dir\"\ncp \"$contract_source\" \"$contract_dir/tinystories-1m-exact-input-contract.json\"\ncp \"$audit\" \"$contract_dir/tinystories-1m-exact-input-audit.json\"\ncontract=\"$contract_dir/tinystories-1m-exact-input-contract.json\"\ntask_2_artifact=\"/nix/store/j9wmaynxm5ji6q2y3l05xphi5hkdph46-tinystories-1m-exact-package-model.json\"\ngeneration_receipt=\"/nix/store/pjlcfpfvmzj7p599jxw28pd9zfkicd33-tinystories-1m-exact-generation.json\"\nadapter=\"/nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories/model_adapter_exact_package.py\"\n/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/19n3yzlma789grci332brkhj86whapvw-tinystories-1m-exact-package-export-provenance.py verify \\\n  --adapter \"$adapter\" --contract \"$contract\" --audit \"$audit\" --package \"$package\" \\\n  --model-path /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot --task-2-artifact \"$task_2_artifact\" \\\n  --generation-receipt \"$generation_receipt\"\nadapter_root=\"$TMPDIR/exact-adapter-root\"\nmkdir -p \"$adapter_root/TinyStories\" \"$adapter_root/artifacts\" \"$adapter_root/scripts/comparison\" \\\n  \"$adapter_root/docs/superpowers/specs\"\ncp /nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories/*.py \"$adapter_root/TinyStories/\"\ncp -r /nix/store/8p7dnzlgfd4cv3z416aai0wzw7lq5wwl-reference \"$adapter_root/artifacts/reference\"\ncp /nix/store/ilbdb4npqa4mvsjyxqhcxvg8m20m97mf-comparison/*.py \"$adapter_root/scripts/comparison/\"\ncp /nix/store/jgs0mrhb9a4y50x88a24973fz1bpr42c-2026-08-28-reference-guided-tinystories-1m-compiler-design.md \\\n  \"$adapter_root/docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md\"\nadapter=\"$adapter_root/TinyStories/model_adapter_exact_package.py\"\n/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/qwq830hflpbcq85iszygxzv0z4x897xs-materialize-pytorch-exported.py \\\n  --adapter \"$adapter\" --contract \"$contract\" --package \"$package\" \\\n  --model-path /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot --out-dir \"$out\"\n/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/19n3yzlma789grci332brkhj86whapvw-tinystories-1m-exact-package-export-provenance.py write \\\n  --adapter \"$adapter\" --contract \"$contract\" --audit \"$audit\" --package \"$package\" \\\n  --model-path /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot --task-2-artifact \"$task_2_artifact\" \\\n  --generation-receipt \"$generation_receipt\" --out-dir \"$out\"\n\n",
+      "build_command_sha256": "29153daadfb88b3744f1575032d2e3552cdc1e66addfe0f64440a730db04b6a3",
+      "build_inputs": "/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env",
+      "canonical_json": "{\"derivations\":{\"qbnvx6p8zslb5j0n2hnzyllnr1wvbdhb-tiny-stories-1m-kev-gpt-exact-pytorch-exported.drv\":{\"args\":[\"-e\",\"/nix/store/v6x3cs394jgqfbi0a42pam708flxaphh-default-builder.sh\"],\"builder\":\"/nix/store/1jzhbwq5rjjaqa75z88ws2b424vh7m53-bash-5.2p32/bin/bash\",\"env\":{\"__structuredAttrs\":\"\",\"buildCommand\":\"set -euo pipefail\\nmkdir -p \\\"$out\\\"\\nln -s /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot \\\"$out/upstream\\\"\\nexport PYTHONPATH=\\\"/nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories:${PYTHONPATH:-}\\\"\\npackage=\\\"/nix/store/p05mqrwgczbd1zpww75f97xvnp109cl4-source/model_packages/tinystories-1m\\\"\\ncontract_source=\\\"/nix/store/g9kgm3x9x9a1zm29p0ksyz1x6vin9nq1-tinystories-1m-exact-input-contract.json\\\"\\naudit=\\\"/nix/store/8fav9ilcx8zli67g9mqmh7c6cyc1i6n7-tinystories-1m-exact-input-audit.json\\\"\\ncontract_dir=\\\"$TMPDIR/exact-inputs\\\"\\nmkdir -p \\\"$contract_dir\\\"\\ncp \\\"$contract_source\\\" \\\"$contract_dir/tinystories-1m-exact-input-contract.json\\\"\\ncp \\\"$audit\\\" \\\"$contract_dir/tinystories-1m-exact-input-audit.json\\\"\\ncontract=\\\"$contract_dir/tinystories-1m-exact-input-contract.json\\\"\\ntask_2_artifact=\\\"/nix/store/j9wmaynxm5ji6q2y3l05xphi5hkdph46-tinystories-1m-exact-package-model.json\\\"\\ngeneration_receipt=\\\"/nix/store/pjlcfpfvmzj7p599jxw28pd9zfkicd33-tinystories-1m-exact-generation.json\\\"\\nadapter=\\\"/nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories/model_adapter_exact_package.py\\\"\\n/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/19n3yzlma789grci332brkhj86whapvw-tinystories-1m-exact-package-export-provenance.py verify \\\\\\n  --adapter \\\"$adapter\\\" --contract \\\"$contract\\\" --audit \\\"$audit\\\" --package \\\"$package\\\" \\\\\\n  --model-path /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot --task-2-artifact \\\"$task_2_artifact\\\" \\\\\\n  --generation-receipt \\\"$generation_receipt\\\"\\nadapter_root=\\\"$TMPDIR/exact-adapter-root\\\"\\nmkdir -p \\\"$adapter_root/TinyStories\\\" \\\"$adapter_root/artifacts\\\" \\\"$adapter_root/scripts/comparison\\\" \\\\\\n  \\\"$adapter_root/docs/superpowers/specs\\\"\\ncp /nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories/*.py \\\"$adapter_root/TinyStories/\\\"\\ncp -r /nix/store/8p7dnzlgfd4cv3z416aai0wzw7lq5wwl-reference \\\"$adapter_root/artifacts/reference\\\"\\ncp /nix/store/ilbdb4npqa4mvsjyxqhcxvg8m20m97mf-comparison/*.py \\\"$adapter_root/scripts/comparison/\\\"\\ncp /nix/store/jgs0mrhb9a4y50x88a24973fz1bpr42c-2026-08-28-reference-guided-tinystories-1m-compiler-design.md \\\\\\n  \\\"$adapter_root/docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md\\\"\\nadapter=\\\"$adapter_root/TinyStories/model_adapter_exact_package.py\\\"\\n/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/qwq830hflpbcq85iszygxzv0z4x897xs-materialize-pytorch-exported.py \\\\\\n  --adapter \\\"$adapter\\\" --contract \\\"$contract\\\" --package \\\"$package\\\" \\\\\\n  --model-path /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot --out-dir \\\"$out\\\"\\n/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/19n3yzlma789grci332brkhj86whapvw-tinystories-1m-exact-package-export-provenance.py write \\\\\\n  --adapter \\\"$adapter\\\" --contract \\\"$contract\\\" --audit \\\"$audit\\\" --package \\\"$package\\\" \\\\\\n  --model-path /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot --task-2-artifact \\\"$task_2_artifact\\\" \\\\\\n  --generation-receipt \\\"$generation_receipt\\\" --out-dir \\\"$out\\\"\\n\\n\",\"buildInputs\":\"/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env\",\"builder\":\"/nix/store/1jzhbwq5rjjaqa75z88ws2b424vh7m53-bash-5.2p32/bin/bash\",\"cmakeFlags\":\"\",\"configureFlags\":\"\",\"depsBuildBuild\":\"\",\"depsBuildBuildPropagated\":\"\",\"depsBuildTarget\":\"\",\"depsBuildTargetPropagated\":\"\",\"depsHostHost\":\"\",\"depsHostHostPropagated\":\"\",\"depsTargetTarget\":\"\",\"depsTargetTargetPropagated\":\"\",\"doCheck\":\"\",\"doInstallCheck\":\"\",\"enableParallelBuilding\":\"1\",\"enableParallelChecking\":\"1\",\"enableParallelInstalling\":\"1\",\"mesonFlags\":\"\",\"name\":\"tiny-stories-1m-kev-gpt-exact-pytorch-exported\",\"nativeBuildInputs\":\"\",\"out\":\"/nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported\",\"outputs\":\"out\",\"passAsFile\":\"buildCommand\",\"patches\":\"\",\"propagatedBuildInputs\":\"\",\"propagatedNativeBuildInputs\":\"\",\"stdenv\":\"/nix/store/zix67r268ihi4c362zw7c0989z12jmy7-stdenv-linux\",\"strictDeps\":\"\",\"system\":\"x86_64-linux\"},\"inputs\":{\"drvs\":{\"i5rz2har3pr3fjr2488ygzndrralpn84-python3-3.11.14-env.drv\":{\"dynamicOutputs\":{},\"outputs\":[\"out\"]},\"lr7nr5f5b0pq50n7jxzvirz56g665nfm-bash-5.2p32.drv\":{\"dynamicOutputs\":{},\"outputs\":[\"out\"]},\"ni250lb1my8z758di6zxaj3m83xcdkdb-tinystories-1m-hf-snapshot.drv\":{\"dynamicOutputs\":{},\"outputs\":[\"out\"]},\"pdjkwisqdp8a98vb9ksm4n3zdbpn9hnj-tinystories-1m-exact-package-export-provenance.py.drv\":{\"dynamicOutputs\":{},\"outputs\":[\"out\"]},\"y81l7s0z5448casjlypn8fw0saw8qidp-stdenv-linux.drv\":{\"dynamicOutputs\":{},\"outputs\":[\"out\"]}},\"srcs\":[\"1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories\",\"8fav9ilcx8zli67g9mqmh7c6cyc1i6n7-tinystories-1m-exact-input-audit.json\",\"8p7dnzlgfd4cv3z416aai0wzw7lq5wwl-reference\",\"g9kgm3x9x9a1zm29p0ksyz1x6vin9nq1-tinystories-1m-exact-input-contract.json\",\"ilbdb4npqa4mvsjyxqhcxvg8m20m97mf-comparison\",\"j9wmaynxm5ji6q2y3l05xphi5hkdph46-tinystories-1m-exact-package-model.json\",\"jgs0mrhb9a4y50x88a24973fz1bpr42c-2026-08-28-reference-guided-tinystories-1m-compiler-design.md\",\"p05mqrwgczbd1zpww75f97xvnp109cl4-source\",\"pjlcfpfvmzj7p599jxw28pd9zfkicd33-tinystories-1m-exact-generation.json\",\"qwq830hflpbcq85iszygxzv0z4x897xs-materialize-pytorch-exported.py\",\"v6x3cs394jgqfbi0a42pam708flxaphh-default-builder.sh\"]},\"name\":\"tiny-stories-1m-kev-gpt-exact-pytorch-exported\",\"outputs\":{\"out\":{\"path\":\"10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported\"}},\"system\":\"x86_64-linux\",\"version\":4}},\"version\":4}",
+      "file_sha256": "3ca53928a59673a3627e2bbc637fe748e64acc4803c59bdda2312b958e419b42",
+      "input_derivations": [
+        "/nix/store/i5rz2har3pr3fjr2488ygzndrralpn84-python3-3.11.14-env.drv",
+        "/nix/store/lr7nr5f5b0pq50n7jxzvirz56g665nfm-bash-5.2p32.drv",
+        "/nix/store/ni250lb1my8z758di6zxaj3m83xcdkdb-tinystories-1m-hf-snapshot.drv",
+        "/nix/store/pdjkwisqdp8a98vb9ksm4n3zdbpn9hnj-tinystories-1m-exact-package-export-provenance.py.drv",
+        "/nix/store/y81l7s0z5448casjlypn8fw0saw8qidp-stdenv-linux.drv"
+      ],
+      "input_sources": [
+        "/nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories",
+        "/nix/store/8fav9ilcx8zli67g9mqmh7c6cyc1i6n7-tinystories-1m-exact-input-audit.json",
+        "/nix/store/8p7dnzlgfd4cv3z416aai0wzw7lq5wwl-reference",
+        "/nix/store/g9kgm3x9x9a1zm29p0ksyz1x6vin9nq1-tinystories-1m-exact-input-contract.json",
+        "/nix/store/ilbdb4npqa4mvsjyxqhcxvg8m20m97mf-comparison",
+        "/nix/store/j9wmaynxm5ji6q2y3l05xphi5hkdph46-tinystories-1m-exact-package-model.json",
+        "/nix/store/jgs0mrhb9a4y50x88a24973fz1bpr42c-2026-08-28-reference-guided-tinystories-1m-compiler-design.md",
+        "/nix/store/p05mqrwgczbd1zpww75f97xvnp109cl4-source",
+        "/nix/store/pjlcfpfvmzj7p599jxw28pd9zfkicd33-tinystories-1m-exact-generation.json",
+        "/nix/store/qwq830hflpbcq85iszygxzv0z4x897xs-materialize-pytorch-exported.py",
+        "/nix/store/v6x3cs394jgqfbi0a42pam708flxaphh-default-builder.sh"
+      ],
+      "json_sha256": "2fb13b6f6c3d89598dc1ab00939818524beada3af1cb5fa416dc632d4699eba9",
+      "output": "/nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported",
+      "path": "/nix/store/qbnvx6p8zslb5j0n2hnzyllnr1wvbdhb-tiny-stories-1m-kev-gpt-exact-pytorch-exported.drv"
+    },
+    "flake_archive_nar_hash": "sha256-tourw/AtIA6MnYmRARy9FF/JQZ1jqIcWdqUOPAOWg4A=",
+    "flake_archive_path": "/nix/store/pn36wr9zac889pkxdy8ccjxbcych06y3-source",
+    "flake_archive_source": "git+file:///home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler?rev=c22c5f8d85e453a56b185f6238970933f5b1d407",
+    "task4_is_ancestor": true,
+    "torch_derivation": {
+      "attribute": "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-torch",
+      "build_command": "set -euo pipefail\nexport PYTHONPATH=\"/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages:/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages/torch_mlir:${PYTHONPATH:-}\"\npython /nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py \\\n  --exported-program-dir /nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported \\\n  --out \"$out\" >/dev/null\n",
+      "build_command_sha256": "fcda2c79caddc85351c58d05c930ededc62213dfb255f48027222c620c561e6c",
+      "build_inputs": "/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env /nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12",
+      "canonical_json": "{\"derivations\":{\"han08nzx4rk44xwh2drcaqhn01k37f18-tiny-stories-1m-kev-gpt-exact-torch.mlir.drv\":{\"args\":[\"-e\",\"/nix/store/v6x3cs394jgqfbi0a42pam708flxaphh-default-builder.sh\"],\"builder\":\"/nix/store/1jzhbwq5rjjaqa75z88ws2b424vh7m53-bash-5.2p32/bin/bash\",\"env\":{\"__structuredAttrs\":\"\",\"buildCommand\":\"set -euo pipefail\\nexport PYTHONPATH=\\\"/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages:/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages/torch_mlir:${PYTHONPATH:-}\\\"\\npython /nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py \\\\\\n  --exported-program-dir /nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported \\\\\\n  --out \\\"$out\\\" >/dev/null\\n\",\"buildInputs\":\"/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env /nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12\",\"builder\":\"/nix/store/1jzhbwq5rjjaqa75z88ws2b424vh7m53-bash-5.2p32/bin/bash\",\"cmakeFlags\":\"\",\"configureFlags\":\"\",\"depsBuildBuild\":\"\",\"depsBuildBuildPropagated\":\"\",\"depsBuildTarget\":\"\",\"depsBuildTargetPropagated\":\"\",\"depsHostHost\":\"\",\"depsHostHostPropagated\":\"\",\"depsTargetTarget\":\"\",\"depsTargetTargetPropagated\":\"\",\"doCheck\":\"\",\"doInstallCheck\":\"\",\"enableParallelBuilding\":\"1\",\"enableParallelChecking\":\"1\",\"enableParallelInstalling\":\"1\",\"mesonFlags\":\"\",\"name\":\"tiny-stories-1m-kev-gpt-exact-torch.mlir\",\"nativeBuildInputs\":\"\",\"out\":\"/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir\",\"outputs\":\"out\",\"passAsFile\":\"buildCommand\",\"patches\":\"\",\"propagatedBuildInputs\":\"\",\"propagatedNativeBuildInputs\":\"\",\"stdenv\":\"/nix/store/zix67r268ihi4c362zw7c0989z12jmy7-stdenv-linux\",\"strictDeps\":\"\",\"system\":\"x86_64-linux\"},\"inputs\":{\"drvs\":{\"a31wgxwx6dh1gfhbjkirphk44n5vjrrg-torch-mlir-0-unstable-2026-02-12.drv\":{\"dynamicOutputs\":{},\"outputs\":[\"out\"]},\"i5rz2har3pr3fjr2488ygzndrralpn84-python3-3.11.14-env.drv\":{\"dynamicOutputs\":{},\"outputs\":[\"out\"]},\"lr7nr5f5b0pq50n7jxzvirz56g665nfm-bash-5.2p32.drv\":{\"dynamicOutputs\":{},\"outputs\":[\"out\"]},\"qbnvx6p8zslb5j0n2hnzyllnr1wvbdhb-tiny-stories-1m-kev-gpt-exact-pytorch-exported.drv\":{\"dynamicOutputs\":{},\"outputs\":[\"out\"]},\"y81l7s0z5448casjlypn8fw0saw8qidp-stdenv-linux.drv\":{\"dynamicOutputs\":{},\"outputs\":[\"out\"]}},\"srcs\":[\"4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py\",\"v6x3cs394jgqfbi0a42pam708flxaphh-default-builder.sh\"]},\"name\":\"tiny-stories-1m-kev-gpt-exact-torch.mlir\",\"outputs\":{\"out\":{\"path\":\"k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir\"}},\"system\":\"x86_64-linux\",\"version\":4}},\"version\":4}",
+      "file_sha256": "c9b704158300b53802d09f42aa20e065c90923a31a5818ef99be141cd66a185c",
+      "input_derivations": [
+        "/nix/store/a31wgxwx6dh1gfhbjkirphk44n5vjrrg-torch-mlir-0-unstable-2026-02-12.drv",
+        "/nix/store/i5rz2har3pr3fjr2488ygzndrralpn84-python3-3.11.14-env.drv",
+        "/nix/store/lr7nr5f5b0pq50n7jxzvirz56g665nfm-bash-5.2p32.drv",
+        "/nix/store/qbnvx6p8zslb5j0n2hnzyllnr1wvbdhb-tiny-stories-1m-kev-gpt-exact-pytorch-exported.drv",
+        "/nix/store/y81l7s0z5448casjlypn8fw0saw8qidp-stdenv-linux.drv"
+      ],
+      "input_sources": [
+        "/nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py",
+        "/nix/store/v6x3cs394jgqfbi0a42pam708flxaphh-default-builder.sh"
+      ],
+      "json_sha256": "556f17c066839cf9805e36f0e59ffee4a29c7aba46008a2814e1d0b8c99cc208",
+      "output": "/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir",
+      "path": "/nix/store/han08nzx4rk44xwh2drcaqhn01k37f18-tiny-stories-1m-kev-gpt-exact-torch.mlir.drv"
+    }
+  },
+  "predecessor_receipt": {
+    "file_sha256": "b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55",
+    "historical_bundle": "artifacts/comparison/tinystories-1m-exact-frontier-determinism",
+    "self_sha256": "af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b"
+  },
+  "registered_build_execution": {
+    "flat-scf": {
+      "artifact": "/nix/store/qskklvplhvrdjz7x097r369n2gjyrr1l-tiny-stories-1m-kev-gpt-exact-flat-scf/manifest.json",
+      "artifact_accepted": false,
+      "artifact_bytes": 118,
+      "artifact_sha256": "8b15b5aeffa19ed20975926fab100d28398863482eccb3fcd6840a65ed2df7cb",
+      "attribute": "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-flat-scf",
+      "backend": "calyx-native-sv",
+      "captured_derivation": "reproducers/flat-scf/flat-scf.drv",
+      "captured_derivation_bytes": 2469,
+      "captured_derivation_json": "reproducers/flat-scf/flat-scf.derivation.json",
+      "captured_derivation_json_bytes": 2688,
+      "captured_derivation_json_sha256": "f2136ee90fc3eddcc6ea0ce1c33e12ad947b356367c4a2d8d282f4118b601c99",
+      "captured_derivation_sha256": "473abeefb63de584b433f1f44dae510ac26024d425b6bc191e448deb4d2b43df",
+      "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-flat-scf'",
+      "derivation": "/nix/store/k8s58qyhywj26hcqpikw8lbalkqb9as5-tiny-stories-1m-kev-gpt-exact-flat-scf.drv",
+      "derivation_build_command": "export FLAT_SCF_BLOCKER_REPORT=/nix/store/piwhsn8qvdxrgj5v4pyi0w8sfx5cmwgy-flat_scf_blocker_report.py\n/nix/store/1jzhbwq5rjjaqa75z88ws2b424vh7m53-bash-5.2p32/bin/bash /nix/store/zizazfz1jzqybkw6pq8a536vvbv744v9-scf_to_flat_scf_no_handshake.sh \\\n  /nix/store/qfhb8ajk2kw32lrmk8xqaa1g6h7w95p8-mlir-21.1.2/bin/mlir-opt /nix/store/2y94p0s6m1hh5hghyddsbh249y4nqbzf-tiny-stories-1m-kev-gpt-exact-scf.mlir \"$out\"\ntest -f \"$out/flat.scf.mlir\"\ntest -f \"$out/manifest.json\"\ntest -f \"$out/blockers.json\"\n",
+      "derivation_build_command_sha256": "f7ef3599576bf08851665945d8c0495bad1da742ef77b7bf6acaf1e73d30ee8e",
+      "derivation_file_sha256": "473abeefb63de584b433f1f44dae510ac26024d425b6bc191e448deb4d2b43df",
+      "derivation_json_sha256": "f2136ee90fc3eddcc6ea0ce1c33e12ad947b356367c4a2d8d282f4118b601c99",
+      "derivation_tool_bindings": [
+        {
+          "bytes": 988512,
+          "path": "/nix/store/1jzhbwq5rjjaqa75z88ws2b424vh7m53-bash-5.2p32/bin/bash",
+          "sha256": "e88e4240c289d3b9c3087d232162a4cec2f28abe11b5e327dd6d9c60195e412e"
+        },
+        {
+          "bytes": 14391514,
+          "path": "/nix/store/2y94p0s6m1hh5hghyddsbh249y4nqbzf-tiny-stories-1m-kev-gpt-exact-scf.mlir",
+          "sha256": "33dddf67a971dae530bbed92e655106c89994b398281752679d70015fe3f27c5"
+        },
+        {
+          "bytes": 8330,
+          "path": "/nix/store/piwhsn8qvdxrgj5v4pyi0w8sfx5cmwgy-flat_scf_blocker_report.py",
+          "sha256": "d07108fcf2671317f745b6956bd56b9c79745b6d7d2b61bf8ff8ad2bb46cd0bc"
+        },
+        {
+          "bytes": 496904,
+          "path": "/nix/store/qfhb8ajk2kw32lrmk8xqaa1g6h7w95p8-mlir-21.1.2/bin/mlir-opt",
+          "sha256": "3da93261c9b6f698539bec86f3606598d8b3ed61a18095eaa03cde87f7140912"
+        },
+        {
+          "bytes": 1047,
+          "path": "/nix/store/zizazfz1jzqybkw6pq8a536vvbv744v9-scf_to_flat_scf_no_handshake.sh",
+          "sha256": "bacc3fa43baf0643b52e83bae31ca243127f362827f621142e762502aeb6ab40"
+        }
+      ],
+      "exit_code": 0,
+      "frontend": "linalg",
+      "invoked": true,
+      "log": "reproducers/flat-scf/flat-scf.log",
+      "log_bytes": 351,
+      "log_sha256": "f1a969fbca53e4d6306ffab9efb4a1e28be77c037976071ec4c93a5733d35da8",
+      "result": "/nix/store/qskklvplhvrdjz7x097r369n2gjyrr1l-tiny-stories-1m-kev-gpt-exact-flat-scf",
+      "route_alias": "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake"
+    },
+    "linalg": {
+      "artifact": "/nix/store/mvcsgr5c0mil2y7km6lfdsq8cngv5xng-tiny-stories-1m-kev-gpt-exact-linalg.mlir",
+      "artifact_accepted": true,
+      "artifact_bytes": 13274515,
+      "artifact_sha256": "f4792aef4a0054386bf4e9e6399cc107e6d947b4d608e97e6041ccdf2ffb59c8",
+      "attribute": "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-linalg",
+      "backend": "calyx-native-sv",
+      "captured_derivation": "reproducers/flat-scf/linalg.drv",
+      "captured_derivation_bytes": 2106,
+      "captured_derivation_json": "reproducers/flat-scf/linalg.derivation.json",
+      "captured_derivation_json_bytes": 2323,
+      "captured_derivation_json_sha256": "38b44487c6afeebf3dad12ac781206f69aa864dc8e637283979a407bc7418a4b",
+      "captured_derivation_sha256": "408515c42a9c4d95b8834cea9380d74f21091abcf5a350baf562450b6a560d9d",
+      "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-linalg'",
+      "derivation": "/nix/store/55543iibb75l0f9lw3cv2fm35sqqddhl-tiny-stories-1m-kev-gpt-exact-linalg.mlir.drv",
+      "derivation_build_command": "/nix/store/1jzhbwq5rjjaqa75z88ws2b424vh7m53-bash-5.2p32/bin/bash /nix/store/qzk63dsifw4qr2q80p2by17mfrm7nafk-pipeline/torch_to_linalg.sh \\\n  /nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/bin/torch-mlir-opt /nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir \"$out\"\n",
+      "derivation_build_command_sha256": "19758bac65fd83b6d5b5df2018e92c10e7d6f051aba7537c171df0f297616c1d",
+      "derivation_file_sha256": "408515c42a9c4d95b8834cea9380d74f21091abcf5a350baf562450b6a560d9d",
+      "derivation_json_sha256": "38b44487c6afeebf3dad12ac781206f69aa864dc8e637283979a407bc7418a4b",
+      "derivation_tool_bindings": [
+        {
+          "bytes": 988512,
+          "path": "/nix/store/1jzhbwq5rjjaqa75z88ws2b424vh7m53-bash-5.2p32/bin/bash",
+          "sha256": "e88e4240c289d3b9c3087d232162a4cec2f28abe11b5e327dd6d9c60195e412e"
+        },
+        {
+          "bytes": 7608283,
+          "path": "/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir",
+          "sha256": "e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674"
+        },
+        {
+          "bytes": 58936864,
+          "path": "/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/bin/torch-mlir-opt",
+          "sha256": "e1445e7540ef7bea2c29e5f36af8f0120e7b13f8fe0e78b01a21d2a0b7a8d9a9"
+        },
+        {
+          "bytes": 871,
+          "path": "/nix/store/qzk63dsifw4qr2q80p2by17mfrm7nafk-pipeline/torch_to_linalg.sh",
+          "sha256": "844249b70bd136fce949c138b0781cc6fe19502fc9bd25d97fe35e449fc53417"
+        }
+      ],
+      "exit_code": 0,
+      "frontend": "linalg",
+      "invoked": true,
+      "log": "reproducers/flat-scf/linalg.log",
+      "log_bytes": 237,
+      "log_sha256": "e0a26e9d90a8df0e37db459b1d681ba911705d30ec717d286f84dbe435ff2a8b",
+      "result": "/nix/store/mvcsgr5c0mil2y7km6lfdsq8cngv5xng-tiny-stories-1m-kev-gpt-exact-linalg.mlir",
+      "route_alias": "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake"
+    },
+    "pytorch-exported": {
+      "artifact": "/nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported/exported.pt2",
+      "artifact_accepted": true,
+      "artifact_bytes": 69510766,
+      "artifact_sha256": "6c9d2931a18811560f6565e9d313390fb5e0b7b167af39ddc094e19b949ce085",
+      "attribute": "tiny-stories-1m-kev-gpt-exact-pytorch-exported",
+      "backend": "calyx-native-sv",
+      "captured_derivation": "reproducers/flat-scf/pytorch-exported.drv",
+      "captured_derivation_bytes": 5722,
+      "captured_derivation_json": "reproducers/flat-scf/pytorch-exported.derivation.json",
+      "captured_derivation_json_bytes": 5869,
+      "captured_derivation_json_sha256": "2fb13b6f6c3d89598dc1ab00939818524beada3af1cb5fa416dc632d4699eba9",
+      "captured_derivation_sha256": "3ca53928a59673a3627e2bbc637fe748e64acc4803c59bdda2312b958e419b42",
+      "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-pytorch-exported'",
+      "derivation": "/nix/store/qbnvx6p8zslb5j0n2hnzyllnr1wvbdhb-tiny-stories-1m-kev-gpt-exact-pytorch-exported.drv",
+      "derivation_build_command": "set -euo pipefail\nmkdir -p \"$out\"\nln -s /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot \"$out/upstream\"\nexport PYTHONPATH=\"/nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories:${PYTHONPATH:-}\"\npackage=\"/nix/store/p05mqrwgczbd1zpww75f97xvnp109cl4-source/model_packages/tinystories-1m\"\ncontract_source=\"/nix/store/g9kgm3x9x9a1zm29p0ksyz1x6vin9nq1-tinystories-1m-exact-input-contract.json\"\naudit=\"/nix/store/8fav9ilcx8zli67g9mqmh7c6cyc1i6n7-tinystories-1m-exact-input-audit.json\"\ncontract_dir=\"$TMPDIR/exact-inputs\"\nmkdir -p \"$contract_dir\"\ncp \"$contract_source\" \"$contract_dir/tinystories-1m-exact-input-contract.json\"\ncp \"$audit\" \"$contract_dir/tinystories-1m-exact-input-audit.json\"\ncontract=\"$contract_dir/tinystories-1m-exact-input-contract.json\"\ntask_2_artifact=\"/nix/store/j9wmaynxm5ji6q2y3l05xphi5hkdph46-tinystories-1m-exact-package-model.json\"\ngeneration_receipt=\"/nix/store/pjlcfpfvmzj7p599jxw28pd9zfkicd33-tinystories-1m-exact-generation.json\"\nadapter=\"/nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories/model_adapter_exact_package.py\"\n/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/19n3yzlma789grci332brkhj86whapvw-tinystories-1m-exact-package-export-provenance.py verify \\\n  --adapter \"$adapter\" --contract \"$contract\" --audit \"$audit\" --package \"$package\" \\\n  --model-path /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot --task-2-artifact \"$task_2_artifact\" \\\n  --generation-receipt \"$generation_receipt\"\nadapter_root=\"$TMPDIR/exact-adapter-root\"\nmkdir -p \"$adapter_root/TinyStories\" \"$adapter_root/artifacts\" \"$adapter_root/scripts/comparison\" \\\n  \"$adapter_root/docs/superpowers/specs\"\ncp /nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories/*.py \"$adapter_root/TinyStories/\"\ncp -r /nix/store/8p7dnzlgfd4cv3z416aai0wzw7lq5wwl-reference \"$adapter_root/artifacts/reference\"\ncp /nix/store/ilbdb4npqa4mvsjyxqhcxvg8m20m97mf-comparison/*.py \"$adapter_root/scripts/comparison/\"\ncp /nix/store/jgs0mrhb9a4y50x88a24973fz1bpr42c-2026-08-28-reference-guided-tinystories-1m-compiler-design.md \\\n  \"$adapter_root/docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md\"\nadapter=\"$adapter_root/TinyStories/model_adapter_exact_package.py\"\n/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/qwq830hflpbcq85iszygxzv0z4x897xs-materialize-pytorch-exported.py \\\n  --adapter \"$adapter\" --contract \"$contract\" --package \"$package\" \\\n  --model-path /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot --out-dir \"$out\"\n/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /nix/store/19n3yzlma789grci332brkhj86whapvw-tinystories-1m-exact-package-export-provenance.py write \\\n  --adapter \"$adapter\" --contract \"$contract\" --audit \"$audit\" --package \"$package\" \\\n  --model-path /nix/store/kw3s159yv90pk879nm0f7v4ikkrxz83w-tinystories-1m-hf-snapshot --task-2-artifact \"$task_2_artifact\" \\\n  --generation-receipt \"$generation_receipt\" --out-dir \"$out\"\n\n",
+      "derivation_build_command_sha256": "29153daadfb88b3744f1575032d2e3552cdc1e66addfe0f64440a730db04b6a3",
+      "derivation_file_sha256": "3ca53928a59673a3627e2bbc637fe748e64acc4803c59bdda2312b958e419b42",
+      "derivation_json_sha256": "2fb13b6f6c3d89598dc1ab00939818524beada3af1cb5fa416dc632d4699eba9",
+      "derivation_tool_bindings": [
+        {
+          "bytes": 7771,
+          "path": "/nix/store/19n3yzlma789grci332brkhj86whapvw-tinystories-1m-exact-package-export-provenance.py",
+          "sha256": "ca2bc56e0c3c4ea017e4a73c81bbebc8584716333c7af3819c611dd957af4a7f"
+        },
+        {
+          "bytes": 63818,
+          "path": "/nix/store/1zmb1f1xl12cd2dmdrq4f5c4qn71jx53-TinyStories/model_adapter_exact_package.py",
+          "sha256": "d7259ccd5545a1826101fbb06b3199f2b5973fb739e1aed13828acc0b2607e5e"
+        },
+        {
+          "bytes": 10768,
+          "path": "/nix/store/8fav9ilcx8zli67g9mqmh7c6cyc1i6n7-tinystories-1m-exact-input-audit.json",
+          "sha256": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd"
+        },
+        {
+          "bytes": 8210,
+          "path": "/nix/store/g9kgm3x9x9a1zm29p0ksyz1x6vin9nq1-tinystories-1m-exact-input-contract.json",
+          "sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c"
+        },
+        {
+          "bytes": 47660,
+          "path": "/nix/store/j9wmaynxm5ji6q2y3l05xphi5hkdph46-tinystories-1m-exact-package-model.json",
+          "sha256": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a"
+        },
+        {
+          "bytes": 10705,
+          "path": "/nix/store/jgs0mrhb9a4y50x88a24973fz1bpr42c-2026-08-28-reference-guided-tinystories-1m-compiler-design.md",
+          "sha256": "99632d030170ceaf0194b8f41c1fa784f262bb82d4f33f35f5fe90f2b4926bfc"
+        },
+        {
+          "bytes": 16032,
+          "path": "/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python",
+          "sha256": "3a3d8fd29d4141e40d95d2892e1d3140eb233eb1e6713beb212f4ed010d1869a"
+        },
+        {
+          "bytes": 954676,
+          "path": "/nix/store/pjlcfpfvmzj7p599jxw28pd9zfkicd33-tinystories-1m-exact-generation.json",
+          "sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3"
+        },
+        {
+          "bytes": 7400,
+          "path": "/nix/store/qwq830hflpbcq85iszygxzv0z4x897xs-materialize-pytorch-exported.py",
+          "sha256": "430e3e9ae61ae35a0da1a83b5fca56ea82094b0a2553bbd90f7d8964cb452d95"
+        }
+      ],
+      "exit_code": 0,
+      "frontend": "linalg",
+      "invoked": true,
+      "log": "reproducers/flat-scf/pytorch-exported.log",
+      "log_bytes": 228,
+      "log_sha256": "993972ee373fbef7b0d334fc180f1277dc9b61698df7c3ed4aaa17a8c63b74e2",
+      "result": "/nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported",
+      "route_alias": "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake"
+    },
+    "scf": {
+      "artifact": "/nix/store/2y94p0s6m1hh5hghyddsbh249y4nqbzf-tiny-stories-1m-kev-gpt-exact-scf.mlir",
+      "artifact_accepted": true,
+      "artifact_bytes": 14391514,
+      "artifact_sha256": "33dddf67a971dae530bbed92e655106c89994b398281752679d70015fe3f27c5",
+      "attribute": "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-scf",
+      "backend": "calyx-native-sv",
+      "captured_derivation": "reproducers/flat-scf/scf.drv",
+      "captured_derivation_bytes": 2063,
+      "captured_derivation_json": "reproducers/flat-scf/scf.derivation.json",
+      "captured_derivation_json_bytes": 2274,
+      "captured_derivation_json_sha256": "515712251c7621dbc1049ef3b5e2e98b9ff586245cb008a4f822b149a66a89aa",
+      "captured_derivation_sha256": "f7cd0465326982fd29fe4c8c848e52650eb0b41647de76157a42b4e0c2ee0f9a",
+      "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-scf'",
+      "derivation": "/nix/store/gmjgx84zqzd5kvvknrxlqnfvcrcj0yfs-tiny-stories-1m-kev-gpt-exact-scf.mlir.drv",
+      "derivation_build_command": "/nix/store/1jzhbwq5rjjaqa75z88ws2b424vh7m53-bash-5.2p32/bin/bash /nix/store/8w4disvffi9fg929dqybyr4f2pmcr22c-linalg_to_scf_no_handshake.sh \\\n  /nix/store/qfhb8ajk2kw32lrmk8xqaa1g6h7w95p8-mlir-21.1.2/bin/mlir-opt /nix/store/mvcsgr5c0mil2y7km6lfdsq8cngv5xng-tiny-stories-1m-kev-gpt-exact-linalg.mlir \"$out\"\n",
+      "derivation_build_command_sha256": "03d6f134ae1aaf71e2e80141d41ac5494098849084c82ee265a64b3a47383005",
+      "derivation_file_sha256": "f7cd0465326982fd29fe4c8c848e52650eb0b41647de76157a42b4e0c2ee0f9a",
+      "derivation_json_sha256": "515712251c7621dbc1049ef3b5e2e98b9ff586245cb008a4f822b149a66a89aa",
+      "derivation_tool_bindings": [
+        {
+          "bytes": 988512,
+          "path": "/nix/store/1jzhbwq5rjjaqa75z88ws2b424vh7m53-bash-5.2p32/bin/bash",
+          "sha256": "e88e4240c289d3b9c3087d232162a4cec2f28abe11b5e327dd6d9c60195e412e"
+        },
+        {
+          "bytes": 879,
+          "path": "/nix/store/8w4disvffi9fg929dqybyr4f2pmcr22c-linalg_to_scf_no_handshake.sh",
+          "sha256": "e0db190fe7265656ee9363e6f6b8aa04be698fbaf2b6a93356ee7a4e85488f7d"
+        },
+        {
+          "bytes": 13274515,
+          "path": "/nix/store/mvcsgr5c0mil2y7km6lfdsq8cngv5xng-tiny-stories-1m-kev-gpt-exact-linalg.mlir",
+          "sha256": "f4792aef4a0054386bf4e9e6399cc107e6d947b4d608e97e6041ccdf2ffb59c8"
+        },
+        {
+          "bytes": 496904,
+          "path": "/nix/store/qfhb8ajk2kw32lrmk8xqaa1g6h7w95p8-mlir-21.1.2/bin/mlir-opt",
+          "sha256": "3da93261c9b6f698539bec86f3606598d8b3ed61a18095eaa03cde87f7140912"
+        }
+      ],
+      "exit_code": 0,
+      "frontend": "linalg",
+      "invoked": true,
+      "log": "reproducers/flat-scf/scf.log",
+      "log_bytes": 231,
+      "log_sha256": "8b6ca90d528f2d4e2a241560d4574ede1942ce405f356815f0a577152ea739ba",
+      "result": "/nix/store/2y94p0s6m1hh5hghyddsbh249y4nqbzf-tiny-stories-1m-kev-gpt-exact-scf.mlir",
+      "route_alias": "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake"
+    },
+    "torch": {
+      "artifact": "/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir",
+      "artifact_accepted": true,
+      "artifact_bytes": 7608283,
+      "artifact_sha256": "e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674",
+      "attribute": "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-torch",
+      "backend": "calyx-native-sv",
+      "captured_derivation": "reproducers/flat-scf/torch.drv",
+      "captured_derivation_bytes": 2433,
+      "captured_derivation_json": "reproducers/flat-scf/torch.derivation.json",
+      "captured_derivation_json_bytes": 2667,
+      "captured_derivation_json_sha256": "556f17c066839cf9805e36f0e59ffee4a29c7aba46008a2814e1d0b8c99cc208",
+      "captured_derivation_sha256": "c9b704158300b53802d09f42aa20e065c90923a31a5818ef99be141cd66a185c",
+      "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-torch'",
+      "derivation": "/nix/store/han08nzx4rk44xwh2drcaqhn01k37f18-tiny-stories-1m-kev-gpt-exact-torch.mlir.drv",
+      "derivation_build_command": "set -euo pipefail\nexport PYTHONPATH=\"/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages:/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/lib/python3.11/site-packages/torch_mlir:${PYTHONPATH:-}\"\npython /nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py \\\n  --exported-program-dir /nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported \\\n  --out \"$out\" >/dev/null\n",
+      "derivation_build_command_sha256": "fcda2c79caddc85351c58d05c930ededc62213dfb255f48027222c620c561e6c",
+      "derivation_file_sha256": "c9b704158300b53802d09f42aa20e065c90923a31a5818ef99be141cd66a185c",
+      "derivation_json_sha256": "556f17c066839cf9805e36f0e59ffee4a29c7aba46008a2814e1d0b8c99cc208",
+      "derivation_tool_bindings": [
+        {
+          "bytes": 2316,
+          "path": "/nix/store/4m5r65n6lah54a4v0y71gpcdppwi7fjj-compile-pytorch.py",
+          "sha256": "c668341ae81c944a9f4e092465e47619824532c6397a9f8797a01914747223d8"
+        }
+      ],
+      "exit_code": 0,
+      "frontend": "linalg",
+      "invoked": true,
+      "log": "reproducers/flat-scf/torch.log",
+      "log_bytes": 235,
+      "log_sha256": "d716dc0fdb96f13527cb120b293f15f9b6f49431252f153581be318eeb9eefaf",
+      "result": "/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir",
+      "route_alias": "tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake"
+    }
+  },
+  "schema": "tinystories-1m-exact-current-pipeline-frontier-v5",
+  "semantic_gate": {
+    "command": "nix develop -c python scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py --probe-report artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json",
+    "evidence": {
+      "contract": {
+        "decision_sha256": "429da5a367755d35bc38308589beaf25d291a8272ebf4d8944bfa4b8919ef8fe",
+        "fixture_file_sha256": "2aadecfedbbf93a617890d21586d17456f945028d866c368c15af754471f3064",
+        "fixture_self_hash": "4490ddcf0e6f59eed32ecfe31482dc142c9907f4e74efe32154a99d5651ef17f",
+        "rejected_cases": [
+          "negative_shift",
+          "shift_greater_than_sixty_two"
+        ],
+        "shift_one_output": [
+          -3,
+          -1,
+          0,
+          0,
+          2
+        ],
+        "valid_cases": [
+          "shift_one",
+          "shift_zero",
+          "shift_sixty_two"
+        ]
+      },
+      "registered_stage": {
+        "stage_artifact_sha256": "e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674",
+        "status": "accepted"
+      },
+      "semantic_probe": {
+        "probe_report_sha256": "645a87cdc4292ea584a04d4268187c612dd070b068036f9fa13b71865b36cbe6",
+        "stage_artifact": "/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir",
+        "stage_artifact_sha256": "e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674",
+        "status": "accepted"
+      }
+    },
+    "probe_report": "artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json",
+    "probe_report_sha256": "645a87cdc4292ea584a04d4268187c612dd070b068036f9fa13b71865b36cbe6",
+    "status": "accepted",
+    "verifier": "scripts/pipeline/verify_tinystories_1m_exact_frontier_semantics.py",
+    "verifier_sha256": "4c9e57d8f35e3dcd7ba8d4de5a98f803d7f2787c3eec1ff7707d3239b95d0e3e"
+  },
+  "sha256": "961b81662493f1241eea58061433779314019e6c46a249022362d77fc61808c8",
+  "source_commit": "c22c5f8d85e453a56b185f6238970933f5b1d407",
+  "stage": "flat-scf",
+  "stages": [
+    {
+      "artifact": "/nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported/exported.pt2",
+      "artifact_accepted": true,
+      "artifact_bytes": 69510766,
+      "artifact_sha256": "6c9d2931a18811560f6565e9d313390fb5e0b7b167af39ddc094e19b949ce085",
+      "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-pytorch-exported'",
+      "exit_code": 0,
+      "log": "reproducers/flat-scf/pytorch-exported.log",
+      "log_bytes": 228,
+      "log_sha256": "993972ee373fbef7b0d334fc180f1277dc9b61698df7c3ed4aaa17a8c63b74e2",
+      "stage": "pytorch-exported",
+      "status": "succeeded",
+      "terminal_diagnostics": [],
+      "tool_revisions": {
+        "build_command_sha256": "29153daadfb88b3744f1575032d2e3552cdc1e66addfe0f64440a730db04b6a3",
+        "derivation": "/nix/store/qbnvx6p8zslb5j0n2hnzyllnr1wvbdhb-tiny-stories-1m-kev-gpt-exact-pytorch-exported.drv",
+        "derivation_file_sha256": "3ca53928a59673a3627e2bbc637fe748e64acc4803c59bdda2312b958e419b42",
+        "derivation_json_sha256": "2fb13b6f6c3d89598dc1ab00939818524beada3af1cb5fa416dc632d4699eba9",
+        "evidence_source_commit": "c22c5f8d85e453a56b185f6238970933f5b1d407"
+      },
+      "upstream_identity": "package_manifest_sha256:374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35"
+    },
+    {
+      "artifact": "/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir",
+      "artifact_accepted": true,
+      "artifact_bytes": 7608283,
+      "artifact_sha256": "e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674",
+      "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-torch'",
+      "exit_code": 0,
+      "log": "reproducers/flat-scf/torch.log",
+      "log_bytes": 235,
+      "log_sha256": "d716dc0fdb96f13527cb120b293f15f9b6f49431252f153581be318eeb9eefaf",
+      "stage": "torch",
+      "status": "succeeded",
+      "terminal_diagnostics": [],
+      "tool_revisions": {
+        "build_command_sha256": "fcda2c79caddc85351c58d05c930ededc62213dfb255f48027222c620c561e6c",
+        "derivation": "/nix/store/han08nzx4rk44xwh2drcaqhn01k37f18-tiny-stories-1m-kev-gpt-exact-torch.mlir.drv",
+        "derivation_file_sha256": "c9b704158300b53802d09f42aa20e065c90923a31a5818ef99be141cd66a185c",
+        "derivation_json_sha256": "556f17c066839cf9805e36f0e59ffee4a29c7aba46008a2814e1d0b8c99cc208",
+        "evidence_source_commit": "c22c5f8d85e453a56b185f6238970933f5b1d407"
+      },
+      "upstream_identity": "6c9d2931a18811560f6565e9d313390fb5e0b7b167af39ddc094e19b949ce085"
+    },
+    {
+      "artifact": "/nix/store/mvcsgr5c0mil2y7km6lfdsq8cngv5xng-tiny-stories-1m-kev-gpt-exact-linalg.mlir",
+      "artifact_accepted": true,
+      "artifact_bytes": 13274515,
+      "artifact_sha256": "f4792aef4a0054386bf4e9e6399cc107e6d947b4d608e97e6041ccdf2ffb59c8",
+      "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-linalg'",
+      "exit_code": 0,
+      "log": "reproducers/flat-scf/linalg.log",
+      "log_bytes": 237,
+      "log_sha256": "e0a26e9d90a8df0e37db459b1d681ba911705d30ec717d286f84dbe435ff2a8b",
+      "stage": "linalg",
+      "status": "succeeded",
+      "terminal_diagnostics": [],
+      "tool_revisions": {
+        "build_command_sha256": "19758bac65fd83b6d5b5df2018e92c10e7d6f051aba7537c171df0f297616c1d",
+        "derivation": "/nix/store/55543iibb75l0f9lw3cv2fm35sqqddhl-tiny-stories-1m-kev-gpt-exact-linalg.mlir.drv",
+        "derivation_file_sha256": "408515c42a9c4d95b8834cea9380d74f21091abcf5a350baf562450b6a560d9d",
+        "derivation_json_sha256": "38b44487c6afeebf3dad12ac781206f69aa864dc8e637283979a407bc7418a4b",
+        "evidence_source_commit": "c22c5f8d85e453a56b185f6238970933f5b1d407"
+      },
+      "upstream_identity": "e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674"
+    },
+    {
+      "artifact": "/nix/store/2y94p0s6m1hh5hghyddsbh249y4nqbzf-tiny-stories-1m-kev-gpt-exact-scf.mlir",
+      "artifact_accepted": true,
+      "artifact_bytes": 14391514,
+      "artifact_sha256": "33dddf67a971dae530bbed92e655106c89994b398281752679d70015fe3f27c5",
+      "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-scf'",
+      "exit_code": 0,
+      "log": "reproducers/flat-scf/scf.log",
+      "log_bytes": 231,
+      "log_sha256": "8b6ca90d528f2d4e2a241560d4574ede1942ce405f356815f0a577152ea739ba",
+      "stage": "scf",
+      "status": "succeeded",
+      "terminal_diagnostics": [],
+      "tool_revisions": {
+        "build_command_sha256": "03d6f134ae1aaf71e2e80141d41ac5494098849084c82ee265a64b3a47383005",
+        "derivation": "/nix/store/gmjgx84zqzd5kvvknrxlqnfvcrcj0yfs-tiny-stories-1m-kev-gpt-exact-scf.mlir.drv",
+        "derivation_file_sha256": "f7cd0465326982fd29fe4c8c848e52650eb0b41647de76157a42b4e0c2ee0f9a",
+        "derivation_json_sha256": "515712251c7621dbc1049ef3b5e2e98b9ff586245cb008a4f822b149a66a89aa",
+        "evidence_source_commit": "c22c5f8d85e453a56b185f6238970933f5b1d407"
+      },
+      "upstream_identity": "f4792aef4a0054386bf4e9e6399cc107e6d947b4d608e97e6041ccdf2ffb59c8"
+    },
+    {
+      "artifact": "/nix/store/qskklvplhvrdjz7x097r369n2gjyrr1l-tiny-stories-1m-kev-gpt-exact-flat-scf/manifest.json",
+      "artifact_accepted": false,
+      "artifact_bytes": 118,
+      "artifact_sha256": "8b15b5aeffa19ed20975926fab100d28398863482eccb3fcd6840a65ed2df7cb",
+      "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-via-linalg-no-handshake-flat-scf'",
+      "exit_code": 0,
+      "log": "reproducers/flat-scf/flat-scf.log",
+      "log_bytes": 351,
+      "log_sha256": "f1a969fbca53e4d6306ffab9efb4a1e28be77c037976071ec4c93a5733d35da8",
+      "stage": "flat-scf",
+      "status": "compiler_failure",
+      "terminal_diagnostics": [
+        "error: registered flat-scf stage completed with residuals; artifact remains rejected"
+      ],
+      "tool_revisions": {
+        "build_command_sha256": "f7ef3599576bf08851665945d8c0495bad1da742ef77b7bf6acaf1e73d30ee8e",
+        "derivation": "/nix/store/k8s58qyhywj26hcqpikw8lbalkqb9as5-tiny-stories-1m-kev-gpt-exact-flat-scf.drv",
+        "derivation_file_sha256": "473abeefb63de584b433f1f44dae510ac26024d425b6bc191e448deb4d2b43df",
+        "derivation_json_sha256": "f2136ee90fc3eddcc6ea0ce1c33e12ad947b356367c4a2d8d282f4118b601c99",
+        "evidence_source_commit": "c22c5f8d85e453a56b185f6238970933f5b1d407"
+      },
+      "upstream_identity": "33dddf67a971dae530bbed92e655106c89994b398281752679d70015fe3f27c5"
+    }
+  ],
+  "status": "compiler_frontier",
+  "task_2_decision_self_sha256": "429da5a367755d35bc38308589beaf25d291a8272ebf4d8944bfa4b8919ef8fe"
+}

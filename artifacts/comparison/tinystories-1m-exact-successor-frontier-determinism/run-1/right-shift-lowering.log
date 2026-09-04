@@ -1,0 +1,18 @@
+$ /nix/store/80aad3hp8r9wn2k18drwg66j4cykvnck-torch-mlir-0-unstable-2026-02-12/bin/torch-mlir-opt '-pass-pipeline=builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=}, torch-backend-to-linalg-on-tensors-backend-pipeline)' /home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/reproducers/tinystories-1m-exact-torch-mlir/bitwise-right-shift-tensor-scalar.mlir
+exit_code: 0
+--- stdout ---
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @main(%arg0: tensor<4x1xi64>) -> tensor<4x1xi64> {
+    %cst = arith.constant dense<1> : tensor<4x1xi64>
+    %0 = tensor.empty() : tensor<4x1xi64>
+    %1 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0, %cst : tensor<4x1xi64>, tensor<4x1xi64>) outs(%0 : tensor<4x1xi64>) {
+    ^bb0(%in: i64, %in_0: i64, %out: i64):
+      %2 = arith.shrsi %in, %in_0 : i64
+      linalg.yield %2 : i64
+    } -> tensor<4x1xi64>
+    return %1 : tensor<4x1xi64>
+  }
+}
+
+--- stderr ---

@@ -1,6 +1,10 @@
 {
-  "schema": "tinystories-1m-exact-input-contract-v1",
-  "status": "identity_frontier",
+  "schema": "tinystories-1m-exact-input-contract-v2",
+  "status": "authenticated",
+  "selection_authority": {
+    "path": "docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md",
+    "sha256": "99632d030170ceaf0194b8f41c1fa784f262bb82d4f33f35f5fe90f2b4926bfc"
+  },
   "historical_contract": {
     "path": "artifacts/reference/tinystories-1m-kev-gpt-contract.json",
     "sha256": "a3158d9e07a121ddda599a9ad0c90e2f36438bed61aa36fc1889d221948ddbcf"
@@ -20,7 +24,26 @@
   "package": {
     "origin": "/home/roland/kev-gpt/.worktrees/kintex-selftest/model_packages/tinystories-1m",
     "manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
-    "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e"
+    "sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e",
+    "files": {
+      "calibration_ids.bin": {"sha256": "2537125a6edea656c5f6b8fe537b4cec7f2a3b2f633f5ee36297135e705bb075", "size": 808},
+      "manifest.json": {"sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35", "size": 247111},
+      "merges.txt": {"sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5", "size": 456318},
+      "quality.json": {"sha256": "ff4daefcf3d24feb2386aaff72a43c5b568ef0fed7a8942307962caeb0a93b69", "size": 20363},
+      "regressions.json": {"sha256": "ce5cdeb32d052425db62cc6b6f11fac10edbe2164d788264fce8035ad582941a", "size": 1657},
+      "scales.bin": {"sha256": "a81faadf9ab21a525a8a20870f2fa97572c66bbf6b88c5cbe2a29cd253355155", "size": 219588},
+      "special_tokens_map.json": {"sha256": "98412137ae43c77f8af52eb51b19c3536d3242cb55339167d841005fa94a23b7", "size": 438},
+      "tokenizer.json": {"sha256": "f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5", "size": 2107652},
+      "tokenizer_config.json": {"sha256": "3d76da0fd37493fbfcd3f0fa9757753d31f92e1779ebd9130809b45546a60261", "size": 722},
+      "vocab.json": {"sha256": "3ba3c3109ff33976c4bd966589c11ee14fcaa1f4c9e5e154c2ed7f99d80709e7", "size": 798156},
+      "weights.bin": {"sha256": "caa140a70f824334d626e20819effabb3a56c28f35cc5c84e6f5f174b3f6bf4e", "size": 3632704}
+    }
+  },
+  "tokenizer": {
+    "type": "GPT2Tokenizer",
+    "sha256": "f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5",
+    "vocab_sha256": "3ba3c3109ff33976c4bd966589c11ee14fcaa1f4c9e5e154c2ed7f99d80709e7",
+    "merges_sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5"
   },
   "quantization": {
     "weights": "symmetric per-output INT8",
@@ -29,14 +52,60 @@
     "activation_vector_widths": [64, 256],
     "scale_format": "little-endian float32"
   },
-  "semantic_authorities": {
-    "qdq": "artifacts/reference/tinystories-1m-qdq-semantics.json",
-    "implementation_profile": "artifacts/reference/tinystories-1m-implementation-profile.json",
-    "fixed_profile": "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json"
+  "fixed_point": {
+    "value_format": "signed Q16.16",
+    "scale_format": "unsigned Q8.24",
+    "gemv_accumulator": "signed 64-bit serial accumulator"
   },
-  "unresolved": [
-    "implementation_profile_unresolved",
-    "board_checkpoint_trace_unavailable",
-    "nonfinite_policy_unresolved"
-  ]
+  "reference": {
+    "prompt_text": "Once upon a time",
+    "prompt_tokens": [7454, 2402, 257, 640],
+    "tokens": [11, 612, 373, 257, 1310, 2576, 3706, 20037, 13, 1375, 6151, 284, 711, 2354, 287, 262],
+    "generation": "greedy top-1"
+  },
+  "deployed_profile": {
+    "name": "fixed_hardware_reference",
+    "revision": "df1fc45b2ffcb26fddc19cfd57621e7eedf6153f",
+    "input_domain": "finite_integer_or_fixed_point_only",
+    "nonfinite_policy": "reject_nonfinite_adapter_input",
+    "sources": {
+      "flake.nix": {"git_blob_sha1": "6f934ccf8d22a1f8c6f040f441fe05c735dc310f", "sha256": "1c5ef1faca8deb7f3f8e53f117930a06abf58290f38edb4925d87186858ba6ba"},
+      "host/kevin_jtag_cli.py": {"git_blob_sha1": "65ccc59004e33e652c024c54dc577d949c75f79e", "sha256": "e22a5916eef0cddeaaa0be9934e7b075f655b7d41f842ec8150d67c80f91204f"},
+      "tinystories/__init__.py": {"git_blob_sha1": "5d0d38ceff3fcac9e685856907697b496d2b91d8", "sha256": "8e62cc3faf3d3710ea425226343cc68a8689cfd1c4f749633b0e6e4d6df54048"},
+      "tinystories/build_package.py": {"git_blob_sha1": "182a28b4e45385128444f1b22efc5fd55f229790", "sha256": "606b99a64d20d143e6b715eb8d2e96688121f1d962c1b5ddd096d27763cd16e5"},
+      "tinystories/gptneo_schema.py": {"git_blob_sha1": "f578e955bda2a50104f495b550fdb0bf889ccad0", "sha256": "edc22552eccea4bf753561702b10ae6aa07540b76b397741c7379ae11507794b"},
+      "tinystories/hardware_reference.py": {"git_blob_sha1": "5e4390378ef162c96c5618c49ea6bf5c67fc0855", "sha256": "3780015d7f4be69cae3952fb630af971a37490a17cf8519fd6ac81a7bb080371"},
+      "tinystories/import_gptneo.py": {"git_blob_sha1": "63af7aba5bc4657da25f3b70c1be9992ec59ff27", "sha256": "b8f3ba958f3b80c82517a9cd8e98ed82d97502b2949a6d072c934e64f5b45e36"},
+      "tinystories/int_reference.py": {"git_blob_sha1": "fcf7543a0be34403f571aa5a82a84299f3a9f3d2", "sha256": "b6353d10d4227d676f78a7130af9a73fca2f0d68422f3215aec9307e0fb893d8"},
+      "tinystories/package_io.py": {"git_blob_sha1": "91859fd26a198c6988b716207841717315c966a3", "sha256": "1e11875ee52774f60a38c1568c17dd0cd1b0db589f231096b36473aa3e5bbb12"},
+      "tinystories/quantize.py": {"git_blob_sha1": "e12738070d0cedc49367a00b642eb830b1252694", "sha256": "6a1388005d9d455a4732a7f59d32d48486c67cf4dc3cbed5027d7d911b0be6f4"},
+      "tinystories/rtl_memories.py": {"git_blob_sha1": "af5d1b41ed69f92c26347ee470b6164e2cf2aad3", "sha256": "1b8bd74d09139ca6acd9bd26b8ad0dbc8326960d7a9997d003c5d99ad26e6fd6"},
+      "tinystories/write_rtl_fixture.py": {"git_blob_sha1": "7add035a1d9d236fe87e5e06258e4c18b3ee6b3a", "sha256": "c920b5e05cf44cef859ed40fd85d67b473a094e782a6e5b86941c0509714cb74"},
+      "fpga/rtl/async_fifo.sv": {"git_blob_sha1": "f0dfe1ab55318dd2f4845811d6804eb41a8416fa", "sha256": "8d8f5ebbd6e4183722b0f4b7b9e5c39305c247905f00dc27f652ef6d15edc300"},
+      "fpga/rtl/bscan_packet_endpoint.sv": {"git_blob_sha1": "6260c1148963866231d8b907d2c280cacc9d8dd8", "sha256": "919ef531f4b4ac0247a9103ad2567ade49ad00031f0e7af21e967f46ba25196c"},
+      "fpga/rtl/gptneo_attention.sv": {"git_blob_sha1": "25184ede523ce0c5202086abb56fc09189b2c3e1", "sha256": "b42c1ed824198e49b685d827a49036bfb41ce6218e6a391a69208fbf48ef1ba9"},
+      "fpga/rtl/gptneo_gelu.sv": {"git_blob_sha1": "4620405b95eaf7f765bb5ba1704c0c973fa2a52f", "sha256": "da5c6f56cc1f42801c6af773de5bbce30f725c6eac7f7e04fa2fb9f87a5932b4"},
+      "fpga/rtl/gptneo_iterative_divider.sv": {"git_blob_sha1": "fadadb9dffae47968b8533b7115a5e01a75bf49a", "sha256": "8665cc99e7bf98e0415775a36c78aa4ff242d30c976dce0719e6d465686a1540"},
+      "fpga/rtl/gptneo_layernorm.sv": {"git_blob_sha1": "68fe56e7724a4b62cf695f5abff13f6a89c98e86", "sha256": "354104a1d2b57552bdca54f291764d90d6b9f7d6f8a2ecc2cb0d95a396430e1b"},
+      "fpga/rtl/gptneo_resident_gemv.sv": {"git_blob_sha1": "1058f8ff440a11641be7885aeb776c15e7107ca6", "sha256": "2dc80a527e6c6c8bb48f76f607df20b8674e505c7e1162d2acf9901fc2c7ebb5"},
+      "fpga/rtl/gptneo_sequencer.sv": {"git_blob_sha1": "899929cd30bf22d8bc25e1c09b615f03f9c56d24", "sha256": "fcdda7231e1ba930184289d186c5ef1ab3010acb8326d82d686a3787dd4fde3d"},
+      "fpga/rtl/tinystories_interactive_top.sv": {"git_blob_sha1": "b7210cc6b200c8cde53fd595c1815c373fd18b61", "sha256": "4d6f0142581bbf07c3835bad59e1a84c6b471f8c25f06eaf30235579eabef54f"},
+      "fpga/rtl/tinystories_packet_controller.sv": {"git_blob_sha1": "e2c393c98a6fd27db81e4c954bdf85b294d7a945", "sha256": "c29a45336ff6a7c34948c91a1431f892ea2023f064127ba8bef76fc847376f15"}
+    }
+  },
+  "semantic_authorities": {
+    "qdq": {
+      "path": "artifacts/reference/tinystories-1m-qdq-semantics.json",
+      "sha256": "a274d61ec5f634fac8fb501339ddfe7ae4bf774d950840498d54c32b90d79e77"
+    },
+    "implementation_profile": {
+      "path": "artifacts/reference/tinystories-1m-implementation-profile.json",
+      "sha256": "756627744bf1e3f8dcab27e9d0accbe9a1ab38d93a73fbbbb01557c08470819b"
+    },
+    "fixed_profile": {
+      "path": "artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json",
+      "sha256": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6"
+    }
+  },
+  "unresolved": []
 }

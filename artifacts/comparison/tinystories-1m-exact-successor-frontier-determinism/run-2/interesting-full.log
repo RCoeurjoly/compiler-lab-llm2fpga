@@ -1,0 +1,6 @@
+$ /home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/reproducers/tinystories-1m-exact-torch-mlir/interesting-left-shift.sh <capture-tmp>/full-failing-ir.mlir
+exit_code: 0
+--- stdout ---
+/build/exact-adapter-root/TinyStories/model_adapter_exact_package.py:879:0: error: failed to legalize operation 'torch.operator' that was explicitly marked illegal
+/build/exact-adapter-root/TinyStories/model_adapter_exact_package.py:879:0: note: see current operation: %1015 = "torch.operator"(%370, %266) <{name = "torch.aten.bitwise_left_shift.Tensor_Scalar"}> : (!torch.vtensor<[4,64],si64>, !torch.int) -> !torch.vtensor<[4,64],si64>
+--- stderr ---

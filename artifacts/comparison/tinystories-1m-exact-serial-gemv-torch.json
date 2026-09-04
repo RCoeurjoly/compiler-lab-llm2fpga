@@ -1,0 +1,122 @@
+{
+  "authority": {
+    "changed_sources": {
+      "exact_adapter": {
+        "bytes": 66892,
+        "path": "TinyStories/model_adapter_exact_package.py",
+        "sha256": "5f2dfa10c54134e44a31f89608b562aea33ef39deacfcd62eadac1f0fda94892"
+      },
+      "serial_gemv_boundary": {
+        "bytes": 2024,
+        "path": "TinyStories/serial_gemv_boundary.py",
+        "sha256": "a3e0c9f5ccd56fcd530174e2e15747008344b8e32384e508611c793008037b14"
+      }
+    },
+    "historical_generation": {
+      "artifact_sha256": "9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3",
+      "bytes": 954676,
+      "file_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+      "path": "artifacts/reference/tinystories-1m-exact-generation.json"
+    },
+    "task1_successor_receipt": {
+      "bytes": 46411,
+      "file_sha256": "d6c71ad94ccb0e00c2edb0dfbc3a2004d9e21bf1a30984b9df57570c04415dee",
+      "path": "artifacts/comparison/tinystories-1m-exact-serial-gemv-successor.json",
+      "receipt_sha256": "ec9985628911a28374d9b304e7896e61d1dc9635612e74311d6667eef470f7db"
+    }
+  },
+  "command": [
+    "nix",
+    "build",
+    "--no-link",
+    "--print-out-paths",
+    "-L",
+    ".#tiny-stories-1m-kev-gpt-exact-serial-gemv-successor-torch"
+  ],
+  "compiler": {
+    "pass_plugin": {
+      "bytes": 39928,
+      "path": "/nix/store/gpv5jd4d58g5y69clmykzj1myywjnz3m-llm2fpga-exact-serial-gemv-torch-mlir-passes-0.1.0/lib/LLM2FPGATorchMLIRPasses.so",
+      "sha256": "1e84e4508d94050951c8394b7a4ea8d8e326219d25c6c672081bad7a24649f26"
+    },
+    "torch_mlir_opt": {
+      "bytes": 33342912,
+      "path": "/nix/store/rl19s7kg77jxl0diirclmv5a9brbv90k-torch-mlir-0-unstable-2026-02-12/bin/torch-mlir-opt",
+      "sha256": "634e9afaf2862c736b2cb19debfa12aaeb35944dae47ff3a6c04b74c2be62f06"
+    }
+  },
+  "historical_model": {
+    "model": "tiny-stories-1m-kev-gpt-exact",
+    "preservation": "byte_for_byte_authoritative",
+    "registration_sha256": "f51745f3ab9e15d2377c89853dc7403f472fecc1c4c56a992d470a46a122b62d"
+  },
+  "input": {
+    "exported_program": {
+      "bytes": 54203054,
+      "path": "/nix/store/zcqzv2vgdyn800zz89r87zjm1rp7r1j5-tiny-stories-1m-kev-gpt-exact-serial-gemv-successor-pytorch-exported/exported.pt2",
+      "sha256": "0560d14783043d98eb68579f17209c81bd90f03eaca5a8fcf4726b40562b2c2d"
+    },
+    "serial_gemv_operator_count": 49,
+    "successor_export_manifest": {
+      "bytes": 2118,
+      "path": "/nix/store/zcqzv2vgdyn800zz89r87zjm1rp7r1j5-tiny-stories-1m-kev-gpt-exact-serial-gemv-successor-pytorch-exported/exact-serial-gemv-successor-provenance.json",
+      "sha256": "0f4069f14fef0e1ece5b4e3250cca18097cc0e690f37e1234d50379d1e84959d"
+    }
+  },
+  "legalizer": {
+    "legalized_serial_gemv_operator_count": 49,
+    "raw_serial_gemv_operator_count": 49,
+    "remaining_raw_serial_gemv_operator_count": 0,
+    "status": "completed"
+  },
+  "model": "tiny-stories-1m-kev-gpt-exact-serial-gemv-successor",
+  "receipt_sha256": "1b85ff43d8b16650d1ec4020e46fee57bd88cd14d081a7630ccd2c88928d3e7b",
+  "registered_route": {
+    "authority_and_stage_verifier": {
+      "bytes": 22040,
+      "path": "scripts/pipeline/verify_exact_serial_gemv_successor_torch.py",
+      "sha256": "58728f3a0da6ce6c2c5343c9b58b75b2fe1fc46fa5fcdbd9923b6b13c377dcd6"
+    },
+    "legalizer": {
+      "bytes": 6382,
+      "path": "tools/torch-mlir-passes/LegalizeExactSerialGemv.cpp",
+      "sha256": "640d4cd303b7ecc526de64dbd730ea1edd1dbbf2a6d3bbdbedc508915058b745"
+    },
+    "model_registration": {
+      "bytes": 28711,
+      "path": "nix/models.nix",
+      "sha256": "d4b4e23365d2466402fd24fd7a86be72fa8b04fba22bb785ab158a8cd86ad521"
+    },
+    "pipeline_driver": {
+      "bytes": 22729,
+      "path": "nix/pipeline.nix",
+      "sha256": "3cb1f0a77686894a795a8e7d3a76afda486d451d5ddf7e914a2f41e61eee35b8"
+    },
+    "pipeline_registration": {
+      "bytes": 141274,
+      "path": "flake.nix",
+      "sha256": "594603bb23080c4cc77950fb43402cb77c9f16216a6bb56ba879eb8dd7356989"
+    },
+    "successor_adapter": {
+      "bytes": 1890,
+      "path": "TinyStories/model_adapter_exact_serial_gemv_successor.py",
+      "sha256": "e403b516600d3247e5cc66ef3541f541239c1db0858cafe29b23529463c19a7a"
+    },
+    "torch_import_driver": {
+      "bytes": 5536,
+      "path": "scripts/compile-pytorch.py",
+      "sha256": "06389450a16376999cdfabe522149863ef0b7da7ef340619d3c1cd5a12db8b12"
+    }
+  },
+  "result": {
+    "frontier": null,
+    "output": {
+      "bytes": 3953520,
+      "path": "/nix/store/4r2i60a5alclxhwzcj1664aw8b4nla3h-tiny-stories-1m-kev-gpt-exact-serial-gemv-successor-torch.mlir",
+      "sha256": "44464a97a3cfb4dcd6be64d33e8b0eab3822cbed53e1f1188761d5759bded57c"
+    },
+    "status": "artifact"
+  },
+  "schema": "tinystories-1m-exact-serial-gemv-torch-stage-v1",
+  "timeout_seconds": 1800
+}

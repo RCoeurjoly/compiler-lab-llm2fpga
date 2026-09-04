@@ -1,0 +1,7 @@
+$ nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-scf'
+exit_code: 0
+--- stdout ---
+/nix/store/brdhvnzk2dk1mgzclm2q1bn5xic1ip6h-tiny-stories-1m-kev-gpt-exact-scf
+--- stderr ---
+--- classifier validation ---
+error: registered scf stage status is 'unavailable': baseline hardware pipeline lowers through CF and Handshake

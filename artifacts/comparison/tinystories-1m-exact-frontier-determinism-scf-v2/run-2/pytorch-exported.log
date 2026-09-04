@@ -1,0 +1,5 @@
+$ nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-pytorch-exported'
+exit_code: 0
+--- stdout ---
+/nix/store/10l4fc5y1rrwyazk2nq6mw800znln97i-tiny-stories-1m-kev-gpt-exact-pytorch-exported
+--- stderr ---

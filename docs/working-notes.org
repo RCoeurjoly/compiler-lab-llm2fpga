@@ -154,3 +154,49 @@ Produce a reproducible report and machine-readable JSON manifest containing the
 aligned contract, source and artifact hashes, RC/1M slice definitions,
 functional results, resource/timing tables, provenance-linked waste map,
 rejected hypotheses, and proposed next compiler changes.
+
+* 2026-08-30 — Exact-input compiler frontier decision
+
+The accepted Task 5 receipt commit =3418f989fec7996561f4e59ba6a6d902c1fb02a5=
+binds the first exact-input failure to Torch-MLIR, not to the model, export,
+backend, or board. The reduced original operation is signed =si64=
+=torch.aten.bitwise_right_shift.Tensor_Scalar= by scalar =1=; the pinned
+Torch-MLIR generated definitions do not contain its scalar overload.
+
+Select exactly one response class: =compiler_pass=. The next follow-up is a
+narrow frontend/legalization change at or before
+=torchdynamo-export-to-torch-backend-pipeline=, which must preserve arithmetic
+right shift for signed =i64= values and retain the adapter's separately
+expressed ties-away-from-zero rounding logic. No adapter/model/package change,
+hardware primitive, scheduler/memory architecture, autoregressive runtime, or
+RTL change is authorized by this checkpoint. The full evidence, retained Task
+1--3 hashes, causal rejections, and red/green regressions are in
+=docs/results/2026-08-29-tinystories-1m-exact-frontier-decision.md= and its
+hash-bound JSON receipt.
+
+** Fix round 1 — semantic (not compilation-only) regression
+
+The selected compiler-pass follow-up is constrained by a deterministic signed
+=si64= tensor/scalar-shift fixture. It proves arithmetic (not logical) shift
+for negative values, scalar broadcast, shift-zero identity, and valid shift
+count 62, with exact output hashes; it also requires named rejection statuses
+and diagnostics for negative and greater-than-62 shifts. A future green stage
+must execute or independently interpret its lowered result against this
+fixture, then mechanically verify the current Task 1 audit, Task 2 artifact,
+and Task 3 generation file/payload/result hashes against the decision receipt.
+Successful compilation or absence of =torch.operator= alone is not evidence of
+semantic correctness.
+
+** Fix round 2 — semantic result provenance
+
+The semantic gate no longer accepts an arbitrary lowered-result JSON. A future
+green run must invoke =run_tinystories_1m_exact_shift_semantic_probe.py=, which
+builds the exact registered Torch stage, resolves its derivation and
+=torch-mlir-opt= binary, invokes the declared executor route with the fixture
+and pinned pipeline, and produces a canonical self-hashed probe report. The
+verifier recomputes the decision and Task 5 receipt/self/reproducer bindings,
+the actual stage artifact and derivation bytes, producer script/command, tool
+binary/pipeline, fixture, report self-hash, and the exact case ID/count set
+before accepting semantics. Duplicated, extra, missing, stale, or detached
+records fail closed. The executor is deliberately a later compiler-pass
+deliverable; no compiler implementation is added at this decision checkpoint.

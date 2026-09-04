@@ -2,7 +2,8 @@
 , pipelineScripts, compilePyTorch, svProvenanceReport, noHandshakeLinalgToScf
 , noHandshakeScfToFlatScf, noHandshakeScfToCalyx, noHandshakeLinalgToLlvm
 , calyxToSvNoHandshake, calyxToHwSvNoHandshake, flatScfBlockerReport, mlirPasses
-, circtPasses, tosaToLinalgMlir ? mlir }:
+, circtPasses, tosaToLinalgMlir ? mlir, torchMlirPasses ? null
+, exactSerialGemvModelNames ? [ ] }:
 let
   stageNames = [
     "hf-snapshot"
@@ -44,6 +45,14 @@ let
   else
     builtins.head matches;
 
+  calyxPreflightReport = pkgs.substituteAll {
+    src = "${pipelineScripts}/calyx_preflight_report.py";
+    calyxPreflightMlirOptPath = "${mlir}/bin/mlir-opt";
+    calyxPreflightMlirOptVersion = pkgs.lib.getVersion mlir;
+    calyxPreflightMlirOptSha256 =
+      builtins.hashFile "sha256" "${mlir}/bin/mlir-opt";
+  };
+
   mkUnavailableStage = { name, stage, reason }:
     pkgs.runCommand "${name}-${stage}" { } ''
       mkdir -p "$out"
@@ -74,12 +83,53 @@ let
     '';
 
   mkTorchStage = { name, pytorchExported, pytorchToolchain ? [ ] }:
-    pkgs.runCommand "${name}-torch.mlir" { buildInputs = pytorchToolchain; } ''
+    let
+      exactSerialGemv = builtins.elem name exactSerialGemvModelNames;
+      exactSerialGemvArgs = if !exactSerialGemv then "" else
+        if torchMlirPasses == null then
+          throw "exact serial-GEMV model ${name} requires torchMlirPasses"
+        else "--torch-mlir-opt ${torchMlirOpt} "
+          + "--pass-plugin ${torchMlirPasses}/lib/LLM2FPGATorchMLIRPasses.so "
+          + "--custom-op-library ${../TinyStories/serial_gemv_boundary.py}";
+    in pkgs.runCommand "${name}-torch.mlir" {
+      buildInputs = pytorchToolchain
+        ++ pkgs.lib.optionals exactSerialGemv [ torchMlirPasses ];
+    } ''
       set -euo pipefail
       export PYTHONPATH="${torchMlir}/${python.sitePackages}:${torchMlir}/${python.sitePackages}/torch_mlir:''${PYTHONPATH:-}"
       python ${compilePyTorch} \
         --exported-program-dir ${pytorchExported} \
-        --out "$out" >/dev/null
+        --out "$out" ${exactSerialGemvArgs} >/dev/null
+    '';
+
+  # A deliberately bounded compiler-owned Calyx handoff for one legalized
+  # serial-GEMV descriptor.  Full-model composition remains a later task: this
+  # derivation proves the component/invoke, Calyx export, and SV parser path
+  # without returning to the scalarized SCF route.
+  mkExactSerialGemvCalyxDerivation = { name, descriptor }:
+    pkgs.runCommand "${name}-exact-serial-gemv-calyx" {
+      buildInputs = [ python circt calyxTool yosysPkg ];
+    } ''
+      set -euo pipefail
+      mkdir -p "$out"
+      timeout 1800 ${python}/bin/python3 \
+        ${pipelineScripts}/lower_exact_serial_gemv_to_calyx.py \
+        --input ${descriptor} \
+        --output "$out/model.calyx.mlir" \
+        --trace "$out/ordered-address-data-trace.json" \
+        --provenance "$out/provenance.json"
+      timeout 1800 ${circt}/bin/circt-opt "$out/model.calyx.mlir" \
+        -o "$out/parsed.calyx.mlir"
+      timeout 1800 ${circt}/bin/circt-translate --export-calyx \
+        "$out/parsed.calyx.mlir" -o "$out/model.futil"
+      timeout 1800 ${calyxTool}/bin/calyx "$out/model.futil" \
+        -l ${calyxTool}/share/calyx -b verilog --synthesis --nested \
+        -d papercut -o "$out/model.sv"
+      timeout 1800 ${yosysPkg}/bin/yosys -p \
+        "read_verilog -sv $out/model.sv; hierarchy -check; stat" \
+        >"$out/yosys-stat.txt"
+      test -s "$out/ordered-address-data-trace.json"
+      test -s "$out/model.sv"
     '';
 
   mkMlirOpStatsDerivation = { name, stageName, tool, input }:
@@ -142,9 +192,9 @@ let
       tmp_pre_calyx="$(mktemp /tmp/no_handshake_pre_calyx_XXXXXX.mlir)"
       ${mlir}/bin/mlir-opt ${flatScf}/flat.scf.mlir \
         --load-pass-plugin=${mlirPasses}/lib/LLM2FPGAMLIRPasses.so \
-        --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx${scoutMathPass},llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
+        --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-negf-for-calyx${scoutMathPass},llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
         -o "$tmp_pre_calyx"
-      export CALYX_PREFLIGHT_REPORT=${pipelineScripts}/calyx_preflight_report.py
+      export CALYX_PREFLIGHT_REPORT=${calyxPreflightReport}
       ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
         ${circt}/bin/circt-opt "$tmp_pre_calyx" "$out"
       ${python}/bin/python3 ${pipelineScripts}/calyx_float_frontier_report.py \
@@ -604,6 +654,7 @@ let
         }) stageNames);
       }) registry));
 in {
+  inherit mkExactSerialGemvCalyxDerivation;
   inherit registerModel registerTosaModel registerTosaNoHandshakeModel
     registerNoHandshakeModel;
   inherit pipelineStagePackagesFromRegistry;

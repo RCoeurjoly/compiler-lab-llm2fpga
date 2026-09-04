@@ -1,0 +1,180 @@
+{
+  "cases": [
+    {
+      "compiler_evidence": {
+        "linalg_output_sha256": "645db9ec7a994c13a0133232b33d2b74615458689e2c9d89465cb7b9bd6ba6dc",
+        "native_module_sha256": "8f3235b56621ce5172be92ca405231ae7dc8a7afa6022fd379556acd8eeb7899",
+        "runner_stdout_sha256": "efe81b3b60df853ab0857f6a096181289f547a7a974585380f8162d0c98db8fb",
+        "torch_frontend_output_sha256": "184d3efaeed1a5e0652afdca202208c0d7052cfbfb80073c4e3f32378a164959",
+        "torch_module_sha256": "5954e6e85a801fe55ee8284230bc49a692ababd3489973a20bc9c159e6852c3f"
+      },
+      "id": "shift_one",
+      "output": {
+        "dtype": "si64",
+        "shape": [
+          5
+        ],
+        "values": [
+          -3,
+          -1,
+          0,
+          0,
+          2
+        ]
+      },
+      "status": "ok"
+    },
+    {
+      "compiler_evidence": {
+        "linalg_output_sha256": "688bc418edbe2e0f4970e282b8a42492a4b8a6389984b89534d1dff16e82d964",
+        "native_module_sha256": "9f868f5cd665f31f1c7f52c9c34314d7c36cbd29239348927b028d83ed71edbc",
+        "runner_stdout_sha256": "6faba9533cd2143ebb2c310d410d90defed52b40ba90b5764f075bea5a04e9dd",
+        "torch_frontend_output_sha256": "216aa48a791c8fdc3ddb71fa2d4ae0ad24c43d175ea70cfe743b30293de1f6a5",
+        "torch_module_sha256": "5d05ea91fe42f40a45812f6272586f5a83b0da031786d6fbc3acca76cdb47220"
+      },
+      "id": "shift_zero",
+      "output": {
+        "dtype": "si64",
+        "shape": [
+          5
+        ],
+        "values": [
+          -5,
+          -1,
+          0,
+          1,
+          5
+        ]
+      },
+      "status": "ok"
+    },
+    {
+      "compiler_evidence": {
+        "linalg_output_sha256": "3a2fd6c4b417e8fce2c09f359c95cd214769daedb364cb02f2c04b9cf93362c9",
+        "native_module_sha256": "96aab19542024bae8da869cd4f34f56b695155a520b76b1c6f8f62d02ea5618b",
+        "runner_stdout_sha256": "18b4b3567a8605d99c7a930582510976c7c6e15bff41b1aab0c76bd11fdf9428",
+        "torch_frontend_output_sha256": "3f6732a0703e991c793f4f9f6eabb98abbf8e4b52224e1093b9b38ccd31ad746",
+        "torch_module_sha256": "ee2c434cbb488cff98bdabb190462580ddac261345f63caa3ac865f70f0bb51a"
+      },
+      "id": "shift_sixty_two",
+      "output": {
+        "dtype": "si64",
+        "shape": [
+          4
+        ],
+        "values": [
+          -1,
+          -1,
+          0,
+          1
+        ]
+      },
+      "status": "ok"
+    },
+    {
+      "compiler_evidence": {
+        "compiler_exit_code": 1,
+        "compiler_stderr_sha256": "4486970ae79e04034ae4ce156b790548aa9fee0a2df500c4df40b4089b0ce815",
+        "torch_module_sha256": "01a902147ee3e5fea727fcde5b754d78364065dab92d5673bf465ae56ee279ef"
+      },
+      "diagnostic": "shift_contract:negative_shift",
+      "id": "negative_shift",
+      "status": "rejected_negative_shift"
+    },
+    {
+      "compiler_evidence": {
+        "compiler_exit_code": 1,
+        "compiler_stderr_sha256": "a79d2b787748d8f3a92bc52be8b1d6d6b5d0933f8d66f206b8f1ec4cba458285",
+        "torch_module_sha256": "bb1f75e6b9abcf26ea10c73edfc6efe14f81aab9bbc1119e96c1185d95906222"
+      },
+      "diagnostic": "shift_contract:greater_than_sixty_two",
+      "id": "shift_greater_than_sixty_two",
+      "status": "rejected_shift_greater_than_sixty_two"
+    }
+  ],
+  "decision_sha256": "429da5a367755d35bc38308589beaf25d291a8272ebf4d8944bfa4b8919ef8fe",
+  "executor": {
+    "command": [
+      "/home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/scripts/pipeline/execute_tinystories_1m_exact_shift_semantic_probe.py",
+      "--stage-artifact",
+      "/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir",
+      "--fixture",
+      "/home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/artifacts/comparison/tinystories-1m-exact-shift-semantics.json",
+      "--tool",
+      "/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/bin/torch-mlir-opt",
+      "--pass-pipeline",
+      "builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=})",
+      "--out",
+      "<temporary>/executor-results.json"
+    ],
+    "command_sha256": "c53059726759063b70c1b030e24325aac50dea473d0fd4e401110bc3e57d58d1",
+    "compiler_route": {
+      "linalg_to_llvm_pipeline": [
+        "--empty-tensor-to-alloc-tensor",
+        "--one-shot-bufferize=bufferize-function-boundaries",
+        "--convert-bufferization-to-memref",
+        "--linalg-generalize-named-ops",
+        "--convert-linalg-to-loops",
+        "--lower-affine",
+        "--convert-scf-to-cf",
+        "--expand-strided-metadata",
+        "--finalize-memref-to-llvm",
+        "--convert-index-to-llvm",
+        "--convert-arith-to-llvm",
+        "--convert-math-to-llvm",
+        "--convert-cf-to-llvm",
+        "--convert-func-to-llvm",
+        "--reconcile-unrealized-casts"
+      ],
+      "mlir_opt": {
+        "binary": "/nix/store/qfhb8ajk2kw32lrmk8xqaa1g6h7w95p8-mlir-21.1.2/bin/mlir-opt",
+        "binary_sha256": "3da93261c9b6f698539bec86f3606598d8b3ed61a18095eaa03cde87f7140912"
+      },
+      "mlir_runner": {
+        "binary": "/nix/store/qfhb8ajk2kw32lrmk8xqaa1g6h7w95p8-mlir-21.1.2/bin/mlir-runner",
+        "binary_sha256": "d501573e86911cb0b21f0ad307ea641431d5daf46b8f6b2a914888ca537f1d79"
+      },
+      "torch_backend_pipeline": "torch-backend-to-linalg-on-tensors-backend-pipeline"
+    },
+    "path": "scripts/pipeline/execute_tinystories_1m_exact_shift_semantic_probe.py",
+    "sha256": "1c003ee2c638b37c27d57ff282c47654f7f07542949d25d35c846cf1cb261f4c"
+  },
+  "fixture_file_sha256": "2aadecfedbbf93a617890d21586d17456f945028d866c368c15af754471f3064",
+  "fixture_self_hash": "4490ddcf0e6f59eed32ecfe31482dc142c9907f4e74efe32154a99d5651ef17f",
+  "producer": {
+    "command": [
+      "scripts/pipeline/run_tinystories_1m_exact_shift_semantic_probe.py",
+      "--executor",
+      "scripts/pipeline/execute_tinystories_1m_exact_shift_semantic_probe.py",
+      "--out",
+      "artifacts/comparison/tinystories-1m-exact-shift-semantic-probe.json"
+    ],
+    "command_sha256": "fa44bf50e2f11c5e7f8b91fad29287307552a45a82a988486dc98554f4298ceb",
+    "script_path": "scripts/pipeline/run_tinystories_1m_exact_shift_semantic_probe.py",
+    "script_sha256": "8564a1773278ca425866b6a0e15ea572951e2e6dd1665d03104399f17f7efa61"
+  },
+  "schema": "tinystories-1m-exact-shift-semantic-probe-v1",
+  "sha256": "cd4a4ca7a723eb1a19ad603fffad1cd345a04cd28d5062d89a50c4dd28d4f8a5",
+  "stage": {
+    "artifact": "/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir",
+    "artifact_sha256": "e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674",
+    "attribute": ".#tiny-stories-1m-kev-gpt-exact-torch",
+    "build_command": [
+      "nix",
+      "build",
+      "--no-link",
+      "--print-out-paths",
+      "-L",
+      ".#tiny-stories-1m-kev-gpt-exact-torch"
+    ],
+    "build_command_sha256": "d33a21e9f8b4564e0e4ed14ec50bf08b7ccc3ed9c99b01b5ead0d5c792356354",
+    "derivation": "/nix/store/han08nzx4rk44xwh2drcaqhn01k37f18-tiny-stories-1m-kev-gpt-exact-torch.mlir.drv",
+    "derivation_sha256": "c9b704158300b53802d09f42aa20e065c90923a31a5818ef99be141cd66a185c"
+  },
+  "tool": {
+    "binary": "/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/bin/torch-mlir-opt",
+    "binary_sha256": "e1445e7540ef7bea2c29e5f36af8f0120e7b13f8fe0e78b01a21d2a0b7a8d9a9",
+    "pipeline": "builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=})",
+    "pipeline_sha256": "03459ef9e78b01af6c357de490b75ef37c1a73adea21346cf610b1cccce529c9"
+  }
+}

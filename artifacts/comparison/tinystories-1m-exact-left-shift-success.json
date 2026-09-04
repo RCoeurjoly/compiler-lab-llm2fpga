@@ -1,0 +1,140 @@
+{
+  "artifact": {
+    "archive": "torch-artifact.mlir.gz",
+    "archive_bytes": 490214,
+    "archive_sha256": "b67d547c763ddd0e4ffdc522a0fc9a241a6066d36462b32004a41d5fe03f2b67",
+    "bytes": 7608283,
+    "generic_operator_count": 0,
+    "left_tensor_count": 122,
+    "left_tensor_scalar_count": 0,
+    "output": "/nix/store/k2q1qg1xn0yvxx3bprvfq3dxphw8vz8m-tiny-stories-1m-kev-gpt-exact-torch.mlir",
+    "right_tensor_count": 1633,
+    "right_tensor_scalar_count": 0,
+    "sha256": "e2e0fe83d874714847cdacc4918fc41220637569c8ac7ca225f0139ab82ea674"
+  },
+  "claims": {
+    "adapter_changed": false,
+    "left_shift_implemented": true,
+    "model_contract_changed": false,
+    "registered_torch_artifact_nonempty": true,
+    "right_shift_preserved": true
+  },
+  "compiler": {
+    "binary": "/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/bin/torch-mlir-opt",
+    "binary_sha256": "e1445e7540ef7bea2c29e5f36af8f0120e7b13f8fe0e78b01a21d2a0b7a8d9a9",
+    "captured_derivation": "tool-derivation.drv",
+    "derivation": "/nix/store/a31wgxwx6dh1gfhbjkirphk44n5vjrrg-torch-mlir-0-unstable-2026-02-12.drv",
+    "derivation_file_sha256": "a2b75ba793310915c8d5460c7166a634bdfb45422afcb20148284d916e223fe8",
+    "nix_expression": "torch-mlir.nix",
+    "nix_expression_sha256": "9b51708c5bc918c9bc19ae4ae15b24d66c6d24b0598574e43b2ac0e5ae384f68",
+    "output": "/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12",
+    "patch": "patches/torch-mlir/legalize-bitwise-right-shift-tensor-scalar.patch",
+    "patch_sha256": "3113814f379e34519c7a707337dbbe8a68703ba3b34ad1324a2ce7ed4ea1f553",
+    "producer": "scripts/pipeline/capture_tinystories_1m_exact_successor_frontier.py",
+    "producer_sha256": "60fd6a3e84fb52f38142b5dd6d810101a204af6a1734b258e1bd2c2cb0420193",
+    "torch_mlir_source_revision": "59c249e5cc2025acca81bdcf1596b8dd36a5c0f9",
+    "verifier": "scripts/pipeline/verify_tinystories_1m_exact_successor_frontier_determinism.py",
+    "verifier_sha256": "49859ff1afee3f4858a65a2a5c19dea78dd8e460f7f2706620c6815e58f37ec6"
+  },
+  "executions": {
+    "left-shift-lowering": {
+      "command": "/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/bin/torch-mlir-opt '-pass-pipeline=builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=}, torch-backend-to-linalg-on-tensors-backend-pipeline)' /home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/reproducers/tinystories-1m-exact-torch-mlir/bitwise-left-shift-tensor-scalar.mlir",
+      "exit_code": 0,
+      "log": "left-shift-lowering.log",
+      "log_bytes": 594,
+      "log_sha256": "10df5e2adc57739c76802d16e43fa75dda6eb1be47f06cd0f899310fd7142b4e"
+    },
+    "left-shift-semantics": {
+      "command": "/nix/store/mkgmf27sxf4i2ar26ym2jg3wzg14bivz-python3-3.11.14-env/bin/python /home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/scripts/pipeline/verify_tinystories_1m_exact_left_shift_semantics.py",
+      "exit_code": 0,
+      "log": "left-shift-semantics.log",
+      "log_bytes": 188,
+      "log_sha256": "b1236275588eb516236d143bbcb1edd5fb7b0abb48b2f6be1753bcf165f7a88b"
+    },
+    "patched-tool": {
+      "command": "nix build --no-link --print-out-paths -L '.#torchMlir'",
+      "exit_code": 0,
+      "log": "tool-build.log",
+      "log_bytes": 95,
+      "log_sha256": "9e33eb691549f8f2cd2e4428a50c7dc15d723820d148c061be2ffd1e22f48e3d"
+    },
+    "registered-torch-stage": {
+      "command": "nix build --no-link --print-out-paths -L '.#tiny-stories-1m-kev-gpt-exact-torch'",
+      "exit_code": 0,
+      "log": "stage-build.log",
+      "log_bytes": 103,
+      "log_sha256": "5edb0b37b2b66910bd7a2808b7d8dd312d107eb9ccc98aa4d51ed13b4ea31d0a"
+    },
+    "right-shift-lowering": {
+      "command": "/nix/store/k8smi8mni8mjmyf37dav2lf4f11is7ha-torch-mlir-0-unstable-2026-02-12/bin/torch-mlir-opt '-pass-pipeline=builtin.module(func.func(torch-match-quantized-custom-ops), torchdynamo-export-to-torch-backend-pipeline{ extra-library=}, torch-backend-to-linalg-on-tensors-backend-pipeline)' /home/roland/compiler-lab-llm2fpga/.worktrees/exact-tinystories-compiler/reproducers/tinystories-1m-exact-torch-mlir/bitwise-right-shift-tensor-scalar.mlir",
+      "exit_code": 0,
+      "log": "right-shift-lowering.log",
+      "log_bytes": 585,
+      "log_sha256": "91c58a6013c5b28e7bf52ce175c9bc389ffcb2998b15478a176aed22c434c63e"
+    }
+  },
+  "identity_bindings": {
+    "task_1": {
+      "file_sha256": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+      "path": "artifacts/reference/tinystories-1m-exact-input-audit.json",
+      "payload_sha256": "7d7a37d08df7e63bdb95063674fe5dc306058e51af8a11bbcd97a4cb2972a766"
+    },
+    "task_2": {
+      "artifact_sha256": "af1901917b52876a9b3343712b89928b272e5dd237cd491ddd9d462c56a52838",
+      "file_sha256": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+      "model_receipt_sha256": "5e56907e60c83c5d98b3c3fe88772b7dfba71e53a9435de548a9d54ea7497834",
+      "path": "artifacts/reference/tinystories-1m-exact-package-model.json"
+    },
+    "task_3": {
+      "artifact_sha256": "9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3",
+      "file_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+      "path": "artifacts/reference/tinystories-1m-exact-generation.json",
+      "result_sha256": "c18106f25030ec58dfd3abc5d75d774506aca65b655fc34b284076b1294f8644"
+    }
+  },
+  "model": "tiny-stories-1m-kev-gpt-exact",
+  "pipeline_execution": {
+    "full_later_stages_not_run": [
+      "linalg",
+      "scf",
+      "flat-scf",
+      "calyx",
+      "calyx-native-sv"
+    ],
+    "full_later_stages_run": [],
+    "reduced_linalg_shift_proofs_run": [
+      "left-shift-lowering",
+      "right-shift-lowering"
+    ],
+    "registered_torch_stage_valid": true
+  },
+  "prior_receipts": [
+    {
+      "file_sha256": "b69fb780157362d30a1c5ee05a4ac67a71e9172b0700e820c52c08f6af70df55",
+      "path": "artifacts/comparison/tinystories-1m-exact-current-pipeline-frontier.json",
+      "preserved": true,
+      "self_sha256": "af3270ff9194b87ca2670f366a220e6a2ada198474f12e5f30a20e62456e7c1b"
+    },
+    {
+      "file_sha256": "5b40f13383c372b49d8e15a5aedfaab15c09ad4061aee96022481ae55424c313",
+      "path": "artifacts/comparison/tinystories-1m-exact-successor-frontier.json",
+      "preserved": true,
+      "self_sha256": "638ed427537be14fe53a0d5d694eb2c13bf09f56f8b0679fadd30dbb746b6822"
+    }
+  ],
+  "schema": "tinystories-1m-exact-left-shift-success-receipt-v1",
+  "semantic_fixture": {
+    "file_sha256": "bf0f51e1417dc4034adbfe8ef8d38e673946b196255d0261559cba05a880ccd9",
+    "path": "artifacts/comparison/tinystories-1m-exact-left-shift-semantics.json",
+    "self_sha256": "672d34819f93db399e7e8faac4747f9bb88b690491c2683912fee9490ffca19c"
+  },
+  "sha256": "c6a7aee9bd614ce1aa4609debc7b2d9925522b156bc1fc567aa868a11a316f45",
+  "source_commit": "e95133e396b4bbbeddb4a5412b771d0128baf0b8",
+  "stage": "torch-mlir",
+  "stage_derivation": {
+    "captured_file": "stage-derivation.drv",
+    "file_sha256": "c9b704158300b53802d09f42aa20e065c90923a31a5818ef99be141cd66a185c",
+    "path": "/nix/store/han08nzx4rk44xwh2drcaqhn01k37f18-tiny-stories-1m-kev-gpt-exact-torch.mlir.drv"
+  },
+  "status": "registered_torch_valid"
+}

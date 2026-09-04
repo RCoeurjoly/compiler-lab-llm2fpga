@@ -1,0 +1,36 @@
+{
+  "eager_output_sha256": "3052200ada2f7c2fc8f882b9c6a2c6355cd2036f4ad121ac850315b9e7e374e6",
+  "export_output_sha256": "3052200ada2f7c2fc8f882b9c6a2c6355cd2036f4ad121ac850315b9e7e374e6",
+  "exported_program_sha256": "08f1736bff472e2c5f51bf77e82225bc351e0e136116378dd30f9075cedeeca4",
+  "frozen_boundary_sha256": {
+    "adapter": "5f2dfa10c54134e44a31f89608b562aea33ef39deacfcd62eadac1f0fda94892",
+    "boundary": "a3e0c9f5ccd56fcd530174e2e15747008344b8e32384e508611c793008037b14"
+  },
+  "input": {
+    "scaled_activation": {
+      "dtype": "signed_i64",
+      "shape": [
+        3,
+        64
+      ]
+    },
+    "weight_codes": {
+      "dtype": "signed_i64_w8_codes",
+      "shape": [
+        64,
+        64
+      ]
+    }
+  },
+  "operator": "llm2fpga.serial_gemv.default",
+  "operator_count": 1,
+  "output": {
+    "dtype": "signed_i64",
+    "shape": [
+      3,
+      64
+    ]
+  },
+  "receipt_sha256": "3d19e756bb9d188b28e6dd5b89c53c3d29fd8e7b44a8a2da2408f47ccb534eb1",
+  "schema": "tinystories-1m-exact-serial-gemv-export-v1"
+}
