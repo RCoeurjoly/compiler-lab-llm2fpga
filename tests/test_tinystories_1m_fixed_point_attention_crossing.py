@@ -19,6 +19,9 @@ MLP_FIXTURE = (
 )
 ATTENTION_CAPTURE = ROOT / "TinyStories/capture_fixed_point_attention_crossing_slice.py"
 MLP_CAPTURE = ROOT / "TinyStories/capture_fixed_point_mlp_crossing_slice.py"
+ATTENTION_LOWERER = (
+    ROOT / "scripts/pipeline/lower_fixed_point_attention_crossing_to_calyx.py"
+)
 
 
 EXPECTED_SHAPES = {
@@ -73,6 +76,63 @@ def load_module(path: Path, name: str):
 
 
 class AttentionCrossingTest(unittest.TestCase):
+    def test_generated_sv_observes_exact_ln1(self):
+        """Catches any generated LayerNorm result that diverges from the fixture."""
+        lowerer = load_module(ATTENTION_LOWERER, "fixed_point_attention_lowerer")
+        artifact = lowerer.generate_ln1_kernel(ATTENTION_FIXTURE)
+        observed = lowerer.run_ln1_sv(artifact, ATTENTION_FIXTURE)
+        fixture = json.loads(ATTENTION_FIXTURE.read_text(encoding="utf-8"))
+        self.assertEqual(
+            observed["ln1_q16_16"],
+            fixture["tensors"]["ln1_output_q16_16"]["values"],
+        )
+        self.assertEqual(
+            observed["little_endian_int64_sha256"],
+            fixture["tensors"]["ln1_output_q16_16"][
+                "little_endian_int64_sha256"
+            ],
+        )
+        self.assertEqual(
+            artifact.provenance["host_preload_memories"],
+            [
+                "block_input_q16_16",
+                "ln1_gamma_q16_16",
+                "ln1_beta_q16_16",
+            ],
+        )
+        self.assertEqual(
+            artifact.provenance["hardware_owned_memories"], ["ln1_q16_16"]
+        )
+        self.assertEqual(
+            artifact.provenance["calyx_disabled_passes"], ["cell-share"]
+        )
+        self.assertEqual(artifact.futil.count("component main("), 1)
+        harness = Path(
+            artifact.provenance["generated_sv_artifacts"]["harness"]
+        ).read_text(encoding="utf-8")
+        preload_arrays = [
+            line
+            for line in harness.splitlines()
+            if line.startswith("static const std::int64_t k")
+        ]
+        self.assertEqual(len(preload_arrays), 3)
+        self.assertNotIn("kExpected", harness)
+        self.assertNotIn("kLn1Output", harness)
+
+    def test_ln1_sv_rejects_post_generation_fixture_mutation(self):
+        """Catches a runner that trusts only generation-time fixture authority."""
+        lowerer = load_module(
+            ATTENTION_LOWERER, "fixed_point_attention_lowerer_mutation"
+        )
+        artifact = lowerer.generate_ln1_kernel(ATTENTION_FIXTURE)
+        mutated = json.loads(ATTENTION_FIXTURE.read_text(encoding="utf-8"))
+        mutated["tensors"]["block_input_q16_16"]["values"][0][0] += 1
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_path = Path(directory) / "mutated-fixture.json"
+            fixture_path.write_text(json.dumps(mutated), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "fixture.*hash|fixture.*authority"):
+                lowerer.run_ln1_sv(artifact, fixture_path)
+
     def test_attention_fixture_replays_and_links_mlp_input(self):
         """Catches an incomplete four-row trace or a divergent MLP handoff."""
         capture_attention = load_module(
