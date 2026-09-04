@@ -47,6 +47,11 @@ block input through attention, MLP, and the final MLP residual addition. Its
 observable output is `block_output_q16_16[4,64]`; a c_proj-only result is not
 a complete block.
 
+**Block-composition fixture**: A self-hashed fixture that links the
+authenticated attention and MLP fixtures by hash and adds only the new
+`block_output_q16_16[4,64]` residual checkpoint. It does not duplicate the
+linked fixtures' records.
+
 **Micro-fixture**: A deliberately smaller instance of a contract slice used
 for fast compiler and RTL iteration. It cannot by itself establish exact-model
 support; it must be paired with a passing contract slice.
