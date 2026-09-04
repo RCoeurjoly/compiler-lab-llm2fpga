@@ -52,6 +52,11 @@ authenticated attention and MLP fixtures by hash and adds only the new
 `block_output_q16_16[4,64]` residual checkpoint. It does not duplicate the
 linked fixtures' records.
 
+**Direct block composition**: One generated `main` in which `ln_2` feeds c_fc
+Q/DQ through hardware memory and the attention residual remains hardware-owned
+until final addition to c_proj output. Host-mediated tensor handoff is not
+block composition.
+
 **Micro-fixture**: A deliberately smaller instance of a contract slice used
 for fast compiler and RTL iteration. It cannot by itself establish exact-model
 support; it must be paired with a passing contract slice.
