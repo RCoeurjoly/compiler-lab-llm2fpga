@@ -4,6 +4,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import re
 import struct
 import sys
 import tempfile
@@ -24,6 +25,9 @@ MLP_FIXTURE = (
     ROOT / "artifacts/reference/tinystories-1m-fixed-point-mlp-crossing-slice.json"
 )
 BLOCK_CAPTURE = ROOT / "TinyStories/capture_fixed_point_block_composition_slice.py"
+BLOCK_LOWERER = (
+    ROOT / "scripts/pipeline/lower_fixed_point_block_composition_to_calyx.py"
+)
 
 
 def load_capture():
@@ -31,6 +35,19 @@ def load_capture():
         raise AssertionError("missing authenticated block-composition capture module")
     spec = importlib.util.spec_from_file_location(
         "fixed_point_block_composition_capture", BLOCK_CAPTURE
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_lowerer():
+    if not BLOCK_LOWERER.is_file():
+        raise AssertionError("missing fixed-point complete-block Calyx lowerer")
+    spec = importlib.util.spec_from_file_location(
+        "fixed_point_block_composition_calyx", BLOCK_LOWERER
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -104,6 +121,100 @@ def reseal_block_fixture(fixture: dict) -> None:
 
 
 class BlockCompositionTest(unittest.TestCase):
+    def test_one_generated_main_observes_exact_complete_block(self):
+        """Catches host composition or any divergent complete-block checkpoint."""
+        lowerer = load_lowerer()
+        artifact = lowerer.generate_block_kernel(
+            BLOCK_FIXTURE, ATTENTION_FIXTURE, MLP_FIXTURE
+        )
+        observed = lowerer.run_block_sv(
+            artifact, BLOCK_FIXTURE, ATTENTION_FIXTURE, MLP_FIXTURE
+        )
+        block = json.loads(BLOCK_FIXTURE.read_text(encoding="utf-8"))
+        attention = json.loads(ATTENTION_FIXTURE.read_text(encoding="utf-8"))
+        mlp = json.loads(MLP_FIXTURE.read_text(encoding="utf-8"))
+
+        expected_names = set(attention["tensors"]) | set(mlp["tensors"]) | {
+            "block_output_q16_16"
+        }
+        self.assertEqual(observed["component_count"], 1)
+        self.assertFalse(observed["host_intermediate"])
+        self.assertEqual(set(observed["little_endian_int64_sha256"]), expected_names)
+        for fixture in (attention, mlp, block):
+            for name, record in fixture["tensors"].items():
+                self.assertEqual(observed[name], record["values"], name)
+                self.assertEqual(
+                    observed["little_endian_int64_sha256"][name],
+                    record["little_endian_int64_sha256"],
+                    name,
+                )
+
+        self.assertEqual(
+            observed["c_fc_input_q16_16"],
+            mlp["tensors"]["c_fc_input_q16_16"]["values"],
+        )
+        self.assertEqual(
+            observed["block_output_q16_16"],
+            block["tensors"]["block_output_q16_16"]["values"],
+        )
+        self.assertGreater(observed["cycles"], 131072)
+
+        self.assertEqual(artifact.futil.count("component main("), 1)
+        self.assertIn(
+            "c_fc_gemv_code_signed.in = c_fc_input_codes_i8.read_data;",
+            artifact.futil,
+        )
+        self.assertIn(
+            "block_output_add.left = attention_residual_q16_16.read_data;",
+            artifact.futil,
+        )
+        self.assertIn(
+            "block_output_add.right = c_proj_output_q16_16.read_data;",
+            artifact.futil,
+        )
+        self.assertFalse(
+            set(artifact.provenance["host_preload_memories"])
+            & set(artifact.provenance["hardware_owned_memories"])
+        )
+        self.assertEqual(
+            artifact.provenance["calyx_disabled_passes"], ["cell-share"]
+        )
+        harness = Path(observed["generated_sv_artifacts"]["harness"]).read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("kExpected", harness)
+        self.assertEqual(
+            len(
+                re.findall(
+                    r"^static const std::int64_t\s+kSource[0-9]+\[",
+                    harness,
+                    re.MULTILINE,
+                )
+            ),
+            len(artifact.provenance["host_preload_memories"]),
+        )
+        for name in artifact.provenance["hardware_owned_memories"]:
+            assignment = (
+                rf"main__DOT__{re.escape(name)}__DOT__mem\[i\]\s*=\s*([^;]+);"
+            )
+            self.assertEqual(re.findall(assignment, harness), ["0"], name)
+
+    def test_block_runner_reauthenticates_after_generation(self):
+        """Catches trusting only the fixtures used when generating the artifact."""
+        lowerer = load_lowerer()
+        artifact = lowerer.generate_block_kernel(
+            BLOCK_FIXTURE, ATTENTION_FIXTURE, MLP_FIXTURE
+        )
+        mutated = json.loads(BLOCK_FIXTURE.read_text(encoding="utf-8"))
+        mutated["tensors"]["block_output_q16_16"]["values"][0][0] += 1
+        with tempfile.TemporaryDirectory() as directory:
+            candidate = Path(directory) / "mutated-block.json"
+            candidate.write_text(json.dumps(mutated), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "fixture tensor canonical hash"):
+                lowerer.run_block_sv(
+                    artifact, candidate, ATTENTION_FIXTURE, MLP_FIXTURE
+                )
+
     def test_block_fixture_links_both_slices_and_replays_final_residual(self):
         """Catches a missing authority link or incorrect final residual."""
         capture_block = load_capture()
