@@ -63,6 +63,55 @@ for _prefix in ("q", "k", "v", "out"):
     )
 EXPECTED_SHAPES["out_bias_q16_16"] = [64]
 
+CAUSAL_SOURCE_MEMORIES = [
+    "attention_exp_lut_q1_20",
+    "block_input_q16_16",
+    "k_input_scale_q8_24",
+    "k_output_scale_q8_24",
+    "k_weight_codes_i8",
+    "k_weight_scale_q8_24",
+    "ln1_beta_q16_16",
+    "ln1_gamma_q16_16",
+    "q_input_scale_q8_24",
+    "q_output_scale_q8_24",
+    "q_weight_codes_i8",
+    "q_weight_scale_q8_24",
+    "v_input_scale_q8_24",
+    "v_output_scale_q8_24",
+    "v_weight_codes_i8",
+    "v_weight_scale_q8_24",
+]
+
+CAUSAL_COMPUTED_CHECKPOINTS = [
+    "ln1_output_q16_16",
+    "q_input_codes_i8",
+    "q_input_q16_16",
+    "q_accumulator_i64",
+    "q_post_weight_rescale_bias_q16_16",
+    "q_output_codes_i8",
+    "q_output_q16_16",
+    "k_input_codes_i8",
+    "k_input_q16_16",
+    "k_accumulator_i64",
+    "k_post_weight_rescale_bias_q16_16",
+    "k_output_codes_i8",
+    "k_output_q16_16",
+    "v_input_codes_i8",
+    "v_input_q16_16",
+    "v_accumulator_i64",
+    "v_post_weight_rescale_bias_q16_16",
+    "v_output_codes_i8",
+    "v_output_q16_16",
+    "attention_score_q8",
+    "attention_maximum_q8",
+    "attention_delta_q8",
+    "attention_exp_q1_20",
+    "attention_denominator_q1_20",
+    "attention_numerator_q17_36",
+    "attention_context_heads_q16_16",
+    "attention_context_q16_16",
+]
+
 
 def load_module(path: Path, name: str):
     if not path.is_file():
@@ -76,6 +125,41 @@ def load_module(path: Path, name: str):
 
 
 class AttentionCrossingTest(unittest.TestCase):
+    def test_generated_sv_observes_exact_qkv_and_causal_context(self):
+        """Catches missing/wrong hardware checkpoints or fixture-seeded results."""
+        lowerer = load_module(
+            ATTENTION_LOWERER, "fixed_point_attention_causal_lowerer"
+        )
+        artifact = lowerer.generate_causal_attention_kernel(ATTENTION_FIXTURE)
+        observed = lowerer.run_causal_attention_sv(artifact, ATTENTION_FIXTURE)
+        fixture = json.loads(ATTENTION_FIXTURE.read_text(encoding="utf-8"))
+
+        for name in CAUSAL_COMPUTED_CHECKPOINTS:
+            self.assertEqual(observed[name], fixture["tensors"][name]["values"], name)
+            self.assertEqual(
+                observed["little_endian_int64_sha256"][name],
+                fixture["tensors"][name]["little_endian_int64_sha256"],
+                name,
+            )
+
+        self.assertEqual(
+            artifact.provenance["host_preload_memories"], CAUSAL_SOURCE_MEMORIES
+        )
+        self.assertEqual(
+            artifact.provenance["hardware_owned_memories"],
+            CAUSAL_COMPUTED_CHECKPOINTS,
+        )
+        self.assertEqual(artifact.provenance["calyx_disabled_passes"], ["cell-share"])
+        self.assertEqual(artifact.futil.count("component main("), 1)
+        self.assertGreater(observed["cycles"], 256)
+
+        harness = Path(
+            artifact.provenance["generated_sv_artifacts"]["harness"]
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("kExpected", harness)
+        for name in CAUSAL_COMPUTED_CHECKPOINTS:
+            self.assertNotIn(f"preload_{name}", harness)
+
     def test_generated_sv_observes_exact_ln1(self):
         """Catches any generated LayerNorm result that diverges from the fixture."""
         lowerer = load_module(ATTENTION_LOWERER, "fixed_point_attention_lowerer")

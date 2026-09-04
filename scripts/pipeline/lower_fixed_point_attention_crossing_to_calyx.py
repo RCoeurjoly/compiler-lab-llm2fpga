@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -22,6 +23,88 @@ LN1_SOURCE_MEMORIES = (
     "ln1_beta_q16_16",
 )
 LN1_HARDWARE_OWNED_MEMORIES = ("ln1_q16_16",)
+
+CAUSAL_ARTIFACT_SCHEMA = (
+    "tinystories-1m-fixed-point-attention-causal-generated-sv-v1"
+)
+CAUSAL_ARTIFACT_DIRECTORY = Path(
+    "/tmp/llm2fpga-tinystories-1m-fixed-point-attention-causal-generated-sv-v1"
+)
+CAUSAL_SOURCE_MEMORIES = (
+    "attention_exp_lut_q1_20",
+    "block_input_q16_16",
+    "k_input_scale_q8_24",
+    "k_output_scale_q8_24",
+    "k_weight_codes_i8",
+    "k_weight_scale_q8_24",
+    "ln1_beta_q16_16",
+    "ln1_gamma_q16_16",
+    "q_input_scale_q8_24",
+    "q_output_scale_q8_24",
+    "q_weight_codes_i8",
+    "q_weight_scale_q8_24",
+    "v_input_scale_q8_24",
+    "v_output_scale_q8_24",
+    "v_weight_codes_i8",
+    "v_weight_scale_q8_24",
+)
+CAUSAL_COMPUTED_CHECKPOINTS = (
+    "ln1_output_q16_16",
+    "q_input_codes_i8",
+    "q_input_q16_16",
+    "q_accumulator_i64",
+    "q_post_weight_rescale_bias_q16_16",
+    "q_output_codes_i8",
+    "q_output_q16_16",
+    "k_input_codes_i8",
+    "k_input_q16_16",
+    "k_accumulator_i64",
+    "k_post_weight_rescale_bias_q16_16",
+    "k_output_codes_i8",
+    "k_output_q16_16",
+    "v_input_codes_i8",
+    "v_input_q16_16",
+    "v_accumulator_i64",
+    "v_post_weight_rescale_bias_q16_16",
+    "v_output_codes_i8",
+    "v_output_q16_16",
+    "attention_score_q8",
+    "attention_maximum_q8",
+    "attention_delta_q8",
+    "attention_exp_q1_20",
+    "attention_denominator_q1_20",
+    "attention_numerator_q17_36",
+    "attention_context_heads_q16_16",
+    "attention_context_q16_16",
+)
+CAUSAL_OBSERVED_TENSORS = (
+    "ln1_output_q16_16",
+    *(
+        name
+        for prefix in ("q", "k", "v")
+        for name in (
+            f"{prefix}_input_codes_i8",
+            f"{prefix}_input_scale_q8_24",
+            f"{prefix}_input_q16_16",
+            f"{prefix}_accumulator_i64",
+            f"{prefix}_post_weight_rescale_bias_q16_16",
+            f"{prefix}_output_codes_i8",
+            f"{prefix}_output_scale_q8_24",
+            f"{prefix}_output_q16_16",
+            f"{prefix}_weight_codes_i8",
+            f"{prefix}_weight_scale_q8_24",
+        )
+    ),
+    "attention_score_q8",
+    "attention_maximum_q8",
+    "attention_delta_q8",
+    "attention_exp_q1_20",
+    "attention_denominator_q1_20",
+    "attention_numerator_q17_36",
+    "attention_context_heads_q16_16",
+    "attention_context_q16_16",
+    "attention_exp_lut_q1_20",
+)
 
 
 @dataclass(frozen=True)
@@ -678,3 +761,1068 @@ def run_ln1_sv(
         "little_endian_int64_sha256": _little_endian_i64_sha256(flat),
         "cycles": observed["cycles"],
     }
+
+
+def _mlp_lowerer():
+    """Load the compiler-owned, already-verified exact GEMV/QDQ generators."""
+    path = ROOT / "scripts/pipeline/lower_fixed_point_mlp_crossing_to_calyx.py"
+    spec = importlib.util.spec_from_file_location(
+        "fixed_point_mlp_shared_phase_generators", path
+    )
+    if spec is None or spec.loader is None:
+        raise ValueError("shared exact fixed-point phase generators unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _flatten_values(value: object) -> list[int]:
+    if isinstance(value, list):
+        flattened: list[int] = []
+        for item in value:
+            flattened.extend(_flatten_values(item))
+        return flattened
+    if isinstance(value, int):
+        return [value]
+    raise ValueError("fixture tensor contains a non-integer value")
+
+
+def _flatten_tensor(fixture: dict[str, Any], name: str) -> list[int]:
+    return _flatten_values(fixture["tensors"][name]["values"])
+
+
+def _checked_causal_fixture(fixture_path: Path) -> dict[str, Any]:
+    """Authenticate the complete source-to-causal-context memory contract."""
+    fixture = _capture_module().verify_fixture(fixture_path)
+    if fixture.get("schema") != FIXTURE_SCHEMA:
+        raise ValueError("causal-attention fixture schema authority mismatch")
+    if fixture.get("slice", {}).get("causal_valid_key_counts") != [1, 2, 3, 4]:
+        raise ValueError("causal-attention legal-slot authority mismatch")
+    expected_arithmetic = {
+        "activation_codes": "signed_int8_saturated",
+        "activation_qdq": "signed_int8_saturated_nearest_ties_away_from_zero",
+        "attention_division": "signed_half_denominator_correction_then_truncating_division",
+        "attention_exp": "delta_clamp_minus4096_to_0_q8_exact_zero_q1.20_lut",
+        "attention_score": "sum_q16.16_products_arithmetic_shift_right_24",
+        "gemv": "ascending_input_index_signed_int64_twos_complement_wrap",
+        "layer_norm": (
+            "truncating_mean_variance_plus_42950_restoring_isqrt_"
+            "truncating_division_q16.16_affine"
+        ),
+        "post_weight_rescale": (
+            "signed_magnitude_half_up_shift_32_plus_optional_q16.16_bias"
+        ),
+        "scale_format": "unsigned_q8.24_int64_tensor",
+        "value_format": "signed_q16.16_int64_tensor",
+    }
+    if fixture.get("arithmetic") != expected_arithmetic:
+        raise ValueError("causal-attention arithmetic authority mismatch")
+
+    expected_shapes: dict[str, list[int]] = {
+        "block_input_q16_16": [4, 64],
+        "ln1_gamma_q16_16": [64],
+        "ln1_beta_q16_16": [64],
+        "ln1_output_q16_16": [4, 64],
+        "attention_score_q8": [4, 16, 4],
+        "attention_maximum_q8": [4, 16],
+        "attention_delta_q8": [4, 16, 4],
+        "attention_exp_q1_20": [4, 16, 4],
+        "attention_denominator_q1_20": [4, 16],
+        "attention_numerator_q17_36": [4, 16, 4],
+        "attention_context_heads_q16_16": [4, 16, 4],
+        "attention_context_q16_16": [4, 64],
+        "attention_exp_lut_q1_20": [4096],
+    }
+    for prefix in ("q", "k", "v"):
+        expected_shapes.update(
+            {
+                f"{prefix}_input_codes_i8": [4, 64],
+                f"{prefix}_input_scale_q8_24": [64],
+                f"{prefix}_input_q16_16": [4, 64],
+                f"{prefix}_accumulator_i64": [4, 64],
+                f"{prefix}_post_weight_rescale_bias_q16_16": [4, 64],
+                f"{prefix}_output_codes_i8": [4, 64],
+                f"{prefix}_output_scale_q8_24": [64],
+                f"{prefix}_output_q16_16": [4, 64],
+                f"{prefix}_weight_codes_i8": [64, 64],
+                f"{prefix}_weight_scale_q8_24": [64],
+            }
+        )
+    for name, shape in expected_shapes.items():
+        record = fixture["tensors"].get(name)
+        count = 1
+        for dimension in shape:
+            count *= dimension
+        if (
+            not isinstance(record, dict)
+            or record.get("shape") != shape
+            or record.get("dtype") != "int64"
+            or record.get("bytes") != count * 8
+            or record.get("fixture_receipt_sha256")
+            != fixture["tensor_fixture_receipt_sha256"]
+        ):
+            raise ValueError(f"causal-attention memory contract mismatch: {name}")
+    return fixture
+
+
+def _ln1_composed_phase() -> tuple[list[str], list[str], str]:
+    """Reuse the proven generated LayerNorm logic inside a larger `main`."""
+    shared = _mlp_lowerer()
+    cells_text, wires_text, control_text = shared._component_sections(
+        _ln1_kernel_futil()
+    )
+    external_lines = (
+        "    @external block_input_q16_16 = seq_mem_d1(64, 256, 8);\n",
+        "    @external ln1_gamma_q16_16 = seq_mem_d1(64, 64, 6);\n",
+        "    @external ln1_beta_q16_16 = seq_mem_d1(64, 64, 6);\n",
+        "    @external ln1_q16_16 = seq_mem_d1(64, 256, 8);\n",
+    )
+    for line in external_lines:
+        if line not in cells_text:
+            raise ValueError("proven ln1 memory ABI changed")
+        cells_text = cells_text.replace(line, "", 1)
+    cells_text = re.sub(r"\bln1_q16_16\b", "ln1_output_q16_16", cells_text)
+    wires_text = re.sub(r"\bln1_q16_16\b", "ln1_output_q16_16", wires_text)
+    return (
+        [line.strip() for line in cells_text.splitlines() if line.strip()],
+        [wires_text.strip()],
+        control_text.strip(),
+    )
+
+
+def _initialize_zero_bias_phase() -> tuple[list[str], list[str], str]:
+    cells = [
+        "zero_bias_counter = std_reg(7);",
+        "zero_bias_lt = std_lt(7);",
+        "zero_bias_increment = std_add(7);",
+        "zero_bias_address = std_slice(7, 6);",
+    ]
+    wires = ["""zero_bias_address.in = zero_bias_counter.out;
+    group zero_bias_init_counter {
+      zero_bias_counter.in = 7'd0;
+      zero_bias_counter.write_en = 1'd1;
+      zero_bias_init_counter[done] = zero_bias_counter.done;
+    }
+    group zero_bias_write {
+      zero_bias_q16_16.addr0 = zero_bias_address.out;
+      zero_bias_q16_16.content_en = 1'd1;
+      zero_bias_q16_16.write_data = 64'd0;
+      zero_bias_q16_16.write_en = 1'd1;
+      zero_bias_write[done] = zero_bias_q16_16.done;
+    }
+    group zero_bias_increment_counter {
+      zero_bias_increment.left = zero_bias_counter.out;
+      zero_bias_increment.right = 7'd1;
+      zero_bias_counter.in = zero_bias_increment.out;
+      zero_bias_counter.write_en = 1'd1;
+      zero_bias_increment_counter[done] = zero_bias_counter.done;
+    }
+    comb group zero_bias_condition {
+      zero_bias_lt.left = zero_bias_counter.out;
+      zero_bias_lt.right = 7'd64;
+    }"""]
+    control = """      zero_bias_init_counter;
+      while zero_bias_lt.out with zero_bias_condition {
+        seq { zero_bias_write; zero_bias_increment_counter; }
+      }"""
+    return cells, wires, control
+
+
+def _initialize_causal_slots_phase() -> tuple[list[str], list[str], str]:
+    """Hardware-write the provenance-defined zero value into future slots."""
+    cells = [
+        "causal_zero_counter = std_reg(9);",
+        "causal_zero_lt = std_lt(9);",
+        "causal_zero_increment = std_add(9);",
+        "causal_zero_address = std_slice(9, 8);",
+    ]
+    wires = ["""causal_zero_address.in = causal_zero_counter.out;
+    group causal_zero_init_counter {
+      causal_zero_counter.in = 9'd0;
+      causal_zero_counter.write_en = 1'd1;
+      causal_zero_init_counter[done] = causal_zero_counter.done;
+    }
+    group causal_zero_write {
+      attention_score_q8.addr0 = causal_zero_address.out;
+      attention_score_q8.content_en = 1'd1;
+      attention_score_q8.write_data = 64'd0;
+      attention_score_q8.write_en = 1'd1;
+      attention_delta_q8.addr0 = causal_zero_address.out;
+      attention_delta_q8.content_en = 1'd1;
+      attention_delta_q8.write_data = 64'd0;
+      attention_delta_q8.write_en = 1'd1;
+      attention_exp_q1_20.addr0 = causal_zero_address.out;
+      attention_exp_q1_20.content_en = 1'd1;
+      attention_exp_q1_20.write_data = 64'd0;
+      attention_exp_q1_20.write_en = 1'd1;
+      causal_zero_write[done] = (attention_score_q8.done & attention_delta_q8.done & attention_exp_q1_20.done) ? 1'd1;
+    }
+    group causal_zero_increment_counter {
+      causal_zero_increment.left = causal_zero_counter.out;
+      causal_zero_increment.right = 9'd1;
+      causal_zero_counter.in = causal_zero_increment.out;
+      causal_zero_counter.write_en = 1'd1;
+      causal_zero_increment_counter[done] = causal_zero_counter.done;
+    }
+    comb group causal_zero_condition {
+      causal_zero_lt.left = causal_zero_counter.out;
+      causal_zero_lt.right = 9'd256;
+    }"""]
+    control = """      causal_zero_init_counter;
+      while causal_zero_lt.out with causal_zero_condition {
+        seq { causal_zero_write; causal_zero_increment_counter; }
+      }"""
+    return cells, wires, control
+
+
+def _causal_attention_phase() -> tuple[list[str], list[str], str]:
+    """Emit exact four-row, sixteen-head causal score/softmax/context logic."""
+    cells = [
+        "causal_row = std_reg(3);",
+        "causal_head = std_reg(5);",
+        "causal_key = std_reg(3);",
+        "causal_lane = std_reg(3);",
+        "causal_row_lt = std_lt(3);",
+        "causal_head_lt = std_lt(5);",
+        "causal_key_le = std_le(3);",
+        "causal_lane_lt = std_lt(3);",
+        "causal_row_increment = std_add(3);",
+        "causal_head_increment = std_add(5);",
+        "causal_key_increment = std_add(3);",
+        "causal_lane_increment = std_add(3);",
+        "causal_row_pad8 = std_pad(3, 8);",
+        "causal_row_shift6 = std_lsh(8);",
+        "causal_key_pad8 = std_pad(3, 8);",
+        "causal_key_shift6 = std_lsh(8);",
+        "causal_head_pad8 = std_pad(5, 8);",
+        "causal_head_shift2 = std_lsh(8);",
+        "causal_lane_pad8 = std_pad(3, 8);",
+        "causal_query_head_lane = std_add(8);",
+        "causal_query_address = std_add(8);",
+        "causal_key_address = std_add(8);",
+        "causal_slot_head_key = std_add(8);",
+        "causal_slot_address = std_add(8);",
+        "causal_row_pad6 = std_pad(3, 6);",
+        "causal_row_shift4 = std_lsh(6);",
+        "causal_head_pad6 = std_pad(5, 6);",
+        "causal_row_head_address = std_add(6);",
+        "causal_dot = std_reg(64);",
+        "causal_product = std_smult_pipe(64);",
+        "causal_dot_add = std_sadd(64);",
+        "causal_score_shift = std_srsh(64);",
+        "causal_score = std_reg(64);",
+        "causal_maximum = std_reg(64);",
+        "causal_score_gt_max = std_sgt(64);",
+        "causal_max_select = std_mux(64);",
+        "causal_negative_4096 = std_ssub(64);",
+        "causal_delta_subtract = std_ssub(64);",
+        "causal_delta_lt_min = std_slt(64);",
+        "causal_delta_clamp = std_mux(64);",
+        "causal_delta = std_reg(64);",
+        "causal_lut_sum = std_sadd(64);",
+        "causal_lut_gt_last = std_sgt(64);",
+        "causal_lut_clamp = std_mux(64);",
+        "causal_lut_address = std_slice(64, 12);",
+        "causal_delta_is_zero = std_eq(64);",
+        "causal_probability_select = std_mux(64);",
+        "causal_denominator = std_reg(64);",
+        "causal_denominator_add = std_add(64);",
+        "causal_numerator = std_reg(64);",
+        "causal_value_product = std_smult_pipe(64);",
+        "causal_numerator_add = std_sadd(64);",
+        "causal_denominator_half = std_rsh(64);",
+        "causal_numerator_negative = std_slt(64);",
+        "causal_negative_half = std_ssub(64);",
+        "causal_correction = std_mux(64);",
+        "causal_corrected_add = std_sadd(64);",
+        "causal_corrected = std_reg(64);",
+        "causal_corrected_negative = std_reg(1);",
+        "causal_corrected_negate = std_ssub(64);",
+        "causal_corrected_abs = std_mux(64);",
+        "causal_divide = std_div_pipe(64);",
+        "causal_quotient_negate = std_ssub(64);",
+        "causal_context_select = std_mux(64);",
+    ]
+    wires = ["""causal_row_pad8.in = causal_row.out;
+    causal_row_shift6.left = causal_row_pad8.out;
+    causal_row_shift6.right = 8'd6;
+    causal_key_pad8.in = causal_key.out;
+    causal_key_shift6.left = causal_key_pad8.out;
+    causal_key_shift6.right = 8'd6;
+    causal_head_pad8.in = causal_head.out;
+    causal_head_shift2.left = causal_head_pad8.out;
+    causal_head_shift2.right = 8'd2;
+    causal_lane_pad8.in = causal_lane.out;
+    causal_query_head_lane.left = causal_head_shift2.out;
+    causal_query_head_lane.right = causal_lane_pad8.out;
+    causal_query_address.left = causal_row_shift6.out;
+    causal_query_address.right = causal_query_head_lane.out;
+    causal_key_address.left = causal_key_shift6.out;
+    causal_key_address.right = causal_query_head_lane.out;
+    causal_slot_head_key.left = causal_head_shift2.out;
+    causal_slot_head_key.right = causal_key_pad8.out;
+    causal_slot_address.left = causal_row_shift6.out;
+    causal_slot_address.right = causal_slot_head_key.out;
+    causal_row_pad6.in = causal_row.out;
+    causal_row_shift4.left = causal_row_pad6.out;
+    causal_row_shift4.right = 6'd4;
+    causal_head_pad6.in = causal_head.out;
+    causal_row_head_address.left = causal_row_shift4.out;
+    causal_row_head_address.right = causal_head_pad6.out;
+
+    group causal_init_row {
+      causal_row.in = 3'd0;
+      causal_row.write_en = 1'd1;
+      causal_init_row[done] = causal_row.done;
+    }
+    group causal_increment_row {
+      causal_row_increment.left = causal_row.out;
+      causal_row_increment.right = 3'd1;
+      causal_row.in = causal_row_increment.out;
+      causal_row.write_en = 1'd1;
+      causal_increment_row[done] = causal_row.done;
+    }
+    group causal_init_head {
+      causal_head.in = 5'd0;
+      causal_head.write_en = 1'd1;
+      causal_init_head[done] = causal_head.done;
+    }
+    group causal_increment_head {
+      causal_head_increment.left = causal_head.out;
+      causal_head_increment.right = 5'd1;
+      causal_head.in = causal_head_increment.out;
+      causal_head.write_en = 1'd1;
+      causal_increment_head[done] = causal_head.done;
+    }
+    group causal_increment_key {
+      causal_key_increment.left = causal_key.out;
+      causal_key_increment.right = 3'd1;
+      causal_key.in = causal_key_increment.out;
+      causal_key.write_en = 1'd1;
+      causal_increment_key[done] = causal_key.done;
+    }
+    group causal_increment_lane {
+      causal_lane_increment.left = causal_lane.out;
+      causal_lane_increment.right = 3'd1;
+      causal_lane.in = causal_lane_increment.out;
+      causal_lane.write_en = 1'd1;
+      causal_increment_lane[done] = causal_lane.done;
+    }
+    comb group causal_row_condition {
+      causal_row_lt.left = causal_row.out;
+      causal_row_lt.right = 3'd4;
+    }
+    comb group causal_head_condition {
+      causal_head_lt.left = causal_head.out;
+      causal_head_lt.right = 5'd16;
+    }
+    comb group causal_key_condition {
+      causal_key_le.left = causal_key.out;
+      causal_key_le.right = causal_row.out;
+    }
+    comb group causal_lane_condition {
+      causal_lane_lt.left = causal_lane.out;
+      causal_lane_lt.right = 3'd4;
+    }
+
+    group causal_init_score_state {
+      causal_maximum.in = 64'd9223372036854775808;
+      causal_maximum.write_en = 1'd1;
+      causal_key.in = 3'd0;
+      causal_key.write_en = 1'd1;
+      causal_init_score_state[done] = (causal_maximum.done & causal_key.done) ? 1'd1;
+    }
+    group causal_init_dot_and_lane {
+      causal_dot.in = 64'd0;
+      causal_dot.write_en = 1'd1;
+      causal_lane.in = 3'd0;
+      causal_lane.write_en = 1'd1;
+      causal_init_dot_and_lane[done] = (causal_dot.done & causal_lane.done) ? 1'd1;
+    }
+    group causal_read_qk {
+      q_output_q16_16.addr0 = causal_query_address.out;
+      q_output_q16_16.content_en = 1'd1;
+      k_output_q16_16.addr0 = causal_key_address.out;
+      k_output_q16_16.content_en = 1'd1;
+      causal_read_qk[done] = (q_output_q16_16.done & k_output_q16_16.done) ? 1'd1;
+    }
+    group causal_multiply_qk {
+      causal_product.left = q_output_q16_16.read_data;
+      causal_product.right = k_output_q16_16.read_data;
+      causal_product.go = 1'd1;
+      causal_multiply_qk[done] = causal_product.done;
+    }
+    group causal_accumulate_dot {
+      causal_dot_add.left = causal_dot.out;
+      causal_dot_add.right = causal_product.out;
+      causal_dot.in = causal_dot_add.out;
+      causal_dot.write_en = 1'd1;
+      causal_accumulate_dot[done] = causal_dot.done;
+    }
+    group causal_latch_score {
+      causal_score_shift.left = causal_dot.out;
+      causal_score_shift.right = 64'd24;
+      causal_score.in = causal_score_shift.out;
+      causal_score.write_en = 1'd1;
+      causal_latch_score[done] = causal_score.done;
+    }
+    group causal_write_score_update_max {
+      causal_score_gt_max.left = causal_score.out;
+      causal_score_gt_max.right = causal_maximum.out;
+      causal_max_select.cond = causal_score_gt_max.out;
+      causal_max_select.tru = causal_score.out;
+      causal_max_select.fal = causal_maximum.out;
+      causal_maximum.in = causal_max_select.out;
+      causal_maximum.write_en = 1'd1;
+      attention_score_q8.addr0 = causal_slot_address.out;
+      attention_score_q8.content_en = 1'd1;
+      attention_score_q8.write_data = causal_score.out;
+      attention_score_q8.write_en = 1'd1;
+      causal_write_score_update_max[done] = (causal_maximum.done & attention_score_q8.done) ? 1'd1;
+    }
+    group causal_write_maximum {
+      attention_maximum_q8.addr0 = causal_row_head_address.out;
+      attention_maximum_q8.content_en = 1'd1;
+      attention_maximum_q8.write_data = causal_maximum.out;
+      attention_maximum_q8.write_en = 1'd1;
+      causal_write_maximum[done] = attention_maximum_q8.done;
+    }
+
+    group causal_init_probability_state {
+      causal_key.in = 3'd0;
+      causal_key.write_en = 1'd1;
+      causal_denominator.in = 64'd0;
+      causal_denominator.write_en = 1'd1;
+      causal_init_probability_state[done] = (causal_key.done & causal_denominator.done) ? 1'd1;
+    }
+    group causal_read_score {
+      attention_score_q8.addr0 = causal_slot_address.out;
+      attention_score_q8.content_en = 1'd1;
+      causal_read_score[done] = attention_score_q8.done;
+    }
+    group causal_latch_delta {
+      causal_negative_4096.left = 64'd0;
+      causal_negative_4096.right = 64'd4096;
+      causal_delta_subtract.left = attention_score_q8.read_data;
+      causal_delta_subtract.right = causal_maximum.out;
+      causal_delta_lt_min.left = causal_delta_subtract.out;
+      causal_delta_lt_min.right = causal_negative_4096.out;
+      causal_delta_clamp.cond = causal_delta_lt_min.out;
+      causal_delta_clamp.tru = causal_negative_4096.out;
+      causal_delta_clamp.fal = causal_delta_subtract.out;
+      causal_delta.in = causal_delta_clamp.out;
+      causal_delta.write_en = 1'd1;
+      attention_delta_q8.addr0 = causal_slot_address.out;
+      attention_delta_q8.content_en = 1'd1;
+      attention_delta_q8.write_data = causal_delta_clamp.out;
+      attention_delta_q8.write_en = 1'd1;
+      causal_latch_delta[done] = (causal_delta.done & attention_delta_q8.done) ? 1'd1;
+    }
+    group causal_read_exp_lut {
+      causal_lut_sum.left = causal_delta.out;
+      causal_lut_sum.right = 64'd4096;
+      causal_lut_gt_last.left = causal_lut_sum.out;
+      causal_lut_gt_last.right = 64'd4095;
+      causal_lut_clamp.cond = causal_lut_gt_last.out;
+      causal_lut_clamp.tru = 64'd4095;
+      causal_lut_clamp.fal = causal_lut_sum.out;
+      causal_lut_address.in = causal_lut_clamp.out;
+      attention_exp_lut_q1_20.addr0 = causal_lut_address.out;
+      attention_exp_lut_q1_20.content_en = 1'd1;
+      causal_read_exp_lut[done] = attention_exp_lut_q1_20.done;
+    }
+    group causal_write_exp_accumulate_denominator {
+      causal_delta_is_zero.left = causal_delta.out;
+      causal_delta_is_zero.right = 64'd0;
+      causal_probability_select.cond = causal_delta_is_zero.out;
+      causal_probability_select.tru = 64'd1048576;
+      causal_probability_select.fal = attention_exp_lut_q1_20.read_data;
+      causal_denominator_add.left = causal_denominator.out;
+      causal_denominator_add.right = causal_probability_select.out;
+      causal_denominator.in = causal_denominator_add.out;
+      causal_denominator.write_en = 1'd1;
+      attention_exp_q1_20.addr0 = causal_slot_address.out;
+      attention_exp_q1_20.content_en = 1'd1;
+      attention_exp_q1_20.write_data = causal_probability_select.out;
+      attention_exp_q1_20.write_en = 1'd1;
+      causal_write_exp_accumulate_denominator[done] = (causal_denominator.done & attention_exp_q1_20.done) ? 1'd1;
+    }
+    group causal_write_denominator {
+      attention_denominator_q1_20.addr0 = causal_row_head_address.out;
+      attention_denominator_q1_20.content_en = 1'd1;
+      attention_denominator_q1_20.write_data = causal_denominator.out;
+      attention_denominator_q1_20.write_en = 1'd1;
+      causal_write_denominator[done] = attention_denominator_q1_20.done;
+    }
+
+    group causal_init_numerator_lane {
+      causal_lane.in = 3'd0;
+      causal_lane.write_en = 1'd1;
+      causal_init_numerator_lane[done] = causal_lane.done;
+    }
+    group causal_init_numerator_key {
+      causal_key.in = 3'd0;
+      causal_key.write_en = 1'd1;
+      causal_numerator.in = 64'd0;
+      causal_numerator.write_en = 1'd1;
+      causal_init_numerator_key[done] = (causal_key.done & causal_numerator.done) ? 1'd1;
+    }
+    group causal_read_probability_value {
+      attention_exp_q1_20.addr0 = causal_slot_address.out;
+      attention_exp_q1_20.content_en = 1'd1;
+      v_output_q16_16.addr0 = causal_key_address.out;
+      v_output_q16_16.content_en = 1'd1;
+      causal_read_probability_value[done] = (attention_exp_q1_20.done & v_output_q16_16.done) ? 1'd1;
+    }
+    group causal_multiply_probability_value {
+      causal_value_product.left = attention_exp_q1_20.read_data;
+      causal_value_product.right = v_output_q16_16.read_data;
+      causal_value_product.go = 1'd1;
+      causal_multiply_probability_value[done] = causal_value_product.done;
+    }
+    group causal_accumulate_numerator {
+      causal_numerator_add.left = causal_numerator.out;
+      causal_numerator_add.right = causal_value_product.out;
+      causal_numerator.in = causal_numerator_add.out;
+      causal_numerator.write_en = 1'd1;
+      causal_accumulate_numerator[done] = causal_numerator.done;
+    }
+    group causal_write_numerator_latch_corrected {
+      causal_denominator_half.left = causal_denominator.out;
+      causal_denominator_half.right = 64'd1;
+      causal_numerator_negative.left = causal_numerator.out;
+      causal_numerator_negative.right = 64'd0;
+      causal_negative_half.left = 64'd0;
+      causal_negative_half.right = causal_denominator_half.out;
+      causal_correction.cond = causal_numerator_negative.out;
+      causal_correction.tru = causal_negative_half.out;
+      causal_correction.fal = causal_denominator_half.out;
+      causal_corrected_add.left = causal_numerator.out;
+      causal_corrected_add.right = causal_correction.out;
+      causal_corrected.in = causal_corrected_add.out;
+      causal_corrected.write_en = 1'd1;
+      causal_corrected_negative.in = causal_numerator_negative.out;
+      causal_corrected_negative.write_en = 1'd1;
+      attention_numerator_q17_36.addr0 = causal_query_address.out;
+      attention_numerator_q17_36.content_en = 1'd1;
+      attention_numerator_q17_36.write_data = causal_numerator.out;
+      attention_numerator_q17_36.write_en = 1'd1;
+      causal_write_numerator_latch_corrected[done] = (causal_corrected.done & causal_corrected_negative.done & attention_numerator_q17_36.done) ? 1'd1;
+    }
+    group causal_divide_context {
+      causal_corrected_negate.left = 64'd0;
+      causal_corrected_negate.right = causal_corrected.out;
+      causal_corrected_abs.cond = causal_corrected_negative.out;
+      causal_corrected_abs.tru = causal_corrected_negate.out;
+      causal_corrected_abs.fal = causal_corrected.out;
+      causal_divide.left = causal_corrected_abs.out;
+      causal_divide.right = causal_denominator.out;
+      causal_divide.go = 1'd1;
+      causal_divide_context[done] = causal_divide.done;
+    }
+    group causal_write_context {
+      causal_quotient_negate.left = 64'd0;
+      causal_quotient_negate.right = causal_divide.out_quotient;
+      causal_context_select.cond = causal_corrected_negative.out;
+      causal_context_select.tru = causal_quotient_negate.out;
+      causal_context_select.fal = causal_divide.out_quotient;
+      attention_context_heads_q16_16.addr0 = causal_query_address.out;
+      attention_context_heads_q16_16.content_en = 1'd1;
+      attention_context_heads_q16_16.write_data = causal_context_select.out;
+      attention_context_heads_q16_16.write_en = 1'd1;
+      attention_context_q16_16.addr0 = causal_query_address.out;
+      attention_context_q16_16.content_en = 1'd1;
+      attention_context_q16_16.write_data = causal_context_select.out;
+      attention_context_q16_16.write_en = 1'd1;
+      causal_write_context[done] = (attention_context_heads_q16_16.done & attention_context_q16_16.done) ? 1'd1;
+    }"""]
+    control = """      causal_init_row;
+      while causal_row_lt.out with causal_row_condition {
+        seq {
+          causal_init_head;
+          while causal_head_lt.out with causal_head_condition {
+            seq {
+              causal_init_score_state;
+              while causal_key_le.out with causal_key_condition {
+                seq {
+                  causal_init_dot_and_lane;
+                  while causal_lane_lt.out with causal_lane_condition {
+                    seq { causal_read_qk; causal_multiply_qk; causal_accumulate_dot; causal_increment_lane; }
+                  }
+                  causal_latch_score;
+                  causal_write_score_update_max;
+                  causal_increment_key;
+                }
+              }
+              causal_write_maximum;
+              causal_init_probability_state;
+              while causal_key_le.out with causal_key_condition {
+                seq {
+                  causal_read_score;
+                  causal_latch_delta;
+                  causal_read_exp_lut;
+                  causal_write_exp_accumulate_denominator;
+                  causal_increment_key;
+                }
+              }
+              causal_write_denominator;
+              causal_init_numerator_lane;
+              while causal_lane_lt.out with causal_lane_condition {
+                seq {
+                  causal_init_numerator_key;
+                  while causal_key_le.out with causal_key_condition {
+                    seq {
+                      causal_read_probability_value;
+                      causal_multiply_probability_value;
+                      causal_accumulate_numerator;
+                      causal_increment_key;
+                    }
+                  }
+                  causal_write_numerator_latch_corrected;
+                  causal_divide_context;
+                  causal_write_context;
+                  causal_increment_lane;
+                }
+              }
+              causal_increment_head;
+            }
+          }
+          causal_increment_row;
+        }
+      }"""
+    return cells, wires, control
+
+
+def _causal_kernel_futil() -> str:
+    shared = _mlp_lowerer()
+    memory_cells = [
+        "@external attention_exp_lut_q1_20 = seq_mem_d1(64, 4096, 12);",
+        "@external block_input_q16_16 = seq_mem_d1(64, 256, 8);",
+        "@external ln1_gamma_q16_16 = seq_mem_d1(64, 64, 6);",
+        "@external ln1_beta_q16_16 = seq_mem_d1(64, 64, 6);",
+        "@external ln1_output_q16_16 = seq_mem_d1(64, 256, 8);",
+        "zero_bias_q16_16 = seq_mem_d1(64, 64, 6);",
+    ]
+    for prefix in ("q", "k", "v"):
+        memory_cells.extend(
+            [
+                f"@external {prefix}_input_codes_i8 = seq_mem_d1(8, 256, 8);",
+                f"@external {prefix}_input_scale_q8_24 = seq_mem_d1(64, 64, 6);",
+                f"@external {prefix}_input_q16_16 = seq_mem_d1(64, 256, 8);",
+                f"@external {prefix}_weight_codes_i8 = seq_mem_d1(8, 4096, 12);",
+                f"@external {prefix}_weight_scale_q8_24 = seq_mem_d1(64, 64, 6);",
+                f"@external {prefix}_accumulator_i64 = seq_mem_d1(64, 256, 8);",
+                f"@external {prefix}_post_weight_rescale_bias_q16_16 = seq_mem_d1(64, 256, 8);",
+                f"@external {prefix}_output_scale_q8_24 = seq_mem_d1(64, 64, 6);",
+                f"@external {prefix}_output_codes_i8 = seq_mem_d1(8, 256, 8);",
+                f"@external {prefix}_output_q16_16 = seq_mem_d1(64, 256, 8);",
+            ]
+        )
+    memory_cells.extend(
+        [
+            "@external attention_score_q8 = seq_mem_d1(64, 256, 8);",
+            "@external attention_maximum_q8 = seq_mem_d1(64, 64, 6);",
+            "@external attention_delta_q8 = seq_mem_d1(64, 256, 8);",
+            "@external attention_exp_q1_20 = seq_mem_d1(64, 256, 8);",
+            "@external attention_denominator_q1_20 = seq_mem_d1(64, 64, 6);",
+            "@external attention_numerator_q17_36 = seq_mem_d1(64, 256, 8);",
+            "@external attention_context_heads_q16_16 = seq_mem_d1(64, 256, 8);",
+            "@external attention_context_q16_16 = seq_mem_d1(64, 256, 8);",
+        ]
+    )
+    phases: list[tuple[list[str], list[str], str]] = [
+        _ln1_composed_phase(),
+        _initialize_zero_bias_phase(),
+    ]
+    for prefix in ("q", "k", "v"):
+        phases.extend(
+            [
+                shared._activation_qdq_phase(
+                    f"{prefix}_input_qdq",
+                    "ln1_output_q16_16",
+                    f"{prefix}_input_scale_q8_24",
+                    f"{prefix}_input_codes_i8",
+                    f"{prefix}_input_q16_16",
+                    256,
+                    64,
+                ),
+                shared._gemv_phase(
+                    f"{prefix}_gemv",
+                    f"{prefix}_input_codes_i8",
+                    f"{prefix}_input_scale_q8_24",
+                    f"{prefix}_weight_codes_i8",
+                    f"{prefix}_accumulator_i64",
+                    4,
+                    64,
+                    64,
+                ),
+                shared._requantize_phase(
+                    f"{prefix}_requant",
+                    f"{prefix}_accumulator_i64",
+                    f"{prefix}_weight_scale_q8_24",
+                    "zero_bias_q16_16",
+                    f"{prefix}_output_scale_q8_24",
+                    f"{prefix}_post_weight_rescale_bias_q16_16",
+                    f"{prefix}_output_codes_i8",
+                    f"{prefix}_output_q16_16",
+                    256,
+                    64,
+                ),
+            ]
+        )
+    phases.extend([_initialize_causal_slots_phase(), _causal_attention_phase()])
+    phase_cells = [cell for cells, _, _ in phases for cell in cells]
+    phase_wires = [wire for _, wires, _ in phases for wire in wires]
+    phase_controls = [control for _, _, control in phases]
+    futil = f'''// Generated exact TinyStories-1M block-0 causal-attention diagnostic.
+// All LayerNorm, projection, and causal checkpoints are hardware-produced.
+import "primitives/core.futil";
+import "primitives/binary_operators.futil";
+import "primitives/memories/seq.futil";
+
+component main(@go go: 1) -> (@done done: 1) {{
+  cells {{
+{shared._indent_lines(memory_cells + phase_cells, 4)}
+  }}
+  wires {{
+{shared._indent_lines(phase_wires, 4)}
+  }}
+  control {{
+    seq {{
+{shared._indent_lines(phase_controls, 0)}
+    }}
+  }}
+}}
+'''
+    if len(re.findall(r"(?m)^component\s+main\b", futil)) != 1:
+        raise ValueError("causal-attention generator did not emit exactly one main")
+    return futil
+
+
+def generate_causal_attention_kernel(fixture_path: Path) -> CalyxArtifact:
+    """Generate the one-component source-to-causal-context diagnostic gate."""
+    fixture = _checked_causal_fixture(fixture_path)
+    futil = _causal_kernel_futil()
+    shared_path = ROOT / "scripts/pipeline/lower_fixed_point_mlp_crossing_to_calyx.py"
+    return CalyxArtifact(
+        futil=futil,
+        provenance={
+            "generated": CAUSAL_ARTIFACT_SCHEMA,
+            "fixture_receipt_sha256": fixture["receipt_sha256"],
+            "tensor_fixture_receipt_sha256": fixture[
+                "tensor_fixture_receipt_sha256"
+            ],
+            "authority": _fixture_authority(fixture),
+            "futil_sha256": hashlib.sha256(futil.encode("utf-8")).hexdigest(),
+            "shared_phase_generator_sha256": hashlib.sha256(
+                shared_path.read_bytes()
+            ).hexdigest(),
+            "component_count": 1,
+            "host_preload_memories": list(CAUSAL_SOURCE_MEMORIES),
+            "hardware_owned_memories": list(CAUSAL_COMPUTED_CHECKPOINTS),
+            "calyx_disabled_passes": ["cell-share"],
+            "legal_causal_key_counts": [1, 2, 3, 4],
+            "future_slot_convention": "hardware_written_zero",
+            "host_intermediate": False,
+        },
+    )
+
+
+def _cpp_print_memory(name: str, count: int, *, signed_i8: bool) -> str:
+    expression = f"root->main__DOT__{name}__DOT__mem[i]"
+    if signed_i8:
+        expression = (
+            "static_cast<std::int64_t>(static_cast<std::int8_t>("
+            + expression
+            + "))"
+        )
+    else:
+        expression = f"static_cast<std::int64_t>({expression})"
+    return f'''  std::cout << ",\\\"{name}\\\":[";
+  for (unsigned i = 0; i < {count}; ++i) {{
+    if (i) std::cout << ',';
+    std::cout << {expression};
+  }}
+  std::cout << ']';'''
+
+
+def _generated_causal_harness(fixture: dict[str, Any]) -> str:
+    """Preload source memories, zero computed memories, and expose raw state."""
+    declarations: list[str] = []
+    preload_groups: list[str] = []
+    cpp_names: list[str] = []
+    for index, name in enumerate(CAUSAL_SOURCE_MEMORIES):
+        values = _flatten_tensor(fixture, name)
+        cpp_name = f"kSource{index:02d}"
+        cpp_names.append(cpp_name)
+        declarations.append(
+            f"// {name}\nstatic const std::int64_t {cpp_name}[{len(values)}] = "
+            f"{{{_cpp_values(values)}}};"
+        )
+        cast = "std::uint8_t" if name.endswith("codes_i8") else "std::uint64_t"
+        preload_groups.append(
+            f"  for (unsigned i = 0; i < {len(values)}; ++i)\n"
+            f"    root->main__DOT__{name}__DOT__mem[i] = "
+            f"static_cast<{cast}>({cpp_name}[i]);"
+        )
+
+    checkpoint_counts = {
+        name: fixture["tensors"][name]["bytes"] // 8
+        for name in CAUSAL_COMPUTED_CHECKPOINTS
+    }
+    zero_groups = [
+        f"  for (unsigned i = 0; i < {count}; ++i)\n"
+        f"    root->main__DOT__{name}__DOT__mem[i] = 0;"
+        for name, count in checkpoint_counts.items()
+    ]
+    print_groups = [
+        _cpp_print_memory(
+            name,
+            fixture["tensors"][name]["bytes"] // 8,
+            signed_i8=name.endswith("codes_i8"),
+        )
+        for name in CAUSAL_OBSERVED_TENSORS
+    ]
+    harness = f'''// Generated source-only causal-attention diagnostic harness.
+// Static arrays below correspond exactly to immutable authenticated sources.
+#include "Vmain.h"
+#include "Vmain___024root.h"
+#include "verilated.h"
+
+#include <cstdint>
+#include <iostream>
+
+{chr(10).join(declarations)}
+
+static void tick(Vmain& model) {{
+  model.clk = 0;
+  model.eval();
+  model.clk = 1;
+  model.eval();
+}}
+
+int main(int argc, char** argv) {{
+  Verilated::commandArgs(argc, argv);
+  Vmain model;
+  auto* root = model.rootp;
+{chr(10).join(preload_groups)}
+{chr(10).join(zero_groups)}
+  model.reset = 1;
+  model.go = 0;
+  for (unsigned i = 0; i < 3; ++i) tick(model);
+  model.reset = 0;
+  model.go = 1;
+  unsigned cycles = 0;
+  while (!model.done && cycles < 10000000) {{
+    tick(model);
+    ++cycles;
+  }}
+  const bool complete = model.done && cycles > 256;
+  std::cout << "{{\\\"status\\\":\\\"" << (complete ? "ok" : "timeout")
+            << "\\\",\\\"cycles\\\":" << cycles;
+{chr(10).join(print_groups)}
+  std::cout << "}}\\n";
+  return complete ? 0 : 1;
+}}
+'''
+    found_arrays = re.findall(
+        r"^static const std::int64_t\s+(kSource[0-9]+)\[",
+        harness,
+        re.MULTILINE,
+    )
+    if found_arrays != cpp_names:
+        raise ValueError("causal-attention harness source preload whitelist mismatch")
+    for name in CAUSAL_COMPUTED_CHECKPOINTS:
+        assignment = rf"main__DOT__{re.escape(name)}__DOT__mem\[i\]\s*=\s*([^;]+);"
+        if re.findall(assignment, harness) != ["0"]:
+            raise ValueError(f"host writes causal-attention checkpoint memory: {name}")
+    if "kExpected" in harness:
+        raise ValueError("causal-attention harness contains an expected-output oracle")
+    return harness
+
+
+def _reshape_flat(values: list[int], shape: list[int]) -> object:
+    if len(shape) == 1:
+        if len(values) != shape[0]:
+            raise ValueError("observed tensor length does not match shape")
+        return values
+    stride = 1
+    for dimension in shape[1:]:
+        stride *= dimension
+    if len(values) != shape[0] * stride:
+        raise ValueError("observed tensor length does not match shape")
+    return [
+        _reshape_flat(values[index * stride : (index + 1) * stride], shape[1:])
+        for index in range(shape[0])
+    ]
+
+
+def _require_causal_checkpoint(
+    name: str, values: list[int], fixture: dict[str, Any]
+) -> str:
+    expected = _flatten_tensor(fixture, name)
+    if len(values) != len(expected):
+        raise RuntimeError(
+            f"generated-SV causal {name} length mismatch: "
+            f"{len(values)} != {len(expected)}"
+        )
+    for index, (actual, wanted) in enumerate(zip(values, expected, strict=True)):
+        if actual != wanted:
+            raise RuntimeError(
+                f"generated-SV causal {name} mismatch at checkpoint {index}: "
+                f"observed {actual}, expected {wanted}"
+            )
+    digest = _little_endian_i64_sha256(values)
+    if digest != fixture["tensors"][name]["little_endian_int64_sha256"]:
+        raise RuntimeError(f"generated-SV causal {name} hash mismatch")
+    return digest
+
+
+def run_causal_attention_sv(
+    artifact: CalyxArtifact, fixture_path: Path
+) -> dict[str, object]:
+    """Compile once and verify every Q/K/V and causal-attention observation."""
+    if artifact.provenance.get("generated") != CAUSAL_ARTIFACT_SCHEMA:
+        raise ValueError("unrecognized generated-SV causal-attention artifact")
+    fixture = _checked_causal_fixture(fixture_path)
+    shared_path = ROOT / "scripts/pipeline/lower_fixed_point_mlp_crossing_to_calyx.py"
+    if (
+        artifact.provenance.get("fixture_receipt_sha256")
+        != fixture["receipt_sha256"]
+        or artifact.provenance.get("tensor_fixture_receipt_sha256")
+        != fixture["tensor_fixture_receipt_sha256"]
+        or artifact.provenance.get("authority") != _fixture_authority(fixture)
+        or artifact.provenance.get("shared_phase_generator_sha256")
+        != hashlib.sha256(shared_path.read_bytes()).hexdigest()
+    ):
+        raise ValueError("generated-SV causal-attention fixture authority mismatch")
+    if artifact.provenance.get("futil_sha256") != hashlib.sha256(
+        artifact.futil.encode("utf-8")
+    ).hexdigest():
+        raise ValueError("generated-SV causal-attention Futil authority mismatch")
+    for name in CAUSAL_COMPUTED_CHECKPOINTS:
+        if f"{name}.write_en = 1'd1" not in artifact.futil:
+            raise ValueError(f"generated-SV causal checkpoint is not hardware-written: {name}")
+
+    artifact_dir = CAUSAL_ARTIFACT_DIRECTORY
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    futil_path = artifact_dir / "causal-attention.futil"
+    sv_path = artifact_dir / "main.sv"
+    harness_path = artifact_dir / "harness.cpp"
+    futil_path.write_text(artifact.futil, encoding="utf-8")
+    harness = _generated_causal_harness(fixture)
+    harness_path.write_text(harness, encoding="utf-8")
+
+    calyx = _calyx_install()
+    calyx_command = [
+        str(calyx / "bin/calyx"),
+        str(futil_path),
+        "-l",
+        str(calyx / "share/calyx"),
+        "-d",
+        "cell-share",
+        "-b",
+        "verilog",
+        "-o",
+        str(sv_path),
+    ]
+    compiled = subprocess.run(
+        calyx_command,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if compiled.returncode != 0 or not sv_path.is_file():
+        raise RuntimeError(
+            f"causal-attention Calyx-to-SV failed: {compiled.stderr.strip()}"
+        )
+
+    verilator_dir = artifact_dir / "verilator"
+    executable = verilator_dir / "fixed_point_attention_causal_harness"
+    verilator_command = [
+        "verilator",
+        "--cc",
+        "--exe",
+        "--build",
+        "--top-module",
+        "main",
+        "--public-flat-rw",
+        "--Mdir",
+        str(verilator_dir),
+        "-CFLAGS",
+        "-std=c++17",
+        "-o",
+        executable.name,
+        str(sv_path),
+        str(harness_path),
+    ]
+    verilated = subprocess.run(
+        verilator_command,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if verilated.returncode != 0 or not executable.is_file():
+        raise RuntimeError(
+            f"causal-attention Verilator build failed: {verilated.stderr.strip()}"
+        )
+    simulated = subprocess.run(
+        [str(executable)],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=600,
+    )
+    if simulated.returncode != 0:
+        raise RuntimeError(
+            "generated-SV causal-attention harness failed: "
+            f"{simulated.stdout.strip()} {simulated.stderr.strip()}"
+        )
+    try:
+        raw = json.loads(
+            next(
+                line
+                for line in reversed(simulated.stdout.splitlines())
+                if line.startswith("{")
+            )
+        )
+    except (json.JSONDecodeError, StopIteration) as error:
+        raise RuntimeError(
+            "generated-SV causal-attention harness did not emit JSON: "
+            f"{simulated.stdout!r}"
+        ) from error
+    if raw.get("status") != "ok" or not isinstance(raw.get("cycles"), int):
+        raise RuntimeError(
+            f"generated-SV causal-attention observation is invalid: {raw}"
+        )
+
+    result: dict[str, object] = {"cycles": raw["cycles"]}
+    hashes: dict[str, str] = {}
+    for name in CAUSAL_OBSERVED_TENSORS:
+        values = raw.get(name)
+        if not isinstance(values, list) or not all(
+            isinstance(value, int) for value in values
+        ):
+            raise RuntimeError(f"generated-SV causal checkpoint invalid: {name}")
+        hashes[name] = _require_causal_checkpoint(name, values, fixture)
+        result[name] = _reshape_flat(values, fixture["tensors"][name]["shape"])
+    result["little_endian_int64_sha256"] = hashes
+
+    artifact.provenance["generated_sv_artifacts"] = {
+        "directory": str(artifact_dir),
+        "futil": str(futil_path),
+        "sv": str(sv_path),
+        "harness": str(harness_path),
+        "executable": str(executable),
+        "futil_sha256": hashlib.sha256(futil_path.read_bytes()).hexdigest(),
+        "sv_sha256": hashlib.sha256(sv_path.read_bytes()).hexdigest(),
+        "harness_sha256": hashlib.sha256(harness.encode("utf-8")).hexdigest(),
+    }
+    artifact.provenance["calyx_command"] = calyx_command
+    artifact.provenance["verilator_command"] = verilator_command
+    artifact.provenance["observed_little_endian_int64_sha256"] = hashes
+    artifact.provenance["cycles"] = raw["cycles"]
+    return result
