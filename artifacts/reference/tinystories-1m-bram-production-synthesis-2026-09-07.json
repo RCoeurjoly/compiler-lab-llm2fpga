@@ -87,6 +87,8 @@
     "board_inference_verified": false,
     "diagnostic": "Explicit sign extension restores the signed-64-bit accumulator boundary while reducing production multiplier widths. Focused tests pass; full synthesis and board inference remain pending."
     ,"coarse_synthesis": {"status": "bounded_in_global_share_sat_no_artifact", "diagnostic": "The pinned coarse flow spent the bounded window in global share SAT solving (2750 cells, 13549 variables, 35034 clauses); no mapped artifact was emitted."}
+    ,"no_global_opt_control": {"status": "coarse_passed_memory_mapping_bounded", "cells": 77930, "generic_cells": {"alu": 333, "lcu": 220, "macc_v2": 38, "mem_v2": 279}, "diagnostic": "Skipping broad opt/share preserves the design and completes coarse preparation quickly; BRAM mapping then remains bounded by the 197 token banks."
+    }
   },
   "claims": {
     "jtag_top_integrated": true,

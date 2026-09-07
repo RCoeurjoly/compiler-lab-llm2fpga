@@ -181,3 +181,10 @@ response as synthesis-preserved. This prevents a board build from silently
 collapsing the accelerator to the LED shell when only status outputs are
 observed. The focused top-integration tests pass; a new mapped resource result
 is still pending.
+
+A no-global-optimization control run (`techmap` + `alumacc` + `memory -nomap`,
+without the broad `opt/share` sequence) completed in about one minute and
+preserved 77,930 cells, including 333 `$alu`, 220 `$lcu`, 38 `$macc_v2`, and
+279 memories. The subsequent BRAM mapper began processing the 197 token banks
+but was bounded before completion. This gives a reproducible fast coarse stage
+and identifies bank-by-bank memory mapping as the next bounded bottleneck.
