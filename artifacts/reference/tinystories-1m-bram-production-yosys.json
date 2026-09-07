@@ -15,8 +15,27 @@
     "diagnostic": "optimized Verilator build completed, but the full two-run model execution did not complete within the bounded observation window"
   },
   "nextpnr": {
-    "status": "not_run",
-    "diagnostic": "this checkout provides no nextpnr-xilinx package or YPCB constraint file"
+    "status": "failed_resource_capacity",
+    "diagnostic": "deterministic constrained nextpnr-xilinx placement reached the YPCB target but requires 1058 RAMB36E1 blocks while the xc7k480tffg1156 device provides 955; placement stopped before timing analysis",
+    "seed": 15,
+    "frequency_mhz": 50,
+    "mapped_resources": {
+      "RAMB36E1": 1058,
+      "RAMB18E1": 13,
+      "DSP48E1": 248,
+      "CARRY4": 2743,
+      "SLICE_LUTX": 31465,
+      "SLICE_FFX": 10284
+    },
+    "available_resources": {
+      "RAMB36E1": 955,
+      "RAMB18E1": 1910,
+      "DSP48E1": 1920,
+      "CARRY4": 74650,
+      "SLICE_LUTX": 597200,
+      "SLICE_FFX": 597200
+    },
+    "first_failure": "Unable to place cell 'core.lm_accumulator_i64.mem.0.57.genblk1.genblk1.upper', no Bels remaining of type 'RAMB36E1_RAMB36E1'"
   },
   "claims": {
     "bram_only_contract": true,
