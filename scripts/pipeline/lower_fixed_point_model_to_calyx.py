@@ -430,7 +430,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
     if production:
         # The streamed LM head reuses one vocabulary-row accumulator for each
         # real context row; it never materializes rows*vocabulary results.
-        hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 65536)}
+        hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 50257)}
     else:
         hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "model_embedding": (64, 1024), "model_token_embedding": (64, 1024), "model_position_embedding": (64, 1024), "model_block_outputs": (64, 8192), "model_final_ln": (64, 1024), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 524288), "model_logits": (64, 1048576)}
     memory_cells += [_memory(name, *descriptor) for name, descriptor in hardware.items()]
