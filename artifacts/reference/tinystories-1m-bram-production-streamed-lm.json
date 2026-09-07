@@ -1,8 +1,8 @@
 {
   "schema": "tinystories-1m-bram-production-streamed-lm-v1",
-  "status": "pre_map_passed_xilinx_mapping_unverified",
-  "futil_sha256": "98de5c7200964b9adce0955b8e4a99776e910ad8238d8114eba3c92bb2fec19a",
-  "synthesis_sv_sha256": "e3076ec4a8688acd7257ddfb30c32041960833de91d7f6420c3ab4db4f848ead",
+  "status": "nextpnr_timing_passed_simulation_unverified",
+  "futil_sha256": "1320fb483e8917dd34c770293315da5290e87ae352ca0d432bdc4adf43725041",
+  "synthesis_sv_sha256": "4a4dba61a6d34288cfd8901cb5841196401ffffdf7067aa5a21fe3e793dbfaa4",
   "frontend": "yosys-slang",
   "pre_map": {
     "status": "passed",
@@ -13,24 +13,41 @@
   },
   "architecture": {
     "lm_head": "only final real context row",
-    "accumulator_storage": "one 65536-entry 64-bit vocabulary row",
+    "accumulator_storage": "one 50257-entry 64-bit vocabulary row",
     "full_logits_storage": false,
     "audit_checkpoint_memories": false
   },
   "mapping": {
-    "status": "not_completed",
-    "diagnostic": "standard synth_xilinx FSM optimization expands the generated control netlist without reaching a mapped resource report in the bounded run; no timing or placement claim is made"
+    "status": "passed",
+    "mapped_resources": {
+      "RAMB36E1": 134,
+      "RAMB18E1": 13,
+      "DSP48E1": 248,
+      "CARRY4": 2638,
+      "FDRE": 10221,
+      "LUT6": 3656
+    },
+    "json_sha256": "1bb6515e387af2974ae2b1ddaa09a320278e5d8527a288c9c36e5ec35c90dd7a",
+    "log_sha256": "df7b9be272"
   },
   "nextpnr": {
-    "status": "not_run",
+    "status": "passed",
     "seed": 15,
-    "board_fit_verified": false
+    "frequency_mhz": 50,
+    "max_frequency_mhz": 56.86,
+    "timing": "passed",
+    "router": "router2",
+    "log_sha256": "53aa4d0f33aa4a0457aa4e87cd5c28933ea96143888da43ab7c949ecb4c1bc7a",
+    "routed_json_sha256": "575f8d2370ad1df1db6d0854509bd887d95a26d1f055e0255100630b2d2925b0",
+    "fasm_sha256": "ee2e71b94c994101c042410a713bfb3cab6206f9c255a951253d7d3b9242c8c2",
+    "board_fit_verified": true
   },
   "simulation": {
     "status": "not_verified"
   },
   "claims": {
     "production_lowering_tests_passed": true,
+    "timing_closed": true,
     "board_inference_verified": false
   }
 }
