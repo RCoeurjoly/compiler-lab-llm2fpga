@@ -386,9 +386,13 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
     if board_io:
         b.wires.append("model_step_is_first.in = model_step_address.out; model_token0_next.cond = model_step_is_first.out; model_token0_next.tru = model_best_token.out; model_token0_next.fal = model_token0.out; model_token1_next.cond = model_step_address.out; model_token1_next.tru = model_best_token.out; model_token1_next.fal = model_token1.out; model_token_select.cond = token_index; model_token_select.tru = model_token1.out; model_token_select.fal = model_token0.out; token_id = model_token_select.out;")
     init_greedy = b.group("model_init_greedy", ["model_best_value.in = 64'd9223372036854775808;", "model_best_value.write_en = 1'd1;", "model_best_token.in = 16'd0;", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
-    accumulator_address = "model_logit.out" if stream_lm_head else "model_accumulator_address.out"
-    read_logit = b.read("model_read_logit", [("lm_accumulator_i64", accumulator_address), ("token_weight_scale_q8_24", "model_logit.out")])
-    mul_logit = b.group("model_multiply_logit", ["model_logit_product.left = lm_accumulator_i64.read_data;", "model_logit_product.right = token_weight_scale_q8_24.read_data;", "model_logit_product.go = 1'd1;"], "model_logit_product.done")
+    if stream_lm_head:
+        read_logit = b.read("model_read_logit", [("token_weight_scale_q8_24", "model_logit.out")])
+        logit_value = "lm_gemv_accumulator.out"
+    else:
+        read_logit = b.read("model_read_logit", [("lm_accumulator_i64", "model_accumulator_address.out"), ("token_weight_scale_q8_24", "model_logit.out")])
+        logit_value = "lm_accumulator_i64.read_data"
+    mul_logit = b.group("model_multiply_logit", [f"model_logit_product.left = {logit_value};", "model_logit_product.right = token_weight_scale_q8_24.read_data;", "model_logit_product.go = 1'd1;"], "model_logit_product.done")
     round_logit = b.round("model_round_logit", "model_logit_product.out", 32)
     write_logit = ""
     if audit_checkpoints:
@@ -464,7 +468,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
     if production:
         # The streamed LM head reuses one vocabulary-row accumulator for each
         # real context row; it never materializes rows*vocabulary results.
-        hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 50257)}
+        hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512)}
     else:
         hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "model_embedding": (64, 1024), "model_token_embedding": (64, 1024), "model_position_embedding": (64, 1024), "model_block_outputs": (64, 8192), "model_final_ln": (64, 1024), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 524288), "model_logits": (64, 1048576)}
     memory_cells += [_memory(name, *descriptor) for name, descriptor in hardware.items()]
@@ -492,6 +496,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
         input_row_expr="model_last_row.out" if production else None,
         input_row_width=4 if production else None,
         input_address_width_override=9 if production else None,
+        write_trace=not production,
     )
     # Restrict expensive vocabulary projections to real context rows.
     gemv_phase = (gemv_phase[0], [w.replace("lm_gemv_row_lt.right = 4'd8;", "lm_gemv_row_lt.right = model_context_length.out;") for w in gemv_phase[1]], gemv_phase[2])

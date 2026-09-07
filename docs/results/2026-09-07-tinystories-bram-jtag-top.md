@@ -22,6 +22,13 @@ The four prompt words are now driven from the CSR shadow registers into the
 generated prompt-loading schedule. The board therefore loads the prompt before
 the start command; no host-side token or intermediate-state feedback is used.
 
+The production LM head now consumes each vocabulary-row GEMV result directly
+from its 64-bit accumulator register during argmax. It no longer materializes
+the 50,257-entry `lm_accumulator_i64` BRAM. The generated structural checkpoint
+therefore falls from 39.3 Mbits / 144 memories to 36.1 Mbits / 143 memories,
+without changing the signed-64-bit arithmetic contract. This is a capacity
+optimization, not yet a fit result.
+
 The model weights remain immutable BRAM initialization data. The JTAG bridge
 has been linted with Verilator in `BSCAN_SIM` mode, and the production
 generated SV still passes Calyx compilation and the focused lowering tests.

@@ -758,6 +758,7 @@ def _gemv_phase(
     input_row_expr: str | None = None,
     input_row_width: int | None = None,
     input_address_width_override: int | None = None,
+    write_trace: bool = True,
 ) -> tuple[list[str], list[str], str]:
     row_width = input_row_width or rows.bit_length()
     output_width = outputs.bit_length()
@@ -787,10 +788,6 @@ def _gemv_phase(
         f"{prefix}_weight_output_shift = std_lsh({weight_address_width});",
         f"{prefix}_weight_k_pad = std_pad({k_width}, {weight_address_width});",
         f"{prefix}_weight_address = std_add({weight_address_width});",
-        f"{prefix}_trace_row_pad = std_pad({row_width}, {trace_address_width});",
-        f"{prefix}_trace_row_shift = std_lsh({trace_address_width});",
-        f"{prefix}_trace_output_pad = std_pad({output_width}, {trace_address_width});",
-        f"{prefix}_trace_address = std_add({trace_address_width});",
         f"{prefix}_code_signed = std_signext(8, 64);",
         f"{prefix}_weight_signed = std_signext(8, 64);",
         f"{prefix}_activation_scale = std_smult_pipe(64);",
@@ -798,6 +795,32 @@ def _gemv_phase(
         f"{prefix}_add = std_sadd(64);",
     ]
     input_row_expr = input_row_expr or f"{prefix}_row_counter.out"
+    trace_cells = []
+    trace_wires = ""
+    write_trace_control = ""
+    if write_trace:
+        trace_cells = [
+            f"{prefix}_trace_row_pad = std_pad({row_width}, {trace_address_width});",
+            f"{prefix}_trace_row_shift = std_lsh({trace_address_width});",
+            f"{prefix}_trace_output_pad = std_pad({output_width}, {trace_address_width});",
+            f"{prefix}_trace_address = std_add({trace_address_width});",
+        ]
+        trace_wires = f"""group {prefix}_write_accumulator {{
+      {prefix}_trace_row_pad.in = {prefix}_row_counter.out;
+      {prefix}_trace_row_shift.left = {prefix}_trace_row_pad.out;
+      {prefix}_trace_row_shift.right = {trace_address_width}'d{trace_shift};
+      {prefix}_trace_output_pad.in = {prefix}_output_counter.out;
+      {prefix}_trace_address.left = {prefix}_trace_row_shift.out;
+      {prefix}_trace_address.right = {prefix}_trace_output_pad.out;
+      {accumulator_trace}.addr0 = {prefix}_trace_address.out;
+      {accumulator_trace}.content_en = 1'd1;
+      {accumulator_trace}.write_data = {prefix}_accumulator.out;
+      {accumulator_trace}.write_en = 1'd1;
+      {prefix}_write_accumulator[done] = {accumulator_trace}.done;
+    }}"""
+        write_trace_control = f"{prefix}_write_accumulator;"
+        insert_at = next(i for i, cell in enumerate(cells) if cell.startswith(f"{prefix}_code_signed ="))
+        cells[insert_at:insert_at] = trace_cells
     wires = [
         f"""group {prefix}_init_row {{
       {prefix}_row_counter.in = {row_width}'d0;
@@ -866,19 +889,7 @@ def _gemv_phase(
       {prefix}_k_counter.write_en = 1'd1;
       {prefix}_increment_k_counter[done] = {prefix}_k_counter.done;
     }}
-    group {prefix}_write_accumulator {{
-      {prefix}_trace_row_pad.in = {prefix}_row_counter.out;
-      {prefix}_trace_row_shift.left = {prefix}_trace_row_pad.out;
-      {prefix}_trace_row_shift.right = {trace_address_width}'d{trace_shift};
-      {prefix}_trace_output_pad.in = {prefix}_output_counter.out;
-      {prefix}_trace_address.left = {prefix}_trace_row_shift.out;
-      {prefix}_trace_address.right = {prefix}_trace_output_pad.out;
-      {accumulator_trace}.addr0 = {prefix}_trace_address.out;
-      {accumulator_trace}.content_en = 1'd1;
-      {accumulator_trace}.write_data = {prefix}_accumulator.out;
-      {accumulator_trace}.write_en = 1'd1;
-      {prefix}_write_accumulator[done] = {accumulator_trace}.done;
-    }}
+    {trace_wires}
     group {prefix}_increment_output_counter {{
       {prefix}_increment_output.left = {prefix}_output_counter.out;
       {prefix}_increment_output.right = {output_width}'d1;
@@ -916,7 +927,7 @@ def _gemv_phase(
               while {prefix}_k_lt.out with {prefix}_k_condition {{
                 seq {{ {prefix}_read_operands; {prefix}_scale_activation; {prefix}_multiply; {prefix}_accumulate; {prefix}_increment_k_counter; }}
               }}
-              {prefix}_write_accumulator;
+              {write_trace_control}
               {prefix}_increment_output_counter;
             }}
           }}
