@@ -234,3 +234,11 @@ is a confirmed critical-path improvement. A subsequent LUT cleanup still
 leaves a small number of generic `$and`/`$or` cells and currently triggers a
 nextpnr packing crash; that cleanup remains the active blocker before timing
 analysis.
+
+A bounded ABC pass on the boolean cone reduced it to 2,281 `LUT2`, 587
+`LUT3`, 559 `LUT4`, 914 `LUT5`, and 252 `LUT6` cells. The remaining 593
+inverters were isolated as the only generic boolean class. Direct JSON
+replacement with native `INV` cells still crashes nextpnr, indicating that
+these generated cells also need the exact per-cell provenance and port
+metadata emitted by Yosys's `lut_map` pass. This remains a packaging and
+legalization task; timing and hardware are unverified.
