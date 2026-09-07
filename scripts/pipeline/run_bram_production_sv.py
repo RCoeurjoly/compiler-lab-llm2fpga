@@ -64,7 +64,9 @@ int main(int argc, char** argv) {
   Verilated::commandArgs(argc, argv);
   if (argc != 2) return 2;
   const std::string directory = argv[1];
+  std::cout << "{\"event\":\"construct_begin\"}" << std::endl;
   Vmain model;
+  std::cout << "{\"event\":\"construct_done\"}" << std::endl;
   auto* root = model.rootp;
   PRELOADS
   std::cout << "{\"event\":\"preload_done\"}" << std::endl;
