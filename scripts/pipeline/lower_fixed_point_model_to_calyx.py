@@ -223,7 +223,7 @@ class Builder:
         return self.group(name, [f"{name}_negative.left = {value};", f"{name}_negative.right = 64'd0;", f"{name}_negate.left = 64'd0;", f"{name}_negate.right = {value};", f"{name}_absolute.cond = {name}_negative.out;", f"{name}_absolute.tru = {name}_negate.out;", f"{name}_absolute.fal = {value};", f"{name}_bias.left = {name}_absolute.out;", f"{name}_bias.right = 64'd{1 << (shift - 1)};", f"{name}_shift.left = {name}_bias.out;", f"{name}_shift.right = 64'd{shift};", f"{name}_signed.left = 64'd0;", f"{name}_signed.right = {name}_shift.out;", f"{name}_select.cond = {name}_negative.out;", f"{name}_select.tru = {name}_signed.out;", f"{name}_select.fal = {name}_shift.out;", f"{name}_result.in = {name}_select.out;", f"{name}_result.write_en = 1'd1;"], name + "_result.done")
 
 
-def _orchestration(builder: Builder, block_control: str, final_control: str, lm_control: str, *, audit_checkpoints: bool = True, stream_lm_head: bool = False, stream_gemv_control: str | None = None) -> str:
+def _orchestration(builder: Builder, block_control: str, final_control: str, lm_control: str, *, audit_checkpoints: bool = True, stream_lm_head: bool = False, stream_gemv_control: str | None = None, board_io: bool = False) -> str:
     b = builder
     counter_specs = [("model_step", 2, "2'd2"), ("model_layer", 4, "4'd8"), ("model_row", 4, "4'd8"), ("model_column", 7, "7'd64"), ("model_copy", 10, "10'd512"), ("model_logit", 16, "16'd50257")]
     if not stream_lm_head:
@@ -237,6 +237,13 @@ def _orchestration(builder: Builder, block_control: str, final_control: str, lm_
     b.cell("model_context_address", "std_slice", 4, 3)
     b.cell("model_layer_bank", "std_slice", 4, 3)
     b.cell("model_step_address", "std_slice", 2, 1)
+    if board_io:
+        b.cell("model_step_is_first", "std_not", 1)
+        b.cell("model_token0_next", "std_mux", 16)
+        b.cell("model_token1_next", "std_mux", 16)
+        b.cell("model_token0", "std_reg", 16)
+        b.cell("model_token1", "std_reg", 16)
+        b.cell("model_token_select", "std_mux", 16)
     b.cell("model_row_address", "std_slice", 4, 3)
     b.cell("model_prompt_address", "std_slice", 4, 2)
     b.cell("model_is_prompt", "std_lt", 4)
@@ -358,6 +365,8 @@ model_last_row.left = model_context_length.out;
 model_last_row.right = 4'd1;
 comb group model_greedy_condition { model_logit_is_better.left = model_round_logit_result.out; model_logit_is_better.right = model_best_value.out; }
 """]
+    if board_io:
+        b.wires.append("model_step_is_first.in = model_step_address.out; model_token0_next.cond = model_step_is_first.out; model_token0_next.tru = model_best_token.out; model_token0_next.fal = model_token0.out; model_token1_next.cond = model_step_address.out; model_token1_next.tru = model_best_token.out; model_token1_next.fal = model_token1.out; model_token_select.cond = token_index; model_token_select.tru = model_token1.out; model_token_select.fal = model_token0.out; token_id = model_token_select.out;")
     init_greedy = b.group("model_init_greedy", ["model_best_value.in = 64'd9223372036854775808;", "model_best_value.write_en = 1'd1;", "model_best_token.in = 16'd0;", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
     accumulator_address = "model_logit.out" if stream_lm_head else "model_accumulator_address.out"
     read_logit = b.read("model_read_logit", [("lm_accumulator_i64", accumulator_address), ("token_weight_scale_q8_24", "model_logit.out")])
@@ -378,7 +387,14 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
         lm_control = ""
     else:
         logits = b.loop("model_logit_row", init_greedy + logit_scan)
-    feedback = b.write("model_commit_feedback", [("selected_tokens", "model_step_address.out", "model_best_token.out"), ("context_tokens", "model_context_address.out", "model_best_token.out")])
+    if board_io:
+        feedback = b.group("model_commit_feedback", [
+            "selected_tokens.addr0 = model_step_address.out;", "selected_tokens.content_en = 1'd1;", "selected_tokens.write_en = 1'd1;", "selected_tokens.write_data = model_best_token.out;",
+            "context_tokens.addr0 = model_context_address.out;", "context_tokens.content_en = 1'd1;", "context_tokens.write_en = 1'd1;", "context_tokens.write_data = model_best_token.out;",
+            "model_token0.in = model_token0_next.out;", "model_token0.write_en = 1'd1;", "model_token1.in = model_token1_next.out;", "model_token1.write_en = 1'd1;",
+        ], "(selected_tokens.done & context_tokens.done) ? 1'd1")
+    else:
+        feedback = b.write("model_commit_feedback", [("selected_tokens", "model_step_address.out", "model_best_token.out"), ("context_tokens", "model_context_address.out", "model_best_token.out")])
     next_context = b.group("model_next_context", ["model_context_next.left = model_context_length.out;", "model_context_next.right = 4'd1;", "model_context_length.in = model_context_next.out;", "model_context_length.write_en = 1'd1;"], "model_context_length.done")
     final_copy = b.loop("model_copy", read_ln + copy_ln) if audit_checkpoints else ""
     steps = b.loop("model_step", embedding + blocks + final_control + final_copy + lm_control + logits + feedback + next_context)
@@ -472,12 +488,13 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
         audit_checkpoints=not production,
         stream_lm_head=production,
         stream_gemv_control=gemv_phase[2] if production else None,
+        board_io=production,
     )
     futil = '''// Compiler-owned exact model orchestration; no imported hand-written RTL.
 import "primitives/core.futil";
 import "primitives/binary_operators.futil";
 import "primitives/memories/seq.futil";
-component main(@go start: 1, valid: 1) -> (@done done: 1) {
+''' + ("component main(@go start: 1, valid: 1, token_index: 1) -> (@done done: 1, token_id: 16) {" if production else "component main(@go start: 1, valid: 1) -> (@done done: 1) {") + '''
   cells {
 ''' + mlp._indent_lines(b.cells, 4) + "\n  }\n  wires {\n" + mlp._indent_lines(b.wires, 4) + "\n  }\n  control {\n" + control + "\n  }\n}\n"
     provenance = {

@@ -57,6 +57,13 @@ class BramProductionTest(unittest.TestCase):
         module = load_module()
         with self.assertRaisesRegex(ValueError, "host_second_token_forbidden"):
             module.generate_production_kernel(ORACLE, host_second_token=612)
+
+    def test_production_exposes_board_token_readback_port(self):
+        module = load_module()
+        artifact = module.generate_production_kernel(ORACLE)
+        self.assertIn("token_index: 1", artifact.futil)
+        self.assertIn("token_id: 16", artifact.futil)
+        self.assertIn("model_token_select.cond = token_index", artifact.futil)
         with self.assertRaisesRegex(ValueError, "host_intermediate_states_forbidden"):
             module.generate_production_kernel(ORACLE, host_intermediate_states={"block.0": []})
 
