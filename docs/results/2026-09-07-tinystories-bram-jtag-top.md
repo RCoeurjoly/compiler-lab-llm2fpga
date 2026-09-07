@@ -203,3 +203,11 @@ same flattened primitive-module metadata as the known-good control
 (`Failed to get direction for port ADDRARDADDR`). The next bounded task is to
 repair that netlist packaging and rerun nextpnr; no board bitstream or
 inference success is claimed.
+
+Comparing the mapped cell against the known-good primitive control identified
+the immediate cause of the import failure: the new mapper emits a 17-bit
+`ADDRARDADDR` connection on a `RAMB36E1`, while the legal Kintex-7 primitive
+interface is 16 bits for this configuration. The control cell is 16 bits and
+is accepted by nextpnr. Therefore the next fix must split or constrain the
+oversized bank during memory legalization; trimming the address bit in the
+RTL would be incorrect because it would alias model data.
