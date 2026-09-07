@@ -243,6 +243,14 @@ these generated cells also need the exact per-cell provenance and port
 metadata emitted by Yosys's `lut_map` pass. This remains a packaging and
 legalization task; timing and hardware are unverified.
 
+The first single-invocation source-level flow (native arithmetic/LUT mapping
+before JSON export) exposed an additional issue with the global memory
+annotation: small asynchronous scratch memories such as `lm_input_q16_16`
+are forced to block RAM and fail Yosys memory legalization (`no valid mapping
+found`). Therefore the production flow must apply block-RAM intent selectively
+to the large model banks and leave scratch/control memories available for
+FF/LUTRAM mapping.
+
 The residual-cell experiment converted the remaining 2,391 muxes, 819 ORs,
 13 ANDs, 14 NOTs, and 17 flip-flops into native LUT/FDRE forms, leaving only
 one constant equality to encode. The resulting JSON is structurally native,
