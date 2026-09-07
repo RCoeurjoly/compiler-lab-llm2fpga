@@ -52,6 +52,16 @@ stage. It did not emit a mapped report within the interactive observation
 window and was terminated; no resource or timing claim is attached to that
 experiment. The production RTL remains unchanged by it.
 
+With the 32-bit scale-table reduction, the current static top now passes the
+Yosys-Slang hierarchy/preparation gate at 52,131 cells and 34,448,640
+structural memory bits. The pinned `synth_xilinx` coarse preparation also
+completes, producing 27,869 post-coarse cells in 407.2 seconds at roughly
+1.42 GB peak RSS. The subsequent complete flow enters a very large FSM and
+SAT-sharing phase, while the bounded post-coarse probe does not yet emit an
+authoritative RAMB36E1/RAMB18E1 mapping. This is now the implementation
+blocker; the durable receipt is
+`artifacts/reference/tinystories-1m-bram-production-synthesis-2026-09-07.json`.
+
 The model weights remain immutable BRAM initialization data. The JTAG bridge
 has been linted with Verilator in `BSCAN_SIM` mode, and the production
 generated SV still passes Calyx compilation and the focused lowering tests.

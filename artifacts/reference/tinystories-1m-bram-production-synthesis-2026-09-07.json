@@ -1,0 +1,40 @@
+{
+  "schema": "tinystories-1m-bram-production-synthesis-attempt-v1",
+  "status": "coarse_preparation_passed_mapping_report_pending",
+  "target": {
+    "device": "xc7k480tffg1156-1",
+    "top": "tinystories_1m_ypcb_bram_production_top"
+  },
+  "inputs": {
+    "futil_sha256": "0e85b234740eb43b91cfbe04a76304eb9647704db2f5f0d561291fb5f2589469",
+    "static_sv_sha256": "ea394d1f8694c2289e9774a62b6ace3a5c9a48bd193b01143c74f7279af7b0a8",
+    "pre_map_json_sha256": "743f5eccb75b1a1751a7aaea2c759bf4869d9b472e5357e46e43ba5d2c7cd322"
+  },
+  "pre_map": {
+    "memories": 143,
+    "memory_bits": 34448640,
+    "cells": 52131
+  },
+  "coarse_preparation": {
+    "status": "passed",
+    "output": "post-coarse RTLIL",
+    "cells": 27869,
+    "memories": 0,
+    "peak_rss_bytes": 1421000000,
+    "elapsed_seconds": 407.2,
+    "artifact_sha256": "4b50db02856383160fbcfaadb23abf4517aaa6c367d931aeb1c71f4699c92022"
+  },
+  "mapping": {
+    "status": "not_yet_authoritative",
+    "nextpnr_status": "not_run",
+    "timing_status": "not_reached",
+    "diagnostic": "The complete synth_xilinx flow enters an extremely large FSM/resource-sharing phase; the bounded post-coarse mapping probe did not emit a valid RAMB resource JSON. No fit or timing claim is made."
+  },
+  "claims": {
+    "jtag_top_integrated": true,
+    "static_model_image_prepared": true,
+    "board_bitstream_verified": false,
+    "timing_closed": false,
+    "board_inference_verified": false
+  }
+}
