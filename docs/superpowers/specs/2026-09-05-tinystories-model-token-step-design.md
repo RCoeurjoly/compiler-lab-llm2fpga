@@ -11,14 +11,14 @@ greedy token selection.
 The acceptance workload is two consecutive token steps in one generated
 Calyx/SystemVerilog main. The token selected by the first step is produced by
 the hardware and is consumed by the second step's embedding lookup. The host
-may preload immutable model tensors and the initial token only; it may not
+may preload immutable model tensors and the frozen initial four-token prompt only; it may not
 provide intermediate hidden states, logits, or the second token.
 
 ## Contract
 
 The top level exposes `clk`, `reset`, `start`, `valid`, and `done`, with
 compiler-owned state, token-feedback, logits, and boundary memories. Reset
-returns the orchestrator to its initial-token state. Every model boundary has
+returns the orchestrator to its initial-prompt state. Every model boundary has
 an independently hashed fixed-point checkpoint against the authenticated
 PyTorch oracle. Simulation and synthesis consume the same Futil and emit a
 self-hashed provenance receipt plus Yosys resource statistics.
