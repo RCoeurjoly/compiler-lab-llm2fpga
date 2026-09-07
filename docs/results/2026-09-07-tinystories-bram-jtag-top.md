@@ -284,3 +284,11 @@ implementation or timing result. The next implementation step is therefore
 to make the native mapping/export incremental or otherwise bounded before
 attempting nextpnr; no replacement RTL or board programming is justified by
 this run.
+
+A short full `synth_xilinx` experiment also completed, but its post-
+optimization top contained only the four I/O cells; the generated core was
+absent from the reachable netlist. That artifact is invalid for implementation
+and indicates that the current top/CSR boundary must be preserved explicitly
+during synthesis. A coarse-to-memory retry entered Yosys resource sharing but
+was stopped before producing an artifact, so it provides no fit or timing
+evidence.
