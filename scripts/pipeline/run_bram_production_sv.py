@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import time
+import re
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -23,8 +24,47 @@ def annotate_bram_memories(source: str) -> str:
     synthesis hint; simulation semantics and memory contents are unchanged.
     """
     needle = "  logic [WIDTH-1:0] mem[SIZE-1:0];"
-    replacement = '  (* ram_style = "block" *)\n' + needle
-    return source if replacement in source else source.replace(needle, replacement)
+    if needle not in source:
+        return source
+    # Keep the generic primitive available for small asynchronous/control
+    # memories.  A separate variant carries the Xilinx BRAM hint, and only
+    # instances whose elaborated SIZE is at least 1024 use it.
+    marker = "module seq_mem_d1_bram #"
+    if marker not in source:
+        start = source.index("module seq_mem_d1 #")
+        end = source.index("endmodule", start) + len("endmodule")
+        body = source[start:end].replace("module seq_mem_d1 #", marker, 1)
+        body = body.replace(needle, '  (* ram_style = "block" *)\n' + needle, 1)
+        source = source[:end] + "\n\n" + body + source[end:]
+    # Match each parameterized instance and inspect its literal SIZE.  This
+    # intentionally leaves non-literal/generated forms untouched.
+    pattern = re.compile(r"seq_mem_d1\s*#\s*\(", re.S)
+    # Skip the primitive definitions themselves; only rewrite instantiations.
+    cursor = source.index("endmodule", source.index("module seq_mem_d1 #")) + len("endmodule")
+    pieces: list[str] = [source[:cursor]]
+    while (match := pattern.search(source, cursor)):
+        open_paren = match.end() - 1
+        depth = 1
+        pos = open_paren + 1
+        while pos < len(source) and depth:
+            depth += source[pos] == "("
+            depth -= source[pos] == ")"
+            pos += 1
+        if depth:
+            break
+        tail = re.match(r"\s*(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(", source[pos:])
+        if not tail:
+            cursor = pos
+            continue
+        params = source[open_paren + 1 : pos - 1]
+        pieces.append(source[cursor : match.start()])
+        if re.search(r"\.SIZE\s*\(\s*(\d+)\s*\)", params) and int(re.search(r"\.SIZE\s*\(\s*(\d+)\s*\)", params).group(1)) >= 1024:
+            pieces.append("seq_mem_d1_bram # (" + params + ") " + tail.group("name") + " (")
+        else:
+            pieces.append(source[match.start() : pos + tail.end()])
+        cursor = pos + tail.end()
+    pieces.append(source[cursor:])
+    return "".join(pieces)
 
 
 def load(path, name):
