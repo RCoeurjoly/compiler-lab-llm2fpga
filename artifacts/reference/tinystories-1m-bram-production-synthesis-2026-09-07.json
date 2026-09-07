@@ -89,6 +89,8 @@
     ,"coarse_synthesis": {"status": "bounded_in_global_share_sat_no_artifact", "diagnostic": "The pinned coarse flow spent the bounded window in global share SAT solving (2750 cells, 13549 variables, 35034 clauses); no mapped artifact was emitted."}
     ,"no_global_opt_control": {"status": "coarse_passed_memory_mapping_bounded", "cells": 77930, "generic_cells": {"alu": 333, "lcu": 220, "macc_v2": 38, "mem_v2": 279}, "diagnostic": "Skipping broad opt/share preserves the design and completes coarse preparation quickly; BRAM mapping then remains bounded by the 197 token banks."
     }
+    ,"bram_style_annotation": {"status": "implemented_and_unit_checked", "annotation": "ram_style=block", "scope": "shared Calyx sequential-memory primitive", "simulation_semantics_changed": false, "diagnostic": "The production SV runner inserts the annotation idempotently so Yosys is directed to XC7 block RAM instead of LUTRAM/FF fallback."
+    }
   },
   "claims": {
     "jtag_top_integrated": true,

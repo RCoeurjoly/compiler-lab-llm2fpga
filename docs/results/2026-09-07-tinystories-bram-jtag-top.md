@@ -188,3 +188,10 @@ preserved 77,930 cells, including 333 `$alu`, 220 `$lcu`, 38 `$macc_v2`, and
 279 memories. The subsequent BRAM mapper began processing the 197 token banks
 but was bounded before completion. This gives a reproducible fast coarse stage
 and identifies bank-by-bank memory mapping as the next bounded bottleneck.
+
+The production SV runner now applies an idempotent
+`(* ram_style = "block" *)` annotation to Calyx's shared sequential-memory
+primitive. The annotation is synthesis-only and leaves RTL behavior and
+immutable initialization unchanged. A direct check changes the generated
+file from zero to one primitive-declaration annotation, covering all memory
+instances; a fresh mapped resource report is still pending.

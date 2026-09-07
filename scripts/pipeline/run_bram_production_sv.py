@@ -14,6 +14,19 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def annotate_bram_memories(source: str) -> str:
+    """Preserve the production memory contract through Calyx SV emission.
+
+    Calyx's generic sequential-memory primitive does not carry a Xilinx RAM
+    style attribute.  Without this post-pass, Yosys is free to choose LUTRAM
+    or FF mapping for the 16K banked model tables.  The attribute is purely a
+    synthesis hint; simulation semantics and memory contents are unchanged.
+    """
+    needle = "  logic [WIDTH-1:0] mem[SIZE-1:0];"
+    replacement = '  (* ram_style = "block" *)\n' + needle
+    return source if replacement in source else source.replace(needle, replacement)
+
+
 def load(path, name):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -126,6 +139,8 @@ def main():
     (directory / "model.futil").write_text(artifact.futil)
     install = Path(subprocess.check_output(["nix", "build", "--no-link", "--print-out-paths", ".#calyx"], cwd=ROOT, text=True).strip())
     subprocess.run([str(install / "bin/calyx"), str(directory / "model.futil"), "-l", str(install / "share/calyx"), "-d", "cell-share", "-b", "verilog", "-o", str(directory / "model.sv")], cwd=ROOT, check=True)
+    model_path = directory / "model.sv"
+    model_path.write_text(annotate_bram_memories(model_path.read_text()))
     source_names = list(artifact.provenance["source_memories"])
     visibility = ['`verilator_config', 'public_flat_rw -module "seq_mem_d1" -var "mem" @(posedge clk)']
     visibility += [f'public_flat_rd -module "main" -var "{name}"' for name in ("selected_tokens_write_en", "selected_tokens_content_en", "selected_tokens_addr0")]
