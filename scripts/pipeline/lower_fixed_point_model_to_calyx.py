@@ -379,10 +379,12 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
     for name, address in banks.items():
         bank = name + "_bank_address"
         b.cell(bank, "std_cat", 3, address, address + 3)
-        block_wires, count = re.subn(rf"\b{name}\.addr0 = ([^;]+);", rf"{bank}.right = \1; {name}.addr0 = {bank}.out;", block_wires)
+        # Keep both concatenation inputs in the memory-access group. Mixing
+        # a continuous bank input with a group-local index makes Calyx's
+        # dead-assign-removal drop the upstream group-local index drivers.
+        block_wires, count = re.subn(rf"\b{name}\.addr0 = ([^;]+);", rf"{bank}.left = model_layer_bank.out; {bank}.right = \1; {name}.addr0 = {bank}.out;", block_wires)
         if count == 0:
             raise ValueError(f"unused model parameter bank: {name}")
-        b.wires.append(f"{bank}.left = model_layer_bank.out;")
     b.wires.append(block_wires)
     final_phase = _layer_norm(attention, final=True)
     qdq_phase = mlp._activation_qdq_phase("lm_input_qdq", "final_output_q16_16", "lm_input_scale_q8_24", "lm_input_codes_i8", "lm_input_q16_16", 512, 64)

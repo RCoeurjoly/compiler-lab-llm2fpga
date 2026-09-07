@@ -1,24 +1,33 @@
 {
   "status": "generated_sv",
-  "futil_sha256": "05843b2728cdba8f5996b0b246af15133e2b40d31bf0012efdbec64b843d6691",
-  "verilog_sha256": "60997241007b9ec477d4393660df7349373e978602b26e24bc25c2beccd465e9",
-  "verilog_bytes": 1929466,
-  "top_ports": ["clk", "reset", "start", "valid", "done"],
-  "elapsed_seconds": 0.33053386499886983,
+  "futil_sha256": "ed7abe873d1a95a0896473acad7467004cc168606b7aac30b1bbdf6c3672509a",
+  "verilog_sha256": "2ae376c49f5fcb8bc897a0f4598487cfda705f582294afee2a2157afb6995d02",
+  "verilog_bytes": 1941344,
+  "top_ports": [
+    "clk",
+    "reset",
+    "start",
+    "valid",
+    "done"
+  ],
+  "elapsed_seconds": 1.3856224800001655,
   "timeout_seconds": 1800,
   "command": [
     "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/bin/calyx",
-    "/tmp/llm2fpga-tinystories-model-orchestrator-v1/model.futil",
+    "/tmp/llm2fpga-tinystories-model-bank-local-v1/model.futil",
     "-l",
     "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/share/calyx",
-    "-d", "cell-share", "-b", "verilog"
+    "-d",
+    "cell-share",
+    "-b",
+    "verilog"
   ],
   "execution_verified": false,
   "schema": "tinystories-1m-model-orchestrator-compile-evidence-v1",
   "oracle_sha256": "31fbd1e3f5b13d7b07466a72e9c6a551ffc00bd4fee375241f095ba5b5cda677",
-  "generator_sha256": "0a673e04ed332b71540ea66ee1e57470ff1365074ce8620f19d45235ab34b459",
+  "generator_sha256": "a4b3ab80bebbfd0d3fe83d7aa2225cafded31e69a0853b8835c04e87d20afb69",
   "base_block_futil_sha256": "ab0ec932bf4a76c97df3beb11dd71a5309fe65e2bd36492ce18dc63f009622c2",
-  "provenance_sha256": "5c3cd42319624e4c84540e69af070213f141829ee954267e971a540d9ba0870c",
+  "provenance_sha256": "06491ac53a834888b4dbf3f6d2b3c3b559023574abc70a092f04226c4ea1203e",
   "scope": "full model generated SV; not simulated, not synthesized, not board inference",
-  "artifact_sha256": "54556c5e2b3613e977d09f7e72af52cb78ea724be76e14f1e1ce91f2e433a3b1"
+  "artifact_sha256": "40a7251aa3a5100bfaeac9e98e13262d5cba0b997ca3678377031b48d8ecba4a"
 }
