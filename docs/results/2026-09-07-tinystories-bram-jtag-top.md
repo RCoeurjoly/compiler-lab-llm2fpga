@@ -274,3 +274,13 @@ registered-read process. The `memory_dff` diagnostic remains unchanged: the
 generated read enable is not recognized as BRAM transparency logic. This
 isolates the remaining memory work to a source-level synchronous bank
 template; no datapath result or hardware claim follows.
+
+The subsequent source-native retry confirmed that the selective bank template
+does map the large token/weight banks, but the run did not produce a complete
+JSON artifact: the process was terminated during the final memory-bank mapping
+phase and the exported file is truncated (JSON parsing fails). This is a
+resource/time failure of the current synthesis invocation, not a successful
+implementation or timing result. The next implementation step is therefore
+to make the native mapping/export incremental or otherwise bounded before
+attempting nextpnr; no replacement RTL or board programming is justified by
+this run.
