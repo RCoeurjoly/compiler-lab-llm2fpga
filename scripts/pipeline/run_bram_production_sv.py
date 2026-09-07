@@ -117,7 +117,7 @@ def main():
     (directory / "visibility.vlt").write_text("\n".join(visibility) + "\n")
     (directory / "harness.cpp").write_text(harness(artifact))
     build = directory / "verilator"
-    subprocess.run(["verilator", "--cc", "--exe", "--build", "-j", "4", "--top-module", "main", "--Mdir", str(build), "-CFLAGS", "-std=c++17", "-o", "production_harness", str(directory / "visibility.vlt"), str(directory / "model.sv"), str(directory / "harness.cpp")], cwd=ROOT, check=True)
+    subprocess.run(["verilator", "--cc", "--exe", "--build", "-j", "8", "--top-module", "main", "--Mdir", str(build), "-CFLAGS", "-std=c++17 -O3", "-o", "production_harness", str(directory / "visibility.vlt"), str(directory / "model.sv"), str(directory / "harness.cpp")], cwd=ROOT, check=True)
     result = subprocess.run([str(build / "production_harness"), str(directory)], cwd=ROOT, text=True, capture_output=True, check=True)
     print(result.stdout, end="")
     receipt = {"status": "passed", "futil_sha256": artifact.provenance["futil_sha256"], "sv_sha256": hashlib.sha256((directory / "model.sv").read_bytes()).hexdigest(), "output": result.stdout.splitlines(), "elapsed_seconds": time.time()}
