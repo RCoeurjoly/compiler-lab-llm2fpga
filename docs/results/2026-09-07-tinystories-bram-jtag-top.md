@@ -211,3 +211,10 @@ interface is 16 bits for this configuration. The control cell is 16 bits and
 is accepted by nextpnr. Therefore the next fix must split or constrain the
 oversized bank during memory legalization; trimming the address bit in the
 RTL would be incorrect because it would alias model data.
+
+The mapped-netlist experiment further shows that this extra bit is constant
+`1` on both read and write address buses for every affected cell. Removing
+that constant padding bit in a temporary JSON normalization does not yet make
+nextpnr import the netlist, so the remaining failure is primitive/module
+packaging rather than address semantics. The normalization is diagnostic only
+and is not an accepted design change.
