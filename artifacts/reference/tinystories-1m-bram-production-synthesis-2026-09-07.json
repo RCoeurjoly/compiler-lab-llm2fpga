@@ -10,7 +10,11 @@
     "static_sv_sha256": "bb2d7421c97c62410059d064dbc52d4d8d1251ec9510cab4b2a2a8f0f18ca0d1",
     "static_image_manifest_sha256": "a21c5122cbc323181a8ef8f27cb2c7a1ca06bd3ab57cb477e71dc8c980a0fbfb",
     "pre_map_json_sha256": "2b36854a262c592897c55eeb9ffcf9965d8c078c722acfe1b8634fd30ee80226",
-    "mapping_input_futil_sha256": "38b5084b9dfea24b8e0e8069138078da0a7019330a59f7dba8c3da936caf3102"
+    "mapping_input_futil_sha256": "b68ee592de87da17be9caa81bbf1eabfe2bba504f14e14587ff02ed93da4e8ab",
+    "pre_map_final_sha256": "c3c75a8dfd7072d7f0c1331bd645136591c1a6c942e59fedb29c6a24f3fe9877",
+    "coarse_final_sha256": "1a0d51f6240fd43338aba999ef742b9961d0370987cbac01551ea79d112e889d",
+    "map_final_sha256": "ea9753a30a898e035184ad9a596af52042a2f8950356c26028d641a2b3c826b8",
+    "nextpnr_json_sha256": "ebaa449ed74c764cff7d2fadc52774204e4715e12041f6bc4d231ca22a84ebc1"
   },
   "pre_map": {
     "memories": 242,
@@ -23,18 +27,20 @@
     "cells": "not_recorded_in_quiet_run",
     "memories": 0,
     "peak_rss_bytes": "not_recorded",
-    "elapsed_seconds": 432.67,
-    "artifact_sha256": "489a7cd37b86d7b9721968a8c40ba35e27d27ce95c2a3b3528c51bc90ebb3196"
+    "elapsed_seconds": 311.86,
+    "artifact_sha256": "1a0d51f6240fd43338aba999ef742b9961d0370987cbac01551ea79d112e889d"
   },
   "mapping": {
-    "status": "memory_mapping_passed_on_same_bank_topology",
-    "artifact_sha256": "de43692e6c30b04f18819407fba4c7a91d87621750b2c0d60e9e4455d56f69dd",
+    "status": "memory_mapping_passed_nextpnr_placement_blocked",
+    "artifact_sha256": "ea9753a30a898e035184ad9a596af52042a2f8950356c26028d641a2b3c826b8",
     "ramb36e1_instances": 39,
     "ramb18e1_instances": 15,
     "remaining_mem_v2": ["prompt_words", "model_token_product.comp.done_buf", "model_position_product.comp.done_buf"],
-    "nextpnr_status": "not_run",
+    "nextpnr_status": "placement_failed",
     "timing_status": "not_reached",
-    "diagnostic": "Banked token code and scale memories were consumed by the XC7 memory mapper; only three small scratch memories remain as $mem_v2. The recorded map predates the final std_bit_slice bank-bit semantic correction but has identical memory topology; it must be rerun for a strict end-to-end receipt. Placement/timing were not run because the mapped RTLIL does not yet export a valid nextpnr JSON. No fit, timing, bitstream, or board-inference claim is made."
+    "nextpnr_json_sha256": "ebaa449ed74c764cff7d2fadc52774204e4715e12041f6bc4d231ca22a84ebc1",
+    "nextpnr_resources": {"lut_required": 628976, "lut_capacity": 597200, "ff": 21976, "ramb36": 38, "ramb18": 14},
+    "diagnostic": "Hash-aligned mapping consumed all banked token memories. After legalizing generic boolean cells for nextpnr, the corrected JSON requires 628,976 SLICE_LUTX sites (105.3% of the 597,200-device capacity), 21,976 FFs, 38 RAMB36E1, and 14 RAMB18E1. Placement therefore fails on genuine LUT over-capacity. A bounded ABC optimization attempt on the generated main module did not produce an artifact within the observation window. No fit, timing, bitstream, or board-inference claim is made."
   },
   "claims": {
     "jtag_top_integrated": true,

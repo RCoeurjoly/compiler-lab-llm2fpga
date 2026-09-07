@@ -52,14 +52,11 @@ stage. It did not emit a mapped report within the interactive observation
 window and was terminated; no resource or timing claim is attached to that
 experiment. The production RTL remains unchanged by it.
 
-With the 32-bit scale-table reduction, the current static top now passes the
-Yosys-Slang hierarchy/preparation gate at 52,131 cells and 34,448,640
-structural memory bits. The pinned `synth_xilinx` coarse preparation also
-completes, producing 27,869 post-coarse cells in 407.2 seconds at roughly
-1.42 GB peak RSS. The subsequent complete flow enters a very large FSM and
-SAT-sharing phase, while the bounded post-coarse probe does not yet emit an
-authoritative RAMB36E1/RAMB18E1 mapping. This is now the implementation
-blocker; the durable receipt is
+The banked static top passes the Yosys-Slang hierarchy/preparation gate at 242
+memories and 35,158,330 structural memory bits. The corrected pinned
+`synth_xilinx` coarse preparation completes in 311.86 seconds; the strict
+map-memory result is 39 RAMB36E1 and 15 RAMB18E1 before final technology
+mapping. The durable hashes and resource/placement diagnostics are in
 `artifacts/reference/tinystories-1m-bram-production-synthesis-2026-09-07.json`.
 
 The model weights remain immutable BRAM initialization data. The JTAG bridge
@@ -85,11 +82,18 @@ and 35,158,330 structural bits. The pinned XC7 coarse pass completed in
 432.67 seconds and the following `map_memory` pass consumed all banked token
 memories into 39 `RAMB36E1` and 15 `RAMB18E1` instances. Only three small
 scratch `$mem_v2` memories remain (`prompt_words` and two done buffers).
-This is the first memory-mapping result for the bank topology, but its map
-artifact predates that final mux-bit correction and is therefore retained as
-diagnostic evidence rather than a final implementation claim. It is not a
-placement or timing result: exporting the corrected mapped RTLIL to a valid
-nextpnr JSON still remains. The hashes and exact residual-memory list
+The corrected design was then rerun end-to-end through Yosys-Slang, XC7
+coarse synthesis, memory mapping, technology mapping, and JSON export. The
+hash-aligned map again consumed the banked memories, and the generated JSON
+reached nextpnr packing. After legalizing generic boolean cells, the design
+requires 628,976 `SLICE_LUTX` sites against 597,200 on the Kintex-7 (105.3%),
+with 21,976 FFs, 38 RAMB36E1, and 14 RAMB18E1. Placement therefore fails on
+genuine LUT over-capacity rather than BRAM capacity. A diagnostic run with
+`--ignore-loops` reached timing-budget annotation but did not place the full
+design. A bounded ABC optimization attempt on the generated `main` module did
+not produce an artifact within the observation window. This is therefore not
+a placement or timing result. The hashes and
+exact residual-memory list
 are recorded in
 `artifacts/reference/tinystories-1m-bram-production-synthesis-2026-09-07.json`.
 
