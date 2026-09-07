@@ -39,16 +39,25 @@ def harness(artifact):
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 template<class Memory> static void preload(Memory& memory, const std::string& path) {
   std::ifstream input(path, std::ios::binary);
   if (!input) throw std::runtime_error("missing source: " + path);
   input.seekg(0, std::ios::end);
-  const auto expected = static_cast<std::streamoff>(memory.m_storage.size() * sizeof(std::uint64_t));
+  const auto words = sizeof(memory.m_storage) / sizeof(memory.m_storage[0]);
+  const auto expected = static_cast<std::streamoff>(words * sizeof(std::uint64_t));
   if (input.tellg() != expected) throw std::runtime_error("source size mismatch: " + path);
   input.seekg(0, std::ios::beg);
-  input.read(reinterpret_cast<char*>(memory.m_storage.data()), expected);
+  std::vector<unsigned char> bytes(static_cast<std::size_t>(expected));
+  input.read(reinterpret_cast<char*>(bytes.data()), expected);
   if (input.gcount() != expected) throw std::runtime_error("short source: " + path);
+  for (std::size_t i = 0; i < words; ++i) {
+    std::uint64_t value = 0;
+    for (unsigned byte = 0; byte < sizeof(std::uint64_t); ++byte)
+      value |= std::uint64_t(bytes[i * sizeof(std::uint64_t) + byte]) << (byte * 8);
+    memory.m_storage[i] = value;
+  }
 }
 
 int main(int argc, char** argv) {
