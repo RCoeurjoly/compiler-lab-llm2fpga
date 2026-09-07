@@ -50,6 +50,16 @@
     "device_dsp48e1_capacity": 1920,
     "diagnostic": "Explicit macc unmapping enables DSP inference, but the resulting 2,433 DSP48E1 instances exceed the 1,920-device capacity; the subsequent fine mapping did not produce an artifact within the bounded observation window."
   },
+  "boolean_optimization_experiment": {
+    "status": "candidate_unverified",
+    "input": "hash-aligned map.il main module",
+    "artifact_sha256": "8979ff84b926a964bd5fe2c1d7c0ca17d9f90f21091813395ee415b8db5a3cf8",
+    "pass": "simplemap selected $and/$or/$xnor/$mux followed by abc -lut 6",
+    "before_cells": {"and": 12029, "or": 3770, "xnor": 2867, "mux": 1798},
+    "after_cells": {"lut": 20801, "and": 4292, "or": 70, "xnor": 1868, "mux": 20},
+    "equivalence_status": "not_completed",
+    "diagnostic": "The bounded pass materially reduces boolean operators, but a formal equivalence receipt and full technology-mapped resource result are still missing; it is not part of the accepted implementation."
+  },
   "claims": {
     "jtag_top_integrated": true,
     "static_model_image_prepared": true,

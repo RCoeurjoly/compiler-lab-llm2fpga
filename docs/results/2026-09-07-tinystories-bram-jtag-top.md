@@ -103,6 +103,14 @@ instances against 1,920 available on the device. Thus DSP inference alone
 does not rescue the design; it moves the over-capacity condition from LUTs to
 DSPs. The bounded receipt records this as a diagnostic experiment.
 
+A second bounded experiment applies `simplemap` only to the large boolean
+operators in `main`, followed by `abc -lut 6`. It reduces the mapped main
+module's `$and/$or/$xnor/$mux` counts from 12,029/3,770/2,867/1,798 to
+4,292/70/1,868/20 and emits 20,801 LUT nodes. This is a promising compiler
+optimization direction, but formal equivalence and a complete resource run
+have not yet completed, so it remains a candidate artifact rather than an
+accepted datapath change.
+
 The generated full-top Verilator run did not reach completion in the observed
 35 million-cycle window and was stopped to avoid an unbounded run. This is a
 simulation-throughput blocker, not an inference result.
