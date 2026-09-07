@@ -266,3 +266,11 @@ but nextpnr still crashes during packing; the generated `CARRY4`/`FDRE`
 instances do not yet have the exact cell metadata emitted by Yosys's own
 mapping passes. This narrows the next fix to native-cell ABI generation rather
 than model memory, arithmetic width, or board capacity.
+
+With the width-aware policy, Yosys correctly maps scratch memories and 32-bit
+scale tables to LUTRAM. It still rejects the 8-bit, 16K-entry token-code
+banks when forced to BRAM, even after simplifying the BRAM variant to a
+registered-read process. The `memory_dff` diagnostic remains unchanged: the
+generated read enable is not recognized as BRAM transparency logic. This
+isolates the remaining memory work to a source-level synchronous bank
+template; no datapath result or hardware claim follows.
