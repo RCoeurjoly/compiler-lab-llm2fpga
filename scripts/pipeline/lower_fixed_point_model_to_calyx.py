@@ -223,12 +223,17 @@ class Builder:
         return self.group(name, [f"{name}_negative.left = {value};", f"{name}_negative.right = 64'd0;", f"{name}_negate.left = 64'd0;", f"{name}_negate.right = {value};", f"{name}_absolute.cond = {name}_negative.out;", f"{name}_absolute.tru = {name}_negate.out;", f"{name}_absolute.fal = {value};", f"{name}_bias.left = {name}_absolute.out;", f"{name}_bias.right = 64'd{1 << (shift - 1)};", f"{name}_shift.left = {name}_bias.out;", f"{name}_shift.right = 64'd{shift};", f"{name}_signed.left = 64'd0;", f"{name}_signed.right = {name}_shift.out;", f"{name}_select.cond = {name}_negative.out;", f"{name}_select.tru = {name}_signed.out;", f"{name}_select.fal = {name}_shift.out;", f"{name}_result.in = {name}_select.out;", f"{name}_result.write_en = 1'd1;"], name + "_result.done")
 
 
-def _orchestration(builder: Builder, block_control: str, final_control: str, lm_control: str, *, audit_checkpoints: bool = True) -> str:
+def _orchestration(builder: Builder, block_control: str, final_control: str, lm_control: str, *, audit_checkpoints: bool = True, stream_lm_head: bool = False, stream_gemv_control: str | None = None) -> str:
     b = builder
-    for name, width, limit in (("model_step", 2, "2'd2"), ("model_layer", 4, "4'd8"), ("model_row", 4, "4'd8"), ("model_column", 7, "7'd64"), ("model_copy", 10, "10'd512"), ("model_logit_row", 4, "model_context_length.out"), ("model_logit", 16, "16'd50257")):
+    counter_specs = [("model_step", 2, "2'd2"), ("model_layer", 4, "4'd8"), ("model_row", 4, "4'd8"), ("model_column", 7, "7'd64"), ("model_copy", 10, "10'd512"), ("model_logit", 16, "16'd50257")]
+    if not stream_lm_head:
+        counter_specs.insert(-1, ("model_logit_row", 4, "model_context_length.out"))
+    for name, width, limit in counter_specs:
         b.counter(name, width, limit)
     b.cell("model_context_length", "std_reg", 4)
     b.cell("model_context_next", "std_add", 4)
+    if stream_lm_head:
+        b.cell("model_last_row", "std_sub", 4)
     b.cell("model_context_address", "std_slice", 4, 3)
     b.cell("model_layer_bank", "std_slice", 4, 3)
     b.cell("model_step_address", "std_slice", 2, 1)
@@ -328,8 +333,10 @@ comb group model_prompt_condition { model_is_prompt.left = model_row.out; model_
         copy_ln = b.write("model_copy_final_ln", [("model_final_ln", "model_ln_checkpoint_address.out", "final_output_q16_16.read_data")])
     # Vocabulary rows are padded to stride 65536 only for addressing; all
     # 50257 exact vocabulary entries, and only real context rows, are visited.
-    b.cell("model_logit_row_address", "std_slice", 4, 3)
-    b.cell("model_accumulator_address", "std_cat", 3, 16, 19)
+    if not stream_lm_head:
+        b.cell("model_logit_row_address", "std_slice", 4, 3)
+    if not stream_lm_head:
+        b.cell("model_accumulator_address", "std_cat", 3, 16, 19)
     if audit_checkpoints:
         b.cell("model_logits_address", "std_cat", 1, 19, 20)
     b.cell("model_logit_product", "std_smult_pipe", 64)
@@ -347,20 +354,30 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
 """]
     else:
         b.wires += ["""
-model_logit_row_address.in = model_logit_row.out;
-model_accumulator_address.left = model_logit_row_address.out;
-model_accumulator_address.right = model_logit.out;
+model_last_row.left = model_context_length.out;
+model_last_row.right = 4'd1;
 comb group model_greedy_condition { model_logit_is_better.left = model_round_logit_result.out; model_logit_is_better.right = model_best_value.out; }
 """]
     init_greedy = b.group("model_init_greedy", ["model_best_value.in = 64'd9223372036854775808;", "model_best_value.write_en = 1'd1;", "model_best_token.in = 16'd0;", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
-    read_logit = b.read("model_read_logit", [("lm_accumulator_i64", "model_accumulator_address.out"), ("token_weight_scale_q8_24", "model_logit.out")])
+    accumulator_address = "model_logit.out" if stream_lm_head else "model_accumulator_address.out"
+    read_logit = b.read("model_read_logit", [("lm_accumulator_i64", accumulator_address), ("token_weight_scale_q8_24", "model_logit.out")])
     mul_logit = b.group("model_multiply_logit", ["model_logit_product.left = lm_accumulator_i64.read_data;", "model_logit_product.right = token_weight_scale_q8_24.read_data;", "model_logit_product.go = 1'd1;"], "model_logit_product.done")
     round_logit = b.round("model_round_logit", "model_logit_product.out", 32)
     write_logit = ""
     if audit_checkpoints:
         write_logit = b.write("model_write_logit", [("model_logits", "model_logits_address.out", "model_round_logit_result.out")])
     greedy = b.group("model_update_greedy", ["model_best_value.in = model_round_logit_result.out;", "model_best_value.write_en = 1'd1;", "model_best_token.in = model_logit.out;", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
-    logits = b.loop("model_logit_row", init_greedy + b.loop("model_logit", read_logit + mul_logit + round_logit + write_logit + f"if model_logit_is_better.out with model_greedy_condition {{ {greedy} }}"))
+    logit_scan = b.loop("model_logit", read_logit + mul_logit + round_logit + write_logit + f"if model_logit_is_better.out with model_greedy_condition {{ {greedy} }}")
+    if stream_lm_head:
+        # Production mode invokes GEMV and consumes its one-row accumulator
+        # before advancing to the next real context row.  This makes the
+        # accumulator a single vocabulary row instead of rows*vocabulary.
+        if stream_gemv_control is None:
+            raise ValueError("streamed LM head requires a GEMV control section")
+        logits = lm_control + stream_gemv_control + init_greedy + logit_scan
+        lm_control = ""
+    else:
+        logits = b.loop("model_logit_row", init_greedy + logit_scan)
     feedback = b.write("model_commit_feedback", [("selected_tokens", "model_step_address.out", "model_best_token.out"), ("context_tokens", "model_context_address.out", "model_best_token.out")])
     next_context = b.group("model_next_context", ["model_context_next.left = model_context_length.out;", "model_context_next.right = 4'd1;", "model_context_length.in = model_context_next.out;", "model_context_length.write_en = 1'd1;"], "model_context_length.done")
     final_copy = b.loop("model_copy", read_ln + copy_ln) if audit_checkpoints else ""
@@ -411,7 +428,9 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
     sources.update(new_sources)
     memory_cells += [_memory(name, record["width"], record["elements"]) for name, record in new_sources.items()]
     if production:
-        hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 524288)}
+        # The streamed LM head reuses one vocabulary-row accumulator for each
+        # real context row; it never materializes rows*vocabulary results.
+        hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 65536)}
     else:
         hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "model_embedding": (64, 1024), "model_token_embedding": (64, 1024), "model_position_embedding": (64, 1024), "model_block_outputs": (64, 8192), "model_final_ln": (64, 1024), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 524288), "model_logits": (64, 1048576)}
     memory_cells += [_memory(name, *descriptor) for name, descriptor in hardware.items()]
@@ -432,13 +451,28 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
     b.wires.append(block_wires)
     final_phase = _layer_norm(attention, final=True)
     qdq_phase = mlp._activation_qdq_phase("lm_input_qdq", "final_output_q16_16", "lm_input_scale_q8_24", "lm_input_codes_i8", "lm_input_q16_16", 512, 64)
-    gemv_phase = mlp._gemv_phase("lm_gemv", "lm_input_codes_i8", "lm_input_scale_q8_24", "token_weight_codes_i8", "lm_accumulator_i64", 8, 64, 50257)
+    gemv_phase = mlp._gemv_phase(
+        "lm_gemv", "lm_input_codes_i8", "lm_input_scale_q8_24",
+        "token_weight_codes_i8", "lm_accumulator_i64",
+        1 if production else 8, 64, 50257,
+        input_row_expr="model_last_row.out" if production else None,
+        input_row_width=4 if production else None,
+        input_address_width_override=9 if production else None,
+    )
     # Restrict expensive vocabulary projections to real context rows.
     gemv_phase = (gemv_phase[0], [w.replace("lm_gemv_row_lt.right = 4'd8;", "lm_gemv_row_lt.right = model_context_length.out;") for w in gemv_phase[1]], gemv_phase[2])
     for cells, wires, _ in (final_phase, qdq_phase, gemv_phase):
         b.cells += cells
         b.wires += wires
-    control = _orchestration(b, "\n".join(p[2] for p in phases), final_phase[2], qdq_phase[2] + gemv_phase[2], audit_checkpoints=not production)
+    control = _orchestration(
+        b,
+        "\n".join(p[2] for p in phases),
+        final_phase[2],
+        qdq_phase[2] if production else qdq_phase[2] + gemv_phase[2],
+        audit_checkpoints=not production,
+        stream_lm_head=production,
+        stream_gemv_control=gemv_phase[2] if production else None,
+    )
     futil = '''// Compiler-owned exact model orchestration; no imported hand-written RTL.
 import "primitives/core.futil";
 import "primitives/binary_operators.futil";
