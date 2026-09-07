@@ -226,3 +226,11 @@ real legalization blocker: 220 generic `$lcu` cells remain, and one cannot be
 placed because no BEL of that type remains. This confirms memory mapping and
 primitive packaging are no longer the first blocker; the next compiler step
 must legalize the generated carry/logic arithmetic before placement.
+
+Applying the validated Xilinx arithmetic map (`techmap.v` plus
+`xilinx/arith_map.v`) converts the 220 `$lcu` cells to 4,235 `CARRY4`
+instances. nextpnr advances past the former `$lcu` placement failure, so this
+is a confirmed critical-path improvement. A subsequent LUT cleanup still
+leaves a small number of generic `$and`/`$or` cells and currently triggers a
+nextpnr packing crash; that cleanup remains the active blocker before timing
+analysis.
