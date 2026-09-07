@@ -78,6 +78,7 @@
   "narrow_product_experiment": {
     "status": "production_only_candidate_functional_tests_passed",
     "mode": "narrow_products",
+    "candidate_futil_sha256": "85352d062b3a57bf2eb02597318cea601787a2949ff0847d99db8b740d58030c",
     "widths": {"int8_times_q8_24": 40, "int8_times_activation": 48, "accumulator_boundary": 64},
     "multiply_pipeline_counts": {"40_bit": 14, "48_bit": 7, "64_bit": 24},
     "prior_64_bit_pipeline_count": 45,
