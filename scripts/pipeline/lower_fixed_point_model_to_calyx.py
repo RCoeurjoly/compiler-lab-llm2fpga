@@ -25,14 +25,16 @@ ORACLE = ROOT / "artifacts/reference/tinystories-1m-fixed-point-model-token-step
 Phase = tuple[list[str], list[str], str]
 
 # The Yosys XC7 BRAM mapper has a bounded address depth.  Keep the exact
-# token-embedding tensor order, but bank it by 512-token rows so every
-# production memory is depth-32768 or smaller.  The final bank is padded with
-# zeros; all valid TinyStories vocabulary addresses remain unchanged.
-TOKEN_CODE_BANKS = 99
-TOKEN_CODE_BANK_DEPTH = 32768
-TOKEN_CODE_ROW_BITS = 9
-TOKEN_SCALE_BANKS = 2
-TOKEN_SCALE_BANK_DEPTH = 32768
+# token-embedding tensor order, but bank it by 256-token rows so every
+# production memory is depth-16384.  This is the largest depth accepted by the
+# installed XC7 BRAM library mapper for the generated synchronous memories.
+# The final bank is padded with zeros; all valid TinyStories vocabulary
+# addresses remain unchanged.
+TOKEN_CODE_BANKS = 197
+TOKEN_CODE_BANK_DEPTH = 16384
+TOKEN_CODE_ROW_BITS = 8
+TOKEN_SCALE_BANKS = 4
+TOKEN_SCALE_BANK_DEPTH = 16384
 
 
 @dataclass(frozen=True)
@@ -314,19 +316,19 @@ def _orchestration(builder: Builder, block_control: str, final_control: str, lm_
     token_code_value = "token_weight_codes_i8.read_data"
     token_scale_value = "token_weight_scale_q8_24.read_data"
     if board_io:
-        b.cell("model_token_row_low", "std_slice", 16, 9)
+        b.cell("model_token_row_low", "std_slice", 16, TOKEN_CODE_ROW_BITS)
         b.cell("model_token_bank_full", "std_rsh", 16)
         b.cell("model_token_scale_bank_full", "std_rsh", 16)
-        b.cell("model_token_bank", "std_slice", 16, 7)
-        b.cell("model_token_scale_bank", "std_slice", 16, 1)
-        b.cell("model_token_code_local", "std_cat", 9, 6, 15)
-        b.cell("model_token_scale_local", "std_slice", 16, 15)
+        b.cell("model_token_bank", "std_slice", 16, 8)
+        b.cell("model_token_scale_bank", "std_slice", 16, 2)
+        b.cell("model_token_code_local", "std_cat", TOKEN_CODE_ROW_BITS, 6, 14)
+        b.cell("model_token_scale_local", "std_slice", 16, 14)
         b.wires += [
             "model_token_row_low.in = context_tokens.read_data;",
             "model_token_bank_full.left = context_tokens.read_data;",
-            "model_token_bank_full.right = 16'd9;",
+            "model_token_bank_full.right = 16'd8;",
             "model_token_scale_bank_full.left = context_tokens.read_data;",
-            "model_token_scale_bank_full.right = 16'd15;",
+            "model_token_scale_bank_full.right = 16'd14;",
             "model_token_bank.in = model_token_bank_full.out;",
             "model_token_scale_bank.in = model_token_scale_bank_full.out;",
             "model_token_code_local.left = model_token_row_low.out;",
@@ -484,11 +486,11 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
     logit_scale_value = "token_weight_scale_q8_24.read_data"
     if board_io:
         b.cell("model_logit_scale_bank_full", "std_rsh", 16)
-        b.cell("model_logit_scale_bank", "std_slice", 16, 1)
-        b.cell("model_logit_scale_local", "std_slice", 16, 15)
+        b.cell("model_logit_scale_bank", "std_slice", 16, 2)
+        b.cell("model_logit_scale_local", "std_slice", 16, 14)
         b.wires += [
             "model_logit_scale_bank_full.left = model_logit.out;",
-            "model_logit_scale_bank_full.right = 16'd15;",
+            "model_logit_scale_bank_full.right = 16'd14;",
             "model_logit_scale_bank.in = model_logit_scale_bank_full.out;",
             "model_logit_scale_local.in = model_logit.out;",
         ]
@@ -585,7 +587,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
             new_sources[f"token_weight_codes_i8_b{bank}"] = {
                 "kind": "code", "buffer": "token_embedding.weight", "width": 8,
                 "elements": TOKEN_CODE_BANK_DEPTH,
-                "banked": {"source_elements": 50257 * 64, "bank": bank, "banks": TOKEN_CODE_BANKS, "depth": TOKEN_CODE_BANK_DEPTH, "layout": "token_rows_512_then_hidden"},
+                "banked": {"source_elements": 50257 * 64, "bank": bank, "banks": TOKEN_CODE_BANKS, "depth": TOKEN_CODE_BANK_DEPTH, "layout": "token_rows_256_then_hidden"},
             }
         for bank in range(TOKEN_SCALE_BANKS):
             new_sources[f"token_weight_scale_q8_24_b{bank}"] = {
@@ -633,7 +635,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
         input_row_width=4 if production else None,
         input_address_width_override=9 if production else None,
         write_trace=not production,
-        banked_weights=("token_weight_codes_i8", TOKEN_CODE_BANKS) if production else None,
+        banked_weights=("token_weight_codes_i8", TOKEN_CODE_BANKS, TOKEN_CODE_ROW_BITS + 6) if production else None,
     )
     # Restrict expensive vocabulary projections to real context rows.
     gemv_phase = (gemv_phase[0], [w.replace("lm_gemv_row_lt.right = 4'd8;", "lm_gemv_row_lt.right = model_context_length.out;") for w in gemv_phase[1]], gemv_phase[2])
@@ -734,7 +736,7 @@ def materialize_model_sources(artifact: CalyxArtifact, bundle) -> dict[str, Any]
             layout = record["banked"]["layout"]
             bank = int(record["banked"]["bank"])
             depth = int(record["banked"]["depth"])
-            if layout == "token_rows_512_then_hidden":
+            if layout in {"token_rows_256_then_hidden", "token_rows_512_then_hidden"}:
                 row_stride = 64
                 rows_per_bank = depth // row_stride
                 start = bank * rows_per_bank * row_stride

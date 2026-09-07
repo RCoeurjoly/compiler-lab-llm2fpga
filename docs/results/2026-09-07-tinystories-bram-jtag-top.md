@@ -38,6 +38,9 @@ both embedding and logit scaling). The resulting Futil memory inventory is
 35.2-Mbit YPCB RAMB36-equivalent budget. This is a structural capacity result,
 not a mapped-resource, timing, bitstream, or board-inference claim. Its
 provenance receipt is `artifacts/reference/tinystories-1m-bram-scale-width-receipt.json`.
+The later 16K-depth physical-bank experiment supersedes this earlier inventory
+for synthesis mapping; the scale-width receipt remains a valid record of the
+independent 32-bit arithmetic-contract reduction.
 
 `scripts/pipeline/prepare_tinystories_1m_bram_image.py` now converts the
 runtime-plusarg memory image into synthesis-visible static `$readmemh` inputs
@@ -67,15 +70,16 @@ generated SV still passes Calyx compilation and the focused lowering tests.
 
 The first coarse-to-memory-mapping attempt exposed the remaining capacity
 problem: the vocabulary tables were represented as 50,257-word memories, and
-the mapper left those memories unresolved. The compiler backend now banks the
-token code table by 512 vocabulary rows (99 banks of depth 32,768) and the
-32-bit token-scale table by contiguous 32K-word banks (2 banks). Address
-selection is explicit in the generated Calyx and preserves the original
-row/column ordering; the final scale bank boundary is bit 15, not the code
-table's bit 9. Each bank-mux level now selects its own address bit (rather
-than repeatedly selecting bit zero); the corrected Futil compiles through
-Calyx, but the expensive coarse/map run must be repeated for a strict hash-
-aligned mapping receipt.
+the mapper left those memories unresolved. A focused mapper diagnostic then
+showed that the installed XC7 BRAM rule set rejects the previous 32,768-word
+bank shape. The compiler backend now preserves the exact flat tensor order
+while using 256 vocabulary rows per code bank (197 banks of depth 16,384) and
+four contiguous 16,384-word 32-bit scale banks. The code-table local address
+is therefore 14 bits and the scale-table bank boundary is bit 14. Address
+selection remains explicit in generated Calyx, including the corrected
+per-level bank-bit selection; focused lowering tests pass and Calyx emits SV.
+The strict coarse/map run must still be repeated for a hash-aligned resource
+receipt, and this change is not yet a fit or timing result.
 
 With that change, the regenerated static image has 242 structural memories
 and 35,158,330 structural bits. The pinned XC7 coarse pass completed in

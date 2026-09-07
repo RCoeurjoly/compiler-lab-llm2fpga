@@ -802,15 +802,16 @@ def _gemv_phase(
     banked_weight_address_wires = ""
     weight_read_lines = f"      {weights}.addr0 = {prefix}_weight_address.out;\n      {weights}.content_en = 1'd1;\n"
     if banked_weights is not None:
-        bank_prefix, bank_count = banked_weights
+        bank_prefix, bank_count = banked_weights[:2]
+        bank_address_shift = banked_weights[2] if len(banked_weights) > 2 else 15
         leaf_count = 1 << (bank_count - 1).bit_length()
         bank_bits = leaf_count.bit_length() - 1
         cells += [
             f"{prefix}_weight_bank_full = std_rsh({weight_address_width});",
             f"{prefix}_weight_bank = std_slice({weight_address_width}, {bank_bits});",
-            f"{prefix}_weight_local = std_slice({weight_address_width}, 15);",
+            f"{prefix}_weight_local = std_slice({weight_address_width}, {bank_address_shift});",
         ]
-        banked_weight_address_wires = f"      {prefix}_weight_bank_full.left = {prefix}_weight_address.out;\n      {prefix}_weight_bank_full.right = {weight_address_width}'d15;\n      {prefix}_weight_bank.in = {prefix}_weight_bank_full.out;\n      {prefix}_weight_local.in = {prefix}_weight_address.out;\n"
+        banked_weight_address_wires = f"      {prefix}_weight_bank_full.left = {prefix}_weight_address.out;\n      {prefix}_weight_bank_full.right = {weight_address_width}'d{bank_address_shift};\n      {prefix}_weight_bank.in = {prefix}_weight_bank_full.out;\n      {prefix}_weight_local.in = {prefix}_weight_address.out;\n"
         banked_weight_done_terms = []
         leaves = []
         for bank in range(bank_count):
