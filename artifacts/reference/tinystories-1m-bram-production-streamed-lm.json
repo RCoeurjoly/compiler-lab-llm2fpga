@@ -1,0 +1,36 @@
+{
+  "schema": "tinystories-1m-bram-production-streamed-lm-v1",
+  "status": "pre_map_passed_xilinx_mapping_unverified",
+  "futil_sha256": "98de5c7200964b9adce0955b8e4a99776e910ad8238d8114eba3c92bb2fec19a",
+  "synthesis_sv_sha256": "e3076ec4a8688acd7257ddfb30c32041960833de91d7f6420c3ab4db4f848ead",
+  "frontend": "yosys-slang",
+  "pre_map": {
+    "status": "passed",
+    "cells": 31666,
+    "memories": 143,
+    "memory_bits": 40300000,
+    "log_sha256": "f2460c6c31e918b9e21471f134a24962947a83f11de90455e1f64245f7d2e698"
+  },
+  "architecture": {
+    "lm_head": "only final real context row",
+    "accumulator_storage": "one 65536-entry 64-bit vocabulary row",
+    "full_logits_storage": false,
+    "audit_checkpoint_memories": false
+  },
+  "mapping": {
+    "status": "not_completed",
+    "diagnostic": "standard synth_xilinx FSM optimization expands the generated control netlist without reaching a mapped resource report in the bounded run; no timing or placement claim is made"
+  },
+  "nextpnr": {
+    "status": "not_run",
+    "seed": 15,
+    "board_fit_verified": false
+  },
+  "simulation": {
+    "status": "not_verified"
+  },
+  "claims": {
+    "production_lowering_tests_passed": true,
+    "board_inference_verified": false
+  }
+}
