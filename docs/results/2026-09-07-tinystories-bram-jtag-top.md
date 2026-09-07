@@ -97,6 +97,12 @@ exact residual-memory list
 are recorded in
 `artifacts/reference/tinystories-1m-bram-production-synthesis-2026-09-07.json`.
 
+The omitted DSP stage was also tested explicitly. Unmapping the coarse
+`$macc_v2` cells enables Xilinx DSP inference, but produces 2,433 `DSP48E1`
+instances against 1,920 available on the device. Thus DSP inference alone
+does not rescue the design; it moves the over-capacity condition from LUTs to
+DSPs. The bounded receipt records this as a diagnostic experiment.
+
 The generated full-top Verilator run did not reach completion in the observed
 35 million-cycle window and was stopped to avoid an unbounded run. This is a
 simulation-throughput blocker, not an inference result.

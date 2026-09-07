@@ -42,6 +42,14 @@
     "nextpnr_resources": {"lut_required": 628976, "lut_capacity": 597200, "ff": 21976, "ramb36": 38, "ramb18": 14},
     "diagnostic": "Hash-aligned mapping consumed all banked token memories. After legalizing generic boolean cells for nextpnr, the corrected JSON requires 628,976 SLICE_LUTX sites (105.3% of the 597,200-device capacity), 21,976 FFs, 38 RAMB36E1, and 14 RAMB18E1. Placement therefore fails on genuine LUT over-capacity. A bounded ABC optimization attempt on the generated main module did not produce an artifact within the observation window. No fit, timing, bitstream, or board-inference claim is made."
   },
+  "dsp_experiment": {
+    "status": "inferred_but_over_capacity",
+    "input": "post-coarse RTL with maccmap -unmap",
+    "artifact_sha256": "899fe2bb6ef7bff1212fb5c889d4f949e41244f6e1438161f9d44f83b18cb1c7",
+    "dsp48e1_instances": 2433,
+    "device_dsp48e1_capacity": 1920,
+    "diagnostic": "Explicit macc unmapping enables DSP inference, but the resulting 2,433 DSP48E1 instances exceed the 1,920-device capacity; the subsequent fine mapping did not produce an artifact within the bounded observation window."
+  },
   "claims": {
     "jtag_top_integrated": true,
     "static_model_image_prepared": true,
