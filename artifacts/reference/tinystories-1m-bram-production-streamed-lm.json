@@ -44,10 +44,11 @@
   },
   "simulation": {
     "status": "not_verified_bounded_timeout",
-    "timeout_seconds": 300,
-    "diagnostic": "Verilator compilation completed; the serial two-run harness produced no token checkpoint before the bounded 300-second execution window",
+    "timeout_seconds": 60,
+    "diagnostic": "Verilator compilation completed; the optimized serial harness did not reach its 1000-cycle progress checkpoint before the bounded execution window",
     "host_optimization": "-O3",
-    "log_sha256": "d9bf9ece04398e74ecd0653dd43c8a023aba30ec6eb1e9d0fbdb23aa56363667"
+    "progress_interval_cycles": 1000,
+    "log_sha256": "e351182e72119471eff8859bd95d5243332a32ab25501e6056377965620cf38c"
   },
   "claims": {
     "production_lowering_tests_passed": true,
