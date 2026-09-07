@@ -72,6 +72,7 @@ int main(int argc, char** argv) {
     model.start = 1; model.valid = 0;
     for (unsigned i = 0; i < 4; ++i) { model.clk = 0; model.eval(); model.clk = 1; model.eval(); }
     model.valid = 1;
+    std::cout << "{\"event\":\"started\",\"run\":" << run << "}" << std::endl;
     while (!model.done && completed[run] < 2000000000ULL) {
       model.clk = 0; model.eval();
       const bool selected = root->main__DOT__selected_tokens_write_en &&
