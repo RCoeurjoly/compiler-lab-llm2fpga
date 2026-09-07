@@ -204,6 +204,14 @@ same flattened primitive-module metadata as the known-good control
 repair that netlist packaging and rerun nextpnr; no board bitstream or
 inference success is claimed.
 
+The first full generated-SV run using the selective-memory artifact was
+bounded at 900 seconds and terminated at 162,431,000 cycles without `done`.
+It emitted an intermediate selected-token write of `0` at cycle 86,196,460,
+not the expected `[11, 612]`. This is neither an inference pass nor a timing
+result; it establishes that the current simulation path is too slow to serve
+as an acceptance check and that its token writeback must be diagnosed before
+hardware programming.
+
 Comparing the mapped cell against the known-good primitive control identified
 the immediate cause of the import failure: the new mapper emits a 17-bit
 `ADDRARDADDR` connection on a `RAMB36E1`, while the legal Kintex-7 primitive
