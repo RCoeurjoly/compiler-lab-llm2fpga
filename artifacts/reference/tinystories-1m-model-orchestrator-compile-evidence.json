@@ -25,9 +25,9 @@
   "execution_verified": false,
   "schema": "tinystories-1m-model-orchestrator-compile-evidence-v1",
   "oracle_sha256": "31fbd1e3f5b13d7b07466a72e9c6a551ffc00bd4fee375241f095ba5b5cda677",
-  "generator_sha256": "a4b3ab80bebbfd0d3fe83d7aa2225cafded31e69a0853b8835c04e87d20afb69",
+  "generator_sha256": "16dbe08fa512e254d8ff0a393ab6d5f73065c7e8bd38050941cf50d58e0362fc",
   "base_block_futil_sha256": "ab0ec932bf4a76c97df3beb11dd71a5309fe65e2bd36492ce18dc63f009622c2",
-  "provenance_sha256": "06491ac53a834888b4dbf3f6d2b3c3b559023574abc70a092f04226c4ea1203e",
+  "provenance_sha256": "1c22899d1dd7b05af462e02d7157fde26e5707562fb15c2ed2b50262d90cd0f1",
   "scope": "full model generated SV; not simulated, not synthesized, not board inference",
-  "artifact_sha256": "40a7251aa3a5100bfaeac9e98e13262d5cba0b997ca3678377031b48d8ecba4a"
+  "artifact_sha256": "6492df0e82abd375c36e06ca2e3eb9fe53e06390abd13ea0026a739530c731df"
 }

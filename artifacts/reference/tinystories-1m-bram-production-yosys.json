@@ -1,0 +1,28 @@
+{
+  "schema": "tinystories-1m-bram-production-yosys-v1",
+  "status": "pre_map_passed",
+  "futil_sha256": "f8e66920b15bb2035be469b9e03d7565fde7d54e1b6c1cb36c8b0a17cd75775b",
+  "synthesis_sv_sha256": "20e6738b8d7a38bfa28646dc80ccc7af133b50fd2827b3288ca552afd0f09707",
+  "frontend": "yosys-slang",
+  "command": "read_slang --ignore-initial --threads 1 --no-proc --max-parse-depth 20000 --top main; hierarchy -top main -check; proc; stat",
+  "resources": {
+    "cells": 31670,
+    "memories": 143,
+    "memory_bits": 69600000
+  },
+  "simulation": {
+    "status": "not_verified",
+    "diagnostic": "optimized Verilator build completed, but the full two-run model execution did not complete within the bounded observation window"
+  },
+  "nextpnr": {
+    "status": "not_run",
+    "diagnostic": "this checkout provides no nextpnr-xilinx package or YPCB constraint file"
+  },
+  "claims": {
+    "bram_only_contract": true,
+    "full_logits_storage": false,
+    "streamed_argmax": true,
+    "board_fit_verified": false,
+    "board_inference_verified": false
+  }
+}

@@ -223,7 +223,7 @@ class Builder:
         return self.group(name, [f"{name}_negative.left = {value};", f"{name}_negative.right = 64'd0;", f"{name}_negate.left = 64'd0;", f"{name}_negate.right = {value};", f"{name}_absolute.cond = {name}_negative.out;", f"{name}_absolute.tru = {name}_negate.out;", f"{name}_absolute.fal = {value};", f"{name}_bias.left = {name}_absolute.out;", f"{name}_bias.right = 64'd{1 << (shift - 1)};", f"{name}_shift.left = {name}_bias.out;", f"{name}_shift.right = 64'd{shift};", f"{name}_signed.left = 64'd0;", f"{name}_signed.right = {name}_shift.out;", f"{name}_select.cond = {name}_negative.out;", f"{name}_select.tru = {name}_signed.out;", f"{name}_select.fal = {name}_shift.out;", f"{name}_result.in = {name}_select.out;", f"{name}_result.write_en = 1'd1;"], name + "_result.done")
 
 
-def _orchestration(builder: Builder, block_control: str, final_control: str, lm_control: str) -> str:
+def _orchestration(builder: Builder, block_control: str, final_control: str, lm_control: str, *, audit_checkpoints: bool = True) -> str:
     b = builder
     for name, width, limit in (("model_step", 2, "2'd2"), ("model_layer", 4, "4'd8"), ("model_row", 4, "4'd8"), ("model_column", 7, "7'd64"), ("model_copy", 10, "10'd512"), ("model_logit_row", 4, "model_context_length.out"), ("model_logit", 16, "16'd50257")):
         b.counter(name, width, limit)
@@ -241,13 +241,15 @@ def _orchestration(builder: Builder, block_control: str, final_control: str, lm_
     b.cell("model_token_address", "std_cat", 16, 6, 22)
     b.cell("model_position_weight_address", "std_cat", 5, 6, 11)
     b.cell("model_copy_address", "std_slice", 10, 9)
-    b.cell("model_embedding_checkpoint_address", "std_cat", 1, 9, 10)
-    b.cell("model_block_step_layer", "std_cat", 1, 3, 4)
-    b.cell("model_block_checkpoint_address", "std_cat", 4, 9, 13)
-    b.cell("model_ln_checkpoint_address", "std_cat", 1, 9, 10)
+    if audit_checkpoints:
+        b.cell("model_embedding_checkpoint_address", "std_cat", 1, 9, 10)
+        b.cell("model_block_step_layer", "std_cat", 1, 3, 4)
+        b.cell("model_block_checkpoint_address", "std_cat", 4, 9, 13)
+        b.cell("model_ln_checkpoint_address", "std_cat", 1, 9, 10)
     b.cell("model_valid_not", "std_not", 1)
     b.cell("model_wait_register", "std_reg", 1)
-    b.wires += ["""
+    if audit_checkpoints:
+        b.wires += ["""
 model_layer_bank.in = model_layer.out;
 model_step_address.in = model_step.out;
 model_context_address.in = model_context_length.out;
@@ -273,6 +275,25 @@ model_ln_checkpoint_address.right = model_copy_address.out;
 comb group model_wait_condition { model_valid_not.in = valid; }
 comb group model_prompt_condition { model_is_prompt.left = model_row.out; model_is_prompt.right = 4'd4; }
 """]
+    else:
+        b.wires += ["""
+model_layer_bank.in = model_layer.out;
+model_step_address.in = model_step.out;
+model_context_address.in = model_context_length.out;
+model_row_address.in = model_row.out;
+model_prompt_address.in = model_row.out;
+model_position_address.in = model_row.out;
+model_column_address.in = model_column.out;
+model_hidden_address.left = model_row_address.out;
+model_hidden_address.right = model_column_address.out;
+model_token_address.left = context_tokens.read_data;
+model_token_address.right = model_column_address.out;
+model_position_weight_address.left = model_position_address.out;
+model_position_weight_address.right = model_column_address.out;
+model_copy_address.in = model_copy.out;
+comb group model_wait_condition { model_valid_not.in = valid; }
+comb group model_prompt_condition { model_is_prompt.left = model_row.out; model_is_prompt.right = 4'd4; }
+"""]
     wait = b.group("model_wait", ["model_wait_register.in = 1'd1;", "model_wait_register.write_en = 1'd1;"], "model_wait_register.done")
     init_length = b.group("model_init_length", ["model_context_length.in = 4'd4;", "model_context_length.write_en = 1'd1;"], "model_context_length.done")
     read_prompt = b.read("model_read_prompt", [("prompt_tokens", "model_prompt_address.out")])
@@ -290,23 +311,33 @@ comb group model_prompt_condition { model_is_prompt.left = model_row.out; model_
     round_position = b.round("model_round_position", "model_position_product.out", 8)
     b.cell("model_embedding_sum", "std_sadd", 64)
     b.wires.append("model_embedding_sum.left = model_round_token_result.out; model_embedding_sum.right = model_round_position_result.out;")
-    write_embedding = b.write("model_write_embedding", [("block_input_q16_16", "model_hidden_address.out", "model_embedding_sum.out"), ("model_embedding", "model_embedding_checkpoint_address.out", "model_embedding_sum.out"), ("model_token_embedding", "model_embedding_checkpoint_address.out", "model_round_token_result.out"), ("model_position_embedding", "model_embedding_checkpoint_address.out", "model_round_position_result.out")])
+    embedding_writes = [("block_input_q16_16", "model_hidden_address.out", "model_embedding_sum.out")]
+    if audit_checkpoints:
+        embedding_writes += [("model_embedding", "model_embedding_checkpoint_address.out", "model_embedding_sum.out"), ("model_token_embedding", "model_embedding_checkpoint_address.out", "model_round_token_result.out"), ("model_position_embedding", "model_embedding_checkpoint_address.out", "model_round_position_result.out")]
+    write_embedding = b.write("model_write_embedding", embedding_writes)
     embedding = b.loop("model_row", read_token + read_token_scale + b.loop("model_column", read_codes + multiply + round_token + round_position + write_embedding))
     read_block = b.read("model_read_block", [("block_output_q16_16", "model_copy_address.out")])
-    copy_block = b.write("model_copy_block", [("block_input_q16_16", "model_copy_address.out", "block_output_q16_16.read_data"), ("model_block_outputs", "model_block_checkpoint_address.out", "block_output_q16_16.read_data")])
+    block_writes = [("block_input_q16_16", "model_copy_address.out", "block_output_q16_16.read_data")]
+    if audit_checkpoints:
+        block_writes += [("model_block_outputs", "model_block_checkpoint_address.out", "block_output_q16_16.read_data")]
+    copy_block = b.write("model_copy_block", block_writes)
     blocks = b.loop("model_layer", block_control + b.loop("model_copy", read_block + copy_block))
-    read_ln = b.read("model_read_final_ln", [("final_output_q16_16", "model_copy_address.out")])
-    copy_ln = b.write("model_copy_final_ln", [("model_final_ln", "model_ln_checkpoint_address.out", "final_output_q16_16.read_data")])
+    read_ln = b.read("model_read_final_ln", [("final_output_q16_16", "model_copy_address.out")]) if audit_checkpoints else ""
+    copy_ln = ""
+    if audit_checkpoints:
+        copy_ln = b.write("model_copy_final_ln", [("model_final_ln", "model_ln_checkpoint_address.out", "final_output_q16_16.read_data")])
     # Vocabulary rows are padded to stride 65536 only for addressing; all
     # 50257 exact vocabulary entries, and only real context rows, are visited.
     b.cell("model_logit_row_address", "std_slice", 4, 3)
     b.cell("model_accumulator_address", "std_cat", 3, 16, 19)
-    b.cell("model_logits_address", "std_cat", 1, 19, 20)
+    if audit_checkpoints:
+        b.cell("model_logits_address", "std_cat", 1, 19, 20)
     b.cell("model_logit_product", "std_smult_pipe", 64)
     b.cell("model_best_value", "std_reg", 64)
     b.cell("model_best_token", "std_reg", 16)
     b.cell("model_logit_is_better", "std_sgt", 64)
-    b.wires += ["""
+    if audit_checkpoints:
+        b.wires += ["""
 model_logit_row_address.in = model_logit_row.out;
 model_accumulator_address.left = model_logit_row_address.out;
 model_accumulator_address.right = model_logit.out;
@@ -314,20 +345,30 @@ model_logits_address.left = model_step_address.out;
 model_logits_address.right = model_accumulator_address.out;
 comb group model_greedy_condition { model_logit_is_better.left = model_round_logit_result.out; model_logit_is_better.right = model_best_value.out; }
 """]
+    else:
+        b.wires += ["""
+model_logit_row_address.in = model_logit_row.out;
+model_accumulator_address.left = model_logit_row_address.out;
+model_accumulator_address.right = model_logit.out;
+comb group model_greedy_condition { model_logit_is_better.left = model_round_logit_result.out; model_logit_is_better.right = model_best_value.out; }
+"""]
     init_greedy = b.group("model_init_greedy", ["model_best_value.in = 64'd9223372036854775808;", "model_best_value.write_en = 1'd1;", "model_best_token.in = 16'd0;", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
     read_logit = b.read("model_read_logit", [("lm_accumulator_i64", "model_accumulator_address.out"), ("token_weight_scale_q8_24", "model_logit.out")])
     mul_logit = b.group("model_multiply_logit", ["model_logit_product.left = lm_accumulator_i64.read_data;", "model_logit_product.right = token_weight_scale_q8_24.read_data;", "model_logit_product.go = 1'd1;"], "model_logit_product.done")
     round_logit = b.round("model_round_logit", "model_logit_product.out", 32)
-    write_logit = b.write("model_write_logit", [("model_logits", "model_logits_address.out", "model_round_logit_result.out")])
+    write_logit = ""
+    if audit_checkpoints:
+        write_logit = b.write("model_write_logit", [("model_logits", "model_logits_address.out", "model_round_logit_result.out")])
     greedy = b.group("model_update_greedy", ["model_best_value.in = model_round_logit_result.out;", "model_best_value.write_en = 1'd1;", "model_best_token.in = model_logit.out;", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
     logits = b.loop("model_logit_row", init_greedy + b.loop("model_logit", read_logit + mul_logit + round_logit + write_logit + f"if model_logit_is_better.out with model_greedy_condition {{ {greedy} }}"))
     feedback = b.write("model_commit_feedback", [("selected_tokens", "model_step_address.out", "model_best_token.out"), ("context_tokens", "model_context_address.out", "model_best_token.out")])
     next_context = b.group("model_next_context", ["model_context_next.left = model_context_length.out;", "model_context_next.right = 4'd1;", "model_context_length.in = model_context_next.out;", "model_context_length.write_en = 1'd1;"], "model_context_length.done")
-    steps = b.loop("model_step", embedding + blocks + final_control + b.loop("model_copy", read_ln + copy_ln) + lm_control + logits + feedback + next_context)
+    final_copy = b.loop("model_copy", read_ln + copy_ln) if audit_checkpoints else ""
+    steps = b.loop("model_step", embedding + blocks + final_control + final_copy + lm_control + logits + feedback + next_context)
     return f"seq {{ while model_valid_not.out with model_wait_condition {{ {wait} }} {init_length} {prompt} {steps} }}"
 
 
-def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None, host_intermediate_states=None) -> CalyxArtifact:
+def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None, host_intermediate_states=None, production: bool = False) -> CalyxArtifact:
     if host_second_token is not None:
         raise ValueError("host_second_token_forbidden")
     if host_intermediate_states is not None:
@@ -369,7 +410,10 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
     }
     sources.update(new_sources)
     memory_cells += [_memory(name, record["width"], record["elements"]) for name, record in new_sources.items()]
-    hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "model_embedding": (64, 1024), "model_token_embedding": (64, 1024), "model_position_embedding": (64, 1024), "model_block_outputs": (64, 8192), "model_final_ln": (64, 1024), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 524288), "model_logits": (64, 1048576)}
+    if production:
+        hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 524288)}
+    else:
+        hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "model_embedding": (64, 1024), "model_token_embedding": (64, 1024), "model_position_embedding": (64, 1024), "model_block_outputs": (64, 8192), "model_final_ln": (64, 1024), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 524288), "model_logits": (64, 1048576)}
     memory_cells += [_memory(name, *descriptor) for name, descriptor in hardware.items()]
     phases = _block_phases(block, attention, mlp)
     b = Builder()
@@ -394,7 +438,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
     for cells, wires, _ in (final_phase, qdq_phase, gemv_phase):
         b.cells += cells
         b.wires += wires
-    control = _orchestration(b, "\n".join(p[2] for p in phases), final_phase[2], qdq_phase[2] + gemv_phase[2])
+    control = _orchestration(b, "\n".join(p[2] for p in phases), final_phase[2], qdq_phase[2] + gemv_phase[2], audit_checkpoints=not production)
     futil = '''// Compiler-owned exact model orchestration; no imported hand-written RTL.
 import "primitives/core.futil";
 import "primitives/binary_operators.futil";
@@ -411,7 +455,8 @@ component main(@go start: 1, valid: 1) -> (@done done: 1) {
         "source_memories": sources,
         "hardware_owned_memories": sorted(set(re.findall(r"@external (\w+) =", futil)) - set(sources)),
         "feedback": "greedy_last_real_row -> context_tokens[context_length] -> token_embedding",
-        "claims": {"compiler_owned_control": True, "existing_arithmetic_generators_modified": False, "sv_execution_verified": False, "board_executed": False},
+        "claims": {"compiler_owned_control": True, "existing_arithmetic_generators_modified": False, "sv_execution_verified": False, "board_executed": False, "board_fit_verified": False},
+        "production_memory_contract": {"audit_checkpoint_memories": [] if production else ["model_embedding", "model_token_embedding", "model_position_embedding", "model_block_outputs", "model_final_ln", "model_logits"], "full_logits_storage": not production, "streamed_argmax": True},
     }
     provenance["artifact_sha256"] = _canonical(provenance)
     return CalyxArtifact(futil, provenance)
