@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import random
 import unittest
 from pathlib import Path
 
@@ -22,6 +23,28 @@ def load_module():
 
 
 class BramProductionTest(unittest.TestCase):
+    @staticmethod
+    def _signed(value: int, width: int) -> int:
+        value &= (1 << width) - 1
+        return value - (1 << width) if value & (1 << (width - 1)) else value
+
+    def test_production_narrow_products_preserve_signed_64_contract(self):
+        module = load_module()
+        artifact = module.generate_production_kernel(ORACLE)
+        self.assertEqual(artifact.futil.count("std_smult_pipe(40)"), 14)
+        self.assertEqual(artifact.futil.count("std_smult_pipe(48)"), 7)
+        rng = random.Random(0x1A2B3C)
+        cases = [(-128, -105952), (-128, 105952), (127, -105952), (127, 105952)]
+        cases += [(rng.randint(-128, 127), rng.randint(-105952, 105952)) for _ in range(256)]
+        for code, scale in cases:
+            reference = self._signed(code * scale, 64)
+            narrowed = self._signed(self._signed(code, 40) * self._signed(scale, 40), 40)
+            self.assertEqual(self._signed(narrowed, 64), reference)
+            activation = narrowed
+            reference_mac = self._signed(activation * code, 64)
+            narrowed_mac = self._signed(self._signed(activation, 48) * self._signed(code, 48), 48)
+            self.assertEqual(self._signed(narrowed_mac, 64), reference_mac)
+
     def test_audit_generator_futil_remains_byte_identical(self):
         module = load_module()
         self.assertEqual(
