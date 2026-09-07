@@ -29,6 +29,13 @@ therefore falls from 39.3 Mbits / 144 memories to 36.1 Mbits / 143 memories,
 without changing the signed-64-bit arithmetic contract. This is a capacity
 optimization, not yet a fit result.
 
+`scripts/pipeline/prepare_tinystories_1m_bram_image.py` now converts the
+runtime-plusarg memory image into synthesis-visible static `$readmemh` inputs
+and emits a hash manifest. The resulting SV was accepted by yosys-slang with
+initialization enabled; the retained receipt is
+`artifacts/reference/tinystories-1m-bram-static-image-receipt.json`. This is
+image readiness only: the receipt intentionally does not claim a bitstream.
+
 The model weights remain immutable BRAM initialization data. The JTAG bridge
 has been linted with Verilator in `BSCAN_SIM` mode, and the production
 generated SV still passes Calyx compilation and the focused lowering tests.

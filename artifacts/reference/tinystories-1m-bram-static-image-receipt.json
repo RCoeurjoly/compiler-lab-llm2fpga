@@ -1,0 +1,15 @@
+{
+  "schema": "tinystories-1m-bram-static-image-receipt-v1",
+  "status": "prepared_not_bitstream_verified",
+  "command": "python scripts/pipeline/prepare_tinystories_1m_bram_image.py <generated-main.sv> <image-dir>",
+  "futil_sha256": "ee2e74f9c21322cbf8d40c84147261a06efcfbe2560039e4fbe0b3c145c5e0c3",
+  "generated_sv_sha256": "10c10a3259e4f32a5a66a378632d173d6aec1e261cc2526fa40ebf3167a37534",
+  "static_sv_sha256": "45e9941613a89667311f5f4b8b2470a6a0eaf2c651047e427d541afc4edb88d9",
+  "manifest_sha256": "a007d3de01e5825118fe7318db5f15f49501d30261d0dcc4e976ebc47fec4b78",
+  "verification": {
+    "static_readmemh_parse": "passed",
+    "dynamic_plusarg_removed": true,
+    "scratch_memories_initialized": false,
+    "bitstream_verified": false
+  }
+}
