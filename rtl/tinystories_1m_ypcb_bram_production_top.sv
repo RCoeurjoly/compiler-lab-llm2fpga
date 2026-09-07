@@ -9,9 +9,9 @@ module tinystories_1m_ypcb_bram_production_top (
 );
   wire start, valid, reset, done;
   wire [0:0] token_index;
-  wire [15:0] token_id;
+  (* keep *) wire [15:0] token_id;
   wire [15:0] prompt_0, prompt_1, prompt_2, prompt_3;
-  wire [63:0] response_word;
+  (* keep *) wire [63:0] response_word;
   wire csr_reset;
   wire csr_done = done;
   wire csr_valid = valid;
@@ -23,7 +23,7 @@ module tinystories_1m_ypcb_bram_production_top (
       .core_token_id(token_id), .core_done(csr_done),
       .response_word(response_word));
   assign reset = csr_reset;
-  main core (
+  (* keep_hierarchy *) main core (
       .clk(clk),
       .reset(reset),
       .start(start),

@@ -175,3 +175,9 @@ the global `share` pass was solving repeated SAT instances (for example,
 artifact. This identifies global sharing as a separate iteration-time
 blocker; future compiler passes must constrain or replace that sharing step
 before another full-board attempt.
+
+The YPCB top now marks the generated core hierarchy, token readback, and CSR
+response as synthesis-preserved. This prevents a board build from silently
+collapsing the accelerator to the LED shell when only status outputs are
+observed. The focused top-integration tests pass; a new mapped resource result
+is still pending.
