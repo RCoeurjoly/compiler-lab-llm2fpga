@@ -242,3 +242,11 @@ replacement with native `INV` cells still crashes nextpnr, indicating that
 these generated cells also need the exact per-cell provenance and port
 metadata emitted by Yosys's `lut_map` pass. This remains a packaging and
 legalization task; timing and hardware are unverified.
+
+The residual-cell experiment converted the remaining 2,391 muxes, 819 ORs,
+13 ANDs, 14 NOTs, and 17 flip-flops into native LUT/FDRE forms, leaving only
+one constant equality to encode. The resulting JSON is structurally native,
+but nextpnr still crashes during packing; the generated `CARRY4`/`FDRE`
+instances do not yet have the exact cell metadata emitted by Yosys's own
+mapping passes. This narrows the next fix to native-cell ABI generation rather
+than model memory, arithmetic width, or board capacity.
