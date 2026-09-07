@@ -1,0 +1,49 @@
+{
+  "schema": "tinystories-1m-bram-production-nextpnr-v1",
+  "status": "failed_resource_capacity",
+  "target": {
+    "device": "xc7k480tffg1156",
+    "top": "tinystories_1m_ypcb_bram_production_top",
+    "xdc_sha256": "a88e1638896ae76da84a83811be20b98a24451b966502efe86a596aae60b1841",
+    "frequency_mhz": 50,
+    "seed": 15,
+    "deterministic": true
+  },
+  "inputs": {
+    "futil_sha256": "f8e66920b15bb2035be469b9e03d7565fde7d54e1b6c1cb36c8b0a17cd75775b",
+    "synthesis_sv_sha256": "20e6738b8d7a38bfa28646dc80ccc7af133b50fd2827b3288ca552afd0f09707",
+    "yosys_json_sha256": "76a70acefa0aa78a64dbf3538d6457b4f903cec30a4eb42a9edb2511c7a46118",
+    "top_sv_sha256": "fe586bd68e8e8828e8771c84d2b67fc5bd73159283cfc7b2ab02793da80dd77f"
+  },
+  "command": "nextpnr-xilinx --chipdb xc7k480tffg1156.bin --xdc tinystories_1m_ypcb_bram_production.xdc --json production.json --write production-routed.json --fasm production.fasm --freq 50 --seed 15 --no-tmdriv",
+  "resources": {
+    "required": {
+      "RAMB36E1": 1058,
+      "RAMB18E1": 13,
+      "DSP48E1": 248,
+      "CARRY4": 2743,
+      "SLICE_LUTX": 31465,
+      "SLICE_FFX": 10284
+    },
+    "available": {
+      "RAMB36E1": 955,
+      "RAMB18E1": 1910,
+      "DSP48E1": 1920,
+      "CARRY4": 74650,
+      "SLICE_LUTX": 597200,
+      "SLICE_FFX": 597200
+    },
+    "ramb36_utilization": 1.1078534031413613
+  },
+  "first_failure": "Unable to place cell 'core.lm_accumulator_i64.mem.0.57.genblk1.genblk1.upper', no Bels remaining of type 'RAMB36E1_RAMB36E1'",
+  "timing": {
+    "status": "not_reached"
+  },
+  "simulation": {
+    "status": "not_verified"
+  },
+  "claims": {
+    "board_fit_verified": false,
+    "board_inference_verified": false
+  }
+}

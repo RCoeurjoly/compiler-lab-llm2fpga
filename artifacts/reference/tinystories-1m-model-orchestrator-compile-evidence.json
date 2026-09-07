@@ -1,0 +1,33 @@
+{
+  "status": "generated_sv",
+  "futil_sha256": "ed7abe873d1a95a0896473acad7467004cc168606b7aac30b1bbdf6c3672509a",
+  "verilog_sha256": "2ae376c49f5fcb8bc897a0f4598487cfda705f582294afee2a2157afb6995d02",
+  "verilog_bytes": 1941344,
+  "top_ports": [
+    "clk",
+    "reset",
+    "start",
+    "valid",
+    "done"
+  ],
+  "elapsed_seconds": 1.3856224800001655,
+  "timeout_seconds": 1800,
+  "command": [
+    "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/bin/calyx",
+    "/tmp/llm2fpga-tinystories-model-bank-local-v1/model.futil",
+    "-l",
+    "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/share/calyx",
+    "-d",
+    "cell-share",
+    "-b",
+    "verilog"
+  ],
+  "execution_verified": false,
+  "schema": "tinystories-1m-model-orchestrator-compile-evidence-v1",
+  "oracle_sha256": "31fbd1e3f5b13d7b07466a72e9c6a551ffc00bd4fee375241f095ba5b5cda677",
+  "generator_sha256": "1a3a7c7776e434b6849212704a8ec48f7c28a095c08812a7173e982a7928cbd4",
+  "base_block_futil_sha256": "ab0ec932bf4a76c97df3beb11dd71a5309fe65e2bd36492ce18dc63f009622c2",
+  "provenance_sha256": "6b01a5423934ca638f50841331847a26730a32e0ced2541a2783eccb26d1f9c0",
+  "scope": "full model generated SV; not simulated, not synthesized, not board inference",
+  "artifact_sha256": "364f21f1160ed50004bfe60a9392cbb0a96995a31904dea4a054f70b749b0503"
+}

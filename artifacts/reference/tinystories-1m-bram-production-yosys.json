@@ -1,0 +1,47 @@
+{
+  "schema": "tinystories-1m-bram-production-yosys-v1",
+  "status": "pre_map_passed",
+  "futil_sha256": "f8e66920b15bb2035be469b9e03d7565fde7d54e1b6c1cb36c8b0a17cd75775b",
+  "synthesis_sv_sha256": "20e6738b8d7a38bfa28646dc80ccc7af133b50fd2827b3288ca552afd0f09707",
+  "frontend": "yosys-slang",
+  "command": "read_slang --ignore-initial --threads 1 --no-proc --max-parse-depth 20000 --top main; hierarchy -top main -check; proc; stat",
+  "resources": {
+    "cells": 31670,
+    "memories": 143,
+    "memory_bits": 69600000
+  },
+  "simulation": {
+    "status": "not_verified",
+    "diagnostic": "optimized Verilator build completed, but the full two-run model execution did not complete within the bounded observation window"
+  },
+  "nextpnr": {
+    "status": "failed_resource_capacity",
+    "diagnostic": "deterministic constrained nextpnr-xilinx placement reached the YPCB target but requires 1058 RAMB36E1 blocks while the xc7k480tffg1156 device provides 955; placement stopped before timing analysis",
+    "seed": 15,
+    "frequency_mhz": 50,
+    "mapped_resources": {
+      "RAMB36E1": 1058,
+      "RAMB18E1": 13,
+      "DSP48E1": 248,
+      "CARRY4": 2743,
+      "SLICE_LUTX": 31465,
+      "SLICE_FFX": 10284
+    },
+    "available_resources": {
+      "RAMB36E1": 955,
+      "RAMB18E1": 1910,
+      "DSP48E1": 1920,
+      "CARRY4": 74650,
+      "SLICE_LUTX": 597200,
+      "SLICE_FFX": 597200
+    },
+    "first_failure": "Unable to place cell 'core.lm_accumulator_i64.mem.0.57.genblk1.genblk1.upper', no Bels remaining of type 'RAMB36E1_RAMB36E1'"
+  },
+  "claims": {
+    "bram_only_contract": true,
+    "full_logits_storage": false,
+    "streamed_argmax": true,
+    "board_fit_verified": false,
+    "board_inference_verified": false
+  }
+}

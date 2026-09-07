@@ -1,0 +1,61 @@
+{
+  "schema": "tinystories-1m-bram-production-streamed-lm-v1",
+  "status": "nextpnr_timing_passed_simulation_unverified",
+  "futil_sha256": "1320fb483e8917dd34c770293315da5290e87ae352ca0d432bdc4adf43725041",
+  "synthesis_sv_sha256": "4a4dba61a6d34288cfd8901cb5841196401ffffdf7067aa5a21fe3e793dbfaa4",
+  "frontend": "yosys-slang",
+  "pre_map": {
+    "status": "passed",
+    "cells": 31666,
+    "memories": 143,
+    "memory_bits": 40300000,
+    "log_sha256": "f2460c6c31e918b9e21471f134a24962947a83f11de90455e1f64245f7d2e698"
+  },
+  "architecture": {
+    "lm_head": "only final real context row",
+    "accumulator_storage": "one 50257-entry 64-bit vocabulary row",
+    "full_logits_storage": false,
+    "audit_checkpoint_memories": false
+  },
+  "mapping": {
+    "status": "passed",
+    "mapped_resources": {
+      "RAMB36E1": 134,
+      "RAMB18E1": 13,
+      "DSP48E1": 248,
+      "CARRY4": 2638,
+      "FDRE": 10221,
+      "LUT6": 3656
+    },
+    "json_sha256": "1bb6515e387af2974ae2b1ddaa09a320278e5d8527a288c9c36e5ec35c90dd7a",
+    "log_sha256": "df7b9be272"
+  },
+  "nextpnr": {
+    "status": "passed",
+    "seed": 15,
+    "frequency_mhz": 50,
+    "max_frequency_mhz": 56.86,
+    "timing": "passed",
+    "router": "router2",
+    "log_sha256": "53aa4d0f33aa4a0457aa4e87cd5c28933ea96143888da43ab7c949ecb4c1bc7a",
+    "routed_json_sha256": "575f8d2370ad1df1db6d0854509bd887d95a26d1f055e0255100630b2d2925b0",
+    "fasm_sha256": "ee2e71b94c994101c042410a713bfb3cab6206f9c255a951253d7d3b9242c8c2",
+    "board_fit_verified": true
+  },
+  "simulation": {
+    "status": "one_run_passed_repeatability_partial",
+    "timeout_seconds": 1200,
+    "diagnostic": "Direct optimized harness execution completed cold run 0 with exact tokens 11,612; a second cold run reproduced token 11 at the identical cycle but its second token was outside the bounded observation window",
+    "host_optimization": "-O3",
+    "progress_interval_cycles": 1000,
+    "tokens": [11, 612],
+    "cycles": 172491391,
+    "repeat_first_token": 11,
+    "log_sha256": "18a930550edd13397ff495e642c927c748f2b4e22ed2a33b3983d604a4d5ea48"
+  },
+  "claims": {
+    "production_lowering_tests_passed": true,
+    "timing_closed": true,
+    "board_inference_verified": false
+  }
+}

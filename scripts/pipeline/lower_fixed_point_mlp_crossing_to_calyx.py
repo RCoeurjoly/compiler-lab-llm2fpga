@@ -755,11 +755,14 @@ def _gemv_phase(
     rows: int,
     inputs: int,
     outputs: int,
+    input_row_expr: str | None = None,
+    input_row_width: int | None = None,
+    input_address_width_override: int | None = None,
 ) -> tuple[list[str], list[str], str]:
-    row_width = rows.bit_length()
+    row_width = input_row_width or rows.bit_length()
     output_width = outputs.bit_length()
     k_width = inputs.bit_length()
-    input_address_width = (rows * inputs - 1).bit_length()
+    input_address_width = input_address_width_override or (rows * inputs - 1).bit_length()
     weight_address_width = (outputs * inputs - 1).bit_length()
     trace_address_width = (rows * outputs - 1).bit_length()
     input_shift = (inputs - 1).bit_length()
@@ -794,6 +797,7 @@ def _gemv_phase(
         f"{prefix}_mac = std_smult_pipe(64);",
         f"{prefix}_add = std_sadd(64);",
     ]
+    input_row_expr = input_row_expr or f"{prefix}_row_counter.out"
     wires = [
         f"""group {prefix}_init_row {{
       {prefix}_row_counter.in = {row_width}'d0;
@@ -813,7 +817,7 @@ def _gemv_phase(
       {prefix}_init_accumulator_and_k[done] = ({prefix}_accumulator.done & {prefix}_k_counter.done) ? 1'd1;
     }}
     group {prefix}_read_operands {{
-      {prefix}_input_row_pad.in = {prefix}_row_counter.out;
+      {prefix}_input_row_pad.in = {input_row_expr};
       {prefix}_input_row_shift.left = {prefix}_input_row_pad.out;
       {prefix}_input_row_shift.right = {input_address_width}'d{input_shift};
       {prefix}_input_k_pad.in = {prefix}_k_counter.out;
