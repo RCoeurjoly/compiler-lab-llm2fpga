@@ -64,8 +64,18 @@ class BramProductionTest(unittest.TestCase):
         self.assertIn("token_index: 1", artifact.futil)
         self.assertIn("token_id: 16", artifact.futil)
         self.assertIn("model_token_select.cond = token_index", artifact.futil)
+        for port in ("prompt_0: 16", "prompt_1: 16", "prompt_2: 16", "prompt_3: 16"):
+            self.assertIn(port, artifact.futil)
+        self.assertIn("model_prompt_value.out", artifact.futil)
         with self.assertRaisesRegex(ValueError, "host_intermediate_states_forbidden"):
             module.generate_production_kernel(ORACLE, host_intermediate_states={"block.0": []})
+
+    def test_ypcb_top_wires_jtag_prompt_into_generated_kernel(self):
+        top = (ROOT / "rtl/tinystories_1m_ypcb_bram_production_top.sv").read_text()
+        for signal in ("prompt_0", "prompt_1", "prompt_2", "prompt_3"):
+            self.assertIn(f".{signal}({signal})", top)
+        self.assertIn("tinystories_1m_jtag_csr csr", top)
+        self.assertIn("main core", top)
 
 
 if __name__ == "__main__":

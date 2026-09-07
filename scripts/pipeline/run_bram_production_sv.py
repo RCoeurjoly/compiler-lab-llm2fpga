@@ -68,6 +68,12 @@ int main(int argc, char** argv) {
   Vmain model;
   std::cout << "{\"event\":\"construct_done\"}" << std::endl;
   auto* root = model.rootp;
+  // The board ABI supplies the authenticated frozen prompt through the same
+  // ports driven by the JTAG CSR shell.
+  model.prompt_0 = 7454;
+  model.prompt_1 = 2402;
+  model.prompt_2 = 257;
+  model.prompt_3 = 640;
   PRELOADS
   std::cout << "{\"event\":\"preload_done\"}" << std::endl;
   std::uint64_t completed[2] = {0, 0};

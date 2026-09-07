@@ -10,6 +10,7 @@ module tinystories_1m_ypcb_bram_production_top (
   wire start, valid, reset, done;
   wire [0:0] token_index;
   wire [15:0] token_id;
+  wire [15:0] prompt_0, prompt_1, prompt_2, prompt_3;
   wire [63:0] response_word;
   wire csr_reset;
   wire csr_done = done;
@@ -18,6 +19,7 @@ module tinystories_1m_ypcb_bram_production_top (
   tinystories_1m_jtag_csr csr (
       .sys_clk(clk), .sys_rst(1'b0), .core_start(start), .core_reset(csr_reset),
       .core_valid(valid), .core_token_index(token_index),
+      .prompt_0(prompt_0), .prompt_1(prompt_1), .prompt_2(prompt_2), .prompt_3(prompt_3),
       .core_token_id(token_id), .core_done(csr_done),
       .response_word(response_word));
   assign reset = csr_reset;
@@ -26,6 +28,7 @@ module tinystories_1m_ypcb_bram_production_top (
       .reset(reset),
       .start(start),
       .valid(csr_valid),
+      .prompt_0(prompt_0), .prompt_1(prompt_1), .prompt_2(prompt_2), .prompt_3(prompt_3),
       .token_index(token_index),
       .token_id(token_id),
       .done(done));

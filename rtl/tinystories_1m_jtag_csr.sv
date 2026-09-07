@@ -18,6 +18,10 @@ module tinystories_1m_jtag_csr #(
     output reg         core_reset,
     output wire        core_valid,
     output reg  [0:0]  core_token_index,
+    output wire [15:0] prompt_0,
+    output wire [15:0] prompt_1,
+    output wire [15:0] prompt_2,
+    output wire [15:0] prompt_3,
     input  wire [15:0] core_token_id,
     input  wire        core_done,
     output reg  [63:0] response_word
@@ -52,6 +56,10 @@ module tinystories_1m_jtag_csr #(
   integer i;
 
   assign core_valid = run_active;
+  assign prompt_0 = prompt_words[0];
+  assign prompt_1 = prompt_words[1];
+  assign prompt_2 = prompt_words[2];
+  assign prompt_3 = prompt_words[3];
   assign scan_tdo = scan_shift_reg[0];
 
   // JTAG clock domain: capture a response and shift/update one command.

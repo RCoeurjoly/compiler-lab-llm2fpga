@@ -246,6 +246,13 @@ def _orchestration(builder: Builder, block_control: str, final_control: str, lm_
         b.cell("model_token_select", "std_mux", 16)
     b.cell("model_row_address", "std_slice", 4, 3)
     b.cell("model_prompt_address", "std_slice", 4, 2)
+    if board_io:
+        for index in range(4):
+            b.cell(f"model_prompt_eq{index}", "std_eq", 2)
+        b.cell("model_prompt_pair01", "std_or", 1)
+        b.cell("model_prompt_value01", "std_mux", 16)
+        b.cell("model_prompt_value23", "std_mux", 16)
+        b.cell("model_prompt_value", "std_mux", 16)
     b.cell("model_is_prompt", "std_lt", 4)
     b.cell("model_position_address", "std_pad", 4, 5)
     b.cell("model_column_address", "std_slice", 7, 6)
@@ -306,10 +313,21 @@ model_copy_address.in = model_copy.out;
 comb group model_wait_condition { model_valid_not.in = valid; }
 comb group model_prompt_condition { model_is_prompt.left = model_row.out; model_is_prompt.right = 4'd4; }
 """]
+    if board_io:
+        b.wires.append(" ".join(
+            [f"model_prompt_eq{index}.left = model_prompt_address.out; model_prompt_eq{index}.right = 2'd{index};"
+             for index in range(4)]
+            + [
+                "model_prompt_pair01.left = model_prompt_eq0.out; model_prompt_pair01.right = model_prompt_eq1.out;",
+                "model_prompt_value01.cond = model_prompt_eq0.out; model_prompt_value01.tru = prompt_0; model_prompt_value01.fal = prompt_1;",
+                "model_prompt_value23.cond = model_prompt_eq2.out; model_prompt_value23.tru = prompt_2; model_prompt_value23.fal = prompt_3;",
+                "model_prompt_value.cond = model_prompt_pair01.out; model_prompt_value.tru = model_prompt_value01.out; model_prompt_value.fal = model_prompt_value23.out;",
+            ]
+        ))
     wait = b.group("model_wait", ["model_wait_register.in = 1'd1;", "model_wait_register.write_en = 1'd1;"], "model_wait_register.done")
     init_length = b.group("model_init_length", ["model_context_length.in = 4'd4;", "model_context_length.write_en = 1'd1;"], "model_context_length.done")
     read_prompt = b.read("model_read_prompt", [("prompt_tokens", "model_prompt_address.out")])
-    copy_prompt = b.write("model_copy_prompt", [("context_tokens", "model_row_address.out", "prompt_tokens.read_data")])
+    copy_prompt = b.write("model_copy_prompt", [("context_tokens", "model_row_address.out", "model_prompt_value.out" if board_io else "prompt_tokens.read_data")])
     pad_prompt = b.write("model_pad_prompt", [("context_tokens", "model_row_address.out", "16'd0")])
     prompt = b.loop("model_row", f"if model_is_prompt.out with model_prompt_condition {{ seq {{ {read_prompt} {copy_prompt} }} }} else {{ {pad_prompt} }}")
     read_token = b.read("model_read_token", [("context_tokens", "model_row_address.out"), ("position_weight_scale_q8_24", "model_position_address.out")])
@@ -494,7 +512,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
 import "primitives/core.futil";
 import "primitives/binary_operators.futil";
 import "primitives/memories/seq.futil";
-''' + ("component main(@go start: 1, valid: 1, token_index: 1) -> (@done done: 1, token_id: 16) {" if production else "component main(@go start: 1, valid: 1) -> (@done done: 1) {") + '''
+''' + ("component main(@go start: 1, valid: 1, token_index: 1, prompt_0: 16, prompt_1: 16, prompt_2: 16, prompt_3: 16) -> (@done done: 1, token_id: 16) {" if production else "component main(@go start: 1, valid: 1) -> (@done done: 1) {") + '''
   cells {
 ''' + mlp._indent_lines(b.cells, 4) + "\n  }\n  wires {\n" + mlp._indent_lines(b.wires, 4) + "\n  }\n  control {\n" + control + "\n  }\n}\n"
     provenance = {

@@ -18,12 +18,17 @@ control boundary. The generated production `main` component now exposes:
 - command `4`: select/read token slot (`command[0]`);
 - command `5`: pulse kernel reset.
 
+The four prompt words are now driven from the CSR shadow registers into the
+generated prompt-loading schedule. The board therefore loads the prompt before
+the start command; no host-side token or intermediate-state feedback is used.
+
 The model weights remain immutable BRAM initialization data. The JTAG bridge
 has been linted with Verilator in `BSCAN_SIM` mode, and the production
 generated SV still passes Calyx compilation and the focused lowering tests.
 
-This is not yet a board-acceptance result. The generated kernel still uses the
-authenticated frozen prompt memory internally; the CSR prompt shadow is not
-yet wired into the compiler schedule. A follow-up change must connect the four
-CSR prompt words to the generated prompt-loading path before producing a
-bitstream or claiming board inference.
+This is not yet a board-acceptance result. A real YPCB bitstream, timing report,
+and three cold-start JTAG runs are still required before claiming board
+inference. The bounded generated-SV execution was timeboxed at 90 seconds
+without reaching completion, and the first full-top Yosys attempt did not
+produce a report within the available synthesis budget. These are integration
+blockers, not evidence of board inference or timing closure.
