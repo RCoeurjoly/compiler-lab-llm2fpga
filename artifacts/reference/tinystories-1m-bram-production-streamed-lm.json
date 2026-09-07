@@ -46,7 +46,8 @@
     "status": "not_verified_bounded_timeout",
     "timeout_seconds": 300,
     "diagnostic": "Verilator compilation completed; the serial two-run harness produced no token checkpoint before the bounded 300-second execution window",
-    "log_sha256": "d203024e446317842582cb266faf0862fa315380df47396259b217249a695c6a"
+    "host_optimization": "-O3",
+    "log_sha256": "d9bf9ece04398e74ecd0653dd43c8a023aba30ec6eb1e9d0fbdb23aa56363667"
   },
   "claims": {
     "production_lowering_tests_passed": true,
