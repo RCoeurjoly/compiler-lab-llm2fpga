@@ -129,3 +129,22 @@ inference. The bounded generated-SV execution was timeboxed at 90 seconds
 without reaching completion, and the first full-top Yosys attempt did not
 produce a report within the available synthesis budget. These are integration
 blockers, not evidence of board inference or timing closure.
+
+## Native primitive legalization checkpoint
+
+The corrected 16K-bank image was rerun with the pinned Xilinx primitive
+definitions instead of the temporary black-box primitive declarations. This
+removed the earlier nextpnr BRAM port assertion: the mapper accepted 38
+`RAMB36E1` and 14 `RAMB18E1` instances and proceeded into placement. A
+selected arithmetic pass (`$alu`, `$lcu`, and `$macc_v2` only) also converted
+the generated kernel arithmetic to 3,843 `CARRY4` cells without expanding the
+whole design. The resulting placement attempt stopped on 38 residual generic
+top-level `$alu` cells (`no Bels remaining of type '$lcu'` in the related
+legalization path), before timing analysis. A full native Xilinx map was
+bounded at 900 seconds and did not emit an artifact, so this is a compiler
+iteration-time and legalization blocker, not a fit or timing result.
+
+The temporary artifacts are retained under `/tmp/llm2fpga-banked-16384-image`:
+`noshare-native-defs.json` is the primitive-definition control, and
+`full-map3.json` records the selected arithmetic mapping. Neither is an
+accepted bitstream.
