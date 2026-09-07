@@ -156,3 +156,15 @@ full-adder-to-CARRY4 experiment expands those cells to 157,986 CARRY4s,
 exceeding the Kintex-7 capacity of 74,650. This rules out a mechanical
 primitive substitution as the closure fix; the generated arithmetic must be
 shared or serialized before a board bitstream is plausible.
+
+## Production-only fixed-point width reduction
+
+The compiler now has an opt-in `narrow_products` mode used only by the
+production BRAM kernel. INT8×Q8.24 products are evaluated at 40 bits and the
+following INT8 product at 48 bits, with explicit sign extension back to the
+existing 64-bit accumulator boundary. The audit/reference generator remains
+byte-identical; the focused test suite passes. The generated production SV
+contains 14 40-bit and 7 48-bit multiply pipelines (versus 45 64-bit
+pipelines in the prior production image). This is an evidence-backed
+resource-reduction candidate, but its full hardware fit and exact board
+inference are still unverified.

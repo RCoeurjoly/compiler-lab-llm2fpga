@@ -151,12 +151,12 @@ def _causal(attention) -> Phase:
     return cells, [text], control
 
 
-def _block_phases(block, attention, mlp) -> list[Phase]:
+def _block_phases(block, attention, mlp, *, narrow_products: bool = False) -> list[Phase]:
     phases = [_layer_norm(attention), attention._initialize_zero_bias_phase()]
     def projection(prefix, source, inputs, outputs, bias, qdq=True):
         if qdq:
-            phases.append(mlp._activation_qdq_phase(f"{prefix}_input_qdq", source, f"{prefix}_input_scale_q8_24", f"{prefix}_input_codes_i8", f"{prefix}_input_q16_16", 8 * inputs, inputs))
-        phases.append(mlp._gemv_phase(f"{prefix}_gemv", f"{prefix}_input_codes_i8", f"{prefix}_input_scale_q8_24", f"{prefix}_weight_codes_i8", f"{prefix}_accumulator_i64", 8, inputs, outputs))
+            phases.append(mlp._activation_qdq_phase(f"{prefix}_input_qdq", source, f"{prefix}_input_scale_q8_24", f"{prefix}_input_codes_i8", f"{prefix}_input_q16_16", 8 * inputs, inputs, narrow_products=narrow_products))
+        phases.append(mlp._gemv_phase(f"{prefix}_gemv", f"{prefix}_input_codes_i8", f"{prefix}_input_scale_q8_24", f"{prefix}_weight_codes_i8", f"{prefix}_accumulator_i64", 8, inputs, outputs, narrow_products=narrow_products))
         phases.append(mlp._requantize_phase(f"{prefix}_requant", f"{prefix}_accumulator_i64", f"{prefix}_weight_scale_q8_24", bias, f"{prefix}_output_scale_q8_24", f"{prefix}_post_weight_rescale_bias_q16_16", f"{prefix}_output_codes_i8", f"{prefix}_output_q16_16", 8 * outputs, outputs))
     for prefix in ("q", "k", "v"):
         projection(prefix, "ln1_output_q16_16", 64, 64, "zero_bias_q16_16")
@@ -610,7 +610,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
     else:
         hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "model_embedding": (64, 1024), "model_token_embedding": (64, 1024), "model_position_embedding": (64, 1024), "model_block_outputs": (64, 8192), "model_final_ln": (64, 1024), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 524288), "model_logits": (64, 1048576)}
     memory_cells += [_memory(name, *descriptor) for name, descriptor in hardware.items()]
-    phases = _block_phases(block, attention, mlp)
+    phases = _block_phases(block, attention, mlp, narrow_products=production)
     b = Builder()
     b.cells += memory_cells
     block_wires = "\n".join(wire for _, wires, _ in phases for wire in wires)
@@ -626,7 +626,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
             raise ValueError(f"unused model parameter bank: {name}")
     b.wires.append(block_wires)
     final_phase = _layer_norm(attention, final=True)
-    qdq_phase = mlp._activation_qdq_phase("lm_input_qdq", "final_output_q16_16", "lm_input_scale_q8_24", "lm_input_codes_i8", "lm_input_q16_16", 512, 64)
+    qdq_phase = mlp._activation_qdq_phase("lm_input_qdq", "final_output_q16_16", "lm_input_scale_q8_24", "lm_input_codes_i8", "lm_input_q16_16", 512, 64, narrow_products=production)
     gemv_phase = mlp._gemv_phase(
         "lm_gemv", "lm_input_codes_i8", "lm_input_scale_q8_24",
         "token_weight_codes_i8", "lm_accumulator_i64",
@@ -636,6 +636,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
         input_address_width_override=9 if production else None,
         write_trace=not production,
         banked_weights=("token_weight_codes_i8", TOKEN_CODE_BANKS, TOKEN_CODE_ROW_BITS + 6) if production else None,
+        narrow_products=production,
     )
     # Restrict expensive vocabulary projections to real context rows.
     gemv_phase = (gemv_phase[0], [w.replace("lm_gemv_row_lt.right = 4'd8;", "lm_gemv_row_lt.right = model_context_length.out;") for w in gemv_phase[1]], gemv_phase[2])

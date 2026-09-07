@@ -75,6 +75,17 @@
       "conclusion": "Primitive substitution is insufficient; arithmetic sharing or serialization is required."
     }
   },
+  "narrow_product_experiment": {
+    "status": "production_only_candidate_functional_tests_passed",
+    "mode": "narrow_products",
+    "widths": {"int8_times_q8_24": 40, "int8_times_activation": 48, "accumulator_boundary": 64},
+    "multiply_pipeline_counts": {"40_bit": 14, "48_bit": 7, "64_bit": 24},
+    "prior_64_bit_pipeline_count": 45,
+    "audit_generator_unchanged": true,
+    "board_fit_verified": false,
+    "board_inference_verified": false,
+    "diagnostic": "Explicit sign extension restores the signed-64-bit accumulator boundary while reducing production multiplier widths. Focused tests pass; full synthesis and board inference remain pending."
+  },
   "claims": {
     "jtag_top_integrated": true,
     "static_model_image_prepared": true,

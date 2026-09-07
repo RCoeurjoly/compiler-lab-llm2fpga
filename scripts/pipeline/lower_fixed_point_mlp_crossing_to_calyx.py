@@ -760,6 +760,7 @@ def _gemv_phase(
     input_address_width_override: int | None = None,
     write_trace: bool = True,
     banked_weights: tuple[str, int] | None = None,
+    narrow_products: bool = False,
 ) -> tuple[list[str], list[str], str]:
     row_width = input_row_width or rows.bit_length()
     output_width = outputs.bit_length()
@@ -769,6 +770,9 @@ def _gemv_phase(
     trace_address_width = (rows * outputs - 1).bit_length()
     input_shift = (inputs - 1).bit_length()
     trace_shift = (outputs - 1).bit_length()
+    product_code_width = 40 if narrow_products else 64
+    product_scale_width = 40 if narrow_products else 64
+    product_mac_width = 48 if narrow_products else 64
     cells = [
         f"{prefix}_accumulator = std_reg(64);",
         f"{prefix}_row_counter = std_reg({row_width});",
@@ -789,10 +793,13 @@ def _gemv_phase(
         f"{prefix}_weight_output_shift = std_lsh({weight_address_width});",
         f"{prefix}_weight_k_pad = std_pad({k_width}, {weight_address_width});",
         f"{prefix}_weight_address = std_add({weight_address_width});",
-        f"{prefix}_code_signed = std_signext(8, 64);",
-        f"{prefix}_weight_signed = std_signext(8, 64);",
-        f"{prefix}_activation_scale = std_smult_pipe(64);",
-        f"{prefix}_mac = std_smult_pipe(64);",
+        f"{prefix}_code_signed = std_signext(8, {product_code_width});",
+        f"{prefix}_scale_signed = std_slice(64, {product_scale_width});",
+        f"{prefix}_weight_signed = std_signext(8, {product_mac_width});",
+        f"{prefix}_activation_scale = std_smult_pipe({product_code_width});",
+        f"{prefix}_activation_scale_wide = std_signext({product_code_width}, {product_mac_width});",
+        f"{prefix}_mac = std_smult_pipe({product_mac_width});",
+        f"{prefix}_mac_wide = std_signext({product_mac_width}, 64);",
         f"{prefix}_add = std_sadd(64);",
     ]
     banked_weight_value = f"{weights}.read_data"
@@ -905,20 +912,22 @@ def _gemv_phase(
     group {prefix}_scale_activation {{
       {prefix}_code_signed.in = {codes}.read_data;
       {prefix}_activation_scale.left = {prefix}_code_signed.out;
-      {prefix}_activation_scale.right = {scales}.read_data;
+      {prefix}_activation_scale.right = {prefix}_scale_signed.out;
       {prefix}_activation_scale.go = 1'd1;
       {prefix}_scale_activation[done] = {prefix}_activation_scale.done;
     }}
     group {prefix}_multiply {{
       {prefix}_weight_signed.in = {banked_weight_value};
-      {prefix}_mac.left = {prefix}_activation_scale.out;
+      {prefix}_activation_scale_wide.in = {prefix}_activation_scale.out;
+      {prefix}_mac.left = {prefix}_activation_scale_wide.out;
       {prefix}_mac.right = {prefix}_weight_signed.out;
       {prefix}_mac.go = 1'd1;
       {prefix}_multiply[done] = {prefix}_mac.done;
     }}
     group {prefix}_accumulate {{
       {prefix}_add.left = {prefix}_accumulator.out;
-      {prefix}_add.right = {prefix}_mac.out;
+      {prefix}_mac_wide.in = {prefix}_mac.out;
+      {prefix}_add.right = {prefix}_mac_wide.out;
       {prefix}_accumulator.in = {prefix}_add.out;
       {prefix}_accumulator.write_en = 1'd1;
       {prefix}_accumulate[done] = {prefix}_accumulator.done;
@@ -975,6 +984,21 @@ def _gemv_phase(
           {prefix}_increment_row_counter;
         }}
       }}"""
+    if not narrow_products:
+        cells = [cell for cell in cells if not any(
+            cell.startswith(f"{prefix}_{name} =")
+            for name in ("scale_signed", "activation_scale_wide", "mac_wide")
+        )]
+        wires[0] = wires[0].replace(
+            f"{prefix}_activation_scale.right = {prefix}_scale_signed.out;",
+            f"{prefix}_activation_scale.right = {scales}.read_data;",
+        ).replace(f"      {prefix}_activation_scale_wide.in = {prefix}_activation_scale.out;\n", "").replace(
+            f"{prefix}_mac.left = {prefix}_activation_scale_wide.out;",
+            f"{prefix}_mac.left = {prefix}_activation_scale.out;",
+        ).replace(f"      {prefix}_mac_wide.in = {prefix}_mac.out;\n", "").replace(
+            f"{prefix}_add.right = {prefix}_mac_wide.out;",
+            f"{prefix}_add.right = {prefix}_mac.out;",
+        )
     return cells, wires, control
 
 
@@ -986,10 +1010,12 @@ def _activation_qdq_phase(
     dequantized_q16: str,
     count: int,
     channels: int,
+    narrow_products: bool = False,
 ) -> tuple[list[str], list[str], str]:
     count_width = count.bit_length()
     address_width = (count - 1).bit_length()
     channel_width = (channels - 1).bit_length()
+    dequant_product_width = 40 if narrow_products else 64
     cells = [
         f"{prefix}_entry_counter = std_reg({count_width});",
         f"{prefix}_entry_lt = std_lt({count_width});",
@@ -1015,7 +1041,10 @@ def _activation_qdq_phase(
         f"{prefix}_saturated_code = std_mux(64);",
         f"{prefix}_code_slice = std_slice(64, 8);",
         f"{prefix}_code_reg = std_reg(64);",
-        f"{prefix}_dequant_product = std_smult_pipe(64);",
+        f"{prefix}_dequant_code = std_slice(64, {dequant_product_width});",
+        f"{prefix}_dequant_scale = std_slice(64, {dequant_product_width});",
+        f"{prefix}_dequant_product = std_smult_pipe({dequant_product_width});",
+        f"{prefix}_dequant_product_wide = std_signext({dequant_product_width}, 64);",
         f"{prefix}_dequant_negative = std_slt(64);",
         f"{prefix}_dequant_negate = std_ssub(64);",
         f"{prefix}_dequant_abs = std_mux(64);",
@@ -1093,19 +1122,22 @@ def _activation_qdq_phase(
       {prefix}_clamp_and_write_code[done] = ({prefix}_code_reg.done & {codes_i8}.done) ? 1'd1;
     }}
     group {prefix}_multiply_dequant {{
-      {prefix}_dequant_product.left = {prefix}_code_reg.out;
-      {prefix}_dequant_product.right = {scales_q24}.read_data;
+      {prefix}_dequant_code.in = {prefix}_code_reg.out;
+      {prefix}_dequant_scale.in = {scales_q24}.read_data;
+      {prefix}_dequant_product.left = {prefix}_dequant_code.out;
+      {prefix}_dequant_product.right = {prefix}_dequant_scale.out;
       {prefix}_dequant_product.go = 1'd1;
       {prefix}_multiply_dequant[done] = {prefix}_dequant_product.done;
     }}
     group {prefix}_round_and_write_dequant {{
-      {prefix}_dequant_negative.left = {prefix}_dequant_product.out;
+      {prefix}_dequant_product_wide.in = {prefix}_dequant_product.out;
+      {prefix}_dequant_negative.left = {prefix}_dequant_product_wide.out;
       {prefix}_dequant_negative.right = 64'd0;
       {prefix}_dequant_negate.left = 64'd0;
-      {prefix}_dequant_negate.right = {prefix}_dequant_product.out;
+      {prefix}_dequant_negate.right = {prefix}_dequant_product_wide.out;
       {prefix}_dequant_abs.cond = {prefix}_dequant_negative.out;
       {prefix}_dequant_abs.tru = {prefix}_dequant_negate.out;
-      {prefix}_dequant_abs.fal = {prefix}_dequant_product.out;
+      {prefix}_dequant_abs.fal = {prefix}_dequant_product_wide.out;
       {prefix}_dequant_bias.left = {prefix}_dequant_abs.out;
       {prefix}_dequant_bias.right = 64'd128;
       {prefix}_dequant_shift.left = {prefix}_dequant_bias.out;
@@ -1145,6 +1177,33 @@ def _activation_qdq_phase(
           {prefix}_increment_entry_counter;
         }}
       }}"""
+    if not narrow_products:
+        cells = [cell for cell in cells if not any(
+            cell.startswith(f"{prefix}_{name} =")
+            for name in ("dequant_code", "dequant_scale", "dequant_product_wide")
+        )]
+        wires[0] = wires[0].replace(
+            f"      {prefix}_dequant_code.in = {prefix}_code_reg.out;\n", ""
+        ).replace(
+            f"      {prefix}_dequant_scale.in = {scales_q24}.read_data;\n", ""
+        ).replace(
+            f"      {prefix}_dequant_product.left = {prefix}_dequant_code.out;",
+            f"      {prefix}_dequant_product.left = {prefix}_code_reg.out;",
+        ).replace(
+            f"      {prefix}_dequant_product.right = {prefix}_dequant_scale.out;",
+            f"      {prefix}_dequant_product.right = {scales_q24}.read_data;",
+        ).replace(
+            f"      {prefix}_dequant_product_wide.in = {prefix}_dequant_product.out;\n", ""
+        ).replace(
+            f"{prefix}_dequant_negative.left = {prefix}_dequant_product_wide.out;",
+            f"{prefix}_dequant_negative.left = {prefix}_dequant_product.out;",
+        ).replace(
+            f"{prefix}_dequant_negate.right = {prefix}_dequant_product_wide.out;",
+            f"{prefix}_dequant_negate.right = {prefix}_dequant_product.out;",
+        ).replace(
+            f"{prefix}_dequant_abs.fal = {prefix}_dequant_product_wide.out;",
+            f"{prefix}_dequant_abs.fal = {prefix}_dequant_product.out;",
+        )
     return cells, wires, control
 
 
