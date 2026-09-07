@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
         root->main__DOT__selected_tokens_content_en;
       const unsigned step = root->main__DOT__selected_tokens_addr0;
       model.clk = 1; model.eval(); ++completed[run];
-      if ((completed[run] % 10000000ULL) == 0)
+      if ((completed[run] % 100000ULL) == 0)
         std::cout << "{\"event\":\"progress\",\"run\":" << run
           << ",\"cycles\":" << completed[run] << "}" << std::endl;
       if (selected && step < 2) {
