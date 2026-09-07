@@ -45,10 +45,10 @@
   "simulation": {
     "status": "not_verified_bounded_timeout",
     "timeout_seconds": 60,
-    "diagnostic": "Verilator compilation completed; the optimized serial harness did not reach its 1000-cycle progress checkpoint before the bounded execution window",
+    "diagnostic": "Verilator compilation completed; the optimized harness did not reach the preload-complete marker before the bounded execution window, so no clock-level behavior was observed",
     "host_optimization": "-O3",
     "progress_interval_cycles": 1000,
-    "log_sha256": "e351182e72119471eff8859bd95d5243332a32ab25501e6056377965620cf38c"
+    "log_sha256": "1c22e1b94894395473c583a5c92be46661f668d776c6256ee469fd391eb78278"
   },
   "claims": {
     "production_lowering_tests_passed": true,
