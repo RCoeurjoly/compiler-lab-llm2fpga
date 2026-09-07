@@ -194,4 +194,12 @@ The production SV runner now applies an idempotent
 primitive. The annotation is synthesis-only and leaves RTL behavior and
 immutable initialization unchanged. A direct check changes the generated
 file from zero to one primitive-declaration annotation, covering all memory
-instances; a fresh mapped resource report is still pending.
+instances. The bounded mapper then completed in 313 seconds and forced all
+banked memories to Xilinx block RAM, producing 784 `RAMB36E1` plus 1,832
+`RAMB18E1` (about 1,700 RAMB36-equivalents). This is within the Kintex-7
+BRAM budget, but it is not yet a placement/timing result. The first nextpnr
+attempt stopped before packing because the exported JSON did not carry the
+same flattened primitive-module metadata as the known-good control
+(`Failed to get direction for port ADDRARDADDR`). The next bounded task is to
+repair that netlist packaging and rerun nextpnr; no board bitstream or
+inference success is claimed.
