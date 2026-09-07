@@ -36,6 +36,12 @@ initialization enabled; the retained receipt is
 `artifacts/reference/tinystories-1m-bram-static-image-receipt.json`. This is
 image readiness only: the receipt intentionally does not claim a bitstream.
 
+A bounded RAMB18/LUTRAM mapping experiment marked only the two largest MLP
+weight memories as distributed and invoked the pinned `synth_xilinx` memory
+stage. It did not emit a mapped report within the interactive observation
+window and was terminated; no resource or timing claim is attached to that
+experiment. The production RTL remains unchanged by it.
+
 The model weights remain immutable BRAM initialization data. The JTAG bridge
 has been linted with Verilator in `BSCAN_SIM` mode, and the production
 generated SV still passes Calyx compilation and the focused lowering tests.
