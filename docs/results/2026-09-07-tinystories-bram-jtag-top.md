@@ -78,6 +78,10 @@ four contiguous 16,384-word 32-bit scale banks. The code-table local address
 is therefore 14 bits and the scale-table bank boundary is bit 14. Address
 selection remains explicit in generated Calyx, including the corrected
 per-level bank-bit selection; focused lowering tests pass and Calyx emits SV.
+An exact reconstruction check at token rows 0, 1, 255, 256, 511, 512, and
+50,256, plus scale-bank boundaries 0, 16,384, 32,768, and 50,256, passed for
+the generated Futil hash
+`1f1622d7bb917be662d5e51375b678f8431034f12fff1878792c02f77505a9b6`.
 The strict coarse/map run must still be repeated for a hash-aligned resource
 receipt, and this change is not yet a fit or timing result.
 
