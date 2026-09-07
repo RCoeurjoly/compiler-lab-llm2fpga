@@ -67,7 +67,13 @@
     "selected_arithmetic_mapping": {"carry4_instances": 3843},
     "nextpnr_status": "stopped_before_timing_on_residual_generic_alu",
     "full_native_mapping_status": "bounded_900_seconds_no_artifact",
-    "diagnostic": "Using the real pinned Xilinx primitive definitions removes the earlier BRAM-pack assertion. Selected arithmetic legalization reaches CARRY4 cells, but 38 top-level generic $alu cells remain; nextpnr stops before timing, and a full native Xilinx map exceeds the bounded iteration window."
+    "diagnostic": "Using the real pinned Xilinx primitive definitions removes the earlier BRAM-pack assertion. Selected arithmetic legalization reaches CARRY4 cells, but 38 top-level generic $alu cells remain; nextpnr stops before timing, and a full native Xilinx map exceeds the bounded iteration window.",
+    "followup": {
+      "nextpnr_pack_resources": {"slice_lutx": 56374, "carry4": 4899, "ramb36e1": 38, "ramb18e1": 14},
+      "residual_full_adders": {"count": 4788, "width_bits": 128},
+      "direct_carry4_expansion": {"carry4_required": 157986, "device_capacity": 74650, "status": "over_capacity"},
+      "conclusion": "Primitive substitution is insufficient; arithmetic sharing or serialization is required."
+    }
   },
   "claims": {
     "jtag_top_integrated": true,

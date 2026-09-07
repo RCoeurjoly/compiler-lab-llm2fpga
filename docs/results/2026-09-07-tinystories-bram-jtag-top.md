@@ -148,3 +148,11 @@ The temporary artifacts are retained under `/tmp/llm2fpga-banked-16384-image`:
 `noshare-native-defs.json` is the primitive-definition control, and
 `full-map3.json` records the selected arithmetic mapping. Neither is an
 accepted bitstream.
+
+The follow-up nextpnr run with direct ALU legalization reached packing and
+reported 56,374 LUT sites, 4,899 CARRY4 sites, and the expected BRAM counts,
+then stopped on 4,788 residual 128-bit `$fa` cells. A direct semantic
+full-adder-to-CARRY4 experiment expands those cells to 157,986 CARRY4s,
+exceeding the Kintex-7 capacity of 74,650. This rules out a mechanical
+primitive substitution as the closure fix; the generated arithmetic must be
+shared or serialized before a board bitstream is plausible.
