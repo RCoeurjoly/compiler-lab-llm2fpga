@@ -43,16 +43,12 @@ def harness(artifact):
 template<class Memory> static void preload(Memory& memory, const std::string& path) {
   std::ifstream input(path, std::ios::binary);
   if (!input) throw std::runtime_error("missing source: " + path);
-  for (auto& word : memory.m_storage) {
-    std::uint64_t value = 0;
-    for (unsigned byte = 0; byte < 8; ++byte) {
-      int ch = input.get();
-      if (ch < 0) throw std::runtime_error("short source: " + path);
-      value |= std::uint64_t(static_cast<unsigned char>(ch)) << (byte * 8);
-    }
-    word = value;
-  }
-  if (input.get() != -1) throw std::runtime_error("oversized source: " + path);
+  input.seekg(0, std::ios::end);
+  const auto expected = static_cast<std::streamoff>(memory.m_storage.size() * sizeof(std::uint64_t));
+  if (input.tellg() != expected) throw std::runtime_error("source size mismatch: " + path);
+  input.seekg(0, std::ios::beg);
+  input.read(reinterpret_cast<char*>(memory.m_storage.data()), expected);
+  if (input.gcount() != expected) throw std::runtime_error("short source: " + path);
 }
 
 int main(int argc, char** argv) {
