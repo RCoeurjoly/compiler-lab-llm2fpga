@@ -218,3 +218,11 @@ that constant padding bit in a temporary JSON normalization does not yet make
 nextpnr import the netlist, so the remaining failure is primitive/module
 packaging rather than address semantics. The normalization is diagnostic only
 and is not an accepted design change.
+
+Re-emitting the mapped JSON through the known-good Xilinx sequence
+(`cells_sim.v`/`cells_xtra.v`, flatten, process lowering, and cleanup) fixes
+the primitive import problem. nextpnr then reaches placement and reports a
+real legalization blocker: 220 generic `$lcu` cells remain, and one cannot be
+placed because no BEL of that type remains. This confirms memory mapping and
+primitive packaging are no longer the first blocker; the next compiler step
+must legalize the generated carry/logic arithmetic before placement.
