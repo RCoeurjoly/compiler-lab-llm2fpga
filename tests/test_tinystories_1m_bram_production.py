@@ -61,13 +61,13 @@ class BramProductionTest(unittest.TestCase):
         source = """module seq_mem_d1 #(parameter SIZE=16, parameter WIDTH=8) (input clk);
   logic [WIDTH-1:0] mem[SIZE-1:0];
 endmodule
-seq_mem_d1 #(.SIZE(2048)) large ( .clk(clk) );
-seq_mem_d1 #(.SIZE(64)) small ( .clk(clk) );
+seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
+seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small ( .clk(clk) );
 """
         result = runner.annotate_bram_memories(source)
         self.assertEqual(result.count('ram_style = "block"'), 1)
-        self.assertIn("seq_mem_d1_bram # (.SIZE(2048)) large", result)
-        self.assertIn("seq_mem_d1 #(.SIZE(64)) small", result)
+        self.assertIn("seq_mem_d1_bram # (.SIZE(2048), .WIDTH(8)) large", result)
+        self.assertIn("seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small", result)
 
     def test_production_futil_removes_audit_memories_and_logits_buffer(self):
         module = load_module()
