@@ -759,6 +759,7 @@ def _gemv_phase(
     input_row_width: int | None = None,
     input_address_width_override: int | None = None,
     write_trace: bool = True,
+    banked_weights: tuple[str, int] | None = None,
 ) -> tuple[list[str], list[str], str]:
     row_width = input_row_width or rows.bit_length()
     output_width = outputs.bit_length()
@@ -794,6 +795,46 @@ def _gemv_phase(
         f"{prefix}_mac = std_smult_pipe(64);",
         f"{prefix}_add = std_sadd(64);",
     ]
+    banked_weight_value = f"{weights}.read_data"
+    banked_weight_reads = ""
+    banked_weight_done = f"{weights}.done"
+    banked_weight_mux_wires = ""
+    banked_weight_address_wires = ""
+    weight_read_lines = f"      {weights}.addr0 = {prefix}_weight_address.out;\n      {weights}.content_en = 1'd1;\n"
+    if banked_weights is not None:
+        bank_prefix, bank_count = banked_weights
+        leaf_count = 1 << (bank_count - 1).bit_length()
+        bank_bits = leaf_count.bit_length() - 1
+        cells += [
+            f"{prefix}_weight_bank_full = std_rsh({weight_address_width});",
+            f"{prefix}_weight_bank = std_slice({weight_address_width}, {bank_bits});",
+            f"{prefix}_weight_local = std_slice({weight_address_width}, 15);",
+        ]
+        banked_weight_address_wires = f"      {prefix}_weight_bank_full.left = {prefix}_weight_address.out;\n      {prefix}_weight_bank_full.right = {weight_address_width}'d15;\n      {prefix}_weight_bank.in = {prefix}_weight_bank_full.out;\n      {prefix}_weight_local.in = {prefix}_weight_address.out;\n"
+        banked_weight_done_terms = []
+        leaves = []
+        for bank in range(bank_count):
+            name = f"{bank_prefix}_b{bank}"
+            banked_weight_reads += f"      {name}.addr0 = {prefix}_weight_local.out;\n      {name}.content_en = 1'd1;\n"
+            banked_weight_done_terms.append(f"{name}.done")
+            leaves.append(f"{name}.read_data")
+        leaves += [f"8'd0"] * (leaf_count - bank_count)
+        for level in range(bank_bits):
+            bit = f"{prefix}_weight_bank_bit_{level}"
+            # Select this mux level's bank bit; slicing the low bit at every
+            # level aliases all banks and silently corrupts weight reads.
+            cells.append(f"{bit} = std_bit_slice({bank_bits}, {level}, {level}, 1);")
+            banked_weight_mux_wires += f"    {bit}.in = {prefix}_weight_bank.out;\n"
+            leaves_next = []
+            for index in range(0, len(leaves), 2):
+                mux = f"{prefix}_weight_bank_mux_{level}_{index // 2}"
+                cells.append(f"{mux} = std_mux(8);")
+                banked_weight_mux_wires += f"    {mux}.cond = {bit}.out; {mux}.tru = {leaves[index + 1]}; {mux}.fal = {leaves[index]};\n"
+                leaves_next.append(f"{mux}.out")
+            leaves = leaves_next
+        banked_weight_value = leaves[0]
+        banked_weight_done = " & ".join(banked_weight_done_terms)
+        weight_read_lines = banked_weight_reads
     input_row_expr = input_row_expr or f"{prefix}_row_counter.out"
     trace_cells = []
     trace_wires = ""
@@ -822,6 +863,7 @@ def _gemv_phase(
         insert_at = next(i for i, cell in enumerate(cells) if cell.startswith(f"{prefix}_code_signed ="))
         cells[insert_at:insert_at] = trace_cells
     wires = [
+        banked_weight_mux_wires +
         f"""group {prefix}_init_row {{
       {prefix}_row_counter.in = {row_width}'d0;
       {prefix}_row_counter.write_en = 1'd1;
@@ -853,13 +895,11 @@ def _gemv_phase(
       {prefix}_weight_k_pad.in = {prefix}_k_counter.out;
       {prefix}_weight_address.left = {prefix}_weight_output_shift.out;
       {prefix}_weight_address.right = {prefix}_weight_k_pad.out;
-      {codes}.addr0 = {prefix}_input_address.out;
+{banked_weight_address_wires}      {codes}.addr0 = {prefix}_input_address.out;
       {codes}.content_en = 1'd1;
       {scales}.addr0 = {prefix}_scale_address.out;
       {scales}.content_en = 1'd1;
-      {weights}.addr0 = {prefix}_weight_address.out;
-      {weights}.content_en = 1'd1;
-      {prefix}_read_operands[done] = ({codes}.done & {scales}.done & {weights}.done) ? 1'd1;
+{weight_read_lines}      {prefix}_read_operands[done] = ({codes}.done & {scales}.done & {banked_weight_done}) ? 1'd1;
     }}
     group {prefix}_scale_activation {{
       {prefix}_code_signed.in = {codes}.read_data;
@@ -869,7 +909,7 @@ def _gemv_phase(
       {prefix}_scale_activation[done] = {prefix}_activation_scale.done;
     }}
     group {prefix}_multiply {{
-      {prefix}_weight_signed.in = {weights}.read_data;
+      {prefix}_weight_signed.in = {banked_weight_value};
       {prefix}_mac.left = {prefix}_activation_scale.out;
       {prefix}_mac.right = {prefix}_weight_signed.out;
       {prefix}_mac.go = 1'd1;

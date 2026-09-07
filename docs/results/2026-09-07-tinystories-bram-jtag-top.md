@@ -66,6 +66,37 @@ The model weights remain immutable BRAM initialization data. The JTAG bridge
 has been linted with Verilator in `BSCAN_SIM` mode, and the production
 generated SV still passes Calyx compilation and the focused lowering tests.
 
+## Banked-memory mapping checkpoint
+
+The first coarse-to-memory-mapping attempt exposed the remaining capacity
+problem: the vocabulary tables were represented as 50,257-word memories, and
+the mapper left those memories unresolved. The compiler backend now banks the
+token code table by 512 vocabulary rows (99 banks of depth 32,768) and the
+32-bit token-scale table by contiguous 32K-word banks (2 banks). Address
+selection is explicit in the generated Calyx and preserves the original
+row/column ordering; the final scale bank boundary is bit 15, not the code
+table's bit 9. Each bank-mux level now selects its own address bit (rather
+than repeatedly selecting bit zero); the corrected Futil compiles through
+Calyx, but the expensive coarse/map run must be repeated for a strict hash-
+aligned mapping receipt.
+
+With that change, the regenerated static image has 242 structural memories
+and 35,158,330 structural bits. The pinned XC7 coarse pass completed in
+432.67 seconds and the following `map_memory` pass consumed all banked token
+memories into 39 `RAMB36E1` and 15 `RAMB18E1` instances. Only three small
+scratch `$mem_v2` memories remain (`prompt_words` and two done buffers).
+This is the first memory-mapping result for the bank topology, but its map
+artifact predates that final mux-bit correction and is therefore retained as
+diagnostic evidence rather than a final implementation claim. It is not a
+placement or timing result: exporting the corrected mapped RTLIL to a valid
+nextpnr JSON still remains. The hashes and exact residual-memory list
+are recorded in
+`artifacts/reference/tinystories-1m-bram-production-synthesis-2026-09-07.json`.
+
+The generated full-top Verilator run did not reach completion in the observed
+35 million-cycle window and was stopped to avoid an unbounded run. This is a
+simulation-throughput blocker, not an inference result.
+
 This is not yet a board-acceptance result. A real YPCB bitstream, timing report,
 and three cold-start JTAG runs are still required before claiming board
 inference. The bounded generated-SV execution was timeboxed at 90 seconds

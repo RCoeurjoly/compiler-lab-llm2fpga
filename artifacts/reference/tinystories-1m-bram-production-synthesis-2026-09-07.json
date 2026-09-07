@@ -1,34 +1,40 @@
 {
-  "schema": "tinystories-1m-bram-production-synthesis-attempt-v1",
-  "status": "coarse_preparation_passed_mapping_report_pending",
+  "schema": "tinystories-1m-bram-production-synthesis-attempt-v2",
+  "status": "banked_memory_mapping_passed_timing_pending",
   "target": {
     "device": "xc7k480tffg1156-1",
     "top": "tinystories_1m_ypcb_bram_production_top"
   },
   "inputs": {
-    "futil_sha256": "0e85b234740eb43b91cfbe04a76304eb9647704db2f5f0d561291fb5f2589469",
-    "static_sv_sha256": "ea394d1f8694c2289e9774a62b6ace3a5c9a48bd193b01143c74f7279af7b0a8",
-    "pre_map_json_sha256": "743f5eccb75b1a1751a7aaea2c759bf4869d9b472e5357e46e43ba5d2c7cd322"
+    "futil_sha256": "b68ee592de87da17be9caa81bbf1eabfe2bba504f14e14587ff02ed93da4e8ab",
+    "static_sv_sha256": "bb2d7421c97c62410059d064dbc52d4d8d1251ec9510cab4b2a2a8f0f18ca0d1",
+    "static_image_manifest_sha256": "a21c5122cbc323181a8ef8f27cb2c7a1ca06bd3ab57cb477e71dc8c980a0fbfb",
+    "pre_map_json_sha256": "2b36854a262c592897c55eeb9ffcf9965d8c078c722acfe1b8634fd30ee80226",
+    "mapping_input_futil_sha256": "38b5084b9dfea24b8e0e8069138078da0a7019330a59f7dba8c3da936caf3102"
   },
   "pre_map": {
-    "memories": 143,
-    "memory_bits": 34448640,
-    "cells": 52131
+    "memories": 242,
+    "memory_bits": 35158330,
+    "cells": "not_recorded_in_quiet_run"
   },
   "coarse_preparation": {
     "status": "passed",
     "output": "post-coarse RTLIL",
-    "cells": 27869,
+    "cells": "not_recorded_in_quiet_run",
     "memories": 0,
-    "peak_rss_bytes": 1421000000,
-    "elapsed_seconds": 407.2,
-    "artifact_sha256": "4b50db02856383160fbcfaadb23abf4517aaa6c367d931aeb1c71f4699c92022"
+    "peak_rss_bytes": "not_recorded",
+    "elapsed_seconds": 432.67,
+    "artifact_sha256": "489a7cd37b86d7b9721968a8c40ba35e27d27ce95c2a3b3528c51bc90ebb3196"
   },
   "mapping": {
-    "status": "not_yet_authoritative",
+    "status": "memory_mapping_passed_on_same_bank_topology",
+    "artifact_sha256": "de43692e6c30b04f18819407fba4c7a91d87621750b2c0d60e9e4455d56f69dd",
+    "ramb36e1_instances": 39,
+    "ramb18e1_instances": 15,
+    "remaining_mem_v2": ["prompt_words", "model_token_product.comp.done_buf", "model_position_product.comp.done_buf"],
     "nextpnr_status": "not_run",
     "timing_status": "not_reached",
-    "diagnostic": "The complete synth_xilinx flow enters an extremely large FSM/resource-sharing phase; the bounded post-coarse mapping probe did not emit a valid RAMB resource JSON. No fit or timing claim is made."
+    "diagnostic": "Banked token code and scale memories were consumed by the XC7 memory mapper; only three small scratch memories remain as $mem_v2. The recorded map predates the final std_bit_slice bank-bit semantic correction but has identical memory topology; it must be rerun for a strict end-to-end receipt. Placement/timing were not run because the mapped RTLIL does not yet export a valid nextpnr JSON. No fit, timing, bitstream, or board-inference claim is made."
   },
   "claims": {
     "jtag_top_integrated": true,

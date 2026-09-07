@@ -24,6 +24,16 @@ SCHEMA = "tinystories-1m-model-orchestrator-calyx-v1"
 ORACLE = ROOT / "artifacts/reference/tinystories-1m-fixed-point-model-token-step-oracle.json"
 Phase = tuple[list[str], list[str], str]
 
+# The Yosys XC7 BRAM mapper has a bounded address depth.  Keep the exact
+# token-embedding tensor order, but bank it by 512-token rows so every
+# production memory is depth-32768 or smaller.  The final bank is padded with
+# zeros; all valid TinyStories vocabulary addresses remain unchanged.
+TOKEN_CODE_BANKS = 99
+TOKEN_CODE_BANK_DEPTH = 32768
+TOKEN_CODE_ROW_BITS = 9
+TOKEN_SCALE_BANKS = 2
+TOKEN_SCALE_BANK_DEPTH = 32768
+
 
 @dataclass(frozen=True)
 class CalyxArtifact:
@@ -223,6 +233,45 @@ class Builder:
         return self.group(name, [f"{name}_negative.left = {value};", f"{name}_negative.right = 64'd0;", f"{name}_negate.left = 64'd0;", f"{name}_negate.right = {value};", f"{name}_absolute.cond = {name}_negative.out;", f"{name}_absolute.tru = {name}_negate.out;", f"{name}_absolute.fal = {value};", f"{name}_bias.left = {name}_absolute.out;", f"{name}_bias.right = 64'd{1 << (shift - 1)};", f"{name}_shift.left = {name}_bias.out;", f"{name}_shift.right = 64'd{shift};", f"{name}_signed.left = 64'd0;", f"{name}_signed.right = {name}_shift.out;", f"{name}_select.cond = {name}_negative.out;", f"{name}_select.tru = {name}_signed.out;", f"{name}_select.fal = {name}_shift.out;", f"{name}_result.in = {name}_select.out;", f"{name}_result.write_en = 1'd1;"], name + "_result.done")
 
 
+def _banked_read(builder: Builder, group_name: str, prefix: str, memory_prefix: str,
+                 banks: int, bank_address: str, local_address: str, width: int):
+    """Read a depth-bounded banked table and mux its selected word.
+
+    All physical banks are read in parallel.  The seven-bit bank selector is
+    reduced through a balanced mux tree; unused leaves are constant zero.  The
+    caller receives a Calyx group statement and the mux output expression.
+    """
+    leaf_count = 1 << (banks - 1).bit_length()
+    bank_bits = leaf_count.bit_length() - 1
+    for level in range(bank_bits):
+        # Select the actual level bit.  A plain std_slice would always select
+        # bit zero and would alias every bank except the first pair.
+        builder.cell(f"{prefix}_bank_bit_{level}", "std_bit_slice", bank_bits, level, level, 1)
+        builder.wires.append(f"{prefix}_bank_bit_{level}.in = {bank_address};")
+    leaves = []
+    assignments = []
+    done_terms = []
+    for bank in range(banks):
+        name = f"{memory_prefix}_b{bank}"
+        assignments += [f"{name}.addr0 = {local_address};", f"{name}.content_en = 1'd1;"]
+        done_terms.append(f"{name}.done")
+        leaves.append(f"{name}.read_data")
+    leaves += [f"{width}'d0"] * (leaf_count - banks)
+    for level in range(bank_bits):
+        next_leaves = []
+        for index in range(0, len(leaves), 2):
+            mux = f"{prefix}_bank_mux_{level}_{index // 2}"
+            builder.cell(mux, "std_mux", width)
+            builder.wires.append(
+                f"{mux}.cond = {prefix}_bank_bit_{level}.out; "
+                f"{mux}.tru = {leaves[index + 1]}; {mux}.fal = {leaves[index]};"
+            )
+            next_leaves.append(f"{mux}.out")
+        leaves = next_leaves
+    group = builder.group(group_name, assignments, f"({' & '.join(done_terms)}) ? 1'd1")
+    return group, leaves[0]
+
+
 def _orchestration(builder: Builder, block_control: str, final_control: str, lm_control: str, *, audit_checkpoints: bool = True, stream_lm_head: bool = False, stream_gemv_control: str | None = None, board_io: bool = False) -> str:
     b = builder
     counter_specs = [("model_step", 2, "2'd2"), ("model_layer", 4, "4'd8"), ("model_row", 4, "4'd8"), ("model_column", 7, "7'd64"), ("model_copy", 10, "10'd512"), ("model_logit", 16, "16'd50257")]
@@ -260,6 +309,36 @@ def _orchestration(builder: Builder, block_control: str, final_control: str, lm_
     b.cell("model_token_address", "std_cat", 16, 6, 22)
     b.cell("model_position_weight_address", "std_cat", 5, 6, 11)
     b.cell("model_copy_address", "std_slice", 10, 9)
+    token_code_read = None
+    token_scale_read = None
+    token_code_value = "token_weight_codes_i8.read_data"
+    token_scale_value = "token_weight_scale_q8_24.read_data"
+    if board_io:
+        b.cell("model_token_row_low", "std_slice", 16, 9)
+        b.cell("model_token_bank_full", "std_rsh", 16)
+        b.cell("model_token_scale_bank_full", "std_rsh", 16)
+        b.cell("model_token_bank", "std_slice", 16, 7)
+        b.cell("model_token_scale_bank", "std_slice", 16, 1)
+        b.cell("model_token_code_local", "std_cat", 9, 6, 15)
+        b.cell("model_token_scale_local", "std_slice", 16, 15)
+        b.wires += [
+            "model_token_row_low.in = context_tokens.read_data;",
+            "model_token_bank_full.left = context_tokens.read_data;",
+            "model_token_bank_full.right = 16'd9;",
+            "model_token_scale_bank_full.left = context_tokens.read_data;",
+            "model_token_scale_bank_full.right = 16'd15;",
+            "model_token_bank.in = model_token_bank_full.out;",
+            "model_token_scale_bank.in = model_token_scale_bank_full.out;",
+            "model_token_code_local.left = model_token_row_low.out;",
+            "model_token_code_local.right = model_column_address.out;",
+            "model_token_scale_local.in = context_tokens.read_data;",
+        ]
+        token_scale_read, token_scale_value = _banked_read(
+            b, "model_read_token_scale", "model_token_scale", "token_weight_scale_q8_24",
+            TOKEN_SCALE_BANKS, "model_token_scale_bank.out", "model_token_scale_local.out", 32)
+        token_code_read, token_code_value = _banked_read(
+            b, "model_read_token_codes", "model_token_code", "token_weight_codes_i8",
+            TOKEN_CODE_BANKS, "model_token_bank.out", "model_token_code_local.out", 8)
     if audit_checkpoints:
         b.cell("model_embedding_checkpoint_address", "std_cat", 1, 9, 10)
         b.cell("model_block_step_layer", "std_cat", 1, 3, 4)
@@ -331,18 +410,24 @@ comb group model_prompt_condition { model_is_prompt.left = model_row.out; model_
     pad_prompt = b.write("model_pad_prompt", [("context_tokens", "model_row_address.out", "16'd0")])
     prompt = b.loop("model_row", f"if model_is_prompt.out with model_prompt_condition {{ seq {{ {read_prompt} {copy_prompt} }} }} else {{ {pad_prompt} }}")
     read_token = b.read("model_read_token", [("context_tokens", "model_row_address.out"), ("position_weight_scale_q8_24", "model_position_address.out")])
-    read_token_scale = b.read("model_read_token_scale", [("token_weight_scale_q8_24", "context_tokens.read_data")])
-    read_codes = b.read("model_read_embedding_codes", [("token_weight_codes_i8", "model_token_address.out"), ("position_weight_codes_i8", "model_position_weight_address.out")])
-    token_scale_value = "token_weight_scale_q8_24.read_data"
+    if board_io:
+        read_codes_position = b.read("model_read_position_code", [("position_weight_codes_i8", "model_position_weight_address.out")])
+        read_token_scale = token_scale_read
+        read_codes = token_code_read + read_codes_position
+    else:
+        read_token_scale = b.read("model_read_token_scale", [("token_weight_scale_q8_24", "context_tokens.read_data")])
+        read_codes = b.read("model_read_embedding_codes", [("token_weight_codes_i8", "model_token_address.out"), ("position_weight_codes_i8", "model_position_weight_address.out")])
+        token_scale_value = "token_weight_scale_q8_24.read_data"
+        token_code_value = "token_weight_codes_i8.read_data"
     token_scale_assign = ""
     if board_io:
         b.cell("model_token_scale_signed", "std_signext", 32, 64)
-        token_scale_assign = "model_token_scale_signed.in = token_weight_scale_q8_24.read_data;"
+        token_scale_assign = f"model_token_scale_signed.in = {token_scale_value};"
         token_scale_value = "model_token_scale_signed.out"
     for p in ("model_token", "model_position"):
         b.cell(p + "_signed", "std_signext", 8, 64)
         b.cell(p + "_product", "std_smult_pipe", 64)
-    multiply_assignments = ["model_token_signed.in = token_weight_codes_i8.read_data;", "model_token_product.left = model_token_signed.out;", f"model_token_product.right = {token_scale_value};", "model_token_product.go = 1'd1;", "model_position_signed.in = position_weight_codes_i8.read_data;", "model_position_product.left = model_position_signed.out;", "model_position_product.right = position_weight_scale_q8_24.read_data;", "model_position_product.go = 1'd1;"]
+    multiply_assignments = [f"model_token_signed.in = {token_code_value};", "model_token_product.left = model_token_signed.out;", f"model_token_product.right = {token_scale_value};", "model_token_product.go = 1'd1;", "model_position_signed.in = position_weight_codes_i8.read_data;", "model_position_product.left = model_position_signed.out;", "model_position_product.right = position_weight_scale_q8_24.read_data;", "model_position_product.go = 1'd1;"]
     if token_scale_assign:
         multiply_assignments.insert(0, token_scale_assign)
     multiply = b.group("model_embedding_multiply", multiply_assignments, "(model_token_product.done & model_position_product.done) ? 1'd1")
@@ -395,16 +480,33 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
     if board_io:
         b.wires.append("model_step_is_first.in = model_step_address.out; model_token0_next.cond = model_step_is_first.out; model_token0_next.tru = model_best_token.out; model_token0_next.fal = model_token0.out; model_token1_next.cond = model_step_address.out; model_token1_next.tru = model_best_token.out; model_token1_next.fal = model_token1.out; model_token_select.cond = token_index; model_token_select.tru = model_token1.out; model_token_select.fal = model_token0.out; token_id = model_token_select.out;")
     init_greedy = b.group("model_init_greedy", ["model_best_value.in = 64'd9223372036854775808;", "model_best_value.write_en = 1'd1;", "model_best_token.in = 16'd0;", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
-    if stream_lm_head:
-        read_logit = b.read("model_read_logit", [("token_weight_scale_q8_24", "model_logit.out")])
-        logit_value = "lm_gemv_accumulator.out"
-    else:
-        read_logit = b.read("model_read_logit", [("lm_accumulator_i64", "model_accumulator_address.out"), ("token_weight_scale_q8_24", "model_logit.out")])
-        logit_value = "lm_accumulator_i64.read_data"
-    logit_scale_assign = ""
+    logit_scale_read = None
     logit_scale_value = "token_weight_scale_q8_24.read_data"
     if board_io:
-        logit_scale_assign = "model_token_scale_signed.in = token_weight_scale_q8_24.read_data;"
+        b.cell("model_logit_scale_bank_full", "std_rsh", 16)
+        b.cell("model_logit_scale_bank", "std_slice", 16, 1)
+        b.cell("model_logit_scale_local", "std_slice", 16, 15)
+        b.wires += [
+            "model_logit_scale_bank_full.left = model_logit.out;",
+            "model_logit_scale_bank_full.right = 16'd15;",
+            "model_logit_scale_bank.in = model_logit_scale_bank_full.out;",
+            "model_logit_scale_local.in = model_logit.out;",
+        ]
+        logit_scale_read, logit_scale_value = _banked_read(
+            b, "model_read_logit_scale", "model_logit_scale", "token_weight_scale_q8_24",
+            TOKEN_SCALE_BANKS, "model_logit_scale_bank.out", "model_logit_scale_local.out", 32)
+    if stream_lm_head:
+        read_logit = (logit_scale_read if board_io else b.read("model_read_logit", [("token_weight_scale_q8_24", "model_logit.out")]))
+        logit_value = "lm_gemv_accumulator.out"
+    else:
+        if board_io:
+            read_logit = b.read("model_read_logit", [("lm_accumulator_i64", "model_accumulator_address.out")]) + logit_scale_read
+        else:
+            read_logit = b.read("model_read_logit", [("lm_accumulator_i64", "model_accumulator_address.out"), ("token_weight_scale_q8_24", "model_logit.out")])
+        logit_value = "lm_accumulator_i64.read_data"
+    logit_scale_assign = ""
+    if board_io:
+        logit_scale_assign = f"model_token_scale_signed.in = {logit_scale_value};"
         logit_scale_value = "model_token_scale_signed.out"
     logit_assignments = [f"model_logit_product.left = {logit_value};", f"model_logit_product.right = {logit_scale_value};", "model_logit_product.go = 1'd1;"]
     if logit_scale_assign:
@@ -472,14 +574,31 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
         memory_cells.append(_memory(name, width, count))
     new_sources = {
         "prompt_tokens": {"kind": "prompt", "width": 16, "elements": 4},
-        "token_weight_codes_i8": {"kind": "code", "buffer": "token_embedding.weight", "width": 8, "elements": 50257 * 64},
-        "token_weight_scale_q8_24": {"kind": "scale", "buffer": "token_embedding.weight", "width": 32 if production else 64, "elements": 50257},
         "position_weight_codes_i8": {"kind": "code", "buffer": "position_embedding.weight", "width": 8, "elements": 32 * 64},
         "position_weight_scale_q8_24": {"kind": "scale", "buffer": "position_embedding.weight", "width": 64, "elements": 32},
         "final_gamma_q16_16": {"kind": "parameter", "buffer": "final_ln.weight", "width": 64, "elements": 64},
         "final_beta_q16_16": {"kind": "parameter", "buffer": "final_ln.bias", "width": 64, "elements": 64},
         "lm_input_scale_q8_24": {"kind": "scale", "buffer": "activation::lm_head.input", "width": 64, "elements": 64},
     }
+    if production:
+        for bank in range(TOKEN_CODE_BANKS):
+            new_sources[f"token_weight_codes_i8_b{bank}"] = {
+                "kind": "code", "buffer": "token_embedding.weight", "width": 8,
+                "elements": TOKEN_CODE_BANK_DEPTH,
+                "banked": {"source_elements": 50257 * 64, "bank": bank, "banks": TOKEN_CODE_BANKS, "depth": TOKEN_CODE_BANK_DEPTH, "layout": "token_rows_512_then_hidden"},
+            }
+        for bank in range(TOKEN_SCALE_BANKS):
+            new_sources[f"token_weight_scale_q8_24_b{bank}"] = {
+                "kind": "scale", "buffer": "token_embedding.weight", "width": 32,
+                "elements": TOKEN_SCALE_BANK_DEPTH,
+                "banked": {"source_elements": 50257, "bank": bank, "banks": TOKEN_SCALE_BANKS, "depth": TOKEN_SCALE_BANK_DEPTH, "layout": "contiguous_token_rows"},
+            }
+    else:
+        old_sources = {
+            "token_weight_codes_i8": {"kind": "code", "buffer": "token_embedding.weight", "width": 8, "elements": 50257 * 64},
+            "token_weight_scale_q8_24": {"kind": "scale", "buffer": "token_embedding.weight", "width": 64, "elements": 50257},
+        }
+        new_sources = {"prompt_tokens": new_sources.pop("prompt_tokens"), **old_sources, **new_sources}
     sources.update(new_sources)
     memory_cells += [_memory(name, record["width"], record["elements"]) for name, record in new_sources.items()]
     if production:
@@ -514,6 +633,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
         input_row_width=4 if production else None,
         input_address_width_override=9 if production else None,
         write_trace=not production,
+        banked_weights=("token_weight_codes_i8", TOKEN_CODE_BANKS) if production else None,
     )
     # Restrict expensive vocabulary projections to real context rows.
     gemv_phase = (gemv_phase[0], [w.replace("lm_gemv_row_lt.right = 4'd8;", "lm_gemv_row_lt.right = model_context_length.out;") for w in gemv_phase[1]], gemv_phase[2])
@@ -610,6 +730,23 @@ def materialize_model_sources(artifact: CalyxArtifact, bundle) -> dict[str, Any]
             value = torch.cat([bundle.model._buffer(record["kind"], record["buffer"].format(layer=layer)).reshape(-1) for layer in range(8)])
         else:
             value = bundle.model._buffer(record["kind"], record["buffer"]).reshape(-1)
+        if record.get("banked"):
+            layout = record["banked"]["layout"]
+            bank = int(record["banked"]["bank"])
+            depth = int(record["banked"]["depth"])
+            if layout == "token_rows_512_then_hidden":
+                row_stride = 64
+                rows_per_bank = depth // row_stride
+                start = bank * rows_per_bank * row_stride
+                value = value[start:start + depth]
+            elif layout == "contiguous_token_rows":
+                start = bank * depth
+                value = value[start:start + depth]
+            else:
+                raise ValueError(f"unknown banked source layout: {layout}")
+            if value.numel() < depth:
+                import torch
+                value = torch.cat([value, torch.zeros(depth - value.numel(), dtype=value.dtype)])
         value = value.detach().cpu().to(torch.int64).flatten().contiguous()
         if value.numel() != record["elements"]:
             raise ValueError(f"source memory shape mismatch: {name}")

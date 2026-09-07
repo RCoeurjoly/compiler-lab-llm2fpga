@@ -43,9 +43,15 @@ class BramProductionTest(unittest.TestCase):
         self.assertIn("selected_tokens", futil)
         self.assertNotIn("lm_accumulator_i64 = seq_mem_d1(64, 50257, 16)", futil)
         self.assertIn("lm_gemv_accumulator = std_reg(64)", futil)
-        self.assertIn("token_weight_scale_q8_24 = seq_mem_d1(32, 50257, 16)", futil)
+        self.assertNotIn("token_weight_scale_q8_24 = seq_mem_d1(32, 50257, 16)", futil)
+        self.assertIn("token_weight_scale_q8_24_b0 = seq_mem_d1(32, 32768, 15)", futil)
+        self.assertIn("token_weight_scale_q8_24_b1 = seq_mem_d1(32, 32768, 15)", futil)
+        self.assertIn("token_weight_codes_i8_b0 = seq_mem_d1(8, 32768, 15)", futil)
+        self.assertIn("token_weight_codes_i8_b98 = seq_mem_d1(8, 32768, 15)", futil)
         self.assertIn("model_token_scale_signed = std_signext(32, 64)", futil)
         self.assertIn("model_last_row", futil)
+        self.assertIn("model_token_code_bank_bit_1 = std_bit_slice(7, 1, 1, 1)", futil)
+        self.assertIn("lm_gemv_weight_bank_bit_1 = std_bit_slice(7, 1, 1, 1)", futil)
 
     def test_production_contract_streams_argmax_and_keeps_source_only_inputs(self):
         module = load_module()
@@ -53,7 +59,11 @@ class BramProductionTest(unittest.TestCase):
         self.assertEqual(artifact.provenance["production_memory_contract"]["full_logits_storage"], False)
         self.assertEqual(artifact.provenance["production_memory_contract"]["audit_checkpoint_memories"], [])
         self.assertEqual(artifact.provenance["claims"]["board_fit_verified"], False)
-        self.assertIn("token_weight_codes_i8", artifact.provenance["source_memories"])
+        sources = artifact.provenance["source_memories"]
+        self.assertIn("token_weight_codes_i8_b0", sources)
+        self.assertEqual(sources["token_weight_codes_i8_b0"]["banked"]["layout"], "token_rows_512_then_hidden")
+        self.assertIn("token_weight_scale_q8_24_b1", sources)
+        self.assertNotIn("token_weight_codes_i8", sources)
         self.assertNotIn("selected_tokens", artifact.provenance["source_memories"])
 
     def test_production_generator_rejects_host_feedback(self):
