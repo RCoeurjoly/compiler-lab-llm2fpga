@@ -62,6 +62,7 @@ int main(int argc, char** argv) {
   Vmain model;
   auto* root = model.rootp;
   PRELOADS
+  std::cout << "{\"event\":\"preload_done\"}" << std::endl;
   std::uint64_t completed[2] = {0, 0};
   std::uint16_t tokens[2][2] = {{0, 0}, {0, 0}};
   for (unsigned run = 0; run < 2; ++run) {
