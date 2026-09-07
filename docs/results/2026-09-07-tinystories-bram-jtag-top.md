@@ -29,6 +29,16 @@ therefore falls from 39.3 Mbits / 144 memories to 36.1 Mbits / 143 memories,
 without changing the signed-64-bit arithmetic contract. This is a capacity
 optimization, not yet a fit result.
 
+The authenticated Q8.24 token-embedding scales are a further exact capacity
+optimization. Their values range from 14,525 to 105,952 and therefore fit in
+signed 32 bits; the generated top stores the 50,257-entry table at 32 bits and
+sign-extends each value to the existing signed 64-bit multiply before use (in
+both embedding and logit scaling). The resulting Futil memory inventory is
+97 memories / 34,448,640 bits (down from 36.1 Mbits), below the approximately
+35.2-Mbit YPCB RAMB36-equivalent budget. This is a structural capacity result,
+not a mapped-resource, timing, bitstream, or board-inference claim. Its
+provenance receipt is `artifacts/reference/tinystories-1m-bram-scale-width-receipt.json`.
+
 `scripts/pipeline/prepare_tinystories_1m_bram_image.py` now converts the
 runtime-plusarg memory image into synthesis-visible static `$readmemh` inputs
 and emits a hash manifest. The resulting SV was accepted by yosys-slang with

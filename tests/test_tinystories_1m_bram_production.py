@@ -43,6 +43,8 @@ class BramProductionTest(unittest.TestCase):
         self.assertIn("selected_tokens", futil)
         self.assertNotIn("lm_accumulator_i64 = seq_mem_d1(64, 50257, 16)", futil)
         self.assertIn("lm_gemv_accumulator = std_reg(64)", futil)
+        self.assertIn("token_weight_scale_q8_24 = seq_mem_d1(32, 50257, 16)", futil)
+        self.assertIn("model_token_scale_signed = std_signext(32, 64)", futil)
         self.assertIn("model_last_row", futil)
 
     def test_production_contract_streams_argmax_and_keeps_source_only_inputs(self):

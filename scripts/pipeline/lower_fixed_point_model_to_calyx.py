@@ -333,10 +333,19 @@ comb group model_prompt_condition { model_is_prompt.left = model_row.out; model_
     read_token = b.read("model_read_token", [("context_tokens", "model_row_address.out"), ("position_weight_scale_q8_24", "model_position_address.out")])
     read_token_scale = b.read("model_read_token_scale", [("token_weight_scale_q8_24", "context_tokens.read_data")])
     read_codes = b.read("model_read_embedding_codes", [("token_weight_codes_i8", "model_token_address.out"), ("position_weight_codes_i8", "model_position_weight_address.out")])
+    token_scale_value = "token_weight_scale_q8_24.read_data"
+    token_scale_assign = ""
+    if board_io:
+        b.cell("model_token_scale_signed", "std_signext", 32, 64)
+        token_scale_assign = "model_token_scale_signed.in = token_weight_scale_q8_24.read_data;"
+        token_scale_value = "model_token_scale_signed.out"
     for p in ("model_token", "model_position"):
         b.cell(p + "_signed", "std_signext", 8, 64)
         b.cell(p + "_product", "std_smult_pipe", 64)
-    multiply = b.group("model_embedding_multiply", ["model_token_signed.in = token_weight_codes_i8.read_data;", "model_token_product.left = model_token_signed.out;", "model_token_product.right = token_weight_scale_q8_24.read_data;", "model_token_product.go = 1'd1;", "model_position_signed.in = position_weight_codes_i8.read_data;", "model_position_product.left = model_position_signed.out;", "model_position_product.right = position_weight_scale_q8_24.read_data;", "model_position_product.go = 1'd1;"], "(model_token_product.done & model_position_product.done) ? 1'd1")
+    multiply_assignments = ["model_token_signed.in = token_weight_codes_i8.read_data;", "model_token_product.left = model_token_signed.out;", f"model_token_product.right = {token_scale_value};", "model_token_product.go = 1'd1;", "model_position_signed.in = position_weight_codes_i8.read_data;", "model_position_product.left = model_position_signed.out;", "model_position_product.right = position_weight_scale_q8_24.read_data;", "model_position_product.go = 1'd1;"]
+    if token_scale_assign:
+        multiply_assignments.insert(0, token_scale_assign)
+    multiply = b.group("model_embedding_multiply", multiply_assignments, "(model_token_product.done & model_position_product.done) ? 1'd1")
     round_token = b.round("model_round_token", "model_token_product.out", 8)
     round_position = b.round("model_round_position", "model_position_product.out", 8)
     b.cell("model_embedding_sum", "std_sadd", 64)
@@ -392,7 +401,15 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
     else:
         read_logit = b.read("model_read_logit", [("lm_accumulator_i64", "model_accumulator_address.out"), ("token_weight_scale_q8_24", "model_logit.out")])
         logit_value = "lm_accumulator_i64.read_data"
-    mul_logit = b.group("model_multiply_logit", [f"model_logit_product.left = {logit_value};", "model_logit_product.right = token_weight_scale_q8_24.read_data;", "model_logit_product.go = 1'd1;"], "model_logit_product.done")
+    logit_scale_assign = ""
+    logit_scale_value = "token_weight_scale_q8_24.read_data"
+    if board_io:
+        logit_scale_assign = "model_token_scale_signed.in = token_weight_scale_q8_24.read_data;"
+        logit_scale_value = "model_token_scale_signed.out"
+    logit_assignments = [f"model_logit_product.left = {logit_value};", f"model_logit_product.right = {logit_scale_value};", "model_logit_product.go = 1'd1;"]
+    if logit_scale_assign:
+        logit_assignments.insert(0, logit_scale_assign)
+    mul_logit = b.group("model_multiply_logit", logit_assignments, "model_logit_product.done")
     round_logit = b.round("model_round_logit", "model_logit_product.out", 32)
     write_logit = ""
     if audit_checkpoints:
@@ -456,7 +473,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
     new_sources = {
         "prompt_tokens": {"kind": "prompt", "width": 16, "elements": 4},
         "token_weight_codes_i8": {"kind": "code", "buffer": "token_embedding.weight", "width": 8, "elements": 50257 * 64},
-        "token_weight_scale_q8_24": {"kind": "scale", "buffer": "token_embedding.weight", "width": 64, "elements": 50257},
+        "token_weight_scale_q8_24": {"kind": "scale", "buffer": "token_embedding.weight", "width": 32 if production else 64, "elements": 50257},
         "position_weight_codes_i8": {"kind": "code", "buffer": "position_embedding.weight", "width": 8, "elements": 32 * 64},
         "position_weight_scale_q8_24": {"kind": "scale", "buffer": "position_embedding.weight", "width": 64, "elements": 32},
         "final_gamma_q16_16": {"kind": "parameter", "buffer": "final_ln.weight", "width": 64, "elements": 64},

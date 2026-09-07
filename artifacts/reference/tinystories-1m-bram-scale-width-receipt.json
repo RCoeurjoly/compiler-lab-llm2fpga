@@ -1,0 +1,26 @@
+{
+  "artifact": "tinystories-1m-bram-scale-width",
+  "status": "structural_capacity_only",
+  "model_scope": "authenticated TinyStories-1M fixed-point contract",
+  "optimization": "store token_weight_scale_q8_24 as 32-bit signed values and sign-extend to 64 bits at every arithmetic use",
+  "authenticated_scale_range": {
+    "min": 14525,
+    "max": 105952,
+    "width_bits": 32,
+    "elements": 50257
+  },
+  "futil_sha256": "0e85b234740eb43b91cfbe04a76304eb9647704db2f5f0d561291fb5f2589469",
+  "generator_sha256": "09941b41aff01804f75b23d246826383c7c2ed4ef96a04cb1d74d16132a6f5b5",
+  "memory_inventory": {
+    "memories": 97,
+    "memory_bits": 34448640,
+    "ypcb_budget_bits_approx": 35200000
+  },
+  "semantic_preservation": {
+    "datapath_scale_consumer": "signed-64-bit multiply after exact sign extension",
+    "audit_futil_byte_identical": true,
+    "board_inference_verified": false,
+    "timing_closed": false,
+    "bitstream_verified": false
+  }
+}
