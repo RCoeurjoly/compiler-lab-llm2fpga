@@ -86,6 +86,7 @@
     "board_fit_verified": false,
     "board_inference_verified": false,
     "diagnostic": "Explicit sign extension restores the signed-64-bit accumulator boundary while reducing production multiplier widths. Focused tests pass; full synthesis and board inference remain pending."
+    ,"coarse_synthesis": {"status": "bounded_in_global_share_sat_no_artifact", "diagnostic": "The pinned coarse flow spent the bounded window in global share SAT solving (2750 cells, 13549 variables, 35034 clauses); no mapped artifact was emitted."}
   },
   "claims": {
     "jtag_top_integrated": true,

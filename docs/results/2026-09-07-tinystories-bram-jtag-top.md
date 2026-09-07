@@ -168,3 +168,10 @@ contains 14 40-bit and 7 48-bit multiply pipelines (versus 45 64-bit
 pipelines in the prior production image). This is an evidence-backed
 resource-reduction candidate, but its full hardware fit and exact board
 inference are still unverified.
+
+The first pinned coarse synthesis attempt on this candidate was bounded while
+the global `share` pass was solving repeated SAT instances (for example,
+2,750 cells / 13,549 variables / 35,034 clauses). It produced no mapped
+artifact. This identifies global sharing as a separate iteration-time
+blocker; future compiler passes must constrain or replace that sharing step
+before another full-board attempt.
