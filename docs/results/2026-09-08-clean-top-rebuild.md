@@ -526,3 +526,35 @@ full-model image, run it inside Nix with
 The receipt records the external transport source hashes and every command
 and captured response. It must be paired with programming/bitstream
 provenance; the receipt alone cannot identify the image loaded on the FPGA.
+
+## Final memory mapping and timing-database admission
+
+The final clocked-ZHOLD, initialized, UPDATE-fixed top completed all 266
+`memory_libmap` checkpoints in `/tmp/regen-safe/clocked-zh-checkpoints`.
+The next native techmap step encountered 256 distinct initialized RAM
+templates before its 180-second diagnostic limit. It exited 124 without a
+primitive checkpoint; coarse logic synthesis did not start. A separate
+900-second run (`native-memory-900.log`) continues this stage from the final
+memory checkpoint with a larger explicit bound. Earlier uninitialized RAM
+counts cannot substitute for this final stage.
+
+The missing timing report was localized independently. GDB confirms that a
+placed CARRY4 has `tt_id=-1` and `inst_id=-1`, causing `getCellDelay` to return
+false. Direct decoding of the active binary database, using the word-scaled
+RelPtr schema in nextpnr's `xilinx/arch.h`, reports:
+
+- device name `xc7k480tffg1156-1`, one speed grade;
+- **zero cell-timing tile types**;
+- 127 wire timing classes and 259 pip timing classes.
+
+`scripts/pipeline/check_xilinx_chipdb_timing.py` reproduces that result and
+exits 1 on the active database. Its tests verify this rejection, pointer
+bounds, and that even nonempty timing metadata is not itself timing closure.
+This is an expected admission failure, not a test failure. The installed
+Kintex X-Ray database has no `timings/` SDF directory. The available local
+`timing.sdf` in the earlier banked-image directory is empty. Thus meaningful
+cell timing requires a qualified timing dataset and rebuilt chip database;
+substituting another family's data without qualification is not accepted.
+The YPCB reference project identifies the physical part as
+`xc7k480tffg1156-2`; the active database's `-1` designation must also be
+disclosed when qualifying any replacement data.
