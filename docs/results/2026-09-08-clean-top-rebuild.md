@@ -360,3 +360,18 @@ the correct direction for collection, but the unrestricted full map was
 terminated while processing the token-weight banks before emitting a JSON
 checkpoint.  It is therefore being replaced with resumable, bounded
 collection rather than treated as a completed implementation run.
+
+## 2026-09-08 nextpnr ABI diagnosis
+
+The completed flattened chain (`base-good.il` through `map-266.il`) and the
+LUTRAM-aware map produce exactly 955 block-RAM and 1,232 RAM64M primitives.
+The first nextpnr probe failed before placement because Yosys emitted legacy
+`RAMB36` cells with no port directions. Adding directions and normalizing the
+cell type to `RAMB36E1` allows packing to consume all 955 available block RAMs,
+but routing then fails at `DIADI32`: the compatibility map exposes the legacy
+64-bit `DIA`/`DOA` interface, while the Kintex-7 `RAMB36E1` ABI requires the
+split `DIADI`/`DIPADIP` and `DOADO` ports (32-bit data plus parity).
+Thus the current blocker is an ABI-correct RAMB36E1 legalization/packing
+pass, not board timing or PCIe/JTAG behavior. The probes were bounded and run
+with `--ignore-loops` only to isolate packing/routing; no bitstream was
+generated or programmed.
