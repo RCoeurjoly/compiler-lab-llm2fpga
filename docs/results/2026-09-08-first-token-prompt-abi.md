@@ -305,3 +305,25 @@ was corrected from a stale 266-checkpoint assumption to consume checkpoint 279.
 Memory mapping is running. These two simulation resets do not count toward
 the three required independent FPGA reconfigurations. All board acceptance
 and the explicitly incomplete accelerator timing coverage remain outstanding.
+
+## Final synthesis: correct simulation, excessive BRAM demand
+
+The complete 279-memory mapping, native conversion, coarse/fine synthesis and
+final netlist export all completed successfully. Final Yosys CHECK reports
+zero problems. Nevertheless, the final design uses **1049 RAMB36E1 and 8
+RAMB18E1**, exceeding the target's 955 full-block sites. No routing or
+programming was attempted for this oversized netlist. Files are under
+`/tmp/tinystories-first-token-lmhead-static-20260909/` (`initialized-final.json`,
+`initialized-final.il`, `map-final.log`). The two exact simulation results
+remain valid; synthesis completion is not board-fit acceptance.
+
+Memory attribution from the mapped full design identifies 788 full blocks for
+token weight codes, 64 for token scales, 64 for the two MLP weight matrices,
+32 for Q/K/V/output weights, and 16 for GELU's LUT, plus other parameters and
+scratch memories. The BRAM demand survives fine mapping and final optimization.
+The next action is evidence-backed lossless on-chip memory allocation, not a
+reduced model, changed arithmetic, DDR3, or an oversized route. As one concrete
+measurement, the exact 50,257 token scales range from 14,525 to 105,952 and
+therefore require only 17 unsigned bits, versus their current 32-bit storage.
+Distributed-RAM capacity and allocation remain to be checked before selecting
+a physical-memory change. No new RTL/memory-width repair has been made here.
