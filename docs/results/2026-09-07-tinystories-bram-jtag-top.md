@@ -375,6 +375,14 @@ generic-cell legalization and points to a nextpnr packing bug or an invalid
 primitive/net invariant in the generated graph. No timing or hardware result
 is inferred from this crash.
 
+Using a locally rebuilt nextpnr with null-net guards in the packer, context,
+timing, and placer walks completes packing and placement deterministically
+(fixed seed 15). At the requested 100 MHz target, the generated clock path is
+reported at only 31.04 MHz; the CSR scan clock reaches 539.08 MHz. Thus the
+toolchain crash is bypassed, but timing closure is still not achieved and no
+bitstream or hardware inference is claimed. The complete downstream guard set
+is recorded in `patches/nextpnr-xilinx/0002-skip-null-nets-across-context-timing-placer.patch`.
+
 The matching nextpnr source defect is in `xilinx/pack.cc`: the
 `pack_constants()` loop dereferences `net.second` without checking for a null
 `NetInfo*`. A minimal downstream patch is recorded at

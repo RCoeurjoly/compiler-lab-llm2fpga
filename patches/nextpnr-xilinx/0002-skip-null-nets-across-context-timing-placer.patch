@@ -1,0 +1,78 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] common: tolerate erased null net slots in checks and placers
+
+The same Yosys re-emission leaves null entries in several net-map walks after
+packing. Guard every affected read so placement and timing can consume the
+otherwise valid live nets.
+
+--- a/common/nextpnr.cc
++++ b/common/nextpnr.cc
+@@
+     for (auto &it : nets) {
++        if (it.second == nullptr)
++            continue;
+         auto &ni = *it.second;
+@@
+     for (auto &n : nets) {
+         auto ni = n.second.get();
++        if (ni == nullptr)
++            continue;
+         NPNR_ASSERT(n.first == ni->name);
+@@
+     for (auto &net : getCtx()->nets) {
+         auto ni = net.second.get();
++        if (ni == nullptr)
++            continue;
+         std::string routing;
+
+--- a/common/timing.cc
++++ b/common/timing.cc
+@@
+         for (auto &net : ctx->nets) {
++            if (net.second == nullptr)
++                continue;
+             for (auto &usr : net.second->users) {
+@@
+         for (auto &net : ctx->nets) {
++            if (net.second == nullptr)
++                continue;
+             for (auto &user : net.second->users) {
+
+--- a/common/placer_heap.cc
++++ b/common/placer_heap.cc
+@@
+         for (auto net : sorted(ctx->nets)) {
+             NetInfo *ni = net.second;
++            if (ni == nullptr)
++                continue;
+             if (ni->driver.cell == nullptr)
+
+--- a/common/placer1.cc
++++ b/common/placer1.cc
+@@
+         for (auto &net : ctx->nets) {
++            if (net.second == nullptr)
++                continue;
+             old_udata.emplace_back(net.second->udata);
+@@
+         for (auto &net : ctx->nets)
+-            net.second->udata = old_udata[net.second->udata];
++            if (net.second != nullptr)
++                net.second->udata = old_udata[net.second->udata];
+@@
+         for (auto net : sorted(ctx->nets)) {
+             NetInfo *ni = net.second;
++            if (ni == nullptr)
++                continue;
+             if (ignore_net(ni))
+@@
+             for (auto &net : p->ctx->nets) {
++                if (net.second == nullptr)
++                    continue;
+                 already_changed_arcs.at(net.second->udata).resize(net.second->users.size());
+@@
+         for (auto net : sorted(ctx->nets)) {
+             NetInfo *ni = net.second;
++            if (ni == nullptr)
++                continue;
+             for (size_t i = 0; i < ni->users.size(); i++) {
