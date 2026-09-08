@@ -43,11 +43,14 @@ module tinystories_1m_jtag_csr #(
 );
 `ifndef BSCAN_SIM
   wire scan_drck, scan_reset, scan_sel, scan_shift, scan_capture, scan_update;
-  wire scan_tdi, scan_tdo;
+  wire scan_tdi, scan_tdo, scan_runtest, scan_tck, scan_tms;
   BSCANE2 #(.DISABLE_JTAG("FALSE"), .JTAG_CHAIN(1)) bscan (
       .CAPTURE(scan_capture), .DRCK(scan_drck), .RESET(scan_reset),
-      .RUNTEST(), .SEL(scan_sel), .SHIFT(scan_shift), .TCK(),
-      .TDI(scan_tdi), .TDO(scan_tdo), .UPDATE(scan_update));
+      .RUNTEST(scan_runtest), .SEL(scan_sel), .SHIFT(scan_shift), .TCK(scan_tck),
+      .TDI(scan_tdi), .TDO(scan_tdo), .TMS(scan_tms), .UPDATE(scan_update));
+  wire unused_scan_runtest = scan_runtest;
+  wire unused_scan_tck = scan_tck;
+  wire unused_scan_tms = scan_tms;
 `endif
 
   reg [63:0] scan_shift_reg;
