@@ -294,6 +294,8 @@ def _banked_read(builder: Builder, group_name: str, prefix: str, memory_prefix: 
 def _orchestration(builder: Builder, block_control: str, final_control: str, lm_control: str, *, audit_checkpoints: bool = True, stream_lm_head: bool = False, stream_gemv_control: str | None = None, board_io: bool = False, generation_steps: int = 2) -> str:
     b = builder
     counter_specs = [("model_step", 2, f"2'd{generation_steps}"), ("model_layer", 4, "4'd8"), ("model_row", 4, "4'd8"), ("model_column", 7, "7'd64"), ("model_copy", 10, "10'd512"), ("model_logit", 16, "16'd50257")]
+    if stream_lm_head:
+        counter_specs.pop()  # GEMV's output counter owns the vocabulary index.
     if not stream_lm_head:
         counter_specs.insert(-1, ("model_logit_row", 4, "model_context_length.out"))
     for name, width, limit in counter_specs:
@@ -498,6 +500,7 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
 """]
     if board_io:
         b.wires.append("model_step_is_first.in = model_step_address.out; model_token0_next.cond = model_step_is_first.out; model_token0_next.tru = model_best_token.out; model_token0_next.fal = model_token0.out; model_token1_next.cond = model_step_address.out; model_token1_next.tru = model_best_token.out; model_token1_next.fal = model_token1.out; model_token_select.cond = token_index; model_token_select.tru = model_token1.out; model_token_select.fal = model_token0.out; token_id = model_token_select.out;")
+    logit_index = "lm_gemv_output_counter.out" if stream_lm_head else "model_logit.out"
     init_greedy = b.group("model_init_greedy", ["model_best_value.in = 64'd9223372036854775808;", "model_best_value.write_en = 1'd1;", "model_best_token.in = 16'd0;", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
     logit_scale_read = None
     logit_scale_value = "token_weight_scale_q8_24.read_data"
@@ -506,16 +509,16 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
         b.cell("model_logit_scale_bank", "std_slice", 16, 2)
         b.cell("model_logit_scale_local", "std_slice", 16, 14)
         b.wires += [
-            "model_logit_scale_bank_full.left = model_logit.out;",
+            f"model_logit_scale_bank_full.left = {logit_index};",
             "model_logit_scale_bank_full.right = 16'd14;",
             "model_logit_scale_bank.in = model_logit_scale_bank_full.out;",
-            "model_logit_scale_local.in = model_logit.out;",
+            f"model_logit_scale_local.in = {logit_index};",
         ]
         logit_scale_read, logit_scale_value = _banked_read(
             b, "model_read_logit_scale", "model_logit_scale", "token_weight_scale_q8_24",
             TOKEN_SCALE_BANKS, "model_logit_scale_bank.out", "model_logit_scale_local.out", 32)
     if stream_lm_head:
-        read_logit = (logit_scale_read if board_io else b.read("model_read_logit", [("token_weight_scale_q8_24", "model_logit.out")]))
+        read_logit = (logit_scale_read if board_io else b.read("model_read_logit", [("token_weight_scale_q8_24", logit_index)]))
         logit_value = "lm_gemv_accumulator.out"
     else:
         if board_io:
@@ -535,17 +538,21 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
     write_logit = ""
     if audit_checkpoints:
         write_logit = b.write("model_write_logit", [("model_logits", "model_logits_address.out", "model_round_logit_result.out")])
-    greedy = b.group("model_update_greedy", ["model_best_value.in = model_round_logit_result.out;", "model_best_value.write_en = 1'd1;", "model_best_token.in = model_logit.out;", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
-    logit_scan = b.loop("model_logit", read_logit + mul_logit + round_logit + write_logit + f"if model_logit_is_better.out with model_greedy_condition {{ {greedy} }}")
+    greedy = b.group("model_update_greedy", ["model_best_value.in = model_round_logit_result.out;", "model_best_value.write_en = 1'd1;", f"model_best_token.in = {logit_index};", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
+    consume_logit = read_logit + mul_logit + round_logit + write_logit + f"if model_logit_is_better.out with model_greedy_condition {{ {greedy} }}"
     if stream_lm_head:
-        # Production mode invokes GEMV and consumes its one-row accumulator
-        # before advancing to the next real context row.  This makes the
-        # accumulator a single vocabulary row instead of rows*vocabulary.
+        # Consume each scalar accumulator before GEMV advances to the next
+        # vocabulary entry and resets it. No logits memory is materialized.
         if stream_gemv_control is None:
             raise ValueError("streamed LM head requires a GEMV control section")
-        logits = lm_control + stream_gemv_control + init_greedy + logit_scan
+        advance = "lm_gemv_increment_output_counter;"
+        if stream_gemv_control.count(advance) != 1:
+            raise ValueError("streamed LM head requires one output advance boundary")
+        streamed = stream_gemv_control.replace(advance, consume_logit + advance)
+        logits = lm_control + init_greedy + streamed
         lm_control = ""
     else:
+        logit_scan = b.loop("model_logit", consume_logit)
         logits = b.loop("model_logit_row", init_greedy + logit_scan)
     if board_io:
         feedback = b.group("model_commit_feedback", [

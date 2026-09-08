@@ -199,3 +199,41 @@ immutable images were independently checked before starting fresh elaboration
 in `/tmp/tinystories-first-token-denominator-static-20260909`. The immutable
 image records still match the accepted baseline exactly. Full-token simulation
 and physical implementation remain pending; there is no board inference claim.
+
+## All transformer blocks and final normalization verified; LM-head localization
+
+The unchanged denominator-repaired full SV still selects token 47208, not 11,
+at cycle 93,137,327. Its fresh diagnostic replay captured all eight block
+outputs; every little-endian int64 hash matches the authenticated model oracle.
+Final normalization also matches exactly:
+`c90397ce02472db5514d53347061a8d181cfbec7b18bfbdf7ac829a8f0352e57`.
+These are full-model executions from immutable inputs, not injected intermediate
+states. Captures are in `/tmp/tinystories-first-token-denominator-20260909/`
+(`block-N-step0.bin`, `final-ln-step0.bin`, `final-head-diagnostic.log`).
+Physical synthesis was stopped and its partial checkpoints preserved after the
+wrong token was observed. No replacement bitstream has been programmed.
+
+The production LM-head schedule ran the entire GEMV vocabulary loop before
+scanning logits, although it stores only one scalar accumulator. Consequently,
+every token's scale consumed the last vocabulary accumulator. The replay's
+final accumulator is -54819352379; token 47208 has the smallest weight scale,
+consistent with this erroneous scale-only argmax.
+
+An executable regression extracts the actual generated LM-head control and
+restricts it to four entries, with hand-derived logits [64,384,448,-128]. The
+old schedule selects entry 0 rather than entry 2. Production orchestration now
+consumes each accumulator (scale, round, compare) inside the GEMV output loop,
+before advancing to the next vocabulary index. The same regression now selects
+entry 2. The non-production audit path remains unchanged.
+
+The regression explicitly pins its bank selector to bank zero to isolate
+scheduling from a second discovered issue: the generated bank-selection address
+is driven only in the operand-read group, although its mux is consumed during
+the later multiply group. Without that fixture isolation, Icarus produces an
+unknown accumulator and stalls in the comparison. This bank-selector lifetime
+issue needs its own executable regression and repair; the passing argmax test
+does not establish that the unmodified banked LM head works. Full-model/token
+revalidation and all three board runs remain outstanding.
+
+All 38 targeted production, arithmetic, memory-latency, static-image, harness
+and JTAG Python regressions pass with the argmax scheduling repair.
