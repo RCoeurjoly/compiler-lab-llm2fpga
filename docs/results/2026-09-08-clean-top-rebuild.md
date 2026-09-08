@@ -212,3 +212,13 @@ technology-mapping run did not emit a netlist or JSON checkpoint; it stopped
 during Xilinx optimization before serialization. Thus frontend legality and
 BRAM inference are improved, but full implementation is still blocked by the
 resource scale of the generated datapath.
+
+## Complete per-memory mapping checkpoint
+
+The serialized top was mapped one memory per process through all 266 memories,
+with restartable RTLIL artifacts. After custom Xilinx techmapping, the result
+contains 962 `__$XILINX_BLOCKRAM_TDP_` primitives, 9,603 cells, and only three
+small residual memories totaling 68 bits. A subsequent `synth_xilinx` attempt
+reaches its built-in BRAM techmap but rejects the custom primitive on a missing
+`PORT_A_USED` defparam. The remaining work is therefore to reconcile the
+custom XC7 BRAM descriptor with the synthesis techmap before placement.
