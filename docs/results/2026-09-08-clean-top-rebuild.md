@@ -19,3 +19,17 @@ The next implementation step is to replace the monolithic preparation with
 the repository's staged Yosys flow (bounded `begin:prepare`, memory mapping,
 and per-stage receipts), preserving the checked-in BSCANE2 parameters and
 static-image manifest at every boundary.
+
+## Staged-flow evidence
+
+That split has now been exercised. Clean elaboration emits
+`/tmp/regen-clean/elab.il` (51 MiB, 2.35 GiB peak), and the pinned
+`synth_xilinx -run begin:prepare` emits `/tmp/regen-clean/prepare.il` (56 MiB,
+624 MiB peak). Both retain `JTAG_CHAIN=1` and `DISABLE_JTAG="FALSE"` on the
+`csr.bscan` cell. A bounded arithmetic coarse pass (technology-map and
+`alumacc`, deliberately omitting global `share` and `memory`) emits
+`/tmp/regen-clean/coarse-raw.il` in 24 seconds at 748 MiB peak. The stock
+coarse flow is confirmed to die in global SAT-based `share`; the standalone
+`memory` pass also exceeds the interactive memory budget. The next blocker is
+therefore staged BRAM legalization with the pinned Yosys architecture data,
+not frontend elaboration or loss of the JTAG parameter.
