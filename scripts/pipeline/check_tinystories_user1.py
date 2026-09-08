@@ -13,9 +13,8 @@ import time
 STATUS = 0x3000000000000000
 RESET = 0x5000000000000000
 IDLE_INITIALIZED = 0x2800000000000000
-# Index bits overlap the value in the frozen CSR ABI. These exercise all four
-# addresses without pretending the interface accepts arbitrary prompt values.
-PROMPT_WORDS = (0x0001, 0x0012, 0x0023, 0x0034)
+# Exact frozen prompt; ABI v2 keeps the index in bits [17:16].
+PROMPT_WORDS = (7454, 2402, 257, 640)
 
 
 def check(client, *, clock_tms, reset_tap, shift_ir, runs=3, delay=time.sleep):
@@ -24,8 +23,8 @@ def check(client, *, clock_tms, reset_tap, shift_ir, runs=3, delay=time.sleep):
     records = []
 
     def exchange(command):
-        if command >> 60 not in (1, 3, 5):
-            raise ValueError("only prompt/status/reset commands are permitted")
+        if command >> 60 not in (1, 3, 5, 6):
+            raise ValueError("only prompt write/read, status and reset commands are permitted")
         clock_tms(client, [1, 0, 0])  # Idle -> Capture-DR -> Shift-DR
         bits = client.shift([0] * 63 + [1], [(command >> i) & 1 for i in range(64)])
         clock_tms(client, [1, 0])  # Exit1-DR -> Update-DR -> Idle
@@ -51,15 +50,17 @@ def check(client, *, clock_tms, reset_tap, shift_ir, runs=3, delay=time.sleep):
         delay(0.01)
         expect(STATUS, IDLE_INITIALIZED)
         expect(RESET, 0)
-        for word in PROMPT_WORDS:
-            expect(0x1000000000000000 | word, word)
+        for index, word in enumerate(PROMPT_WORDS):
+            expect(0x1000000000000000 | (index << 16) | word, word)
+        for index, word in enumerate(PROMPT_WORDS):
+            expect(0x6000000000000000 | (index << 16), word)
         expect(STATUS, IDLE_INITIALIZED | PROMPT_WORDS[0])
         expect(RESET, 0)
         expect(STATUS, IDLE_INITIALIZED)
     return {
-        "schema": "tinystories-user1-csr-check-v1", "status": "passed",
+        "schema": "tinystories-user1-csr-check-v2", "status": "passed",
         "runs": runs, "transactions": records, "inference_started": False,
-        "scope": "status, prompt echoes and prompt-0 status, reset; no inference",
+        "scope": "status, frozen prompt writes and all-word readback, reset; no inference",
     }
 
 
@@ -75,7 +76,7 @@ def main():
     ftdi = importlib.import_module("read_jtag_debug_ftdi_bitbang")
     jtag = importlib.import_module("read_jtag_debug_xvc")
     client = None
-    result = {"schema": "tinystories-user1-csr-check-v1", "status": "failed"}
+    result = {"schema": "tinystories-user1-csr-check-v2", "status": "failed"}
     try:
         client = ftdi.FtdiMpsseJtag(
             serial=args.serial, vid=0x0403, pid=0x6014, freq_hz=1_000_000, tdo_bit=7,

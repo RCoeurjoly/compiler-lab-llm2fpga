@@ -5,8 +5,10 @@
 // The bridge deliberately uses a fixed 64-bit transaction rather than the
 // kev-gpt packet stream: this keeps the compiler milestone small and makes the
 // board ABI independently testable.  A transaction is shifted LSB-first:
-//   command[63:60] op, command[5:4] prompt index, command[15:0] value.
+//   command[63:60] op, command[17:16] prompt index, command[15:0] value.
 //   1 = load prompt word, 2 = start, 3 = status, 4 = select/read token.
+//   5 = reset, 6 = read stored prompt word (response[15:0], upper bits zero).
+// This replaces the legacy overlapping prompt-index/value encoding.
 // Responses are captured from response_word with status in [63:60] and the
 // selected token in [15:0].  Model weights remain immutable BRAM init data.
 module tinystories_1m_jtag_csr #(
@@ -139,7 +141,7 @@ module tinystories_1m_jtag_csr #(
       if (command_toggle_q2 != command_toggle_q1) begin
         case (command_word[63:60])
           4'h1: begin
-            prompt_words[command_word[5:4]] <= command_word[15:0];
+            prompt_words[command_word[17:16]] <= command_word[15:0];
             response_word <= {4'h0, 12'd0, 16'd0, 16'd0, command_word[15:0]};
           end
           4'h2: begin
@@ -167,6 +169,7 @@ module tinystories_1m_jtag_csr #(
             core_token_index <= command_word[0];
             token_read_pending <= 1'b1;
           end
+          4'h6: response_word <= {48'd0, prompt_words[command_word[17:16]]};
           default: response_word <= {4'hf, 60'd0};
         endcase
       end

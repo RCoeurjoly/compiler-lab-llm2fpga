@@ -43,14 +43,21 @@ module tinystories_jtag_csr_tb;
     for (run = 0; run < 3; run = run + 1) begin
       transaction(64'h3000000000000000, received);
       if (response !== 64'h2800000000000000) $fatal(1, "status command lost: %h", response);
-      transaction(64'h1000000000000001, received);
+      transaction(64'h1000000000001d1e, received);
       if (received !== 64'h2800000000000000) $fatal(1, "bad captured status: %h", received);
-      transaction(64'h1000000000000012, received);
-      transaction(64'h1000000000000023, received);
-      transaction(64'h1000000000000034, received);
-      // These values respect the existing overlapping index/value ABI.
-      if ({p0,p1,p2,p3} !== 64'h0001001200230034) $fatal(1, "prompt transfer failed");
+      transaction(64'h1000000000010962, received);
+      transaction(64'h1000000000020101, received);
+      transaction(64'h1000000000030280, received);
+      if ({p0,p1,p2,p3} !== 64'h1d1e096201010280) $fatal(1, "frozen prompt transfer failed: %h", {p0,p1,p2,p3});
+      transaction(64'h6000000000000000, received);
+      transaction(64'h6000000000010000, received);
+      if (received !== 64'h1d1e) $fatal(1, "prompt 0 readback failed");
+      transaction(64'h6000000000020000, received);
+      if (received !== 64'h0962) $fatal(1, "prompt 1 readback failed");
+      transaction(64'h6000000000030000, received);
+      if (received !== 64'h0101) $fatal(1, "prompt 2 readback failed");
       transaction(64'h5000000000000000, received);
+      if (received !== 64'h0280) $fatal(1, "prompt 3 readback failed");
       if ({p0,p1,p2,p3} !== 64'd0 || valid) $fatal(1, "reset failed");
     end
     if (reset_pulses != 3) $fatal(1, "expected three reset pulses");

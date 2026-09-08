@@ -32,8 +32,10 @@ class Device:
             self.prompt = [0] * 4
             self.response = 0
         elif op == 1:
-            self.prompt[(command >> 4) & 3] = command & 65535
+            self.prompt[(command >> 16) & 3] = command & 65535
             self.response = command & 65535
+        elif op == 6:
+            self.response = self.prompt[(command >> 16) & 3]
         else:
             raise AssertionError("unexpected command, including inference START")
         return result
@@ -53,8 +55,12 @@ class User1CheckTest(unittest.TestCase):
         device = Device()
         report = self.run_check(device)
         self.assertEqual(device.resets, 3)
-        self.assertEqual(len(device.commands), 54)
-        self.assertEqual({command >> 60 for command in device.commands}, {1, 3, 5})
+        self.assertEqual(len(device.commands), 78)
+        self.assertEqual({command >> 60 for command in device.commands}, {1, 3, 5, 6})
+        self.assertEqual([c for c in device.commands if c >> 60 == 1][:4], [
+            0x1000000000001d1e, 0x1000000000010962,
+            0x1000000000020101, 0x1000000000030280,
+        ])
         self.assertEqual(device.prompt, [0] * 4)
         self.assertEqual(report["status"], "passed")
         self.assertFalse(report["inference_started"])
@@ -63,6 +69,20 @@ class User1CheckTest(unittest.TestCase):
         device = Device()
         device.shift = lambda *_: [0] * 64
         with self.assertRaisesRegex(RuntimeError, "expected 2800000000000000"):
+            self.run_check(device)
+
+    def test_echo_without_storing_prompt_is_failure(self):
+        device = Device()
+        shift = device.shift
+
+        def lose_write(tms, tdi):
+            result = shift(tms, tdi)
+            if device.commands[-1] >> 60 == 1:
+                device.prompt = [0] * 4
+            return result
+
+        device.shift = lose_write
+        with self.assertRaisesRegex(RuntimeError, "command 6000000000000000"):
             self.run_check(device)
 
     def test_short_response_is_failure(self):
