@@ -18,6 +18,14 @@ control boundary. The generated production `main` component now exposes:
 - command `4`: select/read token slot (`command[0]`);
 - command `5`: pulse kernel reset.
 
+Status responses report three independent lifecycle bits: immutable model
+initialization (`status[59]`), latched completion (`status[58]`), and an active
+run (`status[57]`).  Token selection is deliberately a two-phase operation:
+command `4` updates the generated core's `token_index`, and the response is
+captured on the following system-clock edge.  This avoids returning the
+previous slot due to nonblocking-assignment ordering.  Reset clears the prompt
+shadow and completion latch, so a cold-start protocol is reproducible.
+
 The four prompt words are now driven from the CSR shadow registers into the
 generated prompt-loading schedule. The board therefore loads the prompt before
 the start command; no host-side token or intermediate-state feedback is used.
@@ -292,3 +300,9 @@ and indicates that the current top/CSR boundary must be preserved explicitly
 during synthesis. A coarse-to-memory retry entered Yosys resource sharing but
 was stopped before producing an artifact, so it provides no fit or timing
 evidence.
+
+An attempted mitigation that removed `memory_dff` (the generated BRAM wrapper
+already has a registered read) failed earlier, during legalization: Yosys
+reported `no valid mapping found` for token-weight bank `b196`. Thus
+`memory_dff` is currently required for the bank mapper to recognize the
+template; omitting it is not a valid export-pressure fix.

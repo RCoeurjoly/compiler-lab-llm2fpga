@@ -130,6 +130,16 @@ seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small ( .clk(clk) );
         self.assertIn("tinystories_1m_jtag_csr csr", top)
         self.assertIn("main core", top)
 
+    def test_jtag_abi_preserves_lifecycle_and_readback_ordering(self):
+        csr = (ROOT / "rtl/tinystories_1m_jtag_csr.sv").read_text()
+        self.assertIn("input  wire        model_init_done", csr)
+        self.assertIn("reg        start_pending", csr)
+        self.assertIn("reg        token_read_pending", csr)
+        self.assertIn("reg        done_latched", csr)
+        self.assertIn("response_word <= {4'h0, 12'd0, 16'd0, 16'd0, core_token_id};", csr)
+        self.assertIn("response_word <= {4'h2, model_init_done, done_latched, run_active,", csr)
+        self.assertIn("start_pending <= 1'b1;", csr)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,6 +24,11 @@ module tinystories_1m_jtag_csr #(
     output wire [15:0] prompt_3,
     input  wire [15:0] core_token_id,
     input  wire        core_done,
+    // The production image initializes immutable model memories from
+    // $readmemh at configuration time.  Keep this explicit in the ABI so a
+    // host can distinguish an initialized image from a merely responsive
+    // shell.
+    input  wire        model_init_done,
     output reg  [63:0] response_word
 `ifdef BSCAN_SIM
     ,input wire        scan_drck,
@@ -52,6 +57,9 @@ module tinystories_1m_jtag_csr #(
   reg        command_toggle;
   reg        command_toggle_q1, command_toggle_q2;
   reg        run_active;
+  reg        start_pending;
+  reg        done_latched;
+  reg        token_read_pending;
   reg [15:0] prompt_words [0:PROMPT_WORDS-1];
   integer i;
 
@@ -87,6 +95,9 @@ module tinystories_1m_jtag_csr #(
       core_reset <= 1'b0;
       core_token_index <= 1'b0;
       run_active <= 1'b0;
+      start_pending <= 1'b0;
+      done_latched <= 1'b0;
+      token_read_pending <= 1'b0;
       response_word <= 64'd0;
       for (i = 0; i < PROMPT_WORDS; i = i + 1) prompt_words[i] <= 16'd0;
     end else begin
@@ -94,8 +105,23 @@ module tinystories_1m_jtag_csr #(
       command_toggle_q2 <= command_toggle_q1;
       core_start <= 1'b0;
       core_reset <= 1'b0;
+      if (start_pending) begin
+        // Present start only after run_active has become visible on the
+        // generated core's valid input.  This avoids a one-cycle valid/start
+        // skew at the CDC boundary.
+        core_start <= 1'b1;
+        start_pending <= 1'b0;
+      end
+      // A read command changes the index with a nonblocking assignment.  Do
+      // not capture core_token_id until the following system-clock edge, when
+      // the generated mux has observed the new index.
+      if (token_read_pending) begin
+        response_word <= {4'h0, 12'd0, 16'd0, 16'd0, core_token_id};
+        token_read_pending <= 1'b0;
+      end
       if (core_done) begin
         run_active <= 1'b0;
+        done_latched <= 1'b1;
         response_word <= {4'h0, 12'd0, 16'd0, 16'd0, 16'd0};
       end
       if (command_toggle_q2 != command_toggle_q1) begin
@@ -105,21 +131,29 @@ module tinystories_1m_jtag_csr #(
             response_word <= {4'h0, 12'd0, 16'd0, 16'd0, command_word[15:0]};
           end
           4'h2: begin
-            core_start <= 1'b1;
             run_active <= 1'b1;
+            start_pending <= 1'b1;
+            done_latched <= 1'b0;
             response_word <= {4'h1, 12'd0, 48'd0};
           end
           4'h5: begin
             core_reset <= 1'b1;
             run_active <= 1'b0;
+            start_pending <= 1'b0;
+            done_latched <= 1'b0;
+            token_read_pending <= 1'b0;
+            for (i = 0; i < PROMPT_WORDS; i = i + 1) prompt_words[i] <= 16'd0;
             response_word <= {4'h0, 60'd0};
           end
           4'h3: begin
-            response_word <= {4'h2, 10'd0, run_active, core_done, 32'd0, prompt_words[0]};
+            // status[59] = immutable model image initialized,
+            // status[58] = completion latched, status[57] = currently busy.
+            response_word <= {4'h2, model_init_done, done_latched, run_active,
+                              9'd0, 32'd0, prompt_words[0]};
           end
           4'h4: begin
             core_token_index <= command_word[0];
-            response_word <= {4'h0, 12'd0, 16'd0, 16'd0, core_token_id};
+            token_read_pending <= 1'b1;
           end
           default: response_word <= {4'hf, 60'd0};
         endcase
