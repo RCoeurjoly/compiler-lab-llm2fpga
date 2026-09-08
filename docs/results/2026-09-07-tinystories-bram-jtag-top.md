@@ -451,3 +451,17 @@ reports `Routing complete` with zero arcs remaining. The debug
 `checkRoutedDesign()` assertion then crashes on another erased-net invariant;
 the router1 null-net guard is recorded in
 `patches/nextpnr-xilinx/0009-router1-skip-null-net.patch`.
+### 2026-09-08 routed-FASM checkpoint
+
+With the accumulated null-net guards, the patched local nextpnr-xilinx binary
+routes the mapped TinyStories-1M BRAM/JTAG top deterministically at seed 15:
+router2 reaches `overused=0`, routing completes, and FASM emission succeeds
+(11,062,175 bytes). The previous post-routing crashes were independently
+localized to `Arch::fixupRouting` and the FASM backend iterating null `NetInfo`
+entries; guards are recorded in patches 0010 and 0011.
+
+This is not a production result. nextpnr exits with status 1 because the real
+100 MHz XDC clock still fails timing: the accelerator clock is 47.15 MHz in the
+post-route report (31 MHz target run), versus the required 100 MHz. No `.bit`
+was generated or programmed, and no board inference was attempted. The routed
+FASM is diagnostic only until timing closure and bitstream verification pass.
