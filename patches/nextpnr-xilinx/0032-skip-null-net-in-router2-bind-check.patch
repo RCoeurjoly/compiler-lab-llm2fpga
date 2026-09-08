@@ -1,0 +1,8 @@
+--- a/common/router2.cc
++++ b/common/router2.cc
+@@
+         std::vector<WireId> net_wires;
+         for (auto net : nets_by_udata) {
++            if (net == nullptr)
++                continue;
+ #ifdef ARCH_ECP5
