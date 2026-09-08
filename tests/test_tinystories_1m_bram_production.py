@@ -220,6 +220,28 @@ seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
         self.assertIn("response_word <= {4'h2, model_init_done, done_latched, run_active,", csr)
         self.assertIn("start_pending <= 1'b1;", csr)
 
+    def test_flattened_memory_mapper_discovers_and_resumes_checkpoints(self):
+        path = ROOT / "scripts/pipeline/map_flattened_memory_checkpoints.py"
+        spec = importlib.util.spec_from_file_location("flattened_mapper", path)
+        assert spec and spec.loader
+        mapper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mapper)
+        sample = Path("/tmp/llm2fpga-memory-map-test.il")
+        sample.write_text(
+            "module \\main\n"
+            "  memory width 64 size 512 \\attention_context_q16_16.mem\n"
+            "  memory width 8 size 32768 \\token_weight_codes_i8_b0.mem\n"
+        )
+        try:
+            self.assertEqual(
+                mapper.memory_names(sample),
+                ["attention_context_q16_16.mem", "token_weight_codes_i8_b0.mem"],
+            )
+            self.assertIn("lutrams_xc5v.txt", mapper.checkpoint_script(sample, sample, "attention_context_q16_16.mem"))
+            self.assertIn("brams_xc7.txt", mapper.checkpoint_script(sample, sample, "token_weight_codes_i8_b0.mem"))
+        finally:
+            sample.unlink(missing_ok=True)
+
 
 if __name__ == "__main__":
     unittest.main()
