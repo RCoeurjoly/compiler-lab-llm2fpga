@@ -152,3 +152,6 @@ without mapping errors.
 
 The chain has advanced through `stage135.json` (140 forced-BRAM memories
 mapped), with no per-memory mapping errors.
+
+It now reaches `stage145.json` (150 forced-BRAM memories mapped), continuing
+without mapping errors.
