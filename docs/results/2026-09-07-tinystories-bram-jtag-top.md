@@ -568,3 +568,14 @@ evidence-backed isolation change for the persistent USER1-zero result, not a
 hardware-success claim. Commit `c45558d` contains the RTL change; the focused
 BRAM production suite passes 9/9. A fresh 40 MHz synthesis, route, bitstream
 hash, programming cycle, and cold-start inference are still required.
+
+### 2026-09-08 reset-boundary source correction
+
+Re-elaboration from the checked-in RTL exposed that the production top used
+`scan_reset` without a synthesized declaration; it was only available under
+the simulation-only CSR port conditional. The CSR now exports its TAP reset as
+`tap_reset`, and the top feeds that explicit signal back into `sys_reset`.
+Direct Yosys/SLANG elaboration of the model, CSR, and top completes with zero
+errors, and the focused production suite remains 9/9. Commit `9339d12`
+contains this correction. It must still be carried through mapping, routing,
+programming, and hardware inference.
