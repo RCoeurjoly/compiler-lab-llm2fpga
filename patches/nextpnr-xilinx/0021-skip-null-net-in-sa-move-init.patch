@@ -1,0 +1,10 @@
+--- a/common/placer1.cc
++++ b/common/placer1.cc
+@@
+             already_changed_arcs.resize(p->ctx->nets.size());
+             for (auto &net : p->ctx->nets)
+             {
++                if (net.second == nullptr)
++                    continue;
+                 already_changed_arcs.at(net.second->udata).resize(net.second->users.size());
+             }
