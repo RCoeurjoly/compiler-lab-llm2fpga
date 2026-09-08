@@ -1,0 +1,8 @@
+--- a/common/placer1.cc
++++ b/common/placer1.cc
+@@
+         for (auto net : sorted(ctx->nets)) {
+             NetInfo *ni = net.second;
++            if (ni == nullptr)
++                continue;
+             for (size_t i = 0; i < ni->users.size(); i++) {
