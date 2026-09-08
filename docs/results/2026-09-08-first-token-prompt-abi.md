@@ -164,3 +164,21 @@ clock, or CDC transport change is involved. The actual CSR RTL regression failed
 with the pulse implementation and passes with held START, completion/status,
 token readback and reset cancellation. All 36 targeted Python tests also pass.
 This repairs the internal integration handshake, not an observed board run.
+
+## Softmax denominator scheduling
+
+The scale-connected full run selected incorrect token 47208 at cycle 93,146,543.
+Checkpoint replay established exact Q/K/V, attention scores, maxima, deltas,
+exponentials and weighted numerators. Comparisons project the eight-row/key
+storage onto the four real tokens before checking the fixture. All 64 real
+denominators differ: the first is 2097152 instead of 1048576. This halves the
+first context value (-686 instead of -1371).
+
+The cause is the combined `causal_write_exp_accumulate_denominator` group:
+its register self-add runs for both cycles of the memory write. Production
+lowering now separates the memory write from a one-cycle register accumulation,
+keeping the same probability expression in both groups. The audit path remains
+unchanged. The executable regression extracts these actual generated groups;
+the original schedule reproduces 2097152 and the repaired schedule yields
+1048576 with the probability memory write intact. All 37 targeted tests pass.
+Full attention/block/token verification of this repair remains pending.

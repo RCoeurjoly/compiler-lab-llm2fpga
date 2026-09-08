@@ -113,7 +113,7 @@ def _layer_norm(attention, prefix: str = "", final: bool = False) -> Phase:
     return phase
 
 
-def _causal(attention) -> Phase:
+def _causal(attention, *, split_denominator: bool = False) -> Phase:
     changes = {
         "causal_row": (4,), "causal_key": (4,), "causal_row_lt": (4,),
         "causal_key_le": (4,), "causal_row_increment": (4,), "causal_key_increment": (4,),
@@ -148,6 +148,23 @@ def _causal(attention) -> Phase:
     model_score_head_shift.right = 10'd3;
     model_score_key.in = causal_key.out;
 """
+    if split_denominator:
+        # A two-cycle memory write must not stretch the non-idempotent
+        # denominator register update across both cycles.
+        name = "causal_write_exp_accumulate_denominator"
+        match = re.search(r"group " + name + r" \{(.*?)\n\s*\}", text, re.S)
+        if match is None:
+            raise ValueError("causal denominator group ABI changed")
+        body = match[1]
+        update = re.search(r"causal_denominator_add.left =.*?causal_denominator.write_en = 1'd1;", body, re.S)
+        done = "(causal_denominator.done & attention_exp_q1_20.done) ? 1'd1"
+        if update is None or body.count(done) != 1 or control.count(name + ";") != 1:
+            raise ValueError("causal denominator update ABI changed")
+        probability = body[:update.start()]
+        write = body.replace(update[0], "", 1).replace(done, "attention_exp_q1_20.done", 1)
+        accumulate = "group model_accumulate_denominator {" + probability + update[0] + "\n model_accumulate_denominator[done] = causal_denominator.done;\n}"
+        text = text.replace(match[0], "group " + name + " {" + write + "\n}\n" + accumulate, 1)
+        control = control.replace(name + ";", name + "; model_accumulate_denominator;", 1)
     return cells, [text], control
 
 
@@ -161,7 +178,7 @@ def _block_phases(block, attention, mlp, *, narrow_products: bool = False) -> li
     for prefix in ("q", "k", "v"):
         projection(prefix, "ln1_output_q16_16", 64, 64, "zero_bias_q16_16")
     phases.append(_resize(attention._initialize_causal_slots_phase(), {"causal_zero_counter": (11,), "causal_zero_lt": (11,), "causal_zero_increment": (11,), "causal_zero_address": (11, 10)}, {"causal_zero_lt": 1024}))
-    phases.append(_causal(attention))
+    phases.append(_causal(attention, split_denominator=narrow_products))
     projection("out", "attention_context_q16_16", 64, 64, "out_bias_q16_16")
     phases.append(_resize(attention._residual_add_phase(), {"attention_residual_counter": (10,), "attention_residual_lt": (10,), "attention_residual_increment": (10,), "attention_residual_address": (10, 9)}, {"attention_residual_lt": 512}))
     phases.append(_layer_norm(attention, "ln2_"))
