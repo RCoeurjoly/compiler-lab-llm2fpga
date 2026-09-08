@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import argparse
 import importlib.util
 import json
 import os
@@ -115,6 +116,9 @@ base = production.base
 
 
 def harness(artifact):
+    steps = artifact.provenance["schedule"]["generation_steps"]
+    if type(steps) is not int or steps not in (1, 2):
+        raise ValueError("generation_steps must be 1 or 2")
     preloads = "\n".join(
         f'  preload(root->main__DOT__{name}__DOT__mem, directory + "/source-{name}.bin");'
         for name in artifact.provenance["source_memories"]
@@ -166,7 +170,11 @@ int main(int argc, char** argv) {
   std::cout << "{\"event\":\"preload_done\"}" << std::endl;
   std::uint64_t completed[2] = {0, 0};
   std::uint16_t tokens[2][2] = {{0, 0}, {0, 0}};
+  constexpr unsigned steps = GENERATION_STEPS;
+  const unsigned expected[2] = {11, 612};
   for (unsigned run = 0; run < 2; ++run) {
+    unsigned seen = 0;
+    model.token_index = 0;
     model.reset = 1; model.start = 0; model.valid = 0;
     for (unsigned i = 0; i < 3; ++i) { model.clk = 0; model.eval(); model.clk = 1; model.eval(); }
     model.reset = 0; model.valid = 1;
@@ -184,7 +192,9 @@ int main(int argc, char** argv) {
       if ((completed[run] % 1000ULL) == 0)
         std::cout << "{\"event\":\"progress\",\"run\":" << run
           << ",\"cycles\":" << completed[run] << "}" << std::endl;
-      if (selected && step < 2) {
+      if (selected) {
+        if (step >= steps) return 6;
+        seen |= 1u << step;
         tokens[run][step] = root->main__DOT__selected_tokens__DOT__mem[step];
         std::cout << "{\"event\":\"selected\",\"run\":" << run
           << ",\"step\":" << step << ",\"token\":" << tokens[run][step]
@@ -192,26 +202,37 @@ int main(int argc, char** argv) {
       }
     }
     if (!model.done || completed[run] >= 2000000000ULL) return 3;
+    if (seen != ((1u << steps) - 1)) return 7;
+    for (unsigned step = 0; step < steps; ++step) {
+      model.token_index = step;
+      model.clk = 0; model.eval();
+      if (tokens[run][step] != expected[step] || model.token_id != expected[step]) return 4;
+      std::cout << "{\"event\":\"token_port\",\"run\":" << run
+        << ",\"step\":" << step << ",\"token\":" << model.token_id << "}" << std::endl;
+    }
     std::cout << "{\"event\":\"complete\",\"run\":" << run
       << ",\"cycles\":" << completed[run] << "}" << std::endl;
   }
-  if (tokens[0][0] != 11 || tokens[0][1] != 612 || tokens[1][0] != 11 || tokens[1][1] != 612)
-    return 4;
   if (completed[0] != completed[1] || tokens[0][0] != tokens[1][0] || tokens[0][1] != tokens[1][1]) return 5;
   return 0;
 }
-'''.replace("PRELOADS", preloads)
+'''.replace("PRELOADS", preloads).replace("GENERATION_STEPS", str(steps))
 
 
 def main():
-    directory = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/llm2fpga-tinystories-bram-production-sv").resolve()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("directory", nargs="?", type=Path, default=Path("/tmp/llm2fpga-tinystories-bram-production-sv"))
+    parser.add_argument("--generation-steps", type=int, choices=(1, 2), default=2)
+    args = parser.parse_args()
+    directory = args.directory.resolve()
     directory.mkdir(parents=True, exist_ok=True)
-    artifact = production.generate_production_kernel()
+    artifact = production.generate_production_kernel(generation_steps=args.generation_steps)
     capture = base._load(ROOT / "TinyStories/capture_fixed_point_model_token_step_oracle.py", "production_execution_oracle")
     bundle = capture.exact_adapter.load_successor_exact_model(capture.DEFAULT_CONTRACT, capture.DEFAULT_PACKAGE, capture.DEFAULT_MODEL, capture.DEFAULT_GENERATION)
     for name, tensor in base.materialize_model_sources(artifact, bundle).items():
         (directory / ("source-" + name + ".bin")).write_bytes(tensor.numpy().astype("<i8").tobytes())
     (directory / "model.futil").write_text(artifact.futil)
+    (directory / "provenance.json").write_text(json.dumps(artifact.provenance, indent=2) + "\n")
     install = Path(subprocess.check_output(["nix", "build", "--no-link", "--print-out-paths", ".#calyx"], cwd=ROOT, text=True).strip())
     subprocess.run([str(install / "bin/calyx"), str(directory / "model.futil"), "-l", str(install / "share/calyx"), "-d", "cell-share", "-b", "verilog", "--synthesis", "--nested", "-o", str(directory / "model.sv")], cwd=ROOT, check=True)
     model_path = directory / "model.sv"
@@ -236,7 +257,7 @@ def main():
     build = directory / "verilator"
     subprocess.run(["verilator", "--cc", "--exe", "--build", "-j", "8", "--top-module", "main", "--Mdir", str(build), "-CFLAGS", "-std=c++17 -O3", "-o", "production_harness", str(directory / "visibility.vlt"), str(directory / "model.sv"), str(directory / "harness.cpp")], cwd=ROOT, check=True)
     result = subprocess.run([str(build / "production_harness"), str(directory)], cwd=ROOT, text=True, check=True)
-    receipt = {"status": "passed", "futil_sha256": artifact.provenance["futil_sha256"], "sv_sha256": hashlib.sha256((directory / "model.sv").read_bytes()).hexdigest(), "elapsed_seconds": time.time()}
+    receipt = {"status": "passed", "generation_steps": args.generation_steps, "oracle_sha256": artifact.provenance["oracle_sha256"], "futil_sha256": artifact.provenance["futil_sha256"], "sv_sha256": hashlib.sha256((directory / "model.sv").read_bytes()).hexdigest(), "elapsed_seconds": time.time()}
     (directory / "production-execution.json").write_text(json.dumps(receipt, indent=2) + "\n")
 
 

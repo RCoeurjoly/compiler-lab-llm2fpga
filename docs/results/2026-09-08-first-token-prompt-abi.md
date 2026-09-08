@@ -45,6 +45,15 @@ the provenance records the selected execution length and real context lengths.
 The existing audit-generator Futil hash regression also passes. All 25 targeted
 tests passed after this change. This is generator verification, not execution.
 
+The simulation runner accepts `--generation-steps 1`, retains default 2,
+records compiler provenance, checks observed token commits, rejects commits
+beyond the requested execution length, and compares the public `token_id`
+port as well as stored selected tokens. Executable C++ checker tests use a
+controlled model-port fixture: they are checker tests, not model inference.
+All 29 targeted tests passed. The full one-step model also lowered to SV in
+1.47 seconds (Futil SHA-256
+`55b2ae5a55e7c1931ca627655e48dbafc2c272144f08c48f349a6c23a4160b52`).
+
 Full generated-SV execution, a new physical build, and three
 independent FPGA reconfigurations with exact first-token inference remain
 unperformed. No inference success is claimed. Accelerator timing coverage
