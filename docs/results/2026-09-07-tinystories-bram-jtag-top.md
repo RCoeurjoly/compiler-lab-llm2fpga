@@ -392,6 +392,16 @@ Nix development closure lacks Boost development headers/libraries; the patch
 still needs validation in the project toolchain before it can be used for a
 bitstream.
 
+With the locally rebuilt nextpnr null-net guards, the optimized artifact now
+completes analytical placement and simulated-annealing refinement at fixed
+seed 15. Timing analysis reports 31.04 MHz maximum for the accelerator clock
+(`clk$auto$IOBUF_O$$auto$IOBUF_I$`) versus the 100 MHz YPCB constraint; the
+independent CSR scan clock reaches 539.08 MHz. This is the first reliable
+critical-path result. A subsequent SDF/post-placement step still encounters a
+null-net crash, so no routed bitstream is claimed. The required next change is
+datapath pipelining or structural shortening to recover the 100 MHz margin,
+not weakening the board constraint.
+
 A debugger run confirms the failure is a reproducible SIGSEGV in
 `nextpnr_xilinx::XilinxPacker::pack_constants()`. Post-technology
 `opt_clean; clean` does not change the failure. The crash therefore remains
