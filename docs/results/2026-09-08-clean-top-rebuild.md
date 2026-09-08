@@ -56,3 +56,14 @@ change this cell's `RD_CLK=1'x`: Yosys reported no address FF for the generated
 port and retained an asynchronous read. Thus simply registering the output in
 the helper is insufficient; the compiler must emit an explicit address-stage
 protocol that Yosys can merge, with a corresponding latency/handshake check.
+## Compiler post-pass checkpoint
+
+The checked-in SV post-pass now emits an explicit `read_addr` register in the
+BRAM variant (`217d0cf`), and its focused regression suite passes all 10 tests.
+A fresh full-model generation and Verilator build complete; `memory_dff` now
+merges the address FF for the formerly failing token-weight memory
+(`RD_CLK=clk`). The existing behavioral harness did not complete within a
+30-second bounded run after this latency change (about 4.9 million cycles), so
+the pass is not yet semantically validated for the full accelerator. The next
+step is to retime and validate `done`/`content_en` against model checkpoints
+before FPGA mapping or hardware.
