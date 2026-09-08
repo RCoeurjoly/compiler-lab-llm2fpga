@@ -267,3 +267,12 @@ implementation gap is arithmetic legalization: targeted carry mapping leaves
 3,024 full-adder cells, while bit-level expansion again exceeds a million
 cells. Thus LUTRAM solves the BRAM-capacity count but not yet the complete
 placement path.
+
+The remaining `$fa` cells are not scalar bookkeeping: each sampled cell has
+`WIDTH=128` and exposes 128-bit `A`, `B`, and `C` operands. The 3,024 cells
+therefore represent 387,072 full-adder bits, or about 96,768 CARRY4 slices if
+implemented directly (four bits per slice). Expanding them to gates produced
+1,941,504 cells (774,144 AND, 387,072 OR, and 777,216 XOR), confirming that
+the current generated arithmetic is beyond a practical Kintex-7 placement
+before routing. This is a measured generated-design capacity blocker, not a
+missing PCIe/JTAG or DDR3 integration setting.
