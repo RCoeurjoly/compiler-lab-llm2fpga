@@ -76,6 +76,16 @@ the RTL protocol is sufficient for that BRAM primitive. Full-design mapping
 still needs to be performed incrementally to avoid the monolithic memory
 pass's resource spike.
 
+Incremental mapping is viable at one-memory granularity: five forced-BRAM
+memories map and serialize as `/tmp/regen-clean/stage5.il` (25.3 seconds,
+1.92 GiB peak), and the next two memories each map independently
+(`/tmp/regen-clean/stage6.il` and `stage7one.il`; 10.6 seconds and 1.87 GiB
+peak for the latter). Mapping batches of five exceed the available memory
+while loading the growing 240 MiB RTLIL, so the remaining 224 forced memories
+must be processed one per bounded stage (or the design must be structurally
+partitioned before mapping). This is now an engineering throughput/resource
+constraint, not an unresolved BRAM-port inference failure.
+
 The follow-up post-pass (`ec2a074`) delays the BRAM variant's `done` pulse via
 `read_pending` to match the staged read. The focused suite remains green. A
 fresh full-model generation/build completed, but its existing Verilator
