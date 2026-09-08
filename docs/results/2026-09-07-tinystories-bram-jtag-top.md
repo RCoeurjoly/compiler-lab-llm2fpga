@@ -525,6 +525,14 @@ The reset-corrected replacement bitstream is `tinystories-resetfix-40.bit`
 (SHA-256
 `0b51151cb9d43d26c92df16f1759b760ffc17ec2ca76d010ec219b3faceaf0ac`).
 
+An explicit `.JTAG_CHAIN(1)` parameter was then retained in the synthesized
+BSCANE2 instance and rebuilt end-to-end. The resulting 40 MHz bitstream
+(`tinystories-chain-40.bit`, SHA-256
+`053eed27987c5a383991ee37dd2063859f597e136924fad57476ee90c6e3b6e7`) also
+programmed successfully, but USER1 CSR reads remained zero. Thus the remaining
+failure is not an omitted chain parameter; the scan transaction/framing path
+needs a dedicated hardware loopback check.
+
 Adding Yosys `wreduce` alongside the mux-tree simplification also completed
 quickly but produced byte-for-byte identical packed resource counts (1,898
 CARRY4, 1,027 FDRE, 2,148 LUT1, 1,692 LUT2, 3,053 LUT3, 948 LUT4, 467 LUT5,
