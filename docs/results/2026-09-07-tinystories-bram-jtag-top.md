@@ -354,3 +354,14 @@ host memory budget (exit 137) before producing a placement or timing report.
 This identifies netlist expansion/placer memory, rather than BRAM or BSCAN,
 as the current implementation blocker; no bitstream or hardware inference is
 claimed.
+
+## 2026-09-08 constant-cone reduction checkpoint
+
+Running `opt -full` before primitive legalization reduced the 4,864 128-bit
+AND cells to 27 one-bit AND cells. The remaining full-adders are still emitted
+with 128-bit cones by the generic techmap; legalizing those cones creates about
+131k LUT2 cells. The resulting artifact contains no generic `$` cells after
+memory mapping and FF legalization, but nextpnr pack-only currently
+segfaults in `pack_constants` on this larger mapped graph. This is a backend
+mapping/nextpnr failure checkpoint; timing, bitstream generation, and board
+inference remain unverified.
