@@ -1,6 +1,8 @@
 --- a/xilinx/arch.cc
 +++ b/xilinx/arch.cc
 @@
+ void Arch::findSourceSinkLocations()
+ {
      for (auto net : sorted(nets)) {
          NetInfo *ni = net.second;
 +        if (ni == nullptr)
