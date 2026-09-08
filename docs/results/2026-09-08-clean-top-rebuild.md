@@ -410,3 +410,33 @@ The preserved `base-good.il` remains a mapping diagnostic: its input
 model initialization. Also, the earlier nextpnr probes still contained
 generic logic cells and reported no clocks; they do not establish placement
 or timing for the complete accelerator.
+
+### Completed native mapping and initialized-source import
+
+All 266 native mapping checkpoints completed in a fresh directory. Native
+techmap and library-aware hierarchy report 953 RAMB36E1, one RAMB18E1, and
+1,232 RAM64M cells (`/tmp/regen-safe/native-primitives.log`). Generic logic
+and residual small memories still need synthesis; this count is only a
+memory-capacity result for the diagnostic uninitialized input.
+
+Image preparation now restores missing `$readmemh` calls in `main` when
+Calyx synthesis mode omitted them. It rejects missing source instances and
+duplicate initialization rather than issuing a readiness claim. Six image
+tests pass. Materializing the actual current model emitted 240 immutable
+source files and 240 initializers; independent checks passed for each file's
+hash and word count and for the resulting SV hash.
+
+The initialized source imported successfully without `--ignore-initial`,
+including `proc`, `opt`, and `memory_dff`. Its final RTLIL contains 266
+memories, 233 `$meminit_v2` cells after optimization, and BSCANE2 with
+`JTAG_CHAIN=1`, `DISABLE_JTAG="FALSE"`. This demonstrates preservation of
+initialization through import, not complete end-to-end image verification.
+The next mapping must use this initialized input, not `base-good.il`.
+
+Artifacts under `/tmp/regen-safe/native-static-image/`:
+
+- `manifest.json`: `934857351d1a5458c25e521c21334fd78b27a035d6455259078d8ff7c19e6831`
+  (self-hash field);
+- generated SV SHA-256: `cf3c83638502769966e5c26efaff7c4ec08ee1f73ad03764b45b3980b862b3ad`;
+- static SV SHA-256: `b030e34d96901fd7e04c00f8679c457cc59d26c4906c1d41d6e3e96d46525b93`;
+- `import.ys`, `import.log`, and `initialized-base.il` record the import.

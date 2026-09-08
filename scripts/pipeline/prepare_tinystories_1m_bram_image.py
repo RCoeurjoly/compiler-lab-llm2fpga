@@ -63,6 +63,27 @@ def staticize_sv(source: str, source_names: set[str]) -> str:
     # The generated final block writes every memory back to host files.  It is
     # simulation-only and must not survive into synthesis.
     source = re.sub(r"\nfinal begin\n.*?\nend\n(?=logic )", "\n", source, count=1, flags=re.S)
+    # Calyx --synthesis omits its simulation preload block entirely. Restore
+    # only the authenticated immutable sources, in the generated main scope.
+    missing = sorted(
+        name for name in source_names
+        if f'$readmemh("image-{name}.hex", {name}.mem);' not in source
+    )
+    if missing:
+        main = re.search(r"\bmodule\s+main\b.*?\bendmodule\b", source, re.S)
+        if main is None:
+            raise ValueError("missing main module for immutable memory initialization")
+        for name in missing:
+            if not re.search(r"\b" + re.escape(name) + r"\s*\(", main.group()):
+                raise ValueError(f"missing immutable memory instance: {name}")
+        initial = "\ninitial begin\n" + "\n".join(
+            f'    $readmemh("image-{name}.hex", {name}.mem);' for name in missing
+        ) + "\nend\n"
+        end = main.end() - len("endmodule")
+        source = source[:end] + initial + source[end:]
+    for name in source_names:
+        if source.count(f'$readmemh("image-{name}.hex", {name}.mem);') != 1:
+            raise ValueError(f"immutable memory must have exactly one initializer: {name}")
     return source
 
 

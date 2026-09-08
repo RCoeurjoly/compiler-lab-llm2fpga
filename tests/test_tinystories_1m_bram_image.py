@@ -19,6 +19,32 @@ def load_module():
 
 
 class BramImageTest(unittest.TestCase):
+    def test_synthesis_output_gets_source_initializers_in_main(self):
+        module = load_module()
+        source = '''module seq_mem_d1(); endmodule
+module main(input clk);
+  seq_mem_d1 #(.WIDTH(8)) weights (.clk(clk));
+  seq_mem_d1 scratch (.clk(clk));
+endmodule
+module another(); endmodule
+'''
+        result = module.staticize_sv(source, {"weights"})
+        main = result.split("module main", 1)[1].split("endmodule", 1)[0]
+        self.assertIn('$readmemh("image-weights.hex", weights.mem);', main)
+        self.assertNotIn("image-scratch", result)
+        self.assertEqual(module.staticize_sv(result, {"weights"}), result)
+
+    def test_missing_source_instance_cannot_claim_image_ready(self):
+        module = load_module()
+        with self.assertRaisesRegex(ValueError, "missing immutable memory instance"):
+            module.staticize_sv("module main(); endmodule", {"weights"})
+
+    def test_duplicate_initializers_are_rejected(self):
+        module = load_module()
+        source = '$readmemh("image-weights.hex", weights.mem);\n' * 2
+        with self.assertRaisesRegex(ValueError, "exactly one initializer"):
+            module.staticize_sv(source, {"weights"})
+
     def test_staticizer_removes_runtime_plusarg_and_scratch_initialization(self):
         module = load_module()
         source = """string DATA;\nint CODE;\ninitial begin
