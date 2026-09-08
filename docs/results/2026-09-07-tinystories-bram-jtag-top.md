@@ -365,3 +365,12 @@ memory mapping and FF legalization, but nextpnr pack-only currently
 segfaults in `pack_constants` on this larger mapped graph. This is a backend
 mapping/nextpnr failure checkpoint; timing, bitstream generation, and board
 inference remain unverified.
+
+Replacing the 128-bit generic full-adder expansion with equivalent per-bit
+three-input LUT truth tables reduced the mapped graph to approximately 75k LUT
+sites (58,236 LUT3s plus the existing LUTs), 3,580 CARRY4s, 1,029 FFs, and 46
+BRAMs. The artifact contains only device primitives, but nextpnr still
+segfaults during `pack_constants`; this separates the remaining failure from
+generic-cell legalization and points to a nextpnr packing bug or an invalid
+primitive/net invariant in the generated graph. No timing or hardware result
+is inferred from this crash.
