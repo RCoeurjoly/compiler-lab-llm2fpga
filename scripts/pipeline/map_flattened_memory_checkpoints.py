@@ -70,6 +70,7 @@ def main() -> None:
     names = memory_names(args.input)
     previous = args.input
     completed = 0
+    failure: str | None = None
     for index, name in enumerate(names, 1):
         destination = args.output_dir / f"map-{index}.il"
         if destination.exists():
@@ -82,14 +83,21 @@ def main() -> None:
             script.write(checkpoint_script(previous, destination, name))
             script_path = Path(script.name)
         try:
-            subprocess.run(
-                [args.yosys, "-s", str(script_path)],
-                check=True,
-                timeout=args.timeout,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-            )
+            try:
+                subprocess.run(
+                    [args.yosys, "-s", str(script_path)],
+                    check=True,
+                    timeout=args.timeout,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                )
+            except subprocess.TimeoutExpired:
+                failure = f"timeout mapping memory {index}: {name}"
+                break
+            except subprocess.CalledProcessError as exc:
+                failure = f"yosys failed mapping memory {index}: {name} (exit {exc.returncode})"
+                break
         finally:
             script_path.unlink(missing_ok=True)
         previous = destination
@@ -103,6 +111,8 @@ def main() -> None:
         "last_checkpoint": str(previous),
         "status": "complete" if completed == len(names) else "partial",
     }
+    if failure:
+        receipt["failure"] = failure
     (args.output_dir / "memory-checkpoints.json").write_text(
         json.dumps(receipt, indent=2) + "\n"
     )
