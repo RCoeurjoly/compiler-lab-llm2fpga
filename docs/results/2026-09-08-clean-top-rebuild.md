@@ -137,3 +137,6 @@ without a per-memory mapping error.
 
 It now reaches `stage90.json` (95 forced-BRAM memories mapped), continuing the
 restartable, one-memory-per-process route without mapping errors.
+
+The chain has advanced through `stage100.json` (105 forced-BRAM memories
+mapped), with no per-memory mapping errors.
