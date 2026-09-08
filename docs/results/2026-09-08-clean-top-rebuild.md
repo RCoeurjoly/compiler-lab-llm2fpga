@@ -117,3 +117,8 @@ consumer's `done` edge directly, rather than attempting another long run.
 The JSON chain has since advanced through `stage35.json` (40 forced-BRAM
 memories mapped). Every completed checkpoint remains valid and no mapping
 error has appeared.
+# Mapping continuation
+
+The chain now reaches `stage50.json` (55 forced-BRAM memories mapped). The
+per-memory JSON stages continue to complete without mapping errors, providing
+restartable artifacts for the remaining bank set.
