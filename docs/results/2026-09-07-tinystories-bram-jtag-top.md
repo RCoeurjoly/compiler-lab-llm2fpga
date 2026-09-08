@@ -533,6 +533,11 @@ programmed successfully, but USER1 CSR reads remained zero. Thus the remaining
 failure is not an omitted chain parameter; the scan transaction/framing path
 needs a dedicated hardware loopback check.
 
+Per-command probing (TAP reset, CSR reset, prompt writes, start, and status)
+returned zero for every response with 0.5 s settling between transactions.
+This confirms the failure occurs before CSR command decoding or response
+capture, rather than being a bad prompt/model value.
+
 Adding Yosys `wreduce` alongside the mux-tree simplification also completed
 quickly but produced byte-for-byte identical packed resource counts (1,898
 CARRY4, 1,027 FDRE, 2,148 LUT1, 1,692 LUT2, 3,053 LUT3, 948 LUT4, 467 LUT5,
