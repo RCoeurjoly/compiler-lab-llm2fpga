@@ -488,3 +488,9 @@ The nextpnr `--placer-budgets` experiment was counterproductive: it aborted
 after placement with an internal failure and only 31.65 MHz estimated timing.
 No routed artifact was produced. Placement heuristics therefore do not provide
 a credible path to 100 MHz for this generated netlist.
+
+Adding Yosys `wreduce` alongside the mux-tree simplification also completed
+quickly but produced byte-for-byte identical packed resource counts (1,898
+CARRY4, 1,027 FDRE, 2,148 LUT1, 1,692 LUT2, 3,053 LUT3, 948 LUT4, 467 LUT5,
+1,197 LUT6, and the same BRAM usage). It therefore cannot improve the current
+critical path.
