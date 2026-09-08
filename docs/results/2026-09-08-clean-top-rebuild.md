@@ -185,3 +185,13 @@ mapped), still without mapping errors.
 
 It now reaches `stage215.json` (220 forced-BRAM memories mapped), continuing
 without per-memory mapping errors.
+
+The final forced-BRAM entries complete through `stage224.json`: all 224
+forced-BRAM memories are mapped, and the checkpoint contains no `FDCE` module
+definitions after cell techmapping. The remaining 59 `$mem_v2` cells are
+runtime/control memories. A bounded `memory_map` probe for only the first
+three grows the JSON from 136 MiB to 361 MiB; mapping the next memory exceeds
+the host memory ceiling before serialization. Full closure now requires the
+compiler to emit a synchronous BRAM/LUTRAM protocol for these runtime memories
+as well, or to partition their state, rather than lowering them wholesale to
+FF/mux logic.
