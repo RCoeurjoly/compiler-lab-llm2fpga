@@ -558,3 +558,13 @@ quickly but produced byte-for-byte identical packed resource counts (1,898
 CARRY4, 1,027 FDRE, 2,148 LUT1, 1,692 LUT2, 3,053 LUT3, 948 LUT4, 467 LUT5,
 1,197 LUT6, and the same BRAM usage). It therefore cannot improve the current
 critical path.
+
+### 2026-09-08 BSCAN control-port alignment
+
+The CSR primitive now connects BSCANE2's `RUNTEST`, `TCK`, and `TMS` outputs to
+explicit unused wires, matching the proven PCIe/JTAG status-shift
+instantiation. Previously those ports were left unconnected. This is an
+evidence-backed isolation change for the persistent USER1-zero result, not a
+hardware-success claim. Commit `c45558d` contains the RTL change; the focused
+BRAM production suite passes 9/9. A fresh 40 MHz synthesis, route, bitstream
+hash, programming cycle, and cold-start inference are still required.
