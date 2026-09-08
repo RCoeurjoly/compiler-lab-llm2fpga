@@ -112,3 +112,8 @@ harness still failed to reach a `complete` event in the bounded run (the log
 stopped at 57,000 cycles), so this latency adjustment is not yet proven
 functionally. The next diagnostic must compare one memory transaction and its
 consumer's `done` edge directly, rather than attempting another long run.
+# Incremental mapping continuation
+
+The JSON chain has since advanced through `stage35.json` (40 forced-BRAM
+memories mapped). Every completed checkpoint remains valid and no mapping
+error has appeared.
