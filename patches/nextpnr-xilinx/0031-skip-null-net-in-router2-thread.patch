@@ -1,0 +1,9 @@
+--- a/common/router2.cc
++++ b/common/router2.cc
+@@
+     void router_thread(ThreadContext &t)
+     {
+         for (auto n : t.route_nets) {
++            if (n == nullptr)
++                continue;
+             bool result = route_net(t, n, true);
