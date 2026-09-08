@@ -295,3 +295,13 @@ reconstructs 128-bit operands from the 128-bit assignment context. The hook is
 therefore opt-in and is not yet a production optimization; a compiler/runtime
 change must force the partial-product decomposition (or an equivalent DSP
 primitive boundary) before this hypothesis can reduce the placed design.
+
+The explicit bounded boundary was then exercised on the full regenerated top
+with `LLM2FPGA_APPLY_SIGNED_MULTIPLY_REPAIR=1`. Slang elaboration now reports
+93 multipliers, each with 64-bit operands (the four 32×32 partial products are
+visible after elaboration), instead of the previous 24 128×128 multipliers.
+The production Verilator harness did not complete because its visibility list
+expects pre-synthesis memory hierarchy names that `--synthesis --nested` no
+longer emits; this is a harness ABI issue, not an inference result. The next
+implementation step is to map the 93 bounded multipliers and update the
+harness visibility contract before any board programming.
