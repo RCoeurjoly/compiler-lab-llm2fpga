@@ -307,7 +307,12 @@ implementation step is to map the 93 bounded multipliers and update the
 harness visibility contract before any board programming.
 
 Resumable `memory_libmap` checkpoints for the bounded top now complete through
-120 of 266 memories. The checkpoints are chained (each consumes the previous
+266 of 266 memories. The checkpoints are chained (each consumes the previous
 bounded IL), so this is implementation progress rather than independent
 synthetic probes; primitive legalization and placement remain after the final
 checkpoint.
+
+All 266 chained checkpoints now complete. The first final primitive map still
+reports 962 RAMB36E1 blocks; the checked-in annotator now emits a separate
+LUTRAM variant for the seven 64×512 scratch buffers, targeting the previously
+measured 955-RAMB36E1 fit before the next regeneration.
