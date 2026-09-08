@@ -345,3 +345,12 @@ only; no inference result or bitstream claim is made.  The next gate is a
 hierarchy-aware primitive mapping pass, followed by bounded logic
 legalization and nextpnr.  Board programming remains intentionally blocked
 until those gates pass.
+
+The hierarchy-aware mapping diagnosis found the immediate cause of the prior
+`no valid mapping` error: `memory_libmap` requires `memory_dff` normalization
+for these generated synchronous memories.  With that normalization, the
+current hierarchy maps successfully to Xilinx primitive cells, but the
+straightforward per-module map expands to 2,639 RAMB36E1 and 3,584 RAM64M
+cells.  This is a valid legalization diagnostic, not a fitting result; the
+packing/collection strategy must preserve the efficient 955-RAMB36E1 map
+before nextpnr is attempted.
