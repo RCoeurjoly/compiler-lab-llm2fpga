@@ -69,3 +69,25 @@ Full generated-SV execution, a new physical build, and three
 independent FPGA reconfigurations with exact first-token inference remain
 unperformed. No inference success is claimed. Accelerator timing coverage
 remains incomplete; functional success will not imply full timing qualification.
+
+## Hardware checker preparation
+
+`scripts/pipeline/infer_tinystories_first_token_jtag.py` verifies the frozen
+oracle before opening JTAG. It resets the TAP once, writes and reads all four
+prompt words, issues START once, polls busy/completion with a maximum
+300-second deadline, and checks token zero. Failures preserve transaction
+history; there is no automatic retry or reset after START. The receipt includes
+oracle, checker and transport hashes plus its own hash. It explicitly does not
+establish independent FPGA reconfiguration or bitstream identity; those must
+be bound to the programming evidence during hardware acceptance.
+
+Four controlled-device tests exercise success, bad prompt readback, wrong token,
+and timeout. All 34 targeted tests pass. The checker has not been run against
+the board, which still holds the previous CSR-only-validated image.
+
+Fresh full-top elaboration also passed with 266 memories, one BSCANE2, two
+BUFGs and one MMCME2_ADV. The new RTLIL hash is
+`ab39e8ce2ccf6c16f604899d506e00d09d96bf65493bb9f42c23b8291d21f14d`.
+All 240 static source image records and file hashes match the accepted baseline.
+Memory mapping uses the fresh `/tmp/tinystories-first-token-map-20260908`
+checkpoint directory; it does not reuse earlier top-level RTLIL snapshots.
