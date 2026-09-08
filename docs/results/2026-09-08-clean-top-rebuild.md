@@ -276,3 +276,12 @@ implemented directly (four bits per slice). Expanding them to gates produced
 the current generated arithmetic is beyond a practical Kintex-7 placement
 before routing. This is a measured generated-design capacity blocker, not a
 missing PCIe/JTAG or DDR3 integration setting.
+
+The widening source is identified in the generated helper: the Futil uses
+`std_smult_pipe(64)`, but its signed multiply implementation concatenates a
+second `WIDTH`-bit sign extension before multiplying. Yosys consequently sees
+24 unsigned 128×128 multipliers (the 24 product sites include the final
+normalization and logits paths), then materializes their accumulators as the
+3,024 128-bit `$fa` cells. This gives a concrete compiler/runtime repair
+target: preserve the 64-bit fixed-point result contract while avoiding the
+unnecessary 128-bit operand widening.
