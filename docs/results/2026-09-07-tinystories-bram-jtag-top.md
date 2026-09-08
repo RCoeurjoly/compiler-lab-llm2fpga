@@ -471,3 +471,9 @@ The post-route critical path is now characterized rather than guessed. It is a
 core `std_reg` state register (`model-block.sv:1316`) through a long chain of
 control/mux logic into another generated register. This is the current timing
 closure target; changing the JTAG shell or constraints would not address it.
+
+An isolated `opt_muxtree` compiler experiment completed in 14 seconds and
+produced a valid mapped netlist, but did not change the packed resource profile
+or timing: the same deterministic route reached zero overuse and 47.15 MHz.
+This rules out mux-tree cleanup as the needed closure fix; an actual sequential
+boundary or a materially different control representation is required.
