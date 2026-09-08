@@ -558,3 +558,55 @@ substituting another family's data without qualification is not accepted.
 The YPCB reference project identifies the physical part as
 `xc7k480tffg1156-2`; the active database's `-1` designation must also be
 disclosed when qualifying any replacement data.
+
+## Initialized synthesis and exact-part timing investigation
+
+The 900-second native mapping run completed successfully, followed by coarse
+and fine synthesis. The final initialized top contains 953 RAMB36E1 and one
+RAMB18E1. Coarse synthesis reports 276 DSP48E1; fine synthesis reduces that
+to 231 DSP48E1, with 4,857 CARRY4 and 1,136 RAM64M. These are synthesis
+checkpoints, not placement, timing closure, or hardware acceptance.
+
+SHA-256 values under `/tmp/regen-safe/native-static-image`:
+
+- `initialized-primitives.il`: `cf37ccea094cf4cafc2664863d30c7e93491688b0f53b66d141c2be350e7d23e`
+- `initialized-coarse.il`: `136aea662fcb4237c9452ad7db2e8a6e0c8c51146d1cf2ffa1ba3e51f3851f8d`
+- `initialized-fine.il`: `691ffbb2e1b394914d41276a7629708ef9d914dc2a815f34f080d1a602b86fdf`
+
+ABC9 after RTLIL reload rejected DSP48E1 as non-parametric. Reloading
+`+/xilinx/cells_sim.v` cleared that error and exposed the same problem for
+MMCME2_ADV. The bounded retry restores both standard Verilog libraries
+(`cells_sim.v` and `cells_xtra.v`) to restore frontend specialization data.
+Logs retain both failures; no cell renaming or accelerator RTL change is
+used to bypass them. Full LUT mapping remains unverified.
+The retry with both libraries passed parameter specialization and advanced
+to ABC9 step 4.3.12; its overall 900-second run remains in progress.
+
+The installed Vivado synthesis license is expired; synthesis was not used
+to supply timing data. A separate device-only `link_design` query for
+`xc7k480tffg1156-2` succeeded and returned 690 BEL speed models for one
+CLBLL_L tile. Reusing Project X-Ray's extraction procedure from commit
+`c9f02d8576042325425824647ab5555b1bc77833` then completed default-site-mode
+extraction for 97 tile types without synthesis or placement. Artifacts and
+the upstream checkout are under `/tmp/regen-safe/kintex-timing`.
+
+The first conversion rejected conflicting BRAM `.DEFAULT` properties. The
+converter expects `CONFIG.<property>.VALUES` lists, whereas Vivado 2025's
+broad `CONFIG*` query also returns defaults. A second extraction restricts
+that query to `CONFIG*.VALUES`; the original dump is retained in
+`original-extraction.tar.gz`. Successful raw extraction is not yet a
+qualified timing database, and conversion still requires verification.
+The second conversion reached its 120-second limit (exit 124) without
+emitting SDF files. The property conflict did not recur before that limit;
+conversion performance and completion remain to be investigated.
+
+Source inspection also establishes that this nextpnr implementation's
+`getPortTimingClass` ignores BRAM/DSP endpoints, and `getPortClockingInfo`
+returns fixed 0.1 ns setup/hold/clock-to-Q values. Consequently, even a
+nonempty replacement cell database cannot alone establish full-model
+timing closure. Timing coverage must be resolved before accepting a
+30 MHz timing claim.
+
+The four unittest modules for chipdb admission, BRAM production, BRAM image
+preparation, and USER1 checking pass all 25 tests under Nix Python. No new
+bitstream has been programmed and no inference command has been sent.
