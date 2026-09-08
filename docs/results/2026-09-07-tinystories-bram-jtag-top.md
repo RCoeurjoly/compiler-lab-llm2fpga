@@ -374,3 +374,10 @@ segfaults during `pack_constants`; this separates the remaining failure from
 generic-cell legalization and points to a nextpnr packing bug or an invalid
 primitive/net invariant in the generated graph. No timing or hardware result
 is inferred from this crash.
+
+A debugger run confirms the failure is a reproducible SIGSEGV in
+`nextpnr_xilinx::XilinxPacker::pack_constants()`. Post-technology
+`opt_clean; clean` does not change the failure. The crash therefore remains
+an implementation-tool primitive/net invariant issue, not a timing violation;
+the generated artifact is not yet eligible for placement or bitstream
+generation.
