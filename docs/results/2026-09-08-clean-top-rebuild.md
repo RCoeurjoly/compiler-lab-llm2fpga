@@ -259,3 +259,11 @@ However, Yosys lowers those buffers to FF/mux logic, producing approximately
 1.62 million AND gates; ABC9 cannot complete within the bounded host-memory
 run. The capacity tradeoff therefore fits BRAM numerically but is not a viable
 implementation strategy without a LUTRAM or state-partitioning representation.
+
+Removing the BRAM hint only for those seven buffers and mapping them with
+Yosys's XC7 LUTRAM descriptor yields 955 RAMB36E1 primitives plus 1,232
+RAM64M blocks, with ABC9 completing on the resulting netlist. The remaining
+implementation gap is arithmetic legalization: targeted carry mapping leaves
+3,024 full-adder cells, while bit-level expansion again exceeds a million
+cells. Thus LUTRAM solves the BRAM-capacity count but not yet the complete
+placement path.
