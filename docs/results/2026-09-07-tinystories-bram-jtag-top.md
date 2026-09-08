@@ -505,6 +505,13 @@ This is timing closure only. The bitstream has not yet been programmed on the
 YPCB, and JTAG CSR execution plus the exact `[11, 612]` token result remain
 unverified.
 
+The candidate was subsequently programmed to the YPCB through the Digilent HS3
+without privilege escalation; openFPGALoader reported `isc_done=1`, `init=1`,
+and `done=1`. An initial direct FTDI CSR probe did not return a valid response
+(`0x7f` with one TDO framing and `0x0` with the alternate framing). This is a
+JTAG transaction-framing failure still to be resolved; no inference result is
+claimed.
+
 Adding Yosys `wreduce` alongside the mux-tree simplification also completed
 quickly but produced byte-for-byte identical packed resource counts (1,898
 CARRY4, 1,027 FDRE, 2,148 LUT1, 1,692 LUT2, 3,053 LUT3, 948 LUT4, 467 LUT5,
