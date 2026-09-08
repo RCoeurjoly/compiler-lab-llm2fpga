@@ -182,3 +182,20 @@ unchanged. The executable regression extracts these actual generated groups;
 the original schedule reproduces 2097152 and the repaired schedule yields
 1048576 with the probability memory write intact. All 37 targeted tests pass.
 Full attention/block/token verification of this repair remains pending.
+
+### Repaired full block verified
+
+The full-model replay at `/tmp/tinystories-first-token-denominator-20260909`
+now produces the exact block-0 output at cycle 6,270,512, SHA-256
+`61a7016bc7936ae32cefdf8153cf4560454c662e6c0ea6351144f3a5b377bedf`.
+All eleven captured intervening checkpoints match authenticated attention/MLP
+fixtures: K, V, attention context, output projection, attention residual, ln_2,
+c_fc input, c_fc output, GELU output, c_proj input, and c_proj output.
+The diagnostic links the same compiled full-model archive as the ongoing token
+run; it adds no RTL and supplies no intermediate model state.
+
+The selected Futil, generated/static SV hashes, manifest self-hash and all 240
+immutable images were independently checked before starting fresh elaboration
+in `/tmp/tinystories-first-token-denominator-static-20260909`. The immutable
+image records still match the accepted baseline exactly. Full-token simulation
+and physical implementation remain pending; there is no board inference claim.
