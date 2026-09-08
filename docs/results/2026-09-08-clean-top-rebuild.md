@@ -289,3 +289,9 @@ unnecessary 128-bit operand widening. The repair now computes unsigned
 two's-complement sign correction into the existing `2*WIDTH` result register.
 On the actual generated helper, Yosys reports `A_WIDTH=64`, `B_WIDTH=64`, and
 `Y_WIDTH=128` for the signed specialization.
+
+However, full-top elaboration through the production Yosys-Slang frontend
+reconstructs 128-bit operands from the 128-bit assignment context. The hook is
+therefore opt-in and is not yet a production optimization; a compiler/runtime
+change must force the partial-product decomposition (or an equivalent DSP
+primitive boundary) before this hypothesis can reduce the placed design.

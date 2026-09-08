@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -205,11 +206,14 @@ def main():
     install = Path(subprocess.check_output(["nix", "build", "--no-link", "--print-out-paths", ".#calyx"], cwd=ROOT, text=True).strip())
     subprocess.run([str(install / "bin/calyx"), str(directory / "model.futil"), "-l", str(install / "share/calyx"), "-d", "cell-share", "-b", "verilog", "--synthesis", "--nested", "-o", str(directory / "model.sv")], cwd=ROOT, check=True)
     model_path = directory / "model.sv"
-    repaired_path = directory / "model.repaired.sv"
-    repair_receipt = directory / "signed-multiply-width-repair.json"
-    repair = base._load(ROOT / "scripts/pipeline/repair_calyx_signed_multiply_width.py", "signed_multiply_width_repair")
-    repair.repair(model_path, repaired_path, repair_receipt)
-    repaired_path.replace(model_path)
+    # Keep the experimental multiply repair opt-in until the Slang frontend
+    # preserves its bounded operand widths during full-top elaboration.
+    if os.environ.get("LLM2FPGA_APPLY_SIGNED_MULTIPLY_REPAIR") == "1":
+        repaired_path = directory / "model.repaired.sv"
+        repair_receipt = directory / "signed-multiply-width-repair.json"
+        repair = base._load(ROOT / "scripts/pipeline/repair_calyx_signed_multiply_width.py", "signed_multiply_width_repair")
+        repair.repair(model_path, repaired_path, repair_receipt)
+        repaired_path.replace(model_path)
     model_path.write_text(annotate_bram_memories(model_path.read_text()))
     source_names = list(artifact.provenance["source_memories"])
     visibility = ['`verilator_config', 'public_flat_rw -module "seq_mem_d1" -var "mem" @(posedge clk)']
