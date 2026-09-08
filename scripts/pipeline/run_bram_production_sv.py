@@ -216,7 +216,11 @@ def main():
         repaired_path.replace(model_path)
     model_path.write_text(annotate_bram_memories(model_path.read_text()))
     source_names = list(artifact.provenance["source_memories"])
-    visibility = ['`verilator_config', 'public_flat_rw -module "seq_mem_d1" -var "mem" @(posedge clk)']
+    visibility = [
+        '`verilator_config',
+        'public_flat_rw -module "seq_mem_d1" -var "mem" @(posedge clk)',
+        'public_flat_rw -module "seq_mem_d1_bram" -var "mem" @(posedge clk)',
+    ]
     visibility += [f'public_flat_rd -module "main" -var "{name}"' for name in ("selected_tokens_write_en", "selected_tokens_content_en", "selected_tokens_addr0")]
     (directory / "visibility.vlt").write_text("\n".join(visibility) + "\n")
     (directory / "harness.cpp").write_text(harness(artifact))
