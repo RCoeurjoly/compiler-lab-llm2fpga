@@ -512,6 +512,15 @@ and `done=1`. An initial direct FTDI CSR probe did not return a valid response
 JTAG transaction-framing failure still to be resolved; no inference result is
 claimed.
 
+### 2026-09-08 CSR reset correction
+
+The synthesized top-level CSR reset was corrected to use the BSCAN TAP
+`scan_reset` signal; the previous synthesis-only tie-off left CSR state
+uninitialized. The corrected netlist remapped and rerouted successfully at
+40 MHz, and its bitstream was programmed with `isc_done=1`, `init=1`, and
+`done=1`. Raw USER1 reads still returned an invalid idle pattern, so the CSR
+framing/selection path remains unresolved and inference is not claimed.
+
 Adding Yosys `wreduce` alongside the mux-tree simplification also completed
 quickly but produced byte-for-byte identical packed resource counts (1,898
 CARRY4, 1,027 FDRE, 2,148 LUT1, 1,692 LUT2, 3,053 LUT3, 948 LUT4, 467 LUT5,
