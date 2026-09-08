@@ -375,6 +375,15 @@ generic-cell legalization and points to a nextpnr packing bug or an invalid
 primitive/net invariant in the generated graph. No timing or hardware result
 is inferred from this crash.
 
+The matching nextpnr source defect is in `xilinx/pack.cc`: the
+`pack_constants()` loop dereferences `net.second` without checking for a null
+`NetInfo*`. A minimal downstream patch is recorded at
+`patches/nextpnr-xilinx/0001-skip-null-nets-in-pack-constants.patch`. Building
+that patched fork was not completed in this environment because the available
+Nix development closure lacks Boost development headers/libraries; the patch
+still needs validation in the project toolchain before it can be used for a
+bitstream.
+
 A debugger run confirms the failure is a reproducible SIGSEGV in
 `nextpnr_xilinx::XilinxPacker::pack_constants()`. Post-technology
 `opt_clean; clean` does not change the failure. The crash therefore remains

@@ -1,0 +1,16 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] xilinx: skip null net entries while packing constants
+
+Yosys JSON re-emission can leave erased net slots in the context map. The
+Xilinx constant packer currently dereferences those entries unconditionally,
+causing a deterministic SIGSEGV before placement. Ignore null slots; they do
+not represent a live net and cannot carry a constant driver.
+
+--- a/xilinx/pack.cc
++++ b/xilinx/pack.cc
+@@
+     for (auto net : sorted(ctx->nets)) {
+         NetInfo *ni = net.second;
++        if (ni == nullptr)
++            continue;
+         if (ni->driver.cell != nullptr && ni->driver.cell->type == ctx->id("GND")) {
