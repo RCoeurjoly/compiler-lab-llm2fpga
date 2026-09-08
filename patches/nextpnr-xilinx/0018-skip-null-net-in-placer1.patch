@@ -1,0 +1,8 @@
+--- a/common/placer1.cc
++++ b/common/placer1.cc
+@@
+         decltype(NetInfo::udata) n = 0;
+         for (auto &net : ctx->nets) {
++            if (net.second == nullptr)
++                continue;
+             old_udata.emplace_back(net.second->udata);
