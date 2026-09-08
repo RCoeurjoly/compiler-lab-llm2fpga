@@ -205,3 +205,10 @@ control memories as generic instances. The production SV regenerated in
 `/tmp/regen-pass3/model.sv` contains 287 BRAM-variant references and 14 generic
 instances. Its bounded Verilator execution still did not reach completion, so
 this is a mapping-progress checkpoint, not an inference result.
+
+The staticized image plus the checked-in JTAG CSR/YPCB top also passes
+Yosys-Slang elaboration and reaches `synth_xilinx -family xc7`. The bounded
+technology-mapping run did not emit a netlist or JSON checkpoint; it stopped
+during Xilinx optimization before serialization. Thus frontend legality and
+BRAM inference are improved, but full implementation is still blocked by the
+resource scale of the generated datapath.
