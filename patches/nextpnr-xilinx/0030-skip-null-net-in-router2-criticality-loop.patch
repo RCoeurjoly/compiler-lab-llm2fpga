@@ -1,0 +1,8 @@
+--- a/common/router2.cc
++++ b/common/router2.cc
+@@
+                 get_criticalities(ctx, &net_crit);
+                 for (auto n : route_queue) {
++                    if (nets_by_udata.at(n) == nullptr)
++                        continue;
+                     IdString name = nets_by_udata.at(n)->name;
