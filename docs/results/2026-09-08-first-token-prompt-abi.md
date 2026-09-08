@@ -327,3 +327,26 @@ measurement, the exact 50,257 token scales range from 14,525 to 105,952 and
 therefore require only 17 unsigned bits, versus their current 32-bit storage.
 Distributed-RAM capacity and allocation remain to be checked before selecting
 a physical-memory change. No new RTL/memory-width repair has been made here.
+
+## Lossless physical allocation candidate
+
+The local xc7k480t tilegrid contains 27,150 SLICEM sites: 108,600
+memory-capable LUTs, with 6,950,400 bits of raw 64-bit LUT storage. This is
+an upper bound, not a placement guarantee. The two MLP code memories each
+contain 131,072 eight-bit words; the four token-scale banks each contain
+16,384 thirty-two-bit words. Together they hold 4,194,304 bits.
+
+The checkpoint mapper now selects distributed RAM for these six immutable
+memories, explicitly overriding their BRAM synthesis hints. It does not
+change generated SV, model contents, widths, arithmetic, clocks, memory ports,
+or the two-cycle register staging. The previous seven distributed scratch
+memories retain their policy. The estimated reduction is 128 RAMB36s, from
+1049 to 921 (plus the existing eight half-blocks); this estimate still requires
+fresh synthesis and placement confirmation.
+
+An executable regression first reproduced BRAM allocation under the old
+policy. It now maps all six full-size candidate memory shapes to actual Yosys
+LUTRAM cells, checks retained address/result register widths, and verifies an
+ordinary token-code bank remains BRAM. All 41 targeted tests pass. The full
+generated SV and its two passing simulation runs are unchanged; physical
+implementation and board acceptance are not yet verified for this allocation.

@@ -26,6 +26,15 @@ LUTRAM_NAMES = {
     "ln1_output_q16_16.mem",
     "ln2_output_q16_16.mem",
     "final_output_q16_16.mem",
+    # The exact full model exceeds BRAM capacity by 94 full blocks. These
+    # immutable memories consume 128 BRAMs but fit in available SLICEM RAM.
+    # Keep widths, initialization, ports and register stages unchanged.
+    "c_fc_weight_codes_i8.mem",
+    "c_proj_weight_codes_i8.mem",
+    "token_weight_scale_q8_24_b0.mem",
+    "token_weight_scale_q8_24_b1.mem",
+    "token_weight_scale_q8_24_b2.mem",
+    "token_weight_scale_q8_24_b3.mem",
 }
 
 
@@ -41,17 +50,22 @@ def memory_names(il: Path) -> list[str]:
 
 
 def checkpoint_script(source: Path, destination: Path, name: str, top: str = "main") -> str:
+    use_lutram = any(name.endswith(suffix) for suffix in LUTRAM_NAMES)
     library = (
         "+/xilinx/lutrams_xc5v.txt"
-        if any(name.endswith(suffix) for suffix in LUTRAM_NAMES)
+        if use_lutram
         else "+/xilinx/brams_xc4v.txt -D HAS_SIZE_36 -D HAS_CASCADE -D HAS_MIXWIDTH_SDP"
     )
     # Yosys uses brams_xc4v.txt with these defines for Series 7, paired with
     # brams_xc6v_map.v. Keep read/write ports and width parameters in the native
     # ABI: a TDP port supports at most 36 bits; 72-bit ports require SDP mode.
     selection = f"{top}/\\{name}"
+    # Override only the synthesis hint, not the already verified SV primitive.
+    # Its two-cycle address/result staging is retained by memory_libmap.
+    style = f'setattr -set ram_style "distributed" {selection}\n' if use_lutram else ""
     return (
         f"read_rtlil {source}\n"
+        + style +
         f"memory_libmap -lib {library} {selection}\n"
         f"write_rtlil {destination}\n"
     )
