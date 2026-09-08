@@ -93,6 +93,10 @@ through `stage25.json`); each stage maps one additional forced-BRAM memory and
 remains below 1.35 GiB peak. This establishes a resumable route to a complete
 nextpnr input without repeating the original monolithic pass.
 
+The same process has advanced through `stage30.json` (35 mapped memories in
+total). No stage has reported a mapping error; the work remains bounded by
+per-process runtime and disk checkpointing.
+
 The first nine forced-BRAM memories have now been legalized in successive
 checkpoints (`stage5.il`, `stage6.il`, `stage7one.il`, `stage8one.il`, and
 `stage9one.il`). Each single-memory stage completes without a mapping error;
