@@ -125,3 +125,6 @@ restartable artifacts for the remaining bank set.
 
 It has since advanced through `stage60.json` (65 forced-BRAM memories mapped),
 still with no per-memory mapping errors.
+
+The chain now reaches `stage65.json` (70 forced-BRAM memories mapped), also
+without a mapping error.
