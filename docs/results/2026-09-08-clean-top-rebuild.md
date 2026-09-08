@@ -655,3 +655,34 @@ the unmodified upstream converters. A bounded diagnostic chipdb export is
 running from a symlink overlay of the Kintex database plus those four SDFs.
 Its outputs are explicitly partial and must not be used to claim BRAM/DSP
 timing coverage or full-design closure. The installed chipdb is unchanged.
+
+## Packing and logic-timing diagnostic
+
+The final full-model netlist completed nextpnr packing against the installed
+geometry database: 953/955 RAMB36E1 sites, one RAMB18E1, and 231 DSP48E1.
+`pack-diagnostic.log` reports zero errors and 12,993 warnings, predominantly
+unconnected primitive output nets. This result is not placement/routing
+acceptance, and the warnings have not all been individually qualified.
+
+The separate four-CLB timing database export and assembly both completed.
+The admission checker reports `xc7k480tffg1156-2`, four timed tile types,
+127 wire classes, and 260 pip classes, explicitly with
+`timing_closure_verified=false`. The binary SHA-256 is
+`a96010ce1d1cfa0ac66bc52ba25ff0b77cccdf07d6835dd94eead9afab2d404e`.
+It lives in `/tmp/regen-safe/kintex-timing/clb-diagnostic`, not the installed
+chipdb location.
+
+The unchanged clock/counter probe routes with that database and the same
+constraints/seed 15. Its report now contains the `accelerator_clk` timing
+path through two CARRY4 cells, rather than `No clocks found in design`.
+This confirms that missing logic-cell arcs suppressed paths. The reported
+frequency estimate still inherits the tool's placeholder FF timing and is
+not a qualified silicon limit. Probe artifacts use the prefix
+`clock-probe-clb-timing` in `/tmp/regen-safe/native-static-image`.
+
+A 900-second full-netlist placement/routing diagnostic is now running with
+the new partial database, unchanged constraints, and seed 15. It has passed
+packing and reached analytical placement. Its output prefix is
+`full-clb-diagnostic`; it must not be mistaken for a fully timing-qualified
+bitstream. Read-only USB enumeration also confirms the FT232H programmer
+is present. No device programming or model inference occurred in this step.
