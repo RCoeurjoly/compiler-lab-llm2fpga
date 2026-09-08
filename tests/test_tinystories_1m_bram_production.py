@@ -58,8 +58,10 @@ class BramProductionTest(unittest.TestCase):
         assert spec and spec.loader
         runner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(runner)
-        source = """module seq_mem_d1 #(parameter SIZE=16, parameter WIDTH=8) (input clk);
+        source = """module seq_mem_d1 #(parameter SIZE=16, parameter WIDTH=8, parameter IDX_SIZE=4) (input clk);
   logic [WIDTH-1:0] mem[SIZE-1:0];
+  logic [WIDTH-1:0] read_out;
+  always_ff @(posedge clk) read_out <= mem[addr0];
 endmodule
 seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
 seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small ( .clk(clk) );
@@ -68,6 +70,30 @@ seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small ( .clk(clk) );
         self.assertEqual(result.count('ram_style = "block"'), 1)
         self.assertIn("seq_mem_d1_bram # (.SIZE(2048), .WIDTH(8)) large", result)
         self.assertIn("seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small", result)
+
+    def test_bram_variant_exposes_a_registered_read_address(self):
+        path = ROOT / "scripts/pipeline/run_bram_production_sv.py"
+        spec = importlib.util.spec_from_file_location("bram_sv_runner_addr", path)
+        assert spec and spec.loader
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        source = """module seq_mem_d1 #(parameter SIZE=16, parameter WIDTH=8, parameter IDX_SIZE=4) (input clk);
+  logic [WIDTH-1:0] mem[SIZE-1:0];
+  logic [WIDTH-1:0] read_out;
+  always_ff @(posedge clk) begin
+    if (reset) begin
+      read_out <= '0;
+    end else begin
+      read_out <= mem[addr0];
+    end
+  end
+endmodule
+seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
+"""
+        result = runner.annotate_bram_memories(source)
+        self.assertIn("logic [IDX_SIZE-1:0] read_addr;", result)
+        self.assertIn("read_addr <= addr0;", result)
+        self.assertIn("read_out <= mem[read_addr];", result)
 
     def test_production_futil_removes_audit_memories_and_logits_buffer(self):
         module = load_module()

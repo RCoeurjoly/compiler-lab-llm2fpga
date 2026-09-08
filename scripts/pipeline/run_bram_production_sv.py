@@ -36,6 +36,21 @@ def annotate_bram_memories(source: str) -> str:
         end = source.index("endmodule", start) + len("endmodule")
         body = source[start:end].replace("module seq_mem_d1 #", marker, 1)
         body = body.replace(needle, '  (* ram_style = "block" *)\n' + needle, 1)
+        # Make the address staging explicit for Xilinx BRAM inference.  The
+        # generic Calyx helper registers only read_data, which leaves Yosys
+        # with an asynchronous $mem read port.  Keep the one-cycle contract by
+        # staging the address in the same clocked process as read_out.
+        body = body.replace(
+            "  logic [WIDTH-1:0] read_out;",
+            "  logic [WIDTH-1:0] read_out;\n  logic [IDX_SIZE-1:0] read_addr;",
+            1,
+        )
+        body = body.replace(
+            "  always_ff @(posedge clk) begin\n    if (reset) begin\n      read_out <= '0;",
+            "  always_ff @(posedge clk) begin\n    read_addr <= addr0;\n    if (reset) begin\n      read_addr <= '0;\n      read_out <= '0;",
+            1,
+        )
+        body = body.replace("read_out <= mem[addr0];", "read_out <= mem[read_addr];", 1)
         source = source[:end] + "\n\n" + body + source[end:]
     # Match each parameterized instance and inspect its literal SIZE.  This
     # intentionally leaves non-literal/generated forms untouched.
