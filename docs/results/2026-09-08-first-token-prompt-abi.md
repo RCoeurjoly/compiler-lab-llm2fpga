@@ -282,3 +282,26 @@ Fresh hardware elaboration has started in
 memory-mapping checkpoints. Programming remains gated on repeat simulation
 and implementation checks. No first-token board acceptance or full timing
 qualification is claimed.
+
+### Repeat simulation passed
+
+The same full-model process exited successfully after both reset runs. Each
+selected token 11 at cycle 92,936,273, exposed 11 on the public token port,
+and completed at cycle 92,936,279. The harness also checked that both cycle
+counts and token results are identical. The successful execution receipt is
+`/tmp/tinystories-first-token-lmhead-20260909/production-execution.json`, file
+SHA-256 `a259f298b0c22868c24a2fc7fe27b31f6bf1233a9874bf8a94181a017f612622`.
+
+An independent check authenticated the oracle fixture, compared its
+`artifact_sha256` (not its JSON-file hash) to the receipt, checked the generated
+Futil/SV hashes and memory-latency receipt self-hash, and verified both complete
+event sequences from the log. The runner's existing `elapsed_seconds` field is
+an absolute epoch timestamp, not elapsed runtime; do not use it as a latency
+measurement. Reported cycle counts above are the measured simulation latency.
+
+Fresh elaboration completed successfully. The mapper's inventory is 279
+memories, identical to the previous elaboration; the staged downstream script
+was corrected from a stale 266-checkpoint assumption to consume checkpoint 279.
+Memory mapping is running. These two simulation resets do not count toward
+the three required independent FPGA reconfigurations. All board acceptance
+and the explicitly incomplete accelerator timing coverage remain outstanding.
