@@ -336,3 +336,21 @@ Yosys source elaboration and nextpnr pack-only both pass on the YPCB
 `xc7k480t-ffg1156` database. Full placement currently stops in the CSR control
 plane: the asynchronous JTAG/system-clock state needs explicit FF legalization
 and timing treatment. No routed bitstream or board inference is claimed yet.
+
+The next bounded mapping experiment synthesized the CSR out-of-context (222
+FDREs), then legalized the generated core's synchronous-reset state to FDREs
+and mapped arithmetic to 15,372 MUXCY/XORCY carry cells. The resulting artifact
+packs successfully with 1,128 FDREs, 20,280 LUTs, 14 RAMB18E1s, 38 RAMB36E1s,
+and one physical BSCAN site. Full placement currently terminates after packing
+before a timing report, so this is a pack checkpoint rather than a bitstream or
+hardware result.
+
+The following bounded legalization steps removed the remaining generic
+`$not`, `$logic_*`, `$eq`, `$ne`, `$mux`, `$fa`, and `$and` cells from the
+nextpnr input. Full-adder expansion and boolean legalization substantially
+increase the mapped combinational netlist (the last artifact contains about
+95k LUTs). Deterministic pack-only and low-frequency placement now exhaust the
+host memory budget (exit 137) before producing a placement or timing report.
+This identifies netlist expansion/placer memory, rather than BRAM or BSCAN,
+as the current implementation blocker; no bitstream or hardware inference is
+claimed.
