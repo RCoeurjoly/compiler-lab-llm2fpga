@@ -414,6 +414,11 @@ setup before another SIGSEGV. Routing therefore remains unverified even at the
 31 MHz diagnostic target; the null-net cleanup must continue through the
 router before any FASM or bitstream artifact can be trusted.
 
+The next router2 bisect identifies the first setup dereference in
+`common/router2.cc::setup_nets()`. A corresponding guard is recorded in
+`patches/nextpnr-xilinx/0004-skip-null-nets-in-router2-setup.patch`; the full
+routed flow still needs revalidation after applying it.
+
 A debugger run confirms the failure is a reproducible SIGSEGV in
 `nextpnr_xilinx::XilinxPacker::pack_constants()`. Post-technology
 `opt_clean; clean` does not change the failure. The crash therefore remains

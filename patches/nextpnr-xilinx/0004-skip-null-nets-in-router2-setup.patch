@@ -1,0 +1,13 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] common: skip null nets while initializing router2
+
+Avoid dereferencing erased net slots when constructing router per-net state.
+
+--- a/common/router2.cc
++++ b/common/router2.cc
+@@
+         for (auto net : sorted(ctx->nets)) {
+             NetInfo *ni = net.second;
++            if (ni == nullptr)
++                continue;
+             ni->udata = i;
