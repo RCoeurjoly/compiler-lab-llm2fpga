@@ -984,7 +984,15 @@ def _gemv_phase(
           {prefix}_increment_row_counter;
         }}
       }}"""
-    if not narrow_products:
+    if narrow_products:
+        # Keep the scale adapter driven in the same group as its consumer.
+        # The production path otherwise multiplies by an undriven value.
+        wires[0] = wires[0].replace(
+            f"group {prefix}_scale_activation {{\n",
+            f"group {prefix}_scale_activation {{\n      {prefix}_scale_signed.in = {scales}.read_data;\n",
+            1,
+        )
+    else:
         cells = [cell for cell in cells if not any(
             cell.startswith(f"{prefix}_{name} =")
             for name in ("scale_signed", "activation_scale_wide", "mac_wide")

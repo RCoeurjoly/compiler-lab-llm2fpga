@@ -672,7 +672,7 @@ import "primitives/memories/seq.futil";
         "source_memories": sources,
         "hardware_owned_memories": sorted(set(re.findall(r"@external (\w+) =", futil)) - set(sources)),
         "feedback": "greedy_last_real_row -> context_tokens[context_length] -> token_embedding",
-        "claims": {"compiler_owned_control": True, "existing_arithmetic_generators_modified": False, "sv_execution_verified": False, "board_executed": False, "board_fit_verified": False},
+        "claims": {"compiler_owned_control": True, "existing_arithmetic_generators_modified": production, "sv_execution_verified": False, "board_executed": False, "board_fit_verified": False},
         "production_memory_contract": {"audit_checkpoint_memories": [] if production else ["model_embedding", "model_token_embedding", "model_position_embedding", "model_block_outputs", "model_final_ln", "model_logits"], "full_logits_storage": not production, "streamed_argmax": True},
     }
     provenance["schedule"]["generation_steps"] = generation_steps

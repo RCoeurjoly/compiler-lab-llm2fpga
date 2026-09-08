@@ -123,3 +123,26 @@ The original declaration fails; the corrected declaration produces exactly
 targeted tests pass. This proves the focused repair, not full-model inference.
 The candidate physical build was stopped after the original simulation failure;
 its partial checkpoints remain preserved and must not be reused for the repair.
+
+## Narrowed GEMV scale connection (September 9)
+
+With the latency correction, the first LayerNorm now matches the authenticated
+hash `31f31df11ae9bf6e0ccf1df09b98157a8723c4684c5ce96c673683687bb0ef34`
+at cycle 57,199. Q-input quantization also matches exactly. Q-output and its
+MAC accumulator are zero, however; weight and output scales match the fixture.
+
+Inspection of the generated Futil identified an undriven
+`q_gemv_scale_signed.in`. The narrowed GEMV generator instantiated the adapter
+and consumed its output without connecting the activation-scale memory. The
+wide path bypasses that adapter. The production fix adds that one connection
+inside the consuming group; the wide-path Futil hash remains unchanged.
+Production provenance now acknowledges changes to an existing arithmetic
+generator instead of retaining its previous blanket denial.
+
+An executable Calyx/SV regression uses the first four actual query-input codes,
+activation scales and weight codes. The unfixed narrowed MAC yields unknown
+data in Icarus; the corrected MAC and all 16 test output entries equal the
+hand-derived signed result `-3046697736`. All 36 targeted tests passed before
+full-model revalidation. This does not claim that query projection or inference
+has passed on the repaired full model. The obsolete latency-only full run was
+terminated after localizing this second defect, with its artifacts preserved.
