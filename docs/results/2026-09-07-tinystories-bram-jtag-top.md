@@ -445,3 +445,9 @@ path crashes. The guard is recorded in
 With the route-net guard, router2 reaches zero overuse and then crashes while
 collecting runtime statistics from a null `nets_by_udata` entry. The guard is
 recorded in `patches/nextpnr-xilinx/0008-skip-null-router-runtime-entries.patch`.
+
+With all router2 guards rebuilt, routing reaches zero overuse and router1
+reports `Routing complete` with zero arcs remaining. The debug
+`checkRoutedDesign()` assertion then crashes on another erased-net invariant;
+the router1 null-net guard is recorded in
+`patches/nextpnr-xilinx/0009-router1-skip-null-net.patch`.
