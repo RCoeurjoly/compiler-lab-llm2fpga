@@ -1,0 +1,10 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] router2: skip null entries during bind/check
+
+--- a/common/router2.cc
++++ b/common/router2.cc
+@@
+         for (auto net : nets_by_udata) {
++            if (net == nullptr)
++                continue;
+ #ifdef ARCH_ECP5

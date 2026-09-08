@@ -432,6 +432,11 @@ timing-queue criticality update. A bounds/null guard is recorded in
 `patches/nextpnr-xilinx/0005-skip-null-router-queue-entries.patch`. Routing and
 timing still require a clean completion.
 
+Router2 now reaches `bind_and_check_all()` after three low-overuse iterations;
+the next backtrace found null entries in `nets_by_udata` during route binding.
+The guard is recorded in
+`patches/nextpnr-xilinx/0007-skip-null-router-check-net.patch`.
+
 After adding the `route_net()` null guard and rebuilding, router2 performs
 three routing iterations (overuse 10,849 → 277 → 4) before a later completion
 path crashes. The guard is recorded in
