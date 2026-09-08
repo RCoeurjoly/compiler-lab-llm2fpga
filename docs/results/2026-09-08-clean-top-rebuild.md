@@ -316,3 +316,9 @@ All 266 chained checkpoints now complete. The first final primitive map still
 reports 962 RAMB36E1 blocks; the checked-in annotator now emits a separate
 LUTRAM variant for the seven 64×512 scratch buffers, targeting the previously
 measured 955-RAMB36E1 fit before the next regeneration.
+
+The replayed LUTRAM-aware chain reaches all 266 checkpoints, but final techmap
+still reports 962 physical RAMB36E1s: the XC5V LUTRAM descriptor emits
+width-3 slice cells that its physical map does not currently legalize. The
+remaining implementation task is therefore a descriptor/packing repair (or
+explicit RAM64M packing), before nextpnr can be meaningfully attempted.
