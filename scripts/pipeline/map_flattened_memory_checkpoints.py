@@ -40,16 +40,16 @@ def memory_names(il: Path) -> list[str]:
     return names
 
 
-def checkpoint_script(source: Path, destination: Path, name: str) -> str:
+def checkpoint_script(source: Path, destination: Path, name: str, top: str = "main") -> str:
     library = (
         "/nix/store/cbqyfg8bas2yvlk2hf81g4p5sgqxb6r0-yosys-0.66/share/yosys/"
         "xilinx/lutrams_xc5v.txt"
-        if name in LUTRAM_NAMES
+        if any(name.endswith(suffix) for suffix in LUTRAM_NAMES)
         else "/tmp/yosys-data2/xilinx/brams_xc7.txt"
     )
     # The flattened module is main; the leading backslash is RTLIL's escaped
     # identifier syntax and is accepted by Yosys's selection grammar.
-    selection = f"main/\\{name}"
+    selection = f"{top}/\\{name}"
     return (
         f"read_rtlil {source}\n"
         f"memory_libmap -lib {library} {selection}\n"
@@ -62,6 +62,7 @@ def main() -> None:
     parser.add_argument("input", type=Path, help="flattened, memory_dff-normalized RTLIL")
     parser.add_argument("output_dir", type=Path)
     parser.add_argument("--yosys", default="yosys")
+    parser.add_argument("--top", default="main")
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument("--limit", type=int, default=0, help="map at most this many new memories")
     args = parser.parse_args()
@@ -80,7 +81,7 @@ def main() -> None:
         if args.limit and completed >= args.limit:
             break
         with tempfile.NamedTemporaryFile("w", suffix=".ys", delete=False) as script:
-            script.write(checkpoint_script(previous, destination, name))
+            script.write(checkpoint_script(previous, destination, name, args.top))
             script_path = Path(script.name)
         try:
             try:
