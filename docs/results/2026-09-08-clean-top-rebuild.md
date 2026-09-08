@@ -329,3 +329,19 @@ residual tiny-memory expansion, ABC9 enters technology mapping but exceeds the
 bounded host-memory run while handling roughly 871k AND gates. The fit is
 therefore established at the memory-primitive level; the remaining boundary is
 logic legalization/ABC9 scale before nextpnr placement.
+
+## 2026-09-08 bounded regeneration checkpoint
+
+The width-repair hook now preserves the original signed multiply expression
+for `WIDTH != 64`; it cannot silently replace the 40/48-bit specializations
+with a zero result.  The full regenerated SystemVerilog elaborates through
+Yosys-Slang in a bounded run.  Its generated hierarchy is flattened into
+`main` plus specialized `seq_mem_d1_*` modules, so the earlier memory mapping
+script that selected `core.*` objects is not applicable verbatim.
+
+The production Verilator harness builds, but does not reach its `done` event
+within the existing cycle bound.  That run was terminated and is diagnostic
+only; no inference result or bitstream claim is made.  The next gate is a
+hierarchy-aware primitive mapping pass, followed by bounded logic
+legalization and nextpnr.  Board programming remains intentionally blocked
+until those gates pass.
