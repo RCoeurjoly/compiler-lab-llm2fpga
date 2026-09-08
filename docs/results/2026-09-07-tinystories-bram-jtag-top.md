@@ -402,6 +402,13 @@ null-net crash, so no routed bitstream is claimed. The required next change is
 datapath pipelining or structural shortening to recover the 100 MHz margin,
 not weakening the board constraint.
 
+The routed diagnostic subsequently exposed another null-net dereference in
+`xilinx/arch.cc::findSourceSinkLocations()` after global-clock routing began.
+The local guard lets the run pass placement and reach routing, but a later
+route-stage crash remains. This confirms that the current generated JSON
+exercises multiple erased-net paths in the downstream nextpnr fork; a routed
+FASM/bitstream is still not available.
+
 A debugger run confirms the failure is a reproducible SIGSEGV in
 `nextpnr_xilinx::XilinxPacker::pack_constants()`. Post-technology
 `opt_clean; clean` does not change the failure. The crash therefore remains
