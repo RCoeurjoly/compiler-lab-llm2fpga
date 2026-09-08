@@ -425,3 +425,9 @@ A debugger run confirms the failure is a reproducible SIGSEGV in
 an implementation-tool primitive/net invariant issue, not a timing violation;
 the generated artifact is not yet eligible for placement or bitstream
 generation.
+
+After applying and rebuilding the router2 setup guard, routing reaches its
+main loop; the next backtrace identifies a null `nets_by_udata` entry in the
+timing-queue criticality update. A bounds/null guard is recorded in
+`patches/nextpnr-xilinx/0005-skip-null-router-queue-entries.patch`. Routing and
+timing still require a clean completion.
