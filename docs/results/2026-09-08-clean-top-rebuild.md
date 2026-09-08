@@ -250,3 +250,12 @@ explicit primitive direction metadata, nextpnr reaches the 30 MHz placer with
 refinement starts, but the bounded run stops before routing or output files are
 written. Timing closure and bitstream generation therefore remain unverified;
 the remaining limit is placer/resource scale, not PCIe, DDR3, or JTAG logic.
+
+## BRAM-capacity tradeoff probe
+
+Leaving seven 64-bit × 512-word scratch buffers out of BRAM reduces the
+physical count from 962 to exactly 955 RAMB36E1s, matching the device limit.
+However, Yosys lowers those buffers to FF/mux logic, producing approximately
+1.62 million AND gates; ABC9 cannot complete within the bounded host-memory
+run. The capacity tradeoff therefore fits BRAM numerically but is not a viable
+implementation strategy without a LUTRAM or state-partitioning representation.
