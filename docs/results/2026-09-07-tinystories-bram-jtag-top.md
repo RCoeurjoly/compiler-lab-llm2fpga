@@ -521,6 +521,10 @@ uninitialized. The corrected netlist remapped and rerouted successfully at
 `done=1`. Raw USER1 reads still returned an invalid idle pattern, so the CSR
 framing/selection path remains unresolved and inference is not claimed.
 
+The reset-corrected replacement bitstream is `tinystories-resetfix-40.bit`
+(SHA-256
+`0b51151cb9d43d26c92df16f1759b760ffc17ec2ca76d010ec219b3faceaf0ac`).
+
 Adding Yosys `wreduce` alongside the mux-tree simplification also completed
 quickly but produced byte-for-byte identical packed resource counts (1,898
 CARRY4, 1,027 FDRE, 2,148 LUT1, 1,692 LUT2, 3,053 LUT3, 948 LUT4, 467 LUT5,
