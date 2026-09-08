@@ -222,3 +222,10 @@ small residual memories totaling 68 bits. A subsequent `synth_xilinx` attempt
 reaches its built-in BRAM techmap but rejects the custom primitive on a missing
 `PORT_A_USED` defparam. The remaining work is therefore to reconcile the
 custom XC7 BRAM descriptor with the synthesis techmap before placement.
+
+A bounded compatibility probe confirms the fix direction: renaming the
+generated read-width/read-used parameters to the XC7 techmap ABI allows all
+962 cells to techmap to `RAMB36E1` while preserving BSCANE2 and the three tiny
+FF-mapped memories. This compatibility map is currently an external
+checkpoint; it must be integrated into the reproducible synthesis flow before
+claiming a board-ready bitstream.
