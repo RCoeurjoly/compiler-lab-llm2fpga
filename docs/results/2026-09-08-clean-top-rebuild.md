@@ -235,3 +235,11 @@ The transform is now reproducible through
 and is covered by two unit tests. Applied to Yosys 0.66's XC7-compatible map,
 it performs 14 ABI substitutions and reproduces the validated compatibility
 map byte-for-byte.
+
+With Xilinx primitive port directions attached from `cells_sim.v`, the rebuilt
+nextpnr-xilinx executable starts and consumes the mapped JSON. It places the
+BRAM/BSCAN portion, then stops at generic `$or` cells with no matching BEL.
+Applying a naïve global Yosys `techmap` expands the design to about 1.4 million
+cells; the bounded coarse LUT-mapping stage exceeds the host memory ceiling
+before emitting JSON. The next required step is staged LUT mapping, not
+another transport or CSR change.
