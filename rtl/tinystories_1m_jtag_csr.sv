@@ -75,17 +75,24 @@ module tinystories_1m_jtag_csr #(
   assign prompt_3 = prompt_words[3];
   assign scan_tdo = scan_shift_reg[0];
 
-  // JTAG clock domain: capture a response and shift/update one command.
+  // DRCK clocks only Capture/Shift. It is held high during Update-DR.
   always @(posedge scan_drck or posedge scan_reset) begin
     if (scan_reset) begin
       scan_shift_reg <= 64'd0;
-      command_word <= 64'd0;
-      command_toggle <= 1'b0;
     end else if (scan_sel && scan_capture) begin
       scan_shift_reg <= response_word;
     end else if (scan_sel && scan_shift) begin
       scan_shift_reg <= {scan_tdi, scan_shift_reg[63:1]};
-    end else if (scan_update) begin
+    end
+  end
+
+  // Latch the stable shifted command on the primitive's UPDATE edge. Waiting
+  // for a DRCK edge here loses the transaction on actual BSCANE2 hardware.
+  always @(posedge scan_update or posedge scan_reset) begin
+    if (scan_reset) begin
+      command_word <= 64'd0;
+      command_toggle <= 1'b0;
+    end else if (scan_sel) begin
       command_word <= scan_shift_reg;
       command_toggle <= ~command_toggle;
     end

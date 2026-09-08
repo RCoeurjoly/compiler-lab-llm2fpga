@@ -428,7 +428,7 @@ hash and word count and for the resulting SV hash.
 
 The initialized source imported successfully without `--ignore-initial`,
 including `proc`, `opt`, and `memory_dff`. Its final RTLIL contains 266
-memories, 233 `$meminit_v2` cells after optimization, and BSCANE2 with
+memories, 233 `$meminit` cells after optimization, and BSCANE2 with
 `JTAG_CHAIN=1`, `DISABLE_JTAG="FALSE"`. This demonstrates preservation of
 initialization through import, not complete end-to-end image verification.
 The next mapping must use this initialized input, not `base-good.il`.
@@ -440,3 +440,31 @@ Artifacts under `/tmp/regen-safe/native-static-image/`:
 - generated SV SHA-256: `cf3c83638502769966e5c26efaff7c4ec08ee1f73ad03764b45b3980b862b3ad`;
 - static SV SHA-256: `b030e34d96901fd7e04c00f8679c457cc59d26c4906c1d41d6e3e96d46525b93`;
 - `import.ys`, `import.log`, and `initialized-base.il` record the import.
+
+## Reproduced lost USER1 command and UPDATE-edge repair
+
+Re-emitting the preserved Futil with Calyx and applying the checked-in
+multiply repair and memory annotation reproduced `model.sv` byte-for-byte
+(`cf3c8363…`). Regenerating the Futil from the checked-in compiler also
+matched (`85352d062b3a57bf2eb02597318cea601787a2949ff0847d99db8b740d58030c`).
+
+The installed vendor BSCANE2 simulation model gates DRCK with TCK during
+Capture/Shift and holds it high while selected outside those states. UPDATE
+is a separate output. The checked-in CSR sampled UPDATE only inside its
+`posedge scan_drck` process. There is no DRCK rising edge during Update-DR,
+so it loses commands under that primitive behavior.
+
+`tests/rtl/tinystories_jtag_csr_tb.sv` reproduces this behavior without starting
+the accelerator. With the old command-capture logic it fails on the first
+status command with response `0000000000000000`. With command capture on
+`posedge scan_update`, the identical test passes three status/prompt/reset
+sequences, checking serial response bits, all four prompt registers and reset
+pulses. The existing command encoding and USER1 selection are unchanged.
+The prompt test explicitly respects the existing overlapping index/value
+bits; it does not claim arbitrary prompt encoding or model inference.
+
+Validation used Icarus Verilog 13.0 (`-g2012 -DBSCAN_SIM`) with the checked-in
+testbench and CSR; all 13 production contract tests also passed. The previous
+initialized mapping run contains the old CSR and cannot be used for the
+replacement bitstream. The full model must be imported and mapped with the
+corrected CSR. Hardware confirmation remains pending.
