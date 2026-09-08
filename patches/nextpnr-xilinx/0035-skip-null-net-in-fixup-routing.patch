@@ -1,0 +1,8 @@
+--- a/xilinx/arch_place.cc
++++ b/xilinx/arch_place.cc
+@@
+     for (auto net : sorted(nets)) {
+         NetInfo *ni = net.second;
++        if (ni == nullptr)
++            continue;
+         for (auto &wire : ni->wires) {
