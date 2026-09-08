@@ -1,0 +1,22 @@
+import "primitives/core.futil";
+import "primitives/memories/seq.futil";
+component main(@go go: 1) -> (@done done: 1, result: 64) {
+  cells {
+    memory = seq_mem_d1(64, 512, 9);
+    sum = std_reg(64);
+    add = std_add(64);
+  }
+  wires {
+    result = sum.out;
+    group clear { sum.in = 64'd0; sum.write_en = 1'd1; clear[done] = sum.done; }
+    group r0 { memory.addr0 = 9'd0; memory.content_en = 1'd1; r0[done] = memory.done; }
+    group r1 { memory.addr0 = 9'd1; memory.content_en = 1'd1; r1[done] = memory.done; }
+    group r2 { memory.addr0 = 9'd2; memory.content_en = 1'd1; r2[done] = memory.done; }
+    group r3 { memory.addr0 = 9'd3; memory.content_en = 1'd1; r3[done] = memory.done; }
+    group accumulate {
+      add.left = sum.out; add.right = memory.read_data;
+      sum.in = add.out; sum.write_en = 1'd1; accumulate[done] = sum.done;
+    }
+  }
+  control { seq { clear; r0; accumulate; r1; accumulate; r2; accumulate; r3; accumulate; } }
+}

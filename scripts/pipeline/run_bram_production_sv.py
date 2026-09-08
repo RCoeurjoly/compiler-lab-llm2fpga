@@ -22,6 +22,48 @@ LUTRAM_MEMORIES = {
 }
 
 
+def prepare_production_library(install: Path, directory: Path) -> Path:
+    """Declare the latency of the production SV memory post-pass to Calyx.
+
+    Large memories gain an address stage; small memories retain one-cycle
+    hardware but safely hold their result for the conservative two-cycle
+    schedule. This private metadata overlay never modifies installed RTL.
+    """
+    source = install / "share/calyx"
+    declaration = source / "primitives/memories/seq.futil"
+    original = declaration.read_text()
+    start = original.index("  primitive seq_mem_d1[")
+    end = original.index("  primitive seq_mem_d2[")
+    d1 = original[start:end]
+    if d1.count("@interval(1)") != 1:
+        raise ValueError("unexpected seq_mem_d1 latency declaration")
+    modified = original[:start] + d1.replace("@interval(1)", "@interval(2)") + original[end:]
+    modified = "// Production override: seq_mem_d1 scheduled for two cycles.\n" + modified
+    # Create writable private directories, not copytree's read-only Nix modes.
+    # Unlink only the private declaration; never write through a store link.
+    directory.mkdir()
+    for entry in source.rglob("*"):
+        destination = directory / entry.relative_to(source)
+        if entry.is_dir():
+            destination.mkdir(parents=True, exist_ok=True)
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.symlink_to(entry.resolve())
+    target = directory / "primitives/memories/seq.futil"
+    target.unlink()
+    target.write_text(modified)
+    receipt = {
+        "schema": "tinystories-production-memory-latency-v1",
+        "seq_mem_d1_schedule_cycles": 2,
+        "installed_declaration_sha256": hashlib.sha256(original.encode()).hexdigest(),
+        "production_declaration_sha256": hashlib.sha256(modified.encode()).hexdigest(),
+        "memory_rtl_modified": False,
+    }
+    receipt["receipt_sha256"] = hashlib.sha256(json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    (directory / "production-memory-latency.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    return directory
+
+
 def annotate_bram_memories(source: str) -> str:
     """Preserve the production memory contract through Calyx SV emission.
 
@@ -46,9 +88,9 @@ def annotate_bram_memories(source: str) -> str:
         body = source[start:end].replace("module seq_mem_d1 #", marker, 1)
         body = body.replace(needle, '  (* ram_style = "block" *)\n' + needle, 1)
         # Make the address staging explicit for Xilinx BRAM inference.  The
-        # generic Calyx helper registers only read_data, which leaves Yosys
-        # with an asynchronous $mem read port.  Keep the one-cycle contract by
-        # staging the address in the same clocked process as read_out.
+        # generic Calyx helper registers only read_data. The extra address
+        # stage changes the read latency to two cycles, which must be declared
+        # before scheduling through prepare_production_library.
         body = body.replace(
             "  logic [WIDTH-1:0] read_out;",
             "  logic [WIDTH-1:0] read_out;\n  logic [IDX_SIZE-1:0] read_addr;\n  logic read_pending;",
@@ -234,7 +276,8 @@ def main():
     (directory / "model.futil").write_text(artifact.futil)
     (directory / "provenance.json").write_text(json.dumps(artifact.provenance, indent=2) + "\n")
     install = Path(subprocess.check_output(["nix", "build", "--no-link", "--print-out-paths", ".#calyx"], cwd=ROOT, text=True).strip())
-    subprocess.run([str(install / "bin/calyx"), str(directory / "model.futil"), "-l", str(install / "share/calyx"), "-d", "cell-share", "-b", "verilog", "--synthesis", "--nested", "-o", str(directory / "model.sv")], cwd=ROOT, check=True)
+    library = prepare_production_library(install, directory / "calyx-library")
+    subprocess.run([str(install / "bin/calyx"), str(directory / "model.futil"), "-l", str(library), "-d", "cell-share", "-b", "verilog", "--synthesis", "--nested", "-o", str(directory / "model.sv")], cwd=ROOT, check=True)
     model_path = directory / "model.sv"
     # Keep the experimental multiply repair opt-in until the Slang frontend
     # preserves its bounded operand widths during full-top elaboration.
@@ -258,6 +301,7 @@ def main():
     subprocess.run(["verilator", "--cc", "--exe", "--build", "-j", "8", "--top-module", "main", "--Mdir", str(build), "-CFLAGS", "-std=c++17 -O3", "-o", "production_harness", str(directory / "visibility.vlt"), str(directory / "model.sv"), str(directory / "harness.cpp")], cwd=ROOT, check=True)
     result = subprocess.run([str(build / "production_harness"), str(directory)], cwd=ROOT, text=True, check=True)
     receipt = {"status": "passed", "generation_steps": args.generation_steps, "oracle_sha256": artifact.provenance["oracle_sha256"], "futil_sha256": artifact.provenance["futil_sha256"], "sv_sha256": hashlib.sha256((directory / "model.sv").read_bytes()).hexdigest(), "elapsed_seconds": time.time()}
+    receipt["memory_latency_receipt_sha256"] = json.loads((library / "production-memory-latency.json").read_text())["receipt_sha256"]
     (directory / "production-execution.json").write_text(json.dumps(receipt, indent=2) + "\n")
 
 

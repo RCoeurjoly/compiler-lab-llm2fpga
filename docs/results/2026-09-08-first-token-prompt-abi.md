@@ -63,7 +63,8 @@ tests passed.
 
 The full-model SV run is in `/tmp/tinystories-first-token-sv-20260908`, with log
 `/tmp/tinystories-first-token-sv-20260908.log`, under a 1,800-second outer bound.
-It has entered actual cycle execution; no completion claim is made here.
+It failed with token 0 at cycle 92,688,197; expected token 11. The first-run
+failure is preserved. No second run or board test passed.
 
 Full generated-SV execution, a new physical build, and three
 independent FPGA reconfigurations with exact first-token inference remain
@@ -91,3 +92,34 @@ BUFGs and one MMCME2_ADV. The new RTLIL hash is
 All 240 static source image records and file hashes match the accepted baseline.
 Memory mapping uses the fresh `/tmp/tinystories-first-token-map-20260908`
 checkpoint directory; it does not reuse earlier top-level RTLIL snapshots.
+
+## Localized memory-latency repair
+
+The failing model's embedding output matches the authenticated hash
+`1d6a6b51026506667795de7fd0c4b5d94646aa066b4f7cfe37e69b28829bbcde`
+at cycle 8,344. Block 0 diverges, and its first LayerNorm output already differs
+at cycle 55,071 (observed `bb3087ad033687d744b6576a9744a17f82b7156b3955dc5ce80858166708b95d`).
+The attention fixture verifier passed before comparing its LayerNorm values.
+
+The unchanged compiled model's cycle trace shows a read of address 1 at cycle
+8,367, followed by accumulation at 8,368 while read data is still 17646 and
+`done` is low. Every column contributes 17646; the sum becomes 1129344.
+Calyx declares `seq_mem_d1` with `@interval(1)`, while the production SV
+post-pass inserts an address register and delays `done`: a two-cycle operation.
+Static scheduling consequently consumes the data too early.
+
+Production compilation now creates a private Calyx-library overlay declaring
+`seq_mem_d1` as `@interval(2)` before scheduling. The installed library and
+memory RTL remain unchanged. Small one-cycle memories retain their result
+through this conservative two-cycle schedule. A hashed overlay receipt binds
+the original and replacement declarations, and successful execution receipts
+bind that receipt. Use the production runner to compile the staged-memory
+image; bare generic Calyx lowering is not equivalent.
+
+The permanent regression compiles the first four real embedding values through
+Calyx and the production memory post-pass, then executes the SV with Icarus.
+The original declaration fails; the corrected declaration produces exactly
+`-4243`. The test also verifies the installed declaration is unchanged. All 35
+targeted tests pass. This proves the focused repair, not full-model inference.
+The candidate physical build was stopped after the original simulation failure;
+its partial checkpoints remain preserved and must not be reused for the repair.
