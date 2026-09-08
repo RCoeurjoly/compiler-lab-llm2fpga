@@ -1,0 +1,12 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] router2: ignore null route-net work items
+
+--- a/common/router2.cc
++++ b/common/router2.cc
+@@
+     bool route_net(ThreadContext &t, NetInfo *net, bool is_mt)
+     {
++        if (net == nullptr)
++            return true;
+ 
+ #ifdef ARCH_ECP5
