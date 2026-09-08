@@ -260,3 +260,25 @@ counter and loop limit are bounded; the generated bank addressing, reads,
 arithmetic and argmax are executed unchanged. All 40 targeted tests pass.
 Fresh full-model first-token simulation is the next gate; these regressions
 are not full-model or board-inference acceptance.
+
+## First exact full-model simulation token
+
+At source commit `4d782f6`, the fresh full-model run in
+`/tmp/tinystories-first-token-lmhead-20260909` selected token **11** at cycle
+92,936,273. The harness subsequently started run 1, which is possible only
+after run 0 reaches done, observes exactly one token commit, and checks both
+the selected-token memory and public token output against 11. The second
+reset run is still pending; this is not yet a two-run execution receipt.
+
+Generated Futil SHA-256:
+`e422c0093658d376e23510dea1a8375a87c0df10292d9a237454c862dc49fecc`.
+Generated SV SHA-256:
+`7e359dfd4ea1e78bdd141eeba52cc779d3698fb38b279def96e72a72188fc8b5`.
+The static-image manifest self-hash is
+`9016997551d6a963af0c24903eeb7a219b15cd50bcd8e0b82de050fa10346149`;
+all 240 immutable image records and file hashes match the accepted baseline.
+Fresh hardware elaboration has started in
+`/tmp/tinystories-first-token-lmhead-static-20260909`, without reusing old
+memory-mapping checkpoints. Programming remains gated on repeat simulation
+and implementation checks. No first-token board acceptance or full timing
+qualification is claimed.
