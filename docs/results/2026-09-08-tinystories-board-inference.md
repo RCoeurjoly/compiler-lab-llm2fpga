@@ -19,6 +19,13 @@ must explicitly bind command bit ordering to the RTL ABI. The existing kev-gpt
 packet transport remains unchanged; no transport or RTL fix is accepted by
 this checkpoint.
 
+Inspection of the exact netlist used for this temporary bitstream found that
+its `BSCANE2` cell had an empty parameter map (including no `JTAG_CHAIN`). The
+checked-in RTL does specify `JTAG_CHAIN=1`, so this bitstream is not sufficient
+evidence that the intended USER1 configuration reached the device. A direct
+reroute after manually restoring that parameter hit the unpatched nextpnr
+null-net abort; it did not produce a replacement bitstream.
+
 ## Remaining gate
 
 Resolve and verify physical USER1 selection/capture for the compiler top, then
