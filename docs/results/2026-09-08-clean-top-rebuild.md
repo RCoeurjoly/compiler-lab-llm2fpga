@@ -305,3 +305,9 @@ expects pre-synthesis memory hierarchy names that `--synthesis --nested` no
 longer emits; this is a harness ABI issue, not an inference result. The next
 implementation step is to map the 93 bounded multipliers and update the
 harness visibility contract before any board programming.
+
+Resumable `memory_libmap` checkpoints for the bounded top now complete through
+60 of 266 memories. The checkpoints are chained (each consumes the previous
+bounded IL), so this is implementation progress rather than independent
+synthetic probes; primitive legalization and placement remain after the final
+checkpoint.
