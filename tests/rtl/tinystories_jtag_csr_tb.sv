@@ -10,14 +10,15 @@ module tinystories_jtag_csr_tb;
   wire [15:0] p0, p1, p2, p3;
   wire [63:0] response;
   integer reset_pulses = 0;
+  reg allow_start = 0, core_done = 0;
   always @(posedge clk) begin
     if (core_reset) reset_pulses <= reset_pulses + 1;
-    if (start) $fatal(1, "CSR-only test must never start inference");
+    if (start && !allow_start) $fatal(1, "CSR-only phase must never start inference");
   end
   tinystories_1m_jtag_csr dut (
     .sys_clk(clk), .sys_rst(reset), .core_start(start), .core_reset(core_reset),
     .core_valid(valid), .core_token_index(index), .prompt_0(p0), .prompt_1(p1),
-    .prompt_2(p2), .prompt_3(p3), .core_token_id(16'd0), .core_done(1'b0),
+    .prompt_2(p2), .prompt_3(p3), .core_token_id(index ? 16'd612 : 16'd11), .core_done(core_done),
     .model_init_done(1'b1), .response_word(response), .tap_reset(tap_reset),
     .scan_drck(drck), .scan_reset(reset), .scan_sel(sel), .scan_shift(shift),
     .scan_capture(capture), .scan_update(update), .scan_tdi(tdi), .scan_tdo(tdo)
@@ -61,7 +62,26 @@ module tinystories_jtag_csr_tb;
       if ({p0,p1,p2,p3} !== 64'd0 || valid) $fatal(1, "reset failed");
     end
     if (reset_pulses != 3) $fatal(1, "expected three reset pulses");
-    $display("PASS: three status/prompt/reset sequences with BSCANE2 DRCK behavior");
+    allow_start = 1;
+    transaction(64'h2000000000000000, received);
+    repeat (20) begin
+      @(negedge clk);
+      if (!start || !valid) $fatal(1, "Calyx requires START held until done");
+    end
+    core_done = 1;
+    @(negedge clk);
+    if (start || valid) $fatal(1, "START not released on completion");
+    core_done = 0;
+    transaction(64'h3000000000000000, received);
+    transaction(64'h4000000000000000, received);
+    if (received !== 64'h2c00000000000000) $fatal(1, "completion not latched");
+    transaction(64'h3000000000000000, received);
+    if (received !== 64'd11) $fatal(1, "first token readback failed");
+    transaction(64'h2000000000000000, received);
+    if (!start || !valid) $fatal(1, "second START failed");
+    transaction(64'h5000000000000000, received);
+    if (start || valid) $fatal(1, "reset did not cancel held START");
+    $display("PASS: prompt/readback/reset and held START/completion with BSCANE2 DRCK behavior");
     $finish;
   end
   initial begin #1000000; $fatal(1, "timeout"); end

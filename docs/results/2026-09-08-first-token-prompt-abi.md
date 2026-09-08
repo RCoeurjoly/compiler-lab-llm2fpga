@@ -146,3 +146,21 @@ hand-derived signed result `-3046697736`. All 36 targeted tests passed before
 full-model revalidation. This does not claim that query projection or inference
 has passed on the repaired full model. The obsolete latency-only full run was
 terminated after localizing this second defect, with its artifacts preserved.
+
+## Core START handshake
+
+The scale-connected full-model replay now matches Q-input, Q-MAC accumulator,
+and Q-output fixture hashes exactly. Block 0 still differs and remains under
+checkpoint investigation; there is no full-token success claim.
+
+A separate bounded replay used the board CSR's one-cycle START pulse: it did
+not reach the embedding checkpoint within 100,000 cycles. The otherwise
+identical replay with START held high reached the exact embedding checkpoint
+at cycle 8,871. The Calyx top requires its go input held through execution.
+
+The CSR now retains `core_start` after the existing one-cycle valid/start
+ordering delay and releases it on completion or reset. No JTAG opcode, packet,
+clock, or CDC transport change is involved. The actual CSR RTL regression failed
+with the pulse implementation and passes with held START, completion/status,
+token readback and reset cancellation. All 36 targeted Python tests also pass.
+This repairs the internal integration handshake, not an observed board run.

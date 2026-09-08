@@ -117,12 +117,12 @@ module tinystories_1m_jtag_csr #(
     end else begin
       command_toggle_q1 <= command_toggle;
       command_toggle_q2 <= command_toggle_q1;
-      core_start <= 1'b0;
       core_reset <= 1'b0;
       if (start_pending) begin
         // Present start only after run_active has become visible on the
         // generated core's valid input.  This avoids a one-cycle valid/start
-        // skew at the CDC boundary.
+        // skew at the CDC boundary. Calyx requires go held until done;
+        // this is not a one-cycle start pulse.
         core_start <= 1'b1;
         start_pending <= 1'b0;
       end
@@ -134,6 +134,7 @@ module tinystories_1m_jtag_csr #(
         token_read_pending <= 1'b0;
       end
       if (core_done) begin
+        core_start <= 1'b0;
         run_active <= 1'b0;
         done_latched <= 1'b1;
         response_word <= {4'h0, 12'd0, 16'd0, 16'd0, 16'd0};
@@ -151,6 +152,7 @@ module tinystories_1m_jtag_csr #(
             response_word <= {4'h1, 12'd0, 48'd0};
           end
           4'h5: begin
+            core_start <= 1'b0;
             core_reset <= 1'b1;
             run_active <= 1'b0;
             start_pending <= 1'b0;
