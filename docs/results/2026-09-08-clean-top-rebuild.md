@@ -86,6 +86,14 @@ must be processed one per bounded stage (or the design must be structurally
 partitioned before mapping). This is now an engineering throughput/resource
 constraint, not an unresolved BRAM-port inference failure.
 
+The first nine forced-BRAM memories have now been legalized in successive
+checkpoints (`stage5.il`, `stage6.il`, `stage7one.il`, `stage8one.il`, and
+`stage9one.il`). Each single-memory stage completes without a mapping error;
+the next stage reaches the JSON backend but still needs complete primitive
+process lowering before JSON serialization. This confirms that the incremental
+strategy is making monotonic progress toward a mapped top, while retaining the
+known memory ceiling and avoiding speculative hardware changes.
+
 The follow-up post-pass (`ec2a074`) delays the BRAM variant's `done` pulse via
 `read_pending` to match the staged read. The focused suite remains green. A
 fresh full-model generation/build completed, but its existing Verilator
