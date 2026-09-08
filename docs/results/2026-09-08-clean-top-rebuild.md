@@ -229,3 +229,9 @@ generated read-width/read-used parameters to the XC7 techmap ABI allows all
 FF-mapped memories. This compatibility map is currently an external
 checkpoint; it must be integrated into the reproducible synthesis flow before
 claiming a board-ready bitstream.
+
+The transform is now reproducible through
+`scripts/pipeline/make_xc7_bram_compat_map.py`, which emits a SHA-256 receipt
+and is covered by two unit tests. Applied to Yosys 0.66's XC7-compatible map,
+it performs 14 ABI substitutions and reproduces the validated compatibility
+map byte-for-byte.
