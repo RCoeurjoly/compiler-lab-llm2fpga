@@ -18,6 +18,7 @@ module tinystories_1m_ypcb_bram_production_top (
   wire [15:0] prompt_0, prompt_1, prompt_2, prompt_3;
   (* keep *) wire [63:0] response_word;
   wire csr_reset;
+  wire tap_reset;
   wire csr_done = done;
   wire csr_valid = valid;
   // All immutable source memories are initialized by the configured image's
@@ -28,14 +29,14 @@ module tinystories_1m_ypcb_bram_production_top (
   // sequence.  Feed it into the system-clock domain so synthesized CSR state
   // is initialized deterministically; relying on FPGA FF INIT values left the
   // hardware-only path uninitialized.
-  wire sys_reset = scan_reset;
+  wire sys_reset = tap_reset;
 
   tinystories_1m_jtag_csr csr (
       .sys_clk(clk), .sys_rst(sys_reset), .core_start(start), .core_reset(csr_reset),
       .core_valid(valid), .core_token_index(token_index),
       .prompt_0(prompt_0), .prompt_1(prompt_1), .prompt_2(prompt_2), .prompt_3(prompt_3),
       .core_token_id(token_id), .core_done(csr_done),
-      .model_init_done(model_init_done)
+      .model_init_done(model_init_done), .tap_reset(tap_reset)
 `ifdef BSCAN_SIM
       , .scan_drck(scan_drck), .scan_reset(scan_reset), .scan_sel(scan_sel),
       .scan_shift(scan_shift), .scan_capture(scan_capture), .scan_update(scan_update),

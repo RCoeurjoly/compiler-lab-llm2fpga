@@ -29,7 +29,8 @@ module tinystories_1m_jtag_csr #(
     // host can distinguish an initialized image from a merely responsive
     // shell.
     input  wire        model_init_done,
-    output reg  [63:0] response_word
+    output reg  [63:0] response_word,
+    output wire        tap_reset
 `ifdef BSCAN_SIM
     ,input wire        scan_drck,
     input  wire        scan_reset,
@@ -67,6 +68,7 @@ module tinystories_1m_jtag_csr #(
   integer i;
 
   assign core_valid = run_active;
+  assign tap_reset = scan_reset;
   assign prompt_0 = prompt_words[0];
   assign prompt_1 = prompt_words[1];
   assign prompt_2 = prompt_words[2];
