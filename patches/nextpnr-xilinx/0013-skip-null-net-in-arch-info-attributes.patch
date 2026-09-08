@@ -1,0 +1,11 @@
+--- a/common/nextpnr.cc
++++ b/common/nextpnr.cc
+@@ -584,6 +584,8 @@ void BaseCtx::archInfoToAttributes()
+     }
+     for (auto &net : getCtx()->nets) {
+         auto ni = net.second.get();
++        if (ni == nullptr)
++            continue;
+         std::string routing;
+         bool first = true;
+         for (auto &item : ni->wires) {

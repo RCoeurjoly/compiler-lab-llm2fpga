@@ -1,0 +1,8 @@
+--- a/common/nextpnr.cc
++++ b/common/nextpnr.cc
+@@ -453,6 +453,8 @@ void Context::check() const
+     for (auto &n : nets) {
+         auto ni = n.second.get();
++        if (ni == nullptr)
++            continue;
+         NPNR_ASSERT(n.first == ni->name);

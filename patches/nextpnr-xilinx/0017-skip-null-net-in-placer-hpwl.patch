@@ -1,0 +1,10 @@
+--- a/common/placer_heap.cc
++++ b/common/placer_heap.cc
+@@ -815,6 +815,8 @@
+         wirelen_t hpwl = 0;
+         for (auto net : sorted(ctx->nets)) {
+             NetInfo *ni = net.second;
++            if (ni == nullptr)
++                continue;
+             if (ni->driver.cell == nullptr)
+                 continue;

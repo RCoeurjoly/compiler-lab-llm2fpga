@@ -1,0 +1,16 @@
+--- a/common/timing.cc
++++ b/common/timing.cc
+@@
+         // Clear delays to a very high value first
+         for (auto &net : ctx->nets) {
++            if (net.second == nullptr)
++                continue;
+             for (auto &usr : net.second->users) {
+                 usr.budget = std::numeric_limits<delay_t>::max();
+             }
+@@
+         for (auto &net : ctx->nets) {
++            if (net.second == nullptr)
++                continue;
+             for (auto &user : net.second->users) {
+                 // Post-update check

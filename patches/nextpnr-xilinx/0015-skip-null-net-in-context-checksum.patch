@@ -1,0 +1,9 @@
+--- a/common/nextpnr.cc
++++ b/common/nextpnr.cc
+@@ -351,6 +351,8 @@ uint32_t Context::checksum() const
+     uint32_t cksum_nets_sum = 0;
+     for (auto &it : nets) {
++        if (it.second == nullptr)
++            continue;
+         auto &ni = *it.second;
+         uint32_t x = 123456789;
