@@ -2,6 +2,6 @@
 +++ b/common/router2.cc
 @@
 -            if (ni->name == ctx->id("$PACKER_VCC_NET") || ni->name == ctx->id("$PACKER_GND_NET"))
-+            auto net_name = ni->name.c_str(ctx);
++            std::string net_name = ni->name.c_str(ctx);
 +            if (net_name.rfind("$PACKER_VCC_NET", 0) == 0 || net_name.rfind("$PACKER_GND_NET", 0) == 0)
                  continue;
