@@ -409,6 +409,11 @@ route-stage crash remains. This confirms that the current generated JSON
 exercises multiple erased-net paths in the downstream nextpnr fork; a routed
 FASM/bitstream is still not available.
 
+After guarding `findSourceSinkLocations()`, the run reaches `router2` resource
+setup before another SIGSEGV. Routing therefore remains unverified even at the
+31 MHz diagnostic target; the null-net cleanup must continue through the
+router before any FASM or bitstream artifact can be trusted.
+
 A debugger run confirms the failure is a reproducible SIGSEGV in
 `nextpnr_xilinx::XilinxPacker::pack_constants()`. Post-technology
 `opt_clean; clean` does not change the failure. The crash therefore remains
