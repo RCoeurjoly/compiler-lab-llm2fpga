@@ -354,3 +354,9 @@ straightforward per-module map expands to 2,639 RAMB36E1 and 3,584 RAM64M
 cells.  This is a valid legalization diagnostic, not a fitting result; the
 packing/collection strategy must preserve the efficient 955-RAMB36E1 map
 before nextpnr is attempted.
+
+Flattening the regenerated hierarchy restores top-level memory names and is
+the correct direction for collection, but the unrestricted full map was
+terminated while processing the token-weight banks before emitting a JSON
+checkpoint.  It is therefore being replaced with resumable, bounded
+collection rather than treated as a completed implementation run.
