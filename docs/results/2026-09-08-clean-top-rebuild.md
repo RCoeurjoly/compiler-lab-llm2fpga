@@ -68,6 +68,14 @@ the pass is not yet semantically validated for the full accelerator. The next
 step is to retime and validate `done`/`content_en` against model checkpoints
 before FPGA mapping or hardware.
 
+An exact-cell mapping probe now succeeds for the former blocker: after the
+address-stage change, Yosys maps
+`core.token_weight_scale_q8_24_b3.mem` to `__$XILINX_BLOCKRAM_TDP_` in
+7.7 seconds at 1.86 GiB peak (`/tmp/regen-clean/one-mapped2.il`). This proves
+the RTL protocol is sufficient for that BRAM primitive. Full-design mapping
+still needs to be performed incrementally to avoid the monolithic memory
+pass's resource spike.
+
 The follow-up post-pass (`ec2a074`) delays the BRAM variant's `done` pulse via
 `read_pending` to match the staged read. The focused suite remains green. A
 fresh full-model generation/build completed, but its existing Verilator
