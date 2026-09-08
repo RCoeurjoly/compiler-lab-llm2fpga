@@ -18,12 +18,13 @@ CalyxArtifact = base.CalyxArtifact
 ORACLE = base.ORACLE
 
 
-def generate_production_kernel(oracle_path: Path = ORACLE, *, host_second_token=None, host_intermediate_states=None):
+def generate_production_kernel(oracle_path: Path = ORACLE, *, host_second_token=None, host_intermediate_states=None, generation_steps: int = 2):
     return base.generate_model_kernel(
         oracle_path,
         host_second_token=host_second_token,
         host_intermediate_states=host_intermediate_states,
         production=True,
+        generation_steps=generation_steps,
     )
 
 

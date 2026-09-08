@@ -274,9 +274,9 @@ def _banked_read(builder: Builder, group_name: str, prefix: str, memory_prefix: 
     return group, leaves[0]
 
 
-def _orchestration(builder: Builder, block_control: str, final_control: str, lm_control: str, *, audit_checkpoints: bool = True, stream_lm_head: bool = False, stream_gemv_control: str | None = None, board_io: bool = False) -> str:
+def _orchestration(builder: Builder, block_control: str, final_control: str, lm_control: str, *, audit_checkpoints: bool = True, stream_lm_head: bool = False, stream_gemv_control: str | None = None, board_io: bool = False, generation_steps: int = 2) -> str:
     b = builder
-    counter_specs = [("model_step", 2, "2'd2"), ("model_layer", 4, "4'd8"), ("model_row", 4, "4'd8"), ("model_column", 7, "7'd64"), ("model_copy", 10, "10'd512"), ("model_logit", 16, "16'd50257")]
+    counter_specs = [("model_step", 2, f"2'd{generation_steps}"), ("model_layer", 4, "4'd8"), ("model_row", 4, "4'd8"), ("model_column", 7, "7'd64"), ("model_copy", 10, "10'd512"), ("model_logit", 16, "16'd50257")]
     if not stream_lm_head:
         counter_specs.insert(-1, ("model_logit_row", 4, "model_context_length.out"))
     for name, width, limit in counter_specs:
@@ -544,7 +544,9 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
     return f"seq {{ while model_valid_not.out with model_wait_condition {{ {wait} }} {init_length} {prompt} {steps} }}"
 
 
-def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None, host_intermediate_states=None, production: bool = False) -> CalyxArtifact:
+def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None, host_intermediate_states=None, production: bool = False, generation_steps: int = 2) -> CalyxArtifact:
+    if type(generation_steps) is not int or generation_steps not in (1, 2):
+        raise ValueError("generation_steps must be 1 or 2 (authenticated oracle prefix)")
     if host_second_token is not None:
         raise ValueError("host_second_token_forbidden")
     if host_intermediate_states is not None:
@@ -652,6 +654,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
         stream_lm_head=production,
         stream_gemv_control=gemv_phase[2] if production else None,
         board_io=production,
+        generation_steps=generation_steps,
     )
     futil = '''// Compiler-owned exact model orchestration; no imported hand-written RTL.
 import "primitives/core.futil";
@@ -672,6 +675,8 @@ import "primitives/memories/seq.futil";
         "claims": {"compiler_owned_control": True, "existing_arithmetic_generators_modified": False, "sv_execution_verified": False, "board_executed": False, "board_fit_verified": False},
         "production_memory_contract": {"audit_checkpoint_memories": [] if production else ["model_embedding", "model_token_embedding", "model_position_embedding", "model_block_outputs", "model_final_ln", "model_logits"], "full_logits_storage": not production, "streamed_argmax": True},
     }
+    provenance["schedule"]["generation_steps"] = generation_steps
+    provenance["schedule"]["real_context_lengths"] = [4, 5][:generation_steps]
     provenance["artifact_sha256"] = _canonical(provenance)
     return CalyxArtifact(futil, provenance)
 

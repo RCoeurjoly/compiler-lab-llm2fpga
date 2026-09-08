@@ -36,9 +36,16 @@ write echoes when storage is lost. The host checker never issues START.
 
 ## Remaining acceptance
 
-The approved next change is a compiler generation-step setting (one for this
-goal, preserving the existing two-step default and the unmodified two-step
-oracle). Full generated-SV execution, a new physical build, and three
+The compiler now accepts `generation_steps=1` or `2` (default `2`) through
+`generate_production_kernel` and `generate_model_kernel`. It rejects other
+values, including booleans and non-integer lookalikes. The one-step output
+differs from the two-step Calyx text only in `model_step_lt.right`: `2'd1`
+instead of `2'd2`. Source-memory descriptors and oracle identity are unchanged;
+the provenance records the selected execution length and real context lengths.
+The existing audit-generator Futil hash regression also passes. All 25 targeted
+tests passed after this change. This is generator verification, not execution.
+
+Full generated-SV execution, a new physical build, and three
 independent FPGA reconfigurations with exact first-token inference remain
 unperformed. No inference success is claimed. Accelerator timing coverage
 remains incomplete; functional success will not imply full timing qualification.

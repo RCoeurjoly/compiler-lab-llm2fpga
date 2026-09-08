@@ -23,6 +23,29 @@ def load_module():
 
 
 class BramProductionTest(unittest.TestCase):
+    def test_one_step_preserves_model_and_changes_only_generation_bound(self):
+        module = load_module()
+        import inspect
+        self.assertIn("generation_steps", inspect.signature(module.generate_production_kernel).parameters)
+        default = module.generate_production_kernel(ORACLE)
+        single = module.generate_production_kernel(ORACLE, generation_steps=1)
+        self.assertEqual(default.provenance["schedule"]["generation_steps"], 2)
+        self.assertEqual(single.provenance["schedule"]["generation_steps"], 1)
+        self.assertEqual(single.provenance["schedule"]["real_context_lengths"], [4])
+        self.assertEqual(single.provenance["source_memories"], default.provenance["source_memories"])
+        self.assertEqual(single.provenance["oracle_sha256"], default.provenance["oracle_sha256"])
+        old_bound = "model_step_lt.right = 2'd2;"
+        self.assertEqual(default.futil.count(old_bound), 1)
+        self.assertEqual(single.futil, default.futil.replace(old_bound, "model_step_lt.right = 2'd1;"))
+
+    def test_generation_steps_rejects_outside_authenticated_prefix(self):
+        module = load_module()
+        import inspect
+        self.assertIn("generation_steps", inspect.signature(module.generate_production_kernel).parameters)
+        for steps in (0, 3, -1, True, 1.0, "1"):
+            with self.subTest(steps=steps), self.assertRaisesRegex(ValueError, "generation_steps"):
+                module.generate_production_kernel(ORACLE, generation_steps=steps)
+
     @staticmethod
     def _signed(value: int, width: int) -> int:
         value &= (1 << width) - 1
