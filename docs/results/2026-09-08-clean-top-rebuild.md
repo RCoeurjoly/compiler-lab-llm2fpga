@@ -515,3 +515,14 @@ The old `/tmp/jtag_csr_probe.py` is not an acceptance runner: it sends START
 the CSR state. Hardware acceptance must use a CSR-only sequence, leave TAP
 state intact between command and response, and never send START until the
 communication gate passes.
+
+The replacement host checker is `scripts/pipeline/check_tinystories_user1.py`.
+Its three-run protocol uses only opcodes 1, 3, and 5, verifies serial replies
+and prompt-0 status, and preserves TAP state between each command/result.
+Three host-side tests cover the response pipeline and zero/short failures.
+These tests do not claim hardware success. After programming the verified
+full-model image, run it inside Nix with
+`--transport-dir /home/roland/LLM2FPGA/scripts/task6 --output <receipt.json>`.
+The receipt records the external transport source hashes and every command
+and captured response. It must be paired with programming/bitstream
+provenance; the receipt alone cannot identify the image loaded on the FPGA.
