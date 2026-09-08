@@ -686,3 +686,30 @@ packing and reached analytical placement. Its output prefix is
 `full-clb-diagnostic`; it must not be mistaken for a fully timing-qualified
 bitstream. Read-only USB enumeration also confirms the FT232H programmer
 is present. No device programming or model inference occurred in this step.
+
+## Placement, programming preflight, and acceptance scope
+
+The full diagnostic completed placement and global-clock routing and is
+running router2 within the original 900-second bound. The partial model's
+post-placement estimate is 32.95 MHz for `accelerator_clk`, with scan DRCK
+and UPDATE domains also reported. This is neither a routed result nor
+full accelerator timing qualification.
+
+The existing `task3-main` Nix environment supplies working `fasm2frames` and
+`xc7frames2bit`. An unprogrammed clock-probe conversion for the exact `-2`
+part succeeded, producing an 18 MiB bitstream with SHA-256
+`7619459cc1628714246931ea73e2274c925c2febfdade8b2fd45405307dbb242`.
+It validates the conversion-tool path only and is not the accelerator image.
+Sudoless `openFPGALoader -c digilent_hs3 --ftdi-serial 210299BF3824 --detect`
+successfully reads `0x23751093`, model `xc7k480t`, IR length six. This did
+not program the FPGA or issue an accelerator START command.
+
+Acceptance scope clarification: the active goal requires the full rebuilt
+compiler top and reliable status/reset/prompt communication, not inference.
+After legal routing and bitstream provenance checks, CSR-only hardware
+testing can establish that communication gate while explicitly disclosing
+incomplete full-model timing coverage. It must not be described as full
+timing closure or inference reliability, and it must not substitute a
+clock probe or reduced CSR shell for the actual compiler-generated top.
+No START command is allowed before the CSR gate passes. Timing qualification
+for accelerator execution remains separate, unresolved work.
