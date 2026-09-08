@@ -64,11 +64,13 @@ class BramProductionTest(unittest.TestCase):
   always_ff @(posedge clk) read_out <= mem[addr0];
 endmodule
 seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
+seq_mem_d1 #(.SIZE(512), .WIDTH(64)) wide ( .clk(clk) );
 seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small ( .clk(clk) );
 """
         result = runner.annotate_bram_memories(source)
         self.assertEqual(result.count('ram_style = "block"'), 1)
         self.assertIn("seq_mem_d1_bram # (.SIZE(2048), .WIDTH(8)) large", result)
+        self.assertIn("seq_mem_d1_bram # (.SIZE(512), .WIDTH(64)) wide", result)
         self.assertIn("seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small", result)
 
     def test_bram_variant_exposes_a_registered_read_address(self):

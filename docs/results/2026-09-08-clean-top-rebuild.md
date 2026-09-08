@@ -195,3 +195,13 @@ the host memory ceiling before serialization. Full closure now requires the
 compiler to emit a synchronous BRAM/LUTRAM protocol for these runtime memories
 as well, or to partition their state, rather than lowering them wholesale to
 FF/mux logic.
+
+## Runtime-buffer BRAM expansion
+
+The post-pass now selects every literal `seq_mem_d1` instance with at least
+512 words and width up to 72 bits. This covers the compiler-generated 64-bit
+runtime buffers, not just narrow weight banks, while retaining small CSR and
+control memories as generic instances. The production SV regenerated in
+`/tmp/regen-pass3/model.sv` contains 287 BRAM-variant references and 14 generic
+instances. Its bounded Verilator execution still did not reach completion, so
+this is a mapping-progress checkpoint, not an inference result.

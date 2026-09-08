@@ -27,9 +27,11 @@ def annotate_bram_memories(source: str) -> str:
     if needle not in source:
         return source
     # Keep the generic primitive available for small asynchronous/control
-    # memories.  A separate variant carries the Xilinx BRAM hint, and only
-    # instances whose elaborated SIZE is at least 1024 and WIDTH is at most
-    # 18 use it; wider tables remain available for LUTRAM mapping.
+    # memories.  A separate variant carries the Xilinx BRAM hint, and use it
+    # for substantial buffers (at least 512 words) up to the 72-bit width
+    # supported by the Xilinx block-RAM descriptor.  This includes the
+    # compiler-generated 64-bit runtime buffers that otherwise become
+    # prohibitively large FF/mux networks.
     marker = "module seq_mem_d1_bram #"
     if marker not in source:
         start = source.index("module seq_mem_d1 #")
@@ -81,7 +83,7 @@ def annotate_bram_memories(source: str) -> str:
         pieces.append(source[cursor : match.start()])
         size_match = re.search(r"\.SIZE\s*\(\s*(\d+)\s*\)", params)
         width_match = re.search(r"\.WIDTH\s*\(\s*(\d+)\s*\)", params)
-        if size_match and width_match and int(size_match.group(1)) >= 1024 and int(width_match.group(1)) <= 18:
+        if size_match and width_match and int(size_match.group(1)) >= 512 and int(width_match.group(1)) <= 72:
             pieces.append("seq_mem_d1_bram # (" + params + ") " + tail.group("name") + " (")
         else:
             pieces.append(source[match.start() : pos + tail.end()])
