@@ -243,3 +243,10 @@ Applying a naïve global Yosys `techmap` expands the design to about 1.4 million
 cells; the bounded coarse LUT-mapping stage exceeds the host memory ceiling
 before emitting JSON. The next required step is staged LUT mapping, not
 another transport or CSR change.
+
+After staged ABC9 LUT mapping, targeted XC7 carry/FF/LUT legalization, and
+explicit primitive direction metadata, nextpnr reaches the 30 MHz placer with
+22,628 cells. Analytical placement completes and simulated-annealing
+refinement starts, but the bounded run stops before routing or output files are
+written. Timing closure and bitstream generation therefore remain unverified;
+the remaining limit is placer/resource scale, not PCIe, DDR3, or JTAG logic.
