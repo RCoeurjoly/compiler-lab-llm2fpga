@@ -238,7 +238,10 @@ seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
                 ["attention_context_q16_16.mem", "token_weight_codes_i8_b0.mem"],
             )
             self.assertIn("lutrams_xc5v.txt", mapper.checkpoint_script(sample, sample, "attention_context_q16_16.mem"))
-            self.assertIn("brams_xc7.txt", mapper.checkpoint_script(sample, sample, "token_weight_codes_i8_b0.mem"))
+            script = mapper.checkpoint_script(sample, sample, "token_weight_codes_i8_b0.mem")
+            self.assertIn("+/xilinx/brams_xc4v.txt", script)
+            self.assertIn("-D HAS_SIZE_36 -D HAS_CASCADE -D HAS_MIXWIDTH_SDP", script)
+            self.assertNotIn("/tmp/yosys-data", script)
         finally:
             sample.unlink(missing_ok=True)
 

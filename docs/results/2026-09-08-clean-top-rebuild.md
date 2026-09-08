@@ -1,5 +1,10 @@
 # Clean compiler-top rebuild checkpoint
 
+> Correction after native-library validation: the historical 955-block count
+> below is not proof of a legal full-design fit. The temporary descriptor and
+> partial ABI adapter used for that result are incompatible with the Series-7
+> memory mapping contract. See the native-library correction at the end.
+
 The rebuild was attempted from the authenticated static-image path rather
 than the earlier ad-hoc temporary sources:
 
@@ -375,3 +380,33 @@ Thus the current blocker is an ABI-correct RAMB36E1 legalization/packing
 pass, not board timing or PCIe/JTAG behavior. The probes were bounded and run
 with `--ignore-loops` only to isolate packing/routing; no bitstream was
 generated or programmed.
+
+## Native-library correction
+
+The temporary `/tmp/yosys-data2/xilinx/brams_xc7.txt` permits 72-bit TDP ports.
+The installed Yosys library permits at most 36 bits per TDP port and provides
+a distinct SDP mapping for 72-bit access. Furthermore, the compatibility
+script renames read-width/used parameters but leaves write parameters and
+port names unmatched. Renaming the resulting `RAMB36` JSON cells cannot
+repair those semantics. The preceding fit and packing conclusions are
+withdrawn; timing closure remains unverified as well.
+
+The checkpoint mapper now uses the executing Yosys installation's
+`+/xilinx/brams_xc4v.txt` with `HAS_SIZE_36`, `HAS_CASCADE`, and
+`HAS_MIXWIDTH_SDP`, and its native `+/xilinx/lutrams_xc5v.txt` for scratch
+memories. These are paired with `brams_xc6v_map.v` and `lutrams_xc5v_map.v`,
+without the compatibility script or JSON cell renaming. Old checkpoint
+directories must not be reused with this changed mapping recipe.
+
+A bounded probe mapped the actual attention exponential table, ln1 gamma,
+and token-weight bank 0. Native techmap plus library-aware hierarchy produced
+13 RAMB36E1 cells with explicit port directions, 32-bit DIADI/DOADO ports,
+and both legal SDP and TDP configurations. The first twelve chained memory
+mappings also completed. All 13 affected production tests passed.
+
+The preserved `base-good.il` remains a mapping diagnostic: its input
+`/tmp/regen-safe/model.sv` has no `$readmemh` initializers, and the import used
+`--ignore-initial`. A deployable rebuild must regenerate and verify immutable
+model initialization. Also, the earlier nextpnr probes still contained
+generic logic cells and reported no clocks; they do not establish placement
+or timing for the complete accelerator.

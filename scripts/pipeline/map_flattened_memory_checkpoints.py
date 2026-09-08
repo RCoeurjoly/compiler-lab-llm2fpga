@@ -42,13 +42,13 @@ def memory_names(il: Path) -> list[str]:
 
 def checkpoint_script(source: Path, destination: Path, name: str, top: str = "main") -> str:
     library = (
-        "/nix/store/cbqyfg8bas2yvlk2hf81g4p5sgqxb6r0-yosys-0.66/share/yosys/"
-        "xilinx/lutrams_xc5v.txt"
+        "+/xilinx/lutrams_xc5v.txt"
         if any(name.endswith(suffix) for suffix in LUTRAM_NAMES)
-        else "/tmp/yosys-data2/xilinx/brams_xc7.txt"
+        else "+/xilinx/brams_xc4v.txt -D HAS_SIZE_36 -D HAS_CASCADE -D HAS_MIXWIDTH_SDP"
     )
-    # The flattened module is main; the leading backslash is RTLIL's escaped
-    # identifier syntax and is accepted by Yosys's selection grammar.
+    # Yosys uses brams_xc4v.txt with these defines for Series 7, paired with
+    # brams_xc6v_map.v. Keep read/write ports and width parameters in the native
+    # ABI: a TDP port supports at most 36 bits; 72-bit ports require SDP mode.
     selection = f"{top}/\\{name}"
     return (
         f"read_rtlil {source}\n"
