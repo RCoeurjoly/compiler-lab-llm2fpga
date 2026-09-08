@@ -1,0 +1,8 @@
+--- a/common/router2.cc
++++ b/common/router2.cc
+@@
+             did_something = false;
+             for (auto net : nets_by_udata) {
++                if (net == nullptr)
++                    continue;
+                 WireId src = ctx->getNetinfoSourceWire(net);
