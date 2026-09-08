@@ -33,28 +33,49 @@ NEW_DECL = """  logic [(WIDTH << 1) - 1:0] out_tmp;
   end else begin
     assign bounded_product = '0;
   end endgenerate"""
-MUL64_MODULE = """module llm2fpga_bounded_mul64 #(parameter SIGNED = 0) (
+MUL64_MODULE = """module llm2fpga_bounded_mul32 (
+    input logic [31:0] left, input logic [31:0] right,
+    output logic [63:0] out);
+  always_comb out = left * right;
+endmodule
+
+module llm2fpga_bounded_mul64 #(parameter SIGNED = 0) (
     input logic [63:0] left, input logic [63:0] right,
     output logic [127:0] out);
   logic [63:0] left_mag, right_mag;
   logic [31:0] left_lo, left_hi, right_lo, right_hi;
   logic [63:0] product_ll, product_lh, product_hl, product_hh;
+  logic [127:0] magnitude_out;
   always_comb begin
     left_mag = (SIGNED && left[63]) ? (~left + 1'b1) : left;
     right_mag = (SIGNED && right[63]) ? (~right + 1'b1) : right;
     left_lo = left_mag[31:0]; left_hi = left_mag[63:32];
     right_lo = right_mag[31:0]; right_hi = right_mag[63:32];
-    product_ll = left_lo * right_lo;
-    product_lh = left_lo * right_hi;
-    product_hl = left_hi * right_lo;
-    product_hh = left_hi * right_hi;
-    out = (product_hh << 64) + ((product_lh + product_hl) << 32) + product_ll;
-    if (SIGNED && (left[63] ^ right[63])) out = ~out + 1'b1;
+    // Keep each partial product's operands explicitly 32 bits.  Otherwise
+    // expression sizing in the generated RTL can infer four 64x64 multiplies.
+  end
+  llm2fpga_bounded_mul32 mul_ll (.left(left_mag[31:0]), .right(right_mag[31:0]), .out(product_ll));
+  llm2fpga_bounded_mul32 mul_lh (.left(left_mag[31:0]), .right(right_mag[63:32]), .out(product_lh));
+  llm2fpga_bounded_mul32 mul_hl (.left(left_mag[63:32]), .right(right_mag[31:0]), .out(product_hl));
+  llm2fpga_bounded_mul32 mul_hh (.left(left_mag[63:32]), .right(right_mag[63:32]), .out(product_hh));
+  always_comb begin
+    magnitude_out = (product_hh << 64) + ((product_lh + product_hl) << 32) + product_ll;
+    out = (SIGNED && (left[63] ^ right[63])) ? (~magnitude_out + 1'b1) : magnitude_out;
   end
 endmodule
 
 """
-NEW = "        out_tmp <= bounded_product;"
+NEW_SIGNED = """        if (WIDTH == 64)
+          out_tmp <= bounded_product;
+        else
+          out_tmp <= $signed(
+            { {WIDTH{ltmp[WIDTH-1]}}, ltmp} *
+            { {WIDTH{rtmp[WIDTH-1]}}, rtmp}
+          );"""
+NEW_UNSIGNED = """        if (WIDTH == 64)
+          out_tmp <= bounded_product;
+        else
+          out_tmp <= ltmp * rtmp;"""
 
 
 def repair(source: Path, destination: Path, receipt: Path) -> None:
@@ -66,8 +87,8 @@ def repair(source: Path, destination: Path, receipt: Path) -> None:
         raise ValueError(
             f"expected one signed/unsigned multiply helper and declaration, found signed={matches}, unsigned={unsigned_matches}, declaration={declarations}"
         )
-    repaired = text.replace(OLD_DECL, NEW_DECL).replace(OLD, NEW)
-    repaired = repaired.replace(OLD_UNSIGNED, NEW)
+    repaired = text.replace(OLD_DECL, NEW_DECL).replace(OLD, NEW_SIGNED)
+    repaired = repaired.replace(OLD_UNSIGNED, NEW_UNSIGNED)
     marker = "module std_fp_mult_pipe #("
     if marker not in repaired:
         raise ValueError("missing std_fp_mult_pipe module marker")

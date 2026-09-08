@@ -105,8 +105,10 @@ seq_mem_d1 #(.SIZE(512), .WIDTH(64)) attention_context_q16_16 ( .clk(clk) );
         repair.repair(source, destination, receipt)
         repaired = destination.read_text(encoding="utf-8")
         self.assertIn("module llm2fpga_bounded_mul64", repaired)
+        self.assertIn("module llm2fpga_bounded_mul32", repaired)
         self.assertIn("logic [WIDTH-1:0] left_mag;", repaired)
         self.assertIn("out_tmp <= bounded_product;", repaired)
+        self.assertIn("else\n          out_tmp <= ltmp * rtmp;", repaired)
         self.assertEqual(json.loads(receipt.read_text(encoding="utf-8"))["replacements"], 2)
 
     def test_bram_variant_exposes_a_registered_read_address(self):
