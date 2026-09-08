@@ -86,6 +86,13 @@ must be processed one per bounded stage (or the design must be structurally
 partitioned before mapping). This is now an engineering throughput/resource
 constraint, not an unresolved BRAM-port inference failure.
 
+After purging unused simulation-library modules and applying the Xilinx cell
+techmap, the mapped checkpoint can be serialized as JSON. Stages 10 through 25
+have been completed incrementally (`/tmp/regen-clean/stage10-techmap3.json`
+through `stage25.json`); each stage maps one additional forced-BRAM memory and
+remains below 1.35 GiB peak. This establishes a resumable route to a complete
+nextpnr input without repeating the original monolithic pass.
+
 The first nine forced-BRAM memories have now been legalized in successive
 checkpoints (`stage5.il`, `stage6.il`, `stage7one.il`, `stage8one.il`, and
 `stage9one.il`). Each single-memory stage completes without a mapping error;
