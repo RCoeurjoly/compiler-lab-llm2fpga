@@ -1,0 +1,11 @@
+--- a/common/design_utils.cc
++++ b/common/design_utils.cc
+@@ -90,6 +90,10 @@ void connect_port(const Context *ctx, NetInfo *net, CellInfo *cell, IdString port_name)
+                   log_error("no port named '%s' on %s '%s'\n", ctx->nameOf(port_name), ctx->nameOf(cell->type),
+                             ctx->nameOf(cell));
+     PortInfo &port = cell->ports.at(port_name);
++    // Legalisation may replay an identical connection. Keep this case
++    // idempotent, while retaining the assertion for conflicting nets.
++    if (port.net == net)
++        return;
+     NPNR_ASSERT(port.net == nullptr);
