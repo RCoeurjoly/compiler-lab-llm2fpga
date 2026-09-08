@@ -4,6 +4,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import unittest
+import tempfile
+import inspect
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +21,26 @@ def load_module():
 
 
 class BramImageTest(unittest.TestCase):
+    def test_one_step_image_receipt_binds_selected_compiler_schedule(self):
+        module = load_module()
+        self.assertIn("generation_steps", inspect.signature(module.materialize).parameters)
+        production = module.load(ROOT / "scripts/pipeline/lower_fixed_point_model_bram_production.py", "image_test_production")
+        artifact = production.generate_production_kernel(generation_steps=1)
+        # Only the initializer/manifest boundary is tested here, not valid RTL.
+        source = "module main();\n" + "\n".join(
+            f"seq_mem_d1 {name} ();" for name in artifact.provenance["source_memories"]
+        ) + "\nendmodule\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            sv = directory / "input.sv"
+            sv.write_text(source)
+            receipt = module.materialize(directory / "image", sv=sv, generation_steps=1)
+            self.assertEqual(receipt["generation_steps"], 1)
+            self.assertEqual(receipt["futil_sha256"], artifact.provenance["futil_sha256"])
+            self.assertEqual(receipt["oracle_sha256"], artifact.provenance["oracle_sha256"])
+            self.assertEqual(len(receipt["source_memories"]), 240)
+            self.assertFalse(receipt["claims"]["bitstream_verified"])
+
     def test_synthesis_output_gets_source_initializers_in_main(self):
         module = load_module()
         source = '''module seq_mem_d1(); endmodule

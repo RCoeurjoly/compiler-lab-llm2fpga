@@ -87,10 +87,10 @@ def staticize_sv(source: str, source_names: set[str]) -> str:
     return source
 
 
-def materialize(output: Path, *, sv: Path | None = None) -> dict[str, object]:
+def materialize(output: Path, *, sv: Path | None = None, generation_steps: int = 2) -> dict[str, object]:
     production = load(ROOT / "scripts/pipeline/lower_fixed_point_model_bram_production.py", "bram_image_production")
     capture = load(ROOT / "TinyStories/capture_fixed_point_model_token_step_oracle.py", "bram_image_capture")
-    artifact = production.generate_production_kernel()
+    artifact = production.generate_production_kernel(generation_steps=generation_steps)
     bundle = capture.exact_adapter.load_successor_exact_model(
         capture.DEFAULT_CONTRACT, capture.DEFAULT_PACKAGE,
         capture.DEFAULT_MODEL, capture.DEFAULT_GENERATION,
@@ -119,6 +119,8 @@ def materialize(output: Path, *, sv: Path | None = None) -> dict[str, object]:
     static_path.write_text(static)
     manifest: dict[str, object] = {
         "schema": "tinystories-1m-bram-static-image-v1",
+        "generation_steps": generation_steps,
+        "oracle_sha256": artifact.provenance["oracle_sha256"],
         "futil_sha256": artifact.provenance["futil_sha256"],
         "source_memories": records,
         "generated_sv_sha256": sha256(sv),
@@ -137,8 +139,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("sv", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--generation-steps", type=int, choices=(1, 2), default=2)
     args = parser.parse_args()
-    print(json.dumps(materialize(args.output.resolve(), sv=args.sv.resolve()), indent=2))
+    print(json.dumps(materialize(args.output.resolve(), sv=args.sv.resolve(), generation_steps=args.generation_steps), indent=2))
 
 
 if __name__ == "__main__":

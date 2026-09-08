@@ -54,6 +54,17 @@ All 29 targeted tests passed. The full one-step model also lowered to SV in
 1.47 seconds (Futil SHA-256
 `55b2ae5a55e7c1931ca627655e48dbafc2c272144f08c48f349a6c23a4160b52`).
 
+The static-image builder also accepts `--generation-steps 1` and binds its
+manifest to that schedule's Futil and oracle hashes instead of silently using
+the two-step default. Its new test materializes all 240 real immutable source
+memories into a temporary image and checks the manifest; the test's SV skeleton
+only exercises initialization and is not an inference design. All 30 targeted
+tests passed.
+
+The full-model SV run is in `/tmp/tinystories-first-token-sv-20260908`, with log
+`/tmp/tinystories-first-token-sv-20260908.log`, under a 1,800-second outer bound.
+It has entered actual cycle execution; no completion claim is made here.
+
 Full generated-SV execution, a new physical build, and three
 independent FPGA reconfigurations with exact first-token inference remain
 unperformed. No inference success is claimed. Accelerator timing coverage
