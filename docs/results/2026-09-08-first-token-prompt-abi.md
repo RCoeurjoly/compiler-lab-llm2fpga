@@ -237,3 +237,26 @@ revalidation and all three board runs remain outstanding.
 
 All 38 targeted production, arithmetic, memory-latency, static-image, harness
 and JTAG Python regressions pass with the argmax scheduling repair.
+
+## LM-head bank-selector lifetime repair
+
+Removing the explicit bank-zero fixture override reproduces an unknown
+accumulator at vocabulary entry zero (`row=0 output=0 k=64 acc=x`), followed
+by a stalled comparison in Icarus. Input code and activation scale remain
+known (1 and 16777216). The bank mux is continuously connected, but its
+address inputs previously existed only within `lm_gemv_read_operands`; they
+were undefined during the later multiplication group.
+
+Banked GEMV generation now places the ten weight-address-cone assignments
+outside the read group. The existing output and k counters remain stable from
+read through multiplication and accumulation. No memory primitive, latency,
+numeric operation, unbanked/audit path, or transport is changed.
+
+The previously failing unpinned-selector regression now selects the expected
+token. A second bounded regression executes real vocabulary addresses 252..259,
+crossing the 256-token physical weight-bank boundary, and correctly selects
+258 from logits [0,0,0,0,64,384,448,-128]. Only the fixture's initial output
+counter and loop limit are bounded; the generated bank addressing, reads,
+arithmetic and argmax are executed unchanged. All 40 targeted tests pass.
+Fresh full-model first-token simulation is the next gate; these regressions
+are not full-model or board-inference acceptance.

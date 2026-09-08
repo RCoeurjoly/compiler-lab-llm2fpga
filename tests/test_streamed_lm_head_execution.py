@@ -14,6 +14,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class StreamedLmHeadExecutionTest(unittest.TestCase):
     def test_each_vocabulary_accumulator_reaches_its_own_logit(self):
+        self._run_head(pin_bank=True)
+
+    def test_bank_selector_remains_valid_through_multiply(self):
+        self._run_head(pin_bank=False)
+
+    def test_vocabulary_projection_crosses_a_weight_bank_boundary(self):
+        self._run_head(pin_bank=False, cross_bank=True)
+
+    def _run_head(self, *, pin_bank, cross_bank=False):
         artifact = runner.production.generate_production_kernel(generation_steps=1)
         declarations, control = artifact.futil.split("  control {", 1)
         # Execute the actual generated LM-head schedule, omitting upstream work.
@@ -27,11 +36,16 @@ class StreamedLmHeadExecutionTest(unittest.TestCase):
                               lambda m: m[0] if re.search(r"\b" + m[1] + r"\b", selected_control) else "",
                               declarations)
         futil = declarations + "  control { " + selected_control + " }\n}\n"
-        futil = futil.replace("16'd50257", "16'd4")
+        futil = futil.replace("16'd50257", "16'd260" if cross_bank else "16'd4")
+        if cross_bank:
+            # Execute entries 252..259: four on either side of the real
+            # 256-token bank boundary, without spending cycles on its prefix.
+            futil = futil.replace("lm_gemv_output_counter.in = 16'd0;", "lm_gemv_output_counter.in = 16'd252;")
         # Isolate argmax from the separate bank-selector lifetime defect:
         # this four-entry fixture uses bank zero exclusively.
-        futil = futil.replace("lm_gemv_weight_bank.in = lm_gemv_weight_bank_full.out;", "")
-        futil = futil.replace("  wires {", "  wires {\nlm_gemv_weight_bank.in = 22'd0;")
+        if pin_bank:
+            futil = futil.replace("lm_gemv_weight_bank.in = lm_gemv_weight_bank_full.out;", "")
+            futil = futil.replace("  wires {", "  wires {\nlm_gemv_weight_bank.in = 22'd0;")
         tb = '''module tb;
 reg clk=0, reset=1, start=0; wire done; wire [15:0] token_id;
 always #5 clk=~clk;
@@ -61,6 +75,14 @@ end
 initial begin #1000000; $fatal(1,"timeout row=%0d output=%0d k=%0d best=%0d acc=%0d context=%0d input=%0d scale=%0d",dut.lm_gemv_row_counter.out,dut.lm_gemv_output_counter.out,dut.lm_gemv_k_counter.out,dut.model_best_token.out,$signed(dut.lm_gemv_accumulator.out),dut.model_context_length.out,dut.lm_input_codes_i8.read_data,dut.lm_input_scale_q8_24.read_data); end
 endmodule
 '''
+        if cross_bank:
+            # First bank's sampled logits are zero. The next bank contains the
+            # same four hand-derived logits, so vocabulary entry 258 wins.
+            tb = tb.replace("token_weight_codes_i8_b0.mem", "token_weight_codes_i8_b1.mem")
+            for i in range(4):
+                tb = tb.replace(f"token_weight_scale_q8_24_b0.mem[{i}]", f"token_weight_scale_q8_24_b0.mem[{256+i}]")
+            tb = tb.replace("initial begin\n for", "initial begin\n for(i=0;i<16384;i=i+1) dut.token_weight_codes_i8_b0.mem[i]=0;\n for(i=0;i<256;i=i+1) dut.token_weight_scale_q8_24_b0.mem[i]=256;\n for", 1)
+            tb = tb.replace("16'd2)", "16'd258)").replace("#1000000;", "#10000000;")
         install = Path(subprocess.check_output(["nix", "build", "--no-link", "--print-out-paths", ".#calyx"], cwd=ROOT, text=True, timeout=120).strip())
         iverilog = os.environ.get("IVERILOG", shutil.which("iverilog"))
         vvp = os.environ.get("VVP", shutil.which("vvp"))

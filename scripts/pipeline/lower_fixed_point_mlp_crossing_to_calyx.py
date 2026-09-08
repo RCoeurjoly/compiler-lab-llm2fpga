@@ -1007,6 +1007,16 @@ def _gemv_phase(
             f"{prefix}_add.right = {prefix}_mac_wide.out;",
             f"{prefix}_add.right = {prefix}_mac.out;",
         )
+    if banked_weights is not None:
+        # The memory read finishes before multiplication consumes the bank
+        # mux. Keep its entire address cone driven between those groups;
+        # output/k counters do not advance until after accumulator update.
+        address_ports = r"(?:output_pad\.in|output_shift\.(?:left|right)|k_pad\.in|address\.(?:left|right)|bank_full\.(?:left|right)|bank\.in|local\.in)"
+        pattern = rf"^\s*{re.escape(prefix)}_weight_{address_ports} = [^;]+;"
+        assignments = re.findall(pattern, wires[0], flags=re.M)
+        if len(assignments) != 10:
+            raise ValueError("banked GEMV requires ten weight-address assignments")
+        wires[0] = "\n".join(line.strip() for line in assignments) + "\n" + re.sub(pattern, "", wires[0], flags=re.M)
     return cells, wires, control
 
 
