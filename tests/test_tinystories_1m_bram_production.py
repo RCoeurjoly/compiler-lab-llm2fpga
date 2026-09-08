@@ -73,6 +73,20 @@ seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small ( .clk(clk) );
         self.assertIn("seq_mem_d1_bram # (.SIZE(512), .WIDTH(64)) wide", result)
         self.assertIn("seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small", result)
 
+    def test_signed_multiply_repair_is_strict_and_preserves_result_context(self):
+        path = ROOT / "scripts/pipeline/repair_calyx_signed_multiply_width.py"
+        spec = importlib.util.spec_from_file_location("signed_multiply_repair", path)
+        assert spec and spec.loader
+        repair = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(repair)
+        source = Path("/tmp/calyx-multiply-helper.sv")
+        destination = Path("/tmp/calyx-multiply-helper.repaired.sv")
+        receipt = Path("/tmp/calyx-multiply-helper.receipt.json")
+        source.write_text(repair.OLD, encoding="utf-8")
+        repair.repair(source, destination, receipt)
+        self.assertEqual(destination.read_text(encoding="utf-8"), repair.NEW)
+        self.assertEqual(json.loads(receipt.read_text(encoding="utf-8"))["replacements"], 1)
+
     def test_bram_variant_exposes_a_registered_read_address(self):
         path = ROOT / "scripts/pipeline/run_bram_production_sv.py"
         spec = importlib.util.spec_from_file_location("bram_sv_runner_addr", path)
