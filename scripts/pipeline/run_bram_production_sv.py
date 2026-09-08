@@ -203,7 +203,7 @@ def main():
         (directory / ("source-" + name + ".bin")).write_bytes(tensor.numpy().astype("<i8").tobytes())
     (directory / "model.futil").write_text(artifact.futil)
     install = Path(subprocess.check_output(["nix", "build", "--no-link", "--print-out-paths", ".#calyx"], cwd=ROOT, text=True).strip())
-    subprocess.run([str(install / "bin/calyx"), str(directory / "model.futil"), "-l", str(install / "share/calyx"), "-d", "cell-share", "-b", "verilog", "-o", str(directory / "model.sv")], cwd=ROOT, check=True)
+    subprocess.run([str(install / "bin/calyx"), str(directory / "model.futil"), "-l", str(install / "share/calyx"), "-d", "cell-share", "-b", "verilog", "--synthesis", "--nested", "-o", str(directory / "model.sv")], cwd=ROOT, check=True)
     model_path = directory / "model.sv"
     repaired_path = directory / "model.repaired.sv"
     repair_receipt = directory / "signed-multiply-width-repair.json"

@@ -20,15 +20,26 @@ OLD = """out_tmp <= $signed(
           { {WIDTH{ltmp[WIDTH-1]}}, ltmp} *
           { {WIDTH{rtmp[WIDTH-1]}}, rtmp}
         );"""
-NEW = "out_tmp <= $signed(ltmp) * $signed(rtmp);"
+OLD_DECL = "  logic [(WIDTH << 1) - 1:0] out_tmp;"
+NEW_DECL = """  logic [(WIDTH << 1) - 1:0] out_tmp;
+  logic [WIDTH-1:0] left_mag;
+  logic [WIDTH-1:0] right_mag;
+  logic [(WIDTH << 1) - 1:0] magnitude_product;"""
+NEW = """left_mag = ltmp[WIDTH-1] ? (~ltmp + 1'b1) : ltmp;
+        right_mag = rtmp[WIDTH-1] ? (~rtmp + 1'b1) : rtmp;
+        magnitude_product = left_mag * right_mag;
+        out_tmp <= (ltmp[WIDTH-1] ^ rtmp[WIDTH-1]) ? (~magnitude_product + 1'b1) : magnitude_product;"""
 
 
 def repair(source: Path, destination: Path, receipt: Path) -> None:
     text = source.read_text(encoding="utf-8")
     matches = text.count(OLD)
-    if matches != 1:
-        raise ValueError(f"expected exactly one signed multiply helper, found {matches}")
-    repaired = text.replace(OLD, NEW)
+    declarations = text.count(OLD_DECL)
+    if matches != 1 or declarations != 1:
+        raise ValueError(
+            f"expected one signed multiply helper and declaration, found helper={matches}, declaration={declarations}"
+        )
+    repaired = text.replace(OLD_DECL, NEW_DECL).replace(OLD, NEW)
     destination.write_text(repaired, encoding="utf-8")
     receipt.write_text(
         json.dumps(
@@ -38,7 +49,7 @@ def repair(source: Path, destination: Path, receipt: Path) -> None:
                 "source_sha256": hashlib.sha256(text.encode()).hexdigest(),
                 "repaired_sha256": hashlib.sha256(repaired.encode()).hexdigest(),
                 "replacements": matches,
-                "operand_width_policy": "WIDTH operands, 2*WIDTH result context",
+                "operand_width_policy": "unsigned WIDTH magnitudes, signed correction, 2*WIDTH result context",
             },
             sort_keys=True,
             indent=2,

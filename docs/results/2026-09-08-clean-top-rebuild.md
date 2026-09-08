@@ -284,4 +284,8 @@ second `WIDTH`-bit sign extension before multiplying. Yosys consequently sees
 normalization and logits paths), then materializes their accumulators as the
 3,024 128-bit `$fa` cells. This gives a concrete compiler/runtime repair
 target: preserve the 64-bit fixed-point result contract while avoiding the
-unnecessary 128-bit operand widening.
+unnecessary 128-bit operand widening. The repair now computes unsigned
+`WIDTH`-bit magnitudes, multiplies those at `WIDTH × WIDTH`, and applies the
+two's-complement sign correction into the existing `2*WIDTH` result register.
+On the actual generated helper, Yosys reports `A_WIDTH=64`, `B_WIDTH=64`, and
+`Y_WIDTH=128` for the signed specialization.
