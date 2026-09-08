@@ -12,6 +12,15 @@ module tinystories_1m_ypcb_bram_production_top (
     input wire scan_tdi, output wire scan_tdo
 `endif
 );
+  (* keep *) wire accelerator_clk;
+  wire clock_locked;
+`ifdef BSCAN_SIM
+  assign accelerator_clk = clk;
+  assign clock_locked = 1'b1;
+`else
+  tinystories_1m_ypcb_clock clock_generator (
+      .clk_50mhz(clk), .clk_30mhz(accelerator_clk), .locked(clock_locked));
+`endif
   wire start, valid, reset, done;
   wire [0:0] token_index;
   (* keep *) wire [15:0] token_id;
@@ -29,10 +38,16 @@ module tinystories_1m_ypcb_bram_production_top (
   // sequence.  Feed it into the system-clock domain so synthesized CSR state
   // is initialized deterministically; relying on FPGA FF INIT values left the
   // hardware-only path uninitialized.
-  wire sys_reset = tap_reset;
+  wire async_reset = tap_reset | !clock_locked;
+  (* ASYNC_REG = "TRUE" *) reg [1:0] reset_sync;
+  always @(posedge accelerator_clk or posedge async_reset) begin
+    if (async_reset) reset_sync <= 2'b11;
+    else reset_sync <= {reset_sync[0], 1'b0};
+  end
+  wire sys_reset = reset_sync[1];
 
   tinystories_1m_jtag_csr csr (
-      .sys_clk(clk), .sys_rst(sys_reset), .core_start(start), .core_reset(csr_reset),
+      .sys_clk(accelerator_clk), .sys_rst(sys_reset), .core_start(start), .core_reset(csr_reset),
       .core_valid(valid), .core_token_index(token_index),
       .prompt_0(prompt_0), .prompt_1(prompt_1), .prompt_2(prompt_2), .prompt_3(prompt_3),
       .core_token_id(token_id), .core_done(csr_done),
@@ -44,9 +59,9 @@ module tinystories_1m_ypcb_bram_production_top (
 `endif
       ,
       .response_word(response_word));
-  assign reset = csr_reset;
+  assign reset = csr_reset | sys_reset;
   (* keep_hierarchy *) main core (
-      .clk(clk),
+      .clk(accelerator_clk),
       .reset(reset),
       .start(start),
       .valid(csr_valid),
@@ -54,5 +69,5 @@ module tinystories_1m_ypcb_bram_production_top (
       .token_index(token_index),
       .token_id(token_id),
       .done(done));
-  assign led = {done, valid, clk};
+  assign led = {done, valid, accelerator_clk};
 endmodule

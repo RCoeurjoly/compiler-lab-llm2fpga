@@ -468,3 +468,50 @@ testbench and CSR; all 13 production contract tests also passed. The previous
 initialized mapping run contains the old CSR and cannot be used for the
 replacement bitstream. The full model must be imported and mapped with the
 corrected CSR. Hardware confirmation remains pending.
+
+## Physical 30 MHz clock correction
+
+The YPCB reference design identifies `SYS_CLK` at AA28 as 50,000,000 Hz
+(`ypcb_00338_1p1_hack/.../top/synth/top.v`, SYS_CLK interface metadata).
+The previous top connected this pin directly to the accelerator. A 33.333 ns
+input constraint alone therefore did not produce a physically slower clock.
+
+`rtl/tinystories_1m_ypcb_clock.sv` now generates 30 MHz with an MMCME2_ADV:
+50 MHz input, multiply 18, input divide 1, output divide 30 (900 MHz VCO).
+Both feedback and accelerator output use BUFGs. The board top keeps the core
+and CSR on that clock and synchronizes reset release after MMCM lock and TAP
+reset. Constraints describe the real 20 ns input and 33.333 ns accelerator
+net separately. BSCAN_SIM continues to accept a directly supplied simulation
+clock.
+
+Slang rejects real-valued parameters on blackbox primitives. The import
+therefore uses a port-only clock-wrapper boundary, replaces it with the
+checked-in wrapper through Yosys's native Verilog frontend, then flattens it.
+The native frontend retains the MMCM parameter values as real properties.
+
+A standalone clock/counter probe exposed a nextpnr default: MMCME2_BASE is
+upgraded to ADV with INTERNAL compensation, which disconnects CLKFBIN from
+the supplied feedback buffer. The unused buffer route then trips router1's
+`valid_wires_for_net.count(w)` assertion. This reproduced with local and
+packaged nextpnr and with both routers; router2 misleadingly exited zero
+despite the logged error. A debugger captured the failure in router1::check.
+
+Explicit MMCME2_ADV ZHOLD compensation preserves external feedback. The same
+probe then routed with seed 15, the unchanged pinout, and zero logged errors.
+Its routed JSON connects CLKFBIN to the feedback BUFG output; its FASM
+encodes feedback high/low times 9/9, output high/low times 15/15, and ZHOLD.
+This verifies primitive configuration and routing only: the probe reports
+`No clocks found in design`, so it is not accepted as timing evidence. The
+full design still requires meaningful constrained timing reports.
+
+The 13 production contract tests pass. Probe artifacts are
+`/tmp/regen-safe/native-static-image/clock-probe-zh*`; the final full-model
+import script is `import-clocked.ys`. Earlier `clocked-checkpoints` used the
+provisional BASE clock and must not feed the final build. The final mapping
+will use a fresh `clocked-zh-checkpoints` directory after import.
+
+The old `/tmp/jtag_csr_probe.py` is not an acceptance runner: it sends START
+(opcode 2) and resets the TAP between command and response, which now resets
+the CSR state. Hardware acceptance must use a CSR-only sequence, leave TAP
+state intact between command and response, and never send START until the
+communication gate passes.

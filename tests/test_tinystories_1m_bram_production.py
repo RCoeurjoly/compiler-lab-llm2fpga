@@ -207,7 +207,13 @@ seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
             self.assertIn(f".{signal}({signal})", top)
         self.assertIn("tinystories_1m_jtag_csr csr", top)
         self.assertIn("main core", top)
-        self.assertIn("wire sys_reset = tap_reset", top)
+        self.assertIn("wire async_reset = tap_reset | !clock_locked", top)
+        self.assertIn("wire sys_reset = reset_sync[1]", top)
+        clock = (ROOT / "rtl/tinystories_1m_ypcb_clock.sv").read_text()
+        self.assertIn(".CLKFBOUT_MULT_F(18.0), .CLKOUT0_DIVIDE_F(30.0)", clock)
+        self.assertIn(".CLKIN1_PERIOD(20.0), .DIVCLK_DIVIDE(1)", clock)
+        self.assertIn(".clk(accelerator_clk)", top)
+        self.assertIn(".sys_clk(accelerator_clk)", top)
         self.assertIn(".sys_rst(sys_reset)", top)
 
     def test_jtag_abi_preserves_lifecycle_and_readback_ordering(self):
