@@ -134,3 +134,6 @@ per-stage success and restartability.
 
 The chain has reached `stage80.json` (85 forced-BRAM memories mapped), still
 without a per-memory mapping error.
+
+It now reaches `stage90.json` (95 forced-BRAM memories mapped), continuing the
+restartable, one-memory-per-process route without mapping errors.
