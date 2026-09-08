@@ -1,0 +1,7 @@
+--- a/common/placer1.cc
++++ b/common/placer1.cc
+@@
+         for (auto &net : ctx->nets) {
++            if (net.second == nullptr)
++                continue;
+             net.second->udata = old_udata[net.second->udata];
