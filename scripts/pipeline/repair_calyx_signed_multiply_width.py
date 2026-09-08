@@ -25,11 +25,36 @@ OLD_DECL = "  logic [(WIDTH << 1) - 1:0] out_tmp;"
 NEW_DECL = """  logic [(WIDTH << 1) - 1:0] out_tmp;
   logic [WIDTH-1:0] left_mag;
   logic [WIDTH-1:0] right_mag;
-  logic [(WIDTH << 1) - 1:0] magnitude_product;"""
-NEW = """left_mag = ltmp[WIDTH-1] ? (~ltmp + 1'b1) : ltmp;
-        right_mag = rtmp[WIDTH-1] ? (~rtmp + 1'b1) : rtmp;
-        magnitude_product = left_mag * right_mag;
-        out_tmp <= (ltmp[WIDTH-1] ^ rtmp[WIDTH-1]) ? (~magnitude_product + 1'b1) : magnitude_product;"""
+  logic [(WIDTH << 1) - 1:0] magnitude_product;
+  logic [127:0] bounded_product;
+  generate if (WIDTH == 64) begin
+    llm2fpga_bounded_mul64 #(.SIGNED(SIGNED)) bounded_mul64 (
+      .left(ltmp), .right(rtmp), .out(bounded_product));
+  end else begin
+    assign bounded_product = '0;
+  end endgenerate"""
+MUL64_MODULE = """module llm2fpga_bounded_mul64 #(parameter SIGNED = 0) (
+    input logic [63:0] left, input logic [63:0] right,
+    output logic [127:0] out);
+  logic [63:0] left_mag, right_mag;
+  logic [31:0] left_lo, left_hi, right_lo, right_hi;
+  logic [63:0] product_ll, product_lh, product_hl, product_hh;
+  always_comb begin
+    left_mag = (SIGNED && left[63]) ? (~left + 1'b1) : left;
+    right_mag = (SIGNED && right[63]) ? (~right + 1'b1) : right;
+    left_lo = left_mag[31:0]; left_hi = left_mag[63:32];
+    right_lo = right_mag[31:0]; right_hi = right_mag[63:32];
+    product_ll = left_lo * right_lo;
+    product_lh = left_lo * right_hi;
+    product_hl = left_hi * right_lo;
+    product_hh = left_hi * right_hi;
+    out = (product_hh << 64) + ((product_lh + product_hl) << 32) + product_ll;
+    if (SIGNED && (left[63] ^ right[63])) out = ~out + 1'b1;
+  end
+endmodule
+
+"""
+NEW = "        out_tmp <= bounded_product;"
 
 
 def repair(source: Path, destination: Path, receipt: Path) -> None:
@@ -42,7 +67,11 @@ def repair(source: Path, destination: Path, receipt: Path) -> None:
             f"expected one signed/unsigned multiply helper and declaration, found signed={matches}, unsigned={unsigned_matches}, declaration={declarations}"
         )
     repaired = text.replace(OLD_DECL, NEW_DECL).replace(OLD, NEW)
-    repaired = repaired.replace(OLD_UNSIGNED, "        magnitude_product = ltmp * rtmp;\n        out_tmp <= magnitude_product;")
+    repaired = repaired.replace(OLD_UNSIGNED, NEW)
+    marker = "module std_fp_mult_pipe #("
+    if marker not in repaired:
+        raise ValueError("missing std_fp_mult_pipe module marker")
+    repaired = repaired.replace(marker, MUL64_MODULE + marker, 1)
     destination.write_text(repaired, encoding="utf-8")
     receipt.write_text(
         json.dumps(

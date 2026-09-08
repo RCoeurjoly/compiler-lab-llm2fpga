@@ -82,13 +82,17 @@ seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small ( .clk(clk) );
         source = Path("/tmp/calyx-multiply-helper.sv")
         destination = Path("/tmp/calyx-multiply-helper.repaired.sv")
         receipt = Path("/tmp/calyx-multiply-helper.receipt.json")
-        source.write_text(repair.OLD_DECL + "\n" + repair.OLD + "\n" + repair.OLD_UNSIGNED, encoding="utf-8")
+        source.write_text(
+            "module std_fp_mult_pipe #(\n"
+            + repair.OLD_DECL + "\n" + repair.OLD + "\n"
+            + repair.OLD_UNSIGNED + "\nendmodule\n",
+            encoding="utf-8",
+        )
         repair.repair(source, destination, receipt)
         repaired = destination.read_text(encoding="utf-8")
+        self.assertIn("module llm2fpga_bounded_mul64", repaired)
         self.assertIn("logic [WIDTH-1:0] left_mag;", repaired)
-        self.assertIn("magnitude_product = left_mag * right_mag;", repaired)
-        self.assertIn("out_tmp <= (ltmp[WIDTH-1] ^ rtmp[WIDTH-1])", repaired)
-        self.assertIn("magnitude_product = ltmp * rtmp;", repaired)
+        self.assertIn("out_tmp <= bounded_product;", repaired)
         self.assertEqual(json.loads(receipt.read_text(encoding="utf-8"))["replacements"], 2)
 
     def test_bram_variant_exposes_a_registered_read_address(self):
