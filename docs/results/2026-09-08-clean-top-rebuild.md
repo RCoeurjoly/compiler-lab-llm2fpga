@@ -48,3 +48,11 @@ integration issue: the generated static model must introduce a registered
 read boundary (or otherwise legalize asynchronous ROM/RAM accesses) before
 BRAM mapping can succeed; changing the JTAG CSR or transport would not address
 this failure.
+
+A first temporary registered-address experiment was also run through
+elaboration, arithmetic legalization, `memory_dff`, and `memory_collect`
+(`/tmp/regen-clean/reg-collected.il`; 32 seconds, 1.2 GiB peak). It did not
+change this cell's `RD_CLK=1'x`: Yosys reported no address FF for the generated
+port and retained an asynchronous read. Thus simply registering the output in
+the helper is insufficient; the compiler must emit an explicit address-stage
+protocol that Yosys can merge, with a corresponding latency/handshake check.
