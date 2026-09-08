@@ -533,6 +533,13 @@ programmed successfully, but USER1 CSR reads remained zero. Thus the remaining
 failure is not an omitted chain parameter; the scan transaction/framing path
 needs a dedicated hardware loopback check.
 
+A fixed-pattern scan-capture diagnostic (`0xA5A55A5AF0F00FF0`) was built,
+routed, programmed, and read through USER1. It also returned zero. This proves
+the failure is before `response_word` or system-clock command handling: the
+CSR scan register is not being selected/captured in this generated top. The
+diagnostic assignment was reverted immediately; it is not part of the
+production RTL.
+
 Per-command probing (TAP reset, CSR reset, prompt writes, start, and status)
 returned zero for every response with 0.5 s settling between transactions.
 This confirms the failure occurs before CSR command decoding or response
