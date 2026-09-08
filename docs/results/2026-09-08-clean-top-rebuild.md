@@ -33,3 +33,18 @@ coarse flow is confirmed to die in global SAT-based `share`; the standalone
 `memory` pass also exceeds the interactive memory budget. The next blocker is
 therefore staged BRAM legalization with the pinned Yosys architecture data,
 not frontend elaboration or loss of the JTAG parameter.
+
+## Memory-port diagnosis
+
+The next bounded experiment separated `memory_collect` from mapping. Collection
+itself succeeds in 3.7 seconds at 564 MiB peak and emits
+`/tmp/regen-clean/collected.il`. Mapping then fails deterministically on
+`core.token_weight_scale_q8_24_b3.mem` (32-bit × 16,384 words), which is marked
+`ram_style=block`. Its collected `$mem_v2` cell has an asynchronous read
+(`RD_CLK=1'x`, `RD_CLK_ENABLE=0`) and a synchronous write. The available
+7-series BRAM mapping primitives require clocked read ports, so no valid BRAM
+mapping exists for this generated memory. This is an actionable compiler-top
+integration issue: the generated static model must introduce a registered
+read boundary (or otherwise legalize asynchronous ROM/RAM accesses) before
+BRAM mapping can succeed; changing the JTAG CSR or transport would not address
+this failure.
