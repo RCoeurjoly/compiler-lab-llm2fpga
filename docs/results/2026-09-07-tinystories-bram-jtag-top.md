@@ -326,3 +326,13 @@ packing because the compact mapper emits non-legal RAMB36E1 vector widths
 `port.net == nullptr` assertion. The earlier mapping receipt confirms the
 legal widths are 16-bit addresses and four-bit `WEA`; this is now the active
 compiler netlist legalization task. No bitstream or timing claim follows.
+
+## 2026-09-08 mapping checkpoint
+
+The hierarchical banked source path was rebuilt with the current CSR/top. It
+now produces 14 legal RAMB18E1 and 38 legal RAMB36E1 primitives; the previous
+compact re-emission produced malformed 64-bit RAM ports and is not used.
+Yosys source elaboration and nextpnr pack-only both pass on the YPCB
+`xc7k480t-ffg1156` database. Full placement currently stops in the CSR control
+plane: the asynchronous JTAG/system-clock state needs explicit FF legalization
+and timing treatment. No routed bitstream or board inference is claimed yet.

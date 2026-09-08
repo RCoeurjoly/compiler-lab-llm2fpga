@@ -44,7 +44,11 @@ module tinystories_1m_jtag_csr #(
 `ifndef BSCAN_SIM
   wire scan_drck, scan_reset, scan_sel, scan_shift, scan_capture, scan_update;
   wire scan_tdi, scan_tdo;
+`ifdef SYNTHESIS
+  BSCANE2 bscan (
+`else
   BSCANE2 #(.JTAG_CHAIN(1)) bscan (
+`endif
       .CAPTURE(scan_capture), .DRCK(scan_drck), .RESET(scan_reset),
       .RUNTEST(), .SEL(scan_sel), .SHIFT(scan_shift), .TCK(),
       .TDI(scan_tdi), .TDO(scan_tdo), .UPDATE(scan_update));
