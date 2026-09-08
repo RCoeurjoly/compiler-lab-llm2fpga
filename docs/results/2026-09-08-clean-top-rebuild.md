@@ -131,3 +131,6 @@ without a mapping error.
 
 It now reaches `stage75.json` (80 forced-BRAM memories mapped), with the same
 per-stage success and restartability.
+
+The chain has reached `stage80.json` (85 forced-BRAM memories mapped), still
+without a per-memory mapping error.
