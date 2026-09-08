@@ -44,7 +44,7 @@ module tinystories_1m_jtag_csr #(
 `ifndef BSCAN_SIM
   wire scan_drck, scan_reset, scan_sel, scan_shift, scan_capture, scan_update;
   wire scan_tdi, scan_tdo;
-  BSCANE2 #(.JTAG_CHAIN(1)) bscan (
+  BSCANE2 #(.DISABLE_JTAG("FALSE"), .JTAG_CHAIN(1)) bscan (
       .CAPTURE(scan_capture), .DRCK(scan_drck), .RESET(scan_reset),
       .RUNTEST(), .SEL(scan_sel), .SHIFT(scan_shift), .TCK(),
       .TDI(scan_tdi), .TDO(scan_tdo), .UPDATE(scan_update));
@@ -71,12 +71,12 @@ module tinystories_1m_jtag_csr #(
   assign scan_tdo = scan_shift_reg[0];
 
   // JTAG clock domain: capture a response and shift/update one command.
-  always @(posedge scan_drck) begin
+  always @(posedge scan_drck or posedge scan_reset) begin
     if (scan_reset) begin
       scan_shift_reg <= 64'd0;
       command_word <= 64'd0;
       command_toggle <= 1'b0;
-    end else if (scan_capture) begin
+    end else if (scan_sel && scan_capture) begin
       scan_shift_reg <= response_word;
     end else if (scan_sel && scan_shift) begin
       scan_shift_reg <= {scan_tdi, scan_shift_reg[63:1]};

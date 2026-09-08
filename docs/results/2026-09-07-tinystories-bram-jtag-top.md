@@ -538,6 +538,14 @@ returned zero for every response with 0.5 s settling between transactions.
 This confirms the failure occurs before CSR command decoding or response
 capture, rather than being a bad prompt/model value.
 
+The CSR bridge was aligned with the validated JTAG primitive style
+(`DISABLE_JTAG="FALSE"`, explicit USER1 chain, asynchronous TAP reset, and
+`SEL`-gated capture/shift). A rebuilt and programmed bitstream
+(`tinystories-bscan-40.bit`, SHA-256
+`c3b7e551de16e4b832943f658a3a6d71dbfa0d3bf0f57e3a666f866efcec59e3`) still
+returned zero for every command. The failure therefore survives primitive
+style alignment and remains in physical scan selection/framing.
+
 Adding Yosys `wreduce` alongside the mux-tree simplification also completed
 quickly but produced byte-for-byte identical packed resource counts (1,898
 CARRY4, 1,027 FDRE, 2,148 LUT1, 1,692 LUT2, 3,053 LUT3, 948 LUT4, 467 LUT5,
