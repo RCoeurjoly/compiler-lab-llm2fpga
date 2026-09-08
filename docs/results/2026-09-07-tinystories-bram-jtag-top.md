@@ -489,6 +489,22 @@ after placement with an internal failure and only 31.65 MHz estimated timing.
 No routed artifact was produced. Placement heuristics therefore do not provide
 a credible path to 100 MHz for this generated netlist.
 
+### 2026-09-08 lower-frequency timing closure
+
+The board-clock requirement was corrected: 100 MHz was an inherited XDC
+assumption, not a user-mandated accelerator frequency. The production XDC now
+constrains the accelerator at 40 MHz (25 ns period), conservatively below the
+measured 46.52 MHz maximum. With the fixed seed-15 heap placement, nextpnr
+routes with zero overuse and exits successfully (`PASS at 40.00 MHz`). FASM was
+assembled into a 18,735,151-byte Kintex-7 bitstream candidate:
+
+`tinystories-40.bit` SHA-256
+`c171a574da09e003b3b3f6bd74a5723cae374dc873b5e49cdb0ea4365ac5e9e1`.
+
+This is timing closure only. The bitstream has not yet been programmed on the
+YPCB, and JTAG CSR execution plus the exact `[11, 612]` token result remain
+unverified.
+
 Adding Yosys `wreduce` alongside the mux-tree simplification also completed
 quickly but produced byte-for-byte identical packed resource counts (1,898
 CARRY4, 1,027 FDRE, 2,148 LUT1, 1,692 LUT2, 3,053 LUT3, 948 LUT4, 467 LUT5,
