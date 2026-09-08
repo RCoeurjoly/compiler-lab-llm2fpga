@@ -483,3 +483,8 @@ did not reach routing: relative-constraint legalization moved 17,349 cells but
 left 116 unplaced and made no further progress. This makes it unsuitable as a
 closure strategy for this netlist; heap placement remains the reproducible
 placer, and the generated control path remains the limiting factor.
+
+The nextpnr `--placer-budgets` experiment was counterproductive: it aborted
+after placement with an internal failure and only 31.65 MHz estimated timing.
+No routed artifact was produced. Placement heuristics therefore do not provide
+a credible path to 100 MHz for this generated netlist.
