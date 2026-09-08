@@ -477,3 +477,9 @@ produced a valid mapped netlist, but did not change the packed resource profile
 or timing: the same deterministic route reached zero overuse and 47.15 MHz.
 This rules out mux-tree cleanup as the needed closure fix; an actual sequential
 boundary or a materially different control representation is required.
+
+The fixed-seed simulated-annealing placement comparison was also bounded. It
+did not reach routing: relative-constraint legalization moved 17,349 cells but
+left 116 unplaced and made no further progress. This makes it unsuitable as a
+closure strategy for this netlist; heap placement remains the reproducible
+placer, and the generated control path remains the limiting factor.
