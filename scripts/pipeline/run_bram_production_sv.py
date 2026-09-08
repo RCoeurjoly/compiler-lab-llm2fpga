@@ -14,6 +14,11 @@ import time
 import re
 
 ROOT = Path(__file__).resolve().parents[2]
+LUTRAM_MEMORIES = {
+    "attention_context_q16_16", "attention_residual_q16_16",
+    "block_input_q16_16", "block_output_q16_16", "ln1_output_q16_16",
+    "ln2_output_q16_16", "final_output_q16_16",
+}
 
 
 def annotate_bram_memories(source: str) -> str:
@@ -60,6 +65,9 @@ def annotate_bram_memories(source: str) -> str:
             1,
         )
         source = source[:end] + "\n\n" + body + source[end:]
+        lut_marker = "module seq_mem_d1_lutram #"
+        lut_body = body.replace(marker, lut_marker, 1).replace('  (* ram_style = "block" *)\n', "", 1)
+        source = source.replace(body, body + "\n\n" + lut_body, 1)
     # Match each parameterized instance and inspect its literal SIZE.  This
     # intentionally leaves non-literal/generated forms untouched.
     pattern = re.compile(r"seq_mem_d1\s*#\s*\(", re.S)
@@ -85,7 +93,8 @@ def annotate_bram_memories(source: str) -> str:
         size_match = re.search(r"\.SIZE\s*\(\s*(\d+)\s*\)", params)
         width_match = re.search(r"\.WIDTH\s*\(\s*(\d+)\s*\)", params)
         if size_match and width_match and int(size_match.group(1)) >= 512 and int(width_match.group(1)) <= 72:
-            pieces.append("seq_mem_d1_bram # (" + params + ") " + tail.group("name") + " (")
+            variant = "seq_mem_d1_lutram" if tail.group("name") in LUTRAM_MEMORIES else "seq_mem_d1_bram"
+            pieces.append(variant + " # (" + params + ") " + tail.group("name") + " (")
         else:
             pieces.append(source[match.start() : pos + tail.end()])
         cursor = pos + tail.end()

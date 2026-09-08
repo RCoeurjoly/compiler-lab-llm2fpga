@@ -73,6 +73,20 @@ seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small ( .clk(clk) );
         self.assertIn("seq_mem_d1_bram # (.SIZE(512), .WIDTH(64)) wide", result)
         self.assertIn("seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small", result)
 
+    def test_known_scratch_buffers_use_lutram_variant(self):
+        path = ROOT / "scripts/pipeline/run_bram_production_sv.py"
+        spec = importlib.util.spec_from_file_location("bram_sv_runner_lutram", path)
+        assert spec and spec.loader
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        source = """module seq_mem_d1 #(parameter SIZE=16, parameter WIDTH=8, parameter IDX_SIZE=4) (input clk);
+  logic [WIDTH-1:0] mem[SIZE-1:0];
+endmodule
+seq_mem_d1 #(.SIZE(512), .WIDTH(64)) attention_context_q16_16 ( .clk(clk) );
+"""
+        result = runner.annotate_bram_memories(source)
+        self.assertIn("seq_mem_d1_lutram # (.SIZE(512), .WIDTH(64)) attention_context_q16_16", result)
+
     def test_signed_multiply_repair_is_strict_and_preserves_result_context(self):
         path = ROOT / "scripts/pipeline/repair_calyx_signed_multiply_width.py"
         spec = importlib.util.spec_from_file_location("signed_multiply_repair", path)
