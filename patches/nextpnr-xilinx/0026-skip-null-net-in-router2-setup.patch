@@ -1,0 +1,8 @@
+--- a/common/router2.cc
++++ b/common/router2.cc
+@@
+         for (auto net : sorted(ctx->nets)) {
+             NetInfo *ni = net.second;
++            if (ni == nullptr)
++                continue;
+             ni->udata = i;
