@@ -87,13 +87,25 @@ seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small ( .clk(clk) );
       read_out <= mem[addr0];
     end
   end
+  logic done;
+  always_ff @(posedge clk) begin
+    if (reset) begin
+      done <= '0;
+    end else if (content_en) begin
+      done <= '1;
+    end else begin
+      done <= '0;
+    end
+  end
 endmodule
 seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
 """
         result = runner.annotate_bram_memories(source)
         self.assertIn("logic [IDX_SIZE-1:0] read_addr;", result)
+        self.assertIn("logic read_pending;", result)
         self.assertIn("read_addr <= addr0;", result)
         self.assertIn("read_out <= mem[read_addr];", result)
+        self.assertIn("done <= read_pending;", result)
 
     def test_production_futil_removes_audit_memories_and_logits_buffer(self):
         module = load_module()

@@ -42,7 +42,7 @@ def annotate_bram_memories(source: str) -> str:
         # staging the address in the same clocked process as read_out.
         body = body.replace(
             "  logic [WIDTH-1:0] read_out;",
-            "  logic [WIDTH-1:0] read_out;\n  logic [IDX_SIZE-1:0] read_addr;",
+            "  logic [WIDTH-1:0] read_out;\n  logic [IDX_SIZE-1:0] read_addr;\n  logic read_pending;",
             1,
         )
         body = body.replace(
@@ -51,6 +51,11 @@ def annotate_bram_memories(source: str) -> str:
             1,
         )
         body = body.replace("read_out <= mem[addr0];", "read_out <= mem[read_addr];", 1)
+        body = body.replace(
+            "  always_ff @(posedge clk) begin\n    if (reset) begin\n      done <= '0;\n    end else if (content_en) begin\n      done <= '1;\n    end else begin\n      done <= '0;\n    end\n  end",
+            "  always_ff @(posedge clk) begin\n    if (reset) begin\n      done <= '0;\n      read_pending <= '0;\n    end else begin\n      done <= read_pending;\n      read_pending <= content_en;\n    end\n  end",
+            1,
+        )
         source = source[:end] + "\n\n" + body + source[end:]
     # Match each parameterized instance and inspect its literal SIZE.  This
     # intentionally leaves non-literal/generated forms untouched.
