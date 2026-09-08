@@ -306,3 +306,23 @@ already has a registered read) failed earlier, during legalization: Yosys
 reported `no valid mapping found` for token-weight bank `b196`. Thus
 `memory_dff` is currently required for the bank mapper to recognize the
 template; omitting it is not a valid export-pressure fix.
+
+## Source-wired top and implementation boundary
+
+The production top now includes a synthesizable two-cycle FPGA power-up reset
+for the board-clock CSR domain. This is separate from BSCAN reset: it prevents
+the prompt, start, reset, and token-index ports from becoming unknown before
+the first JTAG transaction. A source-level Yosys elaboration with the static
+generated model produced zero `x` bits on every CSR-to-core connection and
+retained the `main` and JTAG CSR hierarchy.
+
+Re-emitting the older composed JSON was not sufficient: its top-level core
+cell contained unknown (`x`) prompt/control connections and nextpnr crashed in
+`pack_constants`. The source-wired top removes that malformed boundary. With
+the mapped generated main composed behind it, nextpnr now reaches carry and
+LUT packing and recognizes the BSCAN site. The next diagnostic stops in BRAM
+packing because the compact mapper emits non-legal RAMB36E1 vector widths
+(17-bit addresses and 32-bit `WEA` for read-only banks), followed by a
+`port.net == nullptr` assertion. The earlier mapping receipt confirms the
+legal widths are 16-bit addresses and four-bit `WEA`; this is now the active
+compiler netlist legalization task. No bitstream or timing claim follows.

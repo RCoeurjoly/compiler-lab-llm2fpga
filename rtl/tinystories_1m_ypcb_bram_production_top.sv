@@ -24,9 +24,16 @@ module tinystories_1m_ypcb_bram_production_top (
   // synthesis-time $readmemh initializers.  There is no runtime weight load
   // transaction in this BRAM-only milestone.
   wire model_init_done = 1'b1;
+  // BSCAN reset only resets the scan clock domain.  The CSR shadow state is
+  // in the board clock domain, so give it a deterministic FPGA power-up
+  // reset before accepting the first JTAG command.  The initial value maps
+  // to the normal Xilinx flip-flop INIT bit and needs no board reset pin.
+  (* keep *) reg [1:0] powerup_reset = 2'b11;
+  always @(posedge clk) powerup_reset <= {powerup_reset[0], 1'b0};
+  wire sys_reset = powerup_reset[1];
 
   tinystories_1m_jtag_csr csr (
-      .sys_clk(clk), .sys_rst(1'b0), .core_start(start), .core_reset(csr_reset),
+      .sys_clk(clk), .sys_rst(sys_reset), .core_start(start), .core_reset(csr_reset),
       .core_valid(valid), .core_token_index(token_index),
       .prompt_0(prompt_0), .prompt_1(prompt_1), .prompt_2(prompt_2), .prompt_3(prompt_3),
       .core_token_id(token_id), .core_done(csr_done),

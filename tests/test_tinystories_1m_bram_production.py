@@ -129,6 +129,8 @@ seq_mem_d1 #(.SIZE(64), .WIDTH(8)) small ( .clk(clk) );
             self.assertIn(f".{signal}({signal})", top)
         self.assertIn("tinystories_1m_jtag_csr csr", top)
         self.assertIn("main core", top)
+        self.assertIn("reg [1:0] powerup_reset = 2'b11", top)
+        self.assertIn(".sys_rst(sys_reset)", top)
 
     def test_jtag_abi_preserves_lifecycle_and_readback_ordering(self):
         csr = (ROOT / "rtl/tinystories_1m_jtag_csr.sv").read_text()
