@@ -1,0 +1,8 @@
+--- a/xilinx/fasm.cc
++++ b/xilinx/fasm.cc
+@@
+         for (auto net : sorted(ctx->nets)) {
+             NetInfo *ni = net.second;
++            if (ni == nullptr)
++                continue;
+             for (auto &w : ni->wires) {
