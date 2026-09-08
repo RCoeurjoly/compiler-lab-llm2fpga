@@ -122,3 +122,6 @@ error has appeared.
 The chain now reaches `stage50.json` (55 forced-BRAM memories mapped). The
 per-memory JSON stages continue to complete without mapping errors, providing
 restartable artifacts for the remaining bank set.
+
+It has since advanced through `stage60.json` (65 forced-BRAM memories mapped),
+still with no per-memory mapping errors.
