@@ -1,0 +1,11 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] router2: skip null entries in runtime statistics
+
+--- a/common/router2.cc
++++ b/common/router2.cc
+@@
+             std::vector<std::pair<int, IdString>> nets_by_runtime;
+             for (auto &n : nets_by_udata) {
++                if (n == nullptr)
++                    continue;
+                 nets_by_runtime.emplace_back(nets.at(n->udata).total_route_us, n->name);
