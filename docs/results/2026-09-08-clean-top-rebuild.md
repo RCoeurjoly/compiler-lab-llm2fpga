@@ -67,3 +67,11 @@ merges the address FF for the formerly failing token-weight memory
 the pass is not yet semantically validated for the full accelerator. The next
 step is to retime and validate `done`/`content_en` against model checkpoints
 before FPGA mapping or hardware.
+
+The follow-up post-pass (`ec2a074`) delays the BRAM variant's `done` pulse via
+`read_pending` to match the staged read. The focused suite remains green. A
+fresh full-model generation/build completed, but its existing Verilator
+harness still failed to reach a `complete` event in the bounded run (the log
+stopped at 57,000 cycles), so this latency adjustment is not yet proven
+functionally. The next diagnostic must compare one memory transaction and its
+consumer's `done` edge directly, rather than attempting another long run.
