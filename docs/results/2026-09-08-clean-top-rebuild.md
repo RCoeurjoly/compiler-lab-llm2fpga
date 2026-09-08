@@ -1,5 +1,11 @@
 # Clean compiler-top rebuild checkpoint
 
+**Current outcome: the full compiler-generated top is programmed in FPGA
+SRAM and passes the USER1 CSR communication gate.** See the final acceptance
+section below. Historical failures and withdrawn intermediate claims remain
+in this journal for traceability. No inference or full accelerator timing
+qualification is claimed.
+
 > Correction after native-library validation: the historical 955-block count
 > below is not proof of a legal full-design fit. The temporary descriptor and
 > partial ABI adapter used for that result are incompatible with the Series-7
@@ -713,3 +719,98 @@ timing closure or inference reliability, and it must not substitute a
 clock probe or reduced CSR shell for the actual compiler-generated top.
 No START command is allowed before the CSR gate passes. Timing qualification
 for accelerator execution remains separate, unresolved work.
+
+## Final CSR hardware acceptance — passed
+
+Full routing finished in eight iterations with zero overused wires,
+`archfail=0`, exit status zero, and zero errors. All 12,993 packing warnings
+were classified as unused DSP cascade outputs (ACOUT, BCOUT, CARRYCASCOUT,
+PCOUT), not undriven inputs. The partial timing report estimates 59.45 MHz
+for `accelerator_clk` after routing; its incomplete BRAM/DSP and FF timing
+coverage means this is not a full timing-closure claim.
+
+The emitted FASM contains exactly USER1's `BSCAN.JTAG_CHAIN_1`. Its MMCM
+feedback high/low times are 9/9, output high/low times 15/15, input divider
+has NO_COUNT set, and compensation is Z_ZHOLD: nominal 50 MHz × 18 / 30 =
+30 MHz. The bitstream was built from that full routed design, not the probe.
+
+The full bitstream was programmed sudolessly into SRAM on FTDI serial
+`210299BF3824` with the established `digilent_hs3` cable configuration.
+Programming returned zero and reported `isc_done 1`, `init 1`, `done 1`.
+**BPI flash was not modified**; a chassis power cycle will not retain this
+SRAM-only programming.
+
+The initial Python check stopped before opening JTAG because the library
+loader could not locate `libftdi1.so`. Supplying the installed library path
+resolved that environment problem without changing source or bitstream.
+The hardware checker then returned zero and passed **three complete
+status/reset/prompt sequences, 54 transactions**. The tracked raw receipt is
+[2026-09-08-compiler-top-user1-transactions.json](2026-09-08-compiler-top-user1-transactions.json).
+It records only opcodes 1, 3, and 5 and `inference_started=false`.
+
+These are three TAP-reset/CSR-reset sequences, not three chassis cold starts.
+The preserved ABI overlaps prompt index bits with the value; the tested
+words are 0x0001, 0x0012, 0x0023, and 0x0034. The result does not establish
+arbitrary-prompt loading, token generation, or inference correctness.
+
+Re-run the CSR-only acceptance from the repository root:
+
+```sh
+nix develop . -c env \
+  LD_LIBRARY_PATH=/nix/store/giikxmmn66cadlpql43w4515wwik9fs1-libftdi-1.5/lib \
+  python scripts/pipeline/check_tinystories_user1.py \
+  --transport-dir /home/roland/LLM2FPGA/scripts/task6 --runs 3 \
+  --output /tmp/compiler-top-user1-recheck.json
+```
+
+### Preserved artifacts and provenance
+
+The working bitstream, frames, FASM, final netlist, source image and 240 hex
+files, build/program logs, local nextpnr patch, and acceptance receipt are
+preserved outside `/tmp` in
+`result-compiler-top-30mhz-20260908/` under the repository root. This directory
+uses the existing `result-*` ignore rule; large binaries are not committed.
+The complete preserved bundle is about 1.5 GiB, including the routed JSON
+and diagnostic chipdb. Every file passes its portable `bundle.sha256`
+inventory; that inventory's SHA-256 is
+`c856b82ab79441ba607f8f9dcd55497b8fca09a8fed83786117a73ff56f90388`.
+The copied source/image bindings and every captured expected response were
+independently rechecked from this preserved bundle, not just the checker's
+`passed` flag.
+The source tree at programming was clean at
+`5e42a1b1dd6369b353ce4156342546e68e9fffa2`; subsequent changes only record
+acceptance evidence.
+
+To reload the accepted image into SRAM after a power cycle:
+
+```sh
+cd result-compiler-top-30mhz-20260908 &&
+sha256sum -c compiler-top-30mhz.sha256 &&
+timeout 120 /home/roland/openFPGALoader/build/openFPGALoader \
+  -c digilent_hs3 --ftdi-serial 210299BF3824 -m --file-type bit \
+  compiler-top-30mhz.bit
+```
+
+SHA-256 bindings:
+
+- bitstream: `04e80209af3bbbaeec948a9318d2d1ec261a86ceaf6e252095012164d5643c03`
+- frames: `b62260ce3762b39c7cb3f0342dced11a699f36c4db6f91a8f5c6291b812420fc`
+- routed FASM: `5b5dee90c4b7e9f66d83b2b73405a37acf0e922080ed2d36b8765bb72b7d96b2`
+- routed JSON: `37d2c29ee11cf6c925a0d928a2211171e56e0056917e0773d5bda31dfb3ceb46`
+- final synthesis JSON: `dc016ee6659be48bb73bce224ce75a5637a0519456f9295a83573632b74865a5`
+- programming log: `2796c76a9888f5d771850c699fdc8864a071a8cdf58a254d56abb0345566bb92`
+- successful hardware receipt: `8d5091baf88fc6fb5dcdf49fbcc2daca5cb4138ce58475fa560d445c3e9cf607`
+- nextpnr executable: `fe6c462ee6336e3d2af467c97c57326b003e56f4371ef23a24a5c3502ee1a8e5`
+- nextpnr local patch: `8749ef367f09d3d6b9be91ab8a44e2c758fedc13b3f291422b02aafa8c75b5d2`
+
+The executable came from nextpnr commit
+`32e8b798520d90e1130afe95908f04cf52125cf6` plus the recorded local placer
+patch; the X-Ray database is clean at
+`6c02fde2635b0d54397761359375fc8119ef04cf`. The separate diagnostic chipdb
+hash and exact-part extraction provenance are recorded above.
+
+Before programming, all 240 immutable source memories (3,719,908 words)
+passed byte hashes, widths, and lengths. The manifest self-hash and its
+futil/generated-SV/static-SV bindings passed independently. All 25 contract
+tests and the three-sequence CSR simulation passed. Hardware acceptance,
+rather than those simulations alone, establishes this goal's CSR result.
