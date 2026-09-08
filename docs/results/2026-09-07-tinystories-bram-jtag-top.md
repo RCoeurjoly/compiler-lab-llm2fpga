@@ -465,3 +465,9 @@ This is not a production result. nextpnr exits with status 1 because the real
 post-route report (31 MHz target run), versus the required 100 MHz. No `.bit`
 was generated or programmed, and no board inference was attempted. The routed
 FASM is diagnostic only until timing closure and bitstream verification pass.
+
+The post-route critical path is now characterized rather than guessed. It is a
+21.2 ns registered path (7.0 ns LUT logic, 14.2 ns routing) from the generated
+core `std_reg` state register (`model-block.sv:1316`) through a long chain of
+control/mux logic into another generated register. This is the current timing
+closure target; changing the JTAG shell or constraints would not address it.
