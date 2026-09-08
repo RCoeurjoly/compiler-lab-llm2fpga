@@ -610,3 +610,48 @@ timing closure. Timing coverage must be resolved before accepting a
 The four unittest modules for chipdb admission, BRAM production, BRAM image
 preparation, and USER1 checking pass all 25 tests under Nix Python. No new
 bitstream has been programmed and no inference command has been sent.
+
+## Complete native synthesis checkpoint
+
+Further inspection invalidated `initialized-checked.json` as a board input:
+although the generic Yosys check passed, it contained unmapped `$_DFF*` and
+`$_SDFF*` cells. The staged `map_ffram:map_ffs` command excludes the end
+label, and the subsequent run began at `map_luts`, omitting `map_ffs`.
+Similarly, ending at `:check` omitted the standard check/whitebox stage.
+The initial JSON export then rejected simulation processes in FDCE.
+Neither intermediate JSON may be used for board implementation.
+
+The corrected remaining-stage recipe is `map-final.ys`, starting from the
+unchanged `initialized-fine.il`, restoring both native Verilog libraries,
+and running `synth_xilinx -family xc7 -abc9 -run map_ffs:` through the end.
+It completed within its 900-second bound. ABC9 reports equivalent networks,
+and the final Yosys check reports zero problems. This equivalence applies
+to ABC9's mapping boundary, not full-model inference semantics.
+
+The resulting `initialized-final.json` has no internal logic cell types
+(only `$scopeinfo` metadata), exactly one BSCANE2 with `JTAG_CHAIN=1` and
+`DISABLE_JTAG="FALSE"`, and the explicit 50-to-30 MHz ZHOLD MMCM parameters.
+It contains 953 RAMB36E1, one RAMB18E1, 231 DSP48E1, 4,580 CARRY4,
+1,136 RAM64M, 13,752 FDRE, 85 FDCE, two FDPE, and 17 FDSE. Clock mapping
+now includes four BUFGs. These counts are not proof of placement or timing.
+
+Hashes under `/tmp/regen-safe/native-static-image`:
+
+- `initialized-final.json`: `dc016ee6659be48bb73bce224ce75a5637a0519456f9295a83573632b74865a5`
+- `initialized-final.il`: `4b4295b9f7bac66ea5492e6c132ce7ee4e685d9f0b946c3682c12405cabf8f3c`
+- `map-final.ys`: `0773293cf06e7391ab10ec5056db6de5325142f5f8987905c794eb2907c30809`
+
+`final-build-inputs.sha256` records and successfully rechecks the checked-in
+CSR, clock, top, constraints, static-image preparation and mapping scripts,
+static model/manifest, final recipe, and final JSON. This is an input/output
+hash inventory, not yet an end-to-end bitstream provenance receipt. The
+CSR simulation was rerun and passed three status/prompt/reset sequences
+with the vendor-style DRCK gating; hardware acceptance is still pending.
+
+The full timing converter's 180-second profiled run also timed out; periodic
+stack traces locate it in the model-to-pin decoding loops. A separate
+four-CLB-tile diagnostic successfully generated exact-part SDF files using
+the unmodified upstream converters. A bounded diagnostic chipdb export is
+running from a symlink overlay of the Kintex database plus those four SDFs.
+Its outputs are explicitly partial and must not be used to claim BRAM/DSP
+timing coverage or full-design closure. The installed chipdb is unchanged.
