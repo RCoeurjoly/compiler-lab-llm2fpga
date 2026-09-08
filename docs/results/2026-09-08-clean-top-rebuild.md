@@ -322,3 +322,10 @@ still reports 962 physical RAMB36E1s: the XC5V LUTRAM descriptor emits
 width-3 slice cells that its physical map does not currently legalize. The
 remaining implementation task is therefore a descriptor/packing repair (or
 explicit RAM64M packing), before nextpnr can be meaningfully attempted.
+
+An explicit seven-memory mapping pass (LUTRAM first, BRAM for all remaining
+memories) now produces exactly 955 RAMB36E1 and 1,232 RAM64M primitives. After
+residual tiny-memory expansion, ABC9 enters technology mapping but exceeds the
+bounded host-memory run while handling roughly 871k AND gates. The fit is
+therefore established at the memory-primitive level; the remaining boundary is
+logic legalization/ABC9 scale before nextpnr placement.
