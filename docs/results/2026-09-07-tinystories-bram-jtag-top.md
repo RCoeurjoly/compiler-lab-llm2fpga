@@ -579,3 +579,11 @@ Direct Yosys/SLANG elaboration of the model, CSR, and top completes with zero
 errors, and the focused production suite remains 9/9. Commit `9339d12`
 contains this correction. It must still be carried through mapping, routing,
 programming, and hardware inference.
+
+### 2026-09-08 30 MHz timing target
+
+The production clock constraint is now 30 MHz (33.333 ns period). The
+CSR-inclusive timing report reaches 32.79 MHz on the accelerator clock, so
+30 MHz provides positive margin. A replacement bitstream is not yet emitted:
+the current patched nextpnr aborts during post-placement legalization
+(`port.net == nullptr`). Hardware inference remains unverified.
