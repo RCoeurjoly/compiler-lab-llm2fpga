@@ -1,0 +1,8 @@
+--- a/xilinx/arch.cc
++++ b/xilinx/arch.cc
+@@
+     for (auto net : sorted(nets)) {
+         NetInfo *clk_net = net.second;
++        if (clk_net == nullptr)
++            continue;
+         auto clk_driver = clk_net->driver;
