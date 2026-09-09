@@ -592,3 +592,30 @@ production XDC, 30 MHz target and seed 15 are unchanged. Compared with the
 original capacity candidate, packed RAM64M count fell from 24,688 to 17,864;
 this is resource reduction, not proof of legal placement or timing. Board
 inference and the three independent reconfiguration runs remain pending.
+
+### Supported candidate completed place and route
+
+The fixed-seed packed-memory run exited zero. Main placement took 474.54
+seconds and SA refinement 104.44 seconds. Router2 converged in 36 iterations
+to `overused=0 overuse=0 archfail=0`; Router2 time was 995.91 seconds and
+Router1 cleanup 20.73 seconds. Post-routing legalization completed with
+240 disconnected-port warnings and zero errors.
+
+The preliminary accelerator estimate was 29.12 MHz, failing the 30 MHz
+target; the routed report is 33.45 MHz, passing that target on covered paths.
+This is not full timing qualification: the existing partial CLB database,
+uncovered BRAM/DSP endpoints and simplified FF timing remain unresolved.
+Neither the clock target nor constraints were relaxed.
+
+Routed artifacts under `/tmp/tinystories-first-token-packed-static-20260909`:
+
+- `compiler-top-packed.fasm`: SHA-256
+  `463ed8f2cce471512f09d875ac6b9b2aca1c97a6a56095d7ed09e6a842160bab`.
+- `compiler-top-packed-routed.json`: SHA-256
+  `73d2d05553414b312142cef49e6c690f827d70c2e2529a06ac0661a195d08d56`.
+- `compiler-top-packed-nextpnr.log`: full placement, routing and timing report.
+
+Bounded bitstream generation uses the previously validated `task3-main` Nix
+environment, the same xc7k480tffg1156-2 device database, `fasm2frames` followed
+by `xc7frames2bit`. Bitstream completion and board inference are not yet
+claimed by this entry.
