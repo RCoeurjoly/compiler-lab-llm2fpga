@@ -41,6 +41,9 @@ write_verilog -noattr {d}/mapped.v
             self._yosys(d / "map.ys")
             cells = json.loads((d / "native.json").read_text())["modules"]["main"]["cells"]
             self.assertTrue(any(c["type"].startswith("RAM") for c in cells.values()))
+            unsupported = {c["type"] for c in cells.values()
+                           if c["type"].startswith("RAM")} - {"RAM32M", "RAM64M"}
+            self.assertFalse(unsupported, f"unsupported nextpnr ROM primitives: {unsupported}")
             self.assertFalse(any(c["type"].startswith("$mem") for c in cells.values()))
             (d / "tb.sv").write_text('''module tb;
 reg clk=0, reset=1, en=1; reg [8:0] addr=0;

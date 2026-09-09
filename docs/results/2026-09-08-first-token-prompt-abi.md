@@ -520,3 +520,35 @@ database recorded above, unchanged XDC, `--freq 30 --seed 15 --no-tmdriv`.
 Output prefix is `compiler-top-rom` in the same directory. The original
 failed placement is preserved separately. No timing-coverage upgrade or
 hardware inference success is implied by the successful synthesis.
+
+### Backend-compatible packed ROMs
+
+The reduced candidate's nextpnr run exited 255 during DRAM packing:
+`Cannot pack unsupported primitive: RAM256X1S`. It did not reach placement.
+Source inspection of this exact backend confirmed that single-bit SP RAM
+primitives are rejected, whereas RAM32M and RAM64M are handled. This is an
+explicit backend compatibility failure, not another timing or inference
+failure.
+
+The native-ROM regression was extended and failed on the actual RAM256X1S
+output. The ROM library now retains only the installed SDP geometry, which
+maps to supported packed RAM32M/RAM64M cells. The installed library and
+nextpnr sources are unchanged. All 42 targeted regressions passed, including
+native data/reset/enable/staging behavior and the supported-primitive check.
+
+The exact four scale images now map to 5,804 RAM64M instances. A complete
+fixture synthesis reported zero CHECK problems, and this nextpnr binary
+passed its pack-only check with explicit per-port fixture I/O standards.
+The production XDC was not changed. Artifacts have prefix
+`/tmp/tinystories-packed-scale-pack-check`; synthesis log is
+`/tmp/tinystories-packed-scale-pack-synth.log`.
+
+The combined 120-second Icarus run timed out after native conversion and
+simulation compilation; no exhaustive pass is attributed to that run. A
+separate bounded Verilator build of the same exhaustive comparison completed,
+and `/tmp/tinystories-packed-scale-verilated/Vtb` matched all 65,536 real scale
+words with unchanged two-cycle output latency. Verilator is a two-state
+simulation; the smaller Icarus regression separately exercises reset, enables,
+known outputs and staging. The five-minute progress-instrumented Icarus
+diagnostic is not needed to infer this Verilator result. These fixture passes
+still do not prove full-model placement, timing or board inference.
