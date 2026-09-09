@@ -414,3 +414,22 @@ optimized RTL and executable use the prefix
 `/tmp/tinystories-optmem-scale-check`. This checks the scale-memory transformation,
 not complete optimized-model inference or placement; the active router input
 remains unchanged.
+
+### Separate lossless-width mapping candidate
+
+The exhaustive scale-ROM comparison was rerun successfully before starting a
+separate, bounded mapping of the optimized full-model RTLIL. Its input is
+`/tmp/tinystories-capacity-optmem-probe.il`, SHA-256
+`0cee3c605c6c488d2b579350a8cecf5adce9c0494141691e7635fc5d067a7ebb`.
+It contains 278 memories after constant zero-bias elimination. The fresh
+checkpoint directory is `/tmp/tinystories-first-token-optmem-map-20260909`;
+the command uses `map_flattened_memory_checkpoints.py`, the production top,
+a 120-second per-memory limit and a 1,800-second overall limit.
+
+This is a separate candidate, not a restart or replacement of the live
+high-SLICEM-pressure placement run. The original process was confirmed live
+on the host after a sandbox-local process listing failed to show it. Neither
+candidate has yet supplied a new routed bitstream or board inference result.
+Generated model RTL, source tensor values, the 30 MHz clock, JTAG and router
+seed remain unchanged. Full mapped-netlist equivalence is not established by
+the scale-ROM test alone.
