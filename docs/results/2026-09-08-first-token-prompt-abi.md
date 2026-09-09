@@ -498,3 +498,25 @@ exit. Native initialization/configuration comparison includes every `RAM*`
 primitive type, DSP48E1, MMCME2_ADV and BSCANE2. Final counts, routing and board
 inference remain pending. A read-only JTAG check again detected XC7K480T,
 IDCODE `0x23751093`, via the specified HS3 programmer; no new image was loaded.
+
+### Reduced-memory candidate passed final synthesis
+
+Native conversion completed in 710.33 seconds, followed by coarse preparation
+in 13.72 seconds, fine mapping in 94.08 seconds and standard-ABC final mapping
+in 21.10 seconds. Final CHECK reported zero problems and no residual memories
+or processes. The final design contains 830 RAMB36E1, 125 RAMB18E1, 12,544
+RAM256X1S, 1,136 RAM64M and 163 DSP48E1, with four BUFG, one MMCME2_ADV and one
+BSCANE2. These are capacity counts, not evidence of legal placement or timing.
+
+The final JSON is
+`/tmp/tinystories-first-token-rom-static-20260909/initialized-final-abc.json`,
+SHA-256 `188110144cec0d7729462cdbabe8c5120cb9c39593c5d113ee167704a41773f3`.
+Comparison against the fine checkpoint passed all 14,800 native memory, DSP,
+clock and JTAG instances: all specified parameter bits matched and no
+unspecified bits changed. The checker is `/tmp/verify-rom-native-params.py`.
+
+A fresh 1,800-second place/route run uses the same router and partial device
+database recorded above, unchanged XDC, `--freq 30 --seed 15 --no-tmdriv`.
+Output prefix is `compiler-top-rom` in the same directory. The original
+failed placement is preserved separately. No timing-coverage upgrade or
+hardware inference success is implied by the successful synthesis.
