@@ -350,3 +350,37 @@ LUTRAM cells, checks retained address/result register widths, and verifies an
 ordinary token-code bank remains BRAM. All 41 targeted tests pass. The full
 generated SV and its two passing simulation runs are unchanged; physical
 implementation and board acceptance are not yet verified for this allocation.
+
+### Capacity allocation synthesized; standard ABC avoids host OOM
+
+All 279 revised memory mappings, native conversion and coarse/fine mapping
+completed. Final ABC9 synthesis exited 137. The kernel log identifies Yosys as
+the OOM victim, with 28,643,892 kB anonymous RSS; its log ends in ABC9_OPS after
+expanding thousands of parameterized RAM64M behavioral models. This was a host
+resource failure, not an inference mismatch.
+
+A separate bounded final-mapping run from the saved fine netlist used Yosys's
+standard ABC flow instead of ABC9. It completed successfully with zero CHECK
+problems, without changing RTL, model contents, allocation, constraints or
+router seed. The final report has 921 RAMB36E1, eight RAMB18E1, 24,688 RAM64M,
+245 DSP48E1, four BUFG, one MMCME2_ADV and one BSCANE2. The raw BRAM and SLICEM
+counts fit; legal placement is still required. RAM64M uses four 64-bit memory
+LUTs per instance, so SLICEM pressure is substantially higher than the raw
+model-bit estimate alone suggests.
+
+The final JSON is
+`/tmp/tinystories-first-token-capacity-static-20260909/initialized-final-abc.json`,
+SHA-256 `8853f441b1aa8596969b38e1530e39bf7bd00a0615a74810ddda4b4c3deed79d`.
+An independent comparison against `initialized-fine.il` verified all specified
+native memory/MMCM/JTAG parameter bits across 25,619 instances, including
+initialization and clock settings. No unspecified bits changed either; a
+preliminary mismatch came from the checker's handling of compact RTLIL bit
+representations and was resolved by width-aware comparison.
+
+The fixed-seed route has started with seed 15, `--freq 30 --no-tmdriv`, the
+unchanged XDC, router SHA-256
+`fe6c462ee6336e3d2af467c97c57326b003e56f4371ef23a24a5c3502ee1a8e5`,
+and partial device database SHA-256
+`a96010ce1d1cfa0ac66bc52ba25ff0b77cccdf07d6835dd94eead9afab2d404e`.
+The existing incomplete accelerator timing coverage remains explicit. Neither
+routing nor board inference is claimed complete.
