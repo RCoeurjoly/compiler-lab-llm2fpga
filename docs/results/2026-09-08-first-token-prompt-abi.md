@@ -433,3 +433,21 @@ candidate has yet supplied a new routed bitstream or board inference result.
 Generated model RTL, source tensor values, the 30 MHz clock, JTAG and router
 seed remain unchanged. Full mapped-netlist equivalence is not established by
 the scale-ROM test alone.
+
+The separate mapping stopped after 47/278 memories: memory 48, token-scale
+bank 0, had no valid distributed-RAM mapping. The helper returned process exit
+zero despite its receipt correctly reporting `partial`; the receipt, not that
+exit status, is authoritative. A direct replay with `debug memory_libmap`
+identified every candidate rejection as `ROM mapping disabled (prune_rom set)`.
+After `opt_mem` removes inactive write ports, the installed library explicitly
+excludes the resulting ROM; this was not a 17-bit width or tensor-value error.
+
+A private diagnostic copied the installed single-port LUTRAM template's
+geometry, ports and initialization policy, omitting `prune_rom`. Mapping the
+same failing memory then exited zero and extracted its data register. Files:
+`/tmp/tinystories-rom-lutram-xc7.txt`,
+`/tmp/tinystories-optmem-scale-map-rom.ys`, `.il`, and `.log`; the original
+rejection is in `/tmp/tinystories-optmem-scale-map-repro.log`. This establishes
+the mapping-policy cause only. The diagnostic has not been adopted into the
+production mapper, and native mapped-ROM data/latency verification is still
+required before doing so. The installed Yosys library was not modified.
