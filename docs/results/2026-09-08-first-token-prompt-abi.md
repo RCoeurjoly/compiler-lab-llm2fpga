@@ -384,3 +384,22 @@ and partial device database SHA-256
 `a96010ce1d1cfa0ac66bc52ba25ff0b77cccdf07d6835dd94eead9afab2d404e`.
 The existing incomplete accelerator timing coverage remains explicit. Neither
 routing nor board inference is claimed complete.
+
+### Lossless memory-optimization probe during placement
+
+While the unchanged placement process remained live, a separate bounded
+diagnostic ran standard Yosys `opt_mem; opt_clean` on the original elaborated
+RTLIL. It completed successfully and reduced declared memory storage from
+34,515,136 to 32,640,160 bits (1,874,976 redundant bits removed). In particular,
+all four token-scale banks changed from 32 to 17 bits; the memory optimizer
+also narrowed several scale/gamma memories and removed the constant zero-bias
+memory. This is a compiler optimization of redundant storage, not new
+quantization or a modification to source tensors.
+
+Artifacts are `/tmp/tinystories-capacity-optmem-probe.ys`, `.il`, and `.log`.
+The current router input was not replaced, and no resource, timing or hardware
+acceptance is inferred for this diagnostic. It is an evidence-backed fallback
+if the high-SLICEM-pressure placement cannot complete within its existing
+30-minute bound. Detailed live profiling was unavailable: current kernel perf
+policy restricts it and noninteractive sudo requires a password. CPU accounting
+confirmed the placer remained active; no kernel policy was changed.
