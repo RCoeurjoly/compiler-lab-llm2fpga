@@ -477,3 +477,24 @@ output. Artifacts use `/tmp/tinystories-optmem-scale-native-check` (`.ys`,
 `.json`, `.v`, `.log`) and `/tmp/tinystories-optmem-scale-native-test`.
 The test does not establish full-model post-mapping equivalence or timing.
 No accelerator RTL, quantization, source images, clock or transport changed.
+
+### Full optimized allocation completed
+
+The fresh `/tmp/tinystories-first-token-rom-map-20260909` run completed all
+278 memories, as confirmed by its `memory-checkpoints.json` receipt. Final
+checkpoint `map-278.il` has SHA-256
+`8328ed1d677fa988f83e2fe5620b304cfee490a4abde78e3adec80f7589e56c4`;
+the ROM mapping template has SHA-256
+`da3327c2fca40c3ac4fe824712086e93face871c36e5d3f1cf994c7449bb90f5`.
+It retains eight small memories for the later `map_ffram`/`memory_map` stage,
+including prompt/context storage and short constant tables. Allocation
+completion therefore does not mean the final netlist is already native-only.
+
+The next bounded stages run in
+`/tmp/tinystories-first-token-rom-static-20260909`: native primitive conversion,
+coarse preparation, fine mapping, and standard-ABC final mapping. Each is
+limited to 900 seconds and subsequent stages start only after successful
+exit. Native initialization/configuration comparison includes every `RAM*`
+primitive type, DSP48E1, MMCME2_ADV and BSCANE2. Final counts, routing and board
+inference remain pending. A read-only JTAG check again detected XC7K480T,
+IDCODE `0x23751093`, via the specified HS3 programmer; no new image was loaded.
