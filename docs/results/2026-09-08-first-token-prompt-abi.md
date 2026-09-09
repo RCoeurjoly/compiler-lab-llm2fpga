@@ -552,3 +552,12 @@ simulation; the smaller Icarus regression separately exercises reset, enables,
 known outputs and staging. The five-minute progress-instrumented Icarus
 diagnostic is not needed to infer this Verilator result. These fixture passes
 still do not prove full-model placement, timing or board inference.
+
+The separately bounded, progress-instrumented Icarus diagnostic subsequently
+completed with exit zero and matched all 65,536 words as well. Thus both the
+four-state Icarus and two-state Verilator exhaustive comparisons passed for
+the packed-ROM implementation. A fresh full-model mapping is running in
+`/tmp/tinystories-first-token-packed-map-20260909`, with later stages prepared
+in `/tmp/tinystories-first-token-packed-static-20260909`. Superseded ROM-map
+intermediates 1 through 277 are being losslessly gzip-compressed; checkpoint
+278, receipts, logs and source inputs remain uncompressed and preserved.
