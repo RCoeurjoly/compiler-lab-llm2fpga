@@ -1,5 +1,6 @@
 """Exercise actual Yosys memory allocation, including a conflicting BRAM hint."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -9,6 +10,64 @@ from scripts.pipeline.map_flattened_memory_checkpoints import checkpoint_script
 
 
 class CapacityMemoryMappingTest(unittest.TestCase):
+    def test_constant_scale_rom_native_mapping_preserves_values_and_staging(self):
+        # Removing ROM-capable mapping must fail here, as must corruption of
+        # native INIT data or the enabled/reset two-cycle output interface.
+        with tempfile.TemporaryDirectory() as temporary:
+            d = Path(temporary)
+            (d / "image.hex").write_text("".join(f"{(i * 197 + 65537) & 131071:08x}\n" for i in range(512)))
+            (d / "source.sv").write_text(f'''module main(input clk, reset, en,
+input [8:0] addr, output reg [31:0] result);
+(* ram_style="block" *) reg [31:0] \\token_weight_scale_q8_24_b0.mem [0:511];
+reg [8:0] read_addr;
+initial $readmemh("{d}/image.hex", \\token_weight_scale_q8_24_b0.mem );
+always @(posedge clk) begin
+ if(reset) begin read_addr <= 0; result <= 0; end
+ else if(en) begin
+  read_addr <= addr;
+  result <= \\token_weight_scale_q8_24_b0.mem [read_addr];
+ end
+end
+endmodule
+''')
+            (d / "import.ys").write_text(f"read_verilog -sv {d}/source.sv\nproc\nopt\nmemory_dff\nopt_mem\nopt_clean\nwrite_rtlil {d}/source.il\n")
+            self._yosys(d / "import.ys")
+            script = checkpoint_script(d / "source.il", d / "mapped.il", "token_weight_scale_q8_24_b0.mem")
+            (d / "map.ys").write_text(script + f'''techmap -map +/xilinx/lutrams_xc5v_map.v
+write_json {d}/native.json
+rename main mapped
+write_verilog -noattr {d}/mapped.v
+''')
+            self._yosys(d / "map.ys")
+            cells = json.loads((d / "native.json").read_text())["modules"]["main"]["cells"]
+            self.assertTrue(any(c["type"].startswith("RAM") for c in cells.values()))
+            self.assertFalse(any(c["type"].startswith("$mem") for c in cells.values()))
+            (d / "tb.sv").write_text('''module tb;
+reg clk=0, reset=1, en=1; reg [8:0] addr=0;
+always #5 clk=~clk;
+wire [31:0] golden, actual;
+main gold(clk,reset,en,addr,golden);
+mapped dut(clk,reset,en,addr,actual);
+integer i;
+initial begin
+ @(negedge clk);
+ for(i=0;i<1100;i=i+1) begin
+  if ((^golden)===1'bx || actual !== golden)
+    $fatal(1,"native data/staging mismatch cycle %0d: %h != %h",i,actual,golden);
+  reset=(i==519 || i==1031); en=(i<515 || i%3!=0); addr=i;
+  @(negedge clk);
+ end
+ $display("PASS native ROM values, reset, enables and two-cycle staging"); $finish;
+end
+endmodule
+''')
+            data_dir = subprocess.check_output(["yosys-config", "--datdir"], text=True).strip()
+            build = subprocess.run([os.environ.get("IVERILOG", "iverilog"), "-g2012", "-s", "tb", "-o", str(d / "test"), str(d / "tb.sv"), str(d / "source.sv"), str(d / "mapped.v"), str(Path(data_dir) / "xilinx/cells_sim.v")], capture_output=True, text=True, timeout=60)
+            self.assertEqual(build.returncode, 0, build.stderr)
+            run = subprocess.run([os.environ.get("VVP", "vvp"), str(d / "test")], capture_output=True, text=True, timeout=60)
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+            self.assertIn("PASS native ROM", run.stdout)
+
     def test_capacity_banks_map_to_distributed_memory_without_changing_ports(self):
         for name, width, depth, distributed in (
             ("c_fc_weight_codes_i8", 8, 131072, True),

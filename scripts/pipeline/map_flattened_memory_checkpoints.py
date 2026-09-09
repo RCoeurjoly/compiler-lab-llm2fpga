@@ -26,6 +26,9 @@ LUTRAM_NAMES = {
     "ln1_output_q16_16.mem",
     "ln2_output_q16_16.mem",
     "final_output_q16_16.mem",
+}
+
+IMMUTABLE_LUTRAM_NAMES = {
     # The exact full model exceeds BRAM capacity by 94 full blocks. These
     # immutable memories consume 128 BRAMs but fit in available SLICEM RAM.
     # Keep widths, initialization, ports and register stages unchanged.
@@ -36,6 +39,7 @@ LUTRAM_NAMES = {
     "token_weight_scale_q8_24_b2.mem",
     "token_weight_scale_q8_24_b3.mem",
 }
+LUTRAM_NAMES |= IMMUTABLE_LUTRAM_NAMES
 
 
 def memory_names(il: Path) -> list[str]:
@@ -56,6 +60,8 @@ def checkpoint_script(source: Path, destination: Path, name: str, top: str = "ma
         if use_lutram
         else "+/xilinx/brams_xc4v.txt -D HAS_SIZE_36 -D HAS_CASCADE -D HAS_MIXWIDTH_SDP"
     )
+    if any(name.endswith(suffix) for suffix in IMMUTABLE_LUTRAM_NAMES):
+        library = str(Path(__file__).with_name("rom_lutrams_xc7.txt").resolve())
     # Yosys uses brams_xc4v.txt with these defines for Series 7, paired with
     # brams_xc6v_map.v. Keep read/write ports and width parameters in the native
     # ABI: a TDP port supports at most 36 bits; 72-bit ports require SDP mode.

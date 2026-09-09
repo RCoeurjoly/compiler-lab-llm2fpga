@@ -451,3 +451,29 @@ rejection is in `/tmp/tinystories-optmem-scale-map-repro.log`. This establishes
 the mapping-policy cause only. The diagnostic has not been adopted into the
 production mapper, and native mapped-ROM data/latency verification is still
 required before doing so. The installed Yosys library was not modified.
+
+### Native ROM verification and production mapping repair
+
+The original high-pressure placement terminated with timeout exit 124 at its
+1,800-second deadline, without completing a main placement iteration or
+producing a routed result. This is a bounded implementation failure, not a
+functional inference failure. Its artifacts and inputs are preserved.
+
+A new executable regression first reproduced the ROM mapping rejection using
+the production checkpoint helper. The helper now selects a repository-local
+ROM-capable Series-7 LUTRAM template only for the six selected immutable
+memories. The template retains the installed library's SP/DP/QP/SDP geometry,
+cost, port and initialization definitions, omitting only `prune_rom`. Mutable
+scratch memories retain the installed mapping library. The regression checks
+native initialized-memory simulation, reset, read enable and two-cycle
+staging; the existing writable-memory allocation checks also pass. All 42
+targeted compiler, model, memory, CSR and host-checker tests passed.
+
+Additionally, all four exact scale images were compiled through `opt_mem`,
+the ROM-capable library and the installed native LUTRAM techmap. The result
+contains 4,352 RAM256X1S instances. Icarus compared all 65,536 stored words
+against the original 32-bit memories and passed with unchanged two-cycle
+output. Artifacts use `/tmp/tinystories-optmem-scale-native-check` (`.ys`,
+`.json`, `.v`, `.log`) and `/tmp/tinystories-optmem-scale-native-test`.
+The test does not establish full-model post-mapping equivalence or timing.
+No accelerator RTL, quantization, source images, clock or transport changed.

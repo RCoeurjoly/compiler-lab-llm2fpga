@@ -1,0 +1,43 @@
+# Immutable Series-7 ROM mapping using native LUTRAM geometry.
+# Matches Yosys 0.66 xilinx/lutrams_xc5v.txt's geometry and native map.
+# Deliberately omits prune_rom: opt_mem removes inactive write ports, but
+# these selected model ROMs must remain eligible for initialized LUTRAM.
+# Does not change primitive behavior or the installed Yosys libraries.
+ram distributed $__XILINX_LUTRAM_SP_ {
+ cost 8;
+ widthscale;
+ option "ABITS" 5 { abits 5; widths 8 global; }
+ option "ABITS" 6 { abits 6; widths 4 global; }
+ option "ABITS" 7 { abits 7; widths 2 global; }
+ option "ABITS" 8 { abits 8; widths 1 global; }
+ init no_undef;
+ port arsw "RW" { clock posedge; }
+}
+ram distributed $__XILINX_LUTRAM_DP_ {
+ cost 8;
+ widthscale;
+ option "ABITS" 5 { abits 5; widths 4 global; }
+ option "ABITS" 6 { abits 6; widths 2 global; }
+ option "ABITS" 7 { abits 7; widths 1 global; }
+ init no_undef;
+ port arsw "RW" { clock posedge; }
+ port ar "R" { }
+}
+ram distributed $__XILINX_LUTRAM_QP_ {
+ cost 7;
+ widthscale;
+ option "ABITS" 5 { abits 5; widths 2 global; }
+ option "ABITS" 6 { abits 6; widths 1 global; }
+ init no_undef;
+ port arsw "RW" { clock posedge; }
+ port ar "R0" "R1" "R2" { }
+}
+ram distributed $__XILINX_LUTRAM_SDP_ {
+ cost 8;
+ widthscale 7;
+ option "ABITS" 5 { abits 5; widths 6 global; }
+ option "ABITS" 6 { abits 6; widths 3 global; }
+ init no_undef;
+ port sw "W" { clock posedge; }
+ port ar "R" { }
+}
