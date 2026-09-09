@@ -1,0 +1,5 @@
+# Apply before synth_xilinx's map_dsp stage in each synthesis process.
+# Yosys 0.66 DSP register packing loses the sign extension of the generated
+# embedding multiplier. Keep DSP multiplication, but not register/adder packing.
+# See tests/test_xilinx_signed_embedding_product.py and the accompanying README.
+scratchpad -set xilinx_dsp.multonly 1
