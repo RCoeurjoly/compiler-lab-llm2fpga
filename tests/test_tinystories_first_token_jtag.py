@@ -8,7 +8,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "scripts/pipeline/infer_tinystori
 
 
 class InferenceDevice(Device):
-    def __init__(self, token=11, stuck=False, bad_prompt=False):
+    def __init__(self, token=11, stuck=False, bad_prompt=False, status_captures=None):
         super().__init__()
         self.started = False
         self.polls = 0
@@ -16,6 +16,7 @@ class InferenceDevice(Device):
         self.stuck = stuck
         self.bad_prompt = bad_prompt
         self.now = 0
+        self.status_captures = status_captures or {}
 
     def delay(self, seconds):
         self.now += seconds
@@ -25,6 +26,11 @@ class InferenceDevice(Device):
         op = command >> 60
         if op in (2, 4) or (op == 3 and self.started):
             captured = [(self.response >> i) & 1 for i in range(64)]
+            if op == 3 and self.polls in self.status_captures:
+                # Model core_done clearing response_word between UPDATE and
+                # the next CAPTURE, without altering the command being sent.
+                value = self.status_captures[self.polls]
+                captured = [(value >> i) & 1 for i in range(64)]
             self.commands.append(command)
             if op == 2:
                 self.started = True
@@ -67,6 +73,32 @@ class FirstTokenJtagTest(unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertFalse(device.started)
         self.assertTrue(result["transactions"])
+
+    def test_completion_zero_is_reread_without_reset_or_restart(self):
+        device = InferenceDevice(status_captures={1: 0})
+        result = self.execute(device)
+        self.assertEqual(result["status"], "passed", result)
+        self.assertEqual(result["token"], 11)
+        self.assertEqual(result["transient_zero_status_reads"], 1)
+        self.assertEqual(device.resets, 1)
+        self.assertEqual(sum(c >> 60 == 2 for c in device.commands), 1)
+
+    def test_repeated_zero_is_not_accepted_as_completion(self):
+        result = self.execute(InferenceDevice(status_captures={1: 0, 3: 0}))
+        self.assertEqual(result["status"], "failed")
+        self.assertNotIn("token", result)
+
+    def test_other_invalid_status_is_not_retried(self):
+        result = self.execute(InferenceDevice(status_captures={1: 0xdead}))
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("unexpected inference status", result["error"])
+        self.assertNotIn("token", result)
+
+    def test_completion_zero_does_not_mask_wrong_token(self):
+        result = self.execute(InferenceDevice(token=99, status_captures={1: 0}))
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result.get("token"), 99, result)
+        self.assertIn("token mismatch", result["error"])
 
     def test_wrong_token_preserves_trace(self):
         result = self.execute(InferenceDevice(token=99))

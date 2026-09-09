@@ -21,6 +21,7 @@ def infer(client, *, clock_tms, reset_tap, shift_ir, prompt, expected_token,
           timeout=300, delay=time.sleep, monotonic=time.monotonic):
     result = {"schema": "tinystories-first-token-jtag-v1", "status": "failed",
               "transactions": [], "inference_started": False,
+              "transient_zero_status_reads": 0,
               "independent_reconfiguration_verified": False}
     begun = monotonic()
 
@@ -65,6 +66,13 @@ def infer(client, *, clock_tms, reset_tap, shift_ir, prompt, expected_token,
         while monotonic() - begun < timeout:
             status = read(STATUS)
             result["last_status"] = f"{status:016x}"
+            # core_done clears response_word independently of a status command.
+            # If completion lands between UPDATE and CAPTURE, one read can be
+            # zero. Re-read once, retaining the original deadline and trace;
+            # zero is never completion, and no reset or START is retried.
+            if status == 0 and result["transient_zero_status_reads"] == 0:
+                result["transient_zero_status_reads"] += 1
+                continue
             if status == (0x2c00000000000000 | prompt[0]):
                 break
             if status != (0x2a00000000000000 | prompt[0]):
