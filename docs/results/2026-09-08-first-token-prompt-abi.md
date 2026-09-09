@@ -561,3 +561,9 @@ the packed-ROM implementation. A fresh full-model mapping is running in
 in `/tmp/tinystories-first-token-packed-static-20260909`. Superseded ROM-map
 intermediates 1 through 277 are being losslessly gzip-compressed; checkpoint
 278, receipts, logs and source inputs remain uncompressed and preserved.
+
+Compression completed successfully; `gzip -t` passed for all 277 compressed
+intermediates. The directory now occupies 2.4 GB, and checkpoint 278 still
+matches SHA-256 `8328ed1d677fa988f83e2fe5620b304cfee490a4abde78e3adec80f7589e56c4`.
+The intermediates are recoverable with `gunzip`; no checkpoint contents were
+discarded. The active packed-memory build uses a separate directory.
