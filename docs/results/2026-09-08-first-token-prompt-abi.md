@@ -403,3 +403,14 @@ if the high-SLICEM-pressure placement cannot complete within its existing
 30-minute bound. Detailed live profiling was unavailable: current kernel perf
 policy restricts it and noninteractive sudo requires a password. CPU accounting
 confirmed the placer remained active; no kernel policy was changed.
+
+The token-scale narrowing was additionally exercised in a bounded compiled
+simulation: four original 32-bit ROMs loaded from the exact static images were
+compared with their Yosys-optimized 17-bit counterparts. All 65,536 stored words
+(including padded entries) matched at the same two-cycle output latency, with
+unknown original outputs rejected. The Icarus run exited successfully with
+`PASS all 65536 scale words, unchanged two-cycle output`. Diagnostic sources,
+optimized RTL and executable use the prefix
+`/tmp/tinystories-optmem-scale-check`. This checks the scale-memory transformation,
+not complete optimized-model inference or placement; the active router input
+remains unchanged.
