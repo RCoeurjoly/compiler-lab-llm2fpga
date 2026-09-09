@@ -567,3 +567,28 @@ intermediates. The directory now occupies 2.4 GB, and checkpoint 278 still
 matches SHA-256 `8328ed1d677fa988f83e2fe5620b304cfee490a4abde78e3adec80f7589e56c4`.
 The intermediates are recoverable with `gunzip`; no checkpoint contents were
 discarded. The active packed-memory build uses a separate directory.
+
+### Full supported-primitive candidate passed synthesis
+
+All 278 packed-memory allocations completed and the optimized-input hash
+matched the frozen probe. The final allocation checkpoint has SHA-256
+`e0a4fc4936009c0fe6b85deae813a6d672eaabfc56060a6ace4c50360e68a1b8`.
+Native conversion, coarse preparation, fine mapping and standard-ABC final
+mapping all exited zero. Final CHECK reported no problems, no residual
+memories and no processes. The final counts are 830 RAMB36E1, 125 RAMB18E1,
+17,864 RAM64M and 163 DSP48E1, with four BUFG, one MMCME2_ADV and one BSCANE2.
+No unsupported single-bit ROM primitives remain.
+
+The candidate is
+`/tmp/tinystories-first-token-packed-static-20260909/initialized-final-abc.json`,
+SHA-256 `5aebce5eb5d6dd410b8cb047742cb729d6c19a78f37f97dbce18fb253be33587`.
+`/tmp/verify-packed-native-params.py` passed all 18,984 native memory, DSP,
+clock and JTAG instances against the fine checkpoint. All specified bits
+matched; no unspecified parameter bits changed.
+
+A new bounded 1,800-second place/route run has output prefix
+`compiler-top-packed` in the same directory. Router, partial device database,
+production XDC, 30 MHz target and seed 15 are unchanged. Compared with the
+original capacity candidate, packed RAM64M count fell from 24,688 to 17,864;
+this is resource reduction, not proof of legal placement or timing. Board
+inference and the three independent reconfiguration runs remain pending.
