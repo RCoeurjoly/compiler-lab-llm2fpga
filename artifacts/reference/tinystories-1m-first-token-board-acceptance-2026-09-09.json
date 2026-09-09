@@ -1,0 +1,68 @@
+{
+  "schema": "tinystories-1m-first-token-board-acceptance-v1",
+  "status": "passed",
+  "model_scope": "full compiler-generated TinyStories-1M, first token only",
+  "memory": "on-chip BRAM/LUTRAM; no DDR3",
+  "transport": "JTAG; no PCIe",
+  "clock_mhz": 30,
+  "prompt": [
+    7454,
+    2402,
+    257,
+    640
+  ],
+  "expected_token": 11,
+  "independent_sram_reconfigurations": 3,
+  "reconfiguration_evidence": "three separate observed successful programming processes, ordered programming/inference logs; the inference checker alone does not establish reconfiguration",
+  "bitstream_sha256": "2e28abb6638b407fd55b681018275c712afe47fde2de24ba8d1ebe584208b91a",
+  "oracle_sha256": "31fbd1e3f5b13d7b07466a72e9c6a551ffc00bd4fee375241f095ba5b5cda677",
+  "checker_sha256": "60565fa15b2fd1103c8af2b445328be97850743fb686ed0ceb8f623785ab9559",
+  "route_receipt_sha256": "579eeae74c9f10f2e75862cc2529a255db7ccbf79636db40912572574e960396",
+  "covered_accelerator_fmax_mhz": 30.53,
+  "timing_qualification": "partial: BRAM/DSP timing coverage remains unresolved",
+  "sixteen_token_acceptance": "deferred, not demonstrated",
+  "bpi_flash_written": false,
+  "runs": [
+    {
+      "run": 1,
+      "token": 11,
+      "elapsed_seconds": 3.226360842003487,
+      "transient_zero_status_reads": 0,
+      "programming_log_sha256": "2796c76a9888f5d771850c699fdc8864a071a8cdf58a254d56abb0345566bb92",
+      "inference_receipt_sha256": "0636dc2649c30a6f417bb4ff33c23f708b2dbf941d347cfc95a19f39cf780936",
+      "inference_file_sha256": "218c171df95db03621bcb5594ed81349c099bd1192740d1daa7fde41e722439d",
+      "observed_programming_session": 65061,
+      "observed_inference_session": 51966,
+      "observed_programming_exit_code": 0,
+      "observed_inference_exit_code": 0
+    },
+    {
+      "run": 2,
+      "token": 11,
+      "elapsed_seconds": 3.218367885972839,
+      "transient_zero_status_reads": 0,
+      "programming_log_sha256": "2796c76a9888f5d771850c699fdc8864a071a8cdf58a254d56abb0345566bb92",
+      "inference_receipt_sha256": "38bce2c5a60e4644907a7e7d517fa7747b371bcb633daef03aaa4307bffe8076",
+      "inference_file_sha256": "958cbad57f7efe34d32145aba0a69158ff7a02503ae1e7d8b11f9f9a07015e4d",
+      "observed_programming_session": 91822,
+      "observed_inference_session": 12015,
+      "observed_programming_exit_code": 0,
+      "observed_inference_exit_code": 0
+    },
+    {
+      "run": 3,
+      "token": 11,
+      "elapsed_seconds": 3.181494942982681,
+      "transient_zero_status_reads": 0,
+      "programming_log_sha256": "2796c76a9888f5d771850c699fdc8864a071a8cdf58a254d56abb0345566bb92",
+      "inference_receipt_sha256": "8b5386c37a3b67d8a6ac594a9ec1d7b2c0b5c8fa2d682a22d9e61dfba4c56b3d",
+      "inference_file_sha256": "47275cdb16b29ef608e07f7086194c0d4dea0994bbe35178dc1a45cbefb6d8fc",
+      "observed_programming_session": 51503,
+      "observed_inference_session": 61745,
+      "observed_programming_exit_code": 0,
+      "observed_inference_exit_code": 0
+    }
+  ],
+  "audit_script_sha256": "b00453d663f3d6f8deeaff69d4a7dbf969313756e561954783b52deb2bf7e611",
+  "receipt_sha256": "14dc7772a361ecb9eb3445527b2195a4fc04471accb73af51846687bb0cc6b4f"
+}
