@@ -95,7 +95,10 @@ module tinystories_1m_jtag_csr #(
       command_word <= 64'd0;
       command_toggle <= 1'b0;
     end else if (scan_sel) begin
-      command_word <= scan_shift_reg;
+      // Physical BSCANE2 may omit the final DRCK shift when TMS exits
+      // Shift-DR.  The last TDI bit is still present at UPDATE, so restore
+      // command bit 63 explicitly instead of losing the opcode MSB.
+      command_word <= {scan_tdi, scan_shift_reg[62:0]};
       command_toggle <= ~command_toggle;
     end
   end
@@ -172,6 +175,9 @@ module tinystories_1m_jtag_csr #(
             token_read_pending <= 1'b1;
           end
           4'h6: response_word <= {48'd0, prompt_words[command_word[17:16]]};
+          // Diagnostic-only command loopback; production clients never use
+          // opcode 7.  It exposes the exact word captured at UPDATE.
+          4'h7: response_word <= command_word;
           default: response_word <= {4'hf, 60'd0};
         endcase
       end
