@@ -156,6 +156,11 @@ sentinel with the corrected instruction still returned
 `0xe2468acf13579bde`, so the instruction mismatch was a real test defect but
 does not explain the remaining physical result.
 
+A controlled `JTAG_CHAIN=2` variant was also built, routed, programmed, and
+read with both USER1 (`0x02`) and USER2 (`0x04`); both returned zero and neither
+exposed the TDO control. Chain-number inversion is therefore ruled out. The
+direct sentinel source was restored to the validated `JTAG_CHAIN=1` setting.
+
 As a final primitive control, the direct sentinel was rebuilt with TDO wired
 directly to `SEL` (no scan register or CAPTURE logic). The routed image passed
 30 MHz implementation and was programmed (bitstream SHA-256
