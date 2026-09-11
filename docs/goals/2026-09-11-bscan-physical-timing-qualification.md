@@ -140,3 +140,11 @@ is not being observed by the physical endpoint at all (or the board is not
 executing that image), and is a stronger blocker than a simple response-word
 alignment. The next check must verify the programmed image identity and
 observe CAPTURE/SHIFT activity without relying on a CSR command response.
+
+An A/B programming check ruled out a stale image. The known-good sentinel was
+programmed first and immediately returned its expected magic `0x54364a44`;
+the fixed-pattern diagnostic image was then programmed in a fresh FTDI session
+and still returned `0xe2468acf13579bde`, never its `d3...c0de5a17` capture
+marker. The next experiment must therefore validate the selected USER1 chain
+and primitive configuration independently of the CSR module, using a direct
+BSCANE2-to-TDO constant/shift sentinel.
