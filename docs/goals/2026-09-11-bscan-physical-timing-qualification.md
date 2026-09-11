@@ -74,3 +74,23 @@ The minimal command correction was built and programmed (bitstream SHA-256
 reset now returns zero, proving the opcode MSB is restored. The following
 status command still returns zero instead of `0x2800000000000000`; command
 integrity is fixed, while the remaining mismatch is response/event CDC timing.
+
+## Raw-vector sweep (2026-09-11)
+
+`scripts/pipeline/capture_bscan_raw_sweep.py` captured the complete TDO vector
+for the CSR-only loopback pattern `0x7123456789abcdef` at 100 kHz, 1 MHz,
+6 MHz, and 12 MHz, using 64-, 65-, and 66-bit scans, three repetitions per
+case, and TDO extraction bits 7 and 0. The raw receipt is
+`/tmp/bscan-raw-sweep.json`.
+
+With extraction bit 7, every rate, length, and repetition returned the same
+LSB-first vector, decoding as `0xe2468acf13579bde`. With extraction bit 0,
+the 64-bit scan decoded as `0x23456789abcdef7f`, while 65/66-bit scans
+changed between repetitions (`0x123456789abcdef7`, `...f7d`, `...f7c`).
+This is a stable TDO-pin selection result, not a frequency-dependent timing
+failure: bit 7 is the valid HS3 TDO sample and bit 0 is invalid/noisy.
+
+The remaining experiment is therefore an explicit `BSCAN_SIM` TAP replay of
+the recorded TMS/TDI sequence, including the final Shift-DR clock and UPDATE
+edge. Until that replay identifies the first differing event, no further
+response preload or command-bit correction is justified.
