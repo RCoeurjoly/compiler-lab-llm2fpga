@@ -90,6 +90,12 @@ changed between repetitions (`0x123456789abcdef7`, `...f7d`, `...f7c`).
 This is a stable TDO-pin selection result, not a frequency-dependent timing
 failure: bit 7 is the valid HS3 TDO sample and bit 0 is invalid/noisy.
 
+The same endpoint was then captured at 1 MHz with MPSSE negative-edge and
+positive-edge drive. Both modes produced the identical raw vector
+`0111101111011001111010101100100011110011010100010110001001000111` in all
+three repetitions (`0xe2468acf13579bde`). Thus MPSSE drive-edge selection is
+not the source of the offset either.
+
 The remaining experiment is therefore an explicit `BSCAN_SIM` TAP replay of
 the recorded TMS/TDI sequence, including the final Shift-DR clock and UPDATE
 edge. Until that replay identifies the first differing event, no further

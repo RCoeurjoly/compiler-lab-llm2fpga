@@ -10,9 +10,13 @@ import argparse
 import json
 import sys
 import time
+import types
 
 sys.path.insert(0, "/home/roland/LLM2FPGA/scripts/task6")
-from read_jtag_debug_ftdi_bitbang import FtdiMpsseJtag
+from read_jtag_debug_ftdi_bitbang import (
+    FtdiMpsseJtag, MPSSE_BITMODE, MPSSE_DO_READ, MPSSE_LSB,
+    MPSSE_WRITE_NEG, MPSSE_WRITE_TMS, SEND_IMMEDIATE,
+)
 from read_jtag_debug_xvc import clock_tms, reset_tap, shift_ir
 
 
@@ -27,6 +31,25 @@ def exchange(client, command, length):
     return tdo
 
 
+def set_edge_mode(client, edge):
+    """Select the MPSSE TDI drive edge without changing the TAP vector."""
+    write_neg = edge == "neg"
+
+    def shift_chunk(self, tms_bits, tdi_bits):
+        cmd = bytearray()
+        op = MPSSE_WRITE_TMS | MPSSE_LSB | MPSSE_BITMODE | MPSSE_DO_READ
+        if write_neg:
+            op |= MPSSE_WRITE_NEG
+        for tms, tdi in zip(tms_bits, tdi_bits):
+            cmd.extend([op, 0x00, (0x80 if tdi else 0x00) | (0x01 if tms else 0x00)])
+        cmd.append(SEND_IMMEDIATE)
+        self._write(bytes(cmd))
+        raw = self._read_exact(len(tms_bits))
+        return [(byte >> self.tdo_bit) & 1 for byte in raw]
+
+    client._shift_chunk = types.MethodType(shift_chunk, client)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--output", required=True)
@@ -34,19 +57,23 @@ def main():
     ap.add_argument("--frequencies", default="100000,1000000,6000000,12000000")
     ap.add_argument("--lengths", default="64,65,66")
     ap.add_argument("--tdo-bits", default="7,0")
+    ap.add_argument("--edges", default="neg,pos", choices=("neg,pos", "neg", "pos"))
     ap.add_argument("--repetitions", type=int, default=3)
     args = ap.parse_args()
 
     frequencies = [int(x) for x in args.frequencies.split(",")]
     lengths = [int(x) for x in args.lengths.split(",")]
     tdo_bits = [int(x) for x in args.tdo_bits.split(",")]
+    edges = args.edges.split(",")
     rows = []
     for freq in frequencies:
         for tdo_bit in tdo_bits:
+          for edge in edges:
             # The reader's TDO extraction bit is part of the experiment, so
             # create a fresh FTDI session for every setting.
             client = FtdiMpsseJtag(args.serial, 0x0403, 0x6014, freq, tdo_bit)
             try:
+                set_edge_mode(client, edge)
                 reset_tap(client)
                 shift_ir(client, 6, 6)
                 for length in lengths:
@@ -60,6 +87,7 @@ def main():
                         rows.append({
                             "frequency_hz": freq,
                             "tdo_bit": tdo_bit,
+                            "edge": edge,
                             "capture_length": length,
                             "repetition": repetition,
                             "command": f"0x{command:016x}",
