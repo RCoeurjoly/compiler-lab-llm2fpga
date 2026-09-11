@@ -100,3 +100,23 @@ The remaining experiment is therefore an explicit `BSCAN_SIM` TAP replay of
 the recorded TMS/TDI sequence, including the final Shift-DR clock and UPDATE
 edge. Until that replay identifies the first differing event, no further
 response preload or command-bit correction is justified.
+
+## TAP replay comparison (2026-09-11)
+
+`sim/bscan_csr_tap_replay_tb.sv` replays the same 64-bit capture/shift/update
+sequence used by the HS3 probe. With system reset held through a clock edge,
+the simulation produces a zero first capture and then a loopback response of
+`0x7000000000000001` on the following status transaction. The physical CSR
+image instead produced `0xe2468acf13579bde` on the first transaction and
+`0x6000000000000000` on the next one. This is the first evidenced divergence:
+the physical endpoint's capture contents and command/response transaction
+framing differ before any accelerator or model logic is involved.
+
+The simulation replay also exposed that the standalone CSR-only sentinel had
+no system-clock reset (`sys_rst=0`), allowing unknown state in simulation. The
+replay ties reset to the TAP reset for faithful comparison; the production
+top already provides the corresponding synchronized reset. The next minimal
+experiment is to add observable CAPTURE/SHIFT/UPDATE counters and a fixed
+response pattern to the CSR-only top, then determine whether the physical
+capture begins one transaction late or whether UPDATE is occurring on a
+different event.

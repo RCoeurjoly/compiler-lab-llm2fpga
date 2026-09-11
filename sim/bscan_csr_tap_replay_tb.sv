@@ -1,0 +1,49 @@
+`timescale 1ns/1ps
+module bscan_csr_tap_replay_tb;
+  reg sys_clk = 0;
+  reg scan_drck = 0, scan_reset = 0, scan_sel = 1;
+  reg scan_shift = 0, scan_capture = 0, scan_update = 0, scan_tdi = 0;
+  wire scan_tdo;
+  wire [63:0] response_word;
+  wire [15:0] prompt_0;
+  wire core_start, core_reset, core_valid;
+  wire [0:0] core_token_index;
+  always #5 sys_clk = ~sys_clk;
+
+  tinystories_1m_jtag_csr dut (
+    .sys_clk(sys_clk), .sys_rst(scan_reset), .core_start(core_start),
+    .core_reset(core_reset), .core_valid(core_valid),
+    .core_token_index(core_token_index), .prompt_0(prompt_0),
+    .prompt_1(), .prompt_2(), .prompt_3(), .core_token_id(16'd0),
+    .core_done(1'b0), .model_init_done(1'b1), .response_word(response_word),
+    .tap_reset(), .scan_drck(scan_drck), .scan_reset(scan_reset),
+    .scan_sel(scan_sel), .scan_shift(scan_shift),
+    .scan_capture(scan_capture), .scan_update(scan_update),
+    .scan_tdi(scan_tdi), .scan_tdo(scan_tdo));
+
+  task automatic exchange(input [63:0] command, output [63:0] observed);
+    integer i;
+    begin
+      observed = 0;
+      scan_capture = 1; #1 scan_drck = 1; #1 scan_drck = 0;
+      scan_capture = 0; scan_shift = 1;
+      for (i = 0; i < 64; i = i + 1) begin
+        scan_tdi = command[i];
+        observed[i] = scan_tdo;
+        #1 scan_drck = 1; #1 scan_drck = 0;
+      end
+      scan_shift = 0; scan_update = 1; #1 scan_update = 0;
+      repeat (8) @(posedge sys_clk);
+    end
+  endtask
+
+  reg [63:0] observed;
+  initial begin
+    #1 scan_reset = 1; #20 scan_reset = 0;
+    exchange(64'h7000000000000001, observed);
+    $display("command_tdo=%016x response=%016x", observed, response_word);
+    exchange(64'h3000000000000000, observed);
+    $display("status_tdo=%016x response=%016x", observed, response_word);
+    $finish;
+  end
+endmodule
