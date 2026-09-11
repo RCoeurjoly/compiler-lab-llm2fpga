@@ -57,6 +57,8 @@ module tinystories_1m_jtag_csr #(
 `endif
 
   reg [63:0] scan_shift_reg;
+  reg [6:0] scan_shift_count;
+  reg scan_bit60;
   /* verilator lint_off UNUSEDSIGNAL */
   reg [63:0] command_word;
   /* verilator lint_on UNUSEDSIGNAL */
@@ -81,10 +83,16 @@ module tinystories_1m_jtag_csr #(
   always @(posedge scan_drck or posedge scan_reset) begin
     if (scan_reset) begin
       scan_shift_reg <= 64'd0;
+      scan_shift_count <= 7'd0;
+      scan_bit60 <= 1'b0;
     end else if (scan_sel && scan_capture) begin
       scan_shift_reg <= response_word;
+      scan_shift_count <= 7'd0;
     end else if (scan_sel && scan_shift) begin
       scan_shift_reg <= {scan_tdi, scan_shift_reg[63:1]};
+      if (scan_shift_count == 7'd60)
+        scan_bit60 <= scan_tdi;
+      scan_shift_count <= scan_shift_count + 7'd1;
     end
   end
 
@@ -98,7 +106,7 @@ module tinystories_1m_jtag_csr #(
       // Physical BSCANE2 may omit the final DRCK shift when TMS exits
       // Shift-DR.  The last TDI bit is still present at UPDATE, so restore
       // command bit 63 explicitly instead of losing the opcode MSB.
-      command_word <= {scan_tdi, scan_shift_reg[62:0]};
+      command_word <= {scan_shift_reg[63:61], scan_bit60, scan_shift_reg[59:0]};
       command_toggle <= ~command_toggle;
     end
   end
