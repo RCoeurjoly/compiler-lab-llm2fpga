@@ -269,3 +269,15 @@ produces `0x1000000000000000` followed by a prior-payload response such as
 model of the physical divergence; capture presentation relative to UPDATE (or
 the primitive's DRCK timing) remains unresolved. No speculative RTL correction
 is applied.
+
+## Rejected CSR compensation experiments (2026-09-11)
+
+Two isolated hardware candidates were tested after the valid direct-marker
+result. Removing the CSR response right-shift changed the checker failure from
+`0x1000…` to a deterministic `0x2000…` START response, but did not make STATUS
+decode correctly. Replacing the special bit-60 UPDATE reconstruction with the
+verbatim shift register produced raw loopback values such as
+`0xbc00000000000000` and `0x01c48d159e26af37`, i.e. a worse shift. Both
+hypotheses are rejected and the RTL was restored to the last committed
+diagnostic baseline. These results confirm that the CSR mismatch cannot be
+fixed by either simple preload or opcode-bit substitution.

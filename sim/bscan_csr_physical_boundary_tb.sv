@@ -50,6 +50,8 @@ module bscan_csr_physical_boundary_tb;
     $display("physical-model command_tdo=%016x response=%016x", observed, response_word);
     exchange(64'h3000000000000000, observed);
     $display("physical-model status_tdo=%016x response=%016x", observed, response_word);
+    exchange(64'h3000000000000000, observed);
+    $display("physical-model status2_tdo=%016x response=%016x", observed, response_word);
     $finish;
   end
 endmodule
