@@ -148,3 +148,10 @@ and still returned `0xe2468acf13579bde`, never its `d3...c0de5a17` capture
 marker. The next experiment must therefore validate the selected USER1 chain
 and primitive configuration independently of the CSR module, using a direct
 BSCANE2-to-TDO constant/shift sentinel.
+
+The custom probes were also found to select instruction `0x06`, whereas the
+canonical reader and the proven sentinel select USER1 instruction `0x02`.
+Both probes now use `0x02` (commit `0ebd42a`). Repeating the primitive-only
+sentinel with the corrected instruction still returned
+`0xe2468acf13579bde`, so the instruction mismatch was a real test defect but
+does not explain the remaining physical result.
