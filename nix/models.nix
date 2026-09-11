@@ -348,9 +348,11 @@ in {
       cp ${tinyStories1m.sourceDir}/*.py "$adapter_root/TinyStories/"
       cp -r ${../artifacts/reference} "$adapter_root/artifacts/reference"
       cp ${../scripts/comparison}/*.py "$adapter_root/scripts/comparison/"
+      cp -r ${../tests} "$adapter_root/tests"
       cp ${../docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md} \
         "$adapter_root/docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md"
       adapter="$adapter_root/TinyStories/model_adapter_exact_package.py"
+      export PYTHONPATH="$adapter_root:''${PYTHONPATH:-}"
       ${pythonWithTinyStories}/bin/python ${materializePyTorchExported} \
         --adapter "$adapter" --contract "$contract" --package "$package" \
         --model-path ${tinyStories1m.snapshot} --out-dir "$out"

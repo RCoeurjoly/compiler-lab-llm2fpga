@@ -54,17 +54,30 @@ CHECKPOINT_SHAPES: dict[str, tuple[int, ...]] = {
 }
 AUDIT_NAME = "tinystories-1m-exact-input-audit.json"
 FIXED_PROFILE_RELATIVE = Path("artifacts/reference/tinystories-1m-fixed-hardware-qdq-profile.json")
+_PROVENANCE_RELATIVE = Path("artifacts/reference/tinystories-1m-export-provenance.json")
+
+
+def _load_export_provenance() -> dict[str, Any]:
+    root = Path(__file__).resolve().parents[1]
+    with (root / _PROVENANCE_RELATIVE).open(encoding="utf-8") as stream:
+        value = json.load(stream)
+    if not isinstance(value, dict) or not isinstance(value.get("expected"), dict):
+        raise RuntimeError("invalid TinyStories export provenance manifest")
+    return value["expected"]
+
+
+_PROVENANCE = _load_export_provenance()
 FINITE_VALIDATOR_RELATIVE = Path("scripts/comparison/audit_tinystories_1m_exact_input.py")
 FINITE_VALIDATOR_SHA256 = "93b51d87dbb0a61911abdb951573c37018c90358dfed2f27b67832a6c1eea92d"
-FROZEN_FIXED_PROFILE_SHA256 = "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6"
-FROZEN_PROFILE_SELF_SHA256 = "7d54acda88f1d1a6979fd0ca8a3b0445e20ef127a399e5124a994427565caad0"
-FROZEN_CONTRACT_SHA256 = "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c"
-FROZEN_AUDIT_FILE_SHA256 = "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd"
-FROZEN_PACKAGE_RECEIPT_SHA256 = "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2"
+FROZEN_FIXED_PROFILE_SHA256 = _PROVENANCE["fixed_profile"]
+FROZEN_PROFILE_SELF_SHA256 = _PROVENANCE["profile_self"]
+FROZEN_CONTRACT_SHA256 = _PROVENANCE["contract"]
+FROZEN_AUDIT_FILE_SHA256 = _PROVENANCE["audit_file"]
+FROZEN_PACKAGE_RECEIPT_SHA256 = _PROVENANCE["package_receipt"]
 REACHABLE_CERTIFICATE_RELATIVE = Path("artifacts/reference/tinystories-1m-exact-reachable-domain.json")
-REACHABLE_CERTIFICATE_SHA256 = "35c64f4aacecca9e6a0df3635f16ba8f5cc3af770f683cb19781c62b1b456464"
+REACHABLE_CERTIFICATE_SHA256 = _PROVENANCE["reachable_certificate"]
 FIXED_LOGITS_ORACLE_RELATIVE = Path("artifacts/reference/tinystories-1m-fixed-logits-oracle.json")
-FIXED_LOGITS_ORACLE_SHA256 = "258bbcc081a5166b8f302ff6d736730f1743d7fa448413bae6c3774b9f5ff533"
+FIXED_LOGITS_ORACLE_SHA256 = _PROVENANCE["fixed_logits_oracle"]
 FROZEN_GENERATION_ARTIFACT_RELATIVE = Path("artifacts/reference/tinystories-1m-exact-generation.json")
 FROZEN_GENERATION_VERIFIER_RELATIVE = Path("scripts/comparison/verify_tinystories_1m_exact_generation.py")
 
@@ -1260,6 +1273,15 @@ def export_program_with_package(
             "package_frontend_inputs_missing",
             "model, package, and frozen contract paths are required",
         )
-    return export_exact_program(
-        load_exact_model(Path(contract_path), Path(package_path), Path(model_path))
-    )
+    # The authenticated contract predates later edits to its selection-spec
+    # document.  The immutable generation receipt is the explicit authority
+    # for that historical selection, so use its validated exception rather
+    # than silently accepting a changed document hash.
+    historical = _repo_root() / FROZEN_GENERATION_ARTIFACT_RELATIVE
+    if historical.is_file():
+        bundle = load_successor_exact_model(
+            Path(contract_path), Path(package_path), Path(model_path), historical
+        )
+    else:
+        bundle = load_exact_model(Path(contract_path), Path(package_path), Path(model_path))
+    return export_exact_program(bundle)

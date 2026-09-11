@@ -1,0 +1,24 @@
+{
+  "schema": "tinystories-1m-export-provenance-v1",
+  "model": {
+    "id": "roneneldan/TinyStories-1M",
+    "revision": "ac533fb8b4f69c71894bf96badfe11e6294d9fcf"
+  },
+  "expected": {
+    "contract": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+    "audit_file": "3cf8a5b9db8acf0ca04e92277c0f9f07c81900a4c754626183bd1d22063616bd",
+    "audit_payload": "7d7a37d08df7e63bdb95063674fe5dc306058e51af8a11bbcd97a4cb2972a766",
+    "package_manifest": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+    "package_receipt": "aa546aa3956fd5de207af647ed4cf280d26c8477e9f308f9f0b39c1a2b90cca2",
+    "task_2_file": "173f54586fd37f06e03e9b754568df729591d2cacc5b4a238407ea553d3d529a",
+    "task_2_artifact": "af1901917b52876a9b3343712b89928b272e5dd237cd491ddd9d462c56a52838",
+    "task_2_receipt": "5e56907e60c83c5d98b3c3fe88772b7dfba71e53a9435de548a9d54ea7497834",
+    "task_3_file": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3",
+    "task_3_artifact": "9e8d080ad6717ad7a2900f6895e36bd95401eb6cb9ca1b3981afa096c31639c3",
+    "task_3_result": "c18106f25030ec58dfd3abc5d75d774506aca65b655fc34b284076b1294f8644",
+    "fixed_profile": "f3fa88e8af4982a0e189a3887cd256d207d4c0a891ec587ab3b11b069785c9a6",
+    "profile_self": "7d54acda88f1d1a6979fd0ca8a3b0445e20ef127a399e5124a994427565caad0",
+    "reachable_certificate": "35c64f4aacecca9e6a0df3635f16ba8f5cc3af770f683cb19781c62b1b456464",
+    "fixed_logits_oracle": "258bbcc081a5166b8f302ff6d736730f1743d7fa448413bae6c3774b9f5ff533"
+  }
+}
