@@ -26,3 +26,11 @@ one minimal evidence-backed RTL correction.
 
 No host-side bit shifting or ABI change is an acceptable substitute for the
 RTL/physical timing correction.
+
+## Initial control result (2026-09-11)
+
+The existing sentinel was reprogrammed through the HS3 and read with the
+canonical MPSSE transport at 1024 bits. It passed (`magic_ok=true`, magic
+`0x54364a44`, version `1`), confirming that the cable, programmer, USER1
+selection, and host TDO extraction path are operational before CSR-specific
+experiments.
