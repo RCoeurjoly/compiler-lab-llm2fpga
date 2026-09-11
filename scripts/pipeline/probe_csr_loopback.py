@@ -4,7 +4,7 @@ from read_jtag_debug_ftdi_bitbang import FtdiMpsseJtag
 from read_jtag_debug_xvc import reset_tap, shift_ir, clock_tms
 
 c = FtdiMpsseJtag('210299BF3824', 0x0403, 0x6014, 1_000_000, 7)
-reset_tap(c); shift_ir(c, 6, 6)
+reset_tap(c); shift_ir(c, 0x02, 6)  # USER1, matching the canonical reader
 def x(cmd):
     clock_tms(c, [1, 0, 0])
     bits = c.shift([0] * 63 + [1], [(cmd >> i) & 1 for i in range(64)])

@@ -75,7 +75,7 @@ def main():
             try:
                 set_edge_mode(client, edge)
                 reset_tap(client)
-                shift_ir(client, 6, 6)
+                shift_ir(client, 0x02, 6)  # USER1, matching the canonical reader
                 for length in lengths:
                     for repetition in range(args.repetitions):
                         # 0x7 is the CSR-only loopback opcode.  The payload is
