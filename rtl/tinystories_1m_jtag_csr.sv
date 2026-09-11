@@ -86,7 +86,13 @@ module tinystories_1m_jtag_csr #(
       scan_shift_count <= 7'd0;
       scan_bit60 <= 1'b0;
     end else if (scan_sel && scan_capture) begin
+`ifdef BSCAN_SIM
       scan_shift_reg <= response_word;
+`else
+      // Physical BSCANE2 presents the captured word one bit late at TDO;
+      // preload a right-shifted copy so the host observes the ABI word.
+      scan_shift_reg <= {1'b0, response_word[63:1]};
+`endif
       scan_shift_count <= 7'd0;
     end else if (scan_sel && scan_shift) begin
       scan_shift_reg <= {scan_tdi, scan_shift_reg[63:1]};

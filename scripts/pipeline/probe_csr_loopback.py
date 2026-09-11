@@ -11,6 +11,7 @@ def x(cmd):
     clock_tms(c, [1, 0])
     return sum((b & 1) << i for i, b in enumerate(bits))
 for p in (0x0123456789abcdef, 0xaaaaaaaaaaaaaaaa, 0x5555555555555555):
-    x(0x7000000000000000 | (p & ((1 << 60) - 1)))
-    print(f'{x(0x3000000000000000):016x}')
+    command_response = x(0x7000000000000000 | (p & ((1 << 60) - 1)))
+    status_response = x(0x3000000000000000)
+    print(f'command_response={command_response:016x} status_response={status_response:016x}')
 c.close()
