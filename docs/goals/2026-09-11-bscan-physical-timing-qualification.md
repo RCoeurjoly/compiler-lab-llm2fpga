@@ -281,3 +281,14 @@ verbatim shift register produced raw loopback values such as
 hypotheses are rejected and the RTL was restored to the last committed
 diagnostic baseline. These results confirm that the CSR mismatch cannot be
 fixed by either simple preload or opcode-bit substitution.
+
+## Time-box abort condition (2026-09-11)
+
+The bitstream/configuration portion is resolved: a correctly converted
+nextpnr/prjxray image exposes BSCANE2 and the direct marker passes on hardware.
+After three further bounded CSR experiments (reset wiring, preload removal,
+and verbatim UPDATE capture), the CSR gate still fails with deterministic but
+unmodelled response alignment. If a vendor-accurate BSCANE2 primitive model or
+an independently observable physical DRCK/UPDATE trace cannot be obtained,
+this goal is explicitly aborted at the CSR boundary. No TinyStories two-token
+or 16-token claim may be made from the direct-sentinel result alone.

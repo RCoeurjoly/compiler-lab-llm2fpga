@@ -138,7 +138,7 @@ module tinystories_1m_jtag_csr #(
 `endif
     end else if (scan_sel) begin
       // Physical BSCANE2 may omit the final DRCK shift when TMS exits
-      // Shift-DR.  The last TDI bit is still present at UPDATE, so restore
+      // Shift-DR. The last TDI bit is still present at UPDATE, so restore
       // command bit 63 explicitly instead of losing the opcode MSB.
       command_word <= {scan_shift_reg[63:61], scan_bit60, scan_shift_reg[59:0]};
       command_toggle <= ~command_toggle;
