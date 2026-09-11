@@ -156,6 +156,14 @@ sentinel with the corrected instruction still returned
 `0xe2468acf13579bde`, so the instruction mismatch was a real test defect but
 does not explain the remaining physical result.
 
+As a final primitive control, the direct sentinel was rebuilt with TDO wired
+directly to `SEL` (no scan register or CAPTURE logic). The routed image passed
+30 MHz implementation and was programmed (bitstream SHA-256
+`7980441f631640bbe40a9a55deade6780ba4754788c285622a7dad1d35872d21`), but a
+fresh USER1 scan still returned `0xe2468acf13579bde` rather than all ones.
+This removes CSR, CDC, and scan-register behavior from the fault model: the
+custom bitstream's user TDO path is not the path being observed physically.
+
 Finally, the primitive-only image was tested with USER instruction values
 `0x00, 0x01, 0x02, 0x03, 0x04, 0x06, 0x08, 0x10, 0x20, 0x3f`. None exposed
 the programmed `d3...c0de5a17` marker; the observed values were unrelated
