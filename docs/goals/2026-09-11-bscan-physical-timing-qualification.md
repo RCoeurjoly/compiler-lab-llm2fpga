@@ -52,3 +52,12 @@ An explicit temporary map converts the remaining async FFs to `FDCE`/`FDRE`,
 but nextpnr then rejects a generated FF with no resolvable `C` direction. The
 diagnostic image is therefore not programmed; the production toolchain's exact
 FF mapping sequence must be reused before hardware CSR conclusions are drawn.
+
+Using the production `synth_xilinx` flow, the CSR-only image routed and was
+programmed successfully (bitstream SHA-256
+`c990a0d56bb792469c96d4e8c9d5283608a946157946a0fa7de0ab834e55b6b5`). The
+canonical CSR harness then failed on the first command: reset returned
+`0x00000000000000ab` instead of zero. The sentinel's token value is `0xab`, so
+the command opcode is being misdecoded as a token-read operation before any
+TinyStories logic exists. This is the first hardware-vs-simulation divergence
+at the CSR command boundary.

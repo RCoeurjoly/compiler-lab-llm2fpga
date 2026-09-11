@@ -2,14 +2,5 @@ read_verilog -lib /nix/store/cbqyfg8bas2yvlk2hf81g4p5sgqxb6r0-yosys-0.66/share/y
 read_verilog -lib /nix/store/cbqyfg8bas2yvlk2hf81g4p5sgqxb6r0-yosys-0.66/share/yosys/xilinx/cells_xtra.v
 read_verilog -sv rtl/tinystories_1m_jtag_csr.sv rtl/tinystories_bscan_csr_sentinel_top.sv
 hierarchy -top tinystories_bscan_csr_sentinel_top -check -purge_lib
-flatten
-proc; opt; tribuf -logic; deminout; opt_expr; opt_clean
-techmap -map +/cmp2lut.v -map +/cmp2lcu.v -D LUT_WIDTH=46
-alumacc; share; opt; memory -nomap; memory_dff; opt_clean
-techmap -map +/xilinx/lutrams_xc5v_map.v; opt_clean
-proc; opt_clean
-dffunmap
-techmap; opt_clean
-techmap -map scripts/pipeline/xilinx_dff_map.v; opt_clean
-techmap -map +/xilinx/ff_map.v; opt_clean
+synth_xilinx -family xc7 -top tinystories_bscan_csr_sentinel_top -flatten -noiopad -noclkbuf -abc9
 write_json /tmp/bscan-csr-sentinel.json
