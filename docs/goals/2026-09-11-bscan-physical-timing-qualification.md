@@ -245,3 +245,14 @@ It is not a nextpnr/prjxray configuration omission, a stale upload, or an HS3
 sampling problem. No RTL correction is accepted yet; the next experiment must
 instrument or simulate this exact transaction boundary before any change. The
 TinyStories two-token gate remains pending.
+
+## Isolated frame-level chain comparison (2026-09-11)
+
+The isolated FASM feature
+`CFG_CENTER_MID_X61Y188.BSCAN.JTAG_CHAIN_1` converts to the single set bit
+`bit_00400c1a_067_18`. That bit is present in both the known-good sentinel's
+decoded bit list and the correctly regenerated direct/CSR images. The old
+custom `.bit` images have no decoded set bits at all. This establishes that
+the repaired conversion emits the expected BSCAN chain-selection frame bit;
+the remaining CSR failure is downstream of configuration-frame presence, at
+the physical final-shift/UPDATE and CDC transaction boundary.
