@@ -8,5 +8,8 @@ techmap -map +/cmp2lut.v -map +/cmp2lcu.v -D LUT_WIDTH=46
 alumacc; share; opt; memory -nomap; memory_dff; opt_clean
 techmap -map +/xilinx/lutrams_xc5v_map.v; opt_clean
 proc; opt_clean
+dffunmap
+techmap; opt_clean
+techmap -map scripts/pipeline/xilinx_dff_map.v; opt_clean
 techmap -map +/xilinx/ff_map.v; opt_clean
 write_json /tmp/bscan-csr-sentinel.json

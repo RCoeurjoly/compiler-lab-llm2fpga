@@ -47,3 +47,8 @@ The first CSR-only top elaborates, but its inert core-side constants are
 constant-folded by Yosys and leave an unplaceable asynchronous FF form in
 nextpnr. This is a diagnostic-top synthesis issue, not evidence about
 physical BSCAN behavior; the fixture needs observable, non-constant inputs.
+
+An explicit temporary map converts the remaining async FFs to `FDCE`/`FDRE`,
+but nextpnr then rejects a generated FF with no resolvable `C` direction. The
+diagnostic image is therefore not programmed; the production toolchain's exact
+FF mapping sequence must be reused before hardware CSR conclusions are drawn.
