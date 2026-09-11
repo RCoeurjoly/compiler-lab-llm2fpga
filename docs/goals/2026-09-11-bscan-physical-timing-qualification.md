@@ -155,3 +155,11 @@ Both probes now use `0x02` (commit `0ebd42a`). Repeating the primitive-only
 sentinel with the corrected instruction still returned
 `0xe2468acf13579bde`, so the instruction mismatch was a real test defect but
 does not explain the remaining physical result.
+
+Finally, the primitive-only image was tested with USER instruction values
+`0x00, 0x01, 0x02, 0x03, 0x04, 0x06, 0x08, 0x10, 0x20, 0x3f`. None exposed
+the programmed `d3...c0de5a17` marker; the observed values were unrelated
+IDCODE/USER-register data (for example `0x2d97` at `0x01` and
+`0xffffffff` at `0x08`). Thus the failure is not simply selecting the wrong
+USER opcode. The physical BSCANE2 CAPTURE/TDO path or the generated primitive
+mapping remains the unresolved boundary.
