@@ -176,3 +176,10 @@ IDCODE/USER-register data (for example `0x2d97` at `0x01` and
 `0xffffffff` at `0x08`). Thus the failure is not simply selecting the wrong
 USER opcode. The physical BSCANE2 CAPTURE/TDO path or the generated primitive
 mapping remains the unresolved boundary.
+
+The known-good and custom `.bit` files were compared after the Xilinx sync
+word. Both contain the same 18,734,956-byte configuration payload; only 30,096
+bytes differ. This confirms the custom image is a distinct, fully generated
+configuration rather than a stale upload. The remaining bitstream-level task
+is to decode the BSCAN configuration frame(s) within that diff and compare
+their chain/TDO routing bits directly.
