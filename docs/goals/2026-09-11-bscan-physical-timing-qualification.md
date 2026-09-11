@@ -62,6 +62,13 @@ the command opcode is being misdecoded as a token-read operation before any
 TinyStories logic exists. This is the first hardware-vs-simulation divergence
 at the CSR command boundary.
 
+The targeted bit-60 reconstruction was simulated, routed, and programmed
+(bitstream SHA-256
+`1439d2e66bcd5b759eefd2c8595e8a2c41c63f67dfe1c05ef39871be6b957e39`). The
+opcode-loopback probe still returned `0x6000000000000000` for an opcode-7
+command. The single-bit-at-UPDATE hypothesis is rejected; the remaining issue
+involves transaction framing or command/response timing beyond that bit.
+
 The minimal command correction was built and programmed (bitstream SHA-256
 `5e9a3ce4bb37e270ab93a4bab9f73f20f08e68963b0da5c918df49fcb0cc17d9`). Hardware
 reset now returns zero, proving the opcode MSB is restored. The following
