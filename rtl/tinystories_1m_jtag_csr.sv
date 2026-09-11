@@ -59,6 +59,11 @@ module tinystories_1m_jtag_csr #(
   reg [63:0] scan_shift_reg;
   reg [6:0] scan_shift_count;
   reg scan_bit60;
+`ifdef BSCAN_DIAGNOSTIC
+  reg [7:0] diag_capture_count;
+  reg [7:0] diag_shift_count;
+  reg [7:0] diag_update_count;
+`endif
   /* verilator lint_off UNUSEDSIGNAL */
   reg [63:0] command_word;
   /* verilator lint_on UNUSEDSIGNAL */
@@ -85,6 +90,10 @@ module tinystories_1m_jtag_csr #(
       scan_shift_reg <= 64'd0;
       scan_shift_count <= 7'd0;
       scan_bit60 <= 1'b0;
+`ifdef BSCAN_DIAGNOSTIC
+      diag_capture_count <= 8'd0;
+      diag_shift_count <= 8'd0;
+`endif
     end else if (scan_sel && scan_capture) begin
 `ifdef BSCAN_SIM
       scan_shift_reg <= response_word;
@@ -94,11 +103,17 @@ module tinystories_1m_jtag_csr #(
       scan_shift_reg <= {1'b0, response_word[63:1]};
 `endif
       scan_shift_count <= 7'd0;
+`ifdef BSCAN_DIAGNOSTIC
+      diag_capture_count <= diag_capture_count + 8'd1;
+`endif
     end else if (scan_sel && scan_shift) begin
       scan_shift_reg <= {scan_tdi, scan_shift_reg[63:1]};
       if (scan_shift_count == 7'd60)
         scan_bit60 <= scan_tdi;
       scan_shift_count <= scan_shift_count + 7'd1;
+`ifdef BSCAN_DIAGNOSTIC
+      diag_shift_count <= diag_shift_count + 8'd1;
+`endif
     end
   end
 
@@ -108,12 +123,18 @@ module tinystories_1m_jtag_csr #(
     if (scan_reset) begin
       command_word <= 64'd0;
       command_toggle <= 1'b0;
+`ifdef BSCAN_DIAGNOSTIC
+      diag_update_count <= 8'd0;
+`endif
     end else if (scan_sel) begin
       // Physical BSCANE2 may omit the final DRCK shift when TMS exits
       // Shift-DR.  The last TDI bit is still present at UPDATE, so restore
       // command bit 63 explicitly instead of losing the opcode MSB.
       command_word <= {scan_shift_reg[63:61], scan_bit60, scan_shift_reg[59:0]};
       command_toggle <= ~command_toggle;
+`ifdef BSCAN_DIAGNOSTIC
+      diag_update_count <= diag_update_count + 8'd1;
+`endif
     end
   end
 
@@ -181,8 +202,14 @@ module tinystories_1m_jtag_csr #(
           4'h3: begin
             // status[59] = immutable model image initialized,
             // status[58] = completion latched, status[57] = currently busy.
+`ifdef BSCAN_DIAGNOSTIC
+            response_word <= {4'h2, model_init_done, done_latched, run_active,
+                              1'b0, diag_capture_count, diag_shift_count,
+                              diag_update_count, 16'd0, prompt_words[0]};
+`else
             response_word <= {4'h2, model_init_done, done_latched, run_active,
                               9'd0, 32'd0, prompt_words[0]};
+`endif
           end
           4'h4: begin
             core_token_index <= command_word[0];
