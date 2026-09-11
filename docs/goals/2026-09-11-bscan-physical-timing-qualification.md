@@ -210,3 +210,20 @@ conversion and rejects any output for which `bitread` finds no set
 configuration bits, before programming. The remaining gate is to regenerate
 the CSR-only sentinel through this validated path and rerun its hardware
 protocol; only then can the TinyStories two-token gate be attempted.
+
+## Validated CSR regeneration (2026-09-11)
+
+The CSR-only FASM was regenerated with the same validated conversion script.
+The resulting `/tmp/bscan-csr-fix-repaired.bit` has SHA-256
+`21931f389b77bf856e8a9da99c8b6e719431b217f6c3b85f903e7ed27c57aeeb`, and
+`bitread` reports 212,360 decoded configuration bits. After programming this
+image, the canonical USER1 loopback probe completed three transactions with
+the stable pairs `command_response=0x0000000000000000` and
+`status_response=0x7800000000000000`. This is the first CSR hardware result
+after a bitstream independently verified to contain configuration data.
+
+The status value is not yet treated as the full CSR acceptance gate: the
+reset/status/prompt-write/readback/START sequence still needs to be run twice
+against this repaired image. The BSCAN bitstream-conversion blocker itself is
+resolved for the direct sentinel and CSR image; TinyStories two-token testing
+is deferred until that CSR protocol gate is recorded.
