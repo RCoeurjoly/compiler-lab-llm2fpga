@@ -61,3 +61,9 @@ canonical CSR harness then failed on the first command: reset returned
 the command opcode is being misdecoded as a token-read operation before any
 TinyStories logic exists. This is the first hardware-vs-simulation divergence
 at the CSR command boundary.
+
+The minimal command correction was built and programmed (bitstream SHA-256
+`5e9a3ce4bb37e270ab93a4bab9f73f20f08e68963b0da5c918df49fcb0cc17d9`). Hardware
+reset now returns zero, proving the opcode MSB is restored. The following
+status command still returns zero instead of `0x2800000000000000`; command
+integrity is fixed, while the remaining mismatch is response/event CDC timing.
