@@ -42,3 +42,8 @@ counter advanced on every read. Thus generic BSCAN capture/shift timing and
 host sampling are stable. The `0x07`/`0x0f` TinyStories result is localized to
 the CSR response path or its interaction with the system clock, not the cable,
 TDO bit, scan length, or global JTAG rate.
+
+The first CSR-only top elaborates, but its inert core-side constants are
+constant-folded by Yosys and leave an unplaceable asynchronous FF form in
+nextpnr. This is a diagnostic-top synthesis issue, not evidence about
+physical BSCAN behavior; the fixture needs observable, non-constant inputs.
