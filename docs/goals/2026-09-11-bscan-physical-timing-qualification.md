@@ -34,3 +34,11 @@ canonical MPSSE transport at 1024 bits. It passed (`magic_ok=true`, magic
 `0x54364a44`, version `1`), confirming that the cable, programmer, USER1
 selection, and host TDO extraction path are operational before CSR-specific
 experiments.
+
+The physical sweep also passed at capture lengths 64, 65, 66, and 1024 bits.
+TDO extraction bit 7 decoded correctly while bit 0 did not. With bit 7, the
+sentinel remained valid at 100 kHz, 1 MHz, 6 MHz, and 12 MHz MPSSE rates; its
+counter advanced on every read. Thus generic BSCAN capture/shift timing and
+host sampling are stable. The `0x07`/`0x0f` TinyStories result is localized to
+the CSR response path or its interaction with the system clock, not the cable,
+TDO bit, scan length, or global JTAG rate.
