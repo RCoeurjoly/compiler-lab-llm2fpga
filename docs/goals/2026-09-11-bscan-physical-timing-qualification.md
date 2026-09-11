@@ -227,3 +227,21 @@ reset/status/prompt-write/readback/START sequence still needs to be run twice
 against this repaired image. The BSCAN bitstream-conversion blocker itself is
 resolved for the direct sentinel and CSR image; TinyStories two-token testing
 is deferred until that CSR protocol gate is recorded.
+
+## CSR gate after valid conversion (2026-09-11)
+
+The canonical two-run CSR checker was run after programming the repaired CSR
+image, without reprogramming between transactions. It failed immediately on
+the first status check: expected `0x2800000000000000`, observed
+`0x0000000000000000`. A raw loopback probe on the same image returned a stable
+`command_response=0x1000000000000000` followed by a response containing the
+previous transaction's payload. This reproduces the remaining issue with a
+bitstream that `bitread` independently validates and that has already passed
+the direct BSCANE2 sentinel.
+
+The active blocker is therefore the CSR sentinel's command/response
+transaction alignment across the BSCANE2 UPDATE edge and system-clock CDC.
+It is not a nextpnr/prjxray configuration omission, a stale upload, or an HS3
+sampling problem. No RTL correction is accepted yet; the next experiment must
+instrument or simulate this exact transaction boundary before any change. The
+TinyStories two-token gate remains pending.
