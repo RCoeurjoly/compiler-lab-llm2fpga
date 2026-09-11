@@ -101,6 +101,10 @@ module tinystories_1m_jtag_csr #(
       // when UPDATE command decoding is being investigated.
       scan_shift_reg <= {8'hd3, diag_capture_count, diag_shift_count,
                          diag_update_count, 32'hc0de5a17};
+`elsif BSCAN_SIM_PHYSICAL
+      // Diagnostic simulation mode: retain the physical preload adjustment
+      // while still using the explicit BSCAN_SIM ports.
+      scan_shift_reg <= {1'b0, response_word[63:1]};
 `elsif BSCAN_SIM
       scan_shift_reg <= response_word;
 `else

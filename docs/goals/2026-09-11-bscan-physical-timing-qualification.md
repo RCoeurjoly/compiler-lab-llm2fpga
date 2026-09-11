@@ -256,3 +256,16 @@ custom `.bit` images have no decoded set bits at all. This establishes that
 the repaired conversion emits the expected BSCAN chain-selection frame bit;
 the remaining CSR failure is downstream of configuration-frame presence, at
 the physical final-shift/UPDATE and CDC transaction boundary.
+
+## Physical-boundary replay result (2026-09-11)
+
+`sim/bscan_csr_physical_boundary_tb.sv` replays the hypothesized primitive
+behavior in which the final TMS=1 clock exits Shift-DR without a DRCK/SHIFT
+edge. With the physical preload adjustment enabled, simulation produces
+`command_tdo=0x0000000000000000` and
+`status_tdo=0x7800000000000000`. Hardware on the same valid CSR image instead
+produces `0x1000000000000000` followed by a prior-payload response such as
+`0x3891a2b3c4d5e6f7`. Therefore final-shift omission alone is not a complete
+model of the physical divergence; capture presentation relative to UPDATE (or
+the primitive's DRCK timing) remains unresolved. No speculative RTL correction
+is applied.
