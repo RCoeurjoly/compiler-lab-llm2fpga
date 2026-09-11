@@ -183,3 +183,30 @@ bytes differ. This confirms the custom image is a distinct, fully generated
 configuration rather than a stale upload. The remaining bitstream-level task
 is to decode the BSCAN configuration frame(s) within that diff and compare
 their chain/TDO routing bits directly.
+
+## Bitstream conversion diagnosis (2026-09-11)
+
+The direct-sentinel FASM was converted again using the Kintex-7 family database
+and the exact `xc7k480tffg1156-2/part.yaml` with the canonical
+`fasm2frames` → `xc7frames2bit --part_file ... --frm_file ... --output_file ...`
+sequence. The repaired image `/tmp/repro.bit` has SHA-256
+`5992cce7b197d56478aa1ec46336f65be882ff2a91743500718d2467a3c028d4` and
+`bitread` decodes 880,384 set configuration bits. It was programmed on the
+YPCB and the direct `BSCANE2.TDO=SEL` sentinel returned all ones for three
+independent USER1 scans.
+
+This reproduces the failure boundary: the previously programmed custom image
+`/tmp/bscan-const.bit` (SHA-256
+`7980441f631640bbe40a9a55deade6780ba4754788c285622a7dad1d35872d21`) has a
+malformed bitstream header (`b` record length `0x1278` instead of the normal
+one-byte null part record), and `bitread` decodes zero set configuration bits
+from it. The image could report DONE while leaving the generated user-BSCAN
+configuration absent. The FASM and nextpnr route are therefore not implicated
+by the direct hardware test; the defect is in the prior bitstream conversion
+invocation/artifact, not in CSR timing or the JTAG transport.
+
+`scripts/pipeline/build_and_validate_xc7_bitstream.sh` now codifies the exact
+conversion and rejects any output for which `bitread` finds no set
+configuration bits, before programming. The remaining gate is to regenerate
+the CSR-only sentinel through this validated path and rerun its hardware
+protocol; only then can the TinyStories two-token gate be attempted.
