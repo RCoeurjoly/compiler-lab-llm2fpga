@@ -95,7 +95,13 @@ module tinystories_1m_jtag_csr #(
       diag_shift_count <= 8'd0;
 `endif
     end else if (scan_sel && scan_capture) begin
-`ifdef BSCAN_SIM
+`ifdef BSCAN_DIAGNOSTIC
+      // Diagnostic captures bypass the CSR response path entirely.  The
+      // marker and event counters make physical bit alignment observable even
+      // when UPDATE command decoding is being investigated.
+      scan_shift_reg <= {8'hd3, diag_capture_count, diag_shift_count,
+                         diag_update_count, 32'hc0de5a17};
+`elsif BSCAN_SIM
       scan_shift_reg <= response_word;
 `else
       // Physical BSCANE2 presents the captured word one bit late at TDO;

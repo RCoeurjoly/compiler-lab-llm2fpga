@@ -131,3 +131,12 @@ The proposed one-position command reconstruction therefore had no observable
 effect and was reverted; it is not an accepted RTL correction. The counters
 are retained for the next diagnostic protocol, which must expose them through
 a response pattern that cannot itself be misdecoded as opcode 6.
+
+The fixed-pattern counter-capture image (SHA-256
+`94cf5dd89c23376496b24f2de08d68e7aea1f18b5f9d749db361f6cc0eb632f7`) also
+failed to expose its `d3...c0de5a17` marker: three direct 64-bit captures
+again returned `0xe2468acf13579bde`. This means the diagnostic CAPTURE branch
+is not being observed by the physical endpoint at all (or the board is not
+executing that image), and is a stronger blocker than a simple response-word
+alignment. The next check must verify the programmed image identity and
+observe CAPTURE/SHIFT activity without relying on a CSR command response.
