@@ -11,9 +11,9 @@ module tinystories_bscan_csr_sentinel_top (
   wire tap_reset;
 
   // Keep the core side inert but observable through the normal CSR ABI.
-  wire [15:0] core_token_id = 16'd11;
-  wire core_done = 1'b0;
-  wire model_init_done = 1'b1;
+  wire [15:0] core_token_id = prompt_0 ^ 16'h00ab;
+  wire core_done = core_start;
+  wire model_init_done = prompt_0[0];
   wire sys_rst = 1'b0;
 
   tinystories_1m_jtag_csr csr (
