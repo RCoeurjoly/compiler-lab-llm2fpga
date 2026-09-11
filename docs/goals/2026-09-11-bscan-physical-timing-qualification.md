@@ -120,3 +120,14 @@ experiment is to add observable CAPTURE/SHIFT/UPDATE counters and a fixed
 response pattern to the CSR-only top, then determine whether the physical
 capture begins one transaction late or whether UPDATE is occurring on a
 different event.
+
+The diagnostic counter image was synthesized, routed, and programmed at the
+unchanged 30 MHz constraint (bitstream SHA-256
+`b7fcf9879c5f4cdd88c8b67b96e701499ac742292c16ea298644fcf37104a41e`). A
+hardware sequence of reset, status, status, loopback, status returned
+`a000000000000000`, `6000000000000000`, `6000000000000000`,
+`e000000000000002`, `6000000000000000`, identical to the pre-counter image.
+The proposed one-position command reconstruction therefore had no observable
+effect and was reverted; it is not an accepted RTL correction. The counters
+are retained for the next diagnostic protocol, which must expose them through
+a response pattern that cannot itself be misdecoded as opcode 6.
