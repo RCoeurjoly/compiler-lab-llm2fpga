@@ -1,0 +1,9 @@
+{
+  "schema": "tinystories-1m-exact-torch-mlir-gate-v1",
+  "status": "legalized",
+  "mlir_sha256": "44464a97a3cfb4dcd6be64d33e8b0eab3822cbed53e1f1188761d5759bded57c",
+  "gemv_calls": 49,
+  "raw_torch_operator_calls": 0,
+  "ascending_i64_wrap_contracts": 49,
+  "bounded_build_seconds": 1800
+}
