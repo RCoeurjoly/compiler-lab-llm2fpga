@@ -834,8 +834,13 @@ def materialize_model_sources(artifact: CalyxArtifact, bundle) -> dict[str, Any]
             if layout == "token_rows_2048_then_hidden_packed_i8":
                 rows_per_bank = depth // PACKED_TOKEN_CODE_LANES
                 start = bank * rows_per_bank * 64
+                packed_words = pack_token_code_words(value[start:start + rows_per_bank * 64].tolist())
+                # Source memories are serialized as signed int64 words, while
+                # packing is defined over the complete 64-bit bit pattern.
+                # Convert high-bit words to their two's-complement int64
+                # representation before constructing the torch tensor.
                 value = torch.tensor(
-                    pack_token_code_words(value[start:start + rows_per_bank * 64].tolist()),
+                    [word - (1 << 64) if word >= (1 << 63) else word for word in packed_words],
                     dtype=torch.int64,
                 )
             elif layout in {"token_rows_256_then_hidden", "token_rows_512_then_hidden"}:
