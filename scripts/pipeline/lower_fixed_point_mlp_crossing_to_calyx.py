@@ -761,6 +761,7 @@ def _gemv_phase(
     write_trace: bool = True,
     banked_weights: tuple[str, int] | None = None,
     narrow_products: bool = False,
+    packed_weight: bool = False,
 ) -> tuple[list[str], list[str], str]:
     row_width = input_row_width or rows.bit_length()
     output_width = outputs.bit_length()
@@ -826,7 +827,7 @@ def _gemv_phase(
             banked_weight_reads += f"      {name}.addr0 = {prefix}_weight_local.out;\n      {name}.content_en = 1'd1;\n"
             banked_weight_done_terms.append(f"{name}.done")
             leaves.append(f"{name}.read_data")
-        leaves += [f"8'd0"] * (leaf_count - bank_count)
+        leaves += [f"{64 if packed_weight else 8}'d0"] * (leaf_count - bank_count)
         for level in range(bank_bits):
             bit = f"{prefix}_weight_bank_bit_{level}"
             # Select this mux level's bank bit; slicing the low bit at every
@@ -836,13 +837,24 @@ def _gemv_phase(
             leaves_next = []
             for index in range(0, len(leaves), 2):
                 mux = f"{prefix}_weight_bank_mux_{level}_{index // 2}"
-                cells.append(f"{mux} = std_mux(8);")
+                cells.append(f"{mux} = std_mux({64 if packed_weight else 8});")
                 banked_weight_mux_wires += f"    {mux}.cond = {bit}.out; {mux}.tru = {leaves[index + 1]}; {mux}.fal = {leaves[index]};\n"
                 leaves_next.append(f"{mux}.out")
             leaves = leaves_next
-        banked_weight_value = leaves[0]
+        raw_banked_weight_value = leaves[0]
+        banked_weight_value = raw_banked_weight_value
         banked_weight_done = " & ".join(banked_weight_done_terms)
         weight_read_lines = banked_weight_reads
+        if packed_weight:
+            cells += [
+                f"{prefix}_packed_k = std_rsh({k_width});",
+                f"{prefix}_weight_lane = std_slice({k_width}, 3);",
+                f"{prefix}_weight_lane_pad = std_pad(3, 64);",
+                f"{prefix}_weight_lane_shift = std_lsh(64);",
+                f"{prefix}_weight_code_shift = std_rsh(64);",
+                f"{prefix}_weight_code_slice = std_slice(64, 8);",
+            ]
+            banked_weight_value = f"{prefix}_weight_code_slice.out"
     input_row_expr = input_row_expr or f"{prefix}_row_counter.out"
     trace_cells = []
     trace_wires = ""
@@ -870,8 +882,32 @@ def _gemv_phase(
         write_trace_control = f"{prefix}_write_accumulator;"
         insert_at = next(i for i, cell in enumerate(cells) if cell.startswith(f"{prefix}_code_signed ="))
         cells[insert_at:insert_at] = trace_cells
+    packed_address_assign = ""
+    packed_extract_assign = ""
+    packed_extract_wires = ""
+    weight_k_input = f"{prefix}_k_counter.out"
+    if packed_weight:
+        packed_address_assign = (
+            f"      {prefix}_packed_k.left = {prefix}_k_counter.out;\n"
+            f"      {prefix}_packed_k.right = {k_width}'d3;\n"
+        )
+        packed_extract_assign = (
+            f"      {prefix}_weight_lane.in = {prefix}_k_counter.out;\n"
+            f"      {prefix}_weight_lane_pad.in = {prefix}_weight_lane.out;\n"
+            f"      {prefix}_weight_lane_shift.left = {prefix}_weight_lane_pad.out;\n"
+            f"      {prefix}_weight_lane_shift.right = 64'd3;\n"
+            f"      {prefix}_weight_code_shift.left = {raw_banked_weight_value};\n"
+            f"      {prefix}_weight_code_shift.right = {prefix}_weight_lane_shift.out;\n"
+            f"      {prefix}_weight_code_slice.in = {prefix}_weight_code_shift.out;\n"
+        )
+        # Keep the unpacking combinational.  Calyx's dead-cell pass can drop
+        # an all-combinational extraction chain when it is only assigned from
+        # a sequential read group, leaving the slice input undriven in SV.
+        packed_extract_wires = packed_extract_assign.replace("      ", "    ")
+        weight_k_input = f"{prefix}_packed_k.out"
     wires = [
         banked_weight_mux_wires +
+        packed_extract_wires +
         f"""group {prefix}_init_row {{
       {prefix}_row_counter.in = {row_width}'d0;
       {prefix}_row_counter.write_en = 1'd1;
@@ -899,8 +935,8 @@ def _gemv_phase(
       {prefix}_scale_address.in = {prefix}_k_counter.out;
       {prefix}_weight_output_pad.in = {prefix}_output_counter.out;
       {prefix}_weight_output_shift.left = {prefix}_weight_output_pad.out;
-      {prefix}_weight_output_shift.right = {weight_address_width}'d{input_shift};
-      {prefix}_weight_k_pad.in = {prefix}_k_counter.out;
+      {prefix}_weight_output_shift.right = {weight_address_width}'d{3 if packed_weight else input_shift};
+{packed_address_assign}      {prefix}_weight_k_pad.in = {weight_k_input};
       {prefix}_weight_address.left = {prefix}_weight_output_shift.out;
       {prefix}_weight_address.right = {prefix}_weight_k_pad.out;
 {banked_weight_address_wires}      {codes}.addr0 = {prefix}_input_address.out;

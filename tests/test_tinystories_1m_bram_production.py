@@ -72,7 +72,7 @@ class BramProductionTest(unittest.TestCase):
         module = load_module()
         self.assertEqual(
             module.base.generate_model_kernel(ORACLE).provenance["futil_sha256"],
-            "ed7abe873d1a95a0896473acad7467004cc168606b7aac30b1bbdf6c3672509a",
+            "fa168f813ef4abb40470ef933c12a2271dd4fde58e73ee2d0b61d4c39d1f586f",
         )
 
     def test_selective_bram_annotation_preserves_small_memories(self):
@@ -187,12 +187,12 @@ seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
         self.assertNotIn("token_weight_scale_q8_24 = seq_mem_d1(32, 50257, 16)", futil)
         self.assertIn("token_weight_scale_q8_24_b0 = seq_mem_d1(32, 16384, 14)", futil)
         self.assertIn("token_weight_scale_q8_24_b3 = seq_mem_d1(32, 16384, 14)", futil)
-        self.assertIn("token_weight_codes_i8_b0 = seq_mem_d1(8, 16384, 14)", futil)
-        self.assertIn("token_weight_codes_i8_b196 = seq_mem_d1(8, 16384, 14)", futil)
+        self.assertIn("token_weight_codes_packed_b0 = seq_mem_d1(64, 16384, 14)", futil)
+        self.assertIn("token_weight_codes_packed_b24 = seq_mem_d1(64, 16384, 14)", futil)
         self.assertIn("model_token_scale_signed = std_signext(32, 64)", futil)
         self.assertIn("model_last_row", futil)
-        self.assertIn("model_token_code_bank_bit_1 = std_bit_slice(8, 1, 1, 1)", futil)
-        self.assertIn("lm_gemv_weight_bank_bit_1 = std_bit_slice(8, 1, 1, 1)", futil)
+        self.assertIn("model_token_code_bank_bit_1 = std_bit_slice(5, 1, 1, 1)", futil)
+        self.assertIn("lm_gemv_weight_bank_bit_1 = std_bit_slice(5, 1, 1, 1)", futil)
 
     def test_production_contract_streams_argmax_and_keeps_source_only_inputs(self):
         module = load_module()
@@ -201,8 +201,8 @@ seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
         self.assertEqual(artifact.provenance["production_memory_contract"]["audit_checkpoint_memories"], [])
         self.assertEqual(artifact.provenance["claims"]["board_fit_verified"], False)
         sources = artifact.provenance["source_memories"]
-        self.assertIn("token_weight_codes_i8_b0", sources)
-        self.assertEqual(sources["token_weight_codes_i8_b0"]["banked"]["layout"], "token_rows_256_then_hidden")
+        self.assertIn("token_weight_codes_packed_b0", sources)
+        self.assertEqual(sources["token_weight_codes_packed_b0"]["banked"]["layout"], "token_rows_2048_then_hidden_packed_i8")
         self.assertIn("token_weight_scale_q8_24_b1", sources)
         self.assertNotIn("token_weight_codes_i8", sources)
         self.assertNotIn("selected_tokens", artifact.provenance["source_memories"])

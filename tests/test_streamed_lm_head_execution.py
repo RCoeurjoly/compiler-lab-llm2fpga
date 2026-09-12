@@ -19,7 +19,7 @@ class StreamedLmHeadExecutionTest(unittest.TestCase):
     def test_bank_selector_remains_valid_through_multiply(self):
         self._run_head(pin_bank=False)
 
-    def test_vocabulary_projection_crosses_a_weight_bank_boundary(self):
+    def test_vocabulary_projection_selects_a_packed_weight_bank(self):
         self._run_head(pin_bank=False, cross_bank=True)
 
     def _run_head(self, *, pin_bank, cross_bank=False):
@@ -36,11 +36,12 @@ class StreamedLmHeadExecutionTest(unittest.TestCase):
                               lambda m: m[0] if re.search(r"\b" + m[1] + r"\b", selected_control) else "",
                               declarations)
         futil = declarations + "  control { " + selected_control + " }\n}\n"
-        futil = futil.replace("16'd50257", "16'd260" if cross_bank else "16'd4")
+        futil = futil.replace("16'd50257", "16'd4")
         if cross_bank:
-            # Execute entries 252..259: four on either side of the real
-            # 256-token bank boundary, without spending cycles on its prefix.
-            futil = futil.replace("lm_gemv_output_counter.in = 16'd0;", "lm_gemv_output_counter.in = 16'd252;")
+            # The packed-layout unit test covers the 2048-token address
+            # boundary.  Here, force bank 1 while retaining four output rows
+            # so the generated-SV mux is tested without simulating its prefix.
+            futil = futil.replace("lm_gemv_weight_bank.in = lm_gemv_weight_bank_full.out;", "lm_gemv_weight_bank.in = 22'd1;")
         # Isolate argmax from the separate bank-selector lifetime defect:
         # this four-entry fixture uses bank zero exclusively.
         if pin_bank:
@@ -57,10 +58,12 @@ initial begin
  for(i=0;i<64;i=i+1) begin
   dut.lm_input_codes_i8.mem[192+i]=1;
   dut.lm_input_scale_q8_24.mem[i]=16777216;
-  dut.token_weight_codes_i8_b0.mem[i]=1;
-  dut.token_weight_codes_i8_b0.mem[64+i]=3;
-  dut.token_weight_codes_i8_b0.mem[128+i]=7;
-  dut.token_weight_codes_i8_b0.mem[192+i]=-2;
+ end
+ for(i=0;i<8;i=i+1) begin
+  dut.token_weight_codes_packed_b0.mem[i]=64'h0101010101010101;
+  dut.token_weight_codes_packed_b0.mem[8+i]=64'h0303030303030303;
+  dut.token_weight_codes_packed_b0.mem[16+i]=64'h0707070707070707;
+  dut.token_weight_codes_packed_b0.mem[24+i]=64'hfefefefefefefefe;
  end
  dut.token_weight_scale_q8_24_b0.mem[0]=256;
  dut.token_weight_scale_q8_24_b0.mem[1]=512;
@@ -77,12 +80,12 @@ endmodule
 '''
         if cross_bank:
             # First bank's sampled logits are zero. The next bank contains the
-            # same four hand-derived logits, so vocabulary entry 258 wins.
-            tb = tb.replace("token_weight_codes_i8_b0.mem", "token_weight_codes_i8_b1.mem")
+            # same four hand-derived logits, so vocabulary entry 2 wins.
+            tb = tb.replace("token_weight_codes_packed_b0.mem", "token_weight_codes_packed_b1.mem")
             for i in range(4):
-                tb = tb.replace(f"token_weight_scale_q8_24_b0.mem[{i}]", f"token_weight_scale_q8_24_b0.mem[{256+i}]")
-            tb = tb.replace("initial begin\n for", "initial begin\n for(i=0;i<16384;i=i+1) dut.token_weight_codes_i8_b0.mem[i]=0;\n for(i=0;i<256;i=i+1) dut.token_weight_scale_q8_24_b0.mem[i]=256;\n for", 1)
-            tb = tb.replace("16'd2)", "16'd258)").replace("#1000000;", "#10000000;")
+                tb = tb.replace(f"token_weight_scale_q8_24_b0.mem[{i}]", f"token_weight_scale_q8_24_b0.mem[{i}]")
+            tb = tb.replace("initial begin\n for", "initial begin\n for(i=0;i<16384;i=i+1) dut.token_weight_codes_packed_b0.mem[i]=0;\n for(i=0;i<2048;i=i+1) dut.token_weight_scale_q8_24_b0.mem[i]=256;\n for", 1)
+            tb = tb.replace("#1000000;", "#10000000;")
         install = Path(subprocess.check_output(["nix", "build", "--no-link", "--print-out-paths", ".#calyx"], cwd=ROOT, text=True, timeout=120).strip())
         iverilog = os.environ.get("IVERILOG", shutil.which("iverilog"))
         vvp = os.environ.get("VVP", shutil.which("vvp"))
