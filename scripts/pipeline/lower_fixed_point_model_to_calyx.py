@@ -33,8 +33,24 @@ Phase = tuple[list[str], list[str], str]
 TOKEN_CODE_BANKS = 197
 TOKEN_CODE_BANK_DEPTH = 16384
 TOKEN_CODE_ROW_BITS = 8
+# Packed production layout: eight signed INT8 codes share one 64-bit BRAM
+# word.  A depth-16384 bank therefore stores 2048 vocabulary rows, reducing
+# the physical bank count from 197 to 25 while preserving row-major order.
+PACKED_TOKEN_CODE_LANES = 8
+PACKED_TOKEN_CODE_ROWS_PER_BANK = TOKEN_CODE_BANK_DEPTH // (64 // PACKED_TOKEN_CODE_LANES)
+PACKED_TOKEN_CODE_BANKS = (50257 + PACKED_TOKEN_CODE_ROWS_PER_BANK - 1) // PACKED_TOKEN_CODE_ROWS_PER_BANK
 TOKEN_SCALE_BANKS = 4
 TOKEN_SCALE_BANK_DEPTH = 16384
+
+
+def packed_token_code_location(token: int, hidden: int) -> tuple[int, int, int]:
+    """Return (bank, word address, byte lane) for an exact model code."""
+    if not 0 <= token < 50257:
+        raise ValueError("token index outside authenticated vocabulary")
+    if not 0 <= hidden < 64:
+        raise ValueError("hidden index outside authenticated width")
+    row = token % PACKED_TOKEN_CODE_ROWS_PER_BANK
+    return token // PACKED_TOKEN_CODE_ROWS_PER_BANK, row * (64 // PACKED_TOKEN_CODE_LANES) + hidden // PACKED_TOKEN_CODE_LANES, hidden % PACKED_TOKEN_CODE_LANES
 
 
 @dataclass(frozen=True)
