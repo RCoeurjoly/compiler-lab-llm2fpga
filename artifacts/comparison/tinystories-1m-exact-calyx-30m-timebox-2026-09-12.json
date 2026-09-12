@@ -1,0 +1,32 @@
+{
+  "budget": {
+    "exit_code": 124,
+    "log_bytes": 0,
+    "observed_cpu_percent": 122,
+    "observed_peak_rss_kb": 498660,
+    "output_bytes": 0,
+    "wall_seconds": 1800
+  },
+  "command": [
+    "circt-opt",
+    "pre-calyx.mlir",
+    "--lower-scf-to-calyx=top-level-function=main",
+    "-o",
+    "model.calyx.mlir"
+  ],
+  "frontier": "calyx_scalability_frontier",
+  "input": {
+    "bytes": 15748461,
+    "path": "pre-calyx.mlir",
+    "sha256": "54a7df3fec336c5418d3562441a3f9affe45702eb107b89092bc2f7b53afca31"
+  },
+  "interpretation": "The full normalized exact graph does not reach Calyx within the declared 30-minute development bound; no generated Calyx, SV, synthesis, or hardware claim is permitted.",
+  "receipt_sha256": "c7a1573974f4ae79849ae39f1d64599d247186bf037ad3b6f4586b78ac33a664",
+  "schema": "tinystories-1m-exact-calyx-timebox-v1",
+  "status": "deadline_exceeded",
+  "tool": {
+    "path": "circt-opt",
+    "sha256": "087732aac4608ed45effd1d7a81e032791e40a2a11ffff1a75b7031cb69eb2c7",
+    "version": "CIRCT firtool-1.144.0g20260331_5dc62fe"
+  }
+}
