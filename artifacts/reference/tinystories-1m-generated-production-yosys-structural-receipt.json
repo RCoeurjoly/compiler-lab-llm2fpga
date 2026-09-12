@@ -1,0 +1,28 @@
+{
+  "schema": "tinystories-1m-generated-production-yosys-structural-receipt-v1",
+  "status": "passed_structural_only",
+  "scope": "frontend elaboration and pre-mapping structural normalization",
+  "sv_sha256": "c667eda49d2393b651b1c51e6e7586a51d6e03435079509ce28bbc3dbaaa6182",
+  "toolchain": {
+    "yosys": "/nix/store/f1q0w7rd0a4ny4hqvfxlhs4cmariidcy-yosys-0.62/bin/yosys",
+    "slang_plugin": "/nix/store/07xn6zd11qvkp8h65gwycfisr3x9hk4f-yosys-slang/share/yosys/plugins/slang.so"
+  },
+  "frontend": {
+    "read_slang_errors": 0,
+    "read_slang_warnings": 0,
+    "top": "main",
+    "hierarchy_check": "passed"
+  },
+  "pre_mapping": {
+    "cells": 20877,
+    "memories": 341,
+    "memory_bits": 35027168,
+    "ports": 11,
+    "port_bits": 86,
+    "mapping_verified": false,
+    "timing_verified": false,
+    "board_fit_verified": false
+  },
+  "command": "yosys -m yosys-slang -p 'read_slang model.sv; hierarchy -top main -check; flatten; proc; memory_dff; memory_collect; stat'",
+  "log_sha256": "1e8c18d002bff33de0a8eff67c09f9e7d0052bb6142b7a2ded95b44c6c4fc201"
+}
