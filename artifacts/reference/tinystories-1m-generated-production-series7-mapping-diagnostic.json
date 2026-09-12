@@ -1,0 +1,18 @@
+{
+  "schema": "tinystories-1m-generated-production-series7-mapping-diagnostic-v1",
+  "status": "terminated_before_final_stat",
+  "scope": "manual Series-7 block-RAM mapping path; no RTL changes",
+  "sv_sha256": "c667eda49d2393b651b1c51e6e7586a51d6e03435079509ce28bbc3dbaaa6182",
+  "descriptor": "/nix/store/f1q0w7rd0a4ny4hqvfxlhs4cmariidcy-yosys-0.62/share/yosys/xilinx/brams_xc4v.txt",
+  "mapping_file": "/nix/store/f1q0w7rd0a4ny4hqvfxlhs4cmariidcy-yosys-0.62/share/yosys/xilinx/brams_xc6v_map.v",
+  "series7_documentation": "brams_xc4v.txt identifies brams_xc6v_map.v for Virtex 6 and Series 7",
+  "observed": {
+    "forced_blockram_messages": true,
+    "last_memory_seen": "main.token_weight_codes_i8_b69.mem",
+    "final_stat_reached": false,
+    "resource_report_available": false,
+    "timing_report_available": false
+  },
+  "command": "timeout 120 yosys ... memory_libmap -lib brams_xc4v.txt; techmap -map brams_xc6v_map.v; stat",
+  "log_sha256": "61b3c7bcffd052218087650f4420c55593cc0f5208cd38769f42784460ecdb6f"
+}
