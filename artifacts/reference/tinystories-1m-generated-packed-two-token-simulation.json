@@ -1,0 +1,18 @@
+{
+  "schema": "tinystories-1m-generated-packed-two-token-simulation-v1",
+  "status": "passed",
+  "model": "authenticated TinyStories-1M",
+  "oracle_sha256": "7c306e8b6e38e94f54a13b8434c6dff720d0cccfb7a9e9c749198f3dde93f74d",
+  "futil_sha256": "0463a305cd6b7e6dca4ef58e4f2eb42ae7ebf2ad5fa969cb59c3f975d8aa8511",
+  "generated_sv_sha256": "de65f4d8e9c837d36c8b2eae4e3d42404ca9c7c9d4d37b3b1e450fa986301bef",
+  "simulation_log_sha256": "57e323936f12b8b96d20c9e7a2c02551e60ae250450c213a6f51e61e03e7eeac",
+  "prompt_tokens": [7454, 2402, 257, 640],
+  "expected_tokens": [11, 612],
+  "runs": [
+    {"run": 0, "tokens": [11, 612], "cycles": 185872559},
+    {"run": 1, "tokens": [11, 612], "cycles": 185872559}
+  ],
+  "transport": "generated Verilator harness with authenticated source memories",
+  "ddr3": false,
+  "board_verified": false
+}
