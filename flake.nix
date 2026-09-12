@@ -3113,9 +3113,12 @@ PY
                 timeout 1800 ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/compose_exact_serial_gemv_calyx.py \
                   --torch ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
                   --output "$out/model.calyx.mlir" --map "$out/callsites.json"
+                timeout 1800 ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/extract_mlir_dataflow.py \
+                  --input ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
+                  --label tiny-stories-1m-exact-successor --out "$out/ssa-dataflow.json"
                 timeout 1800 ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_composition.py diagnose \
                   --torch ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
-                  --map "$out/callsites.json" --calyx "$out/model.calyx.mlir" --receipt "$out/receipt.json"
+                  --map "$out/callsites.json" --calyx "$out/model.calyx.mlir" --graph "$out/ssa-dataflow.json" --receipt "$out/receipt.json"
               '';
             in pkgs.runCommand "tiny-stories-1m-exact-serial-gemv-sv" {
               buildInputs = [ python portableTorch composition ];
