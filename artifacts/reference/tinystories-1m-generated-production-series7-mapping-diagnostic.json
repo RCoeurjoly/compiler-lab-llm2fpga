@@ -11,7 +11,14 @@
     "last_memory_seen": "main.token_weight_codes_i8_b69.mem",
     "final_stat_reached": false,
     "resource_report_available": false,
-    "timing_report_available": false
+    "timing_report_available": false,
+    "yosys_066_crosscheck": {
+      "tool": "/nix/store/1g0dvnvw75fnlnk4ad586c65wfxbf5rs-yosys-with-plugins-0.66/bin/yosys",
+      "slang_plugin": "/nix/store/x21ifbv5q2b9a3z1s72x35ykr35zby0g-yosys-slang/share/yosys/plugins/slang.so",
+      "last_memory_seen": "main.token_weight_codes_i8_b156.mem",
+      "final_stat_reached": false,
+      "interpretation": "same termination point inside memory_libmap; not a Yosys-0.62 frontend mismatch"
+    }
   },
   "command": "timeout 120 yosys ... memory_libmap -lib brams_xc4v.txt; techmap -map brams_xc6v_map.v; stat",
   "log_sha256": "61b3c7bcffd052218087650f4420c55593cc0f5208cd38769f42784460ecdb6f"
