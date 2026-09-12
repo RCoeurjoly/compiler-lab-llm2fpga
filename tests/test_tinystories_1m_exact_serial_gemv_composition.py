@@ -50,4 +50,14 @@ class CompositionTest(unittest.TestCase):
    self.assertEqual(receipt["status"],"diagnostic")
    self.assertFalse(set(receipt) & {"sv","yosys","commands","tools","elapsed"})
    self.assertFalse(any((directory/name).exists() for name in ("parsed.mlir","model.futil","model.sv","yosys.txt","commands.txt","tools.txt","elapsed.txt")))
+ def test_diagnostic_reports_dropped_source_operation_classes(self):
+  if not TORCH.is_file(): self.skipTest("portable Torch artifact unavailable")
+  mlir,mapping=load().compose(TORCH.read_text())
+  with tempfile.TemporaryDirectory() as directory:
+   directory=Path(directory);map_=directory/"callsites.json";calyx=directory/"model.calyx.mlir"
+   map_.write_text(json.dumps(mapping));calyx.write_text(mlir)
+   receipt=load_verifier().diagnostic(TORCH,map_,calyx)
+   self.assertEqual(receipt["source_operation_counts"]["llm2fpga.serial_gemv"],49)
+   self.assertGreater(receipt["dropped_source_operation_count"],0)
+   self.assertIn("torch.aten.where.self",receipt["dropped_source_operation_counts"])
 if __name__=="__main__":unittest.main()
