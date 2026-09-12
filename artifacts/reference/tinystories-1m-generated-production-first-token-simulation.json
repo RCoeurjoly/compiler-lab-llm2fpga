@@ -1,0 +1,23 @@
+{
+  "schema": "tinystories-1m-generated-production-first-token-simulation-v1",
+  "status": "passed",
+  "scope": "compiler-generated BRAM production top; first-token checkpoint only",
+  "oracle_sha256": "7c306e8b6e38e94f54a13b8434c6dff720d0cccfb7a9e9c749198f3dde93f74d",
+  "futil_sha256": "3902588c44b647b4e4916690e775deed57e7749668eb320384ccef054e42ccc6",
+  "sv_sha256": "c667eda49d2393b651b1c51e6e7586a51d6e03435079509ce28bbc3dbaaa6182",
+  "prompt_tokens": [7454, 2402, 257, 640],
+  "expected_token": 11,
+  "observed_token": 11,
+  "cycles_to_first_token": 92936273,
+  "simulation": {
+    "model": "compiler-generated model.sv; no handwritten RTL imported",
+    "memory_sources": "authenticated source tensor bins",
+    "harness": "temporary early-exit first-token checkpoint",
+    "generated_rtl_modified": false,
+    "board_executed": false,
+    "synthesis_verified": false
+  },
+  "command": "timeout 700 verilator-first-token/production_harness",
+  "log_sha256": "bceffe2573e63fbc57b69c1db1bc1db39591d9c94bcef6c0e1e3b2d8375c916b",
+  "recorded_at": "2026-09-12T15:47:48+02:00"
+}
