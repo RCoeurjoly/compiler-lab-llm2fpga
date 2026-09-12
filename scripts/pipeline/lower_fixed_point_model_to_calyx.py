@@ -53,6 +53,21 @@ def packed_token_code_location(token: int, hidden: int) -> tuple[int, int, int]:
     return token // PACKED_TOKEN_CODE_ROWS_PER_BANK, row * (64 // PACKED_TOKEN_CODE_LANES) + hidden // PACKED_TOKEN_CODE_LANES, hidden % PACKED_TOKEN_CODE_LANES
 
 
+def pack_token_code_words(codes: list[int]) -> list[int]:
+    """Pack row-major signed INT8 token codes into little-endian 64-bit words."""
+    if len(codes) == 0 or len(codes) % 64:
+        raise ValueError("token code tensor must contain complete 64-value rows")
+    if any(type(code) is not int or not -128 <= code <= 127 for code in codes):
+        raise ValueError("token code tensor contains a non-INT8 value")
+    words = []
+    for offset in range(0, len(codes), PACKED_TOKEN_CODE_LANES):
+        word = 0
+        for lane, code in enumerate(codes[offset : offset + PACKED_TOKEN_CODE_LANES]):
+            word |= (code & 0xFF) << (8 * lane)
+        words.append(word)
+    return words
+
+
 @dataclass(frozen=True)
 class CalyxArtifact:
     futil: str

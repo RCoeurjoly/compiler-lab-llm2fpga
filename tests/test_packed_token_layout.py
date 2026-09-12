@@ -21,6 +21,16 @@ class PackedTokenLayoutTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             pipeline.packed_token_code_location(0, 64)
 
+    def test_pack_preserves_signed_int8_lanes(self):
+        codes = [-128, -1, 0, 1, 2, 63, 64, 127] + [0] * 56
+        words = pipeline.pack_token_code_words(codes)
+        self.assertEqual(words[0], 0x7F403F020100FF80)
+        self.assertEqual(len(words), 8)
+
+    def test_pack_requires_complete_row_major_tensor(self):
+        with self.assertRaises(ValueError):
+            pipeline.pack_token_code_words([0] * 7)
+
 
 if __name__ == "__main__":
     unittest.main()
