@@ -1012,6 +1012,15 @@ def _scan_operations(
                 continue
             if previous is not None and previous.value == "@":
                 continue
+            # `memref.global "private"` uses a quoted visibility keyword,
+            # not a quoted operation name.  It is valid MLIR syntax and must
+            # not be treated as an unknown/malformed operation candidate.
+            if (
+                previous is not None
+                and previous.kind == "identifier"
+                and previous.value in {"global", "memref.global"}
+            ):
+                continue
             if previous_is_attribute_equals:
                 continue
             if OPERATION_NAME.fullmatch(token.value) is None:

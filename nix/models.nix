@@ -2,6 +2,13 @@
 , tinyStories1m, fpPrimsSv, materializePyTorchExported, exactPackageExportProvenance
 , exactTinyStoriesPackage }:
 let
+  # The successor receipt is immutable and binds the predecessor adapter at
+  # this exact historical revision.  Keep that snapshot isolated from the
+  # current canonical adapter, whose provenance manifest has since evolved.
+  successorHistoricalSource = builtins.fetchGit {
+    url = "file:///home/roland/compiler-lab-llm2fpga";
+    rev = "8c0fddf2658eafb0fd2ed7da0bc75a57ed35dfe4";
+  };
   representativeCoreEnv = ''
     export TINYSTORIES_CORE_VOCAB_SIZE=32
     export TINYSTORIES_CORE_NUM_LAYERS=2
@@ -272,6 +279,9 @@ in {
         "$adapter_root/scripts/comparison" "$adapter_root/scripts/pipeline" \
         "$adapter_root/docs/superpowers/specs" "$adapter_root/tests"
       cp ${tinyStories1m.sourceDir}/*.py "$adapter_root/TinyStories/"
+      rm -f "$adapter_root/TinyStories/model_adapter_exact_package.py"
+      cp ${successorHistoricalSource}/TinyStories/model_adapter_exact_package.py \
+        "$adapter_root/TinyStories/model_adapter_exact_package.py"
       cp -r ${../artifacts/reference} "$adapter_root/artifacts/reference"
       cp ${../artifacts/comparison/tinystories-1m-exact-serial-gemv-successor.json} \
         "$adapter_root/artifacts/comparison/tinystories-1m-exact-serial-gemv-successor.json"

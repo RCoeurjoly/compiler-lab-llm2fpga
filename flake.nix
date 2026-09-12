@@ -396,6 +396,7 @@
           '';
         };
         pipelineRuntimeScriptBasenames = [
+          "common.sh"
           "calyx_float_frontier_report.py"
           "calyx_preflight_report.py"
           "calyx_to_sv_no_handshake.sh"
@@ -427,6 +428,7 @@
           "write_fp_primitive_blackboxes.py"
           "write_rtlil_stage_stat_report.py"
           "write_utilization_report.py"
+          "yosys_common.sh"
         ];
         pipelineRuntimeScriptEntries = builtins.readDir ./scripts/pipeline;
         missingPipelineRuntimeScripts = builtins.filter
@@ -3027,6 +3029,10 @@ PY
           "tiny-stories-1m-exact-serial-gemv-sv" =
             let
               sourceRoot = builtins.path { path = ./.; name = "llm2fpga-task4-source"; };
+              successorHistoricalSource = builtins.fetchGit {
+                url = "file:///home/roland/compiler-lab-llm2fpga";
+                rev = "8c0fddf2658eafb0fd2ed7da0bc75a57ed35dfe4";
+              };
               task2Source = builtins.fetchGit {
                 # The committed predecessor snapshots are read from the
                 # canonical local repository, not from this evaluated source
@@ -3038,6 +3044,17 @@ PY
                 url = "file:///home/roland/compiler-lab-llm2fpga";
                 rev = "d20351e9298989a67d1956838e062c8bfa8862dd";
               };
+              # Task 1's immutable successor receipt binds the predecessor
+              # adapter at its historical bytes.  Build a source overlay for
+              # the verification stages so every verifier sees that same
+              # authenticated snapshot (the ordinary source root contains the
+              # newer canonical adapter).
+              successorSourceRoot = pkgs.runCommand "tinystories-1m-exact-serial-gemv-successor-source" {} ''
+                cp -r ${sourceRoot}/. "$out/"
+                chmod -R u+w "$out"
+                cp ${successorHistoricalSource}/TinyStories/model_adapter_exact_package.py \
+                  "$out/TinyStories/model_adapter_exact_package.py"
+              '';
               # Keep the exact Task 2 tool closure visible inside the Nix
               # sandbox so the predecessor receipt can verify its own tools.
               task2TorchMlir = torchMlir;
@@ -3066,8 +3083,8 @@ PY
                 buildInputs = [ python ];
               } ''
                 mkdir -p "$out"
-                ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_portable_torch.py \
-                  write --root ${sourceRoot} \
+                ${python}/bin/python3 ${successorSourceRoot}/scripts/pipeline/verify_exact_serial_gemv_portable_torch.py \
+                  write --root ${successorSourceRoot} \
                   --exported-dir ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".pytorchExported} \
                   --torch-output ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
                   --receipt "$out/receipt.json"
@@ -3104,9 +3121,9 @@ PY
               buildInputs = [ python portableTorch composition ];
             } ''
               mkdir -p "$out"
-              ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/run_exact_serial_gemv_frontier.py \
-                --root ${sourceRoot} --task3-root ${task3Source} \
-                --export-receipt ${sourceRoot}/artifacts/comparison/tinystories-1m-exact-serial-gemv-successor.json \
+              ${python}/bin/python3 ${successorSourceRoot}/scripts/pipeline/run_exact_serial_gemv_frontier.py \
+                --root ${successorSourceRoot} --task3-root ${task3Source} \
+                --export-receipt ${successorSourceRoot}/artifacts/comparison/tinystories-1m-exact-serial-gemv-successor.json \
                 --portable-torch-receipt ${portableTorch}/receipt.json \
                 --portable-exported-dir ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".pytorchExported} \
                 --portable-torch-output ${modelRegistry."tiny-stories-1m-kev-gpt-exact-serial-gemv-successor".torchStage} \
@@ -3114,8 +3131,8 @@ PY
                 --composition-map ${composition}/callsites.json --composition-calyx ${composition}/model.calyx.mlir \
                 --task3-gate-receipt ${gate}/receipt.json \
                 --output "$out/frontier.json"
-              ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/verify_exact_serial_gemv_frontier.py \
-                --root ${sourceRoot} --receipt "$out/frontier.json"
+              ${python}/bin/python3 ${successorSourceRoot}/scripts/pipeline/verify_exact_serial_gemv_frontier.py \
+                --root ${successorSourceRoot} --receipt "$out/frontier.json"
             '';
           "rc-math-exp-paper-screen" = rcMathExpPaperScreen;
           "tiny-stories-1m-kev-gpt-exact-normalized-flat-scf" =

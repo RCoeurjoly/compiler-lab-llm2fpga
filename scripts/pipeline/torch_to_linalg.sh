@@ -29,6 +29,7 @@ require_executable "$torch_mlir_opt"
 require_file "$input"
 
 run_to_output "$output" "$torch_mlir_opt" "$input" \
+  --allow-unregistered-dialect \
   --torch-function-to-torch-backend-pipeline \
   --torch-backend-to-linalg-on-tensors-backend-pipeline \
   -canonicalize

@@ -1132,6 +1132,20 @@ class CalyxPreflightReportTest(unittest.TestCase):
         )
         self.assert_valid_self_hash(report)
 
+    def test_quoted_memref_global_visibility_is_not_an_operation(self) -> None:
+        rc, report, stderr, _ = self.run_report(
+            'module { memref.global "private" constant @zero : '
+            'memref<1xi64> = dense<0> }\n',
+            require_clean=True,
+        )
+
+        self.assertEqual(rc, 0, stderr)
+        self.assertIsNotNone(report)
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(report["prohibited_ops"], {})
+        self.assertEqual(report["scanner_diagnostics"], [])
+        self.assert_valid_self_hash(report)
+
     def test_malformed_zero_result_quoted_operation_name_fails_closed(self) -> None:
         rc, report, stderr, _ = self.run_report(
             '"bad name"() : () -> ()\n', require_clean=True
