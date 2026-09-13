@@ -251,6 +251,36 @@ def _memory(name: str, width: int, count: int) -> str:
     return f"@external {name} = seq_mem_d1({width}, {count}, {(count - 1).bit_length()});"
 
 
+def bram_bank_plan(width: int, count: int) -> dict[str, int]:
+    """Return a legal XC7 BRAM36 geometry for a logical one-read memory.
+
+    The Calyx ``seq_mem_d1`` declaration is a logical memory and its width
+    and depth are not themselves legal RAMB36E1 configurations.  Keep this
+    calculation in the compiler (rather than in a generated-SV annotation)
+    so a later physical-memory pass can use one authenticated description for
+    storage, address banking, and source-image serialization.
+    """
+    if type(width) is not int or type(count) is not int or width <= 0 or count <= 0:
+        raise ValueError("memory width and count must be positive integers")
+    # RAMB36E1 simple-dual-port legal width/depth pairs.  Widths are rounded
+    # up to the next lane shape; unused high bits are padding, not data.
+    shapes = ((1, 32768), (2, 16384), (4, 8192), (9, 4096),
+              (18, 2048), (36, 1024), (72, 512))
+    for physical_width, physical_depth in shapes:
+        if width <= physical_width:
+            banks = (count + physical_depth - 1) // physical_depth
+            return {
+                "logical_width": width,
+                "logical_words": count,
+                "banks": banks,
+                "physical_width": physical_width,
+                "physical_depth": physical_depth,
+                "logical_words_per_bank": physical_depth,
+                "capacity_bits": banks * physical_width * physical_depth,
+            }
+    raise ValueError(f"memory width {width} exceeds RAMB36E1 72-bit lane")
+
+
 def _source_binding(name: str) -> tuple[str, str]:
     if name.startswith("ln"):
         ln, kind, _ = name.split("_", 2)
@@ -843,6 +873,15 @@ import "primitives/memories/seq.futil";
             r"\1model_context_length.out;",
             futil,
         )
+    # Publish the physical bank geometry alongside the logical Calyx contract.
+    # This is deliberately metadata-only for now: the upcoming banked-memory
+    # lowering consumes it, while simulation continues to use the logical
+    # ``seq_mem_d1`` ABI unchanged.
+    runtime_bram_plan = {}
+    for match in re.finditer(r"@external (\w+) = seq_mem_d1\((\d+), (\d+), (\d+)\);", futil):
+        name, width, count = match[1], int(match[2]), int(match[3])
+        if count >= 512:
+            runtime_bram_plan[name] = bram_bank_plan(width, count)
     provenance = {
         "schema": SCHEMA, "oracle_sha256": oracle["artifact_sha256"],
         "futil_sha256": _sha(futil.encode()), "base_block_futil_sha256": _sha(base.encode()),
@@ -854,6 +893,7 @@ import "primitives/memories/seq.futil";
         "feedback": "greedy_last_real_row -> context_tokens[context_length] -> token_embedding",
         "claims": {"compiler_owned_control": True, "existing_arithmetic_generators_modified": production, "simulation_checkpoints": bool(audit_checkpoints), "sv_execution_verified": False, "board_executed": False, "board_fit_verified": False},
         "production_memory_contract": {"audit_checkpoint_memories": [] if production else ["model_embedding", "model_token_embedding", "model_position_embedding", "model_block_outputs", "model_final_ln", "model_logits"], "full_logits_storage": not production, "streamed_argmax": True},
+        "runtime_bram_bank_plan": runtime_bram_plan,
     }
     provenance["schedule"]["generation_steps"] = generation_steps
     provenance["schedule"]["real_context_lengths"] = list(geometry.real_context_lengths)
