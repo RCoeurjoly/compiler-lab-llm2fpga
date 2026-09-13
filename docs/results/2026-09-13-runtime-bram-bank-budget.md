@@ -14,7 +14,11 @@ bits; the increase in logical-memory count is the intentional 25-bank scale
 layout. A further source optimization narrows authenticated 64-bit scale and
 parameter words to 32-bit storage with explicit sign-extension adapters. The
 current artifact measures 123 logical memories, 1,174 banks, and 43,278,336
-physical storage bits. This remains a sizing receipt, not a fit claim.
+physical storage bits. The latest conservative lifetime pass additionally
+coalesces the two C/FC code-buffer pairs and attention maximum/denominator;
+the current artifact measures 121 logical memories, 1,171 banks, and
+43,167,744 physical storage bits. This remains a sizing receipt, not a fit
+claim.
 
 The YPCB budget used by this project is 955 RAMB36E1 blocks.  Therefore a
 literal bank-per-logical-memory implementation still cannot fit; this is a

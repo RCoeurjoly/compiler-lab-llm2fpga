@@ -982,6 +982,9 @@ import "primitives/memories/seq.futil";
                 "v_output_codes_i8": "q_input_codes_i8",
                 "out_output_codes_i8": "q_input_codes_i8",
                 "lm_input_codes_i8": "q_input_codes_i8",
+                "c_proj_output_codes_i8": "c_fc_input_codes_i8",
+                "c_proj_input_codes_i8": "c_fc_output_codes_i8",
+                "attention_denominator_q1_20": "attention_maximum_q8",
             },
         )
     if generation_steps == 16:
