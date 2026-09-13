@@ -65,6 +65,9 @@ class BramBankGeometryTests(unittest.TestCase):
         self.assertNotIn("@external v_accumulator_i64 =", artifact.futil)
         self.assertNotIn("@external out_accumulator_i64 =", artifact.futil)
         self.assertNotIn("@external c_proj_accumulator_i64 =", artifact.futil)
+        self.assertEqual(artifact.futil.count("@external q_input_codes_i8 ="), 1)
+        self.assertNotIn("@external k_input_codes_i8 =", artifact.futil)
+        self.assertNotIn("@external v_output_codes_i8 =", artifact.futil)
 
 
 if __name__ == "__main__":

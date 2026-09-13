@@ -929,6 +929,17 @@ import "primitives/memories/seq.futil";
                 "v_accumulator_i64": "q_accumulator_i64",
                 "out_accumulator_i64": "q_accumulator_i64",
                 "c_proj_accumulator_i64": "q_accumulator_i64",
+                # Every listed INT8 code buffer is a 1,280-word transient:
+                # its producer/consumer completes before the next projection
+                # starts, and no later phase retains the codes.
+                "k_input_codes_i8": "q_input_codes_i8",
+                "v_input_codes_i8": "q_input_codes_i8",
+                "out_input_codes_i8": "q_input_codes_i8",
+                "q_output_codes_i8": "q_input_codes_i8",
+                "k_output_codes_i8": "q_input_codes_i8",
+                "v_output_codes_i8": "q_input_codes_i8",
+                "out_output_codes_i8": "q_input_codes_i8",
+                "lm_input_codes_i8": "q_input_codes_i8",
             },
         )
     if generation_steps == 16:
