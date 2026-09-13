@@ -32,3 +32,8 @@ nix develop -c python ... generate_production_kernel(..., generation_steps=16)
 Simulation remains on the unchanged logical `seq_mem_d1` representation until
 the physical-memory lowering is implemented and its preload metadata is updated
 together with the generated RTL.
+
+The bounded no-FSM Yosys checkpoint on the narrowed 16-step SV completed in
+15.19 seconds (peak memory 460.59 MiB), producing 11,539 cells and 30 logical
+`$mem_v2` cells. This is an elaboration checkpoint only; memory technology
+mapping, timing closure, and board execution remain unverified.
