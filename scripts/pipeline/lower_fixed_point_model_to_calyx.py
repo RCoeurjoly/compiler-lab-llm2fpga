@@ -984,6 +984,11 @@ import "primitives/memories/seq.futil";
                 "lm_input_codes_i8": "q_input_codes_i8",
                 "c_proj_output_codes_i8": "c_fc_input_codes_i8",
                 "c_proj_input_codes_i8": "c_fc_output_codes_i8",
+                # GELU has consumed c_fc_output_q16_16 before the c_proj
+                # input Q/DQ phase writes c_proj_input_q16_16.  Both are
+                # 64-bit, rows*256-word transient buffers, so they can share
+                # storage without changing the phase ordering or ABI.
+                "c_proj_input_q16_16": "c_fc_output_q16_16",
                 "attention_denominator_q1_20": "attention_maximum_q8",
             },
         )
