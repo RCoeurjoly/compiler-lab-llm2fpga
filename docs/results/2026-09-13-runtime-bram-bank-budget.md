@@ -7,9 +7,12 @@ artifact and summing the required physical banks gives 114 logical memories,
 lifetime reuse. The first explicit compiler reuse pass coalesces the serial
 Q/K/V/out projection accumulators; the current 16-step artifact measures 110
 logical memories, 1,204 banks, and 44,384,256 physical storage bits. A second
-explicit reuse class coalesces the serial INT8 projection-code buffers; the
-latest artifact measures 102 logical memories, 1,196 banks, and 44,089,344
-physical storage bits.
+explicit reuse class coalesces the serial INT8 projection-code buffers, and a
+third repacks token-scale rows into 2,048-word banks. The latest artifact
+measures 123 logical memories, 1,182 banks, and 43,573,248 physical storage
+bits; the increase in logical-memory count is the intentional 25-bank scale
+layout. The immutable source portion is 1,008 banks, so further packing is
+still required even before runtime scratch storage is counted.
 
 The YPCB budget used by this project is 955 RAMB36E1 blocks.  Therefore a
 literal bank-per-logical-memory implementation still cannot fit; this is a

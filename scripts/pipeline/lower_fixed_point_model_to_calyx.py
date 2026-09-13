@@ -39,8 +39,10 @@ TOKEN_CODE_ROW_BITS = 8
 PACKED_TOKEN_CODE_LANES = 8
 PACKED_TOKEN_CODE_ROWS_PER_BANK = TOKEN_CODE_BANK_DEPTH // (64 // PACKED_TOKEN_CODE_LANES)
 PACKED_TOKEN_CODE_BANKS = (50257 + PACKED_TOKEN_CODE_ROWS_PER_BANK - 1) // PACKED_TOKEN_CODE_ROWS_PER_BANK
-TOKEN_SCALE_BANKS = 4
-TOKEN_SCALE_BANK_DEPTH = 16384
+# Scale rows are 32-bit values. A 2,048-row bank maps to two 36-bit
+# RAMB36E1-width slices, avoiding the padding cost of a 16,384-row bank.
+TOKEN_SCALE_BANK_DEPTH = 2048
+TOKEN_SCALE_BANKS = (50257 + TOKEN_SCALE_BANK_DEPTH - 1) // TOKEN_SCALE_BANK_DEPTH
 
 
 def packed_token_code_location(token: int, hidden: int) -> tuple[int, int, int]:
@@ -527,15 +529,15 @@ def _orchestration(builder: Builder, block_control: str, final_control: str, lm_
         b.cell("model_token_bank_full", "std_rsh", 16)
         b.cell("model_token_scale_bank_full", "std_rsh", 16)
         b.cell("model_token_bank", "std_slice", 16, 5)
-        b.cell("model_token_scale_bank", "std_slice", 16, 2)
+        b.cell("model_token_scale_bank", "std_slice", 16, 5)
         b.cell("model_token_code_local", "std_cat", 11, 3, 14)
-        b.cell("model_token_scale_local", "std_slice", 16, 14)
+        b.cell("model_token_scale_local", "std_slice", 16, 11)
         b.wires += [
             "model_token_row_low.in = context_tokens.read_data;",
             "model_token_bank_full.left = context_tokens.read_data;",
             "model_token_bank_full.right = 16'd11;",
             "model_token_scale_bank_full.left = context_tokens.read_data;",
-            "model_token_scale_bank_full.right = 16'd14;",
+            "model_token_scale_bank_full.right = 16'd11;",
             "model_token_bank.in = model_token_bank_full.out;",
             "model_token_scale_bank.in = model_token_scale_bank_full.out;",
             "model_token_column_shift.left = model_column_address.out;",
@@ -698,11 +700,11 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
     logit_scale_value = "token_weight_scale_q8_24.read_data"
     if board_io:
         b.cell("model_logit_scale_bank_full", "std_rsh", 16)
-        b.cell("model_logit_scale_bank", "std_slice", 16, 2)
-        b.cell("model_logit_scale_local", "std_slice", 16, 14)
+        b.cell("model_logit_scale_bank", "std_slice", 16, 5)
+        b.cell("model_logit_scale_local", "std_slice", 16, 11)
         b.wires += [
             f"model_logit_scale_bank_full.left = {logit_index};",
-            "model_logit_scale_bank_full.right = 16'd14;",
+            "model_logit_scale_bank_full.right = 16'd11;",
             "model_logit_scale_bank.in = model_logit_scale_bank_full.out;",
             f"model_logit_scale_local.in = {logit_index};",
         ]
