@@ -58,6 +58,10 @@ class BramProductionTest(unittest.TestCase):
         self.assertIn("711, 2354, 287, 262", harness)
         self.assertIn("for (unsigned step = 0; step < steps; ++step)", harness)
 
+    def test_production_runner_cli_accepts_sixteen_steps(self):
+        source = (ROOT / "scripts/pipeline/run_bram_production_sv.py").read_text()
+        self.assertIn("choices=(1, 2, 16)", source)
+
     @staticmethod
     def _signed(value: int, width: int) -> int:
         value &= (1 << width) - 1

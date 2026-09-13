@@ -266,7 +266,7 @@ int main(int argc, char** argv) {
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", nargs="?", type=Path, default=Path("/tmp/llm2fpga-tinystories-bram-production-sv"))
-    parser.add_argument("--generation-steps", type=int, choices=(1, 2), default=2)
+    parser.add_argument("--generation-steps", type=int, choices=(1, 2, 16), default=2)
     args = parser.parse_args()
     directory = args.directory.resolve()
     directory.mkdir(parents=True, exist_ok=True)
