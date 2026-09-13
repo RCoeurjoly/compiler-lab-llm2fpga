@@ -41,3 +41,12 @@ The bounded no-FSM Yosys checkpoint on the narrowed 16-step SV completed in
 15.19 seconds (peak memory 460.59 MiB), producing 11,539 cells and 30 logical
 `$mem_v2` cells. This is an elaboration checkpoint only; memory technology
 mapping, timing closure, and board execution remain unverified.
+
+A fresh Nix/Yosys `proc; stat` run on the current compiler-emitted
+`/tmp/llm2fpga-final-sem3/model.sv` also completed successfully. Before memory
+technology mapping it reports 37,500,000 inferred memory bits and 17,217 cells
+(591,119 total wire bits). 37.5 Mib is approximately 1,017 ideal RAMB36E1
+blocks, already above the 955-block YPCB budget; the physical bank estimate
+above is more conservative because it accounts for legal width/depth
+geometry. This confirms that the next blocker is physical storage packing and
+lifetime reuse, not RTL elaboration.
