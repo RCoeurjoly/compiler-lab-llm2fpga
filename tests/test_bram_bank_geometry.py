@@ -5,7 +5,7 @@ from pathlib import Path
 
 from scripts.pipeline.lower_fixed_point_model_bram_production import generate_production_kernel
 
-from scripts.pipeline.lower_fixed_point_model_to_calyx import bram_bank_plan
+from scripts.pipeline.lower_fixed_point_model_to_calyx import bram_bank_plan, alias_runtime_memories
 
 
 class BramBankGeometryTests(unittest.TestCase):
@@ -37,6 +37,34 @@ class BramBankGeometryTests(unittest.TestCase):
             self.assertLessEqual(plan["physical_width"], 72)
             self.assertIn(plan["physical_width"], (1, 2, 4, 9, 18, 36, 72))
             self.assertIn(plan["physical_depth"], (512, 1024, 2048, 4096, 8192, 16384, 32768))
+
+    def test_runtime_alias_keeps_largest_declaration_and_rewrites_uses(self):
+        futil = """component main() -> () {
+  cells {
+    @external q_accumulator_i64 = seq_mem_d1(64, 1280, 11);
+    @external k_accumulator_i64 = seq_mem_d1(64, 1280, 11);
+    @external c_fc_accumulator_i64 = seq_mem_d1(64, 5120, 13);
+  }
+  wires { k_accumulator_i64.addr0 = q_accumulator_i64.addr0; }
+}
+"""
+        result = alias_runtime_memories(
+            futil,
+            {"k_accumulator_i64": "q_accumulator_i64", "q_accumulator_i64": "c_fc_accumulator_i64"},
+        )
+        self.assertEqual(result.count("@external"), 1)
+        self.assertIn("@external c_fc_accumulator_i64 = seq_mem_d1(64, 5120, 13);", result)
+        self.assertNotIn("k_accumulator_i64", result)
+        self.assertNotIn("q_accumulator_i64", result)
+
+    def test_production_futil_reuses_serial_projection_accumulators(self):
+        oracle = Path("artifacts/reference/tinystories-1m-fixed-point-model-token-step-oracle.json")
+        artifact = generate_production_kernel(oracle, generation_steps=1)
+        self.assertEqual(artifact.futil.count("@external q_accumulator_i64 ="), 1)
+        self.assertNotIn("@external k_accumulator_i64 =", artifact.futil)
+        self.assertNotIn("@external v_accumulator_i64 =", artifact.futil)
+        self.assertNotIn("@external out_accumulator_i64 =", artifact.futil)
+        self.assertNotIn("@external c_proj_accumulator_i64 =", artifact.futil)
 
 
 if __name__ == "__main__":

@@ -281,6 +281,62 @@ def bram_bank_plan(width: int, count: int) -> dict[str, int]:
     raise ValueError(f"memory width {width} exceeds RAMB36E1 72-bit lane")
 
 
+def alias_runtime_memories(futil: str, aliases: dict[str, str]) -> str:
+    """Coalesce explicitly non-overlapping runtime memories in generated Futil.
+
+    ``aliases`` maps an old cell name to another cell name.  The mapping is
+    resolved transitively, the surviving declaration is enlarged to the
+    largest logical depth in its alias class, and all cell references are
+    rewritten.  Width mismatches are rejected rather than silently truncating
+    data.  This pass is intentionally explicit: it does not infer liveness.
+    """
+    if not aliases:
+        return futil
+    declaration = re.compile(r"@external (\w+) = seq_mem_d1\((\d+), (\d+), (\d+)\);")
+    records = {m[1]: (int(m[2]), int(m[3])) for m in declaration.finditer(futil)}
+    def root(name: str) -> str:
+        seen = set()
+        while name in aliases:
+            if name in seen:
+                raise ValueError("cyclic runtime memory alias")
+            seen.add(name)
+            name = aliases[name]
+        return name
+    classes: dict[str, list[str]] = {}
+    for old in aliases:
+        if old not in records:
+            raise ValueError(f"cannot alias undeclared runtime memory: {old}")
+        target = root(old)
+        if target not in records:
+            raise ValueError(f"cannot alias to undeclared runtime memory: {target}")
+        classes.setdefault(target, []).append(old)
+    replacements: dict[str, str] = {}
+    for target, members in classes.items():
+        names = [target, *members]
+        widths = {records[name][0] for name in names}
+        if len(widths) != 1:
+            raise ValueError(f"runtime memory alias width mismatch: {names}")
+        width = widths.pop()
+        count = max(records[name][1] for name in names)
+        records[target] = (width, count)
+        replacements.update({name: target for name in members})
+    # Remove aliased declarations before replacing identifiers, then emit the
+    # surviving declaration with a width-correct address field.
+    def declaration_rewrite(match: re.Match[str]) -> str:
+        name, width, count = match[1], int(match[2]), int(match[3])
+        if name in replacements:
+            return ""
+        if name in records:
+            width, count = records[name]
+            index_width = max(1, (count - 1).bit_length())
+            return f"@external {name} = seq_mem_d1({width}, {count}, {index_width});"
+        return match[0]
+    result = declaration.sub(declaration_rewrite, futil)
+    for old, target in sorted(replacements.items(), key=lambda item: -len(item[0])):
+        result = re.sub(rf"\b{re.escape(old)}\b", target, result)
+    return result
+
+
 def _source_binding(name: str) -> tuple[str, str]:
     if name.startswith("ln"):
         ln, kind, _ = name.split("_", 2)
@@ -862,6 +918,19 @@ import "primitives/memories/seq.futil";
 ''' + (f"component main(@go start: 1, valid: 1, token_index: {geometry.token_index_width}, prompt_0: 16, prompt_1: 16, prompt_2: 16, prompt_3: 16) -> (@done done: 1, token_id: 16) {{" if production else "component main(@go start: 1, valid: 1) -> (@done done: 1) {") + '''
   cells {
 ''' + mlp._indent_lines(b.cells, 4) + "\n  }\n  wires {\n" + mlp._indent_lines(b.wires, 4) + "\n  }\n  control {\n" + control + "\n  }\n}\n"
+    if production:
+        # These accumulators execute serially on the shared GEMV datapath and
+        # are never live at the same time. Keep the alias set explicit rather
+        # than attempting heuristic liveness inference.
+        futil = alias_runtime_memories(
+            futil,
+            {
+                "k_accumulator_i64": "q_accumulator_i64",
+                "v_accumulator_i64": "q_accumulator_i64",
+                "out_accumulator_i64": "q_accumulator_i64",
+                "c_proj_accumulator_i64": "q_accumulator_i64",
+            },
+        )
     if generation_steps == 16:
         # The physical storage is provisioned for the largest context, but a
         # step must execute only its real rows.  Running padded future rows
