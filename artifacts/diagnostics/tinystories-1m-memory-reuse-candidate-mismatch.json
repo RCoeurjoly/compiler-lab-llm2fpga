@@ -1,0 +1,21 @@
+{
+  "schema": "tinystories-1m-memory-reuse-candidate-mismatch-v1",
+  "status": "invalid-stale-sv-diagnostic",
+  "baseline_futil_sha256": "d17e45c36e2fd7f984a904b14eaa98bc369c1caf48ca7ad48ddcbc2eb0df0366",
+  "candidate_futil_sha256": "98d4a2e1d407666343461924cc3078de7d28db880b2d404bd9bfed17c62b8ad6",
+  "candidate_sv_sha256": "178131a59cab456329d5d479e8e29a5bf12bb5f4db9f1f89088885c16619b2c6",
+  "alias_count": 42,
+  "protected_model_memory_count": 68,
+  "check": {
+    "scope": "one autonomous token, two independent reset runs requested",
+    "first_run": "terminated at first selected token",
+    "first_selected_step": 0,
+    "expected_token": 11,
+    "observed_token": 1544,
+    "cycle": 81934711,
+    "mismatch": true
+  },
+  "interpretation": "This mismatch cannot be attributed to the alias map: the candidate SV was stale and differed from the current pinned Calyx/memory-latency conversion (including FSM conditions). The same candidate Futil regenerated through the current path produced the expected first token in a later bounded check.",
+  "decision": "Invalidate this receipt as evidence against memory reuse. Do not use its mismatch to reject the alias map or qualify a bitstream.",
+  "next_action": "Regenerate every candidate SV from its Futil with the current pinned conversion path, record both hashes, and repeat semantic checks before drawing conclusions."
+}

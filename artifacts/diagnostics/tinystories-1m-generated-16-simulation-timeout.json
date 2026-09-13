@@ -1,0 +1,45 @@
+{
+  "schema": "tinystories-1m-generated-16-simulation-timeout-v1",
+  "status": "deadline-exceeded",
+  "command": "timeout 7200s ./verilator-full/production_harness /tmp/llm2fpga-current16",
+  "return_code": 124,
+  "run_completed": 0,
+  "run_count_requested": 2,
+  "cycles_at_timeout": 1329000000,
+  "latest_matching_step": 11,
+  "matching_tokens": [11, 612, 373, 257, 1310, 2576, 3706, 20037, 13, 1375, 6151, 284],
+  "expected_remaining_tokens": [711, 2354, 287, 262],
+  "mismatch_observed": false,
+  "interpretation": "The generated serial LM-head simulation matched the first twelve token decisions but exceeded the two-hour host verification deadline before completing the first run. This is not an inference-success receipt.",
+  "synthesis_probe": {
+    "bram_annotation": "completed in temporary copy",
+    "yosys_plain_frontend": "failed: generated SystemVerilog syntax unsupported by the plain Verilog frontend",
+    "yosys_slang_frontend": "failed before stat: current Yosys-Slang rejects generated onehot/assertion constructs and then internal sta_arrival source metadata",
+    "yosys_slang_matching_plugin": {
+      "status": "elaborated",
+      "plugin": "x21ifbv5q2b9a3z1s72x35ykr35zby0g-yosys-slang",
+      "memory_bits": 39100000,
+      "minimum_ramb36_equivalent_if_all_bram": 1061,
+      "xc7k480t_ramb36_capacity_reference": 955,
+      "memory_inventory_bits": {
+        "seq_mem_d1_bram": 38156288,
+        "seq_mem_d1_lutram": 573440,
+        "seq_mem_d1": 322176
+      },
+      "bram_annotated_minimum_ramb36_equivalent": 1036,
+      "memories": 169,
+      "cells": 51916,
+      "processes": 924,
+      "note": "The BRAM-annotated inventory alone requires at least 1036 RAMB36-equivalents, exceeding the XC7K480T reference capacity of 955 before packing overhead. This candidate cannot fit BRAM-only without reducing storage or changing the architecture."
+    },
+    "memory_mapping_probe": {
+      "status": "terminated-after-observation-timeout",
+      "plugin": "x21ifbv5q2b9a3z1s72x35ykr35zby0g-yosys-slang",
+      "passes_reached": ["read_slang", "hierarchy", "proc", "memory_map"],
+      "stat_reached": false,
+      "interpretation": "The memory_map pass did not complete during the bounded probe; no mapped BRAM count or device-fit claim is made."
+    },
+    "resource_fit_status": "unverified"
+  },
+  "next_action": "Preserve RTL semantics; repair or configure the project synthesis frontend for this generated SV, then obtain resource/timing reports. Do not treat the timeout or frontend probe as inference success."
+}

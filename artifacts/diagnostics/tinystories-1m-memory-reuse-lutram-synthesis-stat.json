@@ -1,0 +1,17 @@
+{
+  "schema": "tinystories-1m-generated-synthesis-front-end-v1",
+  "status": "elaborated",
+  "model_futil_sha256": "98d4a2e1d407666343461924cc3078de7d28db880b2d404bd9bfed17c62b8ad6",
+  "model_sv_sha256": "f9b832c20084ec5f6d0d6aa6153dfd0a84e2b67c93b661be901130d9b9e26864",
+  "tool": "Yosys 0.66 + yosys-slang",
+  "top": "main",
+  "memory_count": 127,
+  "memory_bits": 35400000,
+  "cell_count": 33246,
+  "dff_count": 1087,
+  "mul_count": 45,
+  "limitations": [
+    "Front-end elaboration/statistics only",
+    "No technology mapping, BRAM packing, placement, routing, timing, or board result"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema": "tinystories-1m-memory-reuse-candidate-v1",
+  "status": "bounded-semantic-three-token-pass",
+  "model_futil_sha256": "e28feb56ecab15dd31d3630cabe5c7cf389b09ca6d7b36aa1ea26883ffcadb2b",
+  "model_sv_sha256": "0a39e566663559609ef79bdbd0e4df6dfc7bb0c8f6cd3d92bf4b03bebadfb36b",
+  "aliases_sha256": "a470698cc738e9d3cf540192834dff98c1c20a6e7504dbc552a2eeeebde20257",
+  "runs": [{"run": 0, "tokens": [11, 612, 373], "cycles": [82479330, 170333259, 263575513]}],
+  "expected_tokens": [11, 612, 373],
+  "control_comparison": {
+    "full_candidate_extra_alias": "attention_context_heads_q16_16 -> ln1_output_q16_16",
+    "full_candidate_step_2": 11,
+    "batch_b_step_2": 373,
+    "conclusion": "remove the extra alias"
+  },
+  "limitations": [
+    "One reset run only",
+    "Three-token prefix only",
+    "Temporary one-run harness returned code 5 after token checks because its two-run comparison remained enabled",
+    "No full 16-token, fit, timing, or hardware result"
+  ]
+}

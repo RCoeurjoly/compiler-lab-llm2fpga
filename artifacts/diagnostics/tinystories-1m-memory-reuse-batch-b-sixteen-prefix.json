@@ -1,0 +1,34 @@
+{
+  "schema": "tinystories-1m-generated-autoregressive-prefix-v1",
+  "status": "bounded-semantic-prefix-pass",
+  "scope": "single generated-RTL Verilator run; no board, fit, timing, or full-acceptance claim",
+  "candidate": {
+    "model_futil_sha256": "e28feb56ecab15dd31d3630cabe5c7cf389b09ca6d7b36aa1ea26883ffcadb2b",
+    "model_sv_sha256": "0a39e566663559609ef79bdbd0e4df6dfc7bb0c8f6cd3d92bf4b03bebadfb36b",
+    "aliases_sha256": "a470698cc738e9d3cf540192834dff98c1c20a6e7504dbc552a2eeeebde20257",
+    "transport": "generated-RTL Verilator harness",
+    "memory_change": "batch-B liveness aliases; unsafe attention-context alias excluded"
+  },
+  "reference_tokens": [11, 612, 373, 257, 1310, 2576, 3706, 20037, 13, 1375, 6151, 284, 711, 2354, 287, 262],
+  "observed_tokens": [11, 612, 373, 257, 1310, 2576, 3706, 20037, 13, 1375, 6151, 284, 711],
+  "selected_cycles": [82479330, 170333259, 263575513, 362219786, 466279725, 575769067, 690701516, 811090794, 936950545, 1068294503, 1205136356, 1347489796, 1495368515],
+  "matched_steps": 13,
+  "repeatability": {
+    "runs_observed": 2,
+    "all_observed_tokens_identical": true,
+    "all_observed_cycles_identical": true,
+    "note": "A second independently started corrected-harness run reproduced the same 13-token prefix and cycle checkpoints before the same execution boundary."
+  },
+  "termination": {
+    "status": "harness-session-terminated-without-final-receipt",
+    "last_observed_cycle": 1556000000,
+    "missing_steps": [13, 14, 15],
+    "note": "The process handle disappeared after continued progress; no mismatch was observed, but no final exit record was retained."
+  },
+  "limitations": [
+    "Only one simulation run was observed",
+    "Three-run repeatability is not established",
+    "No synthesis, resource-fit, timing, bitstream, or board evidence",
+    "Steps 13-15 were not emitted by this run"
+  ]
+}

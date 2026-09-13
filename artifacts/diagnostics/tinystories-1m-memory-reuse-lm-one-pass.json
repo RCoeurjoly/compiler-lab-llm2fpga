@@ -1,0 +1,32 @@
+{
+  "schema": "tinystories-1m-memory-reuse-lm-one-pass-v1",
+  "status": "bounded-semantic-pass",
+  "baseline_futil_sha256": "d17e45c36e2fd7f984a904b14eaa98bc369c1caf48ca7ad48ddcbc2eb0df0366",
+  "candidate_futil_sha256": "dc8595cc0d5e564337745df6cdb230e14c6bc1a47b5519d44aaada2e32564c10",
+  "candidate_sv_sha256": "5bcfb50536983b4c89f9092a2ffac7b37c98b525396309f55e37cf58ccb363cc",
+  "alias_count": 19,
+  "additional_alias": {
+    "removed": "lm_input_q16_16",
+    "canonical": "block_input_q16_16",
+    "logical_bits": 81920
+  },
+  "check": {
+    "scope": "one autonomous token, two independent reset runs",
+    "run_0": {"token": 11, "cycles": 82479330},
+    "run_1": {"token": 11, "cycles": 82479330},
+    "expected_token": 11,
+    "cycles_match": true,
+    "tokens_match": true
+  },
+  "memory_inventory": {
+    "external_memory_count": 105,
+    "logical_bits": 37331584,
+    "bram_marked_logical_bits": 36800512,
+    "minimum_ramb36_equivalents": 999,
+    "xc7k480t_reference_ramb36_capacity": 955,
+    "fit_status": "lower-bound-still-exceeds-device"
+  },
+  "synthesis": "not run; no fit or timing claim",
+  "decision": "Accept this alias for the next cumulative candidate set; retain one-token semantic gating.",
+  "next_action": "Continue only with individually tested activation aliases or implement explicit IR dependency analysis; then require exact multi-token simulation before mapped synthesis."
+}

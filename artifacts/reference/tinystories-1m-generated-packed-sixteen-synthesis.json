@@ -1,0 +1,22 @@
+{
+  "schema": "tinystories-1m-generated-packed-sixteen-synthesis-v1",
+  "status": "synthesized",
+  "generation_steps": 16,
+  "oracle_sha256": "7c306e8b6e38e94f54a13b8434c6dff720d0cccfb7a9e9c749198f3dde93f74d",
+  "futil_sha256": "f42d55f3ff1173b26178c898ef1baefb104c2bdd5d2366e566b00e26eed19e16",
+  "generated_sv_sha256": "7eff14cae872403e7cdb50f700c628c221b9d244128e200f6dd652c0147440c3",
+  "yosys_log_sha256": "530c329ee248c79c97473d2d9fc90c4cd8adc9ec9e93f6f645a4b304680656ef",
+  "tool": "Yosys 0.66",
+  "resources": {
+    "cells_including_submodules": 95981,
+    "RAMB36E1": 1173,
+    "RAMB18E1": 18,
+    "DSP48E1": 317,
+    "CARRY4": 4442,
+    "FDRE": 16404
+  },
+  "timing_closed": false,
+  "board_fit_verified": false,
+  "simulation_verified": false,
+  "note": "Synthesis only; placement, timing, bitstream, and board inference remain outstanding."
+}

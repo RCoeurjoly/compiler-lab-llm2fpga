@@ -1,0 +1,23 @@
+{
+  "schema": "tinystories-1m-generated-sixteen-first-mismatch-v1",
+  "status": "semantic_mismatch",
+  "scope": "compiler-generated packed TinyStories-1M, 16-step, BRAM-only simulation",
+  "prompt": [7454, 2402, 257, 640],
+  "expected_first_selected_token": 11,
+  "observed_first_selected_token": 1544,
+  "observed_step": 0,
+  "observed_cycles": 168916871,
+  "simulation": {
+    "top": "main",
+    "rows": 20,
+    "generation_steps": 16,
+    "transport": "none",
+    "model_image": "authenticated materialized source memories"
+  },
+  "evidence": {
+    "log": "/tmp/llm2fpga-packed-production-16/run.log",
+    "note": "The first selected-token event diverges before any later autoregressive feedback step; therefore no 16-token or board claim is made.",
+    "readmem_warnings": "Synthesis-form SV reports missing absolute $readmem paths; the harness explicitly preloads the exposed memories before reset. This must be checked independently rather than treated as the root cause."
+  },
+  "next_gate": "Generate the explicit production audit build, compare rows=20 step-0 embedding/block/final-LN checkpoints with the authenticated reference, and localize the first divergent boundary before RTL changes."
+}

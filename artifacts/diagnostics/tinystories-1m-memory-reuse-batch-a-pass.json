@@ -1,0 +1,38 @@
+{
+  "schema": "tinystories-1m-memory-reuse-batch-a-pass-v1",
+  "status": "bounded-semantic-pass",
+  "baseline_futil_sha256": "d17e45c36e2fd7f984a904b14eaa98bc369c1caf48ca7ad48ddcbc2eb0df0366",
+  "candidate_futil_sha256": "0b42faf473e640a8325792f24169f3dd35ca77467c375f33b99897c98998da8f",
+  "candidate_sv_sha256": "d20eb52af313de83b3d1442d51c8ce6be484b6110f77b3b7197363eadf357cd4",
+  "alias_count": 29,
+  "additional_aliases": [
+    "q_accumulator_i64 -> q_input_q16_16",
+    "q_post_weight_rescale_bias_q16_16 -> q_input_q16_16",
+    "q_output_q16_16 -> q_input_q16_16",
+    "k_accumulator_i64 -> k_input_q16_16",
+    "k_post_weight_rescale_bias_q16_16 -> k_input_q16_16",
+    "k_output_q16_16 -> k_input_q16_16",
+    "v_input_q16_16 -> ln1_output_q16_16",
+    "v_accumulator_i64 -> ln1_output_q16_16",
+    "v_post_weight_rescale_bias_q16_16 -> ln1_output_q16_16",
+    "v_output_q16_16 -> ln1_output_q16_16"
+  ],
+  "check": {
+    "scope": "one autonomous token, two independent reset runs",
+    "run_0": {"token": 11, "cycles": 82479330},
+    "run_1": {"token": 11, "cycles": 82479330},
+    "expected_token": 11,
+    "cycles_match": true,
+    "tokens_match": true
+  },
+  "memory_inventory": {
+    "external_memory_count": 95,
+    "logical_bits": 36512384,
+    "bram_marked_logical_bits": 35981312,
+    "minimum_ramb36_equivalents": 977,
+    "xc7k480t_reference_ramb36_capacity": 955,
+    "fit_status": "lower-bound-still-exceeds-device"
+  },
+  "synthesis": "not run; no fit or timing claim",
+  "decision": "Accept batch A for the cumulative semantic candidate; retain exact multi-token gating."
+}

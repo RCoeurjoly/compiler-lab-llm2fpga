@@ -1,0 +1,24 @@
+{
+  "schema": "tinystories-1m-memory-reuse-attention-one-pass-v1",
+  "status": "bounded-semantic-pass",
+  "baseline_futil_sha256": "d17e45c36e2fd7f984a904b14eaa98bc369c1caf48ca7ad48ddcbc2eb0df0366",
+  "candidate_futil_sha256": "784bae0fd6bfdd22e1851e5786e159c99f506b206b72877da47e345d7a705414",
+  "candidate_sv_sha256": "b5604f88b72ca6b4cc9de272cf510e1ea960ffa06bb03e88292c74212dfd924d",
+  "alias_count": 17,
+  "additional_alias": {
+    "removed": "attention_numerator_q17_36",
+    "canonical": "attention_context_heads_q16_16",
+    "logical_bits": 81920
+  },
+  "check": {
+    "scope": "one autonomous token, two independent reset runs",
+    "run_0": {"token": 11, "cycles": 82479330},
+    "run_1": {"token": 11, "cycles": 82479330},
+    "expected_token": 11,
+    "cycles_match": true,
+    "tokens_match": true
+  },
+  "synthesis": "not run; no fit or timing claim",
+  "decision": "Accept this single additional alias for the next candidate set; retain per-alias semantic gating.",
+  "next_action": "Test further activation aliases one at a time, then run exact multi-token simulation and mapped resource analysis."
+}

@@ -1,0 +1,48 @@
+{
+  "schema": "tinystories-1m-generated-autoregressive-mismatch-v1",
+  "status": "first-mismatch-localization-pending",
+  "candidate": {
+    "model_futil_sha256": "98d4a2e1d407666343461924cc3078de7d28db880b2d404bd9bfed17c62b8ad6",
+    "model_sv_sha256": "f9b832c20084ec5f6d0d6aa6153dfd0a84e2b67c93b661be901130d9b9e26864",
+    "transport": "generated-RTL Verilator harness",
+    "memory_change": "q_input_scale_q8_24 and q_weight_scale_q8_24 inferred as LUTRAM"
+  },
+  "observed_tokens": [11, 612, 11],
+  "expected_tokens": [11, 612, 373],
+  "first_mismatch": {
+    "step": 2,
+    "observed": 11,
+    "expected": 373,
+    "cycles": 263575511
+  },
+  "localization": {
+    "status": "single-alias-isolated",
+    "fault_class": "attention-context-memory-clobber",
+    "evidence": [
+      "The prompt/context initialization loop executes before the model-step loop, so the initial padding path is not itself proof of an overwrite",
+      "The mismatch appears only after the second generated token on the memory-reuse candidate",
+      "The same token-2 mismatch occurs with the original BRAM-placement candidate using the same aliases, exonerating LUTRAM placement",
+      "The smaller alias set and batch-A and batch-B candidates all produce token 2 = 373",
+      "The full candidate alone adds attention_context_heads_q16_16 -> ln1_output_q16_16 and produces token 2 = 11"
+    ],
+    "comparison": {"bram_candidate_step_2": 11, "expected_step_2": 373, "lutram_candidate_step_2": 11, "batch_b_step_2": 373},
+    "isolated_alias": "attention_context_heads_q16_16 -> ln1_output_q16_16",
+    "unaliased_baseline": {
+      "model_futil_sha256": "d17e45c36e2fd7f984a904b14eaa98bc369c1caf48ca7ad48ddcbc2eb0df0366",
+      "model_sv_sha256": "36b754ed1b3d2deb8ddf78d22478668558331733420dd657343e869c712e5b15",
+      "matched_steps": 12,
+      "observed_tokens": [11, 612, 373, 257, 1310, 2576, 3706, 20037, 13, 1375, 6151, 284],
+      "termination": "deadline-exceeded-before-step-12"
+    },
+    "next_test": "Run the same three-token harness against the unaliased generated SV, then bisect alias groups"
+  },
+  "prior_matches": [
+    {"step": 0, "token": 11, "cycles": 82479330},
+    {"step": 1, "token": 612, "cycles": 170333261}
+  ],
+  "limitations": [
+    "The run was stopped after the first mismatch",
+    "No RTL fix has been applied",
+    "This does not establish hardware or timing status"
+  ]
+}

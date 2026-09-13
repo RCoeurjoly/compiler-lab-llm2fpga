@@ -127,13 +127,13 @@ def _resize(phase: Phase, changes: dict[str, tuple[int, ...]], limits: dict[str,
     return result, [text], control
 
 
-def _layer_norm(attention, prefix: str = "", final: bool = False) -> Phase:
+def _layer_norm(attention, prefix: str = "", final: bool = False, rows: int = 8) -> Phase:
     phase = attention._ln2_composed_phase() if prefix == "ln2_" else attention._ln1_composed_phase()
     changes = {
-        "row_counter": (4,), "row_lt": (4,), "increment_row": (4,),
-        "row_pad": (4, 9), "row_shift": (9,), "column_pad": (6, 9), "flat_address": (9,),
+        "row_counter": (rows.bit_length(),), "row_lt": (rows.bit_length(),), "increment_row": (rows.bit_length(),),
+        "row_pad": (rows.bit_length(), (rows * 64 - 1).bit_length()), "row_shift": ((rows * 64 - 1).bit_length(),), "column_pad": (6, (rows * 64 - 1).bit_length()), "flat_address": ((rows * 64 - 1).bit_length(),),
     }
-    phase = _resize(phase, {prefix + k: v for k, v in changes.items()}, {prefix + "row_lt": 8})
+    phase = _resize(phase, {prefix + k: v for k, v in changes.items()}, {prefix + "row_lt": rows})
     if final:
         # Namespace the unmodified ln1 arithmetic and reconnect its memory ABI.
         cells = re.findall(r"^(\w+) =", "\n".join(phase[0]), re.M)
@@ -144,23 +144,29 @@ def _layer_norm(attention, prefix: str = "", final: bool = False) -> Phase:
     return phase
 
 
-def _causal(attention, *, split_denominator: bool = False) -> Phase:
+def _causal(attention, *, split_denominator: bool = False, rows: int = 8) -> Phase:
+    if type(rows) is not int or rows not in (8, 20):
+        raise ValueError("causal row capacity must be 8 or 20")
+    rw = rows.bit_length()
+    vw = (rows * 64 - 1).bit_length()
+    sw = (rows * rows * 16 - 1).bit_length()
+    hw = (rows * 16 - 1).bit_length()
     changes = {
-        "causal_row": (4,), "causal_key": (4,), "causal_row_lt": (4,),
-        "causal_key_le": (4,), "causal_row_increment": (4,), "causal_key_increment": (4,),
-        "causal_row_pad8": (4, 9), "causal_row_shift6": (9,),
-        "causal_key_pad8": (4, 9), "causal_key_shift6": (9,),
-        "causal_head_pad8": (5, 9), "causal_head_shift2": (9,),
-        "causal_lane_pad8": (3, 9), "causal_query_head_lane": (9,),
-        "causal_query_address": (9,), "causal_key_address": (9,),
-        "causal_slot_head_key": (10,), "causal_slot_address": (10,),
-        "causal_row_pad6": (4, 7), "causal_row_shift4": (7,),
-        "causal_head_pad6": (5, 7), "causal_row_head_address": (7,),
+        "causal_row": (rw,), "causal_key": (rw,), "causal_row_lt": (rw,),
+        "causal_key_le": (rw,), "causal_row_increment": (rw,), "causal_key_increment": (rw,),
+        "causal_row_pad8": (rw, vw), "causal_row_shift6": (vw,),
+        "causal_key_pad8": (rw, vw), "causal_key_shift6": (vw,),
+        "causal_head_pad8": (5, vw), "causal_head_shift2": (vw,),
+        "causal_lane_pad8": (3, vw), "causal_query_head_lane": (vw,),
+        "causal_query_address": (vw,), "causal_key_address": (vw,),
+        "causal_slot_head_key": (sw,), "causal_slot_address": (sw,),
+        "causal_row_pad6": (rw, hw), "causal_row_shift4": (hw,),
+        "causal_head_pad6": (5, hw), "causal_row_head_address": (hw,),
     }
-    cells, wires, control = _resize(attention._causal_attention_phase(), changes, {"causal_row_lt": 8})
+    cells, wires, control = _resize(attention._causal_attention_phase(), changes, {"causal_row_lt": rows})
     # Score slots are [row,head,key] with key stride8, whereas Q/K/V are
     # [row,head,lane] with lane stride4.  They must not share that address.
-    cells += ["model_score_row = std_pad(4, 10);", "model_score_row_shift = std_lsh(10);", "model_score_head = std_pad(5, 10);", "model_score_head_shift = std_lsh(10);", "model_score_key = std_pad(4, 10);"]
+    cells += [f"model_score_row = std_pad({rw}, {sw});", f"model_score_row_shift = std_lsh({sw});", f"model_score_head = std_pad(5, {sw});", f"model_score_head_shift = std_lsh({sw});", f"model_score_key = std_pad({rw}, {sw});"]
     text = "\n".join(wires)
     for old, new in {
         "causal_slot_head_key.left = causal_head_shift2.out;": "causal_slot_head_key.left = model_score_head_shift.out;",
@@ -170,15 +176,31 @@ def _causal(attention, *, split_denominator: bool = False) -> Phase:
         if text.count(old) != 1:
             raise ValueError("causal score address ABI changed")
         text = text.replace(old, new)
-    text += """
+    text += f"""
     model_score_row.in = causal_row.out;
     model_score_row_shift.left = model_score_row.out;
-    model_score_row_shift.right = 10'd7;
+    model_score_row_shift.right = {sw}'d{7 if rows == 8 else 8};
     model_score_head.in = causal_head.out;
     model_score_head_shift.left = model_score_head.out;
-    model_score_head_shift.right = 10'd3;
+    model_score_head_shift.right = {sw}'d{3 if rows == 8 else 4};
     model_score_key.in = causal_key.out;
 """
+    if rows == 20:
+        # Dense [row,head,key]: row*320 + head*20 + key.  The head stride
+        # is formed as head*16 + head*4; constant shifts avoid multipliers.
+        for axis, low_shift in (("row", 6), ("head", 2)):
+            cells += [f"model_score_{axis}_low_shift = std_lsh({sw});",
+                      f"model_score_{axis}_stride = std_add({sw});"]
+            text += f"""
+    model_score_{axis}_low_shift.left = model_score_{axis}.out;
+    model_score_{axis}_low_shift.right = {sw}'d{low_shift};
+    model_score_{axis}_stride.left = model_score_{axis}_shift.out;
+    model_score_{axis}_stride.right = model_score_{axis}_low_shift.out;
+"""
+        text = text.replace("causal_slot_address.left = model_score_row_shift.out;",
+                            "causal_slot_address.left = model_score_row_stride.out;")
+        text = text.replace("causal_slot_head_key.left = model_score_head_shift.out;",
+                            "causal_slot_head_key.left = model_score_head_stride.out;")
     if split_denominator:
         # A two-cycle memory write must not stretch the non-idempotent
         # denominator register update across both cycles.
@@ -199,24 +221,29 @@ def _causal(attention, *, split_denominator: bool = False) -> Phase:
     return cells, [text], control
 
 
-def _block_phases(block, attention, mlp, *, narrow_products: bool = False) -> list[Phase]:
-    phases = [_layer_norm(attention), attention._initialize_zero_bias_phase()]
+def _block_phases(block, attention, mlp, *, narrow_products: bool = False, rows: int = 8) -> list[Phase]:
+    phases = [_layer_norm(attention, rows=rows), attention._initialize_zero_bias_phase()]
+    def loop_geometry(phase, counter, comparison, increment, address, count):
+        width = count.bit_length()
+        return _resize(phase, {counter: (width,), comparison: (width,),
+                              increment: (width,), address: (width, (count-1).bit_length())},
+                       {comparison: count})
     def projection(prefix, source, inputs, outputs, bias, qdq=True):
         if qdq:
-            phases.append(mlp._activation_qdq_phase(f"{prefix}_input_qdq", source, f"{prefix}_input_scale_q8_24", f"{prefix}_input_codes_i8", f"{prefix}_input_q16_16", 8 * inputs, inputs, narrow_products=narrow_products))
-        phases.append(mlp._gemv_phase(f"{prefix}_gemv", f"{prefix}_input_codes_i8", f"{prefix}_input_scale_q8_24", f"{prefix}_weight_codes_i8", f"{prefix}_accumulator_i64", 8, inputs, outputs, narrow_products=narrow_products))
-        phases.append(mlp._requantize_phase(f"{prefix}_requant", f"{prefix}_accumulator_i64", f"{prefix}_weight_scale_q8_24", bias, f"{prefix}_output_scale_q8_24", f"{prefix}_post_weight_rescale_bias_q16_16", f"{prefix}_output_codes_i8", f"{prefix}_output_q16_16", 8 * outputs, outputs))
+            phases.append(mlp._activation_qdq_phase(f"{prefix}_input_qdq", source, f"{prefix}_input_scale_q8_24", f"{prefix}_input_codes_i8", f"{prefix}_input_q16_16", rows * inputs, inputs, narrow_products=narrow_products))
+        phases.append(mlp._gemv_phase(f"{prefix}_gemv", f"{prefix}_input_codes_i8", f"{prefix}_input_scale_q8_24", f"{prefix}_weight_codes_i8", f"{prefix}_accumulator_i64", rows, inputs, outputs, narrow_products=narrow_products))
+        phases.append(mlp._requantize_phase(f"{prefix}_requant", f"{prefix}_accumulator_i64", f"{prefix}_weight_scale_q8_24", bias, f"{prefix}_output_scale_q8_24", f"{prefix}_post_weight_rescale_bias_q16_16", f"{prefix}_output_codes_i8", f"{prefix}_output_q16_16", rows * outputs, outputs))
     for prefix in ("q", "k", "v"):
         projection(prefix, "ln1_output_q16_16", 64, 64, "zero_bias_q16_16")
-    phases.append(_resize(attention._initialize_causal_slots_phase(), {"causal_zero_counter": (11,), "causal_zero_lt": (11,), "causal_zero_increment": (11,), "causal_zero_address": (11, 10)}, {"causal_zero_lt": 1024}))
-    phases.append(_causal(attention, split_denominator=narrow_products))
+    phases.append(loop_geometry(attention._initialize_causal_slots_phase(), "causal_zero_counter", "causal_zero_lt", "causal_zero_increment", "causal_zero_address", rows * rows * 16))
+    phases.append(_causal(attention, split_denominator=narrow_products, rows=rows))
     projection("out", "attention_context_q16_16", 64, 64, "out_bias_q16_16")
-    phases.append(_resize(attention._residual_add_phase(), {"attention_residual_counter": (10,), "attention_residual_lt": (10,), "attention_residual_increment": (10,), "attention_residual_address": (10, 9)}, {"attention_residual_lt": 512}))
-    phases.append(_layer_norm(attention, "ln2_"))
+    phases.append(loop_geometry(attention._residual_add_phase(), "attention_residual_counter", "attention_residual_lt", "attention_residual_increment", "attention_residual_address", rows * 64))
+    phases.append(_layer_norm(attention, "ln2_", rows=rows))
     projection("c_fc", "ln2_output_q16_16", 64, 256, "c_fc_bias_q16_16")
-    phases.append(_resize(mlp._gelu_phase(), {"gelu_entry_counter": (12,), "gelu_entry_lt": (12,), "gelu_increment_entry": (12,), "gelu_entry_address": (12, 11)}, {"gelu_entry_lt": 2048}))
+    phases.append(loop_geometry(mlp._gelu_phase(), "gelu_entry_counter", "gelu_entry_lt", "gelu_increment_entry", "gelu_entry_address", rows * 256))
     projection("c_proj", "gelu_output_q16_16", 256, 64, "c_proj_bias_q16_16")
-    phases.append(_resize(block._final_residual_phase(), {"block_output_counter": (10,), "block_output_lt": (10,), "block_output_increment": (10,), "block_output_address": (10, 9)}, {"block_output_lt": 512}))
+    phases.append(loop_geometry(block._final_residual_phase(), "block_output_counter", "block_output_lt", "block_output_increment", "block_output_address", rows * 64))
     return phases
 
 
@@ -350,29 +377,44 @@ def _banked_read(builder: Builder, group_name: str, prefix: str, memory_prefix: 
 
 def _orchestration(builder: Builder, block_control: str, final_control: str, lm_control: str, *, audit_checkpoints: bool = True, stream_lm_head: bool = False, stream_gemv_control: str | None = None, board_io: bool = False, generation_steps: int = 2) -> str:
     b = builder
-    counter_specs = [("model_step", 2, f"2'd{generation_steps}"), ("model_layer", 4, "4'd8"), ("model_row", 4, "4'd8"), ("model_column", 7, "7'd64"), ("model_copy", 10, "10'd512"), ("model_logit", 16, "16'd50257")]
+    geometry = _load(ROOT / "scripts/pipeline/tinystories_generation_geometry.py", "orchestration_geometry").generation_geometry(generation_steps)
+    rows, rw, sw = geometry.row_capacity, geometry.row_counter_width, geometry.step_counter_width
+    aw, iw = geometry.row_address_width, geometry.token_index_width
+    count = rows * 64
+    cw, vw = count.bit_length(), (count - 1).bit_length()
+    counter_specs = [("model_step", sw, f"{sw}'d{generation_steps}"), ("model_layer", 4, "4'd8"), ("model_row", rw, f"{rw}'d{rows}"), ("model_column", 7, "7'd64"), ("model_copy", cw, f"{cw}'d{count}"), ("model_logit", 16, "16'd50257")]
     if stream_lm_head:
         counter_specs.pop()  # GEMV's output counter owns the vocabulary index.
     if not stream_lm_head:
         counter_specs.insert(-1, ("model_logit_row", 4, "model_context_length.out"))
     for name, width, limit in counter_specs:
         b.counter(name, width, limit)
-    b.cell("model_context_length", "std_reg", 4)
-    b.cell("model_context_next", "std_add", 4)
+    b.cell("model_context_length", "std_reg", rw)
+    b.cell("model_context_next", "std_add", rw)
     if stream_lm_head:
-        b.cell("model_last_row", "std_sub", 4)
-    b.cell("model_context_address", "std_slice", 4, 3)
+        b.cell("model_last_row", "std_sub", rw)
+    b.cell("model_context_address", "std_slice", rw, aw)
     b.cell("model_layer_bank", "std_slice", 4, 3)
-    b.cell("model_step_address", "std_slice", 2, 1)
-    if board_io:
+    b.cell("model_step_address", "std_slice", sw, iw)
+    if board_io and generation_steps <= 2:
         b.cell("model_step_is_first", "std_not", 1)
         b.cell("model_token0_next", "std_mux", 16)
         b.cell("model_token1_next", "std_mux", 16)
         b.cell("model_token0", "std_reg", 16)
         b.cell("model_token1", "std_reg", 16)
         b.cell("model_token_select", "std_mux", 16)
-    b.cell("model_row_address", "std_slice", 4, 3)
-    b.cell("model_prompt_address", "std_slice", 4, 2)
+    if board_io and generation_steps == 16:
+        for index in range(16):
+            b.cell(f"model_step_eq{index}", "std_eq", iw)
+            b.cell(f"model_output_eq{index}", "std_eq", iw)
+            b.cell(f"model_token{index}_next", "std_mux", 16)
+            b.cell(f"model_token{index}", "std_reg", 16)
+            b.cell(f"model_output_mux{index}", "std_mux", 16)
+            previous = "16'd0" if index == 0 else f"model_output_mux{index-1}.out"
+            b.wires.append(f"model_step_eq{index}.left = model_step_address.out; model_step_eq{index}.right = {iw}'d{index}; model_token{index}_next.cond = model_step_eq{index}.out; model_token{index}_next.tru = model_best_token.out; model_token{index}_next.fal = model_token{index}.out; model_output_eq{index}.left = token_index; model_output_eq{index}.right = {iw}'d{index}; model_output_mux{index}.cond = model_output_eq{index}.out; model_output_mux{index}.tru = model_token{index}.out; model_output_mux{index}.fal = {previous};")
+        b.wires.append("token_id = model_output_mux15.out;")
+    b.cell("model_row_address", "std_slice", rw, aw)
+    b.cell("model_prompt_address", "std_slice", rw, 2)
     if board_io:
         for index in range(4):
             b.cell(f"model_prompt_eq{index}", "std_eq", 2)
@@ -380,16 +422,16 @@ def _orchestration(builder: Builder, block_control: str, final_control: str, lm_
         b.cell("model_prompt_value01", "std_mux", 16)
         b.cell("model_prompt_value23", "std_mux", 16)
         b.cell("model_prompt_value", "std_mux", 16)
-    b.cell("model_is_prompt", "std_lt", 4)
-    b.cell("model_position_address", "std_pad", 4, 5)
+    b.cell("model_is_prompt", "std_lt", rw)
+    b.cell("model_position_address", "std_pad", rw, 5)
     b.cell("model_column_address", "std_slice", 7, 6)
     if board_io:
         b.cell("model_token_column_shift", "std_rsh", 6)
         b.cell("model_token_column_word", "std_slice", 6, 3)
-    b.cell("model_hidden_address", "std_cat", 3, 6, 9)
+    b.cell("model_hidden_address", "std_cat", aw, 6, vw)
     b.cell("model_token_address", "std_cat", 16, 6, 22)
     b.cell("model_position_weight_address", "std_cat", 5, 6, 11)
-    b.cell("model_copy_address", "std_slice", 10, 9)
+    b.cell("model_copy_address", "std_slice", cw, vw)
     token_code_read = None
     token_scale_read = None
     token_code_value = "token_weight_codes_i8.read_data"
@@ -425,10 +467,10 @@ def _orchestration(builder: Builder, block_control: str, final_control: str, lm_
             PACKED_TOKEN_CODE_BANKS, "model_token_bank.out", "model_token_code_local.out", 64,
             packed_lanes=PACKED_TOKEN_CODE_LANES, lane_address="model_column_address.out", lane_width=6)
     if audit_checkpoints:
-        b.cell("model_embedding_checkpoint_address", "std_cat", 1, 9, 10)
-        b.cell("model_block_step_layer", "std_cat", 1, 3, 4)
-        b.cell("model_block_checkpoint_address", "std_cat", 4, 9, 13)
-        b.cell("model_ln_checkpoint_address", "std_cat", 1, 9, 10)
+        b.cell("model_embedding_checkpoint_address", "std_cat", iw, vw, iw + vw)
+        b.cell("model_block_step_layer", "std_cat", iw, 3, iw + 3)
+        b.cell("model_block_checkpoint_address", "std_cat", iw + 3, vw, iw + 3 + vw)
+        b.cell("model_ln_checkpoint_address", "std_cat", iw, vw, iw + vw)
     b.cell("model_valid_not", "std_not", 1)
     b.cell("model_wait_register", "std_reg", 1)
     if audit_checkpoints:
@@ -489,7 +531,7 @@ comb group model_prompt_condition { model_is_prompt.left = model_row.out; model_
             ]
         ))
     wait = b.group("model_wait", ["model_wait_register.in = 1'd1;", "model_wait_register.write_en = 1'd1;"], "model_wait_register.done")
-    init_length = b.group("model_init_length", ["model_context_length.in = 4'd4;", "model_context_length.write_en = 1'd1;"], "model_context_length.done")
+    init_length = b.group("model_init_length", [f"model_context_length.in = {rw}'d4;", "model_context_length.write_en = 1'd1;"], "model_context_length.done")
     read_prompt = b.read("model_read_prompt", [("prompt_tokens", "model_prompt_address.out")])
     copy_prompt = b.write("model_copy_prompt", [("context_tokens", "model_row_address.out", "model_prompt_value.out" if board_io else "prompt_tokens.read_data")])
     pad_prompt = b.write("model_pad_prompt", [("context_tokens", "model_row_address.out", "16'd0")])
@@ -541,13 +583,13 @@ comb group model_prompt_condition { model_is_prompt.left = model_row.out; model_
         b.cell("model_logit_row_address", "std_slice", 4, 3)
     if not stream_lm_head:
         b.cell("model_accumulator_address", "std_cat", 3, 16, 19)
-    if audit_checkpoints:
+    if audit_checkpoints and not stream_lm_head:
         b.cell("model_logits_address", "std_cat", 1, 19, 20)
     b.cell("model_logit_product", "std_smult_pipe", 64)
     b.cell("model_best_value", "std_reg", 64)
     b.cell("model_best_token", "std_reg", 16)
     b.cell("model_logit_is_better", "std_sgt", 64)
-    if audit_checkpoints:
+    if audit_checkpoints and not stream_lm_head:
         b.wires += ["""
 model_logit_row_address.in = model_logit_row.out;
 model_accumulator_address.left = model_logit_row_address.out;
@@ -562,7 +604,7 @@ model_last_row.left = model_context_length.out;
 model_last_row.right = 4'd1;
 comb group model_greedy_condition { model_logit_is_better.left = model_round_logit_result.out; model_logit_is_better.right = model_best_value.out; }
 """]
-    if board_io:
+    if board_io and generation_steps <= 2:
         b.wires.append("model_step_is_first.in = model_step_address.out; model_token0_next.cond = model_step_is_first.out; model_token0_next.tru = model_best_token.out; model_token0_next.fal = model_token0.out; model_token1_next.cond = model_step_address.out; model_token1_next.tru = model_best_token.out; model_token1_next.fal = model_token1.out; model_token_select.cond = token_index; model_token_select.tru = model_token1.out; model_token_select.fal = model_token0.out; token_id = model_token_select.out;")
     logit_index = "lm_gemv_output_counter.out" if stream_lm_head else "model_logit.out"
     init_greedy = b.group("model_init_greedy", ["model_best_value.in = 64'd9223372036854775808;", "model_best_value.write_en = 1'd1;", "model_best_token.in = 16'd0;", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
@@ -600,7 +642,7 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
     mul_logit = b.group("model_multiply_logit", logit_assignments, "model_logit_product.done")
     round_logit = b.round("model_round_logit", "model_logit_product.out", 32)
     write_logit = ""
-    if audit_checkpoints:
+    if audit_checkpoints and not stream_lm_head:
         write_logit = b.write("model_write_logit", [("model_logits", "model_logits_address.out", "model_round_logit_result.out")])
     greedy = b.group("model_update_greedy", ["model_best_value.in = model_round_logit_result.out;", "model_best_value.write_en = 1'd1;", f"model_best_token.in = {logit_index};", "model_best_token.write_en = 1'd1;"], "(model_best_value.done & model_best_token.done) ? 1'd1")
     consume_logit = read_logit + mul_logit + round_logit + write_logit + f"if model_logit_is_better.out with model_greedy_condition {{ {greedy} }}"
@@ -618,30 +660,49 @@ comb group model_greedy_condition { model_logit_is_better.left = model_round_log
     else:
         logit_scan = b.loop("model_logit", consume_logit)
         logits = b.loop("model_logit_row", init_greedy + logit_scan)
-    if board_io:
+    if board_io and generation_steps <= 2:
         feedback = b.group("model_commit_feedback", [
             "selected_tokens.addr0 = model_step_address.out;", "selected_tokens.content_en = 1'd1;", "selected_tokens.write_en = 1'd1;", "selected_tokens.write_data = model_best_token.out;",
             "context_tokens.addr0 = model_context_address.out;", "context_tokens.content_en = 1'd1;", "context_tokens.write_en = 1'd1;", "context_tokens.write_data = model_best_token.out;",
             "model_token0.in = model_token0_next.out;", "model_token0.write_en = 1'd1;", "model_token1.in = model_token1_next.out;", "model_token1.write_en = 1'd1;",
         ], "(selected_tokens.done & context_tokens.done) ? 1'd1")
+    elif board_io:
+        feedback = b.group("model_commit_feedback", [
+            "selected_tokens.addr0 = model_step_address.out;", "selected_tokens.content_en = 1'd1;", "selected_tokens.write_en = 1'd1;", "selected_tokens.write_data = model_best_token.out;",
+            "context_tokens.addr0 = model_context_address.out;", "context_tokens.content_en = 1'd1;", "context_tokens.write_en = 1'd1;", "context_tokens.write_data = model_best_token.out;",
+            *[f"model_token{index}.in = model_token{index}_next.out;" + " model_token%d.write_en = 1'd1;" % index for index in range(16)],
+        ], "(selected_tokens.done & context_tokens.done) ? 1'd1")
     else:
         feedback = b.write("model_commit_feedback", [("selected_tokens", "model_step_address.out", "model_best_token.out"), ("context_tokens", "model_context_address.out", "model_best_token.out")])
-    next_context = b.group("model_next_context", ["model_context_next.left = model_context_length.out;", "model_context_next.right = 4'd1;", "model_context_length.in = model_context_next.out;", "model_context_length.write_en = 1'd1;"], "model_context_length.done")
+    next_context = b.group("model_next_context", ["model_context_next.left = model_context_length.out;", f"model_context_next.right = {rw}'d1;", "model_context_length.in = model_context_next.out;", "model_context_length.write_en = 1'd1;"], "model_context_length.done")
     final_copy = b.loop("model_copy", read_ln + copy_ln) if audit_checkpoints else ""
     steps = b.loop("model_step", embedding + blocks + final_control + final_copy + lm_control + logits + feedback + next_context)
+    if generation_steps == 16:
+        b.wires = [wire.replace("model_is_prompt.right = 4'd4;", "model_is_prompt.right = 5'd4;").replace("model_last_row.right = 4'd1;", "model_last_row.right = 5'd1;") for wire in b.wires]
     return f"seq {{ while model_valid_not.out with model_wait_condition {{ {wait} }} {init_length} {prompt} {steps} }}"
 
 
-def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None, host_intermediate_states=None, production: bool = False, generation_steps: int = 2) -> CalyxArtifact:
-    if type(generation_steps) is not int or generation_steps not in (1, 2):
-        raise ValueError("generation_steps must be 1 or 2 (authenticated oracle prefix)")
+def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None, host_intermediate_states=None, production: bool = False, generation_steps: int = 2, audit_checkpoints: bool | None = None) -> CalyxArtifact:
+    if type(generation_steps) is not int or generation_steps not in (1, 2, 16):
+        raise ValueError("generation_steps must be 1, 2, or 16 (authenticated oracle prefix)")
     if host_second_token is not None:
         raise ValueError("host_second_token_forbidden")
+    if audit_checkpoints is None:
+        audit_checkpoints = not production
     if host_intermediate_states is not None:
         raise ValueError("host_intermediate_states_forbidden")
-    capture = _load(ROOT / "TinyStories/capture_fixed_point_model_token_step_oracle.py", "model_oracle_for_calyx")
-    oracle = json.loads(Path(oracle_path).read_text())
-    capture.verify_oracle_fixture(oracle)
+    geometry = _load(ROOT / "scripts/pipeline/tinystories_generation_geometry.py", "model_generation_geometry").generation_geometry(generation_steps)
+    if generation_steps == 16:
+        capture = _load(ROOT / "TinyStories/capture_fixed_point_continuation_oracle.py", "continuation_oracle_for_calyx")
+        continuation = json.loads((ROOT / "artifacts/reference/tinystories-1m-fixed-point-continuation-oracle.json").read_text())
+        capture.verify_continuation_oracle(continuation)
+        oracle = json.loads(Path(oracle_path).read_text())
+        if oracle.get("artifact_sha256") != continuation["identity"]["legacy_artifact_sha256"]:
+            raise ValueError("sixteen-step oracle must retain the authenticated two-step model identity")
+    else:
+        capture = _load(ROOT / "TinyStories/capture_fixed_point_model_token_step_oracle.py", "model_oracle_for_calyx")
+        oracle = json.loads(Path(oracle_path).read_text())
+        capture.verify_oracle_fixture(oracle)
     block, attention, mlp = _dependencies()
     base = block._block_kernel_futil()
     base_cells, _, _ = mlp._component_sections(base)
@@ -662,7 +723,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
                 count *= 8
             sources[name] = {**source, "width": width, "elements": count}
         elif name != "zero_bias_q16_16":
-            count *= 4 if name in {"attention_score_q8", "attention_delta_q8", "attention_exp_q1_20"} else 2
+            count *= (geometry.row_capacity // 4) ** 2 if name in {"attention_score_q8", "attention_delta_q8", "attention_exp_q1_20"} else geometry.row_capacity // 4
         memory_cells.append(_memory(name, width, count))
     new_sources = {
         "prompt_tokens": {"kind": "prompt", "width": 16, "elements": 4},
@@ -693,14 +754,33 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
         new_sources = {"prompt_tokens": new_sources.pop("prompt_tokens"), **old_sources, **new_sources}
     sources.update(new_sources)
     memory_cells += [_memory(name, record["width"], record["elements"]) for name, record in new_sources.items()]
-    if production:
+    if production and audit_checkpoints:
+        # Explicit diagnostic builds retain the same production arithmetic and
+        # schedule while exposing bounded semantic checkpoints.  They are not
+        # the BRAM production image and are used only for localization.
+        hardware = {
+            "context_tokens": (16, geometry.row_capacity),
+            "selected_tokens": (16, geometry.output_slots),
+            "model_embedding": (64, generation_steps * geometry.row_capacity * 64),
+            "model_token_embedding": (64, generation_steps * geometry.row_capacity * 64),
+            "model_position_embedding": (64, generation_steps * geometry.row_capacity * 64),
+            "model_block_outputs": (64, generation_steps * geometry.row_capacity * 64 * 8),
+            "model_final_ln": (64, generation_steps * geometry.row_capacity * 64),
+            "final_output_q16_16": (64, geometry.row_capacity * 64),
+            "lm_input_codes_i8": (8, geometry.row_capacity * 64),
+            "lm_input_q16_16": (64, geometry.row_capacity * 64),
+            # The production LM head streams one vocabulary row at a time;
+            # retain only that accumulator in an audit build as well.
+            "lm_accumulator_i64": (64, 50257),
+        }
+    elif production:
         # The streamed LM head reuses one vocabulary-row accumulator for each
         # real context row; it never materializes rows*vocabulary results.
-        hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512)}
+        hardware = {"context_tokens": (16, geometry.row_capacity), "selected_tokens": (16, geometry.output_slots), "final_output_q16_16": (64, geometry.row_capacity * 64), "lm_input_codes_i8": (8, geometry.row_capacity * 64), "lm_input_q16_16": (64, geometry.row_capacity * 64)}
     else:
         hardware = {"context_tokens": (16, 8), "selected_tokens": (16, 2), "model_embedding": (64, 1024), "model_token_embedding": (64, 1024), "model_position_embedding": (64, 1024), "model_block_outputs": (64, 8192), "model_final_ln": (64, 1024), "final_output_q16_16": (64, 512), "lm_input_codes_i8": (8, 512), "lm_input_q16_16": (64, 512), "lm_accumulator_i64": (64, 524288), "model_logits": (64, 1048576)}
     memory_cells += [_memory(name, *descriptor) for name, descriptor in hardware.items()]
-    phases = _block_phases(block, attention, mlp, narrow_products=production)
+    phases = _block_phases(block, attention, mlp, narrow_products=production, rows=geometry.row_capacity)
     b = Builder()
     b.cells += memory_cells
     block_wires = "\n".join(wire for _, wires, _ in phases for wire in wires)
@@ -715,15 +795,15 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
         if count == 0:
             raise ValueError(f"unused model parameter bank: {name}")
     b.wires.append(block_wires)
-    final_phase = _layer_norm(attention, final=True)
-    qdq_phase = mlp._activation_qdq_phase("lm_input_qdq", "final_output_q16_16", "lm_input_scale_q8_24", "lm_input_codes_i8", "lm_input_q16_16", 512, 64, narrow_products=production)
+    final_phase = _layer_norm(attention, final=True, rows=geometry.row_capacity)
+    qdq_phase = mlp._activation_qdq_phase("lm_input_qdq", "final_output_q16_16", "lm_input_scale_q8_24", "lm_input_codes_i8", "lm_input_q16_16", geometry.row_capacity * 64, 64, narrow_products=production)
     gemv_phase = mlp._gemv_phase(
         "lm_gemv", "lm_input_codes_i8", "lm_input_scale_q8_24",
         "token_weight_codes_packed", "lm_accumulator_i64",
         1 if production else 8, 64, 50257,
         input_row_expr="model_last_row.out" if production else None,
-        input_row_width=4 if production else None,
-        input_address_width_override=9 if production else None,
+        input_row_width=geometry.context_length_width if production else None,
+        input_address_width_override=geometry.row_address_width + 6 if production else None,
         write_trace=not production,
         banked_weights=("token_weight_codes_packed", PACKED_TOKEN_CODE_BANKS, 14) if production else None,
         narrow_products=production,
@@ -739,7 +819,7 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
         "\n".join(p[2] for p in phases),
         final_phase[2],
         qdq_phase[2] if production else qdq_phase[2] + gemv_phase[2],
-        audit_checkpoints=not production,
+        audit_checkpoints=audit_checkpoints,
         stream_lm_head=production,
         stream_gemv_control=gemv_phase[2] if production else None,
         board_io=production,
@@ -749,23 +829,34 @@ def generate_model_kernel(oracle_path: Path = ORACLE, *, host_second_token=None,
 import "primitives/core.futil";
 import "primitives/binary_operators.futil";
 import "primitives/memories/seq.futil";
-''' + ("component main(@go start: 1, valid: 1, token_index: 1, prompt_0: 16, prompt_1: 16, prompt_2: 16, prompt_3: 16) -> (@done done: 1, token_id: 16) {" if production else "component main(@go start: 1, valid: 1) -> (@done done: 1) {") + '''
+''' + (f"component main(@go start: 1, valid: 1, token_index: {geometry.token_index_width}, prompt_0: 16, prompt_1: 16, prompt_2: 16, prompt_3: 16) -> (@done done: 1, token_id: 16) {{" if production else "component main(@go start: 1, valid: 1) -> (@done done: 1) {") + '''
   cells {
 ''' + mlp._indent_lines(b.cells, 4) + "\n  }\n  wires {\n" + mlp._indent_lines(b.wires, 4) + "\n  }\n  control {\n" + control + "\n  }\n}\n"
+    if generation_steps == 16:
+        # The physical storage is provisioned for the largest context, but a
+        # step must execute only its real rows.  Running padded future rows
+        # changes shared intermediate memories and was observed to change the
+        # first selected token (1544 versus the authenticated 11).  Keep the
+        # capacity static while binding every row loop to the live context.
+        futil = re.sub(
+            r"(\b(?:\w+_row_lt|row_lt)\.right = )5'd20;",
+            r"\1model_context_length.out;",
+            futil,
+        )
     provenance = {
         "schema": SCHEMA, "oracle_sha256": oracle["artifact_sha256"],
         "futil_sha256": _sha(futil.encode()), "base_block_futil_sha256": _sha(base.encode()),
         "compiler_sources": {str(Path(module.__file__).relative_to(ROOT)): _sha(Path(module.__file__).read_bytes()) for module in (block, attention, mlp)},
         "orchestrator_sha256": _sha(Path(__file__).read_bytes()),
-        "schedule": {"layers": list(range(8)), "shared_block_datapaths": 1, "row_capacity": 8, "real_context_lengths": [4, 5], "padded_future_rows": "causally_disconnected_from_real_rows", "lm_head_rows": "real_context_only", "vocabulary": 50257, "vocabulary_storage_stride": 65536},
+        "schedule": {"layers": list(range(8)), "shared_block_datapaths": 1, "row_capacity": geometry.row_capacity, "real_context_lengths": list(geometry.real_context_lengths), "padded_future_rows": "causally_disconnected_from_real_rows", "lm_head_rows": "real_context_only", "vocabulary": 50257, "vocabulary_storage_stride": 65536},
         "source_memories": sources,
         "hardware_owned_memories": sorted(set(re.findall(r"@external (\w+) =", futil)) - set(sources)),
         "feedback": "greedy_last_real_row -> context_tokens[context_length] -> token_embedding",
-        "claims": {"compiler_owned_control": True, "existing_arithmetic_generators_modified": production, "sv_execution_verified": False, "board_executed": False, "board_fit_verified": False},
+        "claims": {"compiler_owned_control": True, "existing_arithmetic_generators_modified": production, "simulation_checkpoints": bool(audit_checkpoints), "sv_execution_verified": False, "board_executed": False, "board_fit_verified": False},
         "production_memory_contract": {"audit_checkpoint_memories": [] if production else ["model_embedding", "model_token_embedding", "model_position_embedding", "model_block_outputs", "model_final_ln", "model_logits"], "full_logits_storage": not production, "streamed_argmax": True},
     }
     provenance["schedule"]["generation_steps"] = generation_steps
-    provenance["schedule"]["real_context_lengths"] = [4, 5][:generation_steps]
+    provenance["schedule"]["real_context_lengths"] = list(geometry.real_context_lengths)
     provenance["artifact_sha256"] = _canonical(provenance)
     return CalyxArtifact(futil, provenance)
 

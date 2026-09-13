@@ -1,0 +1,18 @@
+{
+  "schema": "tinystories-1m-generated-16-simulation-success-v1",
+  "status": "simulation_verified",
+  "command": "timeout 14400s /tmp/llm2fpga-current16/reuse-batch-b/verilator-ofast/production_harness /tmp/llm2fpga-current16",
+  "oracle_sha256": "3e726c8e15945b85eb05c584dbb61e4cdd3a370fa4818d58a04542bc3160e0f6",
+  "futil_sha256": "d17e45c36e2fd7f984a904b14eaa98bc369c1caf48ca7ad48ddcbc2eb0df0366",
+  "generated_sv_sha256": "0a39e566663559609ef79bdbd0e4df6dfc7bb0c8f6cd3d92bf4b03bebadfb36b",
+  "provenance_sha256": "81f551a340b6270d0a33f51f9c710cbf97768a38eda3b58a1e632d0bc05b393b",
+  "log_sha256": "85525fba712c3578dd554458c9c36f40f5d900e7cfc1a32963a329a7c46ca0de4",
+  "generation_steps": 16,
+  "cycles": 1972293273,
+  "tokens": [11, 612, 373, 257, 1310, 2576, 3706, 20037, 13, 1375, 6151, 284, 711, 2354, 287, 262],
+  "mismatch_observed": false,
+  "timing_closed": false,
+  "board_fit_verified": false,
+  "board_executed": false,
+  "notes": "Generated-RTL simulation only; synthesis, placement, bitstream generation, and three YPCB cold starts remain outstanding."
+}

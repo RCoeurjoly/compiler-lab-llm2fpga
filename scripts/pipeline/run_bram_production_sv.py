@@ -159,8 +159,8 @@ base = production.base
 
 def harness(artifact):
     steps = artifact.provenance["schedule"]["generation_steps"]
-    if type(steps) is not int or steps not in (1, 2):
-        raise ValueError("generation_steps must be 1 or 2")
+    if type(steps) is not int or steps not in (1, 2, 16):
+        raise ValueError("generation_steps must be 1, 2, or 16")
     preloads = "\n".join(
         f'  preload(root->main__DOT__{name}__DOT__mem, directory + "/source-{name}.bin");'
         for name in artifact.provenance["source_memories"]
@@ -211,9 +211,9 @@ int main(int argc, char** argv) {
   PRELOADS
   std::cout << "{\"event\":\"preload_done\"}" << std::endl;
   std::uint64_t completed[2] = {0, 0};
-  std::uint16_t tokens[2][2] = {{0, 0}, {0, 0}};
+  std::uint16_t tokens[2][16] = {};
   constexpr unsigned steps = GENERATION_STEPS;
-  const unsigned expected[2] = {11, 612};
+  const unsigned expected[16] = {11, 612, 373, 257, 1310, 2576, 3706, 20037, 13, 1375, 6151, 284, 711, 2354, 287, 262};
   for (unsigned run = 0; run < 2; ++run) {
     unsigned seen = 0;
     model.token_index = 0;
@@ -255,7 +255,9 @@ int main(int argc, char** argv) {
     std::cout << "{\"event\":\"complete\",\"run\":" << run
       << ",\"cycles\":" << completed[run] << "}" << std::endl;
   }
-  if (completed[0] != completed[1] || tokens[0][0] != tokens[1][0] || tokens[0][1] != tokens[1][1]) return 5;
+  if (completed[0] != completed[1]) return 5;
+  for (unsigned step = 0; step < steps; ++step)
+    if (tokens[0][step] != tokens[1][step]) return 5;
   return 0;
 }
 '''.replace("PRELOADS", preloads).replace("GENERATION_STEPS", str(steps))

@@ -1,0 +1,25 @@
+{
+  "schema": "tinystories-1m-memory-reuse-attention-both-first-pass-v1",
+  "status": "bounded-semantic-pass",
+  "candidate_futil_sha256": "98d4a2e1d407666343461924cc3078de7d28db880b2d404bd9bfed17c62b8ad6",
+  "candidate_sv_sha256": "aa56e981009b747b2af2e422d16e4a8dc2b4e3771a92212ecf9563817b928d16",
+  "alias_count": 42,
+  "additional_change": "attention_numerator_q17_36 and attention_context_heads_q16_16 both use ln1_output_q16_16 storage",
+  "check": {
+    "scope": "one autonomous token, two independent reset runs",
+    "run_0": {"token": 11, "cycles": 82479330},
+    "run_1": {"token": 11, "cycles": 82479330},
+    "expected_token": 11,
+    "cycles_match": true,
+    "tokens_match": true
+  },
+  "memory_inventory": {
+    "external_memory_count": 82,
+    "logical_bits": 35447424,
+    "bram_marked_logical_bits": 35244032,
+    "minimum_ramb36_equivalents": 957,
+    "xc7k480t_reference_ramb36_capacity": 955,
+    "fit_status": "lower-bound-still-exceeds-device"
+  },
+  "decision": "Accept as the current one-token semantic candidate; full exact multi-token simulation and mapped fit remain required."
+}

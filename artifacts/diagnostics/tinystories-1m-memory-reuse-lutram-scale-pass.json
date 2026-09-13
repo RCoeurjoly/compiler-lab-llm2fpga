@@ -1,0 +1,32 @@
+{
+  "schema": "tinystories-1m-memory-reuse-candidate-v1",
+  "status": "bounded-semantic-two-reset-pass",
+  "scope": "compiler-generated TinyStories-1M first-token candidate",
+  "change": "Infer q_input_scale_q8_24 and q_weight_scale_q8_24 as two-cycle LUTRAM rather than BRAM; no datapath or transport changes",
+  "model_futil_sha256": "98d4a2e1d407666343461924cc3078de7d28db880b2d404bd9bfed17c62b8ad6",
+  "model_sv_sha256": "f9b832c20084ec5f6d0d6aa6153dfd0a84e2b67c93b661be901130d9b9e26864",
+  "memory_plan_sha256": "68447c9d699e18a9dea5dee9ae118ad7ada7008774f4e1317fbc72d1df08dce4",
+  "runs": [
+    {
+      "run": 0,
+      "prompt_step": 0,
+      "selected_token": 11,
+      "cycles": 82479330,
+      "expected_token": 11
+    },
+    {
+      "run": 1,
+      "prompt_step": 0,
+      "selected_token": 11,
+      "cycles": 82479330,
+      "expected_token": 11
+    }
+  ],
+  "limitations": [
+    "One-token bounded diagnostic only",
+    "Two independent reset runs passed",
+    "Not a complete 16-token simulation",
+    "Not a synthesis, fit, timing, or hardware result",
+    "The nonzero harness exit is due to the intentionally reduced one-token diagnostic"
+  ]
+}

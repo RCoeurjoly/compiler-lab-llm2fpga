@@ -12,14 +12,15 @@
 // Responses are captured from response_word with status in [63:60] and the
 // selected token in [15:0].  Model weights remain immutable BRAM init data.
 module tinystories_1m_jtag_csr #(
-    parameter integer PROMPT_WORDS = 4
+    parameter integer PROMPT_WORDS = 4,
+    parameter integer TOKEN_INDEX_WIDTH = 1
 ) (
     input  wire        sys_clk,
     input  wire        sys_rst,
     output reg         core_start,
     output reg         core_reset,
     output wire        core_valid,
-    output reg  [0:0]  core_token_index,
+    output reg  [TOKEN_INDEX_WIDTH-1:0]  core_token_index,
     output wire [15:0] prompt_0,
     output wire [15:0] prompt_1,
     output wire [15:0] prompt_2,
@@ -222,7 +223,7 @@ module tinystories_1m_jtag_csr #(
 `endif
           end
           4'h4: begin
-            core_token_index <= command_word[0];
+            core_token_index <= command_word[TOKEN_INDEX_WIDTH-1:0];
             token_read_pending <= 1'b1;
           end
           4'h6: response_word <= {48'd0, prompt_words[command_word[17:16]]};

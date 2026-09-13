@@ -1,0 +1,29 @@
+{
+  "schema": "tinystories-1m-memory-reuse-small-pass-v1",
+  "status": "bounded-semantic-pass",
+  "baseline_futil_sha256": "d17e45c36e2fd7f984a904b14eaa98bc369c1caf48ca7ad48ddcbc2eb0df0366",
+  "candidate_futil_sha256": "2043e8d14be34761d659ba0848bdefcbddc055d8c0fec55e11fcf75ba3c62993",
+  "candidate_sv_sha256": "52243cb904393df6e87be5a8be0e10f29ef1ee9718660734f4af95bc5eac2dce",
+  "alias_count": 16,
+  "protected_model_memory_count": 68,
+  "aliased_logical_bits": 1474560,
+  "memory_inventory": {
+    "external_memory_count": 108,
+    "logical_bits": 37577344,
+    "bram_marked_logical_bits": 36964352,
+    "minimum_ramb36_equivalents": 1003,
+    "xc7k480t_reference_ramb36_capacity": 955,
+    "fit_status": "lower-bound-still-exceeds-device"
+  },
+  "check": {
+    "scope": "one autonomous token, two independent reset runs",
+    "run_0": {"token": 11, "cycles": 82479330},
+    "run_1": {"token": 11, "cycles": 82479330},
+    "expected_token": 11,
+    "cycles_match": true,
+    "tokens_match": true
+  },
+  "synthesis": "not run; no fit or timing claim",
+  "interpretation": "Reuse of smaller code and MLP scratch memories preserves the first-token semantic contract in two reset runs. The candidate intentionally leaves all 64x1280 activation memories distinct after the full lexical alias map failed.",
+  "next_action": "Use explicit dependency/liveness analysis to grow this passing alias set conservatively, then run exact multi-token simulation and Yosys/FPGA resource mapping."
+}

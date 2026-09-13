@@ -3,7 +3,9 @@
 // JTAG-controlled YPCB top for the compiler-generated BRAM production kernel.
 // Model memories are initialized by the bitstream; the JTAG CSR supplies the
 // start/reset/read-token control plane without introducing DDR3 or PCIe.
-module tinystories_1m_ypcb_bram_production_top (
+module tinystories_1m_ypcb_bram_production_top #(
+    parameter integer TOKEN_INDEX_WIDTH = 1
+) (
     input wire clk,
     output wire [2:0] led
 `ifdef BSCAN_SIM
@@ -22,7 +24,7 @@ module tinystories_1m_ypcb_bram_production_top (
       .clk_50mhz(clk), .clk_30mhz(accelerator_clk), .locked(clock_locked));
 `endif
   wire start, valid, reset, done;
-  wire [0:0] token_index;
+  wire [TOKEN_INDEX_WIDTH-1:0] token_index;
   (* keep *) wire [15:0] token_id;
   wire [15:0] prompt_0, prompt_1, prompt_2, prompt_3;
   (* keep *) wire [63:0] response_word;
@@ -46,7 +48,7 @@ module tinystories_1m_ypcb_bram_production_top (
   end
   wire sys_reset = reset_sync[1];
 
-  tinystories_1m_jtag_csr csr (
+  tinystories_1m_jtag_csr #(.TOKEN_INDEX_WIDTH(TOKEN_INDEX_WIDTH)) csr (
       .sys_clk(accelerator_clk), .sys_rst(sys_reset), .core_start(start), .core_reset(csr_reset),
       .core_valid(valid), .core_token_index(token_index),
       .prompt_0(prompt_0), .prompt_1(prompt_1), .prompt_2(prompt_2), .prompt_3(prompt_3),

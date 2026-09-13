@@ -46,6 +46,18 @@ class BramProductionTest(unittest.TestCase):
             with self.subTest(steps=steps), self.assertRaisesRegex(ValueError, "generation_steps"):
                 module.generate_production_kernel(ORACLE, generation_steps=steps)
 
+    def test_production_runner_harness_supports_authenticated_sixteen_steps(self):
+        path = ROOT / "scripts/pipeline/run_bram_production_sv.py"
+        spec = importlib.util.spec_from_file_location("bram_sv_runner_sixteen", path)
+        assert spec and spec.loader
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        artifact = runner.production.generate_production_kernel(ORACLE, generation_steps=16)
+        harness = runner.harness(artifact)
+        self.assertIn("constexpr unsigned steps = 16;", harness)
+        self.assertIn("711, 2354, 287, 262", harness)
+        self.assertIn("for (unsigned step = 0; step < steps; ++step)", harness)
+
     @staticmethod
     def _signed(value: int, width: int) -> int:
         value &= (1 << width) - 1
@@ -228,7 +240,7 @@ seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
         top = (ROOT / "rtl/tinystories_1m_ypcb_bram_production_top.sv").read_text()
         for signal in ("prompt_0", "prompt_1", "prompt_2", "prompt_3"):
             self.assertIn(f".{signal}({signal})", top)
-        self.assertIn("tinystories_1m_jtag_csr csr", top)
+        self.assertIn("tinystories_1m_jtag_csr #(.TOKEN_INDEX_WIDTH(TOKEN_INDEX_WIDTH)) csr", top)
         self.assertIn("main core", top)
         self.assertIn("wire async_reset = tap_reset | !clock_locked", top)
         self.assertIn("wire sys_reset = reset_sync[1]", top)
