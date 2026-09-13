@@ -5,7 +5,11 @@ from pathlib import Path
 
 from scripts.pipeline.lower_fixed_point_model_bram_production import generate_production_kernel
 
-from scripts.pipeline.lower_fixed_point_model_to_calyx import bram_bank_plan, alias_runtime_memories
+from scripts.pipeline.lower_fixed_point_model_to_calyx import (
+    bram_bank_plan,
+    alias_runtime_memories,
+    narrow_source_memory_words,
+)
 
 
 class BramBankGeometryTests(unittest.TestCase):
@@ -68,6 +72,21 @@ class BramBankGeometryTests(unittest.TestCase):
         self.assertEqual(artifact.futil.count("@external q_input_codes_i8 ="), 1)
         self.assertNotIn("@external k_input_codes_i8 =", artifact.futil)
         self.assertNotIn("@external v_output_codes_i8 =", artifact.futil)
+
+    def test_narrow_source_memory_adds_explicit_sign_extension(self):
+        futil = """component main() -> () {
+  cells {
+    @external q_weight_scale_q8_24 = seq_mem_d1(64, 512, 9);
+    @external q_output_q16_16 = seq_mem_d1(64, 512, 9);
+  }
+  wires { use.left = q_weight_scale_q8_24.read_data; }
+}
+"""
+        result = narrow_source_memory_words(futil, ["q_weight_scale_q8_24"])
+        self.assertIn("q_weight_scale_q8_24 = seq_mem_d1(32, 512, 9)", result)
+        self.assertIn("q_weight_scale_q8_24_wide = std_signext(32, 64);", result)
+        self.assertIn("q_weight_scale_q8_24_wide.in = q_weight_scale_q8_24.read_data;", result)
+        self.assertIn("use.left = q_weight_scale_q8_24_wide.out;", result)
 
 
 if __name__ == "__main__":

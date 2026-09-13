@@ -11,8 +11,10 @@ explicit reuse class coalesces the serial INT8 projection-code buffers, and a
 third repacks token-scale rows into 2,048-word banks. The latest artifact
 measures 123 logical memories, 1,182 banks, and 43,573,248 physical storage
 bits; the increase in logical-memory count is the intentional 25-bank scale
-layout. The immutable source portion is 1,008 banks, so further packing is
-still required even before runtime scratch storage is counted.
+layout. A further source optimization narrows authenticated 64-bit scale and
+parameter words to 32-bit storage with explicit sign-extension adapters. The
+current artifact measures 123 logical memories, 1,174 banks, and 43,278,336
+physical storage bits. This remains a sizing receipt, not a fit claim.
 
 The YPCB budget used by this project is 955 RAMB36E1 blocks.  Therefore a
 literal bank-per-logical-memory implementation still cannot fit; this is a

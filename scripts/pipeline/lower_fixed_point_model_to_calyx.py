@@ -339,6 +339,36 @@ def alias_runtime_memories(futil: str, aliases: dict[str, str]) -> str:
     return result
 
 
+def narrow_source_memory_words(futil: str, names: list[str]) -> str:
+    """Store proven 32-bit source values in 32-bit memories with wide reads."""
+    if not names:
+        return futil
+    declaration = re.compile(r"@external (\w+) = seq_mem_d1\((\d+), (\d+), (\d+)\);")
+    selected = set(names)
+    adapters: list[str] = []
+    wires: list[str] = []
+    def rewrite(match: re.Match[str]) -> str:
+        name, width, count, index = match[1], int(match[2]), match[3], match[4]
+        if name not in selected:
+            return match[0]
+        if width != 64:
+            raise ValueError(f"source narrowing requires 64-bit declaration: {name}")
+        adapter = name + "_wide"
+        adapters.append(f"{adapter} = std_signext(32, 64);")
+        wires.append(f"{adapter}.in = {name}.read_data;")
+        return f"@external {name} = seq_mem_d1(32, {count}, {index});"
+    result = declaration.sub(rewrite, futil)
+    missing = selected - {m[1] for m in declaration.finditer(futil)}
+    if missing:
+        raise ValueError(f"cannot narrow undeclared source memory: {sorted(missing)}")
+    for name in selected:
+        adapter = name + "_wide"
+        result = re.sub(rf"\b{re.escape(name)}\.read_data\b", adapter + ".out", result)
+    result = result.replace("  cells {", "  cells {\n    " + "\n    ".join(adapters), 1)
+    result = result.replace("  wires {", "  wires {\n    " + "\n    ".join(wires), 1)
+    return result
+
+
 def _source_binding(name: str) -> tuple[str, str]:
     if name.startswith("ln"):
         ln, kind, _ = name.split("_", 2)
@@ -921,6 +951,16 @@ import "primitives/memories/seq.futil";
   cells {
 ''' + mlp._indent_lines(b.cells, 4) + "\n  }\n  wires {\n" + mlp._indent_lines(b.wires, 4) + "\n  }\n  control {\n" + control + "\n  }\n}\n"
     if production:
+        # Authenticated scale/parameter tensors have been range-checked to
+        # signed 32 bits. Store them narrowly and sign-extend at the consumer;
+        # this halves the physical width without changing arithmetic values.
+        narrow_names = [
+            name for name, record in sources.items()
+            if record.get("width") == 64 and record.get("kind") in {"scale", "parameter"}
+        ]
+        futil = narrow_source_memory_words(futil, narrow_names)
+        for name in narrow_names:
+            sources[name]["width"] = 32
         # These accumulators execute serially on the shared GEMV datapath and
         # are never live at the same time. Keep the alias set explicit rather
         # than attempting heuristic liveness inference.
