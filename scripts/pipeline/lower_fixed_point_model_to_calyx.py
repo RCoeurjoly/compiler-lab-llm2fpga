@@ -432,6 +432,51 @@ def narrow_source_memory_words(futil: str, names: list[str]) -> str:
     return result
 
 
+def narrow_runtime_memory_words(futil: str, names: list[str]) -> str:
+    """Store proven 64-bit runtime values in 32-bit memories.
+
+    Runtime intermediates selected by the caller are range-bounded by the
+    fixed-point contract.  Writes are explicitly sliced and reads explicitly
+    sign-extended, keeping the ABI value width unchanged at every consumer.
+    """
+    if not names:
+        return futil
+    declaration = re.compile(r"@external (\w+) = seq_mem_d1\((\d+), (\d+), (\d+)\);")
+    selected = set(names)
+    adapters: list[str] = []
+    wires: list[str] = []
+    found: set[str] = set()
+
+    def rewrite(match: re.Match[str]) -> str:
+        name, width, count, index = match[1], int(match[2]), match[3], match[4]
+        if name not in selected:
+            return match[0]
+        found.add(name)
+        if width != 64:
+            raise ValueError(f"runtime narrowing requires 64-bit declaration: {name}")
+        adapters.extend([
+            f"{name}_wide = std_signext(32, 64);",
+            f"{name}_narrow = std_slice(64, 32);",
+        ])
+        wires.append(f"{name}_wide.in = {name}.read_data;")
+        # Write assignments are adapted below after declaration rewriting.
+        return f"@external {name} = seq_mem_d1(32, {count}, {index});"
+
+    result = declaration.sub(rewrite, futil)
+    missing = selected - found
+    if missing:
+        raise ValueError(f"cannot narrow undeclared runtime memory: {sorted(missing)}")
+    for name in sorted(selected):
+        result = re.sub(rf"\b{re.escape(name)}\.read_data\b", name + "_wide.out", result)
+        write = re.compile(rf"(\b{re.escape(name)}\.write_data = )([^;]+);")
+        result, count = write.subn(rf"{name}_narrow.in = \2;\n    {name}.write_data = {name}_narrow.out;", result)
+        if count == 0:
+            raise ValueError(f"runtime memory has no write assignment: {name}")
+    result = result.replace("  cells {", "  cells {\n    " + "\n    ".join(adapters), 1)
+    result = result.replace("  wires {", "  wires {\n    " + "\n    ".join(wires), 1)
+    return result
+
+
 def _source_binding(name: str) -> tuple[str, str]:
     if name.startswith("ln"):
         ln, kind, _ = name.split("_", 2)
@@ -1084,6 +1129,13 @@ import "primitives/memories/seq.futil";
                 # layer-normalization result is produced.
                 "attention_context_heads_q16_16": "ln1_output_q16_16",
             },
+        )
+        # These score, delta, and probability values are range-bounded fixed-
+        # point intermediates. Store them in 32-bit words while preserving the
+        # existing 64-bit arithmetic interfaces through explicit adapters.
+        futil = narrow_runtime_memory_words(
+            futil,
+            ["attention_score_q8", "attention_delta_q8", "attention_exp_q1_20"],
         )
     if generation_steps == 16:
         # The physical storage is provisioned for the largest context, but a

@@ -9,6 +9,7 @@ from scripts.pipeline.lower_fixed_point_model_to_calyx import (
     bram_bank_plan,
     alias_runtime_memories,
     narrow_source_memory_words,
+    narrow_runtime_memory_words,
 )
 
 
@@ -87,6 +88,28 @@ class BramBankGeometryTests(unittest.TestCase):
         self.assertIn("q_weight_scale_q8_24_wide = std_signext(32, 64);", result)
         self.assertIn("q_weight_scale_q8_24_wide.in = q_weight_scale_q8_24.read_data;", result)
         self.assertIn("use.left = q_weight_scale_q8_24_wide.out;", result)
+
+    def test_narrow_runtime_memory_adapts_reads_and_writes(self):
+        futil = """component main() -> () {
+  cells {
+    @external attention_score_q8 = seq_mem_d1(64, 6400, 13);
+  }
+  wires { group g {
+    attention_score_q8.addr0 = addr.out;
+    attention_score_q8.content_en = 1'd1;
+    attention_score_q8.write_data = score.out;
+    attention_score_q8.write_en = 1'd1;
+    use.left = attention_score_q8.read_data;
+  } }
+}
+"""
+        result = narrow_runtime_memory_words(futil, ["attention_score_q8"])
+        self.assertIn("attention_score_q8 = seq_mem_d1(32, 6400, 13)", result)
+        self.assertIn("attention_score_q8_wide = std_signext(32, 64);", result)
+        self.assertIn("attention_score_q8_narrow = std_slice(64, 32);", result)
+        self.assertIn("attention_score_q8_narrow.in = score.out;", result)
+        self.assertIn("attention_score_q8.write_data = attention_score_q8_narrow.out;", result)
+        self.assertIn("use.left = attention_score_q8_wide.out;", result)
 
 
 if __name__ == "__main__":
