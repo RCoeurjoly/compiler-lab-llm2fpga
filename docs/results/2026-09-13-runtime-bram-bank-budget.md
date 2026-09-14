@@ -82,6 +82,21 @@ lifetime reuse, not RTL elaboration.
 
 ## Alias candidate simulation checkpoint (2026-09-14)
 
+### c_fc accumulator/output reuse candidate (2026-09-14)
+
+The compiler's explicit lifetime-reuse map was extended to coalesce
+`c_fc_accumulator_i64` with `c_fc_output_q16_16`.  The generated Futil and SV
+passed the exact two-token harness twice, with both runs selecting `11, 612`
+at cycles `92,936,273` and `185,872,553` and completing at cycle
+`185,872,559`.  The production receipt records oracle hash
+`7c306e8b6e38e94f54a13b8434c6dff720d0cccfb7a9e9c749198f3dde93f74`, Futil
+hash `10da5ffffb0e780475aa6a7a402934f3669bd0aea6ecbc10094e836915ad12ab`,
+and SV hash `e43159fb56eb48b2491fb5df2b84987a0ca19627dfa6852084fd4b2b277bb92c`.
+Xilinx-family Yosys synthesis completed in 37.9 seconds and inferred 1,013
+`RAMB36E1` and 322 `DSP48E1` cells, a four-BRAM reduction from the preceding
+1,017-cell candidate.  This remains a two-token simulation/resource
+checkpoint; it is not a full-16-token or board-fit result.
+
 The compiler-emitted alias candidate in `/tmp/llm2fpga-alias-full` completed
 the frozen 16-token continuation for two independent simulation runs. Both
 runs produced exactly:

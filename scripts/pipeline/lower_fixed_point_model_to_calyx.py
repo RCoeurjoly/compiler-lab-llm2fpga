@@ -1052,6 +1052,10 @@ import "primitives/memories/seq.futil";
                 # 64-bit, rows*256-word transient buffers, so they can share
                 # storage without changing the phase ordering or ABI.
                 "c_proj_input_q16_16": "c_fc_output_q16_16",
+                # The c_fc accumulator is consumed by its requantization
+                # phase before the c_fc output buffer is read by GELU.  Both
+                # are serial 64-bit buffers with the same extent.
+                "c_fc_accumulator_i64": "c_fc_output_q16_16",
                 "attention_denominator_q1_20": "attention_maximum_q8",
                 # Final layer-normalization output is consumed before the
                 # next generation step reuses block input storage.
