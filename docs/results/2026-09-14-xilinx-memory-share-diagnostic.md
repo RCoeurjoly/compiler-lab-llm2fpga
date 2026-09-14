@@ -53,3 +53,12 @@ result: the deliberately broad rule uses one abstract 72-bit, 15-address-bit
 variant and does not account for the physical depth/width banking required by
 each memory. Width/depth-specific variants and an integrated adapter are still
 required.
+
+A width/depth-variant probe (using 1/2/4/9/18/36/72-bit configurations) also
+completed. It created 63 generic SDP wrappers with configurations
+`(abits,dbits) = (9,72)×35, (10,36)×24, (11,18)×2, (13,4)×2`. A temporary
+port adapter techmapped these to 63 `RAMB36E2` cells. However, those wrappers
+represent only 2,314,240 bits of nominal primitive capacity while the source
+design reports 34.8 Mbit of logical memories. This discrepancy shows that
+initialized/constant memory accounting and/or banking duplication is still
+wrong; the 63-cell result must not be treated as a fit estimate.
