@@ -128,3 +128,12 @@ objective remains BRAM-only), but it confirms that runtime storage—not the
 immutable token tables alone—is the actionable pressure point. A valid
 solution must either pack those remaining BRAMs or explicitly justify a
 compiler-generated LUTRAM policy without changing semantics.
+
+The authenticated INT8 projection matrices are also highly sparse: the FC
+and projection code files contain 44.132% and 44.399% zero codes; each Q/K/V/O
+projection is about 44.2% zero. A lossless bitmap-plus-nonzero-byte encoding
+would use 5.5 bits per code instead of 8 (about 31.7% less storage), while
+preserving exact values. This is a candidate compiler optimization, not yet
+implemented: the GEMV lowering must consume the bitmap in deterministic input
+index order and prove that skipped zeros do not alter the signed-64-bit MAC or
+the authenticated cycle-level contract.
