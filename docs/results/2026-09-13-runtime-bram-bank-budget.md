@@ -111,6 +111,19 @@ Xilinx-family synthesis completed successfully in 37.9 seconds with 1,009
 the candidate remains a two-token simulation/resource checkpoint and does
 not establish full-16-token correctness, fit, timing, or board execution.
 
+### c_fc/GELU in-place reuse candidate (2026-09-14)
+
+The compiler then coalesced the elementwise `gelu_output_q16_16` buffer with
+`c_fc_output_q16_16`; each input word is read before its address is overwritten.
+The generated SV passed two independent exact two-token runs (`11, 612` at
+the authenticated checkpoint cycles).  The receipt records Futil hash
+`9be3f23e5374e0bd146f99ff478b8b834b5b63e3af34c54a2a69102855a1eafa` and SV
+hash `2019565fe2762cfa1ac679ba74cf32f772b9107603621e6cc45942120d7127de`.
+Xilinx-family synthesis completed successfully in 37.9 seconds with 1,005
+`RAMB36E1` and 322 `DSP48E1` cells, a further four-BRAM reduction.  This is
+still a two-token simulation/resource checkpoint; full-16-token semantics,
+fit, timing, and board execution remain outstanding.
+
 The compiler-emitted alias candidate in `/tmp/llm2fpga-alias-full` completed
 the frozen 16-token continuation for two independent simulation runs. Both
 runs produced exactly:
