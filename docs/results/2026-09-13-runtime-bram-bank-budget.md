@@ -124,6 +124,18 @@ Xilinx-family synthesis completed successfully in 37.9 seconds with 1,005
 still a two-token simulation/resource checkpoint; full-16-token semantics,
 fit, timing, and board execution remain outstanding.
 
+### Attention numerator/context reuse candidate (2026-09-14)
+
+The compiler coalesced the serial `attention_numerator_q17_36` and
+`attention_context_q16_16` buffers. Both independent exact two-token
+generated-SV runs passed (`11, 612` at the authenticated checkpoint cycles).
+The receipt records Futil hash
+`b618041db2e9da7bd498962dd465dbd7e1994738f0d747c2ff8ea3684b66ac8d` and SV
+hash `57d122d706492057af5595537f4d666c0409af4a9d44bd08a862760ef06c30f3`.
+Xilinx-family synthesis completed successfully with 1,004 `RAMB36E1` and 322
+`DSP48E1` cells. This saves one further BRAM; full-16-token semantics,
+timing, fit, and board execution remain outstanding.
+
 The compiler-emitted alias candidate in `/tmp/llm2fpga-alias-full` completed
 the frozen 16-token continuation for two independent simulation runs. Both
 runs produced exactly:

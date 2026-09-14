@@ -1062,6 +1062,10 @@ import "primitives/memories/seq.futil";
                 # GELU is an elementwise serial transform: each c_fc output
                 # word is read before the corresponding result is written.
                 "gelu_output_q16_16": "c_fc_output_q16_16",
+                # The attention numerator is consumed before the corresponding
+                # context row is written, so the serial 64-bit buffers can
+                # share storage.
+                "attention_numerator_q17_36": "attention_context_q16_16",
                 "attention_denominator_q1_20": "attention_maximum_q8",
                 # Final layer-normalization output is consumed before the
                 # next generation step reuses block input storage.
