@@ -113,3 +113,9 @@ footprint (918 ideal RAMB36E1 blocks), while capacities 12, 16, and 20 require
 architectural experiment should stream the real context through 8-row tiles
 and use a packed physical allocator; merely reducing the existing 20-row
 array or changing bank geometry is insufficient to establish fit.
+
+Xilinx-specific Yosys synthesis of that same eight-row artifact completed
+successfully and inferred 1,020 `RAMB36E1` and 322 `DSP48E1` cells. It is 65
+RAMB36E1 above the 955-block budget, showing that a packed allocator might
+close the initial tile, but this is only the one-token artifact and does not
+establish full 16-token multi-tile feasibility.
