@@ -1056,6 +1056,9 @@ import "primitives/memories/seq.futil";
                 # phase before the c_fc output buffer is read by GELU.  Both
                 # are serial 64-bit buffers with the same extent.
                 "c_fc_accumulator_i64": "c_fc_output_q16_16",
+                # The post-weight-rescale c_fc values are consumed before
+                # the output Q/DQ phase writes the same serial buffer.
+                "c_fc_post_weight_rescale_bias_q16_16": "c_fc_output_q16_16",
                 "attention_denominator_q1_20": "attention_maximum_q8",
                 # Final layer-normalization output is consumed before the
                 # next generation step reuses block input storage.

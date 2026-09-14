@@ -97,6 +97,20 @@ Xilinx-family Yosys synthesis completed in 37.9 seconds and inferred 1,013
 1,017-cell candidate.  This remains a two-token simulation/resource
 checkpoint; it is not a full-16-token or board-fit result.
 
+### c_fc post-rescale/output reuse candidate (2026-09-14)
+
+The next compiler lifetime-reuse candidate coalesces
+`c_fc_post_weight_rescale_bias_q16_16` with `c_fc_output_q16_16`.  Generated
+SV again passed two independent exact two-token runs (`11, 612` at cycles
+`92,936,273` and `185,872,553`, completing at `185,872,559`).  The receipt
+records Futil hash
+`e9acb685eb162f8fb1a4a2c54f5bcf07faf712b5f882d61ef093e7fdd44c4158` and SV
+hash `c73146bb3aee17a247d5bdc32548a6595395c60bc4b913a3d2fb89859e290d20`.
+Xilinx-family synthesis completed successfully in 37.9 seconds with 1,009
+`RAMB36E1` and 322 `DSP48E1` cells.  This is another four-BRAM reduction;
+the candidate remains a two-token simulation/resource checkpoint and does
+not establish full-16-token correctness, fit, timing, or board execution.
+
 The compiler-emitted alias candidate in `/tmp/llm2fpga-alias-full` completed
 the frozen 16-token continuation for two independent simulation runs. Both
 runs produced exactly:
