@@ -136,6 +136,18 @@ Xilinx-family synthesis completed successfully with 1,004 `RAMB36E1` and 322
 `DSP48E1` cells. This saves one further BRAM; full-16-token semantics,
 timing, fit, and board execution remain outstanding.
 
+### Attention context/residual reuse candidate (2026-09-14)
+
+The compiler coalesced `attention_residual_q16_16` with
+`attention_context_q16_16`. Both independent exact two-token generated-SV
+runs passed (`11, 612` at the authenticated checkpoint cycles). The receipt
+records Futil hash
+`2f2d12b57ed36a20e3ac6400743422556715c9597a282e25df9c551cff1fd442` and SV
+hash `359ec0beffb596d7be20ff30296025a4c68b2ab9721b46a0be015e626ae7bb70`.
+Xilinx-family synthesis completed successfully with 1,003 `RAMB36E1` and 322
+`DSP48E1` cells. This saves one further BRAM; full-16-token semantics,
+timing, fit, and board execution remain outstanding.
+
 The compiler-emitted alias candidate in `/tmp/llm2fpga-alias-full` completed
 the frozen 16-token continuation for two independent simulation runs. Both
 runs produced exactly:

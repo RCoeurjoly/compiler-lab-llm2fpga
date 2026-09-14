@@ -1066,6 +1066,9 @@ import "primitives/memories/seq.futil";
                 # context row is written, so the serial 64-bit buffers can
                 # share storage.
                 "attention_numerator_q17_36": "attention_context_q16_16",
+                # The context row has been consumed by the output projection
+                # before the residual row is written.
+                "attention_residual_q16_16": "attention_context_q16_16",
                 "attention_denominator_q1_20": "attention_maximum_q8",
                 # Final layer-normalization output is consumed before the
                 # next generation step reuses block input storage.
