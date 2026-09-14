@@ -68,6 +68,14 @@ through Yosys hierarchy checking. This establishes synthesis-visible model
 initialization, but does not yet establish BRAM banking, timing, bitstream, or
 board execution.
 
+With the static image present, Yosys retained 107 memories totaling
+32,947,488 logical bits (31.42 MiB-equivalent bits) after collection. The
+width/depth-specific banking rules expanded these to 1,034 generic SDP BRAM
+wrappers before primitive techmap. This is already 79 blocks over the YPCB
+955-RAMB36 budget, even before accounting for non-memory logic and packing.
+The earlier 1,034 figure is therefore the first meaningful pre-placement fit
+signal; reducing only the runtime scratch memories cannot close the gap.
+
 A width/depth-variant probe (using 1/2/4/9/18/36/72-bit configurations) also
 completed. It created 63 generic SDP wrappers with configurations
 `(abits,dbits) = (9,72)×35, (10,36)×24, (11,18)×2, (13,4)×2`. A temporary
