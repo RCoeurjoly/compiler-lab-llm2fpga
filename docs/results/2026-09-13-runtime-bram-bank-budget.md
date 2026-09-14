@@ -119,3 +119,12 @@ successfully and inferred 1,020 `RAMB36E1` and 322 `DSP48E1` cells. It is 65
 RAMB36E1 above the 955-block budget, showing that a packed allocator might
 close the initial tile, but this is only the one-token artifact and does not
 establish full 16-token multi-tile feasibility.
+
+As a diagnostic-only tradeoff, a temporary synthesis fixture forced the
+non-weight runtime buffers to Xilinx distributed RAM. The same eight-row
+artifact then inferred 968 `RAMB36E1`, 20,412 `LUT6`, and 322 `DSP48E1` cells.
+This is 13 BRAM blocks over budget and therefore not yet a deliverable (the
+objective remains BRAM-only), but it confirms that runtime storage—not the
+immutable token tables alone—is the actionable pressure point. A valid
+solution must either pack those remaining BRAMs or explicitly justify a
+compiler-generated LUTRAM policy without changing semantics.
