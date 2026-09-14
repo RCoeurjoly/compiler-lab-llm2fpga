@@ -38,10 +38,10 @@ class BramImageTest(unittest.TestCase):
             self.assertEqual(receipt["generation_steps"], 1)
             self.assertEqual(receipt["futil_sha256"], artifact.provenance["futil_sha256"])
             self.assertEqual(receipt["oracle_sha256"], artifact.provenance["oracle_sha256"])
-            self.assertEqual(len(receipt["source_memories"]), 240)
+            self.assertEqual(len(receipt["source_memories"]), len(artifact.provenance["source_memories"]))
             self.assertFalse(receipt["claims"]["bitstream_verified"])
 
-    def test_synthesis_output_gets_source_initializers_in_main(self):
+    def test_synthesis_output_binds_source_initializer_to_memory_instance(self):
         module = load_module()
         source = '''module seq_mem_d1(); endmodule
 module main(input clk);
@@ -52,7 +52,8 @@ module another(); endmodule
 '''
         result = module.staticize_sv(source, {"weights"})
         main = result.split("module main", 1)[1].split("endmodule", 1)[0]
-        self.assertIn('$readmemh("image-weights.hex", weights.mem);', main)
+        self.assertIn('.INIT_FILE("image-weights.hex")', main)
+        self.assertNotIn('$readmemh("image-weights.hex", weights.mem);', result)
         self.assertNotIn("image-scratch", result)
         self.assertEqual(module.staticize_sv(result, {"weights"}), result)
 
@@ -64,12 +65,16 @@ module another(); endmodule
     def test_duplicate_initializers_are_rejected(self):
         module = load_module()
         source = '$readmemh("image-weights.hex", weights.mem);\n' * 2
-        with self.assertRaisesRegex(ValueError, "exactly one initializer"):
+        with self.assertRaisesRegex(ValueError, "missing immutable memory instance"):
             module.staticize_sv(source, {"weights"})
 
     def test_staticizer_removes_runtime_plusarg_and_scratch_initialization(self):
         module = load_module()
-        source = """string DATA;\nint CODE;\ninitial begin
+        source = """module seq_mem_d1 # (parameter IDX_SIZE = 4) (input clk);
+endmodule
+module main;
+  seq_mem_d1 token_weight_codes_i8 ();
+string DATA;\nint CODE;\ninitial begin
     CODE = $value$plusargs(\"DATA=%s\", DATA);
     $display(\"DATA (path to meminit files): %s\", DATA);
     $readmemh({DATA, \"/token_weight_codes_i8.dat\"}, token_weight_codes_i8.mem);
@@ -79,13 +84,14 @@ final begin
     $writememh({DATA, \"/context_tokens.out\"}, context_tokens.mem);
 end
 logic clk;
+endmodule
 """
         result = module.staticize_sv(source, {"token_weight_codes_i8"})
         self.assertNotIn("$value$plusargs", result)
         self.assertNotIn("context_tokens.dat", result)
         self.assertNotIn("$writememh", result)
         self.assertNotIn("$onehot0", result)
-        self.assertIn('$readmemh("image-token_weight_codes_i8.hex", token_weight_codes_i8.mem);', result)
+        self.assertIn('.INIT_FILE("image-token_weight_codes_i8.hex")', result)
 
     def test_script_is_scoped_to_static_image_and_not_bitstream_claims(self):
         source = SCRIPT.read_text()

@@ -54,6 +54,20 @@ variant and does not account for the physical depth/width banking required by
 each memory. Width/depth-specific variants and an integrated adapter are still
 required.
 
+## Model-image initialization correction
+
+The generated SV's normal Verilator path preloads every source memory from
+host-side binary files. The earlier static-image helper incorrectly inserted
+hierarchical `$readmemh(..., instance.mem)` calls into `main`; Yosys rejected
+these because the second argument is not a local memory. Commit `bf2821a`
+provided a BRAM rule file, and the follow-up staticizer change moves each image
+initializer into the memory implementation behind an `INIT_FILE` instance
+parameter. A regenerated static image contains 89 authenticated image files,
+three local `readmemh(INIT_FILE, mem)` initializers, and parses successfully
+through Yosys hierarchy checking. This establishes synthesis-visible model
+initialization, but does not yet establish BRAM banking, timing, bitstream, or
+board execution.
+
 A width/depth-variant probe (using 1/2/4/9/18/36/72-bit configurations) also
 completed. It created 63 generic SDP wrappers with configurations
 `(abits,dbits) = (9,72)×35, (10,36)×24, (11,18)×2, (13,4)×2`. A temporary

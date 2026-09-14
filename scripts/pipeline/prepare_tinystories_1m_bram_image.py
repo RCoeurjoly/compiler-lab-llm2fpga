@@ -48,41 +48,60 @@ def staticize_sv(source: str, source_names: set[str]) -> str:
         source,
     )
 
-    def replace_read(match: re.Match[str]) -> str:
-        name = match.group(1)
-        if name not in source_names:
-            return ""
-        return f'    $readmemh("image-{name}.hex", {name}.mem);'
+    # The Calyx-generated preload block targets hierarchical instance members
+    # (``instance.mem``).  Yosys does not accept such a target as a synthesis
+    # memory.  Move initialization into each memory module and select the file
+    # through an instance parameter instead.
+    source = re.sub(
+        r"\ninitial begin\n(?:\s*\$readmemh\([^\n]+\);\n)+end\n",
+        "\n",
+        source,
+    )
 
     source = re.sub(
         r"^\s*\$readmemh\(\{DATA, \"/(\w+)\.dat\"\}, \1\.mem\);$",
-        replace_read,
+        lambda match: "",
         source,
         flags=re.M,
     )
     # The generated final block writes every memory back to host files.  It is
     # simulation-only and must not survive into synthesis.
     source = re.sub(r"\nfinal begin\n.*?\nend\n(?=logic )", "\n", source, count=1, flags=re.S)
-    # Calyx --synthesis omits its simulation preload block entirely. Restore
-    # only the authenticated immutable sources, in the generated main scope.
-    missing = sorted(
-        name for name in source_names
-        if f'$readmemh("image-{name}.hex", {name}.mem);' not in source
+    # Add an optional image parameter and a local (synthesis-visible)
+    # initializer to every generated memory implementation.
+    source = source.replace(
+        "parameter IDX_SIZE = 4\n)",
+        'parameter IDX_SIZE = 4,\n    parameter INIT_FILE = ""\n)',
     )
-    if missing:
-        main = re.search(r"\bmodule\s+main\b.*?\bendmodule\b", source, re.S)
-        if main is None:
-            raise ValueError("missing main module for immutable memory initialization")
-        for name in missing:
-            if not re.search(r"\b" + re.escape(name) + r"\s*\(", main.group()):
-                raise ValueError(f"missing immutable memory instance: {name}")
-        initial = "\ninitial begin\n" + "\n".join(
-            f'    $readmemh("image-{name}.hex", {name}.mem);' for name in missing
-        ) + "\nend\n"
-        end = main.end() - len("endmodule")
-        source = source[:end] + initial + source[end:]
+    source = source.replace(
+        "logic [WIDTH-1:0] mem[SIZE-1:0];",
+        'logic [WIDTH-1:0] mem[SIZE-1:0];\n\n  initial if (INIT_FILE != "") $readmemh(INIT_FILE, mem);',
+    )
+    for name in sorted(source_names):
+        init_parameter = f'.INIT_FILE("image-{name}.hex")'
+        existing = source.count(init_parameter)
+        if existing == 1:
+            continue
+        if existing > 1:
+            raise ValueError(f"immutable memory must have exactly one initializer: {name}")
+        instance = re.search(r"\b" + re.escape(name) + r"\s*\(", source)
+        if instance is None:
+            raise ValueError(f"missing immutable memory instance: {name}")
+        instance_start = instance.start()
+        type_match = list(re.finditer(r"\bseq_mem_d1(?:_bram|_lutram)?\b", source[:instance_start]))
+        if not type_match or instance_start - type_match[-1].end() > 256:
+            raise ValueError(f"missing immutable memory instance: {name}")
+        type_end = type_match[-1].end()
+        hash_open = source.find("# (", type_end, instance_start)
+        if hash_open >= 0:
+            close = source.rfind(")", hash_open, instance_start)
+            if close < 0:
+                raise ValueError(f"malformed immutable memory instance: {name}")
+            source = source[:close] + ',\n  .INIT_FILE("image-' + name + '.hex")' + source[close:]
+        else:
+            source = source[:type_end] + ' #(.INIT_FILE("image-' + name + '.hex"))' + source[type_end:]
     for name in source_names:
-        if source.count(f'$readmemh("image-{name}.hex", {name}.mem);') != 1:
+        if source.count(f'.INIT_FILE("image-{name}.hex")') != 1:
             raise ValueError(f"immutable memory must have exactly one initializer: {name}")
     return source
 
