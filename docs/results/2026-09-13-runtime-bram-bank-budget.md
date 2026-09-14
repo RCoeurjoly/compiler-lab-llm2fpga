@@ -68,6 +68,15 @@ fit: the compiler must reduce the simultaneously resident context/workspace
 state (for example with real context tiling and streaming) before a BRAM-only
 full-16 design can be feasible.
 
+The accumulated compiler source was regenerated for `generation_steps=16` and
+lowered by the pinned Calyx backend without executing the long simulation. The
+Futil hash is `a633a364482ea387302edaa66349c44bede505b9ef13f73ec8ab8a881db70b01`
+and the generated SV hash is
+`93c38f296106735f16f96984925edc3de47e4f46d55070a066b8210e9021769a`.
+Calyx emitted its known data-path-inference convergence warnings but returned
+successfully. This is a reproducibility/elaboration receipt, not semantic,
+timing, fit, or hardware evidence.
+
 The calculation was run in the project Nix environment:
 
 ```text
