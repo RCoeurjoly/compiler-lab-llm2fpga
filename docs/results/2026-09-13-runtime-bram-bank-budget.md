@@ -148,6 +148,18 @@ Xilinx-family synthesis completed successfully with 1,003 `RAMB36E1` and 322
 `DSP48E1` cells. This saves one further BRAM; full-16-token semantics,
 timing, fit, and board execution remain outstanding.
 
+### Projection post-rescale buffer reuse candidate (2026-09-14)
+
+The compiler coalesced the serial q/k/v/out post-weight-rescale buffers with
+`attention_context_q16_16`. Both independent exact two-token generated-SV
+runs passed (`11, 612` at the authenticated checkpoint cycles). The receipt
+records Futil hash
+`949a011aada281a7659e851d3b5c403fc813e8829e9ff09318d56b605187b5e7` and SV
+hash `a3fd0f34d1c98caefba22e87ba295823865b07bc68ba20f4148d2ba55ae2d8b8`.
+Xilinx-family synthesis completed successfully with 999 `RAMB36E1` and 322
+`DSP48E1` cells, a four-BRAM reduction. Full-16-token semantics, timing,
+fit, and board execution remain outstanding.
+
 The compiler-emitted alias candidate in `/tmp/llm2fpga-alias-full` completed
 the frozen 16-token continuation for two independent simulation runs. Both
 runs produced exactly:
