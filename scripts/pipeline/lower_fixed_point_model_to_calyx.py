@@ -402,10 +402,12 @@ def alias_runtime_memories(futil: str, aliases: dict[str, str]) -> str:
     return result
 
 
-def narrow_source_memory_words(futil: str, names: list[str]) -> str:
-    """Store proven 32-bit source values in 32-bit memories with wide reads."""
+def narrow_source_memory_words(futil: str, names: list[str], target_width: int = 32) -> str:
+    """Store proven narrow source values with wide reads at each consumer."""
     if not names:
         return futil
+    if target_width <= 0 or target_width > 64:
+        raise ValueError("source narrowing width must be in the range 1..64")
     declaration = re.compile(r"@external (\w+) = seq_mem_d1\((\d+), (\d+), (\d+)\);")
     selected = set(names)
     adapters: list[str] = []
@@ -417,9 +419,9 @@ def narrow_source_memory_words(futil: str, names: list[str]) -> str:
         if width != 64:
             raise ValueError(f"source narrowing requires 64-bit declaration: {name}")
         adapter = name + "_wide"
-        adapters.append(f"{adapter} = std_signext(32, 64);")
+        adapters.append(f"{adapter} = std_signext({target_width}, 64);")
         wires.append(f"{adapter}.in = {name}.read_data;")
-        return f"@external {name} = seq_mem_d1(32, {count}, {index});"
+        return f"@external {name} = seq_mem_d1({target_width}, {count}, {index});"
     result = declaration.sub(rewrite, futil)
     missing = selected - {m[1] for m in declaration.finditer(futil)}
     if missing:
@@ -1069,6 +1071,11 @@ import "primitives/memories/seq.futil";
         futil = narrow_source_memory_words(futil, narrow_names)
         for name in narrow_names:
             sources[name]["width"] = 32
+        # The authenticated GELU table is bounded to signed 16 bits.  Keep
+        # its lookup semantics wide at the consumer while using the native
+        # 18-bit BRAM lane, halving its bank count.
+        futil = narrow_source_memory_words(futil, ["gelu_lut_q12"], target_width=16)
+        sources["gelu_lut_q12"]["width"] = 16
         # These accumulators execute serially on the shared GEMV datapath and
         # are never live at the same time. Keep the alias set explicit rather
         # than attempting heuristic liveness inference.

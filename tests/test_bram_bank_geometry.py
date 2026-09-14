@@ -89,6 +89,18 @@ class BramBankGeometryTests(unittest.TestCase):
         self.assertIn("q_weight_scale_q8_24_wide.in = q_weight_scale_q8_24.read_data;", result)
         self.assertIn("use.left = q_weight_scale_q8_24_wide.out;", result)
 
+    def test_narrow_source_memory_supports_sixteen_bit_lut(self):
+        futil = """component main() -> () {
+  cells {
+    @external gelu_lut_q12 = seq_mem_d1(64, 8192, 13);
+  }
+  wires { use.left = gelu_lut_q12.read_data; }
+}
+"""
+        result = narrow_source_memory_words(futil, ["gelu_lut_q12"], target_width=16)
+        self.assertIn("gelu_lut_q12 = seq_mem_d1(16, 8192, 13)", result)
+        self.assertIn("gelu_lut_q12_wide = std_signext(16, 64);", result)
+
     def test_narrow_runtime_memory_adapts_reads_and_writes(self):
         futil = """component main() -> () {
   cells {
