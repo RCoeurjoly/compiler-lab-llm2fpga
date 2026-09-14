@@ -1056,6 +1056,9 @@ import "primitives/memories/seq.futil";
                 # Final layer-normalization output is consumed before the
                 # next generation step reuses block input storage.
                 "final_output_q16_16": "block_input_q16_16",
+                # The projection result is consumed by the residual write
+                # before the next layer's layer-normalization output is live.
+                "c_proj_output_q16_16": "ln1_output_q16_16",
             },
         )
     if generation_steps == 16:

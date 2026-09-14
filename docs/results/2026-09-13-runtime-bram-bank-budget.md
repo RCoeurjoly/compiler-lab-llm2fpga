@@ -108,6 +108,14 @@ hash `7ceb3b597d6e5a7214d6fdc2ad17ea53011995ee3497a25eefad92f5f2adbc74`.
 Xilinx Yosys synthesis inferred 1,019 RAMB36E1 and 322 DSP48E1 cells. This is
 an evidence-backed alias, but it still exceeds the device budget by 64 BRAMs.
 
+A second planner candidate, `c_proj_output_q16_16 -> ln1_output_q16_16`, also
+passed the exact two-token harness twice with `11, 612` at the authenticated
+checkpoint cycles. Its Futil hash is
+`96af17989c89de807afc99e58f59dc883856138090bfe85186023dc999c1617e`; the
+compiler plan is 1,049 banks and Xilinx synthesis inferred 1,018 RAMB36E1 and
+322 DSP48E1 cells. This independently validates another one-block reduction,
+but the full design remains 63 BRAMs over the budget.
+
 The existing eight-row geometry was also exercised as a bounded gate using the
 compiler-generated SV and the Nix-built Verilator harness. Two independent
 cold simulations both selected token `11` at cycle `92,936,273` and completed
