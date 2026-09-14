@@ -116,6 +116,13 @@ compiler plan is 1,049 banks and Xilinx synthesis inferred 1,018 RAMB36E1 and
 322 DSP48E1 cells. This independently validates another one-block reduction,
 but the full design remains 63 BRAMs over the budget.
 
+A third candidate, `attention_context_heads_q16_16 -> ln1_output_q16_16`,
+passed the exact two-token harness twice (`11, 612` at the same checkpoint
+cycles). Its Futil hash is
+`b259106c42203d2a899525cc4439dcb4633844a64d351e5887f9df1e7b0cb645`;
+Xilinx synthesis inferred 1,017 RAMB36E1 and 322 DSP48E1 cells. This proven
+alias leaves a 62-block gap to the YPCB budget.
+
 The existing eight-row geometry was also exercised as a bounded gate using the
 compiler-generated SV and the Nix-built Verilator harness. Two independent
 cold simulations both selected token `11` at cycle `92,936,273` and completed

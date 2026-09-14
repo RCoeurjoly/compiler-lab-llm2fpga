@@ -1059,6 +1059,9 @@ import "primitives/memories/seq.futil";
                 # The projection result is consumed by the residual write
                 # before the next layer's layer-normalization output is live.
                 "c_proj_output_q16_16": "ln1_output_q16_16",
+                # Attention context-head storage is consumed before the next
+                # layer-normalization result is produced.
+                "attention_context_heads_q16_16": "ln1_output_q16_16",
             },
         )
     if generation_steps == 16:
