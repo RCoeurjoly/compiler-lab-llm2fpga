@@ -98,3 +98,11 @@ generated SV completed successfully, reporting 17,081 cells and 589,975
 total wire bits after elaboration. This is not a device-fit or timing result:
 the physical BRAM estimate remains 1,171 RAMB36E1-equivalent banks versus the
 955-block YPCB budget.
+
+Scaling the row-dependent runtime buffers in the authenticated plan gives a
+useful design target: a tile capacity of 8 rows has a 33,820,672-bit logical
+footprint (918 ideal RAMB36E1 blocks), while capacities 12, 16, and 20 require
+937, 957, and 977 ideal blocks respectively. Thus the compiler's next
+architectural experiment should stream the real context through 8-row tiles
+and use a packed physical allocator; merely reducing the existing 20-row
+array or changing bank geometry is insufficient to establish fit.
