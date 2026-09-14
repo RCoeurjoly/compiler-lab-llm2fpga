@@ -16,6 +16,19 @@ kev-gpt RTL is used. Nix/Yosys `synth_xilinx -family xc7` also completed and
 inferred 1,118 `RAMB36E1` and 322 `DSP48E1` cells. This is not a fit or timing
 result: 1,118 RAMB36E1 still exceeds the 955-block YPCB budget by 163.
 
+## Capacity lower-bound analysis
+
+The authenticated alias artifact's 120 memories contain 37,138,432 logical
+bits, an ideal lower bound of 1,008 RAMB36E1 blocks before port/geometry
+constraints. Immutable weight memories account for 31,899,648 bits (866 ideal
+blocks), leaving only 89 blocks under the 955-block device budget. The
+remaining runtime memories contain 5,238,784 bits (141 ideal blocks), even
+before physical width/depth padding. Therefore bank-geometry tweaks alone
+cannot close the gap. The compiler must reduce the simultaneously resident
+runtime working set—e.g. tile context rows and prove lifetime reuse—or move
+state out of BRAM; changing transport or the arithmetic contract would not
+address this bound.
+
 The compiler now publishes a legal RAMB36E1 geometry for each logical memory
 (`runtime_bram_bank_plan`).  Generating the authenticated 16-step production
 artifact and summing the required physical banks gives 114 logical memories,
