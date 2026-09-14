@@ -44,3 +44,12 @@ now checked in at `fpga/synthesis/xilinx-xc7-bram-rules.txt`. With that file,
 `$__XILINX_BLOCKRAM_SDP_` cells. The subsequent primitive techmap still needs
 to be integrated with the repository's XC7 wrapper; it did not replace those
 generic cells in this standalone probe.
+
+The generic cells use Yosys-generated `A1*`/`B1*` ports, whereas the historical
+XC7 map wrapper expects `PORT_A_*`/`PORT_B_*`; this explains why the unmodified
+techmap was a no-op. A temporary adapter wrapper made replacement execute and
+produced 19 `RAMB36E2` instances, but that count is not accepted as a resource
+result: the deliberately broad rule uses one abstract 72-bit, 15-address-bit
+variant and does not account for the physical depth/width banking required by
+each memory. Width/depth-specific variants and an integrated adapter are still
+required.
