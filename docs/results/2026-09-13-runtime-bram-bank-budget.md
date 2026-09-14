@@ -129,6 +129,13 @@ immutable token tables alone—is the actionable pressure point. A valid
 solution must either pack those remaining BRAMs or explicitly justify a
 compiler-generated LUTRAM policy without changing semantics.
 
+Applying the codec to the authenticated files and round-tripping every row
+gave exact recovery. Including 32-bit bitmap words and row offsets, encoded
+sizes are 782,431 bytes for `c_fc` (25.38% smaller), 730,476 bytes for
+`c_proj` (30.34% smaller), and 195,454 bytes for `q` (25.44% smaller). The
+offset overhead is therefore material and is included in all future packing
+estimates; the earlier 31.7% figure was a bitmap-only upper bound.
+
 The authenticated INT8 projection matrices are also highly sparse: the FC
 and projection code files contain 44.132% and 44.399% zero codes; each Q/K/V/O
 projection is about 44.2% zero. A lossless bitmap-plus-nonzero-byte encoding
