@@ -38,7 +38,9 @@ actual RAMB36E1 count before attempting nextpnr.
 
 An initial direct mapping attempt did not reach mapping: the repository's
 `/tmp/yosys-data2/xilinx/brams_xc7.txt` uses an older `ram block` rule syntax,
-which Yosys 0.66 rejects before reading the design. This is a tool-rule format
-mismatch, not evidence that the memories cannot map. A compatible XC7 rule
-file (or the existing Task 3 mapping wrapper that supplies one) is required
-for the next measurement.
+which Yosys 0.66 rejects before reading the design. A compatible rule file is
+now checked in at `fpga/synthesis/xilinx-xc7-bram-rules.txt`. With that file,
+`memory_bram` completed and converted all 19 memories to generic
+`$__XILINX_BLOCKRAM_SDP_` cells. The subsequent primitive techmap still needs
+to be integrated with the repository's XC7 wrapper; it did not replace those
+generic cells in this standalone probe.

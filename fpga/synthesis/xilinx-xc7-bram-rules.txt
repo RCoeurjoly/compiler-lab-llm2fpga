@@ -1,0 +1,33 @@
+# Yosys 0.66 memory_bram rules for the XC7 primitive wrapper used by this
+# repository's pinned openXC7 flow.  The matching wrapper is
+# $__XILINX_BLOCKRAM_SDP_ / $__XILINX_BLOCKRAM_TDP_ in brams_xc7_map.v.
+bram $__XILINX_BLOCKRAM_TDP_
+  init 1
+  abits 15
+  dbits 72
+  groups 2
+  ports 1 1
+  wrmode 1 1
+  enable 1 1
+  transp 0 0
+  clocks 1 1
+  clkpol 1 1
+endbram
+match $__XILINX_BLOCKRAM_TDP_
+  max waste 100000000
+endmatch
+bram $__XILINX_BLOCKRAM_SDP_
+  init 1
+  abits 15
+  dbits 72
+  groups 2
+  ports 1 1
+  wrmode 0 1
+  enable 1 1
+  transp 0 0
+  clocks 1 1
+  clkpol 1 1
+endbram
+match $__XILINX_BLOCKRAM_SDP_
+  max waste 100000000
+endmatch
