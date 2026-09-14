@@ -99,6 +99,13 @@ total wire bits after elaboration. This is not a device-fit or timing result:
 the physical BRAM estimate remains 1,171 RAMB36E1-equivalent banks versus the
 955-block YPCB budget.
 
+The existing eight-row geometry was also exercised as a bounded gate using the
+compiler-generated SV and the Nix-built Verilator harness. Two independent
+cold simulations both selected token `11` at cycle `92,936,273` and completed
+at cycle `92,936,279`. This validates the four-token prompt/one-token path at
+the candidate tile capacity; it does not yet validate contexts longer than the
+tile or establish a hardware fit.
+
 Scaling the row-dependent runtime buffers in the authenticated plan gives a
 useful design target: a tile capacity of 8 rows has a 33,820,672-bit logical
 footprint (918 ideal RAMB36E1 blocks), while capacities 12, 16, and 20 require
