@@ -1,5 +1,21 @@
 # TinyStories-1M compiler BRAM budget checkpoint
 
+## Alias candidate implementation checkpoint (2026-09-14)
+
+The compiler-emitted alias candidate completed the frozen 16-token continuation
+for two independent simulation runs. Both produced exactly:
+
+```text
+11, 612, 373, 257, 1310, 2576, 3706, 20037,
+13, 1375, 6151, 284, 711, 2354, 287, 262
+```
+
+Its production receipt reports `status=passed`, `generation_steps=16`, and
+authenticated oracle, Futil, and generated-SV hashes. No handwritten or
+kev-gpt RTL is used. Nix/Yosys `synth_xilinx -family xc7` also completed and
+inferred 1,118 `RAMB36E1` and 322 `DSP48E1` cells. This is not a fit or timing
+result: 1,118 RAMB36E1 still exceeds the 955-block YPCB budget by 163.
+
 The compiler now publishes a legal RAMB36E1 geometry for each logical memory
 (`runtime_bram_bank_plan`).  Generating the authenticated 16-step production
 artifact and summing the required physical banks gives 114 logical memories,
