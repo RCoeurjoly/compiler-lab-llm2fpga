@@ -56,6 +56,18 @@ logical memory ABI while reusing or packing additional storage (especially
 shared weights and scratch buffers), then re-run this calculation from the
 transformed artifact.
 
+### Current full-16 logical lower bound (2026-09-14)
+
+Regenerating the current compiler plan for all 16 continuation steps reports
+108 planned memories and 1,104 legal-bank equivalents.  Its logical storage
+is 35,418,112 bits, an ideal lower bound of 984 RAMB36E1 blocks.  Immutable
+authenticated sources account for 32,407,552 bits (901 ideal blocks), leaving
+only 54 ideal blocks under the 955-block device budget for all runtime state.
+Consequently, physical packing alone cannot make the current 20-row schedule
+fit: the compiler must reduce the simultaneously resident context/workspace
+state (for example with real context tiling and streaming) before a BRAM-only
+full-16 design can be feasible.
+
 The calculation was run in the project Nix environment:
 
 ```text
