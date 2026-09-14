@@ -129,18 +129,18 @@ immutable token tables alone—is the actionable pressure point. A valid
 solution must either pack those remaining BRAMs or explicitly justify a
 compiler-generated LUTRAM policy without changing semantics.
 
-Applying the codec to the authenticated files and round-tripping every row
-gave exact recovery. Including 32-bit bitmap words and row offsets, encoded
-sizes are 782,431 bytes for `c_fc` (25.38% smaller), 730,476 bytes for
-`c_proj` (30.34% smaller), and 195,454 bytes for `q` (25.44% smaller). The
-offset overhead is therefore material and is included in all future packing
-estimates; the earlier 31.7% figure was a bitmap-only upper bound.
+An initial byte-level application of the codec appeared to give large savings,
+but that measurement treated serialized padding bytes as INT8 codes and is
+superseded by the correction below.
 
-The authenticated INT8 projection matrices are also highly sparse: the FC
-and projection code files contain 44.132% and 44.399% zero codes; each Q/K/V/O
-projection is about 44.2% zero. A lossless bitmap-plus-nonzero-byte encoding
-would use 5.5 bits per code instead of 8 (about 31.7% less storage), while
-preserving exact values. This is a candidate compiler optimization, not yet
-implemented: the GEMV lowering must consume the bitmap in deterministic input
-index order and prove that skipped zeros do not alter the signed-64-bit MAC or
-the authenticated cycle-level contract.
+The superseded byte-level result must not be used for capacity planning.
+
+### Correction: serialized-word decoding
+
+The preceding byte-level sparsity experiment was invalid for these artifacts:
+each logical INT8 code is serialized as an eight-byte signed memory word. When
+decoded at the declared memory width, the authenticated code tensors contain
+less than 1% zero values (`c_fc` 0.87%, `c_proj` 0.95%, `q` 0.74%). The claimed
+25--30% savings therefore do not apply and sparse weight packing is abandoned.
+The codec remains a tested generic utility only; it is not used by the
+compiler path or any resource estimate.
