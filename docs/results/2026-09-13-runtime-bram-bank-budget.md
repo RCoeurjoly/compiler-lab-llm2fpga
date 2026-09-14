@@ -50,3 +50,22 @@ blocks, already above the 955-block YPCB budget; the physical bank estimate
 above is more conservative because it accounts for legal width/depth
 geometry. This confirms that the next blocker is physical storage packing and
 lifetime reuse, not RTL elaboration.
+
+## Alias candidate simulation checkpoint (2026-09-14)
+
+The compiler-emitted alias candidate in `/tmp/llm2fpga-alias-full` completed
+the frozen 16-token continuation for two independent simulation runs. Both
+runs produced exactly:
+
+```text
+11, 612, 373, 257, 1310, 2576, 3706, 20037,
+13, 1375, 6151, 284, 711, 2354, 287, 262
+```
+
+The production receipt reports `status=passed`, `generation_steps=16`, and
+records the authenticated oracle, Futil, and generated-SV hashes. No
+handwritten or kev-gpt RTL is used. A fresh Nix/Yosys check on the same
+generated SV completed successfully, reporting 17,081 cells and 589,975
+total wire bits after elaboration. This is not a device-fit or timing result:
+the physical BRAM estimate remains 1,171 RAMB36E1-equivalent banks versus the
+955-block YPCB budget.
