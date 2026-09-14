@@ -35,3 +35,10 @@ mapping, device fit, timing closure, bitstream generation, or hardware
 execution.  The next backend experiment is to map these collected memories to
 the XC7 BRAM library with the same `-nosat -nowiden` policy and measure the
 actual RAMB36E1 count before attempting nextpnr.
+
+An initial direct mapping attempt did not reach mapping: the repository's
+`/tmp/yosys-data2/xilinx/brams_xc7.txt` uses an older `ram block` rule syntax,
+which Yosys 0.66 rejects before reading the design. This is a tool-rule format
+mismatch, not evidence that the memories cannot map. A compatible XC7 rule
+file (or the existing Task 3 mapping wrapper that supplies one) is required
+for the next measurement.
