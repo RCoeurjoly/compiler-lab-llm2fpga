@@ -31,6 +31,20 @@ class PackedTokenLayoutTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             pipeline.pack_token_code_words([0] * 7)
 
+    def test_sparse_rows_round_trip_in_input_order(self):
+        codes = [0, -3, 0, 7, 0, 0, 2, 0, 4, 0, 0, 0, -8, 0, 0, 1]
+        bitmap, offsets, values = pipeline.pack_sparse_int8_rows(codes, 8)
+        self.assertEqual(offsets, [0, 3, 6])
+        self.assertEqual(values, [-3, 7, 2, 4, -8, 1])
+        self.assertEqual(
+            pipeline.unpack_sparse_int8_rows(bitmap, offsets, values, 8), codes
+        )
+
+    def test_sparse_rows_reject_bitmap_value_mismatch(self):
+        bitmap, offsets, values = pipeline.pack_sparse_int8_rows([1, 0, 2, 0], 4)
+        with self.assertRaises(ValueError):
+            pipeline.unpack_sparse_int8_rows(bitmap, offsets, values[:-1], 4)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -70,6 +70,69 @@ def pack_token_code_words(codes: list[int]) -> list[int]:
     return words
 
 
+def pack_sparse_int8_rows(codes: list[int], inputs: int) -> tuple[list[int], list[int], list[int]]:
+    """Encode row-major INT8 codes as (bitmaps, offsets, values).
+
+    Each row has one bitmap bit per input index and a compact list of its
+    nonzero signed INT8 values in ascending input order.  Offsets has one
+    entry per row plus a terminal entry, so decoding is random-access by row
+    without relying on variable-width parsing.  Zero rows are represented by
+    an all-zero bitmap and equal consecutive offsets.
+    """
+    if type(inputs) is not int or inputs <= 0:
+        raise ValueError("inputs must be a positive integer")
+    if len(codes) == 0 or len(codes) % inputs:
+        raise ValueError("sparse tensor must contain complete rows")
+    if any(type(code) is not int or not -128 <= code <= 127 for code in codes):
+        raise ValueError("sparse tensor contains a non-INT8 value")
+    rows = len(codes) // inputs
+    bitmap_words = (inputs + 31) // 32
+    bitmaps: list[int] = []
+    offsets = [0]
+    values: list[int] = []
+    for row in range(rows):
+        bitmap = [0] * bitmap_words
+        for index, code in enumerate(codes[row * inputs : (row + 1) * inputs]):
+            if code:
+                bitmap[index // 32] |= 1 << (index % 32)
+                values.append(code)
+        bitmaps.extend(bitmap)
+        offsets.append(len(values))
+    return bitmaps, offsets, values
+
+
+def unpack_sparse_int8_rows(bitmaps: list[int], offsets: list[int], values: list[int], inputs: int) -> list[int]:
+    """Decode :func:`pack_sparse_int8_rows`, validating its structural ABI."""
+    if type(inputs) is not int or inputs <= 0:
+        raise ValueError("inputs must be a positive integer")
+    bitmap_words = (inputs + 31) // 32
+    if len(offsets) < 1 or (len(offsets) - 1) * bitmap_words != len(bitmaps):
+        raise ValueError("sparse bitmap/offset dimensions disagree")
+    if offsets[0] != 0 or any(type(x) is not int or x < 0 for x in offsets):
+        raise ValueError("sparse offsets must be nonnegative and start at zero")
+    if any(offsets[i] > offsets[i + 1] for i in range(len(offsets) - 1)) or offsets[-1] != len(values):
+        raise ValueError("sparse offsets are not monotonic or do not end at values")
+    if any(type(x) is not int or not -128 <= x <= 127 for x in values):
+        raise ValueError("sparse values contain a non-INT8 value")
+    result: list[int] = []
+    for row in range(len(offsets) - 1):
+        row_bitmap = bitmaps[row * bitmap_words : (row + 1) * bitmap_words]
+        cursor = offsets[row]
+        end = offsets[row + 1]
+        for index in range(inputs):
+            present = (row_bitmap[index // 32] >> (index % 32)) & 1
+            if present:
+                if cursor >= end:
+                    raise ValueError("sparse bitmap has too many nonzero entries")
+                result.append(values[cursor])
+                cursor += 1
+            else:
+                result.append(0)
+        if cursor != end:
+            raise ValueError("sparse bitmap has too few nonzero entries")
+    return result
+
+
 @dataclass(frozen=True)
 class CalyxArtifact:
     futil: str
