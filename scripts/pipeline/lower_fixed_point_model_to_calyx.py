@@ -1053,6 +1053,9 @@ import "primitives/memories/seq.futil";
                 # storage without changing the phase ordering or ABI.
                 "c_proj_input_q16_16": "c_fc_output_q16_16",
                 "attention_denominator_q1_20": "attention_maximum_q8",
+                # Final layer-normalization output is consumed before the
+                # next generation step reuses block input storage.
+                "final_output_q16_16": "block_input_q16_16",
             },
         )
     if generation_steps == 16:
