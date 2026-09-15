@@ -647,3 +647,56 @@ placement checkpoint before the bound expired. This confirms that simply
 allowing the current generated netlist more placer time is not a practical
 path; structural reduction or partitioning is required before timing closure
 can be attempted.
+
+## ABC6 structural reduction probe
+
+As a bounded structural experiment, the arithmetic mapping was rerun with
+uniform `abc -lut 6` instead of the mixed LUT2/LUT3/LUT6 mapping. Yosys
+completed in about 47 CPU seconds and emitted a 178 MB RTLIL checkpoint (log
+SHA-256 prefix `61be1a7400`). The top-level cell count fell from 126,802 to
+120,333 (about 5.1%); LUT cells fell by about 11.5%, while the BRAM, DSP, and
+RAM64M populations were unchanged. After the same temporary primitive
+direction metadata, prompt-memory mapping, and read-only RAM legalization,
+nextpnr packed the design deterministically with the same resource totals:
+56,525 LUTs, 1,680 RAMB18E1s, 520 RAMB36E1s, and 330 DSP48E1s.
+
+A 600-second heap-placement probe (seed 15, 30 MHz constraints,
+`--no-route --timing-allow-fail --no-tmdriv`) reached the main analytical
+placer for 107,698 cells after the four initial iterations, but produced no
+placement or timing result before the bound expired. Thus ABC6 gives a modest
+structural reduction and preserves packability, but does not yet cross the
+placement-scaling boundary. These experiments remain temporary backend
+probes; no RTL, FASM, bitstream, or hardware inference claim follows.
+
+## Fanout check after ABC6
+
+The ABC6 handoff was inspected in the pinned Nix environment before choosing
+the next experiment. Its 120,333 top-level cells include 45,824 `RAM64M`,
+19,381 `FDRE`, and 24,863 `LUT6` cells. The dominant nets are unchanged by
+the LUT rewrite: the reset/control bit has fanout 70,163, several memory
+address/data buses have fanout 49,153, and additional buses have fanout about
+16,399. This explains why a roughly five-percent cell reduction does not
+materially improve analytical placement: the global broadcast structure, not
+only LUT count, remains the limiting cost. Any next compiler/backend change
+should therefore target explicit banking/partitioning or fanout-limited
+interfaces, with a bounded pack-and-place check, rather than another uniform
+ABC LUT-size sweep.
+
+The fanout bits can be traced back to concrete compiler signals. The 49,153-
+load buses are the read-data bits of `core.c_fc_weight_codes_i8` and
+`core.c_proj_weight_codes_i8`; the approximately 16,399-load nets are ABC
+logic inputs driven by the same broad datapaths. This makes the next
+optimization target specific: preserve the generated arithmetic, but split
+the weight-read consumers into explicit banks or staged registers before
+flattening. A generic LUT-size change cannot address these broadcasts.
+
+The lowering already records eight-bank metadata for the transformer
+projection memories, but that metadata currently only prefixes the logical
+address; it does not instantiate eight physical read ports. The evidence
+therefore motivates a narrowly scoped compiler change: materialize each
+`*_weight_codes_i8` bank as a separate memory, read the banks in parallel, and
+select the addressed bank through a balanced mux while retaining the same
+layer/row address mapping. The pass must first prove byte-for-byte source
+image equivalence and generated-SV simulation equivalence on the existing
+four-row fixture, then use the bounded pack/place gate. Until that proof is
+implemented, the current handoff remains a diagnostic artifact only.
