@@ -614,3 +614,14 @@ past that unsupported-cell check but triggers the nextpnr assertion
 `port.net == nullptr` during DRAM packing. This is now the narrowest observed
 implementation blocker; it is still a temporary handoff experiment, not a
 committed RTL change or a fit/timing result.
+
+Mapping the isolated 4×16 `csr.prompt_words` memory with Yosys `memory_map`
+removes the last `$mem_v2` cell without touching the model memories. With the
+same temporary read-only-RAM-to-LUT legalization and primitive direction
+metadata, nextpnr enters placement: it packs 56,525 LUTs, 1,680 RAMB18E1s,
+520 RAMB36E1s, 330 DSP48E1s, and the constrained clock/I/O resources. The
+bounded 300-second placement run reaches the main analytical placer for
+114,105 cells but emits no placement or timing result before the timeout.
+Thus the immediate blocker has moved from JSON/packing correctness to
+placement scalability; there is still no timing-closed implementation or
+bitstream.
