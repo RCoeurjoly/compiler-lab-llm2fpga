@@ -22,6 +22,11 @@ modes. The signed-64-bit wrapping GEMV output hash was
 modes; no mismatch was found. DDR3 required two external line requests and
 258 cache hits for this trace.
 
+An exhaustive replay then covered all 4096 table words plus every 16-byte line
+boundary (4354 requests). It also passed with no mismatch; the DDR3 model used
+32 external line requests. Its receipt is
+`artifacts/diagnostics/tinystories-1m-q-projection-memory-equivalence-exhaustive.json`.
+
 Modes are selected through the canonical placement records emitted by
 `scripts/analysis/write_memory_placement_manifest.py`; the BRAM and DDR3
 manifests are recorded at
