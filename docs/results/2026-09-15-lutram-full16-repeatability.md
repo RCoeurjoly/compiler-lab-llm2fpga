@@ -566,3 +566,15 @@ The pack-only gate was repeated with the same handoff, tool, XDC, seed, and
 counts, and log SHA-256 `d0d43640f88d702ea15b037a5ed679d36177f7534b0b609cb8623a9041c618a2`.
 This establishes deterministic mapping/packing; placement remains the only
 backend gate not reached.
+
+## Selective-memory mapping checkpoint
+
+Using the current generated `model.sv`, memory modules were mapped before
+flattening with the existing BRAM/LUTRAM libraries. This completed in about 10
+CPU seconds and produced a 31 MB RTLIL checkpoint (SHA-256
+`4fffb35f16b741bef236e2b4e50b2f355142e47a7f6de1480096fb3bb617ce1c`). A
+bounded `opt -fast` arithmetic pass then completed in about 73 CPU seconds,
+but its output still contained generic memory wrappers and was not a P&R
+handoff. Adding the final `map_memory` stage re-entered the known global
+optimization loop and emitted no checkpoint within the bound. This isolates
+the remaining cost to final primitive legalization after selective mapping.
