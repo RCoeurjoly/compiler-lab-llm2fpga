@@ -195,6 +195,12 @@ inventory has 18,028 FDRE, 11,342 INV, 7,583 CARRY4, 1,832 RAMB18E1, and
 717 RAMB36E1, with no residual generic flip-flop cells. This is a valid
 nextpnr handoff candidate; placement and timing remain unproven.
 
+The legalized handoff also passes the fixed nextpnr pack-only gate in 23.7
+seconds with the production XDC, 30 MHz target, and seed 15.  Packing reports
+the same 1,832/1,910 RAMB18E1 (95%) and 717/955 RAMB36E1 (75%) utilization as
+the earlier candidate.  This removes the residual FF compatibility failure,
+but does not by itself establish placement or routing.
+
 ## Hardware-top nextpnr progression
 
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
