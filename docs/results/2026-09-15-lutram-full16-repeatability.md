@@ -605,3 +605,12 @@ LUT2--LUT5-to-LUT6 INIT expansion did not change that diagnostic.  Therefore
 the design has reached JSON emission, but has **not** reached a valid nextpnr
 pack/placement handoff or timing closure.  No FASM or board bitstream follows
 from this probe.
+
+Injecting primitive port directions from the mapped library definitions lets
+nextpnr pass LUT, clock, DSP, and I/O packing. It then rejects the 160
+`RAM64X1S` cells as an unsupported primitive. A temporary conversion to
+dual-port `RAM64X1D` (duplicating the read address and preserving `INIT`) gets
+past that unsupported-cell check but triggers the nextpnr assertion
+`port.net == nullptr` during DRAM packing. This is now the narrowest observed
+implementation blocker; it is still a temporary handoff experiment, not a
+committed RTL change or a fit/timing result.
