@@ -150,6 +150,22 @@ the analytical phase for over ten minutes (console SHA-256
 is now a placement-runtime/resource-pressure issue rather than a netlist
 compatibility crash.
 
+## Pack-only and placement-only follow-up
+
+The same primitive-clean JSON passed nextpnr's pack-only flow at the fixed
+device, XDC, 30 MHz target, and seed 15 in 23.5 seconds. Packing consumed
+1,832/1,910 RAMB18E1 (95%), 717/955 RAMB36E1 (75%), 194,378/597,200 slice
+LUTs (32%), and 18,184/597,200 slice flip-flops (3%). This confirms that the
+netlist is packable and has nominal device capacity; pack-only does not prove
+placement, timing, routing, or bitstream generation.
+
+A subsequent placement-only run with the same inputs and seed entered the
+main analytical placer after packing, but produced no placement completion,
+timing report, or FASM before it was stopped. Its console is retained at
+`/tmp/llm2fpga-integrated-map/no-bscan-prim2-noroute-900.console`. The current
+implementation gate therefore remains blocked on placement runtime/resource
+pressure, not on simulation or netlist legality.
+
 ## Hardware-top nextpnr progression
 
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
