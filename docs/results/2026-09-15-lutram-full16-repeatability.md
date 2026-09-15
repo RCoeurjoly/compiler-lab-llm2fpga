@@ -713,6 +713,11 @@ covering generation bounds, the authenticated 16-step harness, and source
 manifest exclusion of runtime intermediates. These are compiler/provenance
 gates only; they do not imply physical bank materialization or P&R success.
 
+After publishing the packed projection ABI, the BRAM geometry suite plus the
+signed-64 arithmetic and authenticated 16-step production-harness regressions
+ran cleanly (15 tests). This confirms the representation contract has not
+altered the existing fixed-point semantics or generation schedule.
+
 ## Capacity gate cross-check
 
 The earlier capacity analysis remains a second independent blocker: current
