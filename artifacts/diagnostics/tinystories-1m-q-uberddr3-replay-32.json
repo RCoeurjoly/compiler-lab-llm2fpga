@@ -1,0 +1,12 @@
+{
+  "schema": "tinystories-1m-q-uberddr3-replay-v1",
+  "status": "pass",
+  "transactions": 32,
+  "coverage": "16 contiguous 16-byte writes followed by 16 readbacks",
+  "profile": {"controller_period_ps": 12000, "ddr3_period_ps": 3000, "byte_lanes": 2, "bist_mode": 2, "odelay_supported": 1, "bus_delay": 0},
+  "trace_sha256": "dcf33f48ebfff9b83ba2a20f456e577f5d4fab118e406fa4147b0043acf5dfe7",
+  "simulation_log_sha256": "3a389e28a9c7e414d59e23db3df91754c23be5c300c36072f24a19177f57c9fe",
+  "result_marker": "Wishbone replay passed: 32 transactions",
+  "simulation_time_ps": 135276000,
+  "claims": {"real_uberddr3_controller": true, "micron_memory_model": true, "q_table_full_trace": false, "byte_for_byte_readback": true, "device_timing_closure": false}
+}
