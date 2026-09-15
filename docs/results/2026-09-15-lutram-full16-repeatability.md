@@ -132,6 +132,22 @@ memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
 
+## Staged synthesis checkpoint
+
+Starting from `flatten-optfast.il`, the coarse arithmetic stage
+(`cmp2lut`/`cmp2lcu`, `alumacc`, `opt -fast`, and `memory -nomap`) completed in
+approximately 20 seconds and emitted `coarse.il` (SHA-256
+`08147dbcdbf17ef7f8935e6f7365525dda75d7290be7ee480c72f664cde50579`).  The
+following combined BRAM/LUTRAM mapping also completed and emitted
+`memory-mapped.il` (SHA-256
+`cb3dc69939fb095473fde4147286d98480207919aee3811239657716e1845e6d`).
+
+An initial attempt to invoke the later `synth_xilinx` stages directly failed
+at JSON emission because the Xilinx `FDCE` simulation module still contained
+processes.  This is a stage-invocation issue, not a semantic or timing result;
+the next attempt must use the documented `fine`/`map_cells`/`map_ffs`/
+`map_luts` sequence with primitive libraries handled as black boxes.
+
 ## ABC9 backend diagnostic
 
 Replacing the default ABC pass with Yosys `synth_xilinx -abc9` did not improve
