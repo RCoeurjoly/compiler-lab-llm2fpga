@@ -132,6 +132,16 @@ memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
 
+## Flattening diagnostic
+
+Flattening the integrated RTLIL by itself completed and produced
+`flatten-only.il` (SHA-256 `4719d375ca7069cf6d89b52eee877e8fff9bad5a1e758c5e9ca1e886c2540ef4`).
+However, flattened XC7 synthesis plus compatibility mapping did not finish
+within the 180-second bounded limit (exit status 124; log SHA-256
+`db60495d0929cdbdd0df88c4ebe10c3e1609c6a50fc2fd9ab3cd3b8532dbc5a8`).  This
+separates the earlier nextpnr crash from a second scalability problem: the
+flattened backend path is currently too expensive to produce a handoff JSON.
+
 ## Deterministic nextpnr probe
 
 The synthesized JSON (`integrated-synth.json`, SHA-256
