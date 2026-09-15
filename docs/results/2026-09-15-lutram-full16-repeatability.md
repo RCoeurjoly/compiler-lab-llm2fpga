@@ -132,6 +132,17 @@ memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
 
+## Staged fine/cell-map timebox
+
+Using Yosys's documented `fine:map_cells` range from the successful coarse and
+memory checkpoints did not produce a handoff within 240 seconds (exit status
+124; no JSON; empty redirected log SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`).  The
+coarse and memory stages remain fast, while fine/cell mapping is now the
+measured dominant stage.  Further work should partition or simplify the
+compiler-generated arithmetic before this stage, rather than increasing
+timeouts indefinitely.
+
 ## Staged synthesis checkpoint
 
 Starting from `flatten-optfast.il`, the coarse arithmetic stage
