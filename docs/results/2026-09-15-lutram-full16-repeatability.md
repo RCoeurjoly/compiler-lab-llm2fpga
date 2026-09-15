@@ -625,3 +625,11 @@ bounded 300-second placement run reaches the main analytical placer for
 Thus the immediate blocker has moved from JSON/packing correctness to
 placement scalability; there is still no timing-closed implementation or
 bitstream.
+
+A second placement experiment with timing-driven placement disabled (`heap`,
+seed 15, `--no-route`, `--timing-allow-fail`) was bounded at 600 seconds. It
+repeated the same successful packing and reached the same main analytical
+placer entry for 114,105 cells, but again emitted no placement checkpoint
+before timeout. This rules out timing-driven scoring as the immediate cause;
+the current obstacle is the analytical placer’s scalability on the generated
+netlist.
