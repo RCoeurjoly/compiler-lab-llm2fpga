@@ -287,6 +287,12 @@ candidate consumes 1,029/955 `RAMB36E1` blocks (107%), so it cannot fit the
 target Kintex-7.  This establishes the next tradeoff: retain the replicated
 FSM only with an explicit BRAM/LUTRAM partition that stays within capacity.
 
+A one-hot TDCC encoding probe (`-x 'tdcc:one-hot-cutoff=512'`) was also
+emitted and passed the same staged mapping and pack-only gate.  It changes the
+FSM state register to 407 bits but leaves the memory footprint unchanged:
+nextpnr still reports 1,029/955 `RAMB36E1` (107%).  Thus control encoding alone
+does not resolve the fit frontier.
+
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
 produced a flattened hardware RTLIL checkpoint (`no-bscan-flat.il`, SHA-256
 `b91abccbafee098fdbffbf31a5443494f2d7729e3b73c13ed2a291b6bd7e9bde`).  Direct
