@@ -106,6 +106,17 @@ reported only port-width resize warnings while adapting generic BRAM
 templates.  This remains pre-placement and pre-timing, and the integrated
 production-top wrapper has not yet been passed through this exact sequence.
 
+The integrated RTLIL was then techmapped with the pinned XC7 BRAM and LUTRAM
+templates, producing `integrated-techmapped.il` (SHA-256
+`e1c468de9cfb431679c3a838fe0cbe3ffed1726bc20c3052dfd7ff24578052ad`).  The
+Xilinx cell-mapping pass completed when `cells_sim.v` was loaded as a library,
+and emitted `integrated-cells-mapped.il` (SHA-256
+`b02463e3ffef32c518038ca9798b8f3dc0eaa0fa5bf8adf238760228e92d409f`).  The
+pass reports only expected BRAM/LUTRAM port-width resize warnings.  This is
+still pre-synthesis, pre-placement, and pre-timing; the remaining CSR
+`prompt_words` memory and all implementation/resource limits must be checked
+before a bitstream attempt.
+
 ## Integrated production-top mapping retry
 
 After the host interruption, the integrated pass was rerun from the durable
