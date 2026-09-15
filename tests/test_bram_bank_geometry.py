@@ -8,6 +8,8 @@ from scripts.pipeline.lower_fixed_point_model_bram_production import generate_pr
 from scripts.pipeline.lower_fixed_point_model_to_calyx import (
     bram_bank_plan,
     projection_weight_bank_plan,
+    pack_int8_words,
+    unpack_int8_words,
     alias_runtime_memories,
     narrow_source_memory_words,
     narrow_runtime_memory_words,
@@ -15,6 +17,18 @@ from scripts.pipeline.lower_fixed_point_model_to_calyx import (
 
 
 class BramBankGeometryTests(unittest.TestCase):
+    def test_packed_int8_projection_words_round_trip_four_lanes(self):
+        values = [-128, -1, 0, 1, 7, 63, 127, -64]
+        words = pack_int8_words(values, 4)
+        self.assertEqual(words, [0x0100FF80, 0xC07F3F07])
+        self.assertEqual(unpack_int8_words(words, 4), values)
+
+    def test_packed_int8_rejects_partial_words_and_invalid_lanes(self):
+        with self.assertRaises(ValueError):
+            pack_int8_words([1, 2, 3], 4)
+        with self.assertRaises(ValueError):
+            pack_int8_words([1, 2, 3, 4], 3)
+
     def test_projection_bank_contract_is_explicit_and_layer_preserving(self):
         plan = projection_weight_bank_plan()
         self.assertEqual(plan["c_fc_weight_codes_i8"]["layers"], 8)

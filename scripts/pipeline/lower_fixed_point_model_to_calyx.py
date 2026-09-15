@@ -59,15 +59,44 @@ def pack_token_code_words(codes: list[int]) -> list[int]:
     """Pack row-major signed INT8 token codes into little-endian 64-bit words."""
     if len(codes) == 0 or len(codes) % 64:
         raise ValueError("token code tensor must contain complete 64-value rows")
+    return pack_int8_words(codes, PACKED_TOKEN_CODE_LANES)
+
+
+def pack_int8_words(codes: list[int], lanes: int) -> list[int]:
+    """Pack signed INT8 values into little-endian byte-lane words.
+
+    ``lanes`` is deliberately explicit so projection memories can use four
+    byte lanes while token embeddings retain their existing eight-lane ABI.
+    The operation is a storage representation only: every input byte is
+    preserved verbatim in two's-complement form.
+    """
+    if type(lanes) is not int or lanes <= 0 or lanes > 8 or lanes & (lanes - 1):
+        raise ValueError("lanes must be a power of two in the range 1..8")
+    if len(codes) == 0 or len(codes) % lanes:
+        raise ValueError("INT8 values must contain complete packed words")
     if any(type(code) is not int or not -128 <= code <= 127 for code in codes):
-        raise ValueError("token code tensor contains a non-INT8 value")
+        raise ValueError("INT8 values contain a non-INT8 value")
     words = []
-    for offset in range(0, len(codes), PACKED_TOKEN_CODE_LANES):
+    for offset in range(0, len(codes), lanes):
         word = 0
-        for lane, code in enumerate(codes[offset : offset + PACKED_TOKEN_CODE_LANES]):
+        for lane, code in enumerate(codes[offset : offset + lanes]):
             word |= (code & 0xFF) << (8 * lane)
         words.append(word)
     return words
+
+
+def unpack_int8_words(words: list[int], lanes: int) -> list[int]:
+    """Inverse of :func:`pack_int8_words`, returning signed INT8 values."""
+    if type(lanes) is not int or lanes <= 0 or lanes > 8 or lanes & (lanes - 1):
+        raise ValueError("lanes must be a power of two in the range 1..8")
+    values = []
+    for word in words:
+        if type(word) is not int or not 0 <= word < (1 << (8 * lanes)):
+            raise ValueError("packed word is outside its lane width")
+        for lane in range(lanes):
+            byte = (word >> (8 * lane)) & 0xFF
+            values.append(byte - 256 if byte & 0x80 else byte)
+    return values
 
 
 def pack_sparse_int8_rows(codes: list[int], inputs: int) -> tuple[list[int], list[int], list[int]]:
