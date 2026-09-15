@@ -723,3 +723,14 @@ Consequently, even a successful placement run on the present handoff would not
 establish board fit. Physical banking must be paired with storage-lifetime
 reuse, narrower proven buffers, or another compiler-owned capacity reduction;
 placement optimization alone cannot satisfy the target-device gate.
+
+One additional capacity opportunity is now quantified. The Q/K/V/output and
+`c_fc`/`c_proj` projection code memories currently store one signed INT8 value
+per logical word, which maps to a 9-bit BRAM lane. Packing four adjacent codes
+into a 32-bit word (with explicit byte-lane extraction at the GEMV boundary)
+preserves every signed byte and the authenticated row-major order. For the
+large 16,384-word-per-layer tables this changes the legal RAMB36 geometry from
+roughly 9-bit × 4,096-depth slices to 36-bit × 1,024-depth slices, reducing
+the number of depth slices by about 2×. This is a compiler-owned representation
+change, not a quantization change; it must be gated by source-image hashes and
+four-row simulation equivalence before being considered for the full design.
