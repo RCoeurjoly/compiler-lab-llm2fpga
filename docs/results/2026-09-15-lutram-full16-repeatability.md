@@ -484,6 +484,13 @@ distributed-RAM, and BRAM entry, but aborts in BRAM packing at
 wiring/ABI issue; no fit or timing result follows until that assertion is
 resolved.
 
+The no-`HAS_SIZE_36` variant was then given explicit primitive directions and a
+mechanical `RAM64X1S`/`RAM128X1S` to dual-port LUTRAM compatibility rewrite.
+nextpnr completed packing (including BRAM packing) without an assertion, but
+reported 1,810/955 `RAMB36E1` (189%), 68,354 LUTs, and no DSPs. Thus this mode is
+ABI-compatible but does not fit; the original `HAS_SIZE_36` mode fits the
+logical capacity frontier better but triggers the narrow-RAMB36 packer bug.
+
 As a bounded diagnostic, the integrated memory mapping was repeated without
 Yosys's `HAS_SIZE_36` flag. The resulting handoff contains 102 generic
 `__XILINX_BLOCKRAM_TDP_` cells and 7,738 LUTRAM cells, versus the 55/7,738
