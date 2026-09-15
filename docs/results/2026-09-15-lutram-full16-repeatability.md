@@ -39,3 +39,15 @@ unmapped (log SHA-256
 This establishes the next backend blocker: width/depth-specific rules and an
 explicit distributed-RAM implementation are still needed before resource fit,
 timing, or bitstream generation can be assessed.
+
+## Generated-core ABI boundary
+
+The generated SV was parsed independently and recorded in
+`/tmp/llm2fpga-lutram-full16/generated-interface.json` (bound to the SV hash
+above).  Its `main` module exposes only `start`, `valid`, `token_index`, four
+16-bit prompt words, `done`, `token_id`, `clk`, and `reset`.  It does not expose
+the streaming `valid/ready` channels expected by the older self-test wrapper,
+nor a YPCB transport port.  Consequently the existing board shell's
+`llm2fpga_tinystories_1m_core` blackbox remains an unconnected integration
+contract; no board top or hardware inference claim follows from this
+simulation artifact.
