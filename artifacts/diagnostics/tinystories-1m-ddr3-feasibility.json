@@ -223,19 +223,31 @@
     "transport_models": {
       "no_cache": {
         "requests": 85217536,
-        "description": "one external request per logical weight word"
+        "description": "one external request per logical weight word",
+        "serialized_sequential_ns": 1022610432,
+        "serialized_random_ns": 4175659264
       },
       "sequential_prefetch": {
         "requests": 10652192,
         "burst_words": 8,
-        "description": "one request per contiguous burst run"
+        "description": "one request per contiguous burst run",
+        "serialized_sequential_ns": 127826304,
+        "serialized_random_ns": 521957408
       },
       "small_cache": {
         "cache_words": 1024,
         "requests": 10652192,
         "reuse_distance_words": 393216,
-        "description": "a 1024-word cache cannot retain a projection table until its next context-row reuse"
+        "description": "a 1024-word cache cannot retain a projection table until its next context-row reuse",
+        "serialized_sequential_ns": 127826304,
+        "serialized_random_ns": 521957408
       }
+    },
+    "replay_profile": {
+      "source_log_sha256": "a78d5c3841d50f3761f7a588095e9d067744fee8645847818dd947bfebf37dd3",
+      "sequential_average_ns_per_request": 12,
+      "random_average_ns_per_request": 49,
+      "interpretation": "serialized request-service estimates; excludes accelerator compute, overlap, arbitration, and controller startup"
     }
   }
 }

@@ -34,9 +34,16 @@ The pinned UberDDR3 source qualification confirms the target profile:
 two byte lanes, 333 MHz DDR3, 83.333 MHz controller clock, `BIST_MODE=2`,
 and seed-15 as the working implementation anchor. The existing standalone
 Icarus workload was launched with that source closure, but its legacy DRAM
-model emits very large command traces and was stopped before a clean
-request/ACK latency receipt was produced. Therefore no measured DDR3 latency
-or throughput is claimed here.
+model emits very large command traces and was stopped before a new clean
+request/ACK latency receipt was produced. An existing pinned UberDDR3 XSim
+regression log does provide a measured simulator profile for the same
+configuration: 2,304 sequential operations average 12 ns/request (64-byte
+payload, 5.333 GB/s effective payload rate), while 2,304 random operations
+average 49 ns/request (1.306 GB/s). The source log SHA-256 is
+`a78d5c3841d50f3761f7a588095e9d067744fee8645847818dd947bfebf37dd3`; the
+normalized receipt is
+`artifacts/diagnostics/uberddr3-measured-profile.json`. These are simulator
+measurements, not board measurements.
 
 As a bounded integration-pressure probe, Yosys 0.66 elaborated and optimized
 the existing `rtl/rc-working/rc_ddr3_adapter.sv` in 0.06 seconds. The result
@@ -58,12 +65,18 @@ burst requests. A 1,024-word cache does not retain a projection table until
 its next context-row reuse (the measured schedule distance is 393,216 words),
 so this simple cache has the same request count as burst prefetch. These are
 request-count estimates only; they are not substituted for measured DDR3
-latency or bandwidth.
+latency or bandwidth. Supplying the measured profile to the analyzer adds
+serialized service-time estimates: approximately 1.02 s (no-cache) or 0.128 s
+(8-word bursts) under the sequential 12 ns/request profile, and approximately
+4.18 s or 0.522 s under the random 49 ns/request profile for the full 16-step
+schedule. These estimates exclude compute, overlap, arbitration, and startup;
+they are a feasibility bound, not an inference result.
 
 ## Reproduction
 
 ```text
 nix develop -c python scripts/analysis/tinystories_ddr3_feasibility.py \
   --steps 16 \
+  --profile artifacts/diagnostics/uberddr3-measured-profile.json \
   --output artifacts/diagnostics/tinystories-1m-ddr3-feasibility.json
 ```

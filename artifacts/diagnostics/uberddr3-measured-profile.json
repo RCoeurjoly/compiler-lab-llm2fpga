@@ -1,0 +1,18 @@
+{
+  "schema": "uberddr3-measured-profile-v1",
+  "source_log": "/home/roland/UberDDR3/testbench/xsim/test_12_000_ddr3_3_000_odelay_0_lanes_two_lanes_bus_delay_0_bist_2.log",
+  "source_log_sha256": "a78d5c3841d50f3761f7a588095e9d067744fee8645847818dd947bfebf37dd3",
+  "profile": {"byte_lanes": 2, "ddr3_clock_mhz": 333.333333, "controller_clock_mhz": 83.333333, "controller_period_ns": 12, "bist_mode": 2},
+  "measurements": {
+    "sequential_operations": 2304,
+    "sequential_average_ns_per_request": 12,
+    "sequential_payload_bytes_per_request": 64,
+    "sequential_effective_payload_gb_per_s": 5.3333333333,
+    "random_operations": 2304,
+    "random_average_ns_per_request": 49,
+    "random_payload_bytes_per_request": 64,
+    "random_effective_payload_gb_per_s": 1.306122449
+  },
+  "authority": "existing-UberDDR3-XSim-regression-log",
+  "hardware_measurement": false
+}

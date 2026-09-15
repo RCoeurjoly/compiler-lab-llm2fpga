@@ -139,7 +139,7 @@ def _groups(entries: list[dict[str, int | str]]) -> Iterable[list[dict[str, int 
         yield group
 
 
-def analyze(steps: int, burst_words: int = 8) -> dict[str, Any]:
+def analyze(steps: int, burst_words: int = 8, profile: dict[str, Any] | None = None) -> dict[str, Any]:
     # Run-length encode the exact ordered schedule.  A run is one contiguous
     # logical table visit; expanding it yields the same entries as
     # iter_weight_reads but avoids holding or serializing tens of millions of
@@ -186,6 +186,20 @@ def analyze(steps: int, burst_words: int = 8) -> dict[str, Any]:
             "description": "a 1024-word cache cannot retain a projection table until its next context-row reuse",
         },
     }
+    if profile is not None:
+        measurements = profile["measurements"]
+        sequential_ns = int(measurements["sequential_average_ns_per_request"])
+        random_ns = int(measurements["random_average_ns_per_request"])
+        for model in stats["transport_models"].values():
+            requests = int(model["requests"])
+            model["serialized_sequential_ns"] = requests * sequential_ns
+            model["serialized_random_ns"] = requests * random_ns
+        stats["replay_profile"] = {
+            "source_log_sha256": profile["source_log_sha256"],
+            "sequential_average_ns_per_request": sequential_ns,
+            "random_average_ns_per_request": random_ns,
+            "interpretation": "serialized request-service estimates; excludes accelerator compute, overlap, arbitration, and controller startup",
+        }
     return {
         "schema": "tinystories-1m-ddr3-feasibility-v1",
         "model": "authenticated-tinystories-1m",
@@ -204,8 +218,10 @@ def main() -> None:
     parser.add_argument("--steps", type=int, choices=(1, 2, 16), default=16)
     parser.add_argument("--burst-words", type=int, default=8)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--profile", type=Path, help="measured UberDDR3 profile JSON")
     args = parser.parse_args()
-    result = analyze(args.steps, args.burst_words)
+    profile = json.loads(args.profile.read_text(encoding="utf-8")) if args.profile else None
+    result = analyze(args.steps, args.burst_words, profile)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result["statistics"], sort_keys=True))
 
