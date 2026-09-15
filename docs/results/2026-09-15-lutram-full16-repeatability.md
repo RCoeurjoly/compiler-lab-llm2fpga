@@ -266,6 +266,15 @@ iteration must apply replication within the project’s staged memory mapping or
 use a bounded compiler-side control partition that does not trigger this
 expansion.
 
+The staged mapping was subsequently completed with the XC5-compatible BRAM
+templates (mapped JSON SHA-256
+`ed4005aa25c358ac9267b026ec8d72392470720d9170e9fc651d5dace0a3f317`).
+Nextpnr pack-only accepts that handoff, but full placement rejects the emitted
+legacy `RAMB36` primitive (`core.attention_exp_lut_q1_20.mem.0.0`) because the
+Kintex database requires `RAMB36E1`.  This is a separate primitive-ABI issue,
+not evidence about the FSM replication timing; no FASM or timing result is
+accepted from this branch.
+
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
 produced a flattened hardware RTLIL checkpoint (`no-bscan-flat.il`, SHA-256
 `b91abccbafee098fdbffbf31a5443494f2d7729e3b73c13ed2a291b6bd7e9bde`).  Direct
