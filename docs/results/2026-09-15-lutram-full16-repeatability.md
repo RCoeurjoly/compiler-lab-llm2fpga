@@ -248,6 +248,24 @@ start/control fanout into the generated FSM guards (about 21.6 ns logic and
 optimization.  No board programming or hardware inference has been attempted
 from this candidate.
 
+### TDCC replication probe
+
+The pinned Calyx compiler exposes the relevant control optimization.  Its
+correct pass-qualified option syntax is
+`-x 'tdcc:duplicate-cutoff=1'`; the dotted form is silently ignored.  With
+that option, the emitted SV contains two replicated FSM state registers
+(`fsm0_out` and `fsm1_out`) and distributes the state guards between them.
+This directly targets the measured high-fanout path while remaining a Calyx
+compiler transformation rather than handwritten RTL.
+
+The candidate passed Calyx emission and the bounded pre-map Yosys elaboration.
+The generic `memory_map`/ABC expansion was then stopped after roughly eight
+minutes and 9 GB RSS without producing a JSON handoff.  It is therefore an
+optimization hypothesis, not an accepted implementation result; the next
+iteration must apply replication within the project’s staged memory mapping or
+use a bounded compiler-side control partition that does not trigger this
+expansion.
+
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
 produced a flattened hardware RTLIL checkpoint (`no-bscan-flat.il`, SHA-256
 `b91abccbafee098fdbffbf31a5443494f2d7729e3b73c13ed2a291b6bd7e9bde`).  Direct
