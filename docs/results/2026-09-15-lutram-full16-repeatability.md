@@ -700,3 +700,9 @@ layer/row address mapping. The pass must first prove byte-for-byte source
 image equivalence and generated-SV simulation equivalence on the existing
 four-row fixture, then use the bounded pack/place gate. Until that proof is
 implemented, the current handoff remains a diagnostic artifact only.
+
+For the current model geometry this means eight banks of 2,048 words for each
+16,384-word `c_fc` and `c_proj` projection table (and eight banks of 512 words
+for each 4,096-word Q/K/V/output table). These dimensions are derived from the
+existing logical address widths; they are not a change to the authenticated
+tensor layout.
