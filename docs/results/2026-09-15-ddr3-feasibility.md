@@ -118,6 +118,15 @@ provenance receipt is
 controller-model evidence, but it is still a four-transaction replay rather
 than the complete 85-million-read schedule or board measurement.
 
+With BIST disabled only in the isolated simulator copy (to remove exhaustive
+startup from steady-state measurement), a 512-transaction sequential stream
+(256 writes and 256 reads) passed at the same two-lane/333.333 MHz PHY profile.
+The 512 response latencies were 5–9 controller cycles, mean 7.001953 cycles
+(approximately 84.0 ns at 83.333 MHz). The receipt is
+`artifacts/diagnostics/uberddr3-sequential-512-replay.json`. BIST was not
+changed in the validated design; this run isolates post-initialization service
+time and is not a full-schedule or hardware result.
+
 ## Reproduction
 
 ```text

@@ -1,0 +1,28 @@
+{
+  "schema": "uberddr3-sequential-512-replay-v1",
+  "status": "passed",
+  "configuration": {
+    "controller_period_ps": 12000,
+    "ddr3_period_ps": 3000,
+    "byte_lanes": 2,
+    "odelay_supported": 0,
+    "bus_delay": 0,
+    "bist_mode": 0,
+    "bist_note": "BIST disabled only to isolate steady-state replay; frequency/lane/PHY profile unchanged"
+  },
+  "trace_sha256": "8983824d3b5fdf87738ae484eac8bf5738be43303470479549b4176015f96ccf",
+  "transactions": 512,
+  "reads": 256,
+  "writes": 256,
+  "ordered_replay": "passed",
+  "read_payload_bytes": 4096,
+  "latency_controller_cycles": {"count": 512, "min": 5, "mean": 7.001953125, "max": 9, "distribution": {"5": 255, "6": 1, "9": 256}},
+  "mean_read_service_ns_approx": 84.0234375,
+  "sources": {
+    "testbench_sha256": "70a0872cebbb409472b4fe6e393efceca9c1bf9bd7fe6c57977fd02081f5090f",
+    "captured_output_sha256": "0596aac9a6a21a7a3ba501c6d42c763b239b164ba3856d6cab184a3856d00476"
+  },
+  "hardware_measurement": false,
+  "full_schedule_replay": false,
+  "inference_claim": false
+}
