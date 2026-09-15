@@ -89,3 +89,10 @@ cells (10,260 SDP and 48 SP), and no unmapped memories.  The diagnostic log is
 `250be62e5d2ae87a299ef3691ecef0e3e382cc16a59a7811e56a34815df66aa6`).  This
 is a mapping result only; synthesis, placement, timing, and bitstream
 generation remain to be run.
+
+The primitive-mapped RTLIL was then checked with Yosys's Xilinx simulation
+cell declarations (`+/xilinx/cells_sim.v`); hierarchy validation passed.  The
+top-level aggregate contains 967 `RAMB36E1`, 22 `RAMB18E1`, 4 `RAM32M`, and
+3,600 `RAM64M` instances.  This validates the primitive names and gives a
+resource-count checkpoint, but arithmetic cell mapping, placement, timing,
+and bitstream generation remain outstanding.
