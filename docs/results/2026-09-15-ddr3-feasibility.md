@@ -46,11 +46,20 @@ normalized receipt is
 measurements, not board measurements.
 
 As a bounded integration-pressure probe, Yosys 0.66 elaborated and optimized
-the existing `rtl/rc-working/rc_ddr3_adapter.sv` in 0.06 seconds. The result
-contains 40 cells and 322 public wire bits, with no generic memories or
-unresolved hierarchy. This is useful evidence that the adapter shell is small;
-it is not evidence that the full compiler controller plus DDR3 can route or
-meet timing.
+a deterministic 256-request controller shell instantiated with the audited
+`rtl/rc-working/rc_ddr3_adapter.sv`. The hierarchy contains 64 cells and 608
+public wire bits, with no generic memories or unresolved hierarchy. The
+provenance receipt is
+`artifacts/diagnostics/ddr3-controller-pressure-probe.json`. This is useful
+evidence that the controller/adapter shell is small; it is not evidence that
+the full compiler controller plus DDR3 can route or meet timing.
+
+The BRAM baseline has no runtime full-image JTAG load operation: immutable
+weights are initialized by the bitstream. That requirement is therefore
+explicitly marked not applicable to the baseline in
+`artifacts/diagnostics/tinystories-1m-jtag-load-applicability.json`. A complete
+JTAG load/readback timing must be measured once the DDR3 image-load protocol
+exists; no synthetic transfer time is substituted.
 
 The compiler schedule has strong burst locality, but this artifact does not
 yet establish attainable DDR3 throughput, adapter latency, JTAG load time, or

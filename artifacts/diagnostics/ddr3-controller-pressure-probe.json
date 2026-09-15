@@ -1,0 +1,28 @@
+{
+  "schema": "ddr3-controller-pressure-probe-v1",
+  "status": "elaborated_and_synthesized",
+  "probe": {
+    "requests": 256,
+    "address_stride_bytes": 16,
+    "client_width_bits": 32,
+    "ddr_width_bits": 128,
+    "behavior": "deterministic sequential requests, one outstanding request, adapter handshake"
+  },
+  "sources": {
+    "controller_probe_sha256": "493e2a961d1ecb4ba527a53dc9e62cc7ce31cbe5d0bab567aab0741881335fdd",
+    "adapter_sha256": "e597a2d58b9643c5e792d4254b6867ee72b1b1a4274736a7afc754c9c8ab34bb",
+    "yosys_script_sha256": "6be088039ef79faaae765416e1456818139de5fc893d265b486a566c8a6ab621",
+    "yosys_log_sha256": "1fd9049f8e330b47e48a5b97b21b88f1905d76a8de80456855e80b5171577f2a"
+  },
+  "synthesis": {
+    "tool": "Yosys 0.66",
+    "top": "ddr3_controller_pressure_probe",
+    "hierarchy_cells_including_adapter": 64,
+    "public_wire_bits_including_adapter": 608,
+    "generic_memories": 0,
+    "unresolved_hierarchy": false,
+    "timing_or_routing": "not_run"
+  },
+  "hardware_measurement": false,
+  "inference_claim": false
+}

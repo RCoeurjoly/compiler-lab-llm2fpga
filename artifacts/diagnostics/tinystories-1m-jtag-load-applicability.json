@@ -1,0 +1,8 @@
+{
+  "schema": "tinystories-1m-jtag-load-applicability-v1",
+  "status": "not_applicable_to_bram_baseline",
+  "reason": "The validated BRAM design initializes immutable weights from bitstream memory images; it has no runtime full-image JTAG weight-load command.",
+  "required_follow_up": "Measure the selected DDR3 image-load protocol after the external-memory backend and its JTAG loader exist.",
+  "hardware_measurement": false,
+  "inference_claim": false
+}

@@ -1,0 +1,388 @@
+
+ /----------------------------------------------------------------------------\
+ |  yosys -- Yosys Open SYnthesis Suite                                       |
+ |  Copyright (C) 2012 - 2026  Claire Xenia Wolf <claire@yosyshq.com>         |
+ |  Distributed under an ISC-like license, type "license" to see terms        |
+ \----------------------------------------------------------------------------/
+ Yosys 0.66 (git sha1 7f8fdfd8d7bc08c749a2a969388d3425d4f369d5, clang++ 18.1.8 -fPIC -O3)
+
+-- Executing script file `scripts/analysis/synthesize_ddr3_pressure_probe.ys' --
+
+1. Executing Verilog-2005 frontend: rtl/rc-working/rc_ddr3_adapter.sv
+Parsing SystemVerilog input from `rtl/rc-working/rc_ddr3_adapter.sv' to AST representation.
+Generating RTLIL representation for module `\rc_ddr3_adapter'.
+Successfully finished Verilog frontend.
+
+2. Executing Verilog-2005 frontend: rtl/rc-working/ddr3_controller_pressure_probe.sv
+Parsing SystemVerilog input from `rtl/rc-working/ddr3_controller_pressure_probe.sv' to AST representation.
+Generating RTLIL representation for module `\ddr3_controller_pressure_probe'.
+Successfully finished Verilog frontend.
+
+3. Executing HIERARCHY pass (managing design hierarchy).
+
+3.1. Analyzing design hierarchy..
+Top module:  \ddr3_controller_pressure_probe
+Used module:     \rc_ddr3_adapter
+
+3.2. Analyzing design hierarchy..
+Top module:  \ddr3_controller_pressure_probe
+Used module:     \rc_ddr3_adapter
+Removed 0 unused modules.
+
+4. Executing PROC pass (convert processes to netlists).
+
+4.1. Executing PROC_CLEAN pass (remove empty switches from decision trees).
+Found and cleaned up 1 empty switch in `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:48$13'.
+Removing empty process `rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:48$13'.
+Cleaned up 1 empty switch.
+
+4.2. Executing PROC_RMDEAD pass (remove dead branches from decision trees).
+Marked 3 switch rules as full_case in process $proc$rtl/rc-working/ddr3_controller_pressure_probe.sv:43$17 in module ddr3_controller_pressure_probe.
+Marked 3 switch rules as full_case in process $proc$rtl/rc-working/rc_ddr3_adapter.sv:62$7 in module rc_ddr3_adapter.
+Removed a total of 0 dead cases.
+
+4.3. Executing PROC_PRUNE pass (remove redundant assignments in processes).
+Removed 2 redundant assignments.
+Promoted 6 assignments to connections.
+
+4.4. Executing PROC_INIT pass (extract init attributes).
+
+4.5. Executing PROC_ARST pass (detect async resets in processes).
+
+4.6. Executing PROC_ROM pass (convert switches to ROMs).
+Converted 0 switches.
+<suppressed ~10 debug messages>
+
+4.7. Executing PROC_MUX pass (convert decision trees to multiplexers).
+Creating decoders for process `\ddr3_controller_pressure_probe.$proc$rtl/rc-working/ddr3_controller_pressure_probe.sv:43$17'.
+     1/4: $0\done[0:0]
+     2/4: $0\active[0:0]
+     3/4: $0\issued[31:0]
+     4/4: $0\responses[31:0]
+Creating decoders for process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:62$7'.
+     1/6: $0\resp_valid[0:0]
+     2/6: $0\saved_lane[3:0]
+     3/6: $0\saved_byte_address[31:0]
+     4/6: $0\state[1:0]
+     5/6: $0\resp_rdata[31:0]
+     6/6: $0\resp_error[0:0]
+Creating decoders for process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:54$2'.
+Creating decoders for process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:45$1'.
+
+4.8. Executing PROC_DLATCH pass (convert process syncs to latches).
+No latch inferred for signal `\rc_ddr3_adapter.\wb_cyc' from process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:54$2'.
+No latch inferred for signal `\rc_ddr3_adapter.\wb_stb' from process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:54$2'.
+No latch inferred for signal `\rc_ddr3_adapter.\wb_we' from process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:54$2'.
+No latch inferred for signal `\rc_ddr3_adapter.\wb_addr' from process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:54$2'.
+No latch inferred for signal `\rc_ddr3_adapter.\wb_sel' from process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:54$2'.
+No latch inferred for signal `\rc_ddr3_adapter.\lane_offset' from process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:45$1'.
+
+4.9. Executing PROC_DFF pass (convert process syncs to FFs).
+Creating register for signal `\ddr3_controller_pressure_probe.\done' using process `\ddr3_controller_pressure_probe.$proc$rtl/rc-working/ddr3_controller_pressure_probe.sv:43$17'.
+  created $dff cell `$procdff$151' with positive edge clock.
+Creating register for signal `\ddr3_controller_pressure_probe.\responses' using process `\ddr3_controller_pressure_probe.$proc$rtl/rc-working/ddr3_controller_pressure_probe.sv:43$17'.
+  created $dff cell `$procdff$152' with positive edge clock.
+Creating register for signal `\ddr3_controller_pressure_probe.\issued' using process `\ddr3_controller_pressure_probe.$proc$rtl/rc-working/ddr3_controller_pressure_probe.sv:43$17'.
+  created $dff cell `$procdff$153' with positive edge clock.
+Creating register for signal `\ddr3_controller_pressure_probe.\active' using process `\ddr3_controller_pressure_probe.$proc$rtl/rc-working/ddr3_controller_pressure_probe.sv:43$17'.
+  created $dff cell `$procdff$154' with positive edge clock.
+Creating register for signal `\rc_ddr3_adapter.\resp_valid' using process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:62$7'.
+  created $dff cell `$procdff$155' with positive edge clock.
+Creating register for signal `\rc_ddr3_adapter.\resp_error' using process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:62$7'.
+  created $dff cell `$procdff$156' with positive edge clock.
+Creating register for signal `\rc_ddr3_adapter.\resp_rdata' using process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:62$7'.
+  created $dff cell `$procdff$157' with positive edge clock.
+Creating register for signal `\rc_ddr3_adapter.\state' using process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:62$7'.
+  created $dff cell `$procdff$158' with positive edge clock.
+Creating register for signal `\rc_ddr3_adapter.\saved_byte_address' using process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:62$7'.
+  created $dff cell `$procdff$159' with positive edge clock.
+Creating register for signal `\rc_ddr3_adapter.\saved_lane' using process `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:62$7'.
+  created $dff cell `$procdff$160' with positive edge clock.
+
+4.10. Executing PROC_MEMWR pass (convert process memory writes to cells).
+
+4.11. Executing PROC_CLEAN pass (remove empty switches from decision trees).
+Found and cleaned up 4 empty switches in `\ddr3_controller_pressure_probe.$proc$rtl/rc-working/ddr3_controller_pressure_probe.sv:43$17'.
+Removing empty process `ddr3_controller_pressure_probe.$proc$rtl/rc-working/ddr3_controller_pressure_probe.sv:43$17'.
+Found and cleaned up 6 empty switches in `\rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:62$7'.
+Removing empty process `rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:62$7'.
+Removing empty process `rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:54$2'.
+Removing empty process `rc_ddr3_adapter.$proc$rtl/rc-working/rc_ddr3_adapter.sv:45$1'.
+Cleaned up 10 empty switches.
+
+4.12. Executing OPT_EXPR pass (perform const folding).
+Optimizing module ddr3_controller_pressure_probe.
+<suppressed ~1 debug messages>
+Optimizing module rc_ddr3_adapter.
+<suppressed ~7 debug messages>
+
+5. Executing OPT pass (performing simple optimizations).
+
+5.1. Executing OPT_EXPR pass (perform const folding).
+Optimizing module ddr3_controller_pressure_probe.
+Optimizing module rc_ddr3_adapter.
+<suppressed ~3 debug messages>
+
+5.2. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\ddr3_controller_pressure_probe'.
+Computing hashes of 29 cells of `\ddr3_controller_pressure_probe'.
+Finding duplicate cells in `\ddr3_controller_pressure_probe'.
+Computing hashes of 28 cells of `\ddr3_controller_pressure_probe'.
+Finding duplicate cells in `\ddr3_controller_pressure_probe'.
+<suppressed ~3 debug messages>
+Finding identical cells in module `\rc_ddr3_adapter'.
+Computing hashes of 53 cells of `\rc_ddr3_adapter'.
+Finding duplicate cells in `\rc_ddr3_adapter'.
+Computing hashes of 43 cells of `\rc_ddr3_adapter'.
+Finding duplicate cells in `\rc_ddr3_adapter'.
+<suppressed ~30 debug messages>
+Removed a total of 11 cells.
+
+5.3. Executing OPT_MUXTREE pass (detect dead branches in mux trees).
+Running muxtree optimizer on module \ddr3_controller_pressure_probe..
+  Creating internal representation of mux trees.
+  Evaluating internal representation of mux trees.
+  Analyzing evaluation results.
+Running muxtree optimizer on module \rc_ddr3_adapter..
+  Creating internal representation of mux trees.
+  Evaluating internal representation of mux trees.
+  Analyzing evaluation results.
+Removed 0 multiplexer ports.
+<suppressed ~54 debug messages>
+
+5.4. Executing OPT_REDUCE pass (consolidate $*mux and $reduce_* inputs).
+  Optimizing cells in module \ddr3_controller_pressure_probe.
+  Optimizing cells in module \rc_ddr3_adapter.
+Performed a total of 0 changes.
+
+5.5. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\ddr3_controller_pressure_probe'.
+Computing hashes of 28 cells of `\ddr3_controller_pressure_probe'.
+Finding duplicate cells in `\ddr3_controller_pressure_probe'.
+Finding identical cells in module `\rc_ddr3_adapter'.
+Computing hashes of 43 cells of `\rc_ddr3_adapter'.
+Finding duplicate cells in `\rc_ddr3_adapter'.
+Removed a total of 0 cells.
+
+5.6. Executing OPT_DFF pass (perform DFF optimizations).
+Adding SRST signal on $procdff$154 ($dff) from module ddr3_controller_pressure_probe (D = $procmux$42_Y, Q = \active, rval = 1'0).
+Adding EN signal on $auto$ff.cc:337:slice$161 ($sdff) from module ddr3_controller_pressure_probe (D = $procmux$42_Y, Q = \active).
+Adding SRST signal on $procdff$153 ($dff) from module ddr3_controller_pressure_probe (D = $procmux$50_Y, Q = \issued, rval = 0).
+Adding EN signal on $auto$ff.cc:337:slice$169 ($sdff) from module ddr3_controller_pressure_probe (D = $add$rtl/rc-working/ddr3_controller_pressure_probe.sv:61$24_Y, Q = \issued).
+Adding SRST signal on $procdff$151 ($dff) from module ddr3_controller_pressure_probe (D = $procmux$26_Y, Q = \done, rval = 1'0).
+Adding SRST signal on $procdff$152 ($dff) from module ddr3_controller_pressure_probe (D = $procmux$58_Y, Q = \responses, rval = 0).
+Adding EN signal on $auto$ff.cc:337:slice$182 ($sdff) from module ddr3_controller_pressure_probe (D = $add$rtl/rc-working/ddr3_controller_pressure_probe.sv:56$21_Y, Q = \responses).
+Adding SRST signal on $procdff$160 ($dff) from module rc_ddr3_adapter (D = $procmux$88_Y, Q = \saved_lane, rval = 4'0000).
+Adding EN signal on $auto$ff.cc:337:slice$186 ($sdff) from module rc_ddr3_adapter (D = \req_byte_address [3:0], Q = \saved_lane).
+Adding SRST signal on $procdff$159 ($dff) from module rc_ddr3_adapter (D = $procmux$101_Y, Q = \saved_byte_address, rval = 0).
+Adding EN signal on $auto$ff.cc:337:slice$192 ($sdff) from module rc_ddr3_adapter (D = \req_byte_address, Q = \saved_byte_address).
+Adding SRST signal on $procdff$155 ($dff) from module rc_ddr3_adapter (D = $procmux$69_Y, Q = \resp_valid, rval = 1'0).
+Adding SRST signal on $procdff$156 ($dff) from module rc_ddr3_adapter (D = $procmux$140_Y, Q = \resp_error, rval = 1'0).
+Adding EN signal on $auto$ff.cc:337:slice$199 ($sdff) from module rc_ddr3_adapter (D = $procmux$140_Y, Q = \resp_error).
+Adding SRST signal on $procdff$157 ($dff) from module rc_ddr3_adapter (D = $procmux$126_Y, Q = \resp_rdata, rval = 0).
+Adding EN signal on $auto$ff.cc:337:slice$211 ($sdff) from module rc_ddr3_adapter (D = $procmux$126_Y, Q = \resp_rdata).
+Adding SRST signal on $procdff$158 ($dff) from module rc_ddr3_adapter (D = $procmux$109_Y, Q = \state, rval = 2'00).
+Adding EN signal on $auto$ff.cc:337:slice$223 ($sdff) from module rc_ddr3_adapter (D = $procmux$109_Y, Q = \state).
+
+5.7. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \ddr3_controller_pressure_probe..
+Finding unused cells or wires in module \rc_ddr3_adapter..
+Removed 23 unused cells and 95 unused wires.
+<suppressed ~26 debug messages>
+
+5.8. Executing OPT_EXPR pass (perform const folding).
+Optimizing module ddr3_controller_pressure_probe.
+<suppressed ~2 debug messages>
+Optimizing module rc_ddr3_adapter.
+<suppressed ~2 debug messages>
+
+5.9. Rerunning OPT passes. (Maybe there is more to do..)
+
+5.10. Executing OPT_MUXTREE pass (detect dead branches in mux trees).
+Running muxtree optimizer on module \ddr3_controller_pressure_probe..
+  Creating internal representation of mux trees.
+  Evaluating internal representation of mux trees.
+  Analyzing evaluation results.
+Running muxtree optimizer on module \rc_ddr3_adapter..
+  Creating internal representation of mux trees.
+  Evaluating internal representation of mux trees.
+  Analyzing evaluation results.
+Removed 0 multiplexer ports.
+<suppressed ~27 debug messages>
+
+5.11. Executing OPT_REDUCE pass (consolidate $*mux and $reduce_* inputs).
+  Optimizing cells in module \ddr3_controller_pressure_probe.
+  Optimizing cells in module \rc_ddr3_adapter.
+Performed a total of 0 changes.
+
+5.12. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\ddr3_controller_pressure_probe'.
+Computing hashes of 26 cells of `\ddr3_controller_pressure_probe'.
+Finding duplicate cells in `\ddr3_controller_pressure_probe'.
+Computing hashes of 25 cells of `\ddr3_controller_pressure_probe'.
+Finding duplicate cells in `\ddr3_controller_pressure_probe'.
+<suppressed ~3 debug messages>
+Finding identical cells in module `\rc_ddr3_adapter'.
+Computing hashes of 49 cells of `\rc_ddr3_adapter'.
+Finding duplicate cells in `\rc_ddr3_adapter'.
+Computing hashes of 42 cells of `\rc_ddr3_adapter'.
+Finding duplicate cells in `\rc_ddr3_adapter'.
+Computing hashes of 40 cells of `\rc_ddr3_adapter'.
+Finding duplicate cells in `\rc_ddr3_adapter'.
+<suppressed ~27 debug messages>
+Removed a total of 10 cells.
+
+5.13. Executing OPT_DFF pass (perform DFF optimizations).
+
+5.14. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \ddr3_controller_pressure_probe..
+Finding unused cells or wires in module \rc_ddr3_adapter..
+Removed 0 unused cells and 10 unused wires.
+<suppressed ~2 debug messages>
+
+5.15. Executing OPT_EXPR pass (perform const folding).
+Optimizing module ddr3_controller_pressure_probe.
+Optimizing module rc_ddr3_adapter.
+
+5.16. Rerunning OPT passes. (Maybe there is more to do..)
+
+5.17. Executing OPT_MUXTREE pass (detect dead branches in mux trees).
+Running muxtree optimizer on module \ddr3_controller_pressure_probe..
+  Creating internal representation of mux trees.
+  Evaluating internal representation of mux trees.
+  Analyzing evaluation results.
+Running muxtree optimizer on module \rc_ddr3_adapter..
+  Creating internal representation of mux trees.
+  Evaluating internal representation of mux trees.
+  Analyzing evaluation results.
+Removed 0 multiplexer ports.
+<suppressed ~27 debug messages>
+
+5.18. Executing OPT_REDUCE pass (consolidate $*mux and $reduce_* inputs).
+  Optimizing cells in module \ddr3_controller_pressure_probe.
+  Optimizing cells in module \rc_ddr3_adapter.
+Performed a total of 0 changes.
+
+5.19. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\ddr3_controller_pressure_probe'.
+Computing hashes of 25 cells of `\ddr3_controller_pressure_probe'.
+Finding duplicate cells in `\ddr3_controller_pressure_probe'.
+Finding identical cells in module `\rc_ddr3_adapter'.
+Computing hashes of 40 cells of `\rc_ddr3_adapter'.
+Finding duplicate cells in `\rc_ddr3_adapter'.
+Removed a total of 0 cells.
+
+5.20. Executing OPT_DFF pass (perform DFF optimizations).
+
+5.21. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \ddr3_controller_pressure_probe..
+Finding unused cells or wires in module \rc_ddr3_adapter..
+
+5.22. Executing OPT_EXPR pass (perform const folding).
+Optimizing module ddr3_controller_pressure_probe.
+Optimizing module rc_ddr3_adapter.
+
+5.23. Finished fast OPT passes. (There is nothing left to do.)
+
+6. Executing CHECK pass (checking for obvious problems).
+Checking module ddr3_controller_pressure_probe...
+Checking module rc_ddr3_adapter...
+Found and reported 0 problems.
+
+7. Printing statistics.
+
+=== ddr3_controller_pressure_probe ===
+
+        +----------Local Count, excluding submodules.
+        | 
+       39 wires
+      367 wire bits
+       20 public wires
+      286 public wire bits
+       14 ports
+      218 port bits
+       24 cells
+        2   $add
+        1   $eq
+        3   $logic_and
+        1   $logic_not
+        1   $lt
+        4   $mux
+        2   $not
+        2   $reduce_and
+        2   $reduce_bool
+        2   $reduce_or
+        1   $sdff
+        3   $sdffe
+        1 submodules
+        1   rc_ddr3_adapter
+
+=== rc_ddr3_adapter ===
+
+        +----------Local Count, excluding submodules.
+        | 
+       53 wires
+      514 wire bits
+       21 public wires
+      322 public wire bits
+       17 ports
+      252 port bits
+       40 cells
+        2   $eq
+        1   $gt
+        1   $logic_not
+        1   $logic_or
+       13   $mux
+        5   $ne
+        1   $not
+        4   $pmux
+        3   $reduce_and
+        1   $reduce_bool
+        1   $sdff
+        5   $sdffe
+        1   $shiftx
+        1   $shl
+
+=== design hierarchy ===
+
+        +----------Count including submodules.
+        | 
+       64 ddr3_controller_pressure_probe
+       40 rc_ddr3_adapter
+
+        +----------Count including submodules.
+        | 
+       92 wires
+      881 wire bits
+       41 public wires
+      608 public wire bits
+       31 ports
+      470 port bits
+        - memories
+        - memory bits
+        - processes
+       64 cells
+        2   $add
+        3   $eq
+        1   $gt
+        3   $logic_and
+        2   $logic_not
+        1   $logic_or
+        1   $lt
+       17   $mux
+        5   $ne
+        3   $not
+        4   $pmux
+        5   $reduce_and
+        3   $reduce_bool
+        2   $reduce_or
+        2   $sdff
+        8   $sdffe
+        1   $shiftx
+        1   $shl
+        1 submodules
+        1   rc_ddr3_adapter
+
+End of script. Logfile hash: 9855514db2, time: 0.03s, user: 3.37s, system: 0.44s, MEM: 626.84 MB peak
+Yosys 0.66 (git sha1 7f8fdfd8d7bc08c749a2a969388d3425d4f369d5, clang++ 18.1.8 -fPIC -O3)
+Time spent: 20% 3x read_verilog (0 sec), 18% 3x opt_dff (0 sec), ...
