@@ -61,3 +61,13 @@ The integrated production-top memory-inference pass also completed (log
 inferred 90 generic XC7 BRAM cells but left 27 `$mem_v2` memories unmapped,
 one more than the standalone core due to CSR integration.  This remains an
 inference diagnostic, not a fit or timing result.
+
+As a negative control, running `memory_bram` before versus after
+`memory_dff` produced the same standalone result: 90
+`__XILINX_BLOCKRAM_SDP_` cells and 26 unmapped `$mem_v2` memories.  The logs
+are `memory-nodff.log` (SHA-256
+`63b1c11034f2bca9cb4e8b52d59b7d0d5ee82c92e92fba4b0a1a1c52e954e1dc`) and
+`memory-postdff.log` (SHA-256
+`db37e1cdc6c5ce35f735bca867ad6a16f4491cec67f3e4f8e1d84a3a4cbec5c6`).
+Pass ordering is therefore ruled out as the cause of failed read-port
+mapping.
