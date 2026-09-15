@@ -281,6 +281,12 @@ also attempted as a diagnostic.  Nextpnr aborted during packing with
 parameterization are not name-compatible.  The rename was discarded and is
 not a compatibility fix.
 
+Using Yosys's `brams_xc6v_map.v` instead emits native `RAMB36E1` and
+`RAMB18E1` cells.  Nextpnr pack-only then accepts the primitive ABI, but the
+candidate consumes 1,029/955 `RAMB36E1` blocks (107%), so it cannot fit the
+target Kintex-7.  This establishes the next tradeoff: retain the replicated
+FSM only with an explicit BRAM/LUTRAM partition that stays within capacity.
+
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
 produced a flattened hardware RTLIL checkpoint (`no-bscan-flat.il`, SHA-256
 `b91abccbafee098fdbffbf31a5443494f2d7729e3b73c13ed2a291b6bd7e9bde`).  Direct
