@@ -132,6 +132,18 @@ memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
 
+## Post-flatten optimization checkpoint
+
+Running `opt -fast; opt_clean` after flattening reduced the RTLIL from
+approximately 1.37 million to 493,398 cells and from 895 MiB to 348 MiB;
+the resulting `flatten-optfast.il` has SHA-256
+`ec5249cc749648757b243b8ad1008fe2a19b82c7b67ade7a08236fc0c18e358f`.
+Nevertheless, full XC7 synthesis plus compatibility mapping still exceeded a
+300-second bound (exit status 124; log SHA-256
+`97efecc3086ef2fa1c635368899f4074dcdf4b3e9b0e52b0e319e1430457e4e9`).  No
+nextpnr JSON was emitted.  This optimization materially reduces expansion but
+does not yet make the compiler-generated design implementation-ready.
+
 ## Alternative synthesis diagnostic
 
 Disabling DSP inference did not make the monolithic path tractable: flattened
