@@ -1,0 +1,37 @@
+{
+  "bram": {
+    "cache_hits": 0,
+    "cycles": 260,
+    "external_requests": 0,
+    "output_sha256": "ef3ee7766812f746d8cb1330008d34e7f50c3544e4dee2d9e49e6a3c1d3c545f",
+    "response_sha256": "ec163abf772ac87fc11d17974ab5f2e2323ae2cef1df3091b35286fd2acf3e58"
+  },
+  "contract": {
+    "bram_read_latency": 1,
+    "ddr3_line_bytes": 16,
+    "ddr3_prefetch_lines": 8,
+    "depth_words": 4096,
+    "image_sha256": "4471722eea1e140618812aaef4e60f5ba081b3f720ef79c81fb28c5f415a3395",
+    "logical_name": "blocks.0.attn.q.weight",
+    "read_only": true,
+    "source_path": "result-compiler-top-30mhz-20260908/image-q_weight_codes_i8.hex",
+    "source_sha256": "1fc141206dcc2be0e32f20da7d698a756b2898908ff505d65d7f206f50fc5932",
+    "width_bits": 8
+  },
+  "ddr3": {
+    "cache_bytes": 256,
+    "cache_hits": 258,
+    "cycles": 276,
+    "external_requests": 2,
+    "output_sha256": "ef3ee7766812f746d8cb1330008d34e7f50c3544e4dee2d9e49e6a3c1d3c545f",
+    "response_sha256": "ec163abf772ac87fc11d17974ab5f2e2323ae2cef1df3091b35286fd2acf3e58"
+  },
+  "first_mismatch": null,
+  "schema": "tinystories-1m-projection-memory-equivalence-v1",
+  "status": "pass",
+  "trace": {
+    "addresses": 260,
+    "bram_response_sha256": "ec163abf772ac87fc11d17974ab5f2e2323ae2cef1df3091b35286fd2acf3e58",
+    "ddr3_response_sha256": "ec163abf772ac87fc11d17974ab5f2e2323ae2cef1df3091b35286fd2acf3e58"
+  }
+}

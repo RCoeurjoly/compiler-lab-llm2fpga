@@ -1,0 +1,1173 @@
+{
+  "creator": "Yosys 0.66 (git sha1 7f8fdfd8d7bc08c749a2a969388d3425d4f369d5, clang++ 18.1.8 -fPIC -O3)",
+  "modules": {
+    "llm_ddr3_adapter": {
+      "attributes": {
+        "dynports": "00000000000000000000000000000001",
+        "src": "rtl/memory/llm_ddr3_adapter.sv:8.1-73.10"
+      },
+      "parameter_default_values": {
+        "ADDRESS_WIDTH": "00000000000000000000000000100000",
+        "DDR_DATA_WIDTH": "00000000000000000000000010000000"
+      },
+      "ports": {
+        "clk": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "rst": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "read_valid": {
+          "direction": "input",
+          "bits": [ 4 ]
+        },
+        "read_address": {
+          "direction": "input",
+          "bits": [ 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 ]
+        },
+        "response_valid": {
+          "direction": "output",
+          "bits": [ 37 ]
+        },
+        "response_address": {
+          "direction": "output",
+          "bits": [ 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 ]
+        },
+        "response_data": {
+          "direction": "output",
+          "bits": [ 70, 71, 72, 73, 74, 75, 76, 77 ]
+        },
+        "response_error": {
+          "direction": "output",
+          "bits": [ 78 ]
+        },
+        "wb_cyc": {
+          "direction": "output",
+          "bits": [ 79 ]
+        },
+        "wb_stb": {
+          "direction": "output",
+          "bits": [ 79 ]
+        },
+        "wb_we": {
+          "direction": "output",
+          "bits": [ "0" ]
+        },
+        "wb_addr": {
+          "direction": "output",
+          "bits": [ 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, "0", "0", "0", "0" ]
+        },
+        "wb_sel": {
+          "direction": "output",
+          "bits": [ 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123 ]
+        },
+        "wb_accept": {
+          "direction": "input",
+          "bits": [ 124 ]
+        },
+        "wb_ack": {
+          "direction": "input",
+          "bits": [ 125 ]
+        },
+        "wb_err": {
+          "direction": "input",
+          "bits": [ 126 ]
+        },
+        "wb_rdata": {
+          "direction": "input",
+          "bits": [ 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254 ]
+        }
+      },
+      "cells": {
+        "$auto$ff.cc:337:slice$102": {
+          "hide_name": 1,
+          "type": "$sdffe",
+          "parameters": {
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "EN_POLARITY": "00000000000000000000000000000001",
+            "SRST_POLARITY": "00000000000000000000000000000001",
+            "SRST_VALUE": "00000000",
+            "WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "always_ff": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:44.3-72.6"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "EN": "input",
+            "Q": "output",
+            "SRST": "input"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 255, 256, 257, 258, 259, 260, 261, 262 ],
+            "EN": [ 263 ],
+            "Q": [ 70, 71, 72, 73, 74, 75, 76, 77 ],
+            "SRST": [ 3 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$106": {
+          "hide_name": 1,
+          "type": "$sdffe",
+          "parameters": {
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "EN_POLARITY": "00000000000000000000000000000001",
+            "SRST_POLARITY": "00000000000000000000000000000001",
+            "SRST_VALUE": "0",
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "always_ff": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:44.3-72.6"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "EN": "input",
+            "Q": "output",
+            "SRST": "input"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 126 ],
+            "EN": [ 263 ],
+            "Q": [ 78 ],
+            "SRST": [ 3 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$110": {
+          "hide_name": 1,
+          "type": "$sdffe",
+          "parameters": {
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "EN_POLARITY": "00000000000000000000000000000001",
+            "SRST_POLARITY": "00000000000000000000000000000001",
+            "SRST_VALUE": "00",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "always_ff": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:44.3-72.6"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "EN": "input",
+            "Q": "output",
+            "SRST": "input"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 264, 265 ],
+            "EN": [ 266 ],
+            "Q": [ 267, 268 ],
+            "SRST": [ 3 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$85": {
+          "hide_name": 1,
+          "type": "$sdffe",
+          "parameters": {
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "EN_POLARITY": "00000000000000000000000000000001",
+            "SRST_POLARITY": "00000000000000000000000000000001",
+            "SRST_VALUE": "0000",
+            "WIDTH": "00000000000000000000000000000100"
+          },
+          "attributes": {
+            "always_ff": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:44.3-72.6"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "EN": "input",
+            "Q": "output",
+            "SRST": "input"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 5, 6, 7, 8 ],
+            "EN": [ 269 ],
+            "Q": [ 270, 271, 272, 273 ],
+            "SRST": [ 3 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$89": {
+          "hide_name": 1,
+          "type": "$sdffe",
+          "parameters": {
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "EN_POLARITY": "00000000000000000000000000000001",
+            "SRST_POLARITY": "00000000000000000000000000000001",
+            "SRST_VALUE": "00000000000000000000000000000000",
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "always_ff": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:44.3-72.6"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "EN": "input",
+            "Q": "output",
+            "SRST": "input"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 ],
+            "EN": [ 269 ],
+            "Q": [ 274, 275, 276, 277, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107 ],
+            "SRST": [ 3 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$92": {
+          "hide_name": 1,
+          "type": "$sdff",
+          "parameters": {
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "SRST_POLARITY": "00000000000000000000000000000001",
+            "SRST_VALUE": "0",
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "always_ff": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:44.3-72.6"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "Q": "output",
+            "SRST": "input"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 278 ],
+            "Q": [ 37 ],
+            "SRST": [ 279 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$98": {
+          "hide_name": 1,
+          "type": "$sdffe",
+          "parameters": {
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "EN_POLARITY": "00000000000000000000000000000001",
+            "SRST_POLARITY": "00000000000000000000000000000001",
+            "SRST_VALUE": "00000000000000000000000000000000",
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "always_ff": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:44.3-72.6"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "EN": "input",
+            "Q": "output",
+            "SRST": "input"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 274, 275, 276, 277, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107 ],
+            "EN": [ 263 ],
+            "Q": [ 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 ],
+            "SRST": [ 3 ]
+          }
+        },
+        "$auto$opt_dff.cc:235:make_patterns_logic$112": {
+          "hide_name": 1,
+          "type": "$ne",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 280 ],
+            "B": [ "0", "1" ],
+            "Y": [ 281 ]
+          }
+        },
+        "$auto$opt_dff.cc:235:make_patterns_logic$114": {
+          "hide_name": 1,
+          "type": "$ne",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 124, 79 ],
+            "B": [ "0", "1" ],
+            "Y": [ 282 ]
+          }
+        },
+        "$auto$opt_dff.cc:235:make_patterns_logic$116": {
+          "hide_name": 1,
+          "type": "$ne",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 125, 283 ],
+            "B": [ "0", "1" ],
+            "Y": [ 284 ]
+          }
+        },
+        "$auto$opt_dff.cc:252:make_patterns_logic$100": {
+          "hide_name": 1,
+          "type": "$reduce_and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 125, 283 ],
+            "Y": [ 263 ]
+          }
+        },
+        "$auto$opt_dff.cc:252:make_patterns_logic$118": {
+          "hide_name": 1,
+          "type": "$reduce_and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000011",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 284, 282, 281 ],
+            "Y": [ 266 ]
+          }
+        },
+        "$auto$opt_dff.cc:252:make_patterns_logic$87": {
+          "hide_name": 1,
+          "type": "$reduce_and",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4, 280 ],
+            "Y": [ 269 ]
+          }
+        },
+        "$auto$opt_dff.cc:277:combine_resets$96": {
+          "hide_name": 1,
+          "type": "$reduce_or",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 285, 3 ],
+            "Y": [ 279 ]
+          }
+        },
+        "$auto$opt_dff.cc:81:create_not$93": {
+          "hide_name": 1,
+          "type": "$not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 283 ],
+            "Y": [ 285 ]
+          }
+        },
+        "$procmux$12": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:62.23-62.29|rtl/memory/llm_ddr3_adapter.sv:62.19-68.12"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "0" ],
+            "B": [ "1" ],
+            "S": [ 125 ],
+            "Y": [ 278 ]
+          }
+        },
+        "$procmux$40": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:62.23-62.29|rtl/memory/llm_ddr3_adapter.sv:62.19-68.12"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "x", "x" ],
+            "B": [ "0", "0" ],
+            "S": [ 125 ],
+            "Y": [ 286, 287 ]
+          }
+        },
+        "$procmux$42": {
+          "hide_name": 1,
+          "type": "$pmux",
+          "parameters": {
+            "S_WIDTH": "00000000000000000000000000000011",
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:61.55-61.55|rtl/memory/llm_ddr3_adapter.sv:55.7-70.14"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "0", "0" ],
+            "B": [ 286, 287, 288, 289, 290, 291 ],
+            "S": [ 283, 79, 280 ],
+            "Y": [ 264, 265 ]
+          }
+        },
+        "$procmux$44": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:61.26-61.35|rtl/memory/llm_ddr3_adapter.sv:61.22-61.55"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "x", "x" ],
+            "B": [ "0", "1" ],
+            "S": [ 124 ],
+            "Y": [ 288, 289 ]
+          }
+        },
+        "$procmux$46_CMP0": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:60.12-60.12|rtl/memory/llm_ddr3_adapter.sv:55.7-70.14"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 267, 268 ],
+            "B": [ "1", "0" ],
+            "Y": [ 79 ]
+          }
+        },
+        "$procmux$47": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000010"
+          },
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:56.19-56.29|rtl/memory/llm_ddr3_adapter.sv:56.15-60.12"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "x", "x" ],
+            "B": [ "1", "0" ],
+            "S": [ 4 ],
+            "Y": [ 290, 291 ]
+          }
+        },
+        "$procmux$49_CMP0": {
+          "hide_name": 1,
+          "type": "$logic_not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:55.19-55.19|rtl/memory/llm_ddr3_adapter.sv:55.7-70.14"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 267, 268 ],
+            "Y": [ 280 ]
+          }
+        },
+        "$procmux$73_CMP0": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:61.55-61.55|rtl/memory/llm_ddr3_adapter.sv:55.7-70.14"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 267, 268 ],
+            "B": [ "0", "1" ],
+            "Y": [ 283 ]
+          }
+        },
+        "$shiftx$rtl/memory/llm_ddr3_adapter.sv:65$9": {
+          "hide_name": 1,
+          "type": "$shiftx",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000010000000",
+            "B_SIGNED": "00000000000000000000000000000001",
+            "B_WIDTH": "00000000000000000000000000100000",
+            "Y_WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:65.36-65.55"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254 ],
+            "B": [ "0", "0", "0", 270, 271, 272, 273, "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0" ],
+            "Y": [ 255, 256, 257, 258, 259, 260, 261, 262 ]
+          }
+        },
+        "$shl$rtl/memory/llm_ddr3_adapter.sv:41$5": {
+          "hide_name": 1,
+          "type": "$shl",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000010000",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000100",
+            "Y_WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:41.15-41.58"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0" ],
+            "B": [ 270, 271, 272, 273 ],
+            "Y": [ 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123 ]
+          }
+        }
+      },
+      "netnames": {
+        "$auto$opt_dff.cc:234:make_patterns_logic$111": {
+          "hide_name": 1,
+          "bits": [ 281 ],
+          "attributes": {
+          }
+        },
+        "$auto$opt_dff.cc:234:make_patterns_logic$113": {
+          "hide_name": 1,
+          "bits": [ 282 ],
+          "attributes": {
+          }
+        },
+        "$auto$opt_dff.cc:234:make_patterns_logic$115": {
+          "hide_name": 1,
+          "bits": [ 284 ],
+          "attributes": {
+          }
+        },
+        "$auto$opt_dff.cc:251:make_patterns_logic$103": {
+          "hide_name": 1,
+          "bits": [ 263 ],
+          "attributes": {
+          }
+        },
+        "$auto$opt_dff.cc:251:make_patterns_logic$117": {
+          "hide_name": 1,
+          "bits": [ 266 ],
+          "attributes": {
+          }
+        },
+        "$auto$opt_dff.cc:251:make_patterns_logic$86": {
+          "hide_name": 1,
+          "bits": [ 269 ],
+          "attributes": {
+          }
+        },
+        "$auto$opt_dff.cc:275:combine_resets$95": {
+          "hide_name": 1,
+          "bits": [ 279 ],
+          "attributes": {
+          }
+        },
+        "$auto$rtlil.cc:3255:Not$94": {
+          "hide_name": 1,
+          "bits": [ 285 ],
+          "attributes": {
+          }
+        },
+        "$procmux$12_Y": {
+          "hide_name": 1,
+          "bits": [ 278 ],
+          "attributes": {
+          }
+        },
+        "$procmux$15_CMP": {
+          "hide_name": 1,
+          "bits": [ 283 ],
+          "attributes": {
+          }
+        },
+        "$procmux$25_CMP": {
+          "hide_name": 1,
+          "bits": [ 280 ],
+          "attributes": {
+          }
+        },
+        "$procmux$40_Y": {
+          "hide_name": 1,
+          "bits": [ 286, 287 ],
+          "attributes": {
+          }
+        },
+        "$procmux$42_Y": {
+          "hide_name": 1,
+          "bits": [ 264, 265 ],
+          "attributes": {
+          }
+        },
+        "$procmux$44_Y": {
+          "hide_name": 1,
+          "bits": [ 288, 289 ],
+          "attributes": {
+          }
+        },
+        "$procmux$47_Y": {
+          "hide_name": 1,
+          "bits": [ 290, 291 ],
+          "attributes": {
+          }
+        },
+        "$shiftx$rtl/memory/llm_ddr3_adapter.sv:65$9_Y": {
+          "hide_name": 1,
+          "bits": [ 255, 256, 257, 258, 259, 260, 261, 262 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:65.36-65.55"
+          }
+        },
+        "clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:12.15-12.18"
+          }
+        },
+        "read_address": {
+          "hide_name": 0,
+          "bits": [ 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:14.35-14.47"
+          }
+        },
+        "read_valid": {
+          "hide_name": 0,
+          "bits": [ 4 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:13.15-13.25"
+          }
+        },
+        "response_address": {
+          "hide_name": 0,
+          "bits": [ 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:16.36-16.52"
+          }
+        },
+        "response_data": {
+          "hide_name": 0,
+          "bits": [ 70, 71, 72, 73, 74, 75, 76, 77 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:17.22-17.35"
+          }
+        },
+        "response_error": {
+          "hide_name": 0,
+          "bits": [ 78 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:18.16-18.30"
+          }
+        },
+        "response_valid": {
+          "hide_name": 0,
+          "bits": [ 37 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:15.16-15.30"
+          }
+        },
+        "rst": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:12.32-12.35"
+          }
+        },
+        "saved_address": {
+          "hide_name": 0,
+          "bits": [ 274, 275, 276, 277, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:29.29-29.42"
+          }
+        },
+        "saved_lane": {
+          "hide_name": 0,
+          "bits": [ 270, 271, 272, 273 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:30.25-30.35"
+          }
+        },
+        "state": {
+          "hide_name": 0,
+          "bits": [ 267, 268 ],
+          "attributes": {
+            "enum_type": "$enum0",
+            "enum_value_00": "\\IDLE",
+            "enum_value_01": "\\WAIT_ACCEPT",
+            "enum_value_10": "\\WAIT_ACK",
+            "src": "rtl/memory/llm_ddr3_adapter.sv:28.11-28.16",
+            "wiretype": "\\state_t"
+          }
+        },
+        "wb_accept": {
+          "hide_name": 0,
+          "bits": [ 124 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:22.15-22.24"
+          }
+        },
+        "wb_ack": {
+          "hide_name": 0,
+          "bits": [ 125 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:22.38-22.44"
+          }
+        },
+        "wb_addr": {
+          "hide_name": 0,
+          "bits": [ 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, "0", "0", "0", "0" ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:20.36-20.43"
+          }
+        },
+        "wb_cyc": {
+          "hide_name": 0,
+          "bits": [ 79 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:19.16-19.22"
+          }
+        },
+        "wb_err": {
+          "hide_name": 0,
+          "bits": [ 126 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:22.58-22.64"
+          }
+        },
+        "wb_rdata": {
+          "hide_name": 0,
+          "bits": [ 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:23.36-23.44"
+          }
+        },
+        "wb_sel": {
+          "hide_name": 0,
+          "bits": [ 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:21.39-21.45"
+          }
+        },
+        "wb_stb": {
+          "hide_name": 0,
+          "bits": [ 79 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:19.37-19.43"
+          }
+        },
+        "wb_we": {
+          "hide_name": 0,
+          "bits": [ "0" ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter.sv:19.58-19.63"
+          }
+        }
+      }
+    },
+    "llm_ddr3_adapter_shell": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "rtl/memory/llm_ddr3_adapter_shell.sv:6.1-26.10"
+      },
+      "ports": {
+        "clk": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "rst": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "read_valid": {
+          "direction": "input",
+          "bits": [ 4 ]
+        },
+        "read_address": {
+          "direction": "input",
+          "bits": [ 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 ]
+        },
+        "response_valid": {
+          "direction": "output",
+          "bits": [ 37 ]
+        },
+        "response_data": {
+          "direction": "output",
+          "bits": [ 38, 39, 40, 41, 42, 43, 44, 45 ]
+        },
+        "response_address": {
+          "direction": "output",
+          "bits": [ 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77 ]
+        },
+        "response_error": {
+          "direction": "output",
+          "bits": [ 78 ]
+        },
+        "wb_cyc": {
+          "direction": "output",
+          "bits": [ 79 ]
+        },
+        "wb_stb": {
+          "direction": "output",
+          "bits": [ 80 ]
+        },
+        "wb_we": {
+          "direction": "output",
+          "bits": [ 81 ]
+        },
+        "wb_addr": {
+          "direction": "output",
+          "bits": [ 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113 ]
+        },
+        "wb_sel": {
+          "direction": "output",
+          "bits": [ 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129 ]
+        },
+        "wb_accept": {
+          "direction": "input",
+          "bits": [ 130 ]
+        },
+        "wb_ack": {
+          "direction": "input",
+          "bits": [ 131 ]
+        },
+        "wb_err": {
+          "direction": "input",
+          "bits": [ 132 ]
+        },
+        "wb_rdata": {
+          "direction": "input",
+          "bits": [ 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260 ]
+        }
+      },
+      "cells": {
+        "adapter": {
+          "hide_name": 0,
+          "type": "llm_ddr3_adapter",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:19.20-25.59"
+          },
+          "port_directions": {
+            "clk": "input",
+            "read_address": "input",
+            "read_valid": "input",
+            "response_address": "output",
+            "response_data": "output",
+            "response_error": "output",
+            "response_valid": "output",
+            "rst": "input",
+            "wb_accept": "input",
+            "wb_ack": "input",
+            "wb_addr": "output",
+            "wb_cyc": "output",
+            "wb_err": "input",
+            "wb_rdata": "input",
+            "wb_sel": "output",
+            "wb_stb": "output",
+            "wb_we": "output"
+          },
+          "connections": {
+            "clk": [ 2 ],
+            "read_address": [ 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 ],
+            "read_valid": [ 4 ],
+            "response_address": [ 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77 ],
+            "response_data": [ 38, 39, 40, 41, 42, 43, 44, 45 ],
+            "response_error": [ 78 ],
+            "response_valid": [ 37 ],
+            "rst": [ 3 ],
+            "wb_accept": [ 130 ],
+            "wb_ack": [ 131 ],
+            "wb_addr": [ 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113 ],
+            "wb_cyc": [ 79 ],
+            "wb_err": [ 132 ],
+            "wb_rdata": [ 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260 ],
+            "wb_sel": [ 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129 ],
+            "wb_stb": [ 80 ],
+            "wb_we": [ 81 ]
+          }
+        }
+      },
+      "netnames": {
+        "clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:7.15-7.18"
+          }
+        },
+        "read_address": {
+          "hide_name": 0,
+          "bits": [ 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:9.22-9.34"
+          }
+        },
+        "read_valid": {
+          "hide_name": 0,
+          "bits": [ 4 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:8.15-8.25"
+          }
+        },
+        "response_address": {
+          "hide_name": 0,
+          "bits": [ 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:12.23-12.39"
+          }
+        },
+        "response_data": {
+          "hide_name": 0,
+          "bits": [ 38, 39, 40, 41, 42, 43, 44, 45 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:11.22-11.35"
+          }
+        },
+        "response_error": {
+          "hide_name": 0,
+          "bits": [ 78 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:13.16-13.30"
+          }
+        },
+        "response_valid": {
+          "hide_name": 0,
+          "bits": [ 37 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:10.16-10.30"
+          }
+        },
+        "rst": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:7.32-7.35"
+          }
+        },
+        "wb_accept": {
+          "hide_name": 0,
+          "bits": [ 130 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:16.15-16.24"
+          }
+        },
+        "wb_ack": {
+          "hide_name": 0,
+          "bits": [ 131 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:16.38-16.44"
+          }
+        },
+        "wb_addr": {
+          "hide_name": 0,
+          "bits": [ 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:15.23-15.30"
+          }
+        },
+        "wb_cyc": {
+          "hide_name": 0,
+          "bits": [ 79 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:14.16-14.22"
+          }
+        },
+        "wb_err": {
+          "hide_name": 0,
+          "bits": [ 132 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:16.58-16.64"
+          }
+        },
+        "wb_rdata": {
+          "hide_name": 0,
+          "bits": [ 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:17.23-17.31"
+          }
+        },
+        "wb_sel": {
+          "hide_name": 0,
+          "bits": [ 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:15.52-15.58"
+          }
+        },
+        "wb_stb": {
+          "hide_name": 0,
+          "bits": [ 80 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:14.37-14.43"
+          }
+        },
+        "wb_we": {
+          "hide_name": 0,
+          "bits": [ 81 ],
+          "attributes": {
+            "src": "rtl/memory/llm_ddr3_adapter_shell.sv:14.58-14.63"
+          }
+        }
+      }
+    }
+  }
+}

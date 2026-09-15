@@ -1,0 +1,5 @@
+read_verilog -sv rtl/memory/llm_memory_if.sv rtl/memory/llm_ddr3_adapter.sv rtl/memory/llm_ddr3_adapter_shell.sv
+hierarchy -top llm_ddr3_adapter_shell
+proc; opt; memory_map; opt
+stat -json
+write_json artifacts/diagnostics/llm-ddr3-adapter-shell-yosys.json
