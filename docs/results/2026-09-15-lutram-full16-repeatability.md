@@ -131,3 +131,13 @@ One `$mem_v2` remains for the CSR `prompt_words` storage; the generated-core
 memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
+
+## XC7 synthesis resource checkpoint
+
+With the CSR memory expanded to logic by `memory_map`, XC7-family synthesis
+completed in 38.74 seconds (log SHA-256
+`8720d54fa70ee3e128595bf178eeebadce254b51392112a9ee3a29c049fa64aa`).  The
+result contains 1,055 `RAMB36E1`, 14 `RAMB18E1`, 256 `RAM64X1S`, 12 `RAM32M`,
+and 429,287 total cells (including 310,395 LUT1--LUT6 cells).  Yosys emitted
+4,214 unique warnings, so this is resource/elaboration evidence only; no
+device-specific placement, timing, or fit claim follows from it.
