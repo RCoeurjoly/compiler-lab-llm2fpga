@@ -22,6 +22,12 @@ modes. The signed-64-bit wrapping GEMV output hash was
 modes; no mismatch was found. DDR3 required two external line requests and
 258 cache hits for this trace.
 
+Modes are selected through the canonical placement records emitted by
+`scripts/analysis/write_memory_placement_manifest.py`; the BRAM and DDR3
+manifests are recorded at
+`artifacts/diagnostics/tinystories-1m-q-placement-bram.json` and
+`artifacts/diagnostics/tinystories-1m-q-placement-ddr3.json` respectively.
+
 Commands:
 
 ```text

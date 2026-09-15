@@ -1,0 +1,26 @@
+{
+  "manifest_sha256": "eb42b070a73ff295d2b37eac576172aa39d9c9627cc094a569cca8bf5f3df3ec",
+  "records": [
+    {
+      "address_map": {
+        "endianness": "little",
+        "external_unit": "wishbone_128_bit_word",
+        "lane_zero_is_lowest_address": true,
+        "logical_unit": "byte"
+      },
+      "alignment_bytes": 16,
+      "burst_words": 16,
+      "depth_words": 4096,
+      "image_sha256": "4471722eea1e140618812aaef4e60f5ba081b3f720ef79c81fb28c5f415a3395",
+      "logical_name": "blocks.0.attn.q.weight",
+      "quantization": "W8A8_INT8_projection_weights",
+      "read_latency": "variable_bounded",
+      "read_only": true,
+      "source_path": "result-compiler-top-30mhz-20260908/image-q_weight_codes_i8.hex",
+      "source_sha256": "1fc141206dcc2be0e32f20da7d698a756b2898908ff505d65d7f206f50fc5932",
+      "space": "ddr3",
+      "width_bits": 8
+    }
+  ],
+  "schema": "tinystories-1m-memory-placement-v1"
+}
