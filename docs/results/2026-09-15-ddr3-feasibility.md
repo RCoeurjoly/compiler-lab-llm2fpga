@@ -30,6 +30,21 @@ reused once per context row with a 393,216-read distance in this schedule.
 
 ## Interpretation
 
+The pinned UberDDR3 source qualification confirms the target profile:
+two byte lanes, 333 MHz DDR3, 83.333 MHz controller clock, `BIST_MODE=2`,
+and seed-15 as the working implementation anchor. The existing standalone
+Icarus workload was launched with that source closure, but its legacy DRAM
+model emits very large command traces and was stopped before a clean
+request/ACK latency receipt was produced. Therefore no measured DDR3 latency
+or throughput is claimed here.
+
+As a bounded integration-pressure probe, Yosys 0.66 elaborated and optimized
+the existing `rtl/rc-working/rc_ddr3_adapter.sv` in 0.06 seconds. The result
+contains 40 cells and 322 public wire bits, with no generic memories or
+unresolved hierarchy. This is useful evidence that the adapter shell is small;
+it is not evidence that the full compiler controller plus DDR3 can route or
+meet timing.
+
 The compiler schedule has strong burst locality, but this artifact does not
 yet establish attainable DDR3 throughput, adapter latency, JTAG load time, or
 timing/routing feasibility. Those are the next required measurements. No
