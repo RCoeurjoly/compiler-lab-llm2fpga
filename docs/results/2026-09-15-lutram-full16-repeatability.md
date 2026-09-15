@@ -706,3 +706,9 @@ For the current model geometry this means eight banks of 2,048 words for each
 for each 4,096-word Q/K/V/output table). These dimensions are derived from the
 existing logical address widths; they are not a change to the authenticated
 tensor layout.
+
+The compiler-side contract remains regression-clean: the complete BRAM-bank
+geometry suite (10 tests) passes, as do focused production/orchestrator tests
+covering generation bounds, the authenticated 16-step harness, and source
+manifest exclusion of runtime intermediates. These are compiler/provenance
+gates only; they do not imply physical bank materialization or P&R success.
