@@ -132,6 +132,20 @@ memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
 
+## Deterministic nextpnr probe
+
+The synthesized JSON (`integrated-synth.json`, SHA-256
+`2f2f63bdb60b449c124d08873a8372e87831d41efe0edba1b522d7e35cd65d20`) was
+submitted to the pinned `nextpnr-xilinx` for `xc7k480tffg1156-1`, the
+production XDC, seed 15, and a 30 MHz target.  The process aborted before
+packing with `std::out_of_range` (`__n (which is 12595) >= this->size() (which
+is 0)`); console SHA-256 is
+`533ee3d1b74e8ceeeb931b15576068c648458477c6e4f6ba1256d551954339be`.  No
+FASM or routed output was produced.  This is a reproducible nextpnr input/
+primitive compatibility crash, not a timing failure; the next investigation
+must compare the emitted primitive JSON with the known-good route and apply
+only the established primitive-compatibility mapping before retrying.
+
 ## XC7 synthesis resource checkpoint
 
 With the CSR memory expanded to logic by `memory_map`, XC7-family synthesis
