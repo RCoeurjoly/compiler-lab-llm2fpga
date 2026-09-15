@@ -524,3 +524,17 @@ expanded to roughly 1 GB and did not produce a stable P&R handoff. It is not an
 accepted RTL/compiler fix. The next implementation step is to integrate the
 complete technology-mapping sequence at the pipeline boundary, then re-run the
 same deterministic P&R gate; no handwritten accelerator logic is implicated.
+
+## Placer-mode comparison
+
+The existing pre-optimized/FF-legalized handoff was also run with the locked
+nextpnr fork's simulated-annealing placer, `--no-route`, `--no-tmdriv`, and
+`--timing-allow-fail` (seed 15, 30 MHz). After 120 seconds it was terminated
+while still performing initial placement, at 9,500 of 222,851 cells; no placed
+JSON or timing result was emitted. The console/log SHA-256 is
+`6739aa391490e2f6fd739fa243bcaea23df324ceeaa632aaa08546e5f2f3a0e8`.
+
+This bounded comparison does not show a viable alternate placer. The current
+backend issue is netlist-placement scale, and the next fix must reduce or
+structure that scale in the compiler-owned mapping sequence without changing
+the model contract.
