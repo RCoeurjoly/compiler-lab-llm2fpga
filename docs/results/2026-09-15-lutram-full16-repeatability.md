@@ -1,0 +1,41 @@
+# Distributed-memory TinyStories-1M simulation and mapping gate
+
+## Functional simulation
+
+The generated artifact in `/tmp/llm2fpga-lutram-full16` was exercised with
+`run_bram_production_sv.py --generation-steps 16`.  The harness performs two
+independent reset/start runs, feeds back the generated token through the
+token-index port, and checks every selected token against the frozen oracle.
+
+Receipt: `production-execution.json` (SHA-256
+`b6be336fde9c607157564f40d73a0c134531478e06b75024c23d90f454b7b533`).
+
+- Status: `passed`.
+- Futil SHA-256: `0d461a1e82b22956a73632d1c49f90704ff2a9838401d419ff1b8fc04a87dfc2`.
+- Generated-SV SHA-256: `3af48b2cb480bbeff3fee1e582b1fc836f8e5cb50b08f235cf3dba7c67758c0e`.
+- Oracle SHA-256: `7c306e8b6e38e94f54a13b8434c6dff720d0cccfb7a9e9c749198f3dde93f74`.
+- Both runs selected the exact sequence
+  `11,612,373,257,1310,2576,3706,20037,13,1375,6151,284,711,2354,287,262`.
+- Both runs completed at `1,972,293,279` simulation cycles.
+
+This is generated-RTL simulation evidence only.  It is not a bitstream,
+timing-closure, or board-inference result.
+
+## Technology-mapping probe
+
+The bounded pre-flatten Yosys flow completed with the XC7 rules:
+
+```text
+read_verilog -sv model.sv; hierarchy -top main -check; proc; opt;
+memory_dff; memory -nomap -nosat -nowiden; memory_bram -rules
+fpga/synthesis/xilinx-xc7-bram-rules.txt; stat
+```
+
+Log SHA-256: `69c02113bef46a97650a73e1c9c7f23f63149cf0171d5c2928cd6676fc576969`.
+The pass created 90 generic `__XILINX_BLOCKRAM_SDP_` cells but left 26
+`$mem_v2` memories unmapped.  The post-flatten probe left all 19 memories
+unmapped (log SHA-256
+`fdec3e5589c6b76ac1d8c67a0d8785a4008c83af9790042985ed2db34203d1de`).
+This establishes the next backend blocker: width/depth-specific rules and an
+explicit distributed-RAM implementation are still needed before resource fit,
+timing, or bitstream generation can be assessed.
