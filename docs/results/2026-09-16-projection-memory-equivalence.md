@@ -59,6 +59,13 @@ An initial Yosys STA invocation is recorded in
 paths because the shell has not undergone Kintex-7 technology mapping; this is
 explicitly not timing closure.
 
+The shell was also technology-mapped with `synth_xilinx -family xc7`. The
+Kintex-7-shaped report is
+`artifacts/diagnostics/llm-ddr3-adapter-shell-xc7.json`: the adapter itself is
+77 FDREs, 81 LUTs (including MUXF7), and no memories; the shell adds one BUFG,
+166 IBUF, and 93 OBUF cells. nextpnr-xilinx timing is still required for a
+device/package-specific result.
+
 This is not yet evidence that the physical UberDDR3 controller, full weight
 image loader, timing closure, or hardware inference works. The next gate is to
 connect this contract to the validated UberDDR3 user port and repeat the same
