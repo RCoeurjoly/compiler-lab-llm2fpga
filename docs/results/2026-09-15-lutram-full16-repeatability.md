@@ -311,6 +311,24 @@ primitive-mapped JSON or timing result, so it is not a fit or bitstream claim.
 The next implementation step is to apply the same partition through a
 compiler-owned, restartable mapping stage and then rerun native-E1 packing.
 
+### Reproducible partitioned-core checkpoint
+
+The repository `run_bram_production_sv.py` path was updated to select the
+validated immutable projection-code ROMs and token-scale banks for distributed
+RAM. A fresh Nix run generated `model.sv` (SHA-256
+`a7c658626a94cf21e766872bdbe589783b5f256851cbf571ceefb25563903d7a`) and
+passed two independent exact two-token simulations, both selecting `11, 612`
+at cycles `92,936,273` and `185,872,553`.
+
+The integrated YPCB-top memory pass completed with no remaining `$mem_v2`
+memories. Its RTLIL handoff (SHA-256
+`b7a8b3b248b6d2e4dd49c1aeed7eb4db08b1709225d9aa437d318d6bd446d582`)
+contains 55 generic block-RAM cells and 7,738 distributed-RAM cells. This is a
+substantial capacity reduction relative to the 1,029-native-BRAM candidate,
+but it is not yet a native-E1 JSON or placement result: serialization still
+needs the established FDCE/Xilinx-library compatibility stage before nextpnr
+can be run.
+
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
 produced a flattened hardware RTLIL checkpoint (`no-bscan-flat.il`, SHA-256
 `b91abccbafee098fdbffbf31a5443494f2d7729e3b73c13ed2a291b6bd7e9bde`).  Direct
