@@ -68,6 +68,11 @@ written, read twice, and boundary lines reread. This is the physical
 covers 16 logical requests. See
 `artifacts/diagnostics/tinystories-1m-q-uberddr3-replay-770.json`.
 
+`rtl/memory/llm_q_uberddr3_probe.sv` now connects the logical adapter directly
+to `ddr3_top` using the same profile and Wishbone mapping. Its controller RTL
+is suitable for the next device-mapped synthesis step; primitive-model linting
+requires the UberDDR3 simulation macro set and is not claimed here.
+
 An initial Yosys STA invocation is recorded in
 `artifacts/diagnostics/llm-ddr3-adapter-shell-sta.json`. It reports no timing
 paths because the shell has not undergone Kintex-7 technology mapping; this is
