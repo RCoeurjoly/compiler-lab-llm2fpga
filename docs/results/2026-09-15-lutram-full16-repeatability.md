@@ -538,3 +538,25 @@ This bounded comparison does not show a viable alternate placer. The current
 backend issue is netlist-placement scale, and the next fix must reduce or
 structure that scale in the compiler-owned mapping sequence without changing
 the model contract.
+
+## Checkpointed standard XC7 mapping
+
+The repository's standard `synth_xilinx` sequence was then executed as
+restartable checkpoints: `begin:prepare` (RTLIL SHA-256
+`daca78b9a95ed5afc39f0f6503c94fe438e2728505d2ac6cf9c1842e35f8d3d0`),
+sequential legalization (`c2d5bca16f3dc004add2ae4196e3f097f32c2c44fe0382a6f374303887ac9ed7`),
+arithmetic mapping (`de0fe967d902f7ee04761da82468864b27960212d4e7a4d0b5c00e900111d8c7`),
+and memory mapping (`a47684d2142d281bc14a40604651c0ac27d627598c93a8d8dbf5217992cf0c56`).
+The mapping stage completed in about 151 CPU seconds and passed Yosys checks.
+
+After the established RAM64X1S compatibility transform and explicit
+RAM64X1D directions, the locked nextpnr pack-only gate passed. Its handoff
+contains 59,446 LUTs, 16,773 FFs, 4,866 CARRY4s, 253 DSPs, 1,832 RAMB18E1s,
+and 717 RAMB36E1s. The pack log SHA-256 is
+`d0d43640f88d702ea15b037a5ed679d36177f7534b0b609cb8623a9041c618a2`.
+
+A 300-second placement-only run reached the initial analytical placer with
+31,546 cells but produced no placement result. This is a substantial reduction
+from the earlier 144k/222k-cell handoffs, and establishes a reproducible,
+packable compiler backend checkpoint; placement scalability remains the next
+blocker.
