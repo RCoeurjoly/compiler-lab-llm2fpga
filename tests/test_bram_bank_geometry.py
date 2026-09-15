@@ -7,6 +7,7 @@ from scripts.pipeline.lower_fixed_point_model_bram_production import generate_pr
 
 from scripts.pipeline.lower_fixed_point_model_to_calyx import (
     bram_bank_plan,
+    projection_weight_bank_plan,
     alias_runtime_memories,
     narrow_source_memory_words,
     narrow_runtime_memory_words,
@@ -14,6 +15,15 @@ from scripts.pipeline.lower_fixed_point_model_to_calyx import (
 
 
 class BramBankGeometryTests(unittest.TestCase):
+    def test_projection_bank_contract_is_explicit_and_layer_preserving(self):
+        plan = projection_weight_bank_plan()
+        self.assertEqual(plan["c_fc_weight_codes_i8"]["layers"], 8)
+        self.assertEqual(plan["c_fc_weight_codes_i8"]["local_words"], 16384)
+        self.assertEqual(plan["c_fc_weight_codes_i8"]["bank_shift"], 14)
+        self.assertEqual(plan["q_weight_codes_i8"]["local_words"], 4096)
+        self.assertEqual(plan["q_weight_codes_i8"]["bank_shift"], 12)
+        self.assertTrue(all(item["address_mapping"].startswith("model_layer_bank") for item in plan.values()))
+
     def test_wide_non_power_depth_is_banked_into_legal_ram_shapes(self):
         plan = bram_bank_plan(64, 1280)
         self.assertEqual(plan["banks"], 3)

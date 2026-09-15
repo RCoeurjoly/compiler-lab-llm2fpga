@@ -346,6 +346,34 @@ def bram_bank_plan(width: int, count: int) -> dict[str, int]:
     raise ValueError(f"memory width {width} exceeds RAMB36E1 72-bit lane")
 
 
+def projection_weight_bank_plan() -> dict[str, dict[str, int | str]]:
+    """Describe the explicit layer-bank geometry for projection code memories.
+
+    The generated Calyx currently uses a logical layer-prefixed memory.  Keep
+    this contract in the compiler so a physical-memory pass can materialize
+    banks without guessing tensor dimensions or changing address semantics.
+    ``local_words`` is the per-layer table depth; ``bank_shift`` is the number
+    of low address bits retained inside each layer bank.
+    """
+    geometry = {
+        "q_weight_codes_i8": 4096,
+        "k_weight_codes_i8": 4096,
+        "v_weight_codes_i8": 4096,
+        "out_weight_codes_i8": 4096,
+        "c_fc_weight_codes_i8": 16384,
+        "c_proj_weight_codes_i8": 16384,
+    }
+    return {
+        name: {
+            "layers": 8,
+            "local_words": words,
+            "bank_shift": words.bit_length() - 1,
+            "address_mapping": "model_layer_bank:local_weight_address",
+        }
+        for name, words in geometry.items()
+    }
+
+
 def alias_runtime_memories(futil: str, aliases: dict[str, str]) -> str:
     """Coalesce explicitly non-overlapping runtime memories in generated Futil.
 
@@ -1176,6 +1204,7 @@ import "primitives/memories/seq.futil";
         "claims": {"compiler_owned_control": True, "existing_arithmetic_generators_modified": production, "simulation_checkpoints": bool(audit_checkpoints), "sv_execution_verified": False, "board_executed": False, "board_fit_verified": False},
         "production_memory_contract": {"audit_checkpoint_memories": [] if production else ["model_embedding", "model_token_embedding", "model_position_embedding", "model_block_outputs", "model_final_ln", "model_logits"], "full_logits_storage": not production, "streamed_argmax": True},
         "runtime_bram_bank_plan": runtime_bram_plan,
+        "projection_weight_bank_plan": projection_weight_bank_plan(),
     }
     provenance["schedule"]["generation_steps"] = generation_steps
     provenance["schedule"]["real_context_lengths"] = list(geometry.real_context_lengths)
