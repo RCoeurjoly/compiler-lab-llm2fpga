@@ -132,6 +132,15 @@ memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
 
+## ABC9 backend diagnostic
+
+Replacing the default ABC pass with Yosys `synth_xilinx -abc9` did not improve
+the bounded result: synthesis from `flatten-optfast.il` also reached the
+300-second timeout (exit status 124), with no JSON emitted (log SHA-256
+`97efecc3086ef2fa1c635368899f4074dcdf4b3e9b0e52b0e319e1430457e4e9`).  The
+runtime problem therefore persists across both available combinational
+optimization backends.
+
 ## Post-flatten optimization checkpoint
 
 Running `opt -fast; opt_clean` after flattening reduced the RTLIL from
