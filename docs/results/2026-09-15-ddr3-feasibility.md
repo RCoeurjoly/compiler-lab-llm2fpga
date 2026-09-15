@@ -52,6 +52,14 @@ bandwidth or latency threshold is assumed; the eventual decision is whether
 the measured implementation is functionally correct and reasonable for the
 inference workflow.
 
+The run-length model gives 85,217,536 external requests with no cache. With
+eight-word sequential bursts, the same logical schedule requires 10,652,192
+burst requests. A 1,024-word cache does not retain a projection table until
+its next context-row reuse (the measured schedule distance is 393,216 words),
+so this simple cache has the same request count as burst prefetch. These are
+request-count estimates only; they are not substituted for measured DDR3
+latency or bandwidth.
+
 ## Reproduction
 
 ```text

@@ -172,6 +172,20 @@ def analyze(steps: int, burst_words: int = 8) -> dict[str, Any]:
             "maximum_reuse_distance": sum(inputs * outputs for inputs, outputs, _ in PROJECTIONS.values()) * LAYERS,
         })
     stats = {"steps": per_step, "reads_total": sum(x["reads"] for x in per_step), "payload_bytes_total": sum(x["payload_bytes"] for x in per_step)}
+    stats["transport_models"] = {
+        "no_cache": {"requests": stats["reads_total"], "description": "one external request per logical weight word"},
+        "sequential_prefetch": {
+            "requests": sum(x["bursts_if_sequential"] for x in per_step),
+            "burst_words": burst_words,
+            "description": "one request per contiguous burst run",
+        },
+        "small_cache": {
+            "cache_words": 1024,
+            "requests": sum(x["bursts_if_sequential"] for x in per_step),
+            "reuse_distance_words": 393216,
+            "description": "a 1024-word cache cannot retain a projection table until its next context-row reuse",
+        },
+    }
     return {
         "schema": "tinystories-1m-ddr3-feasibility-v1",
         "model": "authenticated-tinystories-1m",
