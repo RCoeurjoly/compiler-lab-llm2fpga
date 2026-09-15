@@ -497,3 +497,18 @@ Yosys's `HAS_SIZE_36` flag. The resulting handoff contains 102 generic
 partitioned result with `HAS_SIZE_36`. This confirms that the flag changes the
 narrow-memory mode selection; native techmapping and packing of this variant
 remain pending, so it is not yet a fit result.
+
+## Project-locked nextpnr recheck
+
+The non-`BSCAN_SIM` compatibility handoff was rerun with the exact
+project-locked `RCoeurjoly/nextpnr-xilinx` stable-backports tool and matching
+Kintex-7 chip database (seed 15, 30 MHz, production XDC). The fork successfully
+packed the BSCAN primitive, MMCM, global clocks, distributed RAM, and BRAM, and
+reported `RAMB18E1` 1,832/1,910 (95%) plus `RAMB36E1` 717/955 (75%). It then
+stopped at placement because 2,262 generic flip-flop cells remained and no
+`$_DFF_PP1_` BELs were available. The log SHA-256 is
+`23fe9bb323fb3e144d48c490f529515373319fb6db4b2652c5cafdb7403053f8`.
+
+This confirms the current blocker is deterministic placement/FF legalization
+in the hardware handoff, not the earlier BRAM assertion and not timing yet.
+No FASM, routed design, or board-test bitstream has been produced.
