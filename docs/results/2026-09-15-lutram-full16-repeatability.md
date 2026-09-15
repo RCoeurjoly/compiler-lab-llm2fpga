@@ -476,3 +476,10 @@ distributed-RAM packing after the single-port LUTRAM compatibility rewrite. It
 then stopped on `Failed to get direction for port 'ADDRA'` for an integrated
 `RAM64M` cell. This is a primitive-definition/port-metadata mismatch in the
 flattened handoff, still before resource-fit or timing measurement.
+
+Adding explicit `port_directions` maps to every generated primitive cell clears
+the direction error. nextpnr then completes I/O, clock, carry, LUT,
+distributed-RAM, and BRAM entry, but aborts in BRAM packing at
+`design_utils.cc:93` (`port.net == nullptr`). This is now a narrower native BRAM
+wiring/ABI issue; no fit or timing result follows until that assertion is
+resolved.
