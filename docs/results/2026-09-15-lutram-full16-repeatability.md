@@ -47,7 +47,10 @@ The generated SV was parsed independently and recorded in
 above).  Its `main` module exposes only `start`, `valid`, `token_index`, four
 16-bit prompt words, `done`, `token_id`, `clk`, and `reset`.  It does not expose
 the streaming `valid/ready` channels expected by the older self-test wrapper,
-nor a YPCB transport port.  Consequently the existing board shell's
-`llm2fpga_tinystories_1m_core` blackbox remains an unconnected integration
-contract; no board top or hardware inference claim follows from this
-simulation artifact.
+nor a YPCB transport port.  The checked-in production top does connect this
+ABI to the JTAG CSR (`rtl/tinystories_1m_ypcb_bram_production_top.sv`); a fresh
+Yosys elaboration of that top plus this generated SV completed successfully
+(log `/tmp/llm2fpga-lutram-full16/top-elaboration.log`, 12,840 cells, two
+submodules).  The separate `tinystories_1m_ypcb_bram_top.sv` remains a
+blackbox contract shell.  Elaboration still does not establish technology
+mapping, timing closure, bitstream validity, or hardware inference.
