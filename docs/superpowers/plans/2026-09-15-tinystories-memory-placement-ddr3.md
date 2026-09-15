@@ -22,6 +22,25 @@
 
 ---
 
+### Task 0: Falsify or support DDR3 feasibility before backend implementation
+
+**Files:**
+- Create: `scripts/analysis/tinystories_ddr3_feasibility.py`
+- Create: `tests/test_tinystories_ddr3_feasibility.py`
+- Create: `docs/results/2026-09-15-ddr3-feasibility.md`
+
+**Interfaces:**
+- Input is the existing BRAM-mode ordered weight-read trace and the validated UberDDR3 profile.
+- Output is a receipt containing reads/token, locality, reuse distance, replay observations, simple prefetch/cache estimates, and measured full-image JTAG load time.
+
+- [ ] **Step 1: Write trace-analysis tests.** Use a deterministic trace to verify read counting, burst-locality calculation, reuse-distance calculation, and load-time accounting.
+- [ ] **Step 2: Extract the real trace.** Instrument the current BRAM compiler simulation at the logical memory boundary; do not invent a synthetic access pattern.
+- [ ] **Step 3: Replay the trace.** Run it against the measured two-lane 333/83.33 MHz UberDDR3 behavior and record no-cache, simple-prefetch, and small-cache observations.
+- [ ] **Step 4: Measure loading.** Time a complete immutable weight-image load over the existing JTAG path and record the image hash before and after readback.
+- [ ] **Step 5: Run a minimal integration probe.** Synthesize a compiler-controller plus DDR3-adapter shell to expose obvious timing/routing pressure before full integration.
+- [ ] **Step 6: Decide.** Mark the result `supported`, `supported-with-prefetch`, or `not-reasonable` based on observed correctness and practical workflow behavior. Do not compare against a preset bandwidth or latency threshold.
+- [ ] **Step 7: Commit.** Commit the feasibility receipt before implementing placement metadata.
+
 ### Task 1: Inventory and freeze the logical-memory baseline
 
 **Files:**

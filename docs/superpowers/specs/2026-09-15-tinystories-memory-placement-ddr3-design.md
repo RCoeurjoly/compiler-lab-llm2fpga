@@ -67,24 +67,29 @@ work and must not be required to establish backend equivalence.
 
 ## Equivalence and acceptance gates
 
-1. **Contract gate:** placement metadata, source hashes, tensor shapes,
+1. **Feasibility gate:** before implementing the complete backend, extract the
+   real BRAM-mode weight-read trace, replay it against the validated UberDDR3
+   configuration, estimate simple prefetch/cache effects, and measure
+   full-image JTAG loading time. These measurements inform whether the result
+   is reasonable; no preset bandwidth or latency target is imposed.
+2. **Contract gate:** placement metadata, source hashes, tensor shapes,
    quantization, address maps, and initialization images are self-hashed and
    reproducible.
-2. **Abstract-memory gate:** a cycle-accurate reference model checks ordered
+3. **Abstract-memory gate:** a cycle-accurate reference model checks ordered
    reads/writes, reset state, latency, and byte/word addressing.
-3. **Standalone DDR3 gate:** the existing UberDDR3 configuration passes its
+4. **Standalone DDR3 gate:** the existing UberDDR3 configuration passes its
    established initialization/BIST/readback protocol without accelerator logic.
-4. **Single-table gate:** one immutable projection table is lowered once to
+5. **Single-table gate:** one immutable projection table is lowered once to
    BRAM and once to DDR3; both produce identical read traces and output hashes
    in simulation.
-5. **Full-image gate:** the complete immutable weight image loads through the
+6. **Full-image gate:** the complete immutable weight image loads through the
    selected transport and readback hashes exactly match the source image.
-6. **Functional gate:** the generated design matches the authenticated
+7. **Functional gate:** the generated design matches the authenticated
    one-token and then exact 16-token simulation references, with the BRAM mode
    remaining a regression.
-7. **Implementation gate:** Yosys and constrained nextpnr-xilinx complete at
+8. **Implementation gate:** Yosys and constrained nextpnr-xilinx complete at
    the declared clocks, with resource and timing reports for both modes.
-8. **Hardware gate:** each mode that reaches hardware is programmed and runs
+9. **Hardware gate:** each mode that reaches hardware is programmed and runs
    three cold-start YPCB trials; token outputs and runtime are recorded. No
    DDR3 success is claimed from simulation alone.
 
@@ -97,5 +102,5 @@ This design does not generalize to arbitrary PyTorch models, change the model
 or arithmetic, add PCIe and DDR3 simultaneously, or replace compiler output
 with copied kev-gpt RTL. Stop and reassess if the single-table equivalence
 gate cannot pass, if the DDR3 adapter cannot preserve ordered semantics, or if
-the serialized schedule is provably bandwidth-bound without a defined cache
-or prefetch transformation.
+the measured implementation is not reasonable for the project’s inference
+workflow. A bandwidth or latency estimate alone is not a failure.
