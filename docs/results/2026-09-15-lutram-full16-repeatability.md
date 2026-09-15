@@ -132,6 +132,17 @@ memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
 
+## Direct ABC checkpoint
+
+Running a single `abc -fast -lut 6` pass on `flatten-optfast.il` completed in
+about 32 seconds and emitted `abc-direct.il` (SHA-256
+`d8666841b5826476ff9dd0e17acddb6ea0b4df22a9f8fd51f29611e102f5d45d`).  This
+confirms that the timeout is concentrated in the full Xilinx fine-stage
+wrapper, not in ABC LUT mapping alone.  The subsequent FF/I/O cell-map
+attempt still exposed the escaped `FDCE` simulation model to JSON, so no valid
+nextpnr handoff was produced; primitive-library blackboxing must be corrected
+before the next placement probe.
+
 ## Staged fine/cell-map timebox
 
 Using Yosys's documented `fine:map_cells` range from the successful coarse and
