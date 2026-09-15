@@ -468,3 +468,11 @@ result contains 1,055 `RAMB36E1`, 14 `RAMB18E1`, 256 `RAM64X1S`, 12 `RAM32M`,
 and 429,287 total cells (including 310,395 LUT1--LUT6 cells).  Yosys emitted
 4,214 unique warnings, so this is resource/elaboration evidence only; no
 device-specific placement, timing, or fit claim follows from it.
+
+## Partitioned native-pack retry
+
+The regenerated partitioned handoff passed nextpnr I/O, clock, carry, LUT, and
+distributed-RAM packing after the single-port LUTRAM compatibility rewrite. It
+then stopped on `Failed to get direction for port 'ADDRA'` for an integrated
+`RAM64M` cell. This is a primitive-definition/port-metadata mismatch in the
+flattened handoff, still before resource-fit or timing measurement.
