@@ -29,5 +29,6 @@ bram $__XILINX_BLOCKRAM_SDP_
   clkpol 1 1
 endbram
 match $__XILINX_BLOCKRAM_SDP_
+  attribute ram_style=block
   max waste 100000000
 endmatch

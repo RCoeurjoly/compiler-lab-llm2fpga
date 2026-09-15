@@ -19,6 +19,17 @@ LUTRAM_MEMORIES = {
     "attention_context_q16_16", "attention_residual_q16_16",
     "block_input_q16_16", "block_output_q16_16", "ln1_output_q16_16",
     "ln2_output_q16_16", "final_output_q16_16",
+    # These are single-consumer, transient working buffers.  Keeping them in
+    # distributed RAM avoids spending a whole RAMB36 on each 1,280-word
+    # activation while leaving immutable model weights in block RAM.
+    "q_input_codes_i8", "q_input_q16_16", "q_accumulator_i64",
+    "q_output_q16_16", "k_input_q16_16", "k_output_q16_16",
+    "v_input_q16_16", "v_output_q16_16", "out_input_q16_16",
+    "out_output_q16_16", "c_fc_input_codes_i8", "c_fc_input_q16_16",
+    "c_proj_input_q16_16", "c_proj_output_q16_16",
+    "attention_score_q8", "attention_delta_q8", "attention_exp_q1_20",
+    "c_fc_output_codes_i8", "c_fc_output_q16_16",
+    "c_proj_post_weight_rescale_bias_q16_16", "lm_input_q16_16",
 }
 
 
@@ -109,7 +120,9 @@ def annotate_bram_memories(source: str) -> str:
         )
         source = source[:end] + "\n\n" + body + source[end:]
         lut_marker = "module seq_mem_d1_lutram #"
-        lut_body = body.replace(marker, lut_marker, 1).replace('  (* ram_style = "block" *)\n', "", 1)
+        lut_body = body.replace(marker, lut_marker, 1).replace(
+            '  (* ram_style = "block" *)\n',
+            '  (* ram_style = "distributed" *)\n', 1)
         source = source.replace(body, body + "\n\n" + lut_body, 1)
     # Match each parameterized instance and inspect its literal SIZE.  This
     # intentionally leaves non-literal/generated forms untouched.
