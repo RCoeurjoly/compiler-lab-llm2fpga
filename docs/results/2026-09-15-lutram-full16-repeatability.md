@@ -54,3 +54,10 @@ Yosys elaboration of that top plus this generated SV completed successfully
 submodules).  The separate `tinystories_1m_ypcb_bram_top.sv` remains a
 blackbox contract shell.  Elaboration still does not establish technology
 mapping, timing closure, bitstream validity, or hardware inference.
+
+The integrated production-top memory-inference pass also completed (log
+`/tmp/llm2fpga-lutram-full16/top-memory-inference.log`, SHA-256
+`cf46e3315d300be1d01956b3ea8b6f1e19a78fcd7f0e4722b32a9a5a4fa84b6b`).  It
+inferred 90 generic XC7 BRAM cells but left 27 `$mem_v2` memories unmapped,
+one more than the standalone core due to CSR integration.  This remains an
+inference diagnostic, not a fit or timing result.
