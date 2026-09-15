@@ -132,6 +132,17 @@ memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
 
+## Alternative synthesis diagnostic
+
+Disabling DSP inference did not make the monolithic path tractable: flattened
+XC7 synthesis with `-nodsp` also hit a 120-second timeout (exit status 124)
+without producing JSON.  The flatten-only checkpoint is already 895 MiB and
+contains approximately 1.37 million RTLIL cells, versus 429,287 cells in the
+hierarchical synthesis report.  This confirms that hierarchy expansion and
+subsequent generic optimization, rather than only DSP inference, dominate the
+cost.  A compiler/backend partitioning or structural sharing solution is
+required before a nextpnr-compatible flat handoff can be generated.
+
 ## DSP-stage timebox
 
 To separate flattening from arithmetic mapping, the flattened RTLIL was run
