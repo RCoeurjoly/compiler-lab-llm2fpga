@@ -633,3 +633,9 @@ placer entry for 114,105 cells, but again emitted no placement checkpoint
 before timeout. This rules out timing-driven scoring as the immediate cause;
 the current obstacle is the analytical placer’s scalability on the generated
 netlist.
+
+The alternate simulated-annealing placer was also tested with the same
+handoff, seed, constraints, and 30 MHz target. Its 300-second bound did not
+reach the annealing phase: initial placement had reached only about 12,500 of
+262,274 cells. It is therefore substantially less suitable for this netlist
+than the heap placer and does not provide a placement or timing result.
