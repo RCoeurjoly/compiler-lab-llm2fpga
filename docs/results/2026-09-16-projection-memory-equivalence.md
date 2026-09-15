@@ -62,6 +62,12 @@ the controller/model path, but is not yet the exhaustive 4354-request gate.
 A 32-transaction replay (16 contiguous lines written and read back) also
 passed; see `artifacts/diagnostics/tinystories-1m-q-uberddr3-replay-32.json`.
 
+The full physical-line replay then passed 770 transactions: all 256 lines were
+written, read twice, and boundary lines reread. This is the physical
+128-bit-line realization of the 4354 logical-byte trace; each returned line
+covers 16 logical requests. See
+`artifacts/diagnostics/tinystories-1m-q-uberddr3-replay-770.json`.
+
 An initial Yosys STA invocation is recorded in
 `artifacts/diagnostics/llm-ddr3-adapter-shell-sta.json`. It reports no timing
 paths because the shell has not undergone Kintex-7 technology mapping; this is
