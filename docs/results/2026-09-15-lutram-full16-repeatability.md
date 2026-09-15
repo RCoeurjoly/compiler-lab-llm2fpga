@@ -166,6 +166,13 @@ timing report, or FASM before it was stopped. Its console is retained at
 implementation gate therefore remains blocked on placement runtime/resource
 pressure, not on simulation or netlist legality.
 
+For comparison, the alternate `--placer sa` mode with the same device,
+constraints, frequency, seed, and `--no-route` did not reach the main placer
+within the bounded observation window: it was still placing the initial
+222,851-cell population (1,500 cells reported) when stopped.  This rules out
+that placer as an immediate runtime improvement; the default heap placer
+remains the reference backend configuration.
+
 ## Hardware-top nextpnr progression
 
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
