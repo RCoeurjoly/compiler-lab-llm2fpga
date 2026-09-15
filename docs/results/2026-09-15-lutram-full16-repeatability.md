@@ -483,3 +483,10 @@ distributed-RAM, and BRAM entry, but aborts in BRAM packing at
 `design_utils.cc:93` (`port.net == nullptr`). This is now a narrower native BRAM
 wiring/ABI issue; no fit or timing result follows until that assertion is
 resolved.
+
+As a bounded diagnostic, the integrated memory mapping was repeated without
+Yosys's `HAS_SIZE_36` flag. The resulting handoff contains 102 generic
+`__XILINX_BLOCKRAM_TDP_` cells and 7,738 LUTRAM cells, versus the 55/7,738
+partitioned result with `HAS_SIZE_36`. This confirms that the flag changes the
+narrow-memory mode selection; native techmapping and packing of this variant
+remain pending, so it is not yet a fit result.
