@@ -184,6 +184,17 @@ console is retained at
 does not improve the implementation path; the existing fast-ABC JSON remains
 the only placement input with a successful pack checkpoint.
 
+## Pre-mapping optimization and FF legalization
+
+Applying `opt -fast; opt_clean` before device mapping produced a 33.6 MB
+RTLIL checkpoint (`no-bscan-preopt.il`). Mapping it with the pinned XC7
+arithmetic/LUT rules and explicit DFF/DFFE/SDFFE legalization, followed by the
+compatibility map, produced `no-bscan-preopt-fflegal.json` (SHA-256
+`d4ab5db003bf8f258bd9c14f8d594e08779a4e210fdbd35d19d23f674c85773f`). Its
+inventory has 18,028 FDRE, 11,342 INV, 7,583 CARRY4, 1,832 RAMB18E1, and
+717 RAMB36E1, with no residual generic flip-flop cells. This is a valid
+nextpnr handoff candidate; placement and timing remain unproven.
+
 ## Hardware-top nextpnr progression
 
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries

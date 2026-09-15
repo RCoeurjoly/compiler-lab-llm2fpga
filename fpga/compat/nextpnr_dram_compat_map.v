@@ -46,10 +46,48 @@ module \$_DFF_PP1_ (input D, C, output Q);
   wire _TECHMAP_REMOVEINIT_Q_ = 1;
 endmodule
 
+// The generated netlist can contain a positive-clock, negative-reset
+// synchronous-enable FF.  ff_map.v has no PN0P template; realize the same
+// polarity explicitly with an inverted reset and an always-enabled FDRE.
+module \$_SDFFE_PN0P_ (input D, C, E, R, output Q);
+  wire reset_active_high = ~R;
+  FDRE #(.INIT(1'b0)) _TECHMAP_REPLACE_(
+    .D(D), .Q(Q), .C(C), .CE(E), .R(reset_active_high));
+  wire _TECHMAP_REMOVEINIT_Q_ = 1;
+endmodule
+
 module \$_NOT_ (input A, output Y);
   INV _TECHMAP_REPLACE_ (.I(A), .O(Y));
 endmodule
 
-module \$logic_and (input A, B, output Y);
-  LUT2 #(.INIT(4'h8)) _TECHMAP_REPLACE_ (.I0(A), .I1(B), .O(Y));
+// Xilinx simulation-library expressions can survive as a `$not` cell after
+// the standard maps; lower it to the same single-input primitive.
+module \$not #(
+    parameter integer A_WIDTH = 1,
+    parameter integer Y_WIDTH = 1,
+    parameter integer A_SIGNED = 0
+) (input [A_WIDTH-1:0] A, output [Y_WIDTH-1:0] Y);
+  genvar i;
+  generate
+    for (i = 0; i < Y_WIDTH; i = i + 1) begin : gen_inv
+      INV _TECHMAP_REPLACE_ (.I(A[i]), .O(Y[i]));
+    end
+  endgenerate
+endmodule
+
+module \$logic_and #(
+    parameter integer A_WIDTH = 1,
+    parameter integer B_WIDTH = 1,
+    parameter integer Y_WIDTH = 1,
+    parameter integer A_SIGNED = 0,
+    parameter integer B_SIGNED = 0
+) (input [A_WIDTH-1:0] A, input [B_WIDTH-1:0] B,
+   output [Y_WIDTH-1:0] Y);
+  genvar i;
+  generate
+    for (i = 0; i < Y_WIDTH; i = i + 1) begin : gen_and
+      LUT2 #(.INIT(4'h8)) _TECHMAP_REPLACE_ (
+        .I0(A[i]), .I1(B[i]), .O(Y[i]));
+    end
+  endgenerate
 endmodule
