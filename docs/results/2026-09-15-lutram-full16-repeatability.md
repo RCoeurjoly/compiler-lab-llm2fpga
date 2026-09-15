@@ -173,6 +173,17 @@ within the bounded observation window: it was still placing the initial
 that placer as an immediate runtime improvement; the default heap placer
 remains the reference backend configuration.
 
+## Quality-ABC negative control
+
+A bounded comparison replaced `abc -fast` with the pinned quality-oriented
+`abc -lut 6` script while keeping the same flattened RTL and final mapping
+steps.  It did not emit a JSON handoff within the observation window and was
+stopped while still producing repeated BRAM-port resize diagnostics.  The
+console is retained at
+`/tmp/llm2fpga-integrated-map/no-bscan-quality-yosys.console`.  This experiment
+does not improve the implementation path; the existing fast-ABC JSON remains
+the only placement input with a successful pack checkpoint.
+
 ## Hardware-top nextpnr progression
 
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
