@@ -1,0 +1,19 @@
+{
+  "schema": "llm-ddr3-adapter-simulation-v1",
+  "status": "pass",
+  "command": "nix develop -c verilator --binary -Wno-fatal --top-module llm_ddr3_adapter_tb rtl/memory/llm_memory_if.sv rtl/memory/llm_ddr3_adapter.sv rtl/memory/llm_ddr3_adapter_shell.sv tests/rtl/llm_ddr3_adapter_tb.sv -o llm_ddr3_adapter_tb",
+  "result_marker": "LLM_DDR3_ADAPTER_PASS",
+  "tool": "Verilator 5.022",
+  "sources": {
+    "adapter": "27a302852b012abcb8383d0627aae13c61657e2465ab58d34ccc2d03e41e309d",
+    "shell": "224c79a10db451c869cbb62bb67813816a87c6abb3094c2f4b1836a48f185b39",
+    "testbench": "524749346c94faf8c0727c3d0d75dfd7e35aa83e9fd14b6fdd61cb5f96b56696"
+  },
+  "claims": {
+    "reset_and_two_reads": true,
+    "logical_address_returned": true,
+    "byte_lane_selection": true,
+    "physical_uberddr3_model": false,
+    "full_model_inference": false
+  }
+}

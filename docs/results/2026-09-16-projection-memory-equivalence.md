@@ -42,6 +42,9 @@ the adapter (six enabled state registers, mux/compare/shift logic), with no
 memories or unresolved submodules. The structural receipt is
 `artifacts/diagnostics/llm-ddr3-adapter-shell-yosys.json`.
 
+The same shell passed a Verilator reset/two-read handshake test; its receipt is
+`artifacts/diagnostics/llm-ddr3-adapter-sim.json`.
+
 This is not yet evidence that the physical UberDDR3 controller, full weight
 image loader, timing closure, or hardware inference works. The next gate is to
 connect this contract to the validated UberDDR3 user port and repeat the same
