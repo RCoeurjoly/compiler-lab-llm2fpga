@@ -219,6 +219,35 @@ observation, not a successful route.
 
 ## Hardware-top nextpnr progression
 
+### Flat Calyx emission: pack/place/route checkpoint
+
+The authenticated `model.futil` was re-emitted with pinned Calyx 0.7.1 using
+the non-nested Verilog backend and `--disable-verify` (the latter suppresses
+backend-only `$fatal` checks that are not synthesizable by this Yosys flow).
+This is an experimental compiler emission, not yet a functional replacement:
+its generated SV has not completed the exact 16-token simulation gate.
+
+The generated SV SHA-256 is
+`c6426efd5750959916359670dc60fd2b04ae7282288de708937cda32624daf58`.
+After integrating the production YPCB top and applying the existing pinned
+Yosys XC7/LUTRAM/FF compatibility sequence, the JSON handoff SHA-256 is
+`2024b689755d5a09b29a029e9c1fed0e632ae75871a33d4b99f92576d17f52e4`.
+Unlike the earlier nested handoff, this candidate packs and places promptly:
+nextpnr reports 70,889 `SLICE_LUTX` (11%), 6,226 `SLICE_FFX` (1%), 1,534
+`CARRY4`, no BRAM/DSP, one BSCAN, and one MMCM.
+
+Full routing completed with zero unrouted nets, but the implementation gate
+failed timing.  The final routed report gives `accelerator_clk` a maximum
+frequency of 11.42 MHz against the required 30 MHz; CSR scan clocks pass.
+The retained console SHA-256 is
+`208b043ec5eb59cd224c1fee1021a5a787ba97b2141f8d1c467829c82ea848dd`.
+The emitted FASM is therefore not an accepted bitstream: the nextpnr process
+exited nonzero after reporting the timing error.  The first critical path is
+start/control fanout into the generated FSM guards (about 21.6 ns logic and
+65.9 ns routing), providing an evidenced target for the next compiler/backend
+optimization.  No board programming or hardware inference has been attempted
+from this candidate.
+
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
 produced a flattened hardware RTLIL checkpoint (`no-bscan-flat.il`, SHA-256
 `b91abccbafee098fdbffbf31a5443494f2d7729e3b73c13ed2a291b6bd7e9bde`).  Direct
