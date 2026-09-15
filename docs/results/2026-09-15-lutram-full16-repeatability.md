@@ -560,3 +560,9 @@ A 300-second placement-only run reached the initial analytical placer with
 from the earlier 144k/222k-cell handoffs, and establishes a reproducible,
 packable compiler backend checkpoint; placement scalability remains the next
 blocker.
+
+The pack-only gate was repeated with the same handoff, tool, XDC, seed, and
+30 MHz target. It passed with the identical checksum (`0x03a8ffc8`), resource
+counts, and log SHA-256 `d0d43640f88d702ea15b037a5ed679d36177f7534b0b609cb8623a9041c618a2`.
+This establishes deterministic mapping/packing; placement remains the only
+backend gate not reached.
