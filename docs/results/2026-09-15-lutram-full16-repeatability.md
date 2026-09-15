@@ -71,3 +71,21 @@ are `memory-nodff.log` (SHA-256
 `db37e1cdc6c5ce35f735bca867ad6a16f4491cec67f3e4f8e1d84a3a4cbec5c6`).
 Pass ordering is therefore ruled out as the cause of failed read-port
 mapping.
+
+## Combined BRAM/LUTRAM mapping breakthrough
+
+Yosys 0.66 `memory_libmap` succeeds when the pinned BRAM and LUTRAM libraries
+are supplied together:
+
+```text
+memory_libmap -lib +/xilinx/brams_xc4v.txt -D HAS_SIZE_36 -D HAS_CASCADE
+  -D HAS_MIXWIDTH_SDP -lib +/xilinx/lutrams_xc5v.txt
+```
+
+The resulting standalone design has no remaining `$mem_v2` cells.  Its final
+statistics contain 957 block-RAM cells (22 SDP and 935 TDP), 10,308 LUTRAM
+cells (10,260 SDP and 48 SP), and no unmapped memories.  The diagnostic log is
+`/tmp/llm2fpga-lutram-full16/combined-libmap.log` (SHA-256
+`250be62e5d2ae87a299ef3691ecef0e3e382cc16a59a7811e56a34815df66aa6`).  This
+is a mapping result only; synthesis, placement, timing, and bitstream
+generation remain to be run.
