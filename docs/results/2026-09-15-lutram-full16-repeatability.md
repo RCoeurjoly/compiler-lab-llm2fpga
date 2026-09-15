@@ -293,6 +293,24 @@ FSM state register to 407 bits but leaves the memory footprint unchanged:
 nextpnr still reports 1,029/955 `RAMB36E1` (107%).  Thus control encoding alone
 does not resolve the fit frontier.
 
+### BRAM consumer inventory
+
+The native-E1 JSON handoff was grouped by logical memory name before attempting
+another placement run. It contains 1,035 BRAM primitives (1,029 `RAMB36E1` and
+6 `RAMB18E1`). The dominant consumer is the token-weight code banks (852
+primitives); transformer working/state memories account for 70, activation and
+attention tables 36, scales 35, and biases 6. This identifies memory placement,
+not FSM encoding, as the primary fit problem: at least 74 `RAMB36E1` equivalents
+must be removed to get below the 955-device Kintex limit.
+
+A bounded RTLIL experiment forced the annotated small scale/bias/LUT tables to
+`ram_style=distributed`. The mapping log contained 134 block-RAM and 27
+distributed-RAM mappings, versus 251 and 25 respectively in the unpartitioned
+probe. This is only a partition diagnostic: it did not yet produce a complete
+primitive-mapped JSON or timing result, so it is not a fit or bitstream claim.
+The next implementation step is to apply the same partition through a
+compiler-owned, restartable mapping stage and then rerun native-E1 packing.
+
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
 produced a flattened hardware RTLIL checkpoint (`no-bscan-flat.il`, SHA-256
 `b91abccbafee098fdbffbf31a5443494f2d7729e3b73c13ed2a291b6bd7e9bde`).  Direct
