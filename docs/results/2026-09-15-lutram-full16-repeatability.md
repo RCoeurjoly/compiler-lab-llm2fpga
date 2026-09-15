@@ -105,3 +105,18 @@ techmap output carries its required XC7 primitive declarations.  The stage
 reported only port-width resize warnings while adapting generic BRAM
 templates.  This remains pre-placement and pre-timing, and the integrated
 production-top wrapper has not yet been passed through this exact sequence.
+
+## Integrated production-top mapping retry
+
+After the host interruption, the integrated pass was rerun from the durable
+checked-in generated RTL (`result-compiler-top-30mhz-20260908/model.sv`,
+SHA-256 `cf3c83638502769966e5c26efaff7c4ec08ee1f73ad03764b45b3980b862b3ad`).
+The production top, JTAG CSR, and generated core were processed together with
+the same combined BRAM/LUTRAM `memory_libmap` recipe. Yosys completed with exit
+status 0 and emitted `integrated-mapped.il` (SHA-256
+`9a107e9a0d319cc6f9802761b0a6559481ed3771d129db0a87229673661761eb`).
+
+One `$mem_v2` remains for the CSR `prompt_words` storage; the generated-core
+memories are mapped. This is a successful integrated mapping checkpoint, not
+yet synthesis, placement, timing closure, bitstream generation, or hardware
+inference.
