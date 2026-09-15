@@ -45,3 +45,11 @@ module \$_DFF_PP1_ (input D, C, output Q);
     .D(D), .Q(Q), .C(C), .CE(1'b1), .S(1'b0));
   wire _TECHMAP_REMOVEINIT_Q_ = 1;
 endmodule
+
+module \$_NOT_ (input A, output Y);
+  INV _TECHMAP_REPLACE_ (.I(A), .O(Y));
+endmodule
+
+module \$logic_and (input A, B, output Y);
+  LUT2 #(.INIT(4'h8)) _TECHMAP_REPLACE_ (.I0(A), .I1(B), .O(Y));
+endmodule

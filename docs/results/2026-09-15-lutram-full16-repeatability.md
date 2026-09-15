@@ -132,6 +132,24 @@ memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
 
+## Primitive-clean JSON and placement runtime
+
+Applying the fine arithmetic legalization before the final LUT/FF maps, then
+the compatibility map and standard whitebox conversion, produced
+`no-bscan-prim2.json` (SHA-256
+`981ec1bf946963f7a9d1b58d5cf2425ef32d1a12dfb53b6c89ef6f9971dd4360`).  Its
+inventory contains 52,957 LUT3, 32,273 LUT6, 18,028 FDRE, 7,583 CARRY4,
+1,832 RAMB18E1, 717 RAMB36E1, and 240 RAM64X1D cells, with no generic
+flip-flop or single-port RAM cells.
+
+Nextpnr accepted this JSON and entered analytical placement after packing all
+constrained I/O, BSCAN, MMCM, clocks, and memories.  It produced no error or
+FASM during observation; the run was terminated after the placer remained in
+the analytical phase for over ten minutes (console SHA-256
+`d1edd35ddf8d0c0b35e08e476a0a2032d24ee8b5f89de032779c519fa4684414`).  This
+is now a placement-runtime/resource-pressure issue rather than a netlist
+compatibility crash.
+
 ## Hardware-top nextpnr progression
 
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
