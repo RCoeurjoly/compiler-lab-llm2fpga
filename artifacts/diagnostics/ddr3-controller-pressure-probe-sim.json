@@ -1,0 +1,16 @@
+{
+  "schema": "ddr3-controller-pressure-probe-sim-v1",
+  "status": "passed",
+  "requests": 8,
+  "response_count": 8,
+  "cycles": 46,
+  "ack_model": "one-cycle delayed accept, deterministic ordered responses",
+  "sources": {
+    "controller_probe_sha256": "493e2a961d1ecb4ba527a53dc9e62cc7ce31cbe5d0bab567aab0741881335fdd",
+    "adapter_sha256": "e597a2d58b9643c5e792d4254b6867ee72b1b1a4274736a7afc754c9c8ab34bb",
+    "testbench_sha256": "752dddd123b674a84ebb973b74632eaf9681dad336564671e16544cfaf647e6a"
+  },
+  "tool": "Icarus Verilog via nixpkgs",
+  "hardware_measurement": false,
+  "inference_claim": false
+}

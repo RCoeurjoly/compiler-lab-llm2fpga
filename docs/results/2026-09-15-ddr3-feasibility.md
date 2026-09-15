@@ -81,6 +81,13 @@ serialized service-time estimates: approximately 1.02 s (no-cache) or 0.128 s
 schedule. These estimates exclude compute, overlap, arbitration, and startup;
 they are a feasibility bound, not an inference result.
 
+The controller/adapter shell also passes a bounded RTL handshake simulation:
+eight deterministic sequential requests complete with eight ordered responses
+in 46 cycles under a one-cycle delayed-accept behavioral model. The receipt is
+`artifacts/diagnostics/ddr3-controller-pressure-probe-sim.json`. This validates
+the shell’s request/response accounting only; the behavioral model is not a
+substitute for the UberDDR3 controller or board.
+
 ## Reproduction
 
 ```text
