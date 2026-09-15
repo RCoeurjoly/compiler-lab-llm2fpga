@@ -1,0 +1,28 @@
+{
+  "schema": "tinystories-1m-q-uberddr3-binding-v1",
+  "status": "static_contract_pass",
+  "profile": {
+    "byte_lanes": 2,
+    "ddr3_clock_mhz": 333.333,
+    "controller_clock_mhz": 83.333,
+    "data_width_bits": 128,
+    "wishbone_address_unit": "16-byte burst word",
+    "bist_mode": 2
+  },
+  "mapping": {
+    "logical_address_unit": "byte",
+    "adapter_shift": 4,
+    "lane_select": "one-hot byte select",
+    "response_order": "single outstanding request"
+  },
+  "sources": {
+    "uberddr3_top_v": "a357b6abe477bc8772e0e4932e807c4ab7a4a0f519c1bbe5259801bfc5563587",
+    "uberddr3_controller_v": "8ffc4e88d3c2be02c6c5f21dd058db6e5d904be723c392da5b2aa10b5e10f1b3",
+    "measured_profile": "a78d5c3841d50f3761f7a588095e9d067744fee8645847818dd947bfebf37dd3"
+  },
+  "claims": {
+    "port_width_and_address_mapping_match": true,
+    "physical_ddr3_readback": false,
+    "full_model_inference": false
+  }
+}

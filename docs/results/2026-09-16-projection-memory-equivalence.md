@@ -45,6 +45,10 @@ memories or unresolved submodules. The structural receipt is
 The same shell passed a Verilator reset/two-read handshake test; its receipt is
 `artifacts/diagnostics/llm-ddr3-adapter-sim.json`.
 
+The adapter's 128-bit/16-byte address and lane mapping is statically bound to
+the measured two-lane UberDDR3 source/profile in
+`artifacts/diagnostics/tinystories-1m-q-uberddr3-binding.json`.
+
 This is not yet evidence that the physical UberDDR3 controller, full weight
 image loader, timing closure, or hardware inference works. The next gate is to
 connect this contract to the validated UberDDR3 user port and repeat the same
