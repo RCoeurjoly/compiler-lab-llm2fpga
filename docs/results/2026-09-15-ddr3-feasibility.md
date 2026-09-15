@@ -88,6 +88,12 @@ in 46 cycles under a one-cycle delayed-accept behavioral model. The receipt is
 the shell’s request/response accounting only; the behavioral model is not a
 substitute for the UberDDR3 controller or board.
 
+An attempted replay through UberDDR3’s built-in Icarus `+replay_trace` hook did
+not reach its `DONE_CALIBRATE` gate, so it produced no replay pass or latency
+measurement. This is recorded as an inconclusive calibration wait in
+`artifacts/diagnostics/uberddr3-bounded-replay-attempt.json`; it is not treated
+as either DDR3 failure or success.
+
 ## Reproduction
 
 ```text

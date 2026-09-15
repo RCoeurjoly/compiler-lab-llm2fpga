@@ -1,0 +1,15 @@
+{
+  "schema": "uberddr3-bounded-replay-attempt-v1",
+  "status": "inconclusive_calibration_wait",
+  "trace": {
+    "path": "artifacts/diagnostics/uberddr3-bounded-replay.trace",
+    "sha256": "7399fc59f5c87101b6ac4ba57e8bc11032826b6470ee6efaa740e0c2e8c4c96a",
+    "transactions": 4
+  },
+  "command": "./sim_icarus.sh +replay_trace=artifacts/diagnostics/uberddr3-bounded-replay.trace",
+  "observed": "The UberDDR3 Icarus testbench emitted PHY/DRAM traces but did not reach its DONE_CALIBRATE replay gate; no replay pass or latency result was produced.",
+  "captured_output_sha256": "403ed5741b3661388f1ab77f99d9107bc2a49eedf8c7571d1e09f4debcde3fc4",
+  "classification": "undecided",
+  "hardware_measurement": false,
+  "inference_claim": false
+}
