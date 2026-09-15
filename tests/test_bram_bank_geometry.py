@@ -40,6 +40,12 @@ class BramBankGeometryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pack_int8_words([1, 2, 3, 4], 3)
 
+    def test_projection_row_major_stream_survives_four_lane_packing(self):
+        rows = [[-128, -7, 0, 1, 42, 63, 100, 127], [5, -6, 9, -10, 11, -12, 13, -14]]
+        stream = [value for row in rows for value in row]
+        packed = pack_int8_words(stream, 4)
+        self.assertEqual(unpack_int8_words(packed, 4), stream)
+
     def test_projection_bank_contract_is_explicit_and_layer_preserving(self):
         plan = projection_weight_bank_plan()
         self.assertEqual(plan["c_fc_weight_codes_i8"]["layers"], 8)
