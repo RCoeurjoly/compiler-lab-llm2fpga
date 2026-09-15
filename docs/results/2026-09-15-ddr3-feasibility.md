@@ -88,6 +88,14 @@ in 46 cycles under a one-cycle delayed-accept behavioral model. The receipt is
 the shell’s request/response accounting only; the behavioral model is not a
 substitute for the UberDDR3 controller or board.
 
+At the pre-backend decision level, the evidence classifies the access pattern
+as `supported-with-prefetch`: contiguous bursts are strongly favored, while a
+one-request-per-word design is not reasonable as the default architecture.
+This classification is recorded in
+`artifacts/diagnostics/tinystories-1m-ddr3-feasibility-decision.json`; it does
+not waive the full-trace, image-load, routed-timing, or hardware gates listed
+there.
+
 An attempted replay through UberDDR3’s built-in Icarus `+replay_trace` hook did
 not reach its `DONE_CALIBRATE` gate, so it produced no replay pass or latency
 measurement. This is recorded as an inconclusive calibration wait in

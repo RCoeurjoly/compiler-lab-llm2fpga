@@ -1,0 +1,29 @@
+{
+  "schema": "tinystories-1m-ddr3-feasibility-decision-v1",
+  "classification": "supported-with-prefetch",
+  "decision_scope": "pre-backend access-pattern feasibility",
+  "basis": {
+    "schedule_trace_sha256": "533fa153f3c6ec5f08cea652b508f7a3b8f1af5b6c92bf70332ab0714d7ac28c",
+    "full_schedule_logical_reads": 85217536,
+    "full_schedule_sequential_burst_requests": 10652192,
+    "adjacent_locality_fraction_minimum": 0.9998897913830638,
+    "reuse_distance_words": 393216,
+    "uberddr3_profile_replay": "passed",
+    "uberddr3_replay_receipt": "artifacts/diagnostics/uberddr3-bounded-replay-profile.json",
+    "sequential_service_ns_per_request": 12,
+    "random_service_ns_per_request": 49,
+    "serialized_full_schedule_sequential_burst_ns": 127826304,
+    "serialized_full_schedule_random_burst_ns": 521957408
+  },
+  "interpretation": "The exact compiler access pattern is overwhelmingly sequential and is reasonable for UberDDR3 when contiguous accesses are coalesced/prefetched. A no-cache one-request-per-word implementation is not the recommended architecture.",
+  "remaining_gates": [
+    "full BRAM-mode simulator instrumentation or equivalent authenticated ordered trace receipt",
+    "DDR3 image-load/readback protocol and measured full-image JTAG load time",
+    "full schedule replay through the controller model",
+    "routed controller-plus-adapter timing and hardware validation"
+  ],
+  "model_or_arithmetic_changed": false,
+  "complete_ddr3_backend_implemented": false,
+  "hardware_measurement": false,
+  "inference_claim": false
+}
