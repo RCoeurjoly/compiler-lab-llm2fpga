@@ -311,6 +311,15 @@ primitive-mapped JSON or timing result, so it is not a fit or bitstream claim.
 The next implementation step is to apply the same partition through a
 compiler-owned, restartable mapping stage and then rerun native-E1 packing.
 
+The integrated partitioned handoff was flattened and native-techmapped. After
+adding the standard primitive aliases, nextpnr reached constant packing, I/O
+buffer insertion, clock preparation, carry/LUT packing, and distributed-RAM
+packing. The current bounded probe then stops on unsupported `RAM64X1S`/
+`RAM128X1S` cells emitted by the LUTRAM techmap (224 cells total); these are a
+toolchain-compatibility issue, not a fit or timing result. The next repair must
+map these single-port primitives to the supported Kintex dual-port LUTRAM ABI
+while preserving their address/data semantics, then rerun pack-only.
+
 ### Reproducible partitioned-core checkpoint
 
 The repository `run_bram_production_sv.py` path was updated to select the
