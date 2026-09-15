@@ -275,6 +275,12 @@ Kintex database requires `RAMB36E1`.  This is a separate primitive-ABI issue,
 not evidence about the FSM replication timing; no FASM or timing result is
 accepted from this branch.
 
+A JSON-only rename of legacy `RAMB36/RAMB18` cells to `RAMB36E1/RAMB18E1` was
+also attempted as a diagnostic.  Nextpnr aborted during packing with
+`Assertion failure: port.net == nullptr`, showing that the interfaces and/or
+parameterization are not name-compatible.  The rename was discarded and is
+not a compatibility fix.
+
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
 produced a flattened hardware RTLIL checkpoint (`no-bscan-flat.il`, SHA-256
 `b91abccbafee098fdbffbf31a5443494f2d7729e3b73c13ed2a291b6bd7e9bde`).  Direct
