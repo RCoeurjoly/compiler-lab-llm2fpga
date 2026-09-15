@@ -132,6 +132,24 @@ memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
 
+## Hardware-top nextpnr progression
+
+Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
+produced a flattened hardware RTLIL checkpoint (`no-bscan-flat.il`, SHA-256
+`b91abccbafee098fdbffbf31a5443494f2d7729e3b73c13ed2a291b6bd7e9bde`).  Direct
+ABC mapping, final cell mapping, whitebox conversion, and the established RAM
+compatibility rewrite then emitted a clean production JSON
+(`no-bscan-compat.json`, SHA-256
+`c05b27b183427d23f2bc0879d8873e32b2a690824f50f904ac1bba0a137cfce5`).
+
+Nextpnr no longer crashes and successfully packs the clock, BSCAN, MMCM, I/O,
+and memory resources.  Placement stops because 2,262 generic `$_DFF*` cells
+remain, leaving no placeable FF BEL (`Unable to place cell ..., no Bels
+remaining of type '$_DFF_PP1_'`; console SHA-256
+`23fe9bb323fb3e144d48c490f529515373319fb6db4b2652c5cafdb7403053f8`).  This
+is the current implementation blocker; RAM and transport compatibility are
+now past the earlier failure points.
+
 ## Direct ABC checkpoint
 
 Running a single `abc -fast -lut 6` pass on `flatten-optfast.il` completed in
