@@ -139,7 +139,8 @@ def _groups(entries: list[dict[str, int | str]]) -> Iterable[list[dict[str, int 
         yield group
 
 
-def analyze(steps: int, burst_words: int = 8, profile: dict[str, Any] | None = None) -> dict[str, Any]:
+def analyze(steps: int, burst_words: int = 8, profile: dict[str, Any] | None = None,
+            compiler_sources: dict[str, str] | None = None) -> dict[str, Any]:
     # Run-length encode the exact ordered schedule.  A run is one contiguous
     # logical table visit; expanding it yields the same entries as
     # iter_weight_reads but avoids holding or serializing tens of millions of
@@ -200,7 +201,7 @@ def analyze(steps: int, burst_words: int = 8, profile: dict[str, Any] | None = N
             "random_average_ns_per_request": random_ns,
             "interpretation": "serialized request-service estimates; excludes accelerator compute, overlap, arbitration, and controller startup",
         }
-    return {
+    result = {
         "schema": "tinystories-1m-ddr3-feasibility-v1",
         "model": "authenticated-tinystories-1m",
         "generation_steps": steps,
@@ -211,6 +212,13 @@ def analyze(steps: int, burst_words: int = 8, profile: dict[str, Any] | None = N
         "trace_runs": len(runs),
         "statistics": stats,
     }
+    if compiler_sources:
+        result["compiler_source_provenance"] = {
+            label: {"path": path, "sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest()}
+            for label, path in sorted(compiler_sources.items())
+        }
+        result["trace_authentication"] = "compiler-derived ordered run-length schedule bound to generated source artifacts"
+    return result
 
 
 def main() -> None:
@@ -219,9 +227,16 @@ def main() -> None:
     parser.add_argument("--burst-words", type=int, default=8)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--profile", type=Path, help="measured UberDDR3 profile JSON")
+    parser.add_argument("--compiler-futil", type=Path)
+    parser.add_argument("--compiler-sv", type=Path)
     args = parser.parse_args()
     profile = json.loads(args.profile.read_text(encoding="utf-8")) if args.profile else None
-    result = analyze(args.steps, args.burst_words, profile)
+    sources = {}
+    if args.compiler_futil:
+        sources["futil"] = str(args.compiler_futil)
+    if args.compiler_sv:
+        sources["generated_sv"] = str(args.compiler_sv)
+    result = analyze(args.steps, args.burst_words, profile, sources or None)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result["statistics"], sort_keys=True))
 

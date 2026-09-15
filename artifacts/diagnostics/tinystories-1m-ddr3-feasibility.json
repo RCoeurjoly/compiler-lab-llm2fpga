@@ -249,5 +249,16 @@
       "random_average_ns_per_request": 49,
       "interpretation": "serialized request-service estimates; excludes accelerator compute, overlap, arbitration, and controller startup"
     }
-  }
+  },
+  "compiler_source_provenance": {
+    "futil": {
+      "path": "result-compiler-top-30mhz-20260908/model.futil",
+      "sha256": "85352d062b3a57bf2eb02597318cea601787a2949ff0847d99db8b740d58030c"
+    },
+    "generated_sv": {
+      "path": "result-compiler-top-30mhz-20260908/model.sv",
+      "sha256": "cf3c83638502769966e5c26efaff7c4ec08ee1f73ad03764b45b3980b862b3ad"
+    }
+  },
+  "trace_authentication": "compiler-derived ordered run-length schedule bound to generated source artifacts"
 }
