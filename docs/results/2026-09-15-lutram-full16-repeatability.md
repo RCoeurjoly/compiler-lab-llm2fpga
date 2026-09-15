@@ -96,3 +96,12 @@ top-level aggregate contains 967 `RAMB36E1`, 22 `RAMB18E1`, 4 `RAM32M`, and
 3,600 `RAM64M` instances.  This validates the primitive names and gives a
 resource-count checkpoint, but arithmetic cell mapping, placement, timing,
 and bitstream generation remain outstanding.
+
+The subsequent XC7 cell-mapping stage completed and emitted
+`/tmp/llm2fpga-lutram-full16/cells-mapped.il` (SHA-256
+`e153215c07d319d9f9a21503f771cc724ba770237470c759f071ddcbf154f4`).  A fresh
+Yosys readback and hierarchy check passed without additional libraries; the
+techmap output carries its required XC7 primitive declarations.  The stage
+reported only port-width resize warnings while adapting generic BRAM
+templates.  This remains pre-placement and pre-timing, and the integrated
+production-top wrapper has not yet been passed through this exact sequence.
