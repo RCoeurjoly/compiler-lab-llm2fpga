@@ -1,0 +1,27 @@
+{
+  "schema": "uberddr3-bounded-replay-profile-v1",
+  "status": "passed",
+  "configuration": {
+    "controller_period_ps": 12000,
+    "ddr3_period_ps": 3000,
+    "byte_lanes": 2,
+    "odelay_supported": 0,
+    "bus_delay": 0,
+    "bist_mode": 2
+  },
+  "trace_sha256": "7399fc59f5c87101b6ac4ba57e8bc11032826b6470ee6efaa740e0c2e8c4c96a",
+  "transactions": 4,
+  "ordered_replay": "passed",
+  "latency_controller_cycles": [5, 9, 5, 9],
+  "latency_ns": [60, 108, 60, 108],
+  "latency_interpretation": "Icarus model completion latency from replay hook; write/read pairs at two sequential addresses",
+  "sources": {
+    "testbench_sha256": "3b140d26e4b2e0150e972b54e323679b7f4479cd5e120a2d72bd1e3ea5ee06e7",
+    "sim_defines_sha256": "7b3dcb722f3e09b0279ef5d982aaee3deaf0a3246c966b2619726d4eb5d5f331",
+    "dram_parameters_sha256": "3855958320ab6c611b780950259ee447be66a01beb762547c3ecd75e37e40298"
+  },
+  "captured_output_sha256": "55907c2761fe075a835142edc48d959460447ab9f7e3dbed5a3717ec98f6555f",
+  "hardware_measurement": false,
+  "full_schedule_replay": false,
+  "inference_claim": false
+}

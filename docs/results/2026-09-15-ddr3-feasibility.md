@@ -94,6 +94,15 @@ measurement. This is recorded as an inconclusive calibration wait in
 `artifacts/diagnostics/uberddr3-bounded-replay-attempt.json`; it is not treated
 as either DDR3 failure or success.
 
+After restoring the exact validated profile in an isolated testbench copy, the
+same replay hook passed all four ordered transactions. The measured completion
+latencies were 5, 9, 5, and 9 controller cycles (60, 108, 60, and 108 ns at
+83.333 MHz), including write/read pairs at two sequential addresses. The
+provenance receipt is
+`artifacts/diagnostics/uberddr3-bounded-replay-profile.json`. This is direct
+controller-model evidence, but it is still a four-transaction replay rather
+than the complete 85-million-read schedule or board measurement.
+
 ## Reproduction
 
 ```text
