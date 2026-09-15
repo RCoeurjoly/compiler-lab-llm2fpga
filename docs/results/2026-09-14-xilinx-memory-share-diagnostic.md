@@ -84,3 +84,15 @@ represent only 2,314,240 bits of nominal primitive capacity while the source
 design reports 34.8 Mbit of logical memories. This discrepancy shows that
 initialized/constant memory accounting and/or banking duplication is still
 wrong; the 63-cell result must not be treated as a fit estimate.
+
+## Memory-placement probe (2026-09-15)
+
+A temporary generated-SV probe changed 17 transient activation/attention
+instances from `seq_mem_d1_bram` to `seq_mem_d1_lutram` and reran the same
+`memory_bram` rule flow. The result remained 1,022
+`$__XILINX_BLOCKRAM_SDP_` cells. Therefore the current `memory_bram` stage
+does not honor this module-level variant as a placement decision after
+flattening; merely renaming the generated memory primitive cannot recover the
+67-block deficit. A real distributed-RAM pass must act before flattening or
+emit an explicit LUTRAM implementation, then be rechecked for LUT/FF cost and
+functional equivalence.
