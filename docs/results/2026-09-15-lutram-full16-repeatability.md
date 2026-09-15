@@ -201,6 +201,12 @@ the same 1,832/1,910 RAMB18E1 (95%) and 717/955 RAMB36E1 (75%) utilization as
 the earlier candidate.  This removes the residual FF compatibility failure,
 but does not by itself establish placement or routing.
 
+The legalized handoff was also probed with nextpnr's `--placer-budgets` mode
+and routing disabled.  It reached the same initial analytical-placement stage
+with 144,929 cells and produced no placement result in the bounded window.
+Changing placer weighting therefore does not remove the current backend
+scalability bottleneck.
+
 ## Hardware-top nextpnr progression
 
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
