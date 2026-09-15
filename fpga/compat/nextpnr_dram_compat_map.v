@@ -25,3 +25,23 @@ module RAM128X1S(output O, input A0, A1, A2, A3, A4, A5, A6,
       .SPO(O), .DPO(unused_dpo), .D(D), .WCLK(WCLK), .WE(WE),
       .A(addr), .DPRA(addr));
 endmodule
+
+// The pinned Xilinx ff_map intentionally covers only reset/set variants.
+// Lower plain DFFs to the equivalent always-enabled, inactive-reset cells.
+module \$_DFF_P_ (input D, C, output Q);
+  FDRE #(.INIT(1'b0)) _TECHMAP_REPLACE_(
+    .D(D), .Q(Q), .C(C), .CE(1'b1), .R(1'b0));
+  wire _TECHMAP_REMOVEINIT_Q_ = 1;
+endmodule
+
+module \$_DFFE_PP_ (input D, C, E, output Q);
+  FDRE #(.INIT(1'b0)) _TECHMAP_REPLACE_(
+    .D(D), .Q(Q), .C(C), .CE(E), .R(1'b0));
+  wire _TECHMAP_REMOVEINIT_Q_ = 1;
+endmodule
+
+module \$_DFF_PP1_ (input D, C, output Q);
+  FDSE #(.INIT(1'b1)) _TECHMAP_REPLACE_(
+    .D(D), .Q(Q), .C(C), .CE(1'b1), .S(1'b0));
+  wire _TECHMAP_REMOVEINIT_Q_ = 1;
+endmodule
