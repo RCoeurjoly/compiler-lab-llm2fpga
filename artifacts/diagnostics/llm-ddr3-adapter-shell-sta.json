@@ -1,0 +1,14 @@
+{
+  "schema": "llm-ddr3-adapter-shell-sta-v1",
+  "status": "not_actionable_before_technology_mapping",
+  "tool": "Yosys 0.66 STA",
+  "command": "read_verilog -sv ...; hierarchy -top llm_ddr3_adapter_shell; proc; flatten; opt; sta",
+  "result": "No timing paths found",
+  "reason": "The generic RTL still contains unmapped $mux/$pmux/$sdff/$shl cells; no Kintex-7 liberty/technology mapping is available in this shell run.",
+  "resource_receipt": "artifacts/diagnostics/llm-ddr3-adapter-shell-yosys.json",
+  "claims": {
+    "timing_closed": false,
+    "timing_pressure_recorded": true,
+    "physical_kintex7_timing": false
+  }
+}

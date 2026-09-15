@@ -54,6 +54,11 @@ The adapter's 128-bit/16-byte address and lane mapping is statically bound to
 the measured two-lane UberDDR3 source/profile in
 `artifacts/diagnostics/tinystories-1m-q-uberddr3-binding.json`.
 
+An initial Yosys STA invocation is recorded in
+`artifacts/diagnostics/llm-ddr3-adapter-shell-sta.json`. It reports no timing
+paths because the shell has not undergone Kintex-7 technology mapping; this is
+explicitly not timing closure.
+
 This is not yet evidence that the physical UberDDR3 controller, full weight
 image loader, timing closure, or hardware inference works. The next gate is to
 connect this contract to the validated UberDDR3 user port and repeat the same
