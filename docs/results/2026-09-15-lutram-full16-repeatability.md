@@ -639,3 +639,11 @@ handoff, seed, constraints, and 30 MHz target. Its 300-second bound did not
 reach the annealing phase: initial placement had reached only about 12,500 of
 262,274 cells. It is therefore substantially less suitable for this netlist
 than the heap placer and does not provide a placement or timing result.
+
+Finally, a 1,800-second (30-minute) heap-placement bound with timing-driven
+placement disabled reproduced the same outcome. Packing and the four initial
+analytic iterations completed, then the main analytical placer produced no
+placement checkpoint before the bound expired. This confirms that simply
+allowing the current generated netlist more placer time is not a practical
+path; structural reduction or partitioning is required before timing closure
+can be attempted.
