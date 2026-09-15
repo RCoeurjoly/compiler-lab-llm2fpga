@@ -207,6 +207,16 @@ with 144,929 cells and produced no placement result in the bounded window.
 Changing placer weighting therefore does not remove the current backend
 scalability bottleneck.
 
+## Persistent placement timebox
+
+The primitive-clean legalized handoff was run through the complete pinned
+nextpnr invocation with FASM output requested, seed 15, 30 MHz, and the
+production XDC.  After 900 seconds it had produced no FASM or timing report;
+the retained console (SHA-256
+`b6f759bc5d11e86764dc59ad12977f40b4f3af21ff8ae1a056c64db5860fbd91`) ends at
+`Running main analytical placer.`  This is a terminal placement-timeout
+observation, not a successful route.
+
 ## Hardware-top nextpnr progression
 
 Rebuilding without `BSCAN_SIM` and loading both Xilinx primitive libraries
