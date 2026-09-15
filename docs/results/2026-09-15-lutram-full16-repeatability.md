@@ -512,3 +512,15 @@ stopped at placement because 2,262 generic flip-flop cells remained and no
 This confirms the current blocker is deterministic placement/FF legalization
 in the hardware handoff, not the earlier BRAM assertion and not timing yet.
 No FASM, routed design, or board-test bitstream has been produced.
+
+## FF-legalization diagnostic
+
+Applying the standard Xilinx FF techmap to the same compatibility handoff
+removed most generic sequential cells, but exposed additional generic forms
+(`$_DFF*`, then synchronous-reset forms and simple Boolean cells) during
+nextpnr's transforms. A narrowly scoped diagnostic map could advance the
+failure from generic FF placement to generic gate placement, but its JSON
+expanded to roughly 1 GB and did not produce a stable P&R handoff. It is not an
+accepted RTL/compiler fix. The next implementation step is to integrate the
+complete technology-mapping sequence at the pipeline boundary, then re-run the
+same deterministic P&R gate; no handwritten accelerator logic is implicated.
