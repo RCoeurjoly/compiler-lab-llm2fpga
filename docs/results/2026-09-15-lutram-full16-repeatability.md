@@ -578,3 +578,12 @@ but its output still contained generic memory wrappers and was not a P&R
 handoff. Adding the final `map_memory` stage re-entered the known global
 optimization loop and emitted no checkpoint within the bound. This isolates
 the remaining cost to final primitive legalization after selective mapping.
+
+Running the RAM techmap primitives explicitly (`lutrams_xc5v_map.v` followed by
+`brams_xc6v_map.v`) on the fast checkpoint completes in about 9 CPU seconds and
+emits a complete 215 MB RTLIL file (log SHA-256 `a300ea4479`). JSON emission
+still requires the pipeline's primitive-library blackboxing and port-direction
+stage: direct serialization fails on process-bearing `RAM32M` definitions.
+Thus explicit RAM techmapping is not the remaining time sink; producing a
+nextpnr-compatible JSON without losing the full flattened design is the next
+integration task.
