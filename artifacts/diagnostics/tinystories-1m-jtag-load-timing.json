@@ -1,0 +1,16 @@
+{
+  "schema": "tinystories-1m-jtag-load-timing-v1",
+  "status": "measured",
+  "transport": "Digilent HS3 JTAG SRAM programming",
+  "image_kind": "compiler-generated BRAM image; immutable weights embedded in bitstream",
+  "start_utc": "2026-09-09T02:13:50Z",
+  "end_utc": "2026-09-09T02:14:15Z",
+  "elapsed_seconds": 25,
+  "programming_mode": "SRAM",
+  "bitstream_sha256": "2d19d02a214e74ff68c6023bdc89792ff2191c8ab5560d7c77b2b615a0ad32ef",
+  "programming_log_sha256": "69ab44aab74f79e8f55dc5696432c91a42618d1824ef6d945276ea4d3ac0b478",
+  "source": "result-compiler-first-token-failed-20260909/compiler-top-packed-program-run1.log",
+  "readback_hash": false,
+  "hardware_measurement": true,
+  "inference_claim": false
+}

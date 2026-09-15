@@ -61,6 +61,13 @@ explicitly marked not applicable to the baseline in
 JTAG load/readback timing must be measured once the DDR3 image-load protocol
 exists; no synthetic transfer time is substituted.
 
+For the current BRAM architecture, the complete immutable image is embedded in
+the bitstream. An existing HS3 log records full SRAM programming from
+02:13:50Z to 02:14:15Z: 25 seconds. The bitstream and log hashes, and the exact
+scope of this measurement, are recorded in
+`artifacts/diagnostics/tinystories-1m-jtag-load-timing.json`. It is a complete
+BRAM-image programming measurement, not a DDR3 runtime image-load measurement.
+
 The compiler schedule has strong burst locality, but this artifact does not
 yet establish attainable DDR3 throughput, adapter latency, JTAG load time, or
 timing/routing feasibility. Those are the next required measurements. No
