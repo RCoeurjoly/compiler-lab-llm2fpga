@@ -587,3 +587,21 @@ stage: direct serialization fails on process-bearing `RAM32M` definitions.
 Thus explicit RAM techmapping is not the remaining time sink; producing a
 nextpnr-compatible JSON without losing the full flattened design is the next
 integration task.
+
+## Final legalization and nextpnr handoff probe
+
+The final arithmetic/FF/LUT mapping stage completed within the bounded run and
+emitted a 183 MB RTLIL checkpoint (`/tmp/partitioned-final-mapped.il`).  The
+initial JSON emission failed because the simulation definitions for `RAM32M`
+and `RAM64M` still contained processes.  Removing only those two
+process-bearing library definitions (while retaining the other primitive
+metadata) allowed Yosys to emit a 243 MB JSON handoff
+(`/tmp/partitioned-final-narrow.json`).
+
+The first deterministic nextpnr pack attempt then exposed a separate ABI issue:
+the handoff contains LUT cells for which this nextpnr build cannot infer the
+`I0` port direction (`$abc...` cell).  A temporary function-preserving
+LUT2--LUT5-to-LUT6 INIT expansion did not change that diagnostic.  Therefore
+the design has reached JSON emission, but has **not** reached a valid nextpnr
+pack/placement handoff or timing closure.  No FASM or board bitstream follows
+from this probe.
