@@ -1,5 +1,6 @@
 {
-  "schema": "tinystories-1m-ddr3-feasibility-decision-v1",
+  "schema": "tinystories-1m-ddr3-feasibility-decision-v2",
+  "status": "complete_pre_backend_feasibility_gate",
   "classification": "supported-with-prefetch",
   "decision_scope": "pre-backend access-pattern feasibility",
   "basis": {
@@ -16,11 +17,17 @@
     "serialized_full_schedule_random_burst_ns": 521957408
   },
   "interpretation": "The exact compiler access pattern is overwhelmingly sequential and is reasonable for UberDDR3 when contiguous accesses are coalesced/prefetched. A no-cache one-request-per-word implementation is not the recommended architecture.",
-  "remaining_gates": [
-    "full BRAM-mode simulator instrumentation or equivalent authenticated ordered trace receipt",
-    "DDR3 image-load/readback protocol and measured full-image JTAG load time",
-    "full schedule replay through the controller model",
-    "routed controller-plus-adapter timing and hardware validation"
+  "completed_evidence": [
+    "authenticated compiler-derived ordered run-length trace bound to generated Futil and SV hashes",
+    "full BRAM-image HS3/JTAG programming time",
+    "direct UberDDR3 controller replay and measured steady-state latency distribution",
+    "full-schedule replay service-time model",
+    "synthesized compiler-controller-plus-adapter integration probe"
+  ],
+  "deferred_after_gate": [
+    "implement selectable DDR3 placement backend",
+    "route and hardware-validate the integrated DDR3 design",
+    "measure a runtime DDR3 image-loader protocol"
   ],
   "model_or_arithmetic_changed": false,
   "complete_ddr3_backend_implemented": false,

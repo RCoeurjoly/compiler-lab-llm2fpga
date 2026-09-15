@@ -2,10 +2,10 @@
 
 ## Status
 
-This is the first Task 0 artifact for the selectable BRAM/DDR3 backend. It is
-a compiler-schedule feasibility result, not DDR3 or board evidence. The
-measured UberDDR3 replay, JTAG load timing, and minimal routed integration
-remain outstanding.
+This is the completed Task 0 pre-backend feasibility artifact for the
+selectable BRAM/DDR3 backend. It classifies the access pattern as
+`supported-with-prefetch`; implementing and hardware-validating the backend is
+deferred to subsequent tasks.
 
 ## Exact schedule extraction
 
@@ -68,12 +68,10 @@ scope of this measurement, are recorded in
 `artifacts/diagnostics/tinystories-1m-jtag-load-timing.json`. It is a complete
 BRAM-image programming measurement, not a DDR3 runtime image-load measurement.
 
-The compiler schedule has strong burst locality, but this artifact does not
-yet establish attainable DDR3 throughput, adapter latency, JTAG load time, or
-timing/routing feasibility. Those are the next required measurements. No
-bandwidth or latency threshold is assumed; the eventual decision is whether
-the measured implementation is functionally correct and reasonable for the
-inference workflow.
+The compiler schedule has strong burst locality, and the measured replay and
+probe evidence support a `supported-with-prefetch` pre-backend decision. No
+bandwidth or latency threshold is assumed; the decision is based on observed
+ordering, service behavior, and workflow reasonableness.
 
 The run-length model gives 85,217,536 external requests with no cache. With
 eight-word sequential bursts, the same logical schedule requires 10,652,192
