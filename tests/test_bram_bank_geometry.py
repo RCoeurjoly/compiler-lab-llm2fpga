@@ -8,6 +8,7 @@ from scripts.pipeline.lower_fixed_point_model_bram_production import generate_pr
 from scripts.pipeline.lower_fixed_point_model_to_calyx import (
     bram_bank_plan,
     projection_weight_bank_plan,
+    projection_weight_packing_plan,
     pack_int8_words,
     unpack_int8_words,
     alias_runtime_memories,
@@ -17,6 +18,16 @@ from scripts.pipeline.lower_fixed_point_model_to_calyx import (
 
 
 class BramBankGeometryTests(unittest.TestCase):
+    def test_projection_packing_contract_is_four_lane_little_endian(self):
+        plan = projection_weight_packing_plan()
+        self.assertEqual(plan, {
+            "lanes": 4,
+            "word_width": 32,
+            "lane_order": "little_endian_int8",
+            "row_major": "preserved",
+            "quantization_changed": False,
+        })
+
     def test_packed_int8_projection_words_round_trip_four_lanes(self):
         values = [-128, -1, 0, 1, 7, 63, 127, -64]
         words = pack_int8_words(values, 4)

@@ -403,6 +403,17 @@ def projection_weight_bank_plan() -> dict[str, dict[str, int | str]]:
     }
 
 
+def projection_weight_packing_plan() -> dict[str, int | str]:
+    """Return the exact storage ABI for packed projection INT8 codes."""
+    return {
+        "lanes": 4,
+        "word_width": 32,
+        "lane_order": "little_endian_int8",
+        "row_major": "preserved",
+        "quantization_changed": False,
+    }
+
+
 def alias_runtime_memories(futil: str, aliases: dict[str, str]) -> str:
     """Coalesce explicitly non-overlapping runtime memories in generated Futil.
 
@@ -1234,6 +1245,7 @@ import "primitives/memories/seq.futil";
         "production_memory_contract": {"audit_checkpoint_memories": [] if production else ["model_embedding", "model_token_embedding", "model_position_embedding", "model_block_outputs", "model_final_ln", "model_logits"], "full_logits_storage": not production, "streamed_argmax": True},
         "runtime_bram_bank_plan": runtime_bram_plan,
         "projection_weight_bank_plan": projection_weight_bank_plan(),
+        "projection_weight_packing_plan": projection_weight_packing_plan(),
     }
     provenance["schedule"]["generation_steps"] = generation_steps
     provenance["schedule"]["real_context_lengths"] = list(geometry.real_context_lengths)
