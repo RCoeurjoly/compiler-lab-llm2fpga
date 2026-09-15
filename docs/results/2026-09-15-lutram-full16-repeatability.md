@@ -132,6 +132,17 @@ memories are mapped. This is a successful integrated mapping checkpoint, not
 yet synthesis, placement, timing closure, bitstream generation, or hardware
 inference.
 
+## DSP-stage timebox
+
+To separate flattening from arithmetic mapping, the flattened RTLIL was run
+through `synth_xilinx -run map_dsp:` with a 600-second timeout.  The process
+reached the timeout (exit status 124) without emitting the post-DSP RTLIL;
+the redirected log was empty (SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`).  Thus
+the current full-design DSP mapping exceeds ten minutes even before memory
+mapping or JSON emission.  Any optimization must preserve the exact generated
+RTL contract while reducing this pass's monolithic workload.
+
 ## Flattening diagnostic
 
 Flattening the integrated RTLIL by itself completed and produced
