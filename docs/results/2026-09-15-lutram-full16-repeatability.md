@@ -712,3 +712,14 @@ geometry suite (10 tests) passes, as do focused production/orchestrator tests
 covering generation bounds, the authenticated 16-step harness, and source
 manifest exclusion of runtime intermediates. These are compiler/provenance
 gates only; they do not imply physical bank materialization or P&R success.
+
+## Capacity gate cross-check
+
+The earlier capacity analysis remains a second independent blocker: current
+16-step production candidates require approximately 1,017 ideal
+RAMB36-equivalent blocks before legal width/depth padding, and up to 1,171
+with conservative physical geometry, versus 955 RAMB36 blocks on the YPCB.
+Consequently, even a successful placement run on the present handoff would not
+establish board fit. Physical banking must be paired with storage-lifetime
+reuse, narrower proven buffers, or another compiler-owned capacity reduction;
+placement optimization alone cannot satisfy the target-device gate.
