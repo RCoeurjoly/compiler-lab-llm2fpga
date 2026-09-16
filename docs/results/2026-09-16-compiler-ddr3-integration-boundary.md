@@ -43,6 +43,15 @@ are the compiler-side boundary; a DDR3 arbiter still has to enforce one
 outstanding request and map tensor names to the canonical full-image byte
 ranges. This is deliberately not presented as full-model integration.
 
+The shared transport primitive is now
+`rtl/memory/llm_external_memory_arbiter.sv`. It accepts indexed compiler
+requests, grants one owner at a time, converts the byte address to a 16-byte
+Wishbone line, and routes the returned 64-bit lane to the owner. Its focused
+Verilator test covers arbitration, line addressing, and upper-half response
+extraction; it passes with `PASS`. Full-model integration still requires
+instantiating this arbiter and supplying per-tensor base addresses from the
+canonical image map.
+
 The loader-only PCIe/DDR3 baseline is independently accepted in
 `artifacts/diagnostics/2026-09-16-ddr3-pcie-full-image-3-cold-starts.json`.
 No accelerator integration or inference success is claimed here.
