@@ -1,0 +1,43 @@
+{
+  "top": "llm_q_uberddr3_ypcb",
+  "device": "xc7k480tffg1156",
+  "profile": {
+    "byte_lanes": 2,
+    "controller_clock_mhz": 83.333,
+    "ddr3_clock_mhz": 333.333,
+    "seed": 15,
+    "bist_mode": 2
+  },
+  "source": {
+    "yosys_log_sha256": "acf43c2d9447cd09f350639a6488492538e7d9bbdefa272d2769dca99cef25c4",
+    "nextpnr_log_sha256": "8db7c48f8fe97b137160f260dea0a6a17b335eee60c03688599b544e9b61cdee",
+    "routed_json_sha256": "aed2e5bf30f7ee15c9614c72972e8a8327e375d1f6ee778ab739f3b5850348ca"
+  },
+  "resources": {
+    "slice_lutx": 5261,
+    "fdre": 1803,
+    "fdse": 25,
+    "carry4": 72,
+    "lut6": 1198,
+    "ramb18e1": 0,
+    "dsp48e1": 0,
+    "idelay_e2": 18,
+    "iserdes_e2": 18,
+    "oserdes_e2": 43,
+    "iobuf": 76,
+    "iobufds": 2,
+    "plle2_adv": 1
+  },
+  "timing": {
+    "controller_clock_max_mhz": 98.71,
+    "constraint_mhz": 83.333,
+    "pass": true,
+    "router2_checksum": "0xa2e1a45f"
+  },
+  "status": "routed_probe_only",
+  "limitations": [
+    "The wrapper issues a held address-zero probe request after calibration.",
+    "This is not a complete model loader or inference top.",
+    "The exhaustive 4354-request replay remains validated in the controller/model simulation, not on this routed image."
+  ]
+}

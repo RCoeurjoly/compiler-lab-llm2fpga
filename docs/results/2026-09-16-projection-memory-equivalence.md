@@ -105,7 +105,16 @@ log is `/tmp/llm-q-probe-pnr7.log` from the 2026-09-16 run, and the reusable
 electrical/timing constraint template is
 `fpga/constraints/llm_q_uberddr3_probe.xdc`.
 
-This result is useful evidence of integrated timing/resource pressure, but it
-does not pass the device-routing or hardware-inference gate. A production
-attempt must use the validated YPCB DDR pin map and then address the measured
-critical path without changing the DDR3 profile.
+The same probe was then wrapped with the validated YPCB clocking and pin map
+(`rtl/memory/llm_q_uberddr3_ypcb.sv`) and routed successfully. nextpnr reports
+5,261 SLICE_LUTX, 1,803 FDRE, 72 CARRY4, 18 IDELAYE2, 18 ISERDESE2, 43
+OSERDESE2, zero BRAM/DSP, and a final controller-clock maximum of 98.71 MHz
+(PASS at 83.333 MHz). The router checksum is `0xa2e1a45f`; hashes and the
+complete resource/timing receipt are in
+`artifacts/diagnostics/llm-q-uberddr3-ypcb-routing.json`.
+
+This passes the device-specific integration timing/resource gate for the
+probe, not the full-model or hardware-inference gate. The wrapper issues a
+held address-zero request after calibration; the exhaustive 4,354-request
+replay remains validated against the actual controller/model simulation, and
+must still be connected to a real model loader before full integration.
