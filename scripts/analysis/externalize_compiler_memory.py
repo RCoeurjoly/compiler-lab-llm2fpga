@@ -174,12 +174,17 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
   // response until the requester drops it, otherwise one read is re-issued
   // every cycle while the consumer waits for other operands.
   logic served;
+  // A DDR3 response supplies one 64-bit lane.  Narrow elements may start at
+  // any byte offset within that lane, so retain the request offset until the
+  // one-cycle response arrives.
+  logic [2:0] response_byte_offset;
   assign ext_req_valid = content_en && !write_en && !pending && !served;
   assign ext_req_addr = EXT_BASE_ADDR + (addr0 * (WIDTH / 8));
   always_ff @(posedge clk) begin
     if (reset) begin
       pending <= 1'b0;
       served <= 1'b0;
+      response_byte_offset <= '0;
       done <= 1'b0;
       read_data <= '0;
     end else begin
@@ -188,12 +193,13 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
         pending <= 1'b0;
         served <= 1'b0;
       end else if (pending && ext_rsp_valid) begin
-        read_data <= ext_rsp_data[WIDTH-1:0];
+        read_data <= ext_rsp_data >> (response_byte_offset * 8);
         done <= 1'b1;
         pending <= 1'b0;
         served <= 1'b1;
       end else if (ext_req_valid && ext_req_ready) begin
         pending <= 1'b1;
+        response_byte_offset <= ext_req_addr[2:0];
       end
     end
   end

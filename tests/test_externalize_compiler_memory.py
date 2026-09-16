@@ -48,6 +48,12 @@ class ExternalizeCompilerMemoryTest(unittest.TestCase):
         self.assertNotIn("weights.mem", result)
         self.assertIn("other.mem", result)
 
+    def test_subword_response_selects_element_offset_within_ddr_lane(self):
+        result = externalize_memory(SOURCE, "weights")
+        self.assertIn("logic [2:0] response_byte_offset", result.source)
+        self.assertIn("response_byte_offset <= ext_req_addr[2:0]", result.source)
+        self.assertIn("ext_rsp_data >> (response_byte_offset * 8)", result.source)
+
 
 if __name__ == "__main__":
     unittest.main()
