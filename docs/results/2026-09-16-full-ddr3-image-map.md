@@ -25,7 +25,7 @@ The packed binary is emitted by `--image-output` (the working copy is kept in
 `/tmp/tinystories-1m-ddr3-model-image.bin` for transfer experiments). Running
 the generator twice produced identical serialized manifests before the image
 hash field was added, and the generator's canonical map is deterministic. This is
-the address-map contract for the forthcoming loader; it is not yet evidence
-that the image has been transferred to physical DDR3. The next gate is to
-stream these 258,545 lines through the existing transport and compare a full
-readback hash across three cold starts.
+the address-map contract used by the loader. Physical validation is recorded
+in `artifacts/diagnostics/2026-09-16-ddr3-pcie-full-image-3-cold-starts.json`:
+all 258,545 lines were streamed through PCIe and the complete readback matched
+the packed-image hash on all three cold starts.

@@ -1,0 +1,20 @@
+{
+  "schema": "tinystories-1m-ddr3-pcie-image-acceptance-v1",
+  "bitstream_sha256": "515c5343cd276e11d359bc57f97c7f5bd184c04982e6af91b3a298a1ea14e439",
+  "transport": "PCIe",
+  "ddr3_profile": "UberDDR3, two byte lanes, 333/83.33 MHz",
+  "accelerator": "disconnected (loader-only)",
+  "timing": {"rowstream_mhz": 64.77, "pcie_mhz": 66.74},
+  "bdf": "0000:42:00.0",
+  "image_bytes": 4136720,
+  "beats": 258545,
+  "beat_bytes": 16,
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9ffb7edc0319c43e593",
+  "manifest_content_sha256": "1891a310e31817550cb85005b3e08de4159c3a392ba5ed4776b342d03fd12f98",
+  "runs": [
+    {"cold_start": 1, "status": "PASS", "elapsed_seconds": 90.18097054200189, "sha256_loaded": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593", "sha256_readback": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"},
+    {"cold_start": 2, "status": "PASS", "elapsed_seconds": 90.0538386140106, "sha256_loaded": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593", "sha256_readback": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"},
+    {"cold_start": 3, "status": "PASS", "elapsed_seconds": 90.25858786600293, "sha256_loaded": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593", "sha256_readback": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"}
+  ],
+  "acceptance": "PASS"
+}
