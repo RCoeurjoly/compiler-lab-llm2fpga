@@ -32,8 +32,6 @@ module llm_external_memory_arbiter #(
   state_t state;
   logic [$clog2(PORTS)-1:0] owner;
   logic [ADDRESS_BITS-1:0] saved_addr;
-  integer i;
-
   always_comb begin
     req_ready = '0;
     rsp_valid = '0;
@@ -43,7 +41,7 @@ module llm_external_memory_arbiter #(
     wb_addr = saved_addr >> LANE_BITS;
     wb_sel = '1;
     if (state == IDLE) begin
-      for (i = 0; i < PORTS; i = i + 1)
+      for (int i = 0; i < PORTS; i = i + 1)
         if (req_valid[i] && req_ready == '0)
           req_ready[i] = 1'b1;
     end
@@ -64,7 +62,7 @@ module llm_external_memory_arbiter #(
     end else begin
       case (state)
         IDLE: begin
-          for (i = 0; i < PORTS; i = i + 1)
+          for (int i = 0; i < PORTS; i = i + 1)
             if (req_valid[i] && req_ready[i]) begin
               owner <= i;
               saved_addr <= req_addr[i*ADDRESS_BITS +: ADDRESS_BITS];
