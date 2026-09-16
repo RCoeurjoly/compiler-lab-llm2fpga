@@ -1,0 +1,37 @@
+{
+  "schema": "compiler-ddr3-exact-image-settled-mismatch-v1",
+  "status": "simulation_mismatch",
+  "model": "TinyStories-1M",
+  "model_static_source": "result-compiler-top-30mhz-20260908/model-static-init.sv",
+  "model_static_source_sha256": "b030e34d96901fd7e04c00f8679c457cc59d26c4906c1d41d6e3e96d46525b93",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9ffb7edc0319c43e593",
+  "image_manifest_sha256": "1891a310e31817550cb85005b3e08de4159c3a392ba5ed4776b342d03fd12f98",
+  "prompt": [7454, 2402, 257, 640],
+  "expected_first_token": 11,
+  "harness": {
+    "memory_line_bytes": 16,
+    "response_width_bits": 64,
+    "response_latency_cycles": 1,
+    "lane_select": "request_byte_address_bit_3",
+    "line_encoding": "canonical_little_endian_bytes_reversed_per_16_byte_readmemh_line",
+    "start_protocol": "valid_and_start_held_high",
+    "source": "/tmp/ddr3-resume/direct_tb.sv"
+  },
+  "observed": {
+    "cycles": 185376371,
+    "requests": 1287282140,
+    "done": true,
+    "token_id": 0,
+    "model_best_token_out": 0,
+    "model_best_value_out": 0,
+    "model_step_out": 2
+  },
+  "interpretation": "The settled internal argmax state is zero, so the token mismatch is genuine and not a same-edge observation artifact. Reversing each 16-byte $readmemh line did not change the result. The subword response-offset fix is present in the generated external memory cells and its focused regression passes, but it is not sufficient to establish image equivalence.",
+  "next_diagnostic": "Compare the first accelerator memory request/response value stream against the BRAM oracle, including request address, selected 64-bit lane, byte offset, and returned element bits, before another RTL change.",
+  "claims": {
+    "exact_image_simulation_passed": false,
+    "hardware_tested": false,
+    "bitstream_generated": false,
+    "transport_changed": false
+  }
+}
