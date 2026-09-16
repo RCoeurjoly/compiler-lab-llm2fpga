@@ -72,10 +72,12 @@ elaborates through Yosys. The first bounded exact-image simulation exposed a
 protocol issue before any token result: generated `content_en` is level-held,
 but the external cell re-issued a read after each response. This caused a
 repeating response stream and the model never advanced. The external cell now
-latches a `served` response until `content_en` is deasserted; the focused
-source-contract test covers this rule. The next gate is to rerun the behavioral
-DDR3 model with the regenerated 240-vector source and require the first-token
-checkpoint.
+latches a `served` response until `content_en` is deasserted and holds `done`
+at the native level semantics; the focused source-contract test covers these
+rules. The rerun reaches millions of cycles with live memory traffic but does
+not complete within the current five-million-cycle diagnostic bound, so the
+next gate is a longer optimized run with a compact transaction trace and the
+first-token checkpoint.
 
 The loader-only PCIe/DDR3 baseline is independently accepted in
 `artifacts/diagnostics/2026-09-16-ddr3-pcie-full-image-3-cold-starts.json`.

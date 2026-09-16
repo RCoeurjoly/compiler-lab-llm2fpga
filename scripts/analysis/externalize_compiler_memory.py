@@ -183,7 +183,7 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
       done <= 1'b0;
       read_data <= '0;
     end else begin
-      done <= 1'b0;
+      done <= served;
       if (!content_en || write_en) begin
         pending <= 1'b0;
         served <= 1'b0;
