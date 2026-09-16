@@ -26,13 +26,15 @@ class ExternalizeCompilerMemoryTest(unittest.TestCase):
             externalize_memory(SOURCE, "missing")
 
     def test_multiple_memories_share_indexed_external_vectors(self):
-        result = externalize_memories(SOURCE, ["weights", "other"])
+        result = externalize_memories(SOURCE, ["weights", "other"], {"weights": 4096, "other": 8192})
         self.assertIn("output logic [1:0] ext_mem_req_valid", result.source)
         self.assertIn("input logic [1:0] ext_mem_rsp_valid", result.source)
         self.assertIn(".ext_req_valid(ext_mem_req_valid[0])", result.source)
         self.assertIn(".ext_req_valid(ext_mem_req_valid[1])", result.source)
         self.assertIn(".ext_rsp_data(ext_mem_rsp_data[63:0])", result.source)
         self.assertIn(".ext_rsp_data(ext_mem_rsp_data[127:64])", result.source)
+        self.assertIn(".EXT_BASE_ADDR(4096)", result.source)
+        self.assertIn(".EXT_BASE_ADDR(8192)", result.source)
         self.assertEqual(result.memory_names, ("weights", "other"))
 
 

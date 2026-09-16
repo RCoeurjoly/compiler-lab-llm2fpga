@@ -78,7 +78,9 @@ def externalize_memory(source: str, memory_name: str) -> ExternalizationResult:
     return ExternalizationResult(rewritten, memory_name, width)
 
 
-def externalize_memories(source: str, memory_names: list[str]) -> ExternalizationResult:
+def externalize_memories(
+    source: str, memory_names: list[str], base_addresses: dict[str, int] | None = None
+) -> ExternalizationResult:
     """Externalize several memories through indexed shared-port vectors."""
 
     names = tuple(memory_names)
@@ -91,6 +93,14 @@ def externalize_memories(source: str, memory_names: list[str]) -> Externalizatio
     widths = tuple(_parameter(matches[name].group("params"), "WIDTH") for name in names)
     if any(width > 64 for width in widths):
         raise ValueError("external memory slice supports widths up to 64 bits")
+    bases = {name: 0 for name in names}
+    if base_addresses is not None:
+        for name, address in base_addresses.items():
+            if name not in names:
+                raise ValueError(f"base address provided for unselected memory {name!r}")
+            if address < 0:
+                raise ValueError("base address must not be negative")
+            bases[name] = address
     main_match = re.search(r"module\s+main\s*\((?P<ports>.*?)\);", source, re.DOTALL)
     if main_match is None:
         raise ValueError("module main declaration not found")
@@ -117,7 +127,8 @@ def externalize_memories(source: str, memory_names: list[str]) -> Externalizatio
             f",\n  .ext_rsp_valid(ext_mem_rsp_valid[{index}])"
             f",\n  .ext_rsp_data(ext_mem_rsp_data[{index * 64 + 63}:{index * 64}])"
         )
-        replacement = "seq_mem_d1_external # (" + match.group("params") + ") " + name + " (" + body + ");"
+        params = match.group("params") + f",\n    .EXT_BASE_ADDR({bases[name]})"
+        replacement = "seq_mem_d1_external # (" + params + ") " + name + " (" + body + ");"
         rewritten = rewritten[: match.start()] + replacement + rewritten[match.end() :]
     if "module seq_mem_d1_external" not in rewritten:
         rewritten = _EXTERNAL_MODULE + "\n" + rewritten
@@ -127,7 +138,8 @@ def externalize_memories(source: str, memory_names: list[str]) -> Externalizatio
 _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
     parameter WIDTH = 32,
     parameter SIZE = 16,
-    parameter IDX_SIZE = 4
+    parameter IDX_SIZE = 4,
+    parameter EXT_BASE_ADDR = 0
 ) (
    input wire logic clk,
    input wire logic reset,
@@ -145,7 +157,7 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
 );
   logic pending;
   assign ext_req_valid = content_en && !write_en && !pending;
-  assign ext_req_addr = {{(32-IDX_SIZE){1'b0}}, addr0};
+  assign ext_req_addr = EXT_BASE_ADDR + (addr0 * (WIDTH / 8));
   always_ff @(posedge clk) begin
     if (reset) begin
       pending <= 1'b0;

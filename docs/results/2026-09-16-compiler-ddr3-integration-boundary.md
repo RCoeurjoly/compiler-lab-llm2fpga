@@ -52,6 +52,12 @@ extraction; it passes with `PASS`. Full-model integration still requires
 instantiating this arbiter and supplying per-tensor base addresses from the
 canonical image map.
 
+The lowering now accepts per-memory base offsets and scales element indices to
+byte addresses (`EXT_BASE_ADDR + index * (WIDTH/8)`). A Q/K/V rewrite using the
+canonical offsets 565008, 451584, and 4099856 elaborated successfully through
+Yosys. This closes the address-unit ambiguity; a full tensor-list rewrite and
+simulation against the packed image remain outstanding.
+
 The loader-only PCIe/DDR3 baseline is independently accepted in
 `artifacts/diagnostics/2026-09-16-ddr3-pcie-full-image-3-cold-starts.json`.
 No accelerator integration or inference success is claimed here.
