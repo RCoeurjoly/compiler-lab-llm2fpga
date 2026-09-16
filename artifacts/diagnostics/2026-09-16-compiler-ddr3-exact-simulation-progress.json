@@ -1,0 +1,23 @@
+{
+  "schema": "compiler-ddr3-exact-image-simulation-progress-v1",
+  "model": "TinyStories-1M",
+  "image_manifest_sha256": "1891a310e31817550cb85005b3e08de4159c3a392ba5ed4776b342d03fd12f98",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9ffb7edc0319c43e593",
+  "external_memory_ports": 240,
+  "launch_protocol": "start is held high as the generated level-held run enable; valid is asserted after reset settling",
+  "response_model": "one-cycle 128-bit DDR3-line response with 64-bit lane selection",
+  "milestones": [
+    {"cycles": 10000000, "requests": 1005266, "responses": 1005266, "fsm0": 98},
+    {"cycles": 100000000, "requests": 14192913, "responses": 14192912, "fsm0": 387},
+    {"cycles": 200000000, "requests": 38846607, "responses": 38846607, "fsm0": 387},
+    {"cycles": 300000000, "requests": 63500304, "responses": 63500303, "fsm0": 387},
+    {"cycles": 400000000, "requests": 88154001, "responses": 88154000, "fsm0": 387},
+    {"cycles": 450000000, "requests": 100480848, "responses": 100480848, "fsm0": 387}
+  ],
+  "result": "WALL_STOP_NO_DONE",
+  "transport_diagnostic": "request/response counts remained balanced; no Wishbone error or address-change hazard observed",
+  "expected_first_token": 11,
+  "first_token_verified": false,
+  "hardware_verified": false,
+  "next_gate": "accelerate or otherwise bound the exact generated LM-head simulation, then verify token 11"
+}
