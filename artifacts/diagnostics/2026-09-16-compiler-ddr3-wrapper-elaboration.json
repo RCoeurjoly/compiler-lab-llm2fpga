@@ -1,0 +1,25 @@
+{
+  "schema": "compiler-ddr3-wrapper-elaboration-v1",
+  "date": "2026-09-16",
+  "model": "TinyStories-1M",
+  "source": {
+    "accepted_archive": "result-compiler-first-token-signext-20260909/compiler-and-diagnostic-evidence.tar.gz",
+    "accepted_model_sha256": "7e359dfd4ea1e78bdd141eeba52cc779d3698fb38b279def96e72a72188fc8b5",
+    "externalized_model_sha256": "c18aff509dfc22b8a331b082e7c2aa7c63097e977eb8b631d868e363eac3b9ba",
+    "memory_count": 240,
+    "image_manifest_sha256": "1891a310e31817550cb85005b3e08de4159c3a392ba5ed4776b342d03fd12f98"
+  },
+  "boundary": {
+    "wrapper": "rtl/tinystories_1m_ddr3_backend.sv",
+    "wrapper_sha256": "7992e8a8c3a0cc2a40dbcf23ff618f530af79ce7607d1e372b111c0475f82ba0",
+    "arbiter": "rtl/memory/llm_external_memory_arbiter.sv",
+    "arbiter_sha256": "f27c3a464a0ac6475c2dc86f3d5fa86a94242c7efd28d245795c6ca8cb3c66e0",
+    "wishbone_data_bits": 128,
+    "wishbone_address_unit": "16-byte line",
+    "outstanding_requests": 1
+  },
+  "command": "yosys -q -p 'read_verilog -sv model-external.sv llm_external_memory_arbiter.sv tinystories_1m_ddr3_backend.sv; hierarchy -top tinystories_1m_ddr3_backend; proc; opt; check'",
+  "result": "pass",
+  "warnings": "read-only external cells have undriven write_data ports; no parser, hierarchy, latch, or check failure",
+  "hardware_status": "not yet integrated into physical PCIe/UberDDR3 top"
+}
