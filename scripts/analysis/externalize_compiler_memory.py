@@ -153,6 +153,7 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
     parameter WIDTH = 32,
     parameter SIZE = 16,
     parameter IDX_SIZE = 4,
+    parameter INIT_FILE = "",
     parameter EXT_BASE_ADDR = 0
 ) (
    input wire logic clk,
@@ -170,33 +171,38 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
    input wire [63:0] ext_rsp_data
 );
   logic pending;
-  // content_en is a level in the generated memory ABI. Hold a completed
-  // response until the requester drops it, otherwise one read is re-issued
-  // every cycle while the consumer waits for other operands.
-  logic served;
+  // content_en is a level in the generated memory ABI.  A response is held
+  // logically through the level, while a new request may be issued each
+  // response cycle for streaming address-stepping loops.
+  logic response_seen;
   // A DDR3 response supplies one 64-bit lane.  Narrow elements may start at
   // any byte offset within that lane, so retain the request offset until the
   // one-cycle response arrives.
   logic [2:0] response_byte_offset;
-  assign ext_req_valid = content_en && !write_en && !pending && !served;
+  // Match seq_mem_d1_bram: a level-held content_en permits one read per
+  // response cycle, so address-stepping loops can stream through memory.
+  assign ext_req_valid = content_en && !write_en && !pending;
   assign ext_req_addr = EXT_BASE_ADDR + (addr0 * (WIDTH / 8));
   always_ff @(posedge clk) begin
     if (reset) begin
       pending <= 1'b0;
-      served <= 1'b0;
+      response_seen <= 1'b0;
       response_byte_offset <= '0;
       done <= 1'b0;
       read_data <= '0;
     end else begin
-      done <= served;
+      // Once the first response arrives, done remains asserted while the
+      // level-held request is active, just like seq_mem_d1_bram.  The old
+      // response_seen value also preserves BRAM's one-cycle tail after
+      // content_en is deasserted.
+      done <= response_seen || (pending && ext_rsp_valid);
       if (!content_en || write_en) begin
         pending <= 1'b0;
-        served <= 1'b0;
+        response_seen <= 1'b0;
       end else if (pending && ext_rsp_valid) begin
         read_data <= ext_rsp_data >> (response_byte_offset * 8);
-        done <= 1'b1;
         pending <= 1'b0;
-        served <= 1'b1;
+        response_seen <= 1'b1;
       end else if (ext_req_valid && ext_req_ready) begin
         pending <= 1'b1;
         response_byte_offset <= ext_req_addr[2:0];

@@ -89,3 +89,20 @@ compiler datapath completion, not an observed DDR3 transport mismatch.
 The loader-only PCIe/DDR3 baseline is independently accepted in
 `artifacts/diagnostics/2026-09-16-ddr3-pcie-full-image-3-cold-starts.json`.
 No accelerator integration or inference success is claimed here.
+
+## Accepted accelerator source and exact-image first-token pass
+
+The initial long run used the clean-top source (`b030e34d…`), which is not the
+accepted BRAM first-token accelerator. It returned settled token 0 and was
+retained as a source-identity diagnostic. Repeating the same external-image
+simulation with the accepted compiler-generated source
+(`7e359dfd…`, Futil `e422c009…`) produced settled token 11 at cycle 92,936,288
+(`643,641,072` memory requests). The receipt is
+`artifacts/diagnostics/2026-09-16-compiler-ddr3-accepted-source-first-token-pass.json`.
+
+The external memory cell now matches `seq_mem_d1_bram` for level-held
+streaming reads: it permits one request per response cycle and retains the
+BRAM `done` level/tail semantics, while preserving subword byte offsets. This
+closes the exact-image simulation gate only. No DDR3-integrated bitstream has
+been generated or tested on YPCB yet; timing closure and hardware one-token
+acceptance remain outstanding.
