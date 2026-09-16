@@ -106,3 +106,20 @@ BRAM `done` level/tail semantics, while preserving subword byte offsets. This
 closes the exact-image simulation gate only. No DDR3-integrated bitstream has
 been generated or tested on YPCB yet; timing closure and hardware one-token
 acceptance remain outstanding.
+
+## Current source-closed integration boundary
+
+`rtl/tinystories_1m_ddr3_backend.sv` now instantiates the externalized
+compiler `main` and the shared 240-port arbiter. It preserves the generated
+control/token ABI and presents a fixed 128-bit Wishbone read-only boundary,
+which is the boundary used by the validated UberDDR3 loader. The wrapper does
+not contain PCIe or DDR3 PHY logic; the physical top must connect its
+`wb_*` signals without changing the accepted transport profile.
+
+The wrapper contract tests pass, and pinned Yosys elaboration succeeds against
+the actual accepted 240-memory externalized source. During this check Yosys
+found a latch in the arbiter's shared loop-index variable at `PORTS=240`; the
+loop indices are now process-local, with no protocol or timing-policy change.
+The remaining implementation step is to add this source boundary to the
+validated PCIe/UberDDR3 top and run the existing synthesis, placement, and
+timing gates. The loader-only baseline remains unchanged.
