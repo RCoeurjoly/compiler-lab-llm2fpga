@@ -123,3 +123,12 @@ loop indices are now process-local, with no protocol or timing-policy change.
 The remaining implementation step is to add this source boundary to the
 validated PCIe/UberDDR3 top and run the existing synthesis, placement, and
 timing gates. The loader-only baseline remains unchanged.
+
+`rtl/tinystories_1m_ddr3_command_adapter.sv` supplies the corresponding
+control splice: it accepts the existing PCIe-side prompt-token stream,
+assembles four prompt words, holds `start` and `valid` until generated `main`
+asserts `done`, and presents the resulting token with a ready/valid handshake.
+It also forwards the wrapper's Wishbone signals and counts accepted memory
+requests. Its contract tests and a pinned Yosys elaboration pass with the
+240-port backend. This is intentionally a transport-facing adapter only; it
+does not replace the physical PCIe/UberDDR3 top or claim board operation.
