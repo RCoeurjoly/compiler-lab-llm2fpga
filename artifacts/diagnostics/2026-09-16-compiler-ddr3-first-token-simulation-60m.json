@@ -1,0 +1,20 @@
+{
+  "schema": "compiler-ddr3-first-token-simulation-progress-v1",
+  "model": "TinyStories-1M",
+  "image_manifest_sha256": "1891a310e31817550cb85005b3e08de4159c3a392ba5ed4776b342d03fd12f98",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9ffb7edc0319c43e593",
+  "external_memory_ports": 240,
+  "simulation": {
+    "verilator_threads": 4,
+    "wall_time_limit_seconds": 1800,
+    "cycles": 60000000,
+    "requests": 5706646,
+    "responses": 5706646,
+    "result": "WALL_TIMEOUT_NO_DONE",
+    "transport": "no request/response imbalance or Wishbone error observed"
+  },
+  "expected_first_token": 11,
+  "first_token_verified": false,
+  "hardware_verified": false,
+  "next_gate": "accelerated exact-image simulation or controlled run to first-token completion"
+}

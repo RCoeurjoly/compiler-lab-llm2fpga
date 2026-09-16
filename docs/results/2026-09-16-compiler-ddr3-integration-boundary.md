@@ -79,6 +79,13 @@ not complete within the current five-million-cycle diagnostic bound, so the
 next gate is a longer optimized run with a compact transaction trace and the
 first-token checkpoint.
 
+A four-thread exact-image run reached 60,000,000 cycles and 5,706,646 balanced
+requests/responses before the 1,800-second wall limit, without `done`. This is
+recorded in
+`artifacts/diagnostics/2026-09-16-compiler-ddr3-first-token-simulation-60m.json`.
+The remaining simulation risk is runtime to the known ~450-million-cycle
+compiler datapath completion, not an observed DDR3 transport mismatch.
+
 The loader-only PCIe/DDR3 baseline is independently accepted in
 `artifacts/diagnostics/2026-09-16-ddr3-pcie-full-image-3-cold-starts.json`.
 No accelerator integration or inference success is claimed here.
