@@ -35,11 +35,13 @@ The first source-level slice is implemented by
 `scripts/analysis/externalize_compiler_memory.py`. It replaces one selected
 `seq_mem_d1_bram`/`seq_mem_d1_lutram` instance with a latency-aware
 `seq_mem_d1_external` cell and exposes request/response ports on `main`, while
-leaving every other memory untouched. Two unit tests pass, and applying it to
-the real `q_weight_codes_i8` instance (8-bit, 32,768 entries) parses and
-elaborates successfully through Yosys. This is deliberately not presented as
-full-model integration: the next step is a shared arbiter and placement map
-for all eligible immutable memories.
+leaving every other memory untouched. The pass also supports a deterministic
+list of selected memories through indexed shared-port vectors. Three unit
+tests pass, and applying it to the real Q/K/V weight tables (each 8-bit,
+32,768 entries) parses and elaborates successfully through Yosys. The vectors
+are the compiler-side boundary; a DDR3 arbiter still has to enforce one
+outstanding request and map tensor names to the canonical full-image byte
+ranges. This is deliberately not presented as full-model integration.
 
 The loader-only PCIe/DDR3 baseline is independently accepted in
 `artifacts/diagnostics/2026-09-16-ddr3-pcie-full-image-3-cold-starts.json`.
