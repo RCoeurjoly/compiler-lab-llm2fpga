@@ -1,0 +1,33 @@
+{
+  "schema": "disk-cleanup-receipt-v1",
+  "reason": "free space for reproducible DDR3-integrated synthesis/P&R",
+  "removed": [
+    {
+      "path": "result-compiler-first-token-failed-20260909/compiler-top-packed-routed.json",
+      "bytes": 830420511,
+      "sha256": "73d2d05553414b312142cef49e6c690f827d70c2e2529a06ac0661a195d08d56"
+    },
+    {
+      "path": "result-compiler-first-token-failed-20260909/initialized-final-abc.json",
+      "bytes": 162934429,
+      "sha256": "5aebce5eb5d6dd410b8cb047742cb729d6c19a78f37f97dbce18fb253be33587"
+    },
+    {
+      "path": "result-compiler-first-token-failed-20260909/compiler-top-packed.fasm",
+      "bytes": 161145816,
+      "sha256": "463ed8f2cce471512f09d875ac6b9b2aca1c97a6a56095d7ed09e6a842160bab"
+    },
+    {
+      "path": "result-compiler-first-token-failed-20260909/compiler-top-packed.frm",
+      "bytes": 51490824,
+      "sha256": "7aaec54cc43ac34024194dba5d5b932db668f1770b74ccf4e74e71095c7d79f6"
+    }
+  ],
+  "preserved": [
+    "result-compiler-first-token-failed-20260909/compiler-top-packed.bit",
+    "result-compiler-first-token-failed-20260909/*.log",
+    "result-compiler-first-token-failed-20260909/*.tar.gz",
+    "all tracked source, docs, manifests, and receipts"
+  ],
+  "recoverability": "The removed intermediates are reproducible from the preserved source and logs; their original hashes are recorded above."
+}
