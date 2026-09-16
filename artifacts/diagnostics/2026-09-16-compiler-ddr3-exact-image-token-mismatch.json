@@ -1,0 +1,23 @@
+{
+  "schema": "compiler-ddr3-exact-image-token-mismatch-v1",
+  "model": "TinyStories-1M",
+  "source_sha256": "b030e34d96901fd7e04c00f8679c457cc59d26c4906c1d41d6e3e96d46525b93",
+  "externalized_source_sha256": "c7376e29f9d9d78177f52973a490afa905de3fb53664ef6a994df9479afedd62",
+  "image_manifest_sha256": "1891a310e31817550cb85005b3e08de4159c3a392ba5ed4776b342d03fd12f98",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9ffb7edc0319c43e593",
+  "line_image_sha256": "52c169a96fa2218618b3ec845b6cb86c82ca70111e1c681bbb25533a38520141",
+  "external_memory_ports": 240,
+  "response_model": "one-cycle 64-bit response selected from a 128-bit DDR3 line",
+  "launch_protocol": "start held high; valid asserted after reset settling",
+  "observed": {
+    "cycles": 184854551,
+    "requests": 1287282140,
+    "responses": 1287282140,
+    "done": true,
+    "token_id": 0
+  },
+  "expected_first_token": 11,
+  "status": "mismatch",
+  "diagnosis": "The accelerator completed with balanced traffic but returned token 0. The first harness image used canonical bytes as a Verilog $readmemh vector; that reverses byte significance within each 128-bit word. The run is retained as a harness-packing diagnostic. The corrected line image reverses each 16-byte line before $readmemh and is being rerun; no RTL or transport change is implied.",
+  "hardware_verified": false
+}
