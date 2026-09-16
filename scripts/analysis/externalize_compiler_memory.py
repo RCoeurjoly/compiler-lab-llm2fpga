@@ -170,19 +170,28 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
    input wire [63:0] ext_rsp_data
 );
   logic pending;
-  assign ext_req_valid = content_en && !write_en && !pending;
+  // content_en is a level in the generated memory ABI. Hold a completed
+  // response until the requester drops it, otherwise one read is re-issued
+  // every cycle while the consumer waits for other operands.
+  logic served;
+  assign ext_req_valid = content_en && !write_en && !pending && !served;
   assign ext_req_addr = EXT_BASE_ADDR + (addr0 * (WIDTH / 8));
   always_ff @(posedge clk) begin
     if (reset) begin
       pending <= 1'b0;
+      served <= 1'b0;
       done <= 1'b0;
       read_data <= '0;
     end else begin
       done <= 1'b0;
-      if (pending && ext_rsp_valid) begin
+      if (!content_en || write_en) begin
+        pending <= 1'b0;
+        served <= 1'b0;
+      end else if (pending && ext_rsp_valid) begin
         read_data <= ext_rsp_data[WIDTH-1:0];
         done <= 1'b1;
         pending <= 1'b0;
+        served <= 1'b1;
       end else if (ext_req_valid && ext_req_ready) begin
         pending <= 1'b1;
       end

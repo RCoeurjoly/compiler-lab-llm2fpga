@@ -18,6 +18,8 @@ class ExternalizeCompilerMemoryTest(unittest.TestCase):
         self.assertIn("seq_mem_d1_external", result.source)
         self.assertIn(".ext_req_valid(ext_mem_req_valid)", result.source)
         self.assertIn(".ext_rsp_data(ext_mem_rsp_data)", result.source)
+        self.assertIn("logic served", result.source)
+        self.assertIn("!served", result.source)
         self.assertIn("seq_mem_d1_bram #(.IDX_SIZE(2), .SIZE(4), .WIDTH(8)) other", result.source)
         self.assertEqual(result.memory_name, "weights")
         self.assertEqual(result.memory_width, 8)
