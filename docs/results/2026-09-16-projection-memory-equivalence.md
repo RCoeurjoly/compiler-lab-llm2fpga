@@ -89,3 +89,23 @@ This is not yet evidence that the physical UberDDR3 controller, full weight
 image loader, timing closure, or hardware inference works. The next gate is to
 connect this contract to the validated UberDDR3 user port and repeat the same
 single-table readback equivalence against its actual memory model.
+
+## Integrated device-mapping diagnostic
+
+The probe `rtl/memory/llm_q_uberddr3_probe.sv` was synthesized together with
+the real UberDDR3 controller and PHY, then passed to nextpnr-xilinx for the
+YPCB Kintex-7 device database at seed 15 and 83.333 MHz. Placement completed
+with 7,398 mapped cells (including 1,875 FDRE, 1,412 LUT6, 78 CARRY4,
+43 OSERDESE2, 18 ISERDESE2, and 18 IDELAYE2). The timing report showed a
+maximum adapter-clock frequency of 78.65 MHz, so this unconstrained probe
+misses the 83.333 MHz target by 4.68 MHz. Routing then stopped at the first
+DDR DQS arc (`ddr3.ddr3_phy_inst.oserdes_dqs[1]`) because the probe has no
+YPCB package LOCs; it is therefore not a valid board bitstream. The diagnostic
+log is `/tmp/llm-q-probe-pnr7.log` from the 2026-09-16 run, and the reusable
+electrical/timing constraint template is
+`fpga/constraints/llm_q_uberddr3_probe.xdc`.
+
+This result is useful evidence of integrated timing/resource pressure, but it
+does not pass the device-routing or hardware-inference gate. A production
+attempt must use the validated YPCB DDR pin map and then address the measured
+critical path without changing the DDR3 profile.
