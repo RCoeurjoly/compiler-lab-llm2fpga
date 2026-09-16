@@ -23,6 +23,14 @@ preserving each memory's logical read latency and data width. The transformation
 must emit the existing full-image address map and retain a BRAM mode for
 equivalence testing.
 
+The initial shared contract is defined by
+`scripts/analysis/compiler_external_memory_contract.py`; its canonical hash is
+`b5815f8488ab9dce79c774106d1024514b1d3afd4bcdda4351de402301b9f4bd`. It is
+byte-addressed, uses 16-byte lines, permits one outstanding request, and
+requires in-order responses. Its three contract tests pass under the Nix
+Python environment; this is a protocol foundation, not yet a full-model
+lowering.
+
 The loader-only PCIe/DDR3 baseline is independently accepted in
 `artifacts/diagnostics/2026-09-16-ddr3-pcie-full-image-3-cold-starts.json`.
 No accelerator integration or inference success is claimed here.
