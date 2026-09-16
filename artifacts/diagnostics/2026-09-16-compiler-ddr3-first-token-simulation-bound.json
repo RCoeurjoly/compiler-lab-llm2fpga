@@ -1,0 +1,20 @@
+{
+  "schema": "compiler-ddr3-first-token-simulation-bound-v1",
+  "model": "TinyStories-1M",
+  "image_manifest_sha256": "1891a310e31817550cb85005b3e08de4159c3a392ba5ed4776b342d03fd12f98",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9ffb7edc0319c43e593",
+  "external_memory_ports": 240,
+  "arbiter_profile": "one outstanding request, 128-bit line, 64-bit routed lane",
+  "simulation": {
+    "rtl": "compiler-generated externalized model-static-init",
+    "transport": "behavioral Wishbone DDR3 image",
+    "verilator_threads": 4,
+    "cycle_bound": 5000000,
+    "result": "BOUND_EXCEEDED_NO_DONE",
+    "observed": "initial memory responses complete without repeated-response storm; design continues computation and does not assert done within bound"
+  },
+  "expected_first_token": 11,
+  "first_token_verified": false,
+  "hardware_verified": false,
+  "next_gate": "longer or accelerated exact-image simulation with compact transaction counters"
+}
