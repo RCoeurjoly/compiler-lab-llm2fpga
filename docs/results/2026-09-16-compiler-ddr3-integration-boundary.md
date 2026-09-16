@@ -31,6 +31,16 @@ requires in-order responses. Its three contract tests pass under the Nix
 Python environment; this is a protocol foundation, not yet a full-model
 lowering.
 
+The first source-level slice is implemented by
+`scripts/analysis/externalize_compiler_memory.py`. It replaces one selected
+`seq_mem_d1_bram`/`seq_mem_d1_lutram` instance with a latency-aware
+`seq_mem_d1_external` cell and exposes request/response ports on `main`, while
+leaving every other memory untouched. Two unit tests pass, and applying it to
+the real `q_weight_codes_i8` instance (8-bit, 32,768 entries) parses and
+elaborates successfully through Yosys. This is deliberately not presented as
+full-model integration: the next step is a shared arbiter and placement map
+for all eligible immutable memories.
+
 The loader-only PCIe/DDR3 baseline is independently accepted in
 `artifacts/diagnostics/2026-09-16-ddr3-pcie-full-image-3-cold-starts.json`.
 No accelerator integration or inference success is claimed here.
