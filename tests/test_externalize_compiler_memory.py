@@ -3,6 +3,7 @@ import unittest
 from scripts.analysis.externalize_compiler_memory import (
     externalize_memories,
     externalize_memory,
+    remove_static_initializers,
 )
 
 
@@ -36,6 +37,13 @@ class ExternalizeCompilerMemoryTest(unittest.TestCase):
         self.assertIn(".EXT_BASE_ADDR(4096)", result.source)
         self.assertIn(".EXT_BASE_ADDR(8192)", result.source)
         self.assertEqual(result.memory_names, ("weights", "other"))
+
+    def test_external_initializers_are_removed_without_touching_bram_state(self):
+        static = ('$readmemh("image-weights.hex", weights.mem);\n'
+                  '$readmemh("image-other.hex", other.mem);\n')
+        result = remove_static_initializers(static, ["weights"])
+        self.assertNotIn("weights.mem", result)
+        self.assertIn("other.mem", result)
 
 
 if __name__ == "__main__":

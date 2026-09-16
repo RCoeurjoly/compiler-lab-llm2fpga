@@ -8,7 +8,10 @@ tensor memories.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import argparse
+import json
 import re
+from pathlib import Path
 
 
 _INSTANCE = re.compile(
@@ -25,6 +28,17 @@ class ExternalizationResult:
     memory_width: int
     memory_names: tuple[str, ...] = ()
     memory_widths: tuple[int, ...] = ()
+
+
+def remove_static_initializers(source: str, memory_names: list[str] | tuple[str, ...]) -> str:
+    """Remove readmemh calls for memories moved behind the external port."""
+
+    selected = set(memory_names)
+    pattern = re.compile(
+        r'^[ \t]*\$readmemh\([ \t]*"[^"]+"[ \t]*,[ \t]*(?P<name>[A-Za-z_][A-Za-z0-9_]*)\.mem[ \t]*\);[ \t]*\n?',
+        re.MULTILINE,
+    )
+    return pattern.sub(lambda m: "" if m.group("name") in selected else m.group(0), source)
 
 
 def _parameter(params: str, name: str) -> int:
@@ -176,3 +190,26 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
   end
 endmodule
 '''
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+    tensors = manifest.get("tensors", [])
+    names = [item["name"] for item in tensors]
+    bases = {item["name"]: int(item["ddr3_offset"]) for item in tensors}
+    source = args.input.read_text(encoding="utf-8")
+    source = remove_static_initializers(source, names)
+    result = externalize_memories(source, names, bases)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(result.source, encoding="utf-8")
+    print(json.dumps({"memory_count": len(names), "memory_names": names}, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

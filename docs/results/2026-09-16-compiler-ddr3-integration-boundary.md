@@ -58,6 +58,19 @@ canonical offsets 565008, 451584, and 4099856 elaborated successfully through
 Yosys. This closes the address-unit ambiguity; a full tensor-list rewrite and
 simulation against the packed image remain outstanding.
 
+The reproducible CLI for the complete transformation is:
+
+```text
+nix develop -c python scripts/analysis/externalize_compiler_memory.py \\
+  --input result-compiler-top-30mhz-20260908/model-static-init.sv \\
+  --manifest artifacts/diagnostics/tinystories-1m-ddr3-model-image-manifest.json \\
+  --output /tmp/model-full-external.sv
+```
+
+It produces the 240-memory source with external initializers removed and
+elaborates through Yosys. The next gate is a behavioral DDR3 model driving the
+240-vector arbiter and checking the first-token checkpoint.
+
 The loader-only PCIe/DDR3 baseline is independently accepted in
 `artifacts/diagnostics/2026-09-16-ddr3-pcie-full-image-3-cold-starts.json`.
 No accelerator integration or inference success is claimed here.
