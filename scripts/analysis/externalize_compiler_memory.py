@@ -23,6 +23,8 @@ class ExternalizationResult:
     source: str
     memory_name: str
     memory_width: int
+    memory_names: tuple[str, ...] = ()
+    memory_widths: tuple[int, ...] = ()
 
 
 def _parameter(params: str, name: str) -> int:
@@ -74,6 +76,52 @@ def externalize_memory(source: str, memory_name: str) -> ExternalizationResult:
     if "module seq_mem_d1_external" not in rewritten:
         rewritten = _EXTERNAL_MODULE + "\n" + rewritten
     return ExternalizationResult(rewritten, memory_name, width)
+
+
+def externalize_memories(source: str, memory_names: list[str]) -> ExternalizationResult:
+    """Externalize several memories through indexed shared-port vectors."""
+
+    names = tuple(memory_names)
+    if not names or len(set(names)) != len(names):
+        raise ValueError("memory names must be a non-empty unique list")
+    matches = {m.group("name"): m for m in _INSTANCE.finditer(source)}
+    missing = [name for name in names if name not in matches]
+    if missing:
+        raise ValueError(f"memory instance {missing[0]!r} not found")
+    widths = tuple(_parameter(matches[name].group("params"), "WIDTH") for name in names)
+    if any(width > 64 for width in widths):
+        raise ValueError("external memory slice supports widths up to 64 bits")
+    main_match = re.search(r"module\s+main\s*\((?P<ports>.*?)\);", source, re.DOTALL)
+    if main_match is None:
+        raise ValueError("module main declaration not found")
+    count = len(names)
+    ports = main_match.group("ports") + (
+        f",\n  output logic [{count - 1}:0] ext_mem_req_valid"
+        f",\n  input logic [{count - 1}:0] ext_mem_req_ready"
+        f",\n  output logic [{count * 32 - 1}:0] ext_mem_req_addr"
+        f",\n  input logic [{count - 1}:0] ext_mem_rsp_valid"
+        f",\n  input logic [{count * 64 - 1}:0] ext_mem_rsp_data"
+    )
+    rewritten = source[: main_match.start("ports")] + ports + source[main_match.end("ports") :]
+    # Replace from the end so source offsets remain valid.
+    selected = {
+        m.group("name"): m for m in _INSTANCE.finditer(rewritten) if m.group("name") in names
+    }
+    for index in sorted(range(count), key=lambda i: selected[names[i]].start(), reverse=True):
+        name = names[index]
+        match = selected[name]
+        body = match.group("body") + (
+            f",\n  .ext_req_valid(ext_mem_req_valid[{index}])"
+            f",\n  .ext_req_ready(ext_mem_req_ready[{index}])"
+            f",\n  .ext_req_addr(ext_mem_req_addr[{index * 32 + 31}:{index * 32}])"
+            f",\n  .ext_rsp_valid(ext_mem_rsp_valid[{index}])"
+            f",\n  .ext_rsp_data(ext_mem_rsp_data[{index * 64 + 63}:{index * 64}])"
+        )
+        replacement = "seq_mem_d1_external # (" + match.group("params") + ") " + name + " (" + body + ");"
+        rewritten = rewritten[: match.start()] + replacement + rewritten[match.end() :]
+    if "module seq_mem_d1_external" not in rewritten:
+        rewritten = _EXTERNAL_MODULE + "\n" + rewritten
+    return ExternalizationResult(rewritten, names[0], widths[0], names, widths)
 
 
 _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
