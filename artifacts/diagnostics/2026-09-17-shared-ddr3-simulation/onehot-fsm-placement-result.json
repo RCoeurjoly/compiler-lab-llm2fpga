@@ -1,0 +1,27 @@
+{
+  "status": "placement_completed_estimated_timing_failed",
+  "session": 88514,
+  "exit_code": 0,
+  "warnings": 990,
+  "errors": 0,
+  "seed": 15,
+  "rowstream_estimated_mhz": 43.00,
+  "rowstream_required_mhz": 83.33,
+  "pcie_estimated_mhz": 53.69,
+  "pcie_required_mhz": 62.50,
+  "log_sha256": "262984f750910bc01c8a65eab85812238a8cb270d31d5e6597d9b68a76e33d39",
+  "placed_json_sha256": "54db1f5b5597edcc58100d0f6a543a17b87bb3bda8ff9d24ec01d1bc2bbada75",
+  "worst_rowstream_path": {
+    "source": "compiler_accelerator.run_active",
+    "source_cell": "$auto$ff.cc:337:slice$212387.Q",
+    "intermediate": "compiler_accelerator.core.compiler_core.adder7_right[0]",
+    "endpoint_net": "compiler_accelerator.core.compiler_core.fsm_in[1]",
+    "endpoint_cell": "$auto$ff.cc:337:slice$248807.D",
+    "total_ns": 23.3,
+    "logic_ns": 3.2,
+    "estimated_routing_ns": 20.1
+  },
+  "source_diagnosis": "The reported path now crosses the separate four-bit static-schedule counter fsm, not the recoded main fsm0. adder7 operands are fsm_out and one, each gated by early_reset_static_par_thread4_go_out. Its output passes through the shared fsm_in priority mux. Other branches similarly select guarded incrementers; the zero/reset branch appears in the middle, so collapsing priorities without preserving that ordering would be unsound for arbitrary overlapping go signals.",
+  "decision": "Do not promote one-hot alone: resource use increased and overall placement estimate did not improve. It moved the reported worst path, so the result does not prove that recoding has no local benefit. Investigate the evidenced static-counter increment/mux cone before another implementation change. No route launched.",
+  "qualification": "Placement estimate only, not routed timing or physical failure. Do not modify PCIe based on its estimate. Recoding equivalence and staged-arbiter first-token simulation remain pending; no bitstream or board acceptance."
+}
