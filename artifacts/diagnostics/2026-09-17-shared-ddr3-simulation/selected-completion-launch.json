@@ -1,0 +1,19 @@
+{
+  "status": "launched_not_acceptance",
+  "compiler_commit": "66a154a",
+  "generated_accelerator": "/nix/store/fp15vjfq4rnv55hyhs9cj6jdkf7sh1k9-selected-completion.sv",
+  "generated_accelerator_sha256": "eefbc34e60006e01f7d33b405298d6cea5c3bb122552fa338665b34db5c948cf",
+  "simulation_build_exit_code": 0,
+  "simulation_executable_sha256": "712cf26d22087c01579dc0d021cc05226cec79f516916930546e86ff3e2d346e",
+  "simulation_command": "timeout --signal=TERM --kill-after=10s 10800 /tmp/compiler-ddr3-current.2Z9Mo4/obj-selected-completion/Vcommand_integration_wrapper +IMAGE=/tmp/compiler-ddr3-current.2Z9Mo4/tinystories-ddr3-lines.hex",
+  "simulation_log": "/tmp/compiler-ddr3-current.2Z9Mo4/selected-completion-run.log",
+  "synthesis_command": "timeout --signal=TERM --kill-after=10s 1800 /nix/store/1g0dvnvw75fnlnk4ad586c65wfxbf5rs-yosys-with-plugins-0.66/bin/yosys -s artifacts/diagnostics/2026-09-17-shared-ddr3-simulation/selected-completion-synthesis.ys",
+  "synthesis_log": "/tmp/compiler-ddr3-current.2Z9Mo4/selected-completion-synthesis.log",
+  "qualification_limits": [
+    "Historical launch record only; not evidence that either process remains live or passed.",
+    "Same simulation wrapper, driver and model image as command-integration-result.json; registered request stage plus selected token-bank completion register.",
+    "Synthesis script differs from registered-request-synthesis.ys only in compiler accelerator input and output netlist path.",
+    "Previous registered-request simulation remains separate; it cannot qualify this revision.",
+    "No new timing, bitstream or hardware acceptance. Preserve prior baselines."
+  ]
+}
