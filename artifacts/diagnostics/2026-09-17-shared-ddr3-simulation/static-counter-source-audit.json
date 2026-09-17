@@ -1,0 +1,23 @@
+{
+  "status": "hierarchy_and_mapped_source_attribution_checked",
+  "netlist_sha256": "01f0c4796d9b18dd0c47da185525a1a5f3f0983d2a31b0b6fa801fea8d87608d",
+  "synthesis_log_sha256": "42e32d6f912096de7e4ada5cf70c599b553841edc2632b961b8687cf2db85b93",
+  "used_accelerator_hierarchy": [
+    "tinystories_1m_ddr3_command_adapter",
+    "tinystories_1m_ddr3_backend",
+    "main",
+    "llm_external_memory_arbiter"
+  ],
+  "removed_unused_legacy_modules": [
+    "task6_tinystories_ddr_service",
+    "task6_tinystories_ddr_accelerator",
+    "task6_ddr3_rowstream_wb_top1_reader",
+    "task6_ddr3_rowstream_top1_cutout"
+  ],
+  "mapped_cells_with_legacy_source_path_match": 0,
+  "mapped_cells_with_current_compiler_source_path_match": 31187,
+  "compiler_source": "/nix/store/ssakxn1r6z30bkiw8k92lc84lf17q509-static-counter-reviewed.sv",
+  "compiler_source_sha256": "41b98813203c4c1f8183da2e93dd105dcae087d8fee1e02c9bc61eedb7d9dfce",
+  "method": "Inspect Yosys Used module / Removing unused module messages, then count final top-module cells whose src attribute contains the current compiler source pin or any of the four legacy module filenames. Counts include synthesis metadata cells, not just physical cells.",
+  "qualification": "The shared recipe parses legacy files, but hierarchy removes the legacy accelerator/service/top1 implementations. Transport token collector, CDC and command-stage modules remain in scope. This supplements source provenance; filename attribution alone is not a proof of compiler derivation, functional equivalence, physical timing or board inference. The exact compiler transformation and source hashes remain bound by the other candidate receipts."
+}
