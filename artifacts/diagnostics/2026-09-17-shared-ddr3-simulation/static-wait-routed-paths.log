@@ -1,0 +1,291 @@
+Info:    1366537 |   250816    1115721 |    0   538 |         0|       5.40   10255.74|
+Info: Routing complete.
+Info: Router1 time 10255.74s
+Info: Checksum: 0xf8cb599b
+
+Info: Critical path report for clock 'pcie_7x_top_aximm_i.task6_pcie_status_i.drck' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$217328.Q
+Info:  1.3  1.4    Net pcie_7x_top_aximm_i.task6_pcie_status_i.shift_q[293] budget 41.466999 ns (275,98) -> (275,134)
+Info:                Sink $auto$xilinx_dffopt.cc:341:execute$937317.A6
+Info:  0.2  1.6  Source $auto$xilinx_dffopt.cc:341:execute$937317.O6
+Info:  0.0  1.6    Net $auto$xilinx_dffopt.cc:347:execute$937318 budget 41.466000 ns (275,134) -> (275,134)
+Info:                Sink $auto$ff.cc:337:slice$217327.D
+Info:  0.1  1.7  Setup $auto$ff.cc:337:slice$217327.D
+Info: 0.4 ns logic, 1.3 ns routing
+
+Info: Critical path report for clock 'rowstream_ddr3.jtag_command_shift.drck' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$200191.Q
+Info:  2.6  2.7    Net rowstream_ddr3.jtag_command_shift.shift_q[161] budget 41.466999 ns (259,317) -> (250,233)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$751396.A2
+Info:  0.2  2.9  Source $abc$737188$auto$blifparse.cc:557:parse_blif$751396.O5
+Info:  0.0  2.9    Net $abc$737188$flatten\rowstream_ddr3.\jtag_command_shift.$0\shift_q[207:0][160] budget 41.466000 ns (250,233) -> (250,233)
+Info:                Sink $auto$ff.cc:337:slice$200190.D
+Info:  0.1  3.0  Setup $auto$ff.cc:337:slice$200190.D
+Info: 0.4 ns logic, 2.6 ns routing
+
+Info: Critical path report for clock 'rowstream_ddr3.jtag_command_shift.tck' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$200018.Q
+Info:  0.3  0.4    Net rowstream_ddr3.jtag_command_shift.toggle_tck_q budget 41.466999 ns (130,112) -> (130,112)
+Info:                Sink $auto$xilinx_dffopt.cc:332:execute$938451.A3
+Info:  0.2  0.6  Source $auto$xilinx_dffopt.cc:332:execute$938451.O5
+Info:  0.0  0.7    Net $auto$xilinx_dffopt.cc:347:execute$938452 budget 41.466000 ns (130,112) -> (130,112)
+Info:                Sink $auto$ff.cc:337:slice$200018.D
+Info:  0.1  0.8  Setup $auto$ff.cc:337:slice$200018.D
+Info: 0.4 ns logic, 0.4 ns routing
+
+Info: Critical path report for clock 'rowstream_clk' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$546100.Q
+Info:  6.3  6.4    Net compiler_accelerator.core.compiler_core.context_tokens_read_data[13] budget 0.711000 ns (157,146) -> (83,332)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737615.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.S0
+Info:  0.1  6.5  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737615.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  3.5  9.9    Net $abc$737188$auto$blifparse.cc:557:parse_blif$737612.A[2] budget 0.237000 ns (83,332) -> (83,241)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737612.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.A3
+Info:  0.2 10.1  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737612.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.O6
+Info:  0.0 10.1    Net $abc$737188$auto$blifparse.cc:557:parse_blif$737612.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget 0.236000 ns (83,241) -> (83,241)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737612.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.0
+Info:  0.1 10.2  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737612.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.0 10.2    Net $abc$737188$auto$blifparse.cc:557:parse_blif$737612.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget 0.236000 ns (83,241) -> (83,241)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737612.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.0
+Info:  0.1 10.3  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737612.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  0.9 11.3    Net $abc$737188$auto$blifparse.cc:557:parse_blif$737576.A[7] budget 0.236000 ns (83,241) -> (81,261)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737576.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.S0
+Info:  0.1 11.4  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737576.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  1.2 12.6    Net $abc$737188$auto$blifparse.cc:557:parse_blif$737395.A[5] budget 0.184000 ns (81,261) -> (78,289)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737395.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.A6
+Info:  0.2 12.8  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737395.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.O6
+Info:  0.0 12.8    Net $abc$737188$auto$blifparse.cc:557:parse_blif$737395.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget 0.184000 ns (78,289) -> (78,289)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737395.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.1
+Info:  0.1 12.9  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737395.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.0 12.9    Net $abc$737188$auto$blifparse.cc:557:parse_blif$737395.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget 0.184000 ns (78,289) -> (78,289)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737395.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.1
+Info:  0.1 13.0  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737395.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  4.3 17.2    Net $abc$737188$auto$blifparse.cc:557:parse_blif$752677.A[6] budget 0.184000 ns (78,289) -> (34,146)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737675.A3
+Info:  0.2 17.4  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737675.O6
+Info:  5.7 23.2    Net compiler_accelerator.core.compiler_core.token_weight_codes_i8_b0_addr0[6] budget 0.219000 ns (34,146) -> (91,316)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$755968.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.A4
+Info:  0.2 23.4  Source $abc$737188$auto$blifparse.cc:557:parse_blif$755968.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.O6
+Info:  0.0 23.4    Net $abc$737188$auto$blifparse.cc:557:parse_blif$755968.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget 0.219000 ns (91,316) -> (91,316)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$755968.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.0
+Info:  0.1 23.5  Source $abc$737188$auto$blifparse.cc:557:parse_blif$755968.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.0 23.5    Net $abc$737188$auto$blifparse.cc:557:parse_blif$755968.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget 0.219000 ns (91,316) -> (91,316)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$755968.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.0
+Info:  0.1 23.6  Source $abc$737188$auto$blifparse.cc:557:parse_blif$755968.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  0.9 24.5    Net $abc$737188$auto$blifparse.cc:557:parse_blif$757109.A[6] budget 0.219000 ns (91,316) -> (83,321)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$757109.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.S0
+Info:  0.1 24.6  Source $abc$737188$auto$blifparse.cc:557:parse_blif$757109.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.0 24.6    Net $abc$737188$auto$blifparse.cc:557:parse_blif$757109.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget 0.206000 ns (83,321) -> (83,321)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$757109.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.0
+Info:  0.1 24.7  Source $abc$737188$auto$blifparse.cc:557:parse_blif$757109.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  2.9 27.6    Net $abc$737188$auto$blifparse.cc:557:parse_blif$757084.A[7] budget 0.208000 ns (83,321) -> (86,230)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$757084.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.S0
+Info:  0.1 27.7  Source $abc$737188$auto$blifparse.cc:557:parse_blif$757084.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  2.1 29.8    Net $auto$alumacc.cc:512:replace_alu$159994.B[12] budget 0.189000 ns (86,230) -> (81,145)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$756928.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.A2
+Info:  0.2 30.0  Source $abc$737188$auto$blifparse.cc:557:parse_blif$756928.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.O6
+Info:  0.0 30.0    Net $abc$737188$auto$blifparse.cc:557:parse_blif$756928.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget 0.189000 ns (81,145) -> (81,145)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$756928.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.1
+Info:  0.1 30.0  Source $abc$737188$auto$blifparse.cc:557:parse_blif$756928.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.6 30.6    Net $abc$737188$auto$blifparse.cc:557:parse_blif$777674.A[4] budget 0.189000 ns (81,145) -> (81,136)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$777674.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.A5
+Info:  0.2 30.8  Source $abc$737188$auto$blifparse.cc:557:parse_blif$777674.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.O6
+Info:  0.0 30.8    Net $abc$737188$auto$blifparse.cc:557:parse_blif$777674.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget 0.189000 ns (81,136) -> (81,136)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$777674.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.0
+Info:  0.1 30.9  Source $abc$737188$auto$blifparse.cc:557:parse_blif$777674.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.0 30.9    Net $abc$737188$auto$blifparse.cc:557:parse_blif$777674.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget 0.189000 ns (81,136) -> (81,136)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$777674.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.1
+Info:  0.1 31.0  Source $abc$737188$auto$blifparse.cc:557:parse_blif$777674.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  1.2 32.2    Net $abc$737188$auto$blifparse.cc:557:parse_blif$777927.A[6] budget 0.190000 ns (81,136) -> (110,162)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$777711.A3
+Info:  0.2 32.4  Source $abc$737188$auto$blifparse.cc:557:parse_blif$777711.O5
+Info:  1.5 34.0    Net $abc$737188$auto$blifparse.cc:557:parse_blif$777926.A[0] budget 0.190000 ns (110,162) -> (91,132)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$777926.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.A1
+Info:  0.2 34.2  Source $abc$737188$auto$blifparse.cc:557:parse_blif$777926.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.O6
+Info:  0.0 34.2    Net $abc$737188$auto$blifparse.cc:557:parse_blif$777926.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget 0.183000 ns (91,132) -> (91,132)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$777926.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.1
+Info:  0.1 34.3  Source $abc$737188$auto$blifparse.cc:557:parse_blif$777926.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.0 34.3    Net $abc$737188$auto$blifparse.cc:557:parse_blif$777926.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget 0.183000 ns (91,132) -> (91,132)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$777926.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.1
+Info:  0.1 34.4  Source $abc$737188$auto$blifparse.cc:557:parse_blif$777926.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  0.9 35.3    Net $abc$737188$auto$blifparse.cc:557:parse_blif$783396.A[4] budget 0.189000 ns (91,132) -> (86,149)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$783393.A2
+Info:  0.2 35.5  Source $abc$737188$auto$blifparse.cc:557:parse_blif$783393.O5
+Info:  1.1 36.6    Net $abc$737188$auto$blifparse.cc:557:parse_blif$783394.A[3] budget 0.189000 ns (86,149) -> (81,132)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$783394.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.A4
+Info:  0.2 36.8  Source $abc$737188$auto$blifparse.cc:557:parse_blif$783394.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.O6
+Info:  0.0 36.8    Net $abc$737188$auto$blifparse.cc:557:parse_blif$783394.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget 0.183000 ns (81,132) -> (81,132)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$783394.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.1
+Info:  0.1 36.9  Source $abc$737188$auto$blifparse.cc:557:parse_blif$783394.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.9 37.8    Net $abc$737188$flatten\compiler_accelerator.\core.\memory_arbiter.$0\last_grant_group[3:0][0] budget 0.183000 ns (81,132) -> (91,147)
+Info:                Sink $auto$ff.cc:337:slice$496304.D
+Info:  0.1 37.9  Setup $auto$ff.cc:337:slice$496304.D
+Info: 3.9 ns logic, 34.0 ns routing
+
+Info: Critical path report for clock 'pcie_user_clk' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$234079.Q
+Info:  3.4  3.5    Net pcie_ingress.ingress.wdata_q[15] budget 1.134000 ns (253,79) -> (233,190)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737777.A5
+Info:  0.2  3.7  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737777.O5
+Info:  0.4  4.1    Net $techmap852383$abc$737188$auto$blifparse.cc:557:parse_blif$737773.A[1] budget 1.134000 ns (233,190) -> (233,190)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737850.A4
+Info:  0.2  4.3  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737850.O5
+Info:  0.6  4.9    Net $techmap852456$abc$737188$auto$blifparse.cc:557:parse_blif$737849.A[1] budget 1.255000 ns (233,190) -> (233,196)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737849.A4
+Info:  0.2  5.1  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737849.O5
+Info:  0.5  5.6    Net $techmap852457$abc$737188$auto$blifparse.cc:557:parse_blif$737845.A[0] budget 1.400000 ns (233,196) -> (233,201)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$737845.A3
+Info:  0.2  5.8  Source $abc$737188$auto$blifparse.cc:557:parse_blif$737845.O5
+Info:  0.4  6.3    Net $techmap852458$abc$737188$auto$blifparse.cc:557:parse_blif$737840.A[0] budget 1.400000 ns (233,201) -> (225,201)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$738060.A1
+Info:  0.2  6.5  Source $abc$737188$auto$blifparse.cc:557:parse_blif$738060.O6
+Info:  0.8  7.2    Net $techmap852669$abc$737188$auto$blifparse.cc:557:parse_blif$738059.A[1] budget 1.400000 ns (225,201) -> (208,178)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$738059.A5
+Info:  0.2  7.4  Source $abc$737188$auto$blifparse.cc:557:parse_blif$738059.O6
+Info:  2.1  9.5    Net $techmap852670$abc$737188$auto$blifparse.cc:557:parse_blif$738058.A[0] budget 1.400000 ns (208,178) -> (197,105)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$738058.A2
+Info:  0.2  9.7  Source $abc$737188$auto$blifparse.cc:557:parse_blif$738058.O5
+Info:  0.4 10.1    Net $techmap852674$abc$737188$auto$blifparse.cc:557:parse_blif$738057.A[1] budget 1.400000 ns (197,105) -> (191,103)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$738640.A2
+Info:  0.2 10.3  Source $abc$737188$auto$blifparse.cc:557:parse_blif$738640.O6
+Info:  0.4 10.7    Net $techmap853249$abc$737188$auto$blifparse.cc:557:parse_blif$738639.A[3] budget 1.400000 ns (191,103) -> (191,103)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$739046.A3
+Info:  0.2 10.9  Source $abc$737188$auto$blifparse.cc:557:parse_blif$739046.O5
+Info:  0.0 10.9    Net $abc$737188$flatten\pcie_ingress.\ingress.$5$lookahead\m2_full_block_input_vector_o$24650[511:0]$25943[108] budget 1.400000 ns (191,103) -> (191,103)
+Info:                Sink $auto$ff.cc:337:slice$233065.D
+Info:  0.1 11.0  Setup $auto$ff.cc:337:slice$233065.D
+Info: 2.0 ns logic, 9.0 ns routing
+
+Info: Critical path report for clock 'pcie_7x_top_aximm_i.pcie_7x_i.PIPE_OOBCLK_IN' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$210875.Q
+Info:  0.4  0.5    Net pcie_7x_top_aximm_i.pcie_7x_i.gt_wrapper_gtx.pipe_wrapper_i.fsm[1] budget 11.705000 ns (294,105) -> (297,100)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$742097.A5
+Info:  0.2  0.7  Source $abc$737188$auto$blifparse.cc:557:parse_blif$742097.O5
+Info:  0.5  1.2    Net $techmap856706$abc$737188$auto$blifparse.cc:557:parse_blif$742095.A[1] budget 11.705000 ns (297,100) -> (297,100)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$742095.A2
+Info:  0.2  1.4  Source $abc$737188$auto$blifparse.cc:557:parse_blif$742095.O6
+Info:  0.4  1.8    Net pcie_7x_top_aximm_i.pcie_7x_i.gt_wrapper_gtx.pipe_wrapper_i.sync_txphalign budget 11.705000 ns (297,100) -> (297,103)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$783706.A1
+Info:  0.2  2.0  Source $abc$737188$auto$blifparse.cc:557:parse_blif$783706.O5
+Info:  0.3  2.3    Net $techmap895503$abc$737188$auto$blifparse.cc:557:parse_blif$783705.A[4] budget 11.705000 ns (297,103) -> (297,102)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$783705.A5
+Info:  0.2  2.5  Source $abc$737188$auto$blifparse.cc:557:parse_blif$783705.O6
+Info:  0.5  3.0    Net $techmap895506$abc$737188$auto$blifparse.cc:557:parse_blif$783702.A[5] budget 11.705000 ns (297,102) -> (294,105)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$783702.A6
+Info:  0.2  3.2  Source $abc$737188$auto$blifparse.cc:557:parse_blif$783702.O6
+Info:  0.4  3.6    Net $techmap895507$abc$737188$auto$blifparse.cc:557:parse_blif$783701.A[5] budget 11.704000 ns (294,105) -> (294,103)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$783701.A6
+Info:  0.2  3.8  Source $abc$737188$auto$blifparse.cc:557:parse_blif$783701.O6
+Info:  0.6  4.3    Net $abc$737188$auto$opt_dff.cc:251:make_patterns_logic$135065 budget 11.704000 ns (294,103) -> (294,100)
+Info:                Sink $auto$ff.cc:337:slice$210874.CE
+Info:  0.1  4.4  Setup $auto$ff.cc:337:slice$210874.CE
+Info: 1.4 ns logic, 3.0 ns routing
+
+Info: Critical path report for cross-domain path 'posedge pcie_user_clk' -> 'posedge pcie_7x_top_aximm_i.task6_pcie_status_i.drck':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$546112.Q
+Info:  2.4  2.5    Net pcie_7x_top_aximm_i.user_reset_q budget 41.466999 ns (259,157) -> (267,74)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$751045.A1
+Info:  0.2  2.7  Source $abc$737188$auto$blifparse.cc:557:parse_blif$751045.O5
+Info:  0.0  2.7    Net $abc$737188$flatten\pcie_7x_top_aximm_i.\task6_pcie_status_i.$0\shift_q[1023:0][42] budget 41.466000 ns (267,74) -> (267,74)
+Info:                Sink $auto$ff.cc:337:slice$217077.D
+Info:  0.1  2.8  Setup $auto$ff.cc:337:slice$217077.D
+Info: 0.4 ns logic, 2.4 ns routing
+
+Info: Critical path report for cross-domain path 'posedge pcie_user_clk' -> 'posedge rowstream_clk':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$206283.Q
+Info:  3.0  3.1    Net pcie_user_rst_n budget 5.800000 ns (267,149) -> (157,94)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$792067.A1
+Info:  0.2  3.3  Source $abc$737188$auto$blifparse.cc:557:parse_blif$792067.O6
+Info:  0.6  3.9    Net $abc$737188$auto$rtlil.cc:3492:NotGate$689573 budget 5.800000 ns (157,94) -> (157,94)
+Info:                Sink $auto$ff.cc:337:slice$542394.SR
+Info:  0.1  4.0  Setup $auto$ff.cc:337:slice$542394.SR
+Info: 0.4 ns logic, 3.6 ns routing
+
+Info: Critical path report for cross-domain path 'posedge rowstream_clk' -> 'posedge pcie_user_clk':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$199925.Q
+Info:  2.4  2.5    Net rowstream_ddr3.uberddr3.ddr3_controller_inst.o_wb_stall_int_q budget 0.970000 ns (14,75) -> (13,172)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$741601.A2
+Info:  0.2  2.7  Source $abc$737188$auto$blifparse.cc:557:parse_blif$741601.O6
+Info:  3.4  6.1    Net $techmap856210$abc$737188$auto$blifparse.cc:557:parse_blif$741600.A[0] budget 2.272000 ns (13,172) -> (147,82)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$741600.A1
+Info:  0.2  6.3  Source $abc$737188$auto$blifparse.cc:557:parse_blif$741600.O6
+Info:  0.0  6.3    Net rowstream_top1_debug_status[12] budget 3.800000 ns (147,82) -> (147,82)
+Info:                Sink $auto$ff.cc:337:slice$180661.D
+Info:  0.1  6.4  Setup $auto$ff.cc:337:slice$180661.D
+Info: 0.6 ns logic, 5.8 ns routing
+
+Info: Critical path report for cross-domain path 'posedge rowstream_ddr3.jtag_command_shift.drck' -> 'posedge rowstream_ddr3.jtag_command_shift.tck':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$200141.Q
+Info:  1.3  1.4    Net rowstream_ddr3.jtag_command_shift.shift_q[111] budget 83.133003 ns (220,222) -> (191,197)
+Info:                Sink $auto$ff.cc:337:slice$200557.D
+Info:  0.1  1.5  Setup $auto$ff.cc:337:slice$200557.D
+Info: 0.2 ns logic, 1.3 ns routing
+
+Info: Critical path report for cross-domain path 'posedge rowstream_ddr3.jtag_command_shift.tck' -> 'posedge rowstream_clk':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$200551.Q
+Info:  1.7  1.8    Net rowstream_ddr3.jtag_command_shift.payload_tck_q[105] budget 11.800000 ns (200,215) -> (190,167)
+Info:                Sink $auto$ff.cc:337:slice$500476.D
+Info:  0.1  1.9  Setup $auto$ff.cc:337:slice$500476.D
+Info: 0.2 ns logic, 1.7 ns routing
+
+Info: Critical path report for cross-domain path 'posedge rowstream_ddr3.jtag_command_shift.tck' -> 'posedge rowstream_ddr3.jtag_command_shift.drck':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$200557.Q
+Info:  1.2  1.4    Net rowstream_ddr3.jtag_command_shift.payload_tck_q[111] budget 41.466999 ns (191,197) -> (220,222)
+Info:                Sink $abc$737188$auto$blifparse.cc:557:parse_blif$751629.A3
+Info:  0.2  1.5  Source $abc$737188$auto$blifparse.cc:557:parse_blif$751629.O5
+Info:  0.0  1.6    Net $abc$737188$flatten\rowstream_ddr3.\jtag_command_shift.$0\shift_q[207:0][111] budget 41.466000 ns (220,222) -> (220,222)
+Info:                Sink $auto$ff.cc:337:slice$200141.D
+Info:  0.1  1.7  Setup $auto$ff.cc:337:slice$200141.D
+Info: 0.4 ns logic, 1.3 ns routing
+
+Info: Max frequency for clock 'pcie_7x_top_aximm_i.task6_pcie_status_i.drck': 579.04 MHz (PASS at 12.00 MHz)
+Info: Max frequency for clock       'rowstream_ddr3.jtag_command_shift.drck': 332.89 MHz (PASS at 12.00 MHz)
+Info: Max frequency for clock        'rowstream_ddr3.jtag_command_shift.tck': 1331.56 MHz (PASS at 12.00 MHz)
+ERROR: Max frequency for clock                                'rowstream_clk': 26.39 MHz (FAIL at 83.33 MHz)
+Info: Max frequency for clock                                'pcie_user_clk': 90.97 MHz (PASS at 62.50 MHz)
+Info: Max frequency for clock 'pcie_7x_top_aximm_i.pcie_7x_i.PIPE_OOBCLK_IN': 225.28 MHz (PASS at 12.00 MHz)
+
+Info: Max delay posedge pcie_user_clk                          -> posedge pcie_7x_top_aximm_i.task6_pcie_status_i.drck: 2.84 ns
+Info: Max delay posedge pcie_user_clk                          -> posedge rowstream_clk                               : 3.98 ns
+Info: Max delay posedge rowstream_clk                          -> posedge pcie_user_clk                               : 6.44 ns
+Info: Max delay posedge rowstream_ddr3.jtag_command_shift.drck -> posedge rowstream_ddr3.jtag_command_shift.tck       : 1.47 ns
+Info: Max delay posedge rowstream_ddr3.jtag_command_shift.tck  -> posedge rowstream_clk                               : 1.89 ns
+Info: Max delay posedge rowstream_ddr3.jtag_command_shift.tck  -> posedge rowstream_ddr3.jtag_command_shift.drck      : 1.67 ns
+
+Info: Slack histogram:
+Info:  legend: * represents 377 endpoint(s)
+Info:          + represents [1,377) endpoint(s)
+Info: [-25900, -20463) |**+
+Info: [-20463, -15026) |*****+
+Info: [-15026,  -9589) |****+
+Info: [ -9589,  -4152) |*****+
+Info: [ -4152,   1285) |*****************+
+Info: [  1285,   6722) |*************************************************+
+Info: [  6722,  12159) |************************************************************ 
+Info: [ 12159,  17596) |************************+
+Info: [ 17596,  23033) | 
+Info: [ 23033,  28470) | 
+Info: [ 28470,  33907) | 
+Info: [ 33907,  39344) | 
+Info: [ 39344,  44781) | 
+Info: [ 44781,  50218) | 
+Info: [ 50218,  55655) | 
+Info: [ 55655,  61092) | 
+Info: [ 61092,  66529) | 
+Info: [ 66529,  71966) | 
+Info: [ 71966,  77403) | 
+Info: [ 77403,  82840) |*****+
+Info: Running post-routing legalisation...
+
+990 warnings, 1 error

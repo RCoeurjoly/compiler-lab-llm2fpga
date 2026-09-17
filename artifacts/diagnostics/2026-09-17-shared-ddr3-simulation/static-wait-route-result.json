@@ -1,0 +1,50 @@
+{
+  "status": "routed_but_failed_timing_do_not_program",
+  "exit_code": 1,
+  "timed_out": false,
+  "launch_receipt": "static-wait-route-launch.json",
+  "router_seconds": 10255.74,
+  "seed": 15,
+  "router": "router1",
+  "constraints_changed": false,
+  "netlist_sha256": "7c0d56a27079c02afd41fc9926c97f88c7508b9cae594526e6dd61ad326457cc",
+  "log_path": "/tmp/compiler-ddr3-current.2Z9Mo4/static-wait-route.log",
+  "log_sha256": "8320f087a759d18f35288a65b88fff06591c4e7e59154676f7f6638da807c544",
+  "preserved_excerpt": "static-wait-routed-paths.log",
+  "excerpt_source_lines": [
+    2793,
+    3085
+  ],
+  "routed_fasm_path": "/tmp/compiler-ddr3-current.2Z9Mo4/static-wait-routed.fasm",
+  "routed_fasm_sha256": "c61139d7292b0e99a188afb633d308ae28ddea4b206c87c657c04d40130652dc",
+  "routed_json_path": "/tmp/compiler-ddr3-current.2Z9Mo4/static-wait-routed.json",
+  "routed_json_sha256": "00ec431ba73d568c232d3076a49d6624d53f29b6a1d2751a045b61efe4a72f78",
+  "timing": {
+    "rowstream_clk": {
+      "required_mhz": 83.33,
+      "achieved_mhz": 26.39,
+      "passed": false,
+      "path_ns": 37.9,
+      "logic_ns": 3.9,
+      "routing_ns": 34,
+      "source": "compiler_accelerator.core.compiler_core.context_tokens_read_data[13]",
+      "via": "compiler_accelerator.core.compiler_core.token_weight_codes_i8_b0_addr0[6]",
+      "sink": "compiler_accelerator.core.memory_arbiter.last_grant_group[0]"
+    },
+    "pcie_user_clk": {
+      "required_mhz": 62.5,
+      "achieved_mhz": 90.97,
+      "passed": true
+    }
+  },
+  "warnings": 990,
+  "errors": 1,
+  "bitstream_generated": false,
+  "hardware_programmed": false,
+  "qualification_limits": [
+    "FASM and routed JSON were emitted despite the nonzero exit; neither is acceptance-qualified",
+    "PCIe pass describes the tool's covered paths, not complete PHY/CDC timing qualification",
+    "No DDR3 or PCIe change authorized by this diagnosis; target the measured compiler request/arbiter path",
+    "One-token simulation passes do not override physical timing failure"
+  ]
+}

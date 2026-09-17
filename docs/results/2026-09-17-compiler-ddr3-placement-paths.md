@@ -68,3 +68,27 @@ The full log/JSON remain temporary at
 `/tmp/compiler-ddr3-current.2Z9Mo4/static-wait-placement-diagnostic.{log,json}`;
 the tracked excerpt preserves log lines 1395–1523 and 1614–1619. Neither the
 placed JSON nor its exit status is timing acceptance.
+
+## Subsequent original-tool routed result
+
+The original, unmodified nextpnr job subsequently finished routing in
+10,255.74 router seconds and exited **1**, not a timeout. It reports
+**26.39 MHz, FAIL at 83.33 MHz** for `rowstream_clk` and **90.97 MHz, PASS at
+62.50 MHz** for `pcie_user_clk`. The PCIe placement estimate was therefore not
+a routed failure; do not modify the validated PCIe transport based on it.
+
+The routed rowstream path confirms the same region as the placement diagnosis:
+`context_tokens_read_data[13]` through `token_weight_codes_i8_b0_addr0[6]`
+to `memory_arbiter.last_grant_group[0]`, totaling **37.9 ns** (3.9 ns logic,
+34.0 ns routing), against a 12 ns period. The exact path and result are in
+`static-wait-routed-paths.log` and `static-wait-route-result.json` in the
+diagnostic artifact directory. The source/destination bits differ from the
+placement-estimated worst path; the compiler request-to-arbitration dependency
+is the same. This is now routed evidence, not just a placement hypothesis.
+
+The tool emitted FASM and routed JSON despite timing failure. Their hashes are
+recorded for diagnosis, **not approval to convert or program**. No bitstream
+was generated or programmed. Covered-path PCIe success is not a claim of full
+PHY/CDC timing coverage. The next implementation experiment must address the
+compiler request path while retaining exact memory-response semantics and the
+validated PCIe/DDR3 transport, clocks and constraints.

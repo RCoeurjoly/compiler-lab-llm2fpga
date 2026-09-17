@@ -149,3 +149,19 @@ five backpressured cycles and verifies retirement after the output handshake.
 This remains a preloaded, fixed-latency memory simulation: no PCIe loading,
 owner mux, physical DDR3, clock crossings, routed timing or hardware acceptance
 is established. No production RTL or transport change accompanied this test.
+
+### Original-tool routing completed, but failed timing
+
+`static-wait-route-result.json` records terminal exit **1** after routing
+completed (not a timeout). `rowstream_clk` achieves only **26.39 MHz** versus
+the required **83.33 MHz**; PCIe's covered paths pass at **90.97 MHz** versus
+**62.50 MHz**. The preserved `static-wait-routed-paths.log` localizes the
+37.9 ns rowstream path from the compiler context-token register through
+token-weight request logic to the memory arbiter's group-selection register.
+See `docs/results/2026-09-17-compiler-ddr3-placement-paths.md` for the source
+trace and distinction from the earlier placement estimates.
+
+FASM and routed JSON exist but are **not timing-qualified**. They have not been
+converted to a bitstream or programmed. Passing simulation does not override
+this failure; the next fix must target the evidenced compiler request path,
+not weaken constraints or change the validated PCIe/DDR3 transport.
