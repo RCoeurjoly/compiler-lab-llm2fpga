@@ -1,0 +1,39 @@
+{
+  "status": "synthesis_passed_placement_launched_not_timing_qualified",
+  "compiler_commit": "7c21388",
+  "synthesis_session": 3658,
+  "exit_code": 0,
+  "recipe": "static-counter-synthesis.ys",
+  "log": "/tmp/compiler-ddr3-current.2Z9Mo4/static-counter-synthesis.log",
+  "log_sha256": "42e32d6f912096de7e4ada5cf70c599b553841edc2632b961b8687cf2db85b93",
+  "netlist": "/tmp/compiler-ddr3-current.2Z9Mo4/static-counter-diagnostic.json",
+  "netlist_sha256": "01f0c4796d9b18dd0c47da185525a1a5f3f0983d2a31b0b6fa801fea8d87608d",
+  "reported_seconds": 740.28,
+  "peak_memory_mb": 2025.77,
+  "check_problems": 0,
+  "warnings_unique": 1005,
+  "warnings_total": 1248,
+  "resources": {
+    "LUT": 53256,
+    "FF": 40469,
+    "DSP48E1": 245,
+    "RAMB36E1": 47,
+    "RAMB18E1": 7,
+    "MUXF7": 1224,
+    "MUXF8": 195,
+    "CARRY4": 3940
+  },
+  "placement": {
+    "session": 90303,
+    "timeout_seconds": 1800,
+    "seed": 15,
+    "mode": "no-route, diagnostic critical-path reporting",
+    "log": "/tmp/compiler-ddr3-current.2Z9Mo4/static-counter-placement.log",
+    "output": "/tmp/compiler-ddr3-current.2Z9Mo4/static-counter-placement.json",
+    "tool": "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+    "chipdb": "/nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin",
+    "xdc": "/nix/store/ppnarr616qy3dp42r46xf7hb8x4x4m3x-task6-ypcb-pcie-uberddr3-rowstream-loader.xdc",
+    "pre_pack": "/nix/store/y88il6wq3p8ik3kp68md3f0miysafiay-nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py"
+  },
+  "qualification": "Synthesis completion is not timing closure or inference acceptance. Full-model static-counter simulation remains in progress. Placement is not routing. No candidate bitstream or board result. PCIe/DDR3 sources, constraints and seed unchanged."
+}
