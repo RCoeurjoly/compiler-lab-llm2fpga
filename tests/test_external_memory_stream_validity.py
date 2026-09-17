@@ -72,11 +72,16 @@ TESTBENCH = r"""module tb;
         $fatal(1, "done asserted before the delayed second response");
     end
 
+    // The response belongs to accepted byte address 1, not the live input.
+    // A request pipeline must retain this association through backpressure.
+    addr0 = 2;
     ext_rsp_data = 64'h2200;
     ext_rsp_valid = 1;
     tick();
     if (!done || read_data != 8'h22)
       $fatal(1, "second response did not publish its own data and done");
+    if (!ext_req_valid || ext_req_addr != 2)
+      $fatal(1, "completion was incorrectly associated with the new input address");
     $display("PASS: done only marks the currently returned streaming word valid");
     $finish;
   end
