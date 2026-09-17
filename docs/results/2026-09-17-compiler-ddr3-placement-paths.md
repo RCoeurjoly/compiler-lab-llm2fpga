@@ -186,3 +186,33 @@ completion assignment into the registered predicate. Candidate SHA-256:
 Its full-model simulation and implementation timing have not been qualified.
 The preceding registered-request simulation continues with its unchanged
 executable; its result must not be attributed to this newer candidate.
+
+### Selected-completion placement and route launch
+
+The placement-only diagnostic completed with exit 0 and estimates
+**36.28 MHz, FAIL at 83.33 MHz** for rowstream, and **50.96 MHz, FAIL at
+62.50 MHz** for PCIe. Rowstream improved from the preceding 30.58 MHz
+estimate, but neither estimate establishes routed timing.
+
+The new worst rowstream path is `fsm0.out[8]` to
+`$auto$ff.cc:337:slice$203293.CE`: 27.6 ns total, 1.6 ns logic and 26.0 ns
+estimated routing. The synthesized endpoint Q maps to
+`token_weight_codes_i8_b47.queued_address[13]`. This is the compiler FSM to
+request-capture enable path, not the preceding context-token bank-selector
+path. No additional compiler modification has been made from this estimate.
+
+`selected-completion-placement-paths.log` preserves full-log lines 1390–1452
+and 1555–1560. Full log SHA-256:
+`c23576e0c5fbecaea6ea6e1c62c202126bb235f7ba50dbb58d21d5d0ce4f46d0`.
+Placed JSON SHA-256:
+`a66f4fd561781e4fbda549d8e5709d564c2523a9d2abc37c6a3d637012e423da`.
+The full files are `/tmp/compiler-ddr3-current.2Z9Mo4/selected-completion-placement.{log,json}`.
+
+The unmodified pinned router was launched on the same synthesized candidate
+to obtain routed timing before choosing another change. Exact command and
+input/constraint identities are in `selected-completion-route-launch.json`.
+It retains seed 15, router1, placer budgets, original clocks/XDC/pre-pack,
+and a 10,800-second timebox. No allow-fail flag, relaxed constraint, alternate
+seed or hardware operation. Both compiler-candidate simulations were still
+running at launch. Any emitted FASM remains unqualified unless both actual
+routed timing and the corresponding full-model functional gate pass.

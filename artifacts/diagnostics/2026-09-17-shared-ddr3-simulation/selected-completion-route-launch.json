@@ -1,0 +1,14 @@
+{
+  "status_at_recording": "launched_not_timing_acceptance",
+  "session_id_at_launch": 95952,
+  "timebox_seconds": 10800,
+  "netlist_sha256": "b883ec8f37a1777935b0b657991315597eab632a802eb6e712195a18663d3f57",
+  "xdc_sha256": "890ebb9d0fc854c8595d3e9e67b4a4074fe42ac7682680b9c33dd1d2c8662f57",
+  "prepack_sha256": "42acd411f3e34ac494e56f64b12c0de81394b567d5087c1213b820040fa9d698",
+  "command": "timeout --signal=TERM --kill-after=30s 10800 /nix/store/zq3cih2dv7nbssw9i16a137c11pcm3qi-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx --chipdb /nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin --xdc /nix/store/ppnarr616qy3dp42r46xf7hb8x4x4m3x-task6-ypcb-pcie-uberddr3-rowstream-loader.xdc --json /tmp/compiler-ddr3-current.2Z9Mo4/selected-completion-diagnostic.json --pre-pack /nix/store/y88il6wq3p8ik3kp68md3f0miysafiay-nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py --placer-budgets --router router1 --seed 15 --fasm /tmp/compiler-ddr3-current.2Z9Mo4/selected-completion-routed.fasm --write /tmp/compiler-ddr3-current.2Z9Mo4/selected-completion-routed.json > /tmp/compiler-ddr3-current.2Z9Mo4/selected-completion-route.log 2>&1",
+  "constraints_changed": false,
+  "hardware_programmed": false,
+  "note": "Historical launch record, not a live process indicator. Inspect the session and terminal log for outcome. No timing-allow-fail or no-tmdriv override.",
+  "compiler_commit": "66a154a",
+  "full_model_simulation_status_at_launch": "running_not_qualified"
+}
