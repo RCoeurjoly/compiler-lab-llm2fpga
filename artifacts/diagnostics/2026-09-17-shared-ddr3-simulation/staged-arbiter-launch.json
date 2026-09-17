@@ -1,0 +1,20 @@
+{
+  "status_at_recording": "simulation_build_and_synthesis_launched_not_qualified",
+  "compiler_commit": "9d59d7c",
+  "arbiter_commit": "d273e75",
+  "accelerator_sha256": "5017489235325a787506dd4216774c0eaa64e4951159a7b1df06e6510c3d462a",
+  "accelerator_store_path": "/nix/store/zqddxawpllwrqanpyqc1fsbc8x61wngf-idle-capture.sv",
+  "arbiter_sha256": "f8e42248a165fd053c28a2860879863ae64daa82275cf1e90ee7ad00895bac9e",
+  "arbiter_store_path": "/nix/store/9zbn7rgdgpw2q7h92sj22h3m4b446d5a-llm_external_memory_arbiter.sv",
+  "simulation_build_session": 68535,
+  "simulation_build_log": "/tmp/compiler-ddr3-current.2Z9Mo4/staged-arbiter-build.log",
+  "simulation_build_timebox_seconds": 1800,
+  "synthesis_session": 24744,
+  "synthesis_log": "/tmp/compiler-ddr3-current.2Z9Mo4/staged-arbiter-synthesis.log",
+  "synthesis_recipe": "staged-arbiter-synthesis.ys",
+  "synthesis_timebox_seconds": 1800,
+  "validated_pcie_or_ddr3_changed": false,
+  "constraints_changed": false,
+  "hardware_programmed": false,
+  "note": "Historical launch receipt, not a live-process or passing-result claim. Same simulation harness and build flags as idle-capture, with the pinned staged arbiter and obj-staged-arbiter output directory. The concurrent idle-capture run uses the old arbiter and cannot qualify this candidate."
+}
