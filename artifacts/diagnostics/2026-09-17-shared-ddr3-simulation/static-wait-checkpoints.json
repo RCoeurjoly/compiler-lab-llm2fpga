@@ -27,6 +27,20 @@
   "total_matched_writes": 9344,
   "comparison": "Per-memory ordered address/data records; consecutive identical writes suppressed. Not a cross-memory transaction ordering proof.",
   "unreached_checkpoints": ["c_fc_output_q16_16", "gelu_output_q16_16"],
+  "deeper_replay": {
+    "candidate_cycles": 10000000,
+    "candidate_exit_code": 0,
+    "candidate_log_sha256": "ac53a1d26bc7b5844fc0eff649f8907f3acd84fbb426a48cb39c7f6535637f14",
+    "reference_log_sha256": "ebac2f2aeceefc2092d2c8434dccdc3d799a53eb58e255776f10aae7cecfb36e",
+    "additional_complete_first_block_checkpoints": {
+      "c_fc_output_q16_16": 2048,
+      "gelu_output_q16_16": 2048,
+      "c_proj_output_q16_16": 512,
+      "block_output_q16_16": 512
+    },
+    "additional_matching_writes": 5120,
+    "note": "All common captured prefixes match. This reaches the first block output and begins the next block, but does not complete first-token inference. The top-level unreached_checkpoints field describes only the earlier five-million-cycle capture."
+  },
   "first_token_acceptance": false,
   "timing_acceptance": false,
   "hardware_acceptance": false,

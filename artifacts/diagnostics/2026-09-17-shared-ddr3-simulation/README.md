@@ -98,3 +98,10 @@ attention exponential writes that previously diverged. MLP/GELU writes were
 not reached in this capture; this is not full first-token acceptance.
 `static-wait-checkpoints.json` records counts, hashes, and the separate full-run
 launch. The additional contract tests bring the focused passing total to 16.
+
+The subsequent ten-million-cycle replay also completed: all 2,048 first MLP
+projection writes, 2,048 GELU writes, 512 MLP output-projection writes, and 512
+first-block output writes match the BRAM reference. This adds 5,120 matching
+writes at those checkpoints and clears the observed first-block output boundary.
+The replay begins the next block but does not finish first-token inference.
+Its hashes and scope are recorded in the receipt's `deeper_replay` section.
