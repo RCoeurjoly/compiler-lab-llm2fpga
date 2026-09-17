@@ -1,0 +1,26 @@
+{
+  "status": "passed_simulated_external_memory_first_token_only",
+  "compiler_fix_commit": "052a185",
+  "exit_code": 0,
+  "prompt_tokens": [7454, 2402, 257, 640],
+  "expected_token": 11,
+  "actual_token": 11,
+  "cycles": 145402912,
+  "requests": 13116912,
+  "responses": 13116912,
+  "post_done_tokens": [11, 11],
+  "generated_accelerator_sha256": "b93f285e8ae877b110774c27b8ab1d4a7c0b37d277be75d5e8142d9fc739ae9d",
+  "executable_sha256": "92fe650366179508ae34bb45372e26a5802b5893821e28a348a56a59c550512f",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+  "log_path": "/tmp/compiler-ddr3-current.2Z9Mo4/static-wait-first-token.log",
+  "log_sha256": "fafd9cb4f3580532157b8f00521d8bea3de4ec36e32ef20cbc4072db08845827",
+  "driver": "driver.cpp",
+  "wrapper": "wrapper.sv",
+  "command": "timeout --signal=TERM --kill-after=10s 10800 /tmp/compiler-ddr3-current.2Z9Mo4/static-wait-first-token 300000000",
+  "qualification_limits": [
+    "Real compiler accelerator and 240-port arbiter, preloaded fixed-latency Wishbone memory model.",
+    "No PCIe loading, owner-mux arbitration, DDR3 PHY/calibration or asynchronous crossings exercised.",
+    "Transaction counts are not ordered address/data traces; memory model does not explicitly reject out-of-range addresses.",
+    "One simulated token only; timing closure, bitstream and hardware acceptance remain pending."
+  ]
+}

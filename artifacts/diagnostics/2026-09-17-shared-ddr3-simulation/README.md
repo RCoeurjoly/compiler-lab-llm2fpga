@@ -85,8 +85,8 @@ The candidate is generated from the same raw compiler source. Disabling only
 the new legalization reproduces the previous `0d054638...` source hash exactly.
 With the correction, the source SHA-256 is
 `b93f285e8ae877b110774c27b8ab1d4a7c0b37d277be75d5e8142d9fc739ae9d`.
-Full-model checkpoint replay, first-token acceptance, new synthesis/timing, and
-hardware acceptance remain pending for this candidate. No PCIe, DDR3, clock, or
+At correction launch, full-model replay, first-token acceptance, synthesis/timing,
+and hardware acceptance were pending (see subsequent results below). No PCIe, DDR3, clock, or
 constraint changes accompany this correction.
 
 ### Completed bounded replay
@@ -118,3 +118,14 @@ input and netlist output path differ between the two synthesis scripts.
 These counts are not placement or timing acceptance. Full first-token simulation
 was still running when synthesis completed; no corrected-candidate bitstream
 has been produced or programmed.
+
+### Corrected first-token simulation passed
+
+The bounded full run subsequently exited **0**, producing authenticated token
+**11** after **145,402,912 cycles**, with **13,116,912 requests and responses**.
+The token remained 11 on both recorded post-completion cycles.
+`static-wait-first-token-result.json` binds the terminal result to the exact
+generated accelerator, executable, image, and log. This clears the simulated
+first-token gate for the real arbiter and preloaded Wishbone memory model.
+It does not establish PCIe loading, physical DDR3, timing closure, or board
+inference; those remain required. No replacement bitstream was programmed.
