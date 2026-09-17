@@ -21,7 +21,15 @@
     "logic_ns": 1.4,
     "estimated_routing_ns": 20.0
   },
-  "source_diagnosis": "The endpoint is an external-memory request-valid register, not the canonicalized static counter. Bank 140 content_en selects model_token_bank_out or lm_gemv_weight_bank_out according to the active read group; the external cell combines that enable with busy and duplicate-address suppression before setting request_queued. The exact mapped branch through that predicate is not yet isolated. Most reported delay is estimated interconnect.",
+  "source_diagnosis": "The endpoint is an external-memory request-valid register, not the canonicalized static counter. Bank 140 content_en selects model_token_bank_out or lm_gemv_weight_bank_out according to the active read group; the external cell combines that enable with busy and duplicate-address suppression before setting request_queued. Netlist tracing confirms the path begins in bank selection: LUT2 761137 (INIT 0100) takes context token bits 14/15, also model_token_bank_out bits 6/7; LUT2 761174 (INIT 1000) combines that partial decode with another bank-bit decode, then LUT6 770008 feeds LUT2 770007. The latter also consumes a predicate of bank-140 request_queued and pending through LUT2 770009. This is the bank-selection/enqueue cone, not physical DDR3 logic. Complete Boolean reconstruction and actual routed delay remain unproven. Most reported delay is estimated interconnect.",
+  "netlist_trace": {
+    "source_bits": [48801, 48802],
+    "partial_bank_decode_bits": [48786, 48808, 48890],
+    "later_path_bits": [60668, 60646],
+    "queue_state_bits": {"request_queued": 28494, "pending": 60636},
+    "netlist_sha256": "01f0c4796d9b18dd0c47da185525a1a5f3f0983d2a31b0b6fa801fea8d87608d",
+    "method": "Read-only inspection of mapped cell input/output connections, LUT INITs and named-net aliases. Cell suffixes above share prefix $abc$736297$auto$blifparse.cc:557:parse_blif$."
+  },
   "decision": "Do not add another RTL fix based only on placement. Obtain bounded production-tool routed timing for this candidate while its exact-image simulation finishes. Do not change PCIe, DDR3, clocks, constraints or seed. Do not convert/program on a timing failure or incomplete functional result.",
   "qualification": "Placement estimate, not routed timing. Frequency improved relative to the preceding one-hot-only candidate but still misses both targets. No bitstream or board inference result."
 }
