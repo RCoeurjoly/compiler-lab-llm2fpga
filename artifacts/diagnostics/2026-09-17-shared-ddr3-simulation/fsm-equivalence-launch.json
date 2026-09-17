@@ -1,0 +1,29 @@
+{
+  "status": "diagnostic_launched_not_proven",
+  "session": 80946,
+  "timeout_seconds": 1800,
+  "termination_grace_seconds": 10,
+  "source_sha256": "5017489235325a787506dd4216774c0eaa64e4951159a7b1df06e6510c3d462a",
+  "fixture": "/tmp/compiler-ddr3-current.2Z9Mo4/fsm-equivalence-fixture.sv",
+  "fixture_sha256": "7a03c8b7b164d2da4baeae840130d024691f8ffc41d74c4e5c25f7e23cb90358",
+  "recipe": "/tmp/compiler-ddr3-current.2Z9Mo4/fsm-equivalence.ys",
+  "recipe_sha256": "cc11d69f73f9f86bcd61108e0010ac57d97dafe189c099c8258bb7d84e25516f",
+  "log": "/tmp/compiler-ddr3-current.2Z9Mo4/fsm-equivalence.log",
+  "extraction": "Copy exact fsm0_in and fsm0_write_en assignment statements from the generated source; expose the 389 other Boolean identifiers as independent guard inputs; retain nine-bit state with synchronous reset to zero and write-enable hold semantics. Expose decoded state as output for comparison.",
+  "commands": [
+    "read_verilog -sv /tmp/compiler-ddr3-current.2Z9Mo4/fsm-equivalence-fixture.sv",
+    "hierarchy -top fsm_fixture -check",
+    "proc",
+    "opt -nodffe -nosdff",
+    "equiv_opt -assert fsm -encoding one-hot"
+  ],
+  "tool": "/nix/store/1g0dvnvw75fnlnk4ad586c65wfxbf5rs-yosys-with-plugins-0.66/bin/yosys",
+  "observed": "Pre-transform CHECK reports zero problems; FSM extraction began. Warning says forcing recoding of exposed state may increase circuit size.",
+  "limits": [
+    "Launch receipt is not proof or evidence that the process remains live.",
+    "Diagnostic fixture only; not accelerator RTL or a model milestone.",
+    "equiv_induct uses conditional temporal induction; reset synchronization also needs explicit checking before an equivalence claim.",
+    "Does not prove technology mapping, physical DDR3, timing or board inference.",
+    "Fixture exposes state for verification, so its resource use must not be substituted for integrated synthesis resources."
+  ]
+}
