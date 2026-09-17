@@ -216,3 +216,24 @@ and a 10,800-second timebox. No allow-fail flag, relaxed constraint, alternate
 seed or hardware operation. Both compiler-candidate simulations were still
 running at launch. Any emitted FASM remains unqualified unless both actual
 routed timing and the corresponding full-model functional gate pass.
+
+### Selected-completion terminal outcome
+
+The route session 95952 terminated with exit **124** at the unchanged
+10,800-second deadline. The final routing progress line reports 10,427.06
+router seconds; placement and other stages also consume the overall deadline.
+Neither requested routed FASM nor routed JSON exists. There is **no final
+routed timing result**. The frequency reports earlier in the log remain
+placement estimates and must not be presented as routed timing.
+
+`selected-completion-route-result.json` records the terminal outcome and full
+log hash. The separate `selected-completion-result.json` records the completed
+first-token simulation (token 11, 13,116,912 matched requests/responses), using
+simulated memory rather than physical DDR3. No bitstream conversion or board
+programming occurred. This supersedes the historical running statuses above.
+
+Next investigation: inspect the compiler FSM-to-request-capture control path
+identified by placement and its fanout before selecting another compiler
+change. The timeout alone does not establish that path as the final routed
+critical path, nor justify changing clocks, DDR3, PCIe, or seed. No automatic
+longer retry or additional RTL fix has been launched.
