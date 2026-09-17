@@ -1,0 +1,33 @@
+{
+  "status": "compiler_rewrite_equivalent_not_implementation_qualified",
+  "baseline_accelerator_sha256": "5017489235325a787506dd4216774c0eaa64e4951159a7b1df06e6510c3d462a",
+  "candidate_sha256": "41b98813203c4c1f8183da2e93dd105dcae087d8fee1e02c9bc61eedb7d9dfce",
+  "candidate_store_path": "/nix/store/ssakxn1r6z30bkiw8k92lc84lf17q509-static-counter-reviewed.sv",
+  "generation": "externalize_compiler_memory.py on accepted-model.sv with the unchanged tinystories-1m-ddr3-model-image-manifest.json; separate output static-counter-reviewed.sv",
+  "full_candidate_delta_check": "PASS: canonicalize_static_counter(idle-capture.sv) equals regenerated candidate byte for byte.",
+  "change": "Collapse 56 guarded incrementer selections in the four-bit static counter into one counter+1 expression. Preserve the middle zero branch with logical negation masking only later branches. Leave write enable, DDR waits and state/register wiring unchanged.",
+  "red": "Session 29259: existing implementation retained three incrementers and did not reject changed operators/operands. Session 70490: review-derived multi-bit zero-guard regression failed with bitwise complement.",
+  "green": {
+    "regression_session": 39775,
+    "regression_exit_code": 0,
+    "regression_tests": 23,
+    "regression_seconds": 53.681,
+    "final_counter_session": 51571,
+    "final_counter_exit_code": 0,
+    "final_counter_tests": 7,
+    "note": "Final counter tests include the newly added idempotence test; these overlap the regression suite."
+  },
+  "exact_counter_equivalence": {
+    "exit_code": 0,
+    "enable_count": 56,
+    "original_incrementers": 56,
+    "fixture_sha256": "5bf92e32de955bf6ac9e70ffa14e39281277b4ae6da0297c68b20998f24676b5",
+    "log_sha256": "3fcf03324b9a807e464840ed11cb8722620c9e6b0bf3ba289000a40d1151493a",
+    "proven_output_bits": 4,
+    "unproven": 0,
+    "recipe": "read_verilog -sv static-counter-reviewed-equivalence.sv; hierarchy -check; proc; flatten gold gate; opt; equiv_make gold gate equiv; hierarchy -top equiv; equiv_simple; equiv_status -assert",
+    "scope": "Exact source next-state equation and all referenced standard-adder instances/operands. All four-bit counter values and all 56 independent Boolean enables, including overlap and wraparound. Two-state combinational equivalence, not a four-state-X claim."
+  },
+  "review": "Independent review found and corrected the multi-bit zero-guard bug; no remaining high/medium findings. Added idempotence test and exact-source proof to address low test gaps.",
+  "qualification": "No new full-model token result, timing closure, bitstream or hardware inference. The passing earlier candidates remain distinct."
+}

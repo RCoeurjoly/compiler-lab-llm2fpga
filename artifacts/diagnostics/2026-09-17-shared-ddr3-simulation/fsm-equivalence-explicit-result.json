@@ -1,0 +1,19 @@
+{
+  "status": "extracted_controller_equivalence_and_reset_proven",
+  "session": 95880,
+  "exit_code": 0,
+  "proven_equiv_cells": 408,
+  "unproven_equiv_cells": 0,
+  "reported_seconds": 316.16,
+  "log_sha256": "99ff608a870f135c69ff04d8055226a5865dff68ea5367009271bac85545fdc0",
+  "launch_receipt": "fsm-equivalence-explicit-launch.json",
+  "reset_check": {
+    "session": 51848,
+    "exit_code": 0,
+    "result": "SAT proof finished - no model found: SUCCESS!",
+    "log_sha256": "167bbdc49ab1d0a6e20fe8e220d9dbc4d01c76e66ecaabf180fd57795cadbac0",
+    "command": "read_rtlil /tmp/compiler-ddr3-current.2Z9Mo4/fsm-explicit-prepared.il; miter -equiv -flatten gold gate reset_miter; hierarchy -top reset_miter; sat -seq 2 -set-def-inputs -set-at 1 in_reset 1 -set-at 2 in_reset 0 -prove-skip 1 -prove trigger 0 -verify -timeout 120",
+    "scope": "Decoded state equality after one asserted synchronous-reset step, arbitrary initial registers and arbitrary defined guard inputs. Complements state-mapped induction; not an independent unbounded proof."
+  },
+  "qualification": "Exact extracted nine-bit/401-state main controller recoding only. Does not prove full synthesis/technology mapping, physical timing, memory transport or board inference. The 43 MHz placement estimate still fails the required 83.33 MHz."
+}

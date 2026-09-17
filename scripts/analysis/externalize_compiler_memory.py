@@ -338,6 +338,80 @@ def externalize_memory(source: str, memory_name: str) -> ExternalizationResult:
     return ExternalizationResult(rewritten, memory_name, width)
 
 
+def canonicalize_static_counter(source: str) -> str:
+    """Share identical static-schedule increments, preserving reset priority.
+
+    Only the compiler's known four-bit counter/standard-adder form is accepted.
+    No mutually-exclusive-enable assumption is needed: increments before the
+    zero branch win; increments after it remain masked by its original guard.
+    The register's write-enable (including external-memory waits) is untouched.
+    """
+    marker = "// LLM2FPGA shared static-counter increment v1"
+    if marker in source:
+        return source
+    main = re.search(r"\bmodule\s+main\b.*?\bendmodule\b", source, re.DOTALL)
+    if main is None:
+        return source
+    body = main.group(0)
+    matches = list(re.finditer(r"\bassign\s+fsm_in\s*=([^;]+);", body))
+    if not matches:
+        return source
+    if len(matches) != 1 or not re.search(r"\b(?:logic|wire)\s*\[3:0\]\s+fsm_out\b", body):
+        raise ValueError("unsupported static counter declaration")
+    match = matches[0]
+    chunks = match.group(1).split(":")
+    if chunks[-1].strip() != "4'd0":
+        raise ValueError("unsupported static counter default")
+
+    def assignment(name: str) -> str:
+        found = re.findall(rf"\bassign\s+{re.escape(name)}\s*=([^;]+);", body)
+        if len(found) != 1:
+            raise ValueError(f"expected exactly one {name} assignment")
+        return re.sub(r"\s+", "", found[0])
+
+    before, after = [], []
+    zero_guard = None
+    for chunk in chunks[:-1]:
+        parts = chunk.split("?")
+        if len(parts) != 2:
+            raise ValueError("unsupported static counter selection")
+        guard, value = (part.strip() for part in parts)
+        if value == "4'd0":
+            if zero_guard is not None:
+                raise ValueError("multiple static counter zero branches")
+            zero_guard = guard
+            continue
+        condition = re.fullmatch(r"fsm_out\s*!=\s*4'd\d+\s*&\s*(\w+)", guard)
+        adder = re.fullmatch(r"(adder\d*)_out", value)
+        if condition is None or adder is None:
+            raise ValueError("unsupported static counter increment branch")
+        name, enable = adder.group(1), condition.group(1)
+        instances = re.findall(
+            rf"\bstd_add\s*#\s*\(\s*\.WIDTH\s*\(4\)\s*\)\s+{name}\s*\((.*?)\);",
+            body, re.DOTALL,
+        )
+        expected_ports = {"left": name + "_left", "right": name + "_right", "out": value}
+        if len(instances) != 1:
+            raise ValueError(f"unsupported static counter adder {name}")
+        ports = re.findall(r"\.(\w+)\s*\(\s*(\w+)\s*\)", instances[0])
+        if len(ports) != 3 or dict(ports) != expected_ports:
+            raise ValueError(f"unsupported static counter wiring {name}")
+        if (assignment(name + "_left") != f"{enable}?fsm_out:4'd0"
+                or assignment(name + "_right") != f"{enable}?4'd1:4'd0"):
+            raise ValueError(f"unsupported static counter operands {name}")
+        (before if zero_guard is None else after).append(guard)
+    if zero_guard is None or not (before or after):
+        raise ValueError("expected static counter increment and zero branches")
+
+    def any_guard(guards: list[str]) -> str:
+        return " | ".join(f"({guard})" for guard in guards) or "1'b0"
+
+    increment = f"({any_guard(before)}) | (!({zero_guard}) & ({any_guard(after)}))"
+    replacement = f"{marker}\nassign fsm_in = ({increment}) ? (fsm_out + 4'd1) : 4'd0;"
+    body = body[:match.start()] + replacement + body[match.end():]
+    return source[:main.start()] + body + source[main.end():]
+
+
 def externalize_memories(
     source: str, memory_names: list[str], base_addresses: dict[str, int] | None = None
 ) -> ExternalizationResult:
@@ -355,6 +429,7 @@ def externalize_memories(
     source = select_banked_memory_reads(source)
     source = latch_external_memory_completion_joins(source, names)
     source = legalize_static_external_reads(source, names)
+    source = canonicalize_static_counter(source)
     matches = {m.group("name"): m for m in _INSTANCE.finditer(source)}
     missing = [name for name in names if name not in matches]
     if missing:
