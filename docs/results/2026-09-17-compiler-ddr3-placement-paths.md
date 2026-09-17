@@ -401,3 +401,40 @@ Files remain under `/tmp/compiler-ddr3-current.2Z9Mo4/` with basename
 simulation handles were both confirmed live during this inspection. Neither
 had yet produced a first-token result. No new RTL change or full route was
 launched on the basis of this placement estimate.
+
+### Compiler FSM encoding investigation
+
+Source inspection finds 401 next-state branches (530 disjunctive guard
+terms), covering states 0 through 400, with default next-state value zero.
+A read-only guard audit parsed every term as a state equality plus positive
+or negative Boolean literals. There were no unsupported atoms and no
+overlapping guards between different branches. This is a two-state guard
+audit, not a complete four-state or sequential equivalence proof.
+State 375 advances to 376 when `invoke217_done_out & tdcc_go_out` is true.
+
+Importantly, the synthesis log confirms that Yosys **already extracts** this
+FSM. At lines 216021–216023 it chooses binary encoding under `auto`;
+the FSM information reports 402 inputs, 401 outputs and nine state bits.
+Therefore a source-level priority-mux rewrite is not justified merely by
+the nested ternaries. Investigate the existing synthesis encoding first.
+
+A bounded diagnostic synthesis was launched as session **81189**, with a
+1,800-second timeout and 10-second termination grace. The tracked recipe is
+`artifacts/diagnostics/2026-09-17-shared-ddr3-simulation/onehot-fsm-synthesis.ys`
+(SHA-256 `f31157f76af3501c5eac21b498144d43707b5f402140501d11608293dcba59d2`).
+It retains all staged-arbiter immutable sources and parameters. After process
+lowering and flattening it asserts that exactly one wire matches
+`compiler_accelerator.core.compiler_core.fsm0.out`, and sets only that wire's
+`fsm_encoding` attribute to `one-hot` before the existing Xilinx synthesis.
+No accelerator source, arithmetic, completion latency, transport FSM,
+controller profile or constraint is deliberately changed.
+
+The tool is the same pinned Yosys 0.66 executable as the staged-arbiter recipe.
+Output files are `/tmp/compiler-ddr3-current.2Z9Mo4/onehot-fsm-synthesis.log`
+and `onehot-fsm-diagnostic.json`. The handle was confirmed live; synthesis
+acceptance remains pending. This tests whether localizing state transitions
+reduces the completion-to-state cone, at the cost of additional state flops.
+Before promotion, check actual encoding/resource results, equivalence of the
+recoded controller, placement and routed timing. Existing RTL simulation
+cannot alone qualify a synthesis-encoding change. No bitstream is authorized
+by this diagnostic launch.
