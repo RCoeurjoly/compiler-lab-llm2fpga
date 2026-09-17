@@ -1,0 +1,32 @@
+{
+  "status": "synthesis_completed_not_inference_or_timing_acceptance",
+  "date": "2026-09-17",
+  "command": "timeout --signal=TERM --kill-after=10s 1800 /nix/store/1g0dvnvw75fnlnk4ad586c65wfxbf5rs-yosys-with-plugins-0.66/bin/yosys -s synthesis.ys",
+  "exit_code": 0,
+  "elapsed_seconds_reported_by_yosys": 727.32,
+  "peak_memory_mb": 1950.12,
+  "netlist_path": "/tmp/compiler-ddr3-current.2Z9Mo4/current-repaired-diagnostic.json",
+  "netlist_sha256": "a4244e5f158bacdb4bfc9aa313f9efb1d214898709774ceab06679056d43e3ce",
+  "script_sha256": "c6b385f8421df4afa749e2137b48238d7de7553272f096d9c9e55f2a7cf7e7a9",
+  "generated_accelerator_sha256": "0d0546383070b515210ab989f0ebb2bc7e93e69895ada4df0e6b930fcf98cecb",
+  "arbiter_sha256": "4e0615ed78336f22380335c0c63fa8bea83bcde151808c1a8ec15797b357e726",
+  "final_yosys_check_problems": 0,
+  "warnings_total": 4881,
+  "warnings_unique": 4767,
+  "cells_including_scope_metadata": 124883,
+  "lut_cells": 51335,
+  "flip_flops": 36078,
+  "dsp48e1": 245,
+  "ramb36e1": 47,
+  "ramb18e1": 7,
+  "legacy_accelerator_and_service_removed_by_hierarchy": true,
+  "mapping_options": "synth_xilinx -flatten -arch xc7 -nosrl -noiopad -nolutram",
+  "qualification_limits": [
+    "Exact-image first-token simulation was still running when this synthesis completed.",
+    "Synthesis counts are not placement, timing, or hardware acceptance.",
+    "The final optimized check reports zero problems; earlier process-level checks had unused and undriven warnings.",
+    "PCIe and DDR3 sources remain pinned to the earlier synthesis inputs; no clock constraints were relaxed.",
+    "The board top snapshot includes the existing uncommitted command-stage bypass; the script pins its exact Nix store snapshot rather than claiming a clean integration-repository revision.",
+    "Accelerator remains on the existing 83.33 MHz rowstream clock; the separate 30 MHz integration question remains unresolved."
+  ]
+}
