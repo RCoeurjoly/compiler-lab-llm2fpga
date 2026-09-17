@@ -1,0 +1,10 @@
+{
+  "status": "bounded_route_launched_not_qualified",
+  "session": 81227,
+  "timebox_seconds": 10800,
+  "seed": 15,
+  "netlist_sha256": "01f0c4796d9b18dd0c47da185525a1a5f3f0983d2a31b0b6fa801fea8d87608d",
+  "log": "/tmp/compiler-ddr3-current.2Z9Mo4/static-counter-route.log",
+  "command": "timeout --signal=TERM --kill-after=30s 10800 /nix/store/zq3cih2dv7nbssw9i16a137c11pcm3qi-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx --chipdb /nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin --xdc /nix/store/ppnarr616qy3dp42r46xf7hb8x4x4m3x-task6-ypcb-pcie-uberddr3-rowstream-loader.xdc --json /tmp/compiler-ddr3-current.2Z9Mo4/static-counter-diagnostic.json --pre-pack /nix/store/y88il6wq3p8ik3kp68md3f0miysafiay-nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py --placer-budgets --router router1 --seed 15 --fasm /tmp/compiler-ddr3-current.2Z9Mo4/static-counter-routed.fasm --write /tmp/compiler-ddr3-current.2Z9Mo4/static-counter-routed.json > /tmp/compiler-ddr3-current.2Z9Mo4/static-counter-route.log 2>&1",
+  "qualification": "Production nextpnr, unchanged constraints and seed. Full route is diagnostic until terminal timing passes. Exact-image simulation session 58300 remains active at launch. Neither an emitted FASM nor a successful launch establishes qualification; require simulation and routed timing success before conversion or programming."
+}

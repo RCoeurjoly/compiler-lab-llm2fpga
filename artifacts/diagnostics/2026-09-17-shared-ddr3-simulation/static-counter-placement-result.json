@@ -1,0 +1,27 @@
+{
+  "status": "placement_completed_estimated_timing_failed",
+  "session": 90303,
+  "exit_code": 0,
+  "warnings": 990,
+  "errors": 0,
+  "seed": 15,
+  "rowstream_estimated_mhz": 46.74,
+  "rowstream_required_mhz": 83.33,
+  "pcie_estimated_mhz": 58.14,
+  "pcie_required_mhz": 62.50,
+  "log_sha256": "9c85a4e37c938f66566751125d834d8bfea4559719258dafe395595ed5af9c5e",
+  "placed_json_sha256": "60de6bedee1f7acf8e0e4c841c8124bc846e31f441b2ac098b6e672ecea5f2ba",
+  "worst_rowstream_path": {
+    "source": "compiler_accelerator.core.compiler_core.context_tokens_read_data[15]",
+    "source_cell": "$auto$ff.cc:337:slice$541275.Q",
+    "endpoint_cell": "$auto$ff.cc:337:slice$230015.D",
+    "endpoint_register": "compiler_accelerator.core.compiler_core.token_weight_codes_i8_b140.request_queued",
+    "endpoint_synthesis_q_bit": 28494,
+    "total_ns": 21.4,
+    "logic_ns": 1.4,
+    "estimated_routing_ns": 20.0
+  },
+  "source_diagnosis": "The endpoint is an external-memory request-valid register, not the canonicalized static counter. Bank 140 content_en selects model_token_bank_out or lm_gemv_weight_bank_out according to the active read group; the external cell combines that enable with busy and duplicate-address suppression before setting request_queued. The exact mapped branch through that predicate is not yet isolated. Most reported delay is estimated interconnect.",
+  "decision": "Do not add another RTL fix based only on placement. Obtain bounded production-tool routed timing for this candidate while its exact-image simulation finishes. Do not change PCIe, DDR3, clocks, constraints or seed. Do not convert/program on a timing failure or incomplete functional result.",
+  "qualification": "Placement estimate, not routed timing. Frequency improved relative to the preceding one-hot-only candidate but still misses both targets. No bitstream or board inference result."
+}
