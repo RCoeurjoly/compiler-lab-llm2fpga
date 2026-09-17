@@ -28,49 +28,129 @@ module llm_external_memory_arbiter #(
 );
   localparam int BYTE_LANES = WB_DATA_BITS / 8;
   localparam int LANE_BITS = $clog2(BYTE_LANES);
+  localparam int OWNER_BITS = (PORTS > 1) ? $clog2(PORTS) : 1;
+  localparam int PRIORITY_GROUP_WIDTH = 16;
+  localparam int PRIORITY_GROUPS =
+    (PORTS + PRIORITY_GROUP_WIDTH - 1) / PRIORITY_GROUP_WIDTH;
+  localparam int LOCAL_BITS = $clog2(PRIORITY_GROUP_WIDTH);
+  localparam int GROUP_BITS = (PRIORITY_GROUPS > 1) ? $clog2(PRIORITY_GROUPS) : 1;
   typedef enum logic [1:0] {IDLE, ISSUE, WAIT_ACK} state_t;
   state_t state;
-  logic [$clog2(PORTS)-1:0] owner;
+  logic [OWNER_BITS-1:0] owner;
+  logic [GROUP_BITS-1:0] last_grant_group;
+  logic [PRIORITY_GROUPS*LOCAL_BITS-1:0] last_grant_local;
   logic [ADDRESS_BITS-1:0] saved_addr;
+  logic [PORTS-1:0] grant;
+  logic [OWNER_BITS-1:0] grant_owner;
+  logic [ADDRESS_BITS-1:0] grant_addr;
+  logic response_valid_q;
+  logic [OWNER_BITS-1:0] response_owner_q;
+  logic [DATA_BITS-1:0] response_data_q;
+  logic [PRIORITY_GROUPS*PRIORITY_GROUP_WIDTH-1:0] padded_req_valid;
+  logic [PRIORITY_GROUPS-1:0] group_valid;
+  logic [GROUP_BITS-1:0] group_start;
+  logic [PRIORITY_GROUPS-1:0] group_priority_mask;
+  logic [PRIORITY_GROUPS-1:0] group_after_last;
+  logic [PRIORITY_GROUPS-1:0] group_candidates;
+  logic [PRIORITY_GROUPS-1:0] group_grant;
+  logic [PRIORITY_GROUPS*PRIORITY_GROUP_WIDTH-1:0] local_grant;
+  logic [PRIORITY_GROUPS*PRIORITY_GROUP_WIDTH-1:0] padded_grant;
+  logic [LOCAL_BITS-1:0] local_start;
+  logic [PRIORITY_GROUP_WIDTH-1:0] local_mask;
+  logic [PRIORITY_GROUP_WIDTH-1:0] local_after_last;
+  logic [PRIORITY_GROUP_WIDTH-1:0] local_candidates;
   always_comb begin
     req_ready = '0;
     rsp_valid = '0;
-    rsp_data = '0;
+    // The read word is registered when Wishbone completes and then broadcast
+    // to all ports; rsp_valid identifies the sole consumer.  This avoids a
+    // saved-address lane mux followed by a 240-way data demultiplexer and the
+    // per-memory byte extractor in one same-cycle critical path.
+    rsp_data = {PORTS{response_data_q}};
+    // Round-robin among 16-requester groups and within each group. Persistent
+    // level-held requests otherwise let a low-index memory starve later banks
+    // while it reissues the same read waiting for the other banks to finish.
+    padded_req_valid = '0;
+    padded_req_valid[PORTS-1:0] = req_valid;
+    group_valid = '0;
+    group_start = last_grant_group + 1'b1;
+    if (group_start >= GROUP_BITS'(PRIORITY_GROUPS)) group_start = '0;
+    group_priority_mask = {PRIORITY_GROUPS{1'b1}} << group_start;
+    group_after_last = '0;
+    group_candidates = '0;
+    local_grant = '0;
+    for (int g = 0; g < PRIORITY_GROUPS; g = g + 1) begin
+      group_valid[g] = |padded_req_valid[g*PRIORITY_GROUP_WIDTH +: PRIORITY_GROUP_WIDTH];
+      local_start = last_grant_local[g*LOCAL_BITS +: LOCAL_BITS] + 1'b1;
+      local_mask = {PRIORITY_GROUP_WIDTH{1'b1}} << local_start;
+      local_after_last =
+        padded_req_valid[g*PRIORITY_GROUP_WIDTH +: PRIORITY_GROUP_WIDTH] & local_mask;
+      local_candidates = (|local_after_last) ? local_after_last :
+        padded_req_valid[g*PRIORITY_GROUP_WIDTH +: PRIORITY_GROUP_WIDTH];
+      local_grant[g*PRIORITY_GROUP_WIDTH +: PRIORITY_GROUP_WIDTH] =
+        local_candidates & (~local_candidates + {{(PRIORITY_GROUP_WIDTH-1){1'b0}}, 1'b1});
+    end
+    group_after_last = group_valid & group_priority_mask;
+    group_candidates = (|group_after_last) ? group_after_last : group_valid;
+    group_grant = group_candidates &
+      (~group_candidates + {{(PRIORITY_GROUPS-1){1'b0}}, 1'b1});
+    padded_grant = '0;
+    for (int g = 0; g < PRIORITY_GROUPS; g = g + 1)
+      padded_grant[g*PRIORITY_GROUP_WIDTH +: PRIORITY_GROUP_WIDTH] =
+        local_grant[g*PRIORITY_GROUP_WIDTH +: PRIORITY_GROUP_WIDTH] &
+        {PRIORITY_GROUP_WIDTH{group_grant[g]}};
+    grant = padded_grant[PORTS-1:0];
+    grant_owner = '0;
+    grant_addr = '0;
+    for (int i = 0; i < PORTS; i = i + 1) begin
+      grant_owner |= OWNER_BITS'(i) & {OWNER_BITS{grant[i]}};
+      grant_addr |= req_addr[i*ADDRESS_BITS +: ADDRESS_BITS] &
+        {ADDRESS_BITS{grant[i]}};
+    end
     wb_cyc = state != IDLE;
     wb_stb = state == ISSUE;
     wb_addr = saved_addr >> LANE_BITS;
     wb_sel = '1;
-    if (state == IDLE) begin
-      for (int i = 0; i < PORTS; i = i + 1)
-        if (req_valid[i] && req_ready == '0)
-          req_ready[i] = 1'b1;
-    end
-    if (state == WAIT_ACK && (wb_ack || wb_err)) begin
-      rsp_valid[owner] = 1'b1;
-      if (saved_addr[LANE_BITS-1:0] < BYTE_LANES/2)
-        rsp_data[owner*DATA_BITS +: DATA_BITS] = wb_rdata[DATA_BITS-1:0];
-      else
-        rsp_data[owner*DATA_BITS +: DATA_BITS] = wb_rdata[WB_DATA_BITS-1 -: DATA_BITS];
-    end
+    if (state == IDLE) req_ready = grant;
+    for (int i = 0; i < PORTS; i = i + 1)
+      rsp_valid[i] = response_valid_q && (response_owner_q == OWNER_BITS'(i));
   end
 
   always_ff @(posedge clk) begin
     if (rst) begin
       state <= IDLE;
       owner <= '0;
+      last_grant_group <= GROUP_BITS'(PRIORITY_GROUPS - 1);
+      last_grant_local <= '1;
       saved_addr <= '0;
+      response_valid_q <= 1'b0;
+      response_owner_q <= '0;
+      response_data_q <= '0;
     end else begin
+      response_valid_q <= 1'b0;
+      response_data_q <= '0;
       case (state)
-        IDLE: begin
-          for (int i = 0; i < PORTS; i = i + 1)
-            if (req_valid[i] && req_ready[i]) begin
-              owner <= i;
-              saved_addr <= req_addr[i*ADDRESS_BITS +: ADDRESS_BITS];
-              state <= ISSUE;
+        IDLE: if (|req_ready) begin
+          owner <= grant_owner;
+          saved_addr <= grant_addr;
+          for (int g = 0; g < PRIORITY_GROUPS; g = g + 1) begin
+            if (group_grant[g]) begin
+              last_grant_group <= GROUP_BITS'(g);
+              last_grant_local[g*LOCAL_BITS +: LOCAL_BITS] <= LOCAL_BITS'(grant_owner);
             end
+          end
+          state <= ISSUE;
         end
         ISSUE: if (wb_accept) state <= WAIT_ACK;
-        WAIT_ACK: if (wb_ack || wb_err) state <= IDLE;
+        WAIT_ACK: if (wb_ack || wb_err) begin
+          response_owner_q <= owner;
+          if (saved_addr[LANE_BITS-1:0] < BYTE_LANES/2)
+            response_data_q <= wb_rdata[DATA_BITS-1:0];
+          else
+            response_data_q <= wb_rdata[WB_DATA_BITS-1 -: DATA_BITS];
+          response_valid_q <= 1'b1;
+          state <= IDLE;
+        end
         default: state <= IDLE;
       endcase
     end

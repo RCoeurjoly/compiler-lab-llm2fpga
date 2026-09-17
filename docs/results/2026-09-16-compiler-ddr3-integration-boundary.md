@@ -90,7 +90,7 @@ The loader-only PCIe/DDR3 baseline is independently accepted in
 `artifacts/diagnostics/2026-09-16-ddr3-pcie-full-image-3-cold-starts.json`.
 No accelerator integration or inference success is claimed here.
 
-## Accepted accelerator source and exact-image first-token pass
+## Historical first-token result (not shared-DDR integration acceptance)
 
 The initial long run used the clean-top source (`b030e34d…`), which is not the
 accepted BRAM first-token accelerator. It returned settled token 0 and was
@@ -100,12 +100,44 @@ simulation with the accepted compiler-generated source
 (`643,641,072` memory requests). The receipt is
 `artifacts/diagnostics/2026-09-16-compiler-ddr3-accepted-source-first-token-pass.json`.
 
-The external memory cell now matches `seq_mem_d1_bram` for level-held
-streaming reads: it permits one request per response cycle and retains the
-BRAM `done` level/tail semantics, while preserving subword byte offsets. This
-closes the exact-image simulation gate only. No DDR3-integrated bitstream has
-been generated or tested on YPCB yet; timing closure and hardware one-token
-acceptance remain outstanding.
+The earlier claim that this closed the integration simulation gate is withdrawn.
+The receipt records more memory requests than cycles and externalized RTL hash
+`84397c4e…`, whereas the subsequent synthesis used `c18aff50…`. The original
+harness has not been recovered. This evidence does not establish inference
+through the actual shared single-port memory arbiter.
+
+### 2026-09-17 integration audit and repairs
+
+A delayed-response regression reproduced stale `done` on the synthesized
+external-memory cell: after changing the requested address, `done` remained
+asserted with the previous word before the new response arrived. The current
+compiler externalization pass emits completion pulses, captures independently
+timed operands at generated completion joins, and enables only the selected
+token-weight bank. The shared arbiter uses hierarchical round-robin selection
+and registered responses. Focused regressions cover streaming validity,
+staggered completion, bank selection, arbitration, and persistent requesters;
+these are not full-inference acceptance.
+
+Separately, the compiler-enabled board shell disconnected PCIe loader writes
+from DDR3. Integration-repository commit `e368449` restores transaction-level
+host/accelerator ownership through the existing Wishbone owner mux. Its
+enabled/disabled-shell tests check host writes and accelerator reads.
+
+The replacement first-token simulation uses freshly transformed compiler RTL
+SHA-256 `0d0546383070b515210ab989f0ebb2bc7e93e69895ada4df0e6b930fcf98cecb`,
+the 240-port shared arbiter, and the packed model image
+`e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593`.
+It is bounded to 300 million cycles / three hours. At this audit it is still
+running; no first-token result is claimed. Its Wishbone image model does not
+simulate the physical PCIe endpoint or DDR3 PHY.
+
+The board shell currently clocks the compiler adapter from the 83.33 MHz
+rowstream domain, not its prior 30 MHz accelerator domain. The retired
+placement reported 33.47 MHz rowstream and 53.02 MHz PCIe maximum frequencies,
+below the unchanged 83.33/62.5 MHz requirements. Routing was stopped after the
+functional defect was reproduced. No timing-qualified integrated bitstream or
+hardware inference is established. Clock-domain restructuring, if required,
+must preserve the validated PCIe and DDR3 clocks and be separately verified.
 
 ## Current source-closed integration boundary
 
