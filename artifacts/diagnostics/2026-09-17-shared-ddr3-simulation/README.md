@@ -105,3 +105,16 @@ first-block output writes match the BRAM reference. This adds 5,120 matching
 writes at those checkpoints and clears the observed first-block output boundary.
 The replay begins the next block but does not finish first-token inference.
 Its hashes and scope are recorded in the receipt's `deeper_replay` section.
+
+### Corrected-candidate diagnostic synthesis
+
+`static-wait-synthesis.ys` completed successfully, with zero problems in the
+final optimized Yosys check. The source-pinned result is recorded in
+`static-wait-synthesis-result.json`: 51,993 LUTs, 36,084 flip-flops, 245 DSPs,
+47 RAMB36s, and 7 RAMB18s. Relative to the earlier diagnostic this is +658 LUTs
+and +6 flip-flops; DSP/BRAM counts are unchanged. Only the generated accelerator
+input and netlist output path differ between the two synthesis scripts.
+
+These counts are not placement or timing acceptance. Full first-token simulation
+was still running when synthesis completed; no corrected-candidate bitstream
+has been produced or programmed.
