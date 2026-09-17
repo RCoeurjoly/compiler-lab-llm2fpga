@@ -1,0 +1,22 @@
+{
+  "status": "unproven_not_qualified",
+  "session": 80946,
+  "exit_code": 1,
+  "log_sha256": "71e595d258f5d09c7aebe1d96f5903d8647d4af52a91149b1a9f21304e1fe9e8",
+  "proven_equiv_cells": 389,
+  "unproven_equiv_cells": 10,
+  "unproven": ["state[8:0]", "fsm0_write_en"],
+  "interpretation": "Induction steps one through four failed to prove equivalence. Only input aliases were proven. No reset-reachable counterexample was produced; this is neither an equivalence pass nor evidence of a specific functional bug.",
+  "followup": {
+    "hypothesis": "The proof needs the explicit binary-to-one-hot state relation; extending unconditioned induction is not yet justified.",
+    "session": 44032,
+    "status": "launched_not_proven",
+    "timeout_seconds": 1800,
+    "termination_grace_seconds": 10,
+    "recipe": "/tmp/compiler-ddr3-current.2Z9Mo4/fsm-equivalence-encoding-map.ys",
+    "log": "/tmp/compiler-ddr3-current.2Z9Mo4/fsm-equivalence-encoding-map.log",
+    "change": "Export fsm -encoding one-hot -encfile mapping; pass it to equiv_make. Save gold/gate models, mapped equivalence model and proof state before final assertion.",
+    "unchanged": "Same exact controller fixture and pinned Yosys executable as fsm-equivalence-launch.json. No accelerator RTL, transport, clock or constraint change.",
+    "remaining": "State-map handling must be verified in the log. Reset synchronization remains a separate proof obligation. No technology-mapping, timing or hardware claim."
+  }
+}
