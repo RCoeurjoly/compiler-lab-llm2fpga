@@ -38,3 +38,12 @@ proves transfer integrity, not accelerator arithmetic or timing.
 The recipe has been checked against the host utility's reference parser and
 transfer-image normalizer without MMIO access. It has not been run on hardware
 for this compiler DDR3 candidate.
+
+The actual command-adapter RTL now also has a behavioral Verilator test in
+`tests/test_tinystories_1m_ddr3_command_adapter.py`: four-word prompt order,
+held start/valid, rejection of early START, stalled request acceptance/counting,
+delayed response forwarding, retained token under backpressure, and clear/rearm.
+Its source is byte-identical to the synthesis-pinned adapter. A mutation that
+disconnects held `valid` is rejected by the test. The backend in this test is
+an explicitly test-only contract fixture; this does not establish actual-model
+inference through the command adapter or through PCIe.
