@@ -145,3 +145,27 @@ nextpnr executable, XDC, pre-pack, chip database, seed 15, placer budgets and
 `--no-route` settings as the preceding placement diagnostic, with the new
 netlist recorded in `registered-request-synthesis-result.json` and separate
 output paths. Full-model simulation is still pending; no route was launched.
+
+### Source-level follow-up
+
+The generated candidate has a combinational `model_read_token_codes_done_in`
+expression selecting completion across banks b0–b196. Its `done_out` is a
+`std_wire` alias, and `model_read_token_codes_go_in` is
+`~model_read_token_codes_done_out & fsm0_out == 9'd13 & tdcc_go_out`.
+That go signal controls bank address muxes and selected content enables,
+including bank b143, whose queued-address capture enable is the reported
+placement endpoint. The bank selector itself comes from context-token bits.
+
+`latch_external_memory_completion_joins` explicitly skips expressions with
+fewer than two top-level AND operands. The selected-bank OR expression is
+one such operand, so token lookup bypasses completion registration. By
+contrast, the LM-head operand group has three operands and already uses
+`llm2fpga_lm_gemv_read_operands_completion_seen` registers.
+
+The next bounded hypothesis is to register this selected-completion result
+with the same reset/rearm discipline. This must retain selected-bank
+qualification (not accept arbitrary bank completion), reject stale responses
+outside the active group, preserve the returned data until consumption, and
+handle repeated groups and reset. It requires a failing behavioral fixture,
+regression tests, full-model equivalence and a new timing measurement. No
+additional RTL change has been applied on the strength of this hypothesis.
