@@ -1,0 +1,41 @@
+{
+  "status": "bounded_checkpoint_match_not_first_token_acceptance",
+  "compiler_fix_commit": "052a185",
+  "generated_accelerator_sha256": "b93f285e8ae877b110774c27b8ab1d4a7c0b37d277be75d5e8142d9fc739ae9d",
+  "reference_log_sha256": "eb37d8b13673aa4fa6337441ede064cb72e38bea1c61d6c664a5d4cdf41eeec3",
+  "candidate_log_sha256": "fbbaeadfa90c97dc89ab06241a24facc725423d9dad340a90dcb4366ac26f407",
+  "checkpoint_driver_sha256": "faefced91bd909728c96f2c62b375b0d133f76ff15187e4772094239873c11a8",
+  "candidate_simulation_binary_sha256": "9f6584b1aee01d563e580593c64713266e002fb562438d52da5f83d83d4d681f",
+  "candidate_cycles": 5000000,
+  "candidate_exit_code": 0,
+  "matched_writes": {
+    "block_input": 512,
+    "ln1_output": 512,
+    "q_input_codes_i8": 512,
+    "q_accumulator_i64": 512,
+    "q_output_q16_16": 512,
+    "k_output_q16_16": 512,
+    "v_output_q16_16": 512,
+    "attention_score_q8": 1600,
+    "attention_exp_q1_20": 1600,
+    "out_input_codes_i8": 512,
+    "out_accumulator_i64": 512,
+    "out_output_q16_16": 512,
+    "attention_residual_q16_16": 512,
+    "ln2_output_q16_16": 512
+  },
+  "total_matched_writes": 9344,
+  "comparison": "Per-memory ordered address/data records; consecutive identical writes suppressed. Not a cross-memory transaction ordering proof.",
+  "unreached_checkpoints": ["c_fc_output_q16_16", "gelu_output_q16_16"],
+  "first_token_acceptance": false,
+  "timing_acceptance": false,
+  "hardware_acceptance": false,
+  "full_first_token_run_launch": {
+    "binary_sha256": "92fe650366179508ae34bb45372e26a5802b5893821e28a348a56a59c550512f",
+    "cycle_limit": 300000000,
+    "wall_limit_seconds": 10800,
+    "expected_token": 11,
+    "log": "/tmp/compiler-ddr3-current.2Z9Mo4/static-wait-first-token.log",
+    "note": "Launch record only; consult the live process or terminal log for current state."
+  }
+}

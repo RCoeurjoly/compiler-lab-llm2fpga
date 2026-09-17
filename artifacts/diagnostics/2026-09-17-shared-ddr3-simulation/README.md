@@ -88,3 +88,13 @@ With the correction, the source SHA-256 is
 Full-model checkpoint replay, first-token acceptance, new synthesis/timing, and
 hardware acceptance remain pending for this candidate. No PCIe, DDR3, clock, or
 constraint changes accompany this correction.
+
+### Completed bounded replay
+
+The corrected model completed a five-million-cycle capture. All **9,344**
+captured writes through attention output/residual and the second layer
+normalization match the compiler BRAM reference. This includes all 1,600
+attention exponential writes that previously diverged. MLP/GELU writes were
+not reached in this capture; this is not full first-token acceptance.
+`static-wait-checkpoints.json` records counts, hashes, and the separate full-run
+launch. The additional contract tests bring the focused passing total to 16.
