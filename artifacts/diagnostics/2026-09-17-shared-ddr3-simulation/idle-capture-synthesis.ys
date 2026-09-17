@@ -1,0 +1,54 @@
+read_verilog -lib +/xilinx/cells_sim.v
+read_verilog -lib +/xilinx/cells_xtra.v
+read_verilog -sv \
+  -DTASK6_PCIE_ROWSTREAM_INGRESS_PORTS \
+  -DTASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS \
+  -DTASK6_COMPILER_DDR3_ACCELERATOR_PORTS \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/xilinx_pcie_mmcm.v \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/axil_to_al.v \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/axis_pcie_to_al_us.v \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_7x.v \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_axi_rx.v \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_axi_tx.v \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_block.v \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_brams.v \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_tx_thrtl_ctl.v \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pipe_wrapper_gtx.v \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/aximm-minimal/pcie_7x_top_aximm.v \
+  /nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_reset_ready.v \
+  /nix/store/i51l5i03r7vw52aajgh0nxqj0w94v8cj-task6-ypcb-uberddr3-source/rtl/ddr3_top.v \
+  /nix/store/i51l5i03r7vw52aajgh0nxqj0w94v8cj-task6-ypcb-uberddr3-source/rtl/ddr3_controller.v \
+  /nix/store/i51l5i03r7vw52aajgh0nxqj0w94v8cj-task6-ypcb-uberddr3-source/rtl/ddr3_phy.v \
+  /nix/store/i51l5i03r7vw52aajgh0nxqj0w94v8cj-task6-ypcb-uberddr3-source/rtl/ecc/ecc_dec.sv \
+  /nix/store/i51l5i03r7vw52aajgh0nxqj0w94v8cj-task6-ypcb-uberddr3-source/rtl/ecc/ecc_enc.sv \
+  /nix/store/4mqwy17q04bb93phnak6cvbzfbbwcdzx-task6_pcie_jtag_status_shift.v \
+  /nix/store/abc4n8yyy0l1d9xxvvibzb5kb9hr52h4-task6_pcie_axil_app_status_shift.v \
+  /nix/store/p2fd086c91bii7c2r98kyc7lc5f6cmyp-task6_pcie_axil_rowstream_loader_ingress.v \
+  /nix/store/0nmdqf1jvf7vx3qjkli0aq844i13629z-task6_tinystories_token_collector.sv \
+  /nix/store/4245i1xhk7vd0nf4h6ba639vrzr8mxv7-task6_tinystories_token_cdc.sv \
+  /nix/store/lmm94hg6wk62sgzgz5dndrx5hm4bf047-task6_pcie_axil_rowstream_loader_ingress_cdc.v \
+  /nix/store/1ds1wyjn08wjd6wlra5wkv29iv4ad3ig-task6_tinystories_loader_command_stage.sv \
+  /nix/store/dsd3xbvbh95ynvjcvkwm372k56z73kzk-task6_q024_topk_score_compare.sv \
+  /nix/store/lnn7aswcpy496cr11z1g41yx8hh7cwhz-task6_ddr3_rowstream_top1_cutout.sv \
+  /nix/store/pnlwf9kbyjjiqzc28kj241hb6gkgp1zy-task6_ddr3_rowstream_wb_top1_reader.sv \
+  /nix/store/7hsp8kn2h3wmch4yn2fvlvqib76k35y5-task6_wishbone_bandwidth_counters.sv \
+  /nix/store/l51madxn3c7922vdwx1bnzap1b0gl957-task6_model_word_uberddr3_bridge.sv \
+  /nix/store/5f2fppa4a3636py498f4pv5500dsizfm-task6_wishbone_owner_mux.sv \
+  /nix/store/aincxkd098377rq7kflyq09rcls29dms-task6_wishbone_request_register.sv \
+  /nix/store/rl8g2z3jqf9dzns4md3aji8rixnhdym5-task6_tinystories_ddr_accelerator.sv \
+  /nix/store/jnd4sms8l8d56ky96cc4klnjk3r3wjwq-task6_tinystories_ddr_service.sv \
+  /nix/store/zb8831gd8jn5w4v3xvxd4adg4pw11vpk-committed-loader-shell-complete.sv \
+  /nix/store/b94xikjvgxy83rcbdrsb9hn8s7ba8q4g-task6_ypcb_pcie_uberddr3_rowstream_loader_top.sv \
+  /nix/store/zqddxawpllwrqanpyqc1fsbc8x61wngf-idle-capture.sv \
+  /nix/store/xs26iaazqfp72wr0fcnkn73krld2ln6d-llm_external_memory_arbiter.sv \
+  /nix/store/4n5p2q9c3im9qrizysw6jcfc4ni0xc39-tinystories_1m_ddr3_backend.sv \
+  /nix/store/dn9gwzarhz2kdlc9z8v7h7s6q1fpz7qr-tinystories_1m_ddr3_command_adapter.sv
+chparam -set ENABLE_PCIE_TOP1 0 task6_ypcb_pcie_uberddr3_rowstream_loader_top
+chparam -set TINYSTORIES_LOADER_ONLY 1 task6_ypcb_pcie_uberddr3_rowstream_loader_top
+chparam -set TINYSTORIES_ENABLE_SERVICE 0 task6_ypcb_pcie_uberddr3_rowstream_loader_top
+chparam -set TINYSTORIES_ENABLE_COMPILER_DDR3 1 task6_ypcb_pcie_uberddr3_rowstream_loader_top
+hierarchy -top task6_ypcb_pcie_uberddr3_rowstream_loader_top -check
+stat
+synth_xilinx -flatten -arch xc7 -nosrl -noiopad -nolutram -top task6_ypcb_pcie_uberddr3_rowstream_loader_top
+stat -top task6_ypcb_pcie_uberddr3_rowstream_loader_top
+write_json /tmp/compiler-ddr3-current.2Z9Mo4/idle-capture-diagnostic.json
