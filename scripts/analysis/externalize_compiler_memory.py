@@ -423,6 +423,8 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
    input wire [63:0] ext_rsp_data
 );
   logic pending;
+  logic request_queued;
+  logic [31:0] queued_address;
   logic response_ready;
   logic [IDX_SIZE-1:0] request_index;
   logic [IDX_SIZE-1:0] response_index;
@@ -433,12 +435,16 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
   // Emit one response pulse and suppress duplicate reads until the client
   // advances its address or ends the current operation. The generated join
   // lowering captures pulses from independent external-memory responses.
-  assign ext_req_valid = content_en && !write_en && !pending &&
-    (!response_ready || (response_index != addr0));
-  assign ext_req_addr = EXT_BASE_ADDR + (addr0 * (WIDTH / 8));
+  // Cut the measured context-token/scheduler/address-to-arbiter timing path.
+  // Once captured, a read is irrevocable until accepted (or reset). Keep its
+  // identity and byte offset with it, not with the client's changing inputs.
+  assign ext_req_valid = request_queued;
+  assign ext_req_addr = queued_address;
   always_ff @(posedge clk) begin
     if (reset) begin
       pending <= 1'b0;
+      request_queued <= 1'b0;
+      queued_address <= '0;
       response_ready <= 1'b0;
       request_index <= '0;
       response_index <= '0;
@@ -456,8 +462,14 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
         response_ready <= content_en && !write_en;
       end else if (ext_req_valid && ext_req_ready) begin
         pending <= 1'b1;
-        request_index <= addr0;
+        request_queued <= 1'b0;
         response_byte_offset <= ext_req_addr[2:0];
+        response_ready <= 1'b0;
+      end else if (content_en && !write_en && !pending && !request_queued &&
+                   (!response_ready || (response_index != addr0))) begin
+        request_queued <= 1'b1;
+        queued_address <= EXT_BASE_ADDR + (addr0 * (WIDTH / 8));
+        request_index <= addr0;
         response_ready <= 1'b0;
       end
     end

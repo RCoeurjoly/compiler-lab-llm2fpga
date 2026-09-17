@@ -35,7 +35,7 @@ TESTBENCH = r"""module tb;
     reset = 0;
     content_en = 1;
     addr0 = 0;
-    #1;
+    tick(); // Capture the request before arbitration.
     if (!ext_req_valid || ext_req_addr != 0)
       $fatal(1, "first read request missing");
     tick();
@@ -57,7 +57,7 @@ TESTBENCH = r"""module tb;
     // Keep content_en asserted as in a generated streaming memory group, but
     // step to a different address after consuming the first response.
     addr0 = 1;
-    #1;
+    tick(); // Capture the next request; do not expose a live address.
     if (!ext_req_valid || ext_req_addr != 1)
       $fatal(1, "second address was not requested");
     tick();
@@ -80,6 +80,8 @@ TESTBENCH = r"""module tb;
     tick();
     if (!done || read_data != 8'h22)
       $fatal(1, "second response did not publish its own data and done");
+    ext_rsp_valid = 0;
+    tick(); // Queue the next address after publishing the previous response.
     if (!ext_req_valid || ext_req_addr != 2)
       $fatal(1, "completion was incorrectly associated with the new input address");
     $display("PASS: done only marks the currently returned streaming word valid");

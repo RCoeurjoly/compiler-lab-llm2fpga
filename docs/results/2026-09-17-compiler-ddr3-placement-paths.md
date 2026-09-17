@@ -92,3 +92,25 @@ was generated or programmed. Covered-path PCIe success is not a claim of full
 PHY/CDC timing coverage. The next implementation experiment must address the
 compiler request path while retaining exact memory-response semantics and the
 validated PCIe/DDR3 transport, clocks and constraints.
+
+## Registered-request experiment (not timing acceptance)
+
+The next candidate changes the compiler externalization pass's emitted
+`seq_mem_d1_external` primitive: it snapshots the byte address and element
+index before asserting a registered request-valid signal. A queued request
+remains stable until accepted or reset, even if the client inputs change.
+The response byte offset is captured from that registered address at
+acceptance. The arbiter, command adapter, DDR3 and PCIe are unchanged.
+
+The focused 14-test external-memory suite passes, including a new behavioral
+test for registration, backpressure, changing live addresses, response-byte
+selection and queued-request reset. The new registration assertion failed
+against the previous combinational primitive. Regeneration of the complete
+model changes only this primitive, not the arithmetic or scheduler bodies.
+Candidate generated-SV SHA-256:
+`75cd4d642a66e50f762a40741e3e42b0bf48f768ced5549226ac13dd81bb0338`.
+
+This introduces an additional request-capture cycle. Full-model first-token
+simulation and new implementation timing are still required; the unit tests
+do not establish either. The prior passing simulation and failed routed
+candidate are preserved separately. No replacement bitstream is qualified.
