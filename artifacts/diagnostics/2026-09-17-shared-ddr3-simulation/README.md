@@ -129,3 +129,23 @@ generated accelerator, executable, image, and log. This clears the simulated
 first-token gate for the real arbiter and preloaded Wishbone memory model.
 It does not establish PCIe loading, physical DDR3, timing closure, or board
 inference; those remain required. No replacement bitstream was programmed.
+
+### Real command-adapter integration simulation passed
+
+`command-integration-result.json` records a further bounded run through the
+actual production command adapter and backend, the same corrected compiler
+RTL, and the same 240-port arbiter. It exited **0** with token **11** after
+**145,402,913 cycles after start**, and **13,116,912 requests and responses**.
+Unlike the earlier adapter unit fixture, this executes the actual model.
+
+The tracked `command-integration-wrapper.sv`, `command-integration-driver.cpp`
+and full `command-integration-run.log` preserve the test. The wrapper takes the
+authenticated memory hex via `+IMAGE=...` rather than a fixed path. It rejects
+writes, partial byte selects, out-of-range reads, multiple outstanding requests
+and unmatched responses. The driver sends the four prompt words through the
+adapter, checks its request counter, requires token 11, holds the output for
+five backpressured cycles and verifies retirement after the output handshake.
+
+This remains a preloaded, fixed-latency memory simulation: no PCIe loading,
+owner mux, physical DDR3, clock crossings, routed timing or hardware acceptance
+is established. No production RTL or transport change accompanied this test.

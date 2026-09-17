@@ -47,3 +47,11 @@ Its source is byte-identical to the synthesis-pinned adapter. A mutation that
 disconnects held `valid` is rejected by the test. The backend in this test is
 an explicitly test-only contract fixture; this does not establish actual-model
 inference through the command adapter or through PCIe.
+
+A separate actual-model simulation subsequently passed through the real
+command adapter and backend: token 11, 145,402,913 cycles after start, and
+13,116,912 matched requests/responses, including output backpressure and
+retirement checks. See
+`artifacts/diagnostics/2026-09-17-shared-ddr3-simulation/command-integration-result.json`.
+Its preloaded Wishbone model is not PCIe loading or physical DDR3, and this
+host command still awaits a timing-qualified, programmed candidate.
