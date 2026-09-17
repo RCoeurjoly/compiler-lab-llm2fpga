@@ -14,6 +14,11 @@ module llm_external_memory_arbiter_tb;
 
   llm_external_memory_arbiter #(.PORTS(240)) dut (.*);
 
+  task await_grant;
+    while (!(|req_ready)) begin @(posedge clk); #1; end
+  endtask
+  initial begin #10000; $fatal(1, "arbiter handshake timed out"); end
+
   initial begin
     repeat (2) @(posedge clk);
     rst <= 0;
@@ -28,6 +33,7 @@ module llm_external_memory_arbiter_tb;
     req_valid[12] = 1'b1;
     req_valid[239] = 1'b1;
     #1;
+    await_grant();
     $display("ready=%b valid=%b state=%0d", req_ready, req_valid, dut.state);
     if (!req_ready[3] || req_ready[12] || req_ready[239] || $countones(req_ready) != 1)
       $fatal(1, "lowest-index one-hot request grant failed");
@@ -52,6 +58,7 @@ module llm_external_memory_arbiter_tb;
     @(negedge clk);
     wb_ack = 0;
     #1;
+    await_grant();
     if (!req_ready[239] || req_ready[12] || $countones(req_ready) != 1)
       $fatal(1, "pending later-group request was not granted fairly");
     @(posedge clk);
@@ -73,6 +80,7 @@ module llm_external_memory_arbiter_tb;
     @(negedge clk);
     wb_ack = 0;
     #1;
+    await_grant();
     if (!req_ready[12] || $countones(req_ready) != 1)
       $fatal(1, "pending same-group request was not granted after wraparound");
     @(posedge clk);

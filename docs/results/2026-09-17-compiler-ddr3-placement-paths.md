@@ -341,3 +341,29 @@ current candidate is still running and must retain its identity.
 Placed JSON SHA-256:
 `f7a10bc08d423aeabdcdbe9e46ca64667b0dfb8e93bbecb1d1cf8e30eaf95d7f`.
 Full files remain `/tmp/compiler-ddr3-current.2Z9Mo4/idle-capture-placement.{log,json}`.
+
+### Registered arbitration selection candidate
+
+The compiler-memory adapter now has separate IDLE selection and CAPTURE
+handshake stages. IDLE registers a one-hot requester and owner, without
+acknowledging the client. CAPTURE acknowledges that registered requester and
+captures its still-held address; only then does ISSUE activate Wishbone.
+Fairness cursors advance on capture, not selection. Withdrawal abandons the
+choice without a bus read or fairness update. The PCIe and UberDDR3 components,
+their timing constraints and public memory protocol remain unchanged.
+
+The new staging test failed on the previous arbiter with `request bypassed
+registered selection` (session 76448, exit 1). After the change, the 17-test
+external-memory suite passed in 48.427 seconds (session 62920, exit 0).
+The separate 240-port ownership/order test and persistent-request fairness
+test also passed (session 31655, exit 0). Checks include registered selection,
+atomic capture, competing arrivals, Wishbone backpressure, response owner/lane,
+withdrawal without fairness advance, reset and real compiler completion groups.
+The older direct-grant test now waits for the handshake instead of assuming
+combinational readiness. Independent review found no blocker/high/medium issue.
+
+Arbiter source SHA-256:
+`f8e42248a165fd053c28a2860879863ae64daa82275cf1e90ee7ad00895bac9e`.
+This needs a separate full-model simulation and integrated implementation run.
+The still-running idle-capture simulation (26853) uses the previous immutable
+arbiter and cannot qualify this candidate. No timing/board success is claimed.

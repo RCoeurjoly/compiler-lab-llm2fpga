@@ -34,7 +34,7 @@ module llm_external_memory_arbiter #(
     (PORTS + PRIORITY_GROUP_WIDTH - 1) / PRIORITY_GROUP_WIDTH;
   localparam int LOCAL_BITS = $clog2(PRIORITY_GROUP_WIDTH);
   localparam int GROUP_BITS = (PRIORITY_GROUPS > 1) ? $clog2(PRIORITY_GROUPS) : 1;
-  typedef enum logic [1:0] {IDLE, ISSUE, WAIT_ACK} state_t;
+  typedef enum logic [1:0] {IDLE, CAPTURE, ISSUE, WAIT_ACK} state_t;
   state_t state;
   logic [OWNER_BITS-1:0] owner;
   logic [GROUP_BITS-1:0] last_grant_group;
@@ -43,6 +43,8 @@ module llm_external_memory_arbiter #(
   logic [PORTS-1:0] grant;
   logic [OWNER_BITS-1:0] grant_owner;
   logic [ADDRESS_BITS-1:0] grant_addr;
+  logic [PORTS-1:0] selected_grant_q;
+  logic [OWNER_BITS-1:0] selected_owner_q;
   logic response_valid_q;
   logic [OWNER_BITS-1:0] response_owner_q;
   logic [DATA_BITS-1:0] response_data_q;
@@ -104,14 +106,16 @@ module llm_external_memory_arbiter #(
     grant_addr = '0;
     for (int i = 0; i < PORTS; i = i + 1) begin
       grant_owner |= OWNER_BITS'(i) & {OWNER_BITS{grant[i]}};
+      // Selection is registered before this payload mux. The requester has
+      // not received ready yet, so it must still hold its valid and address.
       grant_addr |= req_addr[i*ADDRESS_BITS +: ADDRESS_BITS] &
-        {ADDRESS_BITS{grant[i]}};
+        {ADDRESS_BITS{selected_grant_q[i]}};
     end
-    wb_cyc = state != IDLE;
+    wb_cyc = (state == ISSUE) || (state == WAIT_ACK);
     wb_stb = state == ISSUE;
     wb_addr = saved_addr >> LANE_BITS;
     wb_sel = '1;
-    if (state == IDLE) req_ready = grant;
+    if (state == CAPTURE && !rst) req_ready = selected_grant_q & req_valid;
     for (int i = 0; i < PORTS; i = i + 1)
       rsp_valid[i] = response_valid_q && (response_owner_q == OWNER_BITS'(i));
   end
@@ -123,6 +127,8 @@ module llm_external_memory_arbiter #(
       last_grant_group <= GROUP_BITS'(PRIORITY_GROUPS - 1);
       last_grant_local <= '1;
       saved_addr <= '0;
+      selected_grant_q <= '0;
+      selected_owner_q <= '0;
       response_valid_q <= 1'b0;
       response_owner_q <= '0;
       response_data_q <= '0;
@@ -130,16 +136,25 @@ module llm_external_memory_arbiter #(
       response_valid_q <= 1'b0;
       response_data_q <= '0;
       case (state)
-        IDLE: if (|req_ready) begin
-          owner <= grant_owner;
+        IDLE: if (|grant) begin
+          selected_grant_q <= grant;
+          selected_owner_q <= grant_owner;
+          state <= CAPTURE;
+        end
+        CAPTURE: if (|req_ready) begin
+          owner <= selected_owner_q;
           saved_addr <= grant_addr;
           for (int g = 0; g < PRIORITY_GROUPS; g = g + 1) begin
-            if (group_grant[g]) begin
+            if (selected_owner_q / PRIORITY_GROUP_WIDTH == g) begin
               last_grant_group <= GROUP_BITS'(g);
-              last_grant_local[g*LOCAL_BITS +: LOCAL_BITS] <= LOCAL_BITS'(grant_owner);
+              last_grant_local[g*LOCAL_BITS +: LOCAL_BITS] <= LOCAL_BITS'(selected_owner_q);
             end
           end
           state <= ISSUE;
+        end else begin
+          // A withdrawn choice must not issue a read or advance fairness.
+          // Compiler memory clients normally hold valid until acceptance.
+          state <= IDLE;
         end
         ISSUE: if (wb_accept) state <= WAIT_ACK;
         WAIT_ACK: if (wb_ack || wb_err) begin
