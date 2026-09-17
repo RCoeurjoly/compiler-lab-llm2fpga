@@ -300,3 +300,13 @@ in this primitive. SHA-256:
 This candidate still requires full-model simulation, integrated synthesis,
 mapped-path inspection and timing measurement. No timing or hardware success
 is claimed; the live address-to-D path remains and must also be measured.
+
+Integrated synthesis completed successfully (session 98338, exit 0, zero
+CHECK problems). The mapped netlist hash and resources are recorded in
+`idle-capture-synthesis-result.json`. Inspecting the same b47 queued-address
+bit 13 now maps to `$auto$ff.cc:337:slice$198257.Q`. Its CE net 67115 has
+only two sequential leaves: net 25841 (`request_queued`) and net 67105
+(`pending`). The preceding 75-leaf enable cone is absent at this endpoint.
+This validates the structural hypothesis, not timing closure. Placement-only
+diagnostics were launched as session 15030 with the unchanged constraints,
+seed 15 and 1,800-second limit; full-model simulation remains pending.
