@@ -1,0 +1,30 @@
+{
+  "status": "synthesis_completed_not_inference_or_timing_acceptance",
+  "compiler_commit": "cb83227",
+  "exit_code": 0,
+  "elapsed_seconds_reported_by_yosys": 679.34,
+  "peak_memory_mb": 2062.55,
+  "script": "registered-request-synthesis.ys",
+  "script_sha256": "a940d1a06bbfbfdc371146a1ea22f9012ca0c945a6ef64d03f28bbd44c45fcba",
+  "netlist_path": "/tmp/compiler-ddr3-current.2Z9Mo4/registered-request-diagnostic.json",
+  "netlist_sha256": "6c3b8b1673d26fdb1a0545e506f4e8c0d3e2625cd11ee41b81ebc33b2dd9851c",
+  "log_path": "/tmp/compiler-ddr3-current.2Z9Mo4/registered-request-synthesis.log",
+  "log_sha256": "20a713f91b6d73e1d90bfb6997d5bfb20bf88ef0730ae18f0e00c62c65fc6063",
+  "generated_accelerator_sha256": "75cd4d642a66e50f762a40741e3e42b0bf48f768ced5549226ac13dd81bb0338",
+  "final_yosys_check_problems": 0,
+  "warnings_unique": 4767,
+  "warnings_total": 4881,
+  "cells_including_scope_metadata": 133887,
+  "lut_cells": 53519,
+  "flip_flops": 39826,
+  "dsp48e1": 245,
+  "ramb36e1": 47,
+  "ramb18e1": 7,
+  "legacy_accelerator_and_service_removed_by_hierarchy": true,
+  "qualification_limits": [
+    "Full-model simulation was still running when synthesis completed.",
+    "Synthesis success is not board fit, timing closure or inference acceptance.",
+    "Same pinned transport, mapping flags, clocks and constraints as static-wait baseline.",
+    "Placement-only diagnostic launched with the documented print-path diagnostic nextpnr, seed 15 and unchanged XDC/pre-pack; no route or bitstream yet."
+  ]
+}
