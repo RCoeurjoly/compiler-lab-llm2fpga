@@ -1,0 +1,18 @@
+{
+  "status_at_recording": "build_passed_simulation_launched_not_qualified",
+  "compiler_commit": "9d59d7c",
+  "arbiter_commit": "d273e75",
+  "build_session": 68535,
+  "build_exit_code": 0,
+  "build_log_sha256": "133c4295ff0a71f7f8761c9ac5758fb6ddae9028f58bf2b41e3b6a654142f21e",
+  "executable_sha256": "adcd94baaa1c47c9db229c6d152656d3adcc73a8be8eb82e29451de11c519aa7",
+  "accelerator_sha256": "5017489235325a787506dd4216774c0eaa64e4951159a7b1df06e6510c3d462a",
+  "arbiter_sha256": "f8e42248a165fd053c28a2860879863ae64daa82275cf1e90ee7ad00895bac9e",
+  "memory_hex_sha256": "52c169a96fa2218618b3ec845b6cb86c82ca70111e1c681bbb25533a38520141",
+  "simulation_session": 1411,
+  "timebox_seconds": 10800,
+  "expected_token": 11,
+  "command": "timeout --signal=TERM --kill-after=10s 10800 /tmp/compiler-ddr3-current.2Z9Mo4/obj-staged-arbiter/Vcommand_integration_wrapper +IMAGE=/tmp/compiler-ddr3-current.2Z9Mo4/tinystories-ddr3-lines.hex > /tmp/compiler-ddr3-current.2Z9Mo4/staged-arbiter-run.log 2>&1",
+  "hardware_programmed": false,
+  "qualification": "Historical launch receipt, not passing simulation evidence. Uses preloaded modeled memory, not physical DDR3 or PCIe image loading. Distinct from the concurrent old-arbiter idle-capture simulation."
+}
