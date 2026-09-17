@@ -179,7 +179,10 @@ def latch_external_memory_completion_joins(
     rewritten = source
     for match in reversed(list(assignment.finditer(source))):
         terms = _split_top_level_and(match.group("rhs"))
-        if len(terms) < 2:
+        # Token lookup has one selected-bank completion expression, but its
+        # selector-to-done-to-go feedback is also a measured critical path.
+        # Register that predicate without discarding bank qualification.
+        if len(terms) < 2 and match.group("signal") != "model_read_token_codes_done_in":
             continue
         identifiers = set(re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", match.group("rhs")))
         if not identifiers.intersection(external_done):

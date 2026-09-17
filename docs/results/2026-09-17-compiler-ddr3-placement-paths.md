@@ -169,3 +169,20 @@ outside the active group, preserve the returned data until consumption, and
 handle repeated groups and reset. It requires a failing behavioral fixture,
 regression tests, full-model equivalence and a new timing measurement. No
 additional RTL change has been applied on the strength of this hypothesis.
+
+### Selected-completion test-first candidate
+
+The subsequent behavioral fixture failed against the previous pass with
+`selected completion bypassed register`. The narrow change exempts only
+`model_read_token_codes_done_in` from the single-operand skip, using the
+existing completion register/reset/rearm mechanism. All 15 focused
+external-memory tests pass, including selected/unselected responses, inactive
+responses, repeated groups and reset. This is a request-control timing
+experiment, not a change to model arithmetic, PCIe or DDR3.
+
+Regenerating from the same accepted compiler input changes only this one
+completion assignment into the registered predicate. Candidate SHA-256:
+`eefbc34e60006e01f7d33b405298d6cea5c3bb122552fa338665b34db5c948cf`.
+Its full-model simulation and implementation timing have not been qualified.
+The preceding registered-request simulation continues with its unchanged
+executable; its result must not be attributed to this newer candidate.
