@@ -1,0 +1,16 @@
+{
+  "status_at_recording": "build_passed_simulation_launched_not_qualified",
+  "compiler_commit": "9d59d7c",
+  "build_session": 32365,
+  "build_exit_code": 0,
+  "build_log_sha256": "2c49797abdb7c642cba148b2bcb61a2a38be9db974e697fbf7b2e86ff4e34199",
+  "accelerator_sha256": "5017489235325a787506dd4216774c0eaa64e4951159a7b1df06e6510c3d462a",
+  "executable_sha256": "72ece56efe67acb9c1e993fc2020e0c8e19f161518b8de68eca5677122e5c972",
+  "memory_hex_sha256": "52c169a96fa2218618b3ec845b6cb86c82ca70111e1c681bbb25533a38520141",
+  "simulation_session": 26853,
+  "timebox_seconds": 10800,
+  "expected_token": 11,
+  "command": "timeout --signal=TERM --kill-after=10s 10800 /tmp/compiler-ddr3-current.2Z9Mo4/obj-idle-capture/Vcommand_integration_wrapper +IMAGE=/tmp/compiler-ddr3-current.2Z9Mo4/tinystories-ddr3-lines.hex > /tmp/compiler-ddr3-current.2Z9Mo4/idle-capture-run.log 2>&1",
+  "hardware_programmed": false,
+  "qualification": "Historical launch record, not simulation success or a live-process indicator. Preloaded modeled memory, not physical DDR3 or PCIe model loading."
+}
