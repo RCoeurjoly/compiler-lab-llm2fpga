@@ -42,3 +42,49 @@ physical timing. Counts are diagnostics, not an ordered address/data trace.
 The model does not explicitly reject out-of-range addresses. A passing result
 must therefore retain these scope limits; integrated board acceptance remains
 a separate requirement.
+
+## Terminal result and localized correction
+
+The original run finished with **FAIL**, not a timeout: 145,253,465 cycles,
+13,100,528 requests and responses, token **640**, expected **11**. Its terminal
+log SHA-256 is `1db4ee1f5b5579abda8d2a7c041768fc075cebd115fa23e2f9ffe2468d63c140`.
+Do not use its synthesized candidate for hardware acceptance.
+
+Checkpoint replay against the compiler-generated BRAM implementation, initialized
+from the same hash-verified image, matched block inputs, layer normalization,
+Q/K/V projections, and all 1,600 captured attention-score writes. The earliest
+observed mismatch was attention exponential write ordinal 1,040, address 128:
+expected `0x0ebd69`, actual `0x0ff008`. These are LUT entries 4075 and 4095.
+
+An observational driver linked against the unchanged failing simulation library
+recorded this sequence (before each active clock edge):
+
+| Cycle | Static phase | Read enabled | Requested index | Response index | Pending | Read data |
+|---|---|---|---|---|---|---|
+| 2458836 | 0 | 1 | 4095 (previous) | 4095 | 0 | ff008 |
+| 2458837 | 1 | 1 | 4075 | 4095 | 1 | ff008 |
+| 2458838 | 2, consume | 0 | 4075 | 4095 | 1 | ff008 |
+
+Thus consumption precedes completion of the correct lookup. The externalization
+pass handled dynamic completion groups, but had retained BRAM-latency static
+schedules for attention, GELU, and the fallback prompt memory.
+
+`legalize_static_external_reads` now holds the shared static scheduler at the
+last read phase until the corresponding response arrives. It preserves memory
+addressing, arithmetic, and transport. The three recognized schedules were
+audited for side effects at the held phases; unfamiliar schedules are rejected.
+This is an exact-TinyStories schedule legalization, not a general Calyx static
+control conversion.
+
+The new RTL regression failed before the change for all three schedules and
+passes with response delays of 1, 7, and 19 cycles. It covers both GELU reads,
+repeated operations, request counts/addresses, and a disabled conditional prompt
+read. The focused external-memory suite passes 12 tests.
+
+The candidate is generated from the same raw compiler source. Disabling only
+the new legalization reproduces the previous `0d054638...` source hash exactly.
+With the correction, the source SHA-256 is
+`b93f285e8ae877b110774c27b8ab1d4a7c0b37d277be75d5e8142d9fc739ae9d`.
+Full-model checkpoint replay, first-token acceptance, new synthesis/timing, and
+hardware acceptance remain pending for this candidate. No PCIe, DDR3, clock, or
+constraint changes accompany this correction.

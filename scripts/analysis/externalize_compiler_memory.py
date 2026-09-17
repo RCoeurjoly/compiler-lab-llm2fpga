@@ -221,9 +221,79 @@ def _parameter(params: str, name: str) -> int:
     return int(match.group(1))
 
 
+def legalize_static_external_reads(
+    source: str, memory_names: list[str] | tuple[str, ...]
+) -> str:
+    """Wait at the end of audited TinyStories static memory-read windows.
+
+    Dynamic groups consume ``done``; static Calyx schedules instead assume
+    BRAM latency. Keep their read window open until the external response is
+    captured, before executing any downstream writes. These exact schedules
+    were audited for side effects in the stalled phase. Reject unfamiliar
+    static schedules rather than silently claiming variable-latency support.
+    This is not a general static-to-dynamic Calyx conversion.
+    """
+    schedules = {
+        "attention_exp_lut_q1_20": (
+            "fsm_out < 4'd2 & early_reset_static_par_thread8_go_out",
+            "fsm_out == 4'd1",
+        ),
+        "gelu_lut_q12": (
+            "(fsm_out < 4'd2 | fsm_out >= 4'd3 & fsm_out < 4'd5) & early_reset_static_seq50_go_out",
+            "fsm_out == 4'd1 || fsm_out == 4'd4",
+        ),
+        "prompt_tokens": (
+            "cond_wire_out & fsm_out >= 4'd1 & fsm_out < 4'd3 & early_reset_static_seq0_go_out",
+            "fsm_out == 4'd2",
+        ),
+    }
+    states = []
+    waits = []
+    for name in memory_names:
+        assignments = re.findall(
+            rf"\bassign\s+{re.escape(name)}_content_en\s*=\s*([^;]+);", source
+        )
+        if not assignments:
+            continue
+        if len(assignments) != 1:
+            raise ValueError(f"ambiguous content enable for {name}")
+        expression = assignments[0]
+        if "fsm_out" not in expression and "early_reset_static" not in expression:
+            continue
+        expected = schedules.get(name)
+        if expected is None or re.sub(r"\s+", "", expression) != re.sub(r"\s+", "", expected[0]):
+            raise ValueError(f"unsupported static external-read schedule for {name}")
+        seen = f"llm2fpga_{name}_static_response_seen"
+        if re.search(rf"\b{seen}\b", source):
+            raise ValueError(f"static external-read schedule already legalized for {name}")
+        states.append(
+            f"logic {seen};\n"
+            "always_ff @(posedge clk) begin\n"
+            f"  if (reset || !{name}_content_en) {seen} <= 1'b0;\n"
+            f"  else if ({name}_done) {seen} <= 1'b1;\n"
+            "end\n"
+        )
+        waits.append(
+            f"({name}_content_en && ({expected[1]}) && !({name}_done || {seen}))"
+        )
+    if not waits:
+        return source
+    scheduler = list(re.finditer(r"\bassign\s+fsm_write_en\s*=\s*([^;]+);", source))
+    if len(scheduler) != 1:
+        raise ValueError("static external reads require exactly one audited fsm_write_en")
+    match = scheduler[0]
+    replacement = (
+        "// LLM2FPGA latency-tolerant static external-memory reads v1\n"
+        + "".join(states)
+        + f"assign fsm_write_en = ({match[1]}) && !(" + " || ".join(waits) + ");"
+    )
+    return source[:match.start()] + replacement + source[match.end():]
+
+
 def externalize_memory(source: str, memory_name: str) -> ExternalizationResult:
     """Replace one generated d1 memory and expose a simple external ABI."""
 
+    source = legalize_static_external_reads(source, [memory_name])
     selected: re.Match[str] | None = None
     for match in _INSTANCE.finditer(source):
         if match.group("name") == memory_name:
@@ -281,6 +351,7 @@ def externalize_memories(
         raise ValueError("memory names must be a non-empty unique list")
     source = select_banked_memory_reads(source)
     source = latch_external_memory_completion_joins(source, names)
+    source = legalize_static_external_reads(source, names)
     matches = {m.group("name"): m for m in _INSTANCE.finditer(source)}
     missing = [name for name in names if name not in matches]
     if missing:
