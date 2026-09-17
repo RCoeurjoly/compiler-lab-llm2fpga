@@ -310,3 +310,34 @@ only two sequential leaves: net 25841 (`request_queued`) and net 67105
 This validates the structural hypothesis, not timing closure. Placement-only
 diagnostics were launched as session 15030 with the unchanged constraints,
 seed 15 and 1,800-second limit; full-model simulation remains pending.
+
+### Idle-capture placement outcome
+
+Placement session 15030 completed with exit 0 (990 warnings, zero errors).
+Estimated rowstream frequency is **37.14 MHz, FAIL at 83.33 MHz**; PCIe is
+**58.11 MHz, FAIL at 62.50 MHz**. These remain placement estimates, not routed
+timing. Removing the payload-enable cone improved the rowstream estimate only
+slightly from 36.28 MHz. No new full route has been launched.
+
+The worst estimated rowstream path now starts at
+`token_weight_codes_i8_b99.request_queued` (request-valid port 231) and ends at
+the shared arbiter's `saved_addr[14]`: 26.9 ns, comprising 2.4 ns logic and
+24.5 ns estimated routing. Mapped endpoints are `slice$228396.Q` and
+`slice$188145.D`. The full source inspection of
+`rtl/memory/llm_external_memory_arbiter.sv` shows that group/local round-robin
+selection and a 240-port masked address reduction all precede the same saved
+address register. This is a different cone from the repaired payload CE.
+
+Before another long route, investigate separating arbitration selection from
+address capture in the compiler-memory adapter, with explicit request lifetime,
+fairness, reset and Wishbone-handshake tests. Do not change the validated PCIe
+or DDR3 controller. This is an architectural boundary to review, not permission
+to keep stacking speculative per-signal fixes. Full-model simulation of the
+current candidate is still running and must retain its identity.
+
+`idle-capture-placement-paths.log` preserves full-log lines 1388–1468 and
+1559–1564. Full log SHA-256:
+`ef9198aaf3cc3c98ae908a39c52ac9ed21096386ecdb8d69afe372498cfc362c`.
+Placed JSON SHA-256:
+`f7a10bc08d423aeabdcdbe9e46ca64667b0dfb8e93bbecb1d1cf8e30eaf95d7f`.
+Full files remain `/tmp/compiler-ddr3-current.2Z9Mo4/idle-capture-placement.{log,json}`.
