@@ -1,0 +1,16 @@
+{
+  "schema": "compiler-ddr3-first-token-host-reference-v1",
+  "purpose": "expected input/output, not DDR3 inference acceptance",
+  "prompt": "Once upon a time",
+  "prompt_ids": [7454, 2402, 257, 640],
+  "output_ids": [11],
+  "requested_tokens": 1,
+  "package_manifest_sha256": "c511cd6010e9d87133bf1a134d7ffe3f13bb8459b62d8e4be2c5225cd3852375",
+  "model_image_bytes": 4136720,
+  "model_image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+  "compiler_input_sha256": "7e359dfd4ea1e78bdd141eeba52cc779d3698fb38b279def96e72a72188fc8b5",
+  "expected_token_source": "artifacts/reference/tinystories-1m-first-token-board-acceptance-2026-09-09.json",
+  "oracle_sha256": "31fbd1e3f5b13d7b07466a72e9c6a551ffc00bd4fee375241f095ba5b5cda677",
+  "hardware_package_tag_checked_by_compiler_adapter": false,
+  "legacy_debug_trace_available": false
+}
