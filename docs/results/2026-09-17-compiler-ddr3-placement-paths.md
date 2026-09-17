@@ -367,3 +367,37 @@ Arbiter source SHA-256:
 This needs a separate full-model simulation and integrated implementation run.
 The still-running idle-capture simulation (26853) uses the previous immutable
 arbiter and cannot qualify this candidate. No timing/board success is claimed.
+
+### Staged-arbiter placement outcome
+
+The placement log ends with post-placement legalisation and 990 warnings,
+zero errors; the session handle is no longer available, so no exit code is
+inferred. The placed JSON exists. Estimated rowstream frequency improves to
+**44.80 MHz, FAIL at 83.33 MHz**; PCIe is **62.77 MHz, PASS at 62.50 MHz**.
+These are not routed timing results or permission to program a bitstream.
+
+The worst rowstream path is now inside compiler control, not the arbiter:
+`lm_input_qdq_divide.done` (also `invoke217_done_in/out`) to the synchronous
+reset input of `fsm0.out[7]`. The mapped source is
+`$auto$ff.cc:337:slice$454574.Q`, net 4951; the endpoint is
+`$auto$ff.cc:337:slice$704774.SR`, mapped FDRE R net 4413 and Q net 632.
+The estimate is 22.3 ns: 2.4 ns logic and 19.9 ns routing. The source net
+alone contributes 6.7 ns estimated routing. Mapping was checked against the
+top module of `staged-arbiter-diagnostic.json`, not inferred from cell numbers.
+
+The generated source assigns `invoke217_done_in = lm_input_qdq_divide_done`
+and enables invoke217 at FSM state 375. The endpoint's physical SR pin does
+not by itself implicate the external reset: synthesis can map next-state
+logic onto synchronous-reset pins. Trace this completion-to-next-state cone
+before proposing a compiler scheduling change. The prior arbitration cone is
+no longer the reported worst path; this does not establish its timing closure.
+
+Full placement log SHA-256:
+`0b3fdff0ef30edd0d88d979276ef4ded77168d932e8b3f891e9471e2b28670da`.
+Placed JSON SHA-256:
+`aa55457343a807fad745dcfbe6d27412f4c9546462aebc455a24f74f377ec006`.
+Files remain under `/tmp/compiler-ddr3-current.2Z9Mo4/` with basename
+`staged-arbiter-placement`. Full-model staged-arbiter and idle-capture
+simulation handles were both confirmed live during this inspection. Neither
+had yet produced a first-token result. No new RTL change or full route was
+launched on the basis of this placement estimate.
