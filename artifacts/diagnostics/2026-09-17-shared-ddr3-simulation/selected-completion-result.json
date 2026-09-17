@@ -1,0 +1,53 @@
+{
+  "status": "passed_real_command_adapter_simulated_memory_first_token_only",
+  "exit_code": 0,
+  "prompt_tokens": [
+    7454,
+    2402,
+    257,
+    640
+  ],
+  "expected_token": 11,
+  "actual_token": 11,
+  "cycles_after_start": 151974086,
+  "requests": 13116912,
+  "responses": 13116912,
+  "compiler_fix_commit": "66a154a",
+  "generated_accelerator_sha256": "eefbc34e60006e01f7d33b405298d6cea5c3bb122552fa338665b34db5c948cf",
+  "arbiter_sha256": "4e0615ed78336f22380335c0c63fa8bea83bcde151808c1a8ec15797b357e726",
+  "backend_sha256": "7992e8a8c3a0cc2a40dbcf23ff618f530af79ce7607d1e372b111c0475f82ba0",
+  "adapter_sha256": "b60998389d4a1ee669c57ae6e06c6d9e7289f98eb180396199e9448678aca976",
+  "model_image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+  "memory_hex_sha256": "52c169a96fa2218618b3ec845b6cb86c82ca70111e1c681bbb25533a38520141",
+  "model_image_bytes": 4136720,
+  "log": "selected-completion-run.log",
+  "log_sha256": "6e79a0797ecbbefa6088fc1f8d532d726fa0c0d981a652d280e81f59bcc77e50",
+  "wrapper": "command-integration-wrapper.sv",
+  "wrapper_sha256": "7a942116f85556db4935e42d2d0fcd367f9e3e7492c57fcecd7e76d6515ca4ef",
+  "driver": "command-integration-driver.cpp",
+  "driver_sha256": "86cc28f54c60d9fc5396b875beacfc2d2785418f1b8ae745e6cc519c87d6fb67",
+  "executable_sha256": "712cf26d22087c01579dc0d021cc05226cec79f516916930546e86ff3e2d346e",
+  "build_exit_code": 0,
+  "build_timeout_seconds": 1800,
+  "run_timeout_seconds": 10800,
+  "max_cycles": 300000000,
+  "build_command": "nix develop .#default -c timeout --signal=TERM --kill-after=10s 1800 verilator --cc --exe --build --timing -j 2 -O3 -Wno-fatal --top-module command_integration_wrapper --Mdir /tmp/compiler-ddr3-current.2Z9Mo4/obj-selected-completion /tmp/compiler-ddr3-current.2Z9Mo4/selected-completion.sv /nix/store/xs26iaazqfp72wr0fcnkn73krld2ln6d-llm_external_memory_arbiter.sv /nix/store/4n5p2q9c3im9qrizysw6jcfc4ni0xc39-tinystories_1m_ddr3_backend.sv /nix/store/dn9gwzarhz2kdlc9z8v7h7s6q1fpz7qr-tinystories_1m_ddr3_command_adapter.sv /home/roland/compiler-lab-llm2fpga/artifacts/diagnostics/2026-09-17-shared-ddr3-simulation/command-integration-wrapper.sv /home/roland/compiler-lab-llm2fpga/artifacts/diagnostics/2026-09-17-shared-ddr3-simulation/command-integration-driver.cpp",
+  "run_command": "timeout --signal=TERM --kill-after=10s 10800 /tmp/compiler-ddr3-current.2Z9Mo4/obj-selected-completion/Vcommand_integration_wrapper +IMAGE=/tmp/compiler-ddr3-current.2Z9Mo4/tinystories-ddr3-lines.hex",
+  "checked": [
+    "Four prompt words accepted, fifth prompt blocked",
+    "Real adapter, backend, compiler main and 240-port arbiter",
+    "Reads only, full byte select, in-range memory addresses",
+    "Single outstanding transaction and no unmatched response",
+    "Adapter request counter matches accepted Wishbone requests",
+    "Exact token 11, all requests answered at completion",
+    "Token held under five cycles of output backpressure",
+    "Output handshake retires token and busy"
+  ],
+  "qualification_limits": [
+    "Preloaded fixed-latency Wishbone model, not PCIe loading or owner-mux arbitration",
+    "No physical DDR3 PHY/calibration or asynchronous crossings",
+    "Counts are not ordered address/data trace hashes",
+    "One simulated token; no timing closure, bitstream or hardware acceptance",
+    "Corresponding selected-completion route was still running when simulation completed; no timing closure or programming claim."
+  ]
+}
