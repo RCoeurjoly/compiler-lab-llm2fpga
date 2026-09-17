@@ -1,5 +1,6 @@
 """The compiler request stage must isolate live addresses from arbitration."""
 
+import json
 import shutil
 import subprocess
 import tempfile
@@ -68,6 +69,64 @@ endmodule
 
 
 class RegisteredExternalRequestTest(unittest.TestCase):
+    def test_address_capture_enable_has_no_live_client_dependency(self):
+        """Catch the measured address-mux/comparison-to-capture-enable path.
+
+        This is a structural timing requirement, not functional equivalence:
+        functional request stability is checked separately below.
+        """
+        self.assertIsNotNone(shutil.which("yosys"))
+        with tempfile.TemporaryDirectory(prefix="memory-capture-cone-") as directory:
+            path = Path(directory)
+            (path / "memory.sv").write_text(em._EXTERNAL_MODULE)
+            build = subprocess.run(
+                ["yosys", "-Q", "-T", "-p",
+                 "read_verilog -sv memory.sv; hierarchy -top seq_mem_d1_external; "
+                 "proc; opt; write_json memory.json"],
+                cwd=path, capture_output=True, text=True, timeout=60,
+            )
+            self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+            module = json.loads((path / "memory.json").read_text())["modules"][
+                "seq_mem_d1_external"]
+            drivers = {}
+            for cell in module["cells"].values():
+                for port, bits in cell["connections"].items():
+                    if cell["port_directions"][port] == "output":
+                        for bit in bits:
+                            drivers[bit] = cell
+            forbidden = {
+                bit for port in ("addr0", "content_en", "write_en")
+                for bit in module["ports"][port]["bits"]
+            }
+            def leaves(bit, visited):
+                if not isinstance(bit, int) or bit in visited:
+                    return set()
+                visited.add(bit)
+                cell = drivers.get(bit)
+                if cell is None or "dff" in cell["type"]:
+                    return {bit}
+                return set().union(*(
+                    leaves(source, visited)
+                    for port, bits in cell["connections"].items()
+                    if cell["port_directions"][port] == "input"
+                    for source in bits
+                ))
+            for signal in ("queued_address", "request_index"):
+                checked = 0
+                for bit in module["netnames"][signal]["bits"]:
+                    if not isinstance(bit, int):
+                        continue
+                    cell = drivers[bit]
+                    self.assertIn("dff", cell["type"])
+                    self.assertIn("EN", cell["connections"])
+                    for enable in cell["connections"]["EN"]:
+                        self.assertFalse(
+                            leaves(enable, set()) & forbidden,
+                            f"{signal} capture enable depends on live client inputs",
+                        )
+                    checked += 1
+                self.assertGreater(checked, 0)
+
     def test_request_is_registered_and_stable_until_accepted(self):
         self.assertIsNotNone(shutil.which("verilator"))
         with tempfile.TemporaryDirectory(prefix="registered-memory-request-") as directory:

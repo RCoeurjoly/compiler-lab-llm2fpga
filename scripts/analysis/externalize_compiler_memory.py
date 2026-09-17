@@ -456,6 +456,17 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
       read_data <= '0;
     end else begin
       done <= pending && ext_rsp_valid;
+      // Sample the payload whenever the local slot is empty. The valid bit
+      // below still uses the complete read/duplicate-suppression predicate,
+      // so sampling alone cannot issue a request. On the enqueue edge both
+      // payload and valid capture the same client inputs; queued/pending
+      // then freeze the payload until the transaction has completed.
+      // Keep the address mux and duplicate comparison out of the wide
+      // payload-register enable cone measured in the integrated design.
+      if (!pending && !request_queued) begin
+        queued_address <= EXT_BASE_ADDR + (addr0 * (WIDTH / 8));
+        request_index <= addr0;
+      end
       if (!content_en || write_en)
         response_ready <= 1'b0;
       if (pending && ext_rsp_valid) begin
@@ -471,8 +482,6 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
       end else if (content_en && !write_en && !pending && !request_queued &&
                    (!response_ready || (response_index != addr0))) begin
         request_queued <= 1'b1;
-        queued_address <= EXT_BASE_ADDR + (addr0 * (WIDTH / 8));
-        request_index <= addr0;
         response_ready <= 1'b0;
       end
     end

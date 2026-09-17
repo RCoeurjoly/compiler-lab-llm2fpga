@@ -275,3 +275,28 @@ would still be asserted only under the existing predicate. This must first
 prove atomic capture, backpressure stability, duplicate suppression, response
 offsets and reset in simulation. Then inspect the mapped CE cone and placement
 before spending another full route. No such change has yet been implemented.
+
+### Idle-slot payload capture candidate
+
+The hypothesis above is now implemented only in the compiler-emitted external
+memory primitive: `queued_address` and `request_index` sample when
+`!pending && !request_queued`; the complete request-valid predicate is unchanged.
+Sampling and valid assertion use the same edge's inputs. Queued and pending
+states freeze payload, including on the response edge. Payload may toggle
+while invalid, increasing switching; no extra request is authorized by sampling.
+
+The new Yosys structural test failed before the change with
+`queued_address capture enable depends on live client inputs` (test session
+44914, exit 1). After the change, all 16 focused external-memory tests passed
+in 43.815 seconds (session 86694, exit 0). The structural test checks both
+payload-register EN cones exclude live address, content-enable, and write-enable
+inputs; existing RTL tests check accepted transactions, backpressure, byte
+offsets, duplicate suppression, changed client addresses, joins and reset.
+Independent read-only review found no blocker/high/medium findings.
+
+The regenerated full-model source differs from the preceding candidate only
+in this primitive. SHA-256:
+`5017489235325a787506dd4216774c0eaa64e4951159a7b1df06e6510c3d462a`.
+This candidate still requires full-model simulation, integrated synthesis,
+mapped-path inspection and timing measurement. No timing or hardware success
+is claimed; the live address-to-D path remains and must also be measured.
