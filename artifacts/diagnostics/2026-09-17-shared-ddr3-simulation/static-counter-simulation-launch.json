@@ -1,0 +1,18 @@
+{
+  "status_at_recording": "build_passed_simulation_launched_not_qualified",
+  "compiler_commit": "7c21388",
+  "build_session": 86226,
+  "build_exit_code": 0,
+  "build_log_sha256": "de1e2f9ad5d847c4e1854d734e226f16aedf45386449a8f10eb5252eb6e1893e",
+  "executable_sha256": "243909e057342495c4c37bc8285754159fceeb5d4b57662503b4397a84ea2eb5",
+  "accelerator_sha256": "41b98813203c4c1f8183da2e93dd105dcae087d8fee1e02c9bc61eedb7d9dfce",
+  "arbiter_sha256": "f8e42248a165fd053c28a2860879863ae64daa82275cf1e90ee7ad00895bac9e",
+  "memory_hex_sha256": "52c169a96fa2218618b3ec845b6cb86c82ca70111e1c681bbb25533a38520141",
+  "simulation_session": 58300,
+  "timeout_seconds": 10800,
+  "termination_grace_seconds": 10,
+  "max_cycles": 300000000,
+  "expected_token": 11,
+  "command": "timeout --signal=TERM --kill-after=10s 10800 /tmp/compiler-ddr3-current.2Z9Mo4/obj-static-counter/Vcommand_integration_wrapper +IMAGE=/tmp/compiler-ddr3-current.2Z9Mo4/tinystories-ddr3-lines.hex > /tmp/compiler-ddr3-current.2Z9Mo4/static-counter-run.log 2>&1",
+  "qualification": "Launch receipt, not passing simulation or continued process liveness. Models external memory; does not exercise PCIe loading or physical DDR3. RTL simulation does not cover synthesis-only one-hot recoding. No timing, bitstream or hardware acceptance."
+}
