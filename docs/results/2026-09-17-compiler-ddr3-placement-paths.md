@@ -114,3 +114,34 @@ This introduces an additional request-capture cycle. Full-model first-token
 simulation and new implementation timing are still required; the unit tests
 do not establish either. The prior passing simulation and failed routed
 candidate are preserved separately. No replacement bitstream is qualified.
+
+### Candidate placement result
+
+The registered-request placement-only diagnostic completed with exit 0.
+Its rowstream estimate is **30.58 MHz, FAIL at 83.33 MHz**, compared with
+18.43 MHz for the preceding placement-only baseline. This is an improvement
+in placement estimates, not routed timing closure. PCIe estimates 47.54 MHz
+against 62.50 MHz; as the baseline demonstrated, this does not establish a
+routed PCIe failure.
+
+The worst rowstream path now starts at `context_tokens_read_data[15]` and
+ends at `$auto$ff.cc:337:slice$205084.CE`, totaling 32.7 ns (2.3 ns logic,
+30.4 ns estimated routing). Synthesized-netlist bit mapping identifies the
+sink register's Q as `token_weight_codes_i8_b143.queued_address[5]`.
+The reported limiting path is therefore upstream of the new request
+register, not the former arbiter grant-register endpoint. The next source
+investigation is the compiler bank-selection/scheduler-to-request-capture
+enable cone; this result alone does not authorize an untested RTL change.
+
+Exact rowstream/PCIe paths and clock estimates are preserved in
+`registered-request-placement-paths.log` (full-log lines 1388–1465 and
+1553–1558). Full log SHA-256:
+`2437647ac8d5cb8572327075b639e522a26861c0e884913095fb13452c3536a9`.
+Placed JSON SHA-256:
+`da5af84a1c2344e54bfb671af00eee394153168cfe8363223d030e379f280a1d`.
+Both full artifacts remain under `/tmp/compiler-ddr3-current.2Z9Mo4/` as
+`registered-request-placement.{log,json}`. The run used the same diagnostic
+nextpnr executable, XDC, pre-pack, chip database, seed 15, placer budgets and
+`--no-route` settings as the preceding placement diagnostic, with the new
+netlist recorded in `registered-request-synthesis-result.json` and separate
+output paths. Full-model simulation is still pending; no route was launched.
