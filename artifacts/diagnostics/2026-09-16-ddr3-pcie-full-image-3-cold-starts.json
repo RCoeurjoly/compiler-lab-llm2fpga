@@ -9,12 +9,21 @@
   "image_bytes": 4136720,
   "beats": 258545,
   "beat_bytes": 16,
-  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9ffb7edc0319c43e593",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
   "manifest_content_sha256": "1891a310e31817550cb85005b3e08de4159c3a392ba5ed4776b342d03fd12f98",
   "runs": [
     {"cold_start": 1, "status": "PASS", "elapsed_seconds": 90.18097054200189, "sha256_loaded": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593", "sha256_readback": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"},
     {"cold_start": 2, "status": "PASS", "elapsed_seconds": 90.0538386140106, "sha256_loaded": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593", "sha256_readback": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"},
     {"cold_start": 3, "status": "PASS", "elapsed_seconds": 90.25858786600293, "sha256_loaded": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593", "sha256_readback": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"}
   ],
-  "acceptance": "PASS"
+  "acceptance": "PASS",
+  "acceptance_scope": "Full-image PCIe loading and DDR3 readback on three cold starts only. No accelerator inference or fixed-profile timing-closure acceptance.",
+  "timing_qualification": {
+    "required_rowstream_mhz": 83.33,
+    "required_pcie_mhz": 62.5,
+    "recorded_rowstream_meets_requirement": false,
+    "recorded_pcie_meets_requirement": true,
+    "qualification": "The recorded rowstream figure of 64.77 MHz is below the fixed 83.33 MHz target. Historical image-transfer PASS does not waive timing closure for the integrated candidate."
+  },
+  "summary_correction": "Corrected the top-level image hash to match all three recorded load/readback hashes, the authenticated compiler first-token reference, and the actual 4136720-byte image. Historical run values are unchanged."
 }
