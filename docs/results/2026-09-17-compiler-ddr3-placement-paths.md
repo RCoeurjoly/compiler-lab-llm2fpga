@@ -237,3 +237,41 @@ identified by placement and its fanout before selecting another compiler
 change. The timeout alone does not establish that path as the final routed
 critical path, nor justify changing clocks, DDR3, PCIe, or seed. No automatic
 longer retry or additional RTL fix has been launched.
+
+### Post-timeout mapped-cone investigation
+
+Read-only inspection of the same synthesis JSON (SHA-256
+`b883ec8f37a1777935b0b657991315597eab632a802eb6e712195a18663d3f57`)
+counts input-pin loads, not just distinct consumer cells:
+
+| Mapped net bit | Driver suffix | Input-pin loads |
+| --- | --- | ---: |
+| 1285 | `slice$709338.Q` (FSM bit 8) | 55 |
+| 1279 | `parse_blif$766375.O` | 56 |
+| 1276 | `parse_blif$766373.O` | 212 |
+| 1546 | `parse_blif$766486.O` | 371 |
+| 67611 | `parse_blif$803106.O` (endpoint CE) | 32 |
+
+Tracing LUT/MUXF inputs back to sequential boundaries gives 11 leaves for
+net 1276: the nine FSM bits, `start`, and registered token-read completion.
+Net 1546 adds `lm_gemv_weight_address.out[10]` and
+`context_tokens.read_data[4]`: this is shared address-selection logic, not
+merely a replicated enable. Endpoint CE net 67611 has 75 sequential/input
+leaves, including the local `response_index`, `response_ready`, `pending`,
+and `request_queued` state. Its Q endpoint is still
+`token_weight_codes_i8_b47.queued_address[13]`.
+
+The compiler source explains this dependency: `addr0` selects token versus
+LM-head address using read-group go; the external-memory primitive captures
+both address and request index under the full request predicate, including
+`response_index != addr0`. Consequently the address mux/comparison also
+controls the address-register CE. This identifies a concrete combinational
+cone; it does not prove the routing timeout's cause or final critical path.
+
+Next bounded hypothesis: separate idle-slot address sampling from the
+duplicate-suppressed request-valid decision. Address and index could sample
+while the local slot is empty, then freeze while queued or pending; valid
+would still be asserted only under the existing predicate. This must first
+prove atomic capture, backpressure stability, duplicate suppression, response
+offsets and reset in simulation. Then inspect the mapped CE cone and placement
+before spending another full route. No such change has yet been implemented.
