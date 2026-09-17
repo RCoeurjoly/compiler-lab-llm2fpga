@@ -1,0 +1,64 @@
+{
+  "schema": "compiler-ddr3-qualification-audit-v1",
+  "status": "shared-port-first-token-not-yet-proven",
+  "prior_receipt": "artifacts/diagnostics/2026-09-16-compiler-ddr3-accepted-source-first-token-pass.json",
+  "prior_receipt_limits": {
+    "externalized_source_sha256": "84397c4ef16d389c504e41b2bfbac0a5578e6bca40fc8d69a4faf70d25b4584f",
+    "requests": 643641072,
+    "cycles": 92936288,
+    "does_not_authenticate_current_shared_port_candidate": true,
+    "original_harness_source_not_located_in_this_audit": true
+  },
+  "retired_routing_candidate": {
+    "json_sha256": "32ba561021d9cec8ce7e9ec2808d51ba6c3c30bb0a06c5a8d9a388dadd335036",
+    "externalized_source_sha256": "c18aff509dfc22b8a331b082e7c2aa7c63097e977eb8b631d868e363eac3b9ba",
+    "arbiter_sha256": "4e0615ed78336f22380335c0c63fa8bea83bcde151808c1a8ec15797b357e726",
+    "arbiter_policy": "hierarchical round-robin; fixedprio artifact label is misleading",
+    "placement_mhz": {"rowstream_clk": 33.47, "pcie_user_clk": 53.02},
+    "required_mhz": {"rowstream_clk": 83.33, "pcie_user_clk": 62.5},
+    "route_session": 80431,
+    "route_exit": 130,
+    "route_stopped_because": "exact source fails delayed streaming-read regression",
+    "regression": "routed_source_stream_tb.sv",
+    "observed_failure": {"new_address": 1, "done": 1, "read_data_hex": "11", "response_valid": 0},
+    "routed_timing_proven": false,
+    "hardware_tested": false
+  },
+  "loader_ownership_repair": {
+    "repository": "/home/roland/LLM2FPGA/.worktrees/kev-baseline-limits",
+    "commit": "e368449",
+    "failure": "compiler-enabled branch tied physical Wishbone write-enable low and disconnected loader responses",
+    "test": "scripts/task6/check_compiler_loader_ownership.py",
+    "red": "PCIe loader write disconnected from DDR3",
+    "green": "enabled and disabled branches pass host write, stalled transaction ownership, accelerator read, ACK/data/error routing",
+    "full_physical_shell_synthesis_after_repair": "pending",
+    "hardware_revalidation": "pending"
+  },
+  "clock_integration_audit": {
+    "accepted_bram_accelerator_clock_mhz": 30,
+    "accepted_bram_covered_fmax_mhz": 30.53,
+    "accepted_bram_receipt": "artifacts/reference/tinystories-1m-first-token-board-acceptance-2026-09-09.json",
+    "integrated_accelerator_clock_mhz": 83.33,
+    "integrated_clock_connection": "task6_ypcb_pcie_uberddr3_rowstream_loader_top.sv:545 .clk(rowstream_clk)",
+    "existing_30mhz_clock_wrapper": "rtl/tinystories_1m_ypcb_clock.sv",
+    "critical_path_not_yet_localized": true,
+    "next_evaluation_after_functional_pass": "separate accelerator domain at its validated clock, retaining PCIe and DDR3 clocks and constraints"
+  },
+  "regenerated_candidate": {
+    "compiler_input_sha256": "7e359dfd4ea1e78bdd141eeba52cc779d3698fb38b279def96e72a72188fc8b5",
+    "externalized_source_sha256": "0d0546383070b515210ab989f0ebb2bc7e93e69895ada4df0e6b930fcf98cecb",
+    "pass": "scripts/analysis/externalize_compiler_memory.py, current worktree",
+    "packed_image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "image_hex_sha256": "52c169a96fa2218618b3ec845b6cb86c82ca70111e1c681bbb25533a38520141",
+    "same_delayed_read_regression": "PASS",
+    "full_shared_port_first_token": "running",
+    "simulation_session": 20252,
+    "simulation_binary_sha256": "e2d1816fcb22fe8b20739a9c36118233caeb58cb9ab0770fea206268baaba0f6",
+    "simulation_log": "current-pass-exact-run-3h.log",
+    "simulation_cycle_limit": 300000000,
+    "simulation_wall_limit_seconds": 10800,
+    "initial_30_minute_run": "stopped early after measured throughput showed its bound could not reach the known workload; exit 143",
+    "timing_closed": false,
+    "hardware_tested": false
+  }
+}
