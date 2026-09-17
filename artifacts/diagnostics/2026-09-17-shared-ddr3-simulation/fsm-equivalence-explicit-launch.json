@@ -1,0 +1,28 @@
+{
+  "preceding_attempt": {
+    "session": 44032,
+    "exit_code": 1,
+    "status": "proof_harness_error_before_comparison",
+    "error": "Can't find gold module gold.",
+    "cause_observed": "Partial equiv_opt execution stashed the transformed design but did not populate gold/gate before equiv_make. The prepared RTLIL contained no modules.",
+    "log_sha256": "77b171bf9d1569ff78e35dd59ac51d59b458d8b1bcab49a3ffeb871a364ede39"
+  },
+  "harness_smoke": {
+    "scope": "Three-state synthetic controller solely to test proof-script save/copy/encoding-map orchestration; not model correctness or a project milestone.",
+    "result": "Four equivalence cells proven; zero unproven; Yosys reached end of script.",
+    "log": "/tmp/compiler-ddr3-current.2Z9Mo4/fsm-proof-smoke.log",
+    "log_sha256": "dd067182b479fae6152c65e3813515a007c61bba9d61b470ff233534db365842"
+  },
+  "exact_fixture_retry": {
+    "status": "launched_not_proven",
+    "session": 95880,
+    "timeout_seconds": 1800,
+    "termination_grace_seconds": 10,
+    "recipe": "/tmp/compiler-ddr3-current.2Z9Mo4/fsm-equivalence-explicit.ys",
+    "recipe_sha256": "25d44795a5675a2331146043a4ac951ee68a68a2b1e879314a4d6c31717484ab",
+    "log": "/tmp/compiler-ddr3-current.2Z9Mo4/fsm-equivalence-explicit.log",
+    "change": "Explicit design -save preopt; run fsm with encoding-map export; rename transformed fixture gate; design -copy-from preopt -as gold fsm_fixture; equiv_make -encfile; equiv_induct; equiv_status -assert. Save RTLIL before and after extraction and before and after induction.",
+    "fixture_sha256": "7a03c8b7b164d2da4baeae840130d024691f8ffc41d74c4e5c25f7e23cb90358",
+    "qualification": "Same exact fixture and pinned Yosys. No accelerator design change. Earlier unproven result is not superseded until this exact-fixture check and reset synchronization are verified."
+  }
+}
