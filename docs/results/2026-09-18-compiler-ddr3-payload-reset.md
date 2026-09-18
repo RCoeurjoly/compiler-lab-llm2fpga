@@ -64,3 +64,25 @@ The bounded three-hour seed-15 route remains running at this report's
 checkpoint (session 28013). Completed routing, passing final timing and board
 inference remain required before promotion. The previous pinned static-counter
 candidate and loader baseline remain intact.
+
+## Read-only critical-path investigation during routing
+
+The no-route placement report identifies
+`compiler_accelerator.core.compiler_core.context_tokens_read_data[13]`
+to bank 137's `request_queued` register as the rowstream critical path:
+1.5 ns logic plus 19.4 ns estimated routing. This is an estimate, not evidence
+of the final routed critical path or proof that bank selection causes the
+router's convergence difficulty.
+
+Counting input-pin connections in the synthesized netlist (SHA-256
+`739a784e287d157f61647afc597e62a7574aae1123be2d43cde007459cf64dd8`)
+finds 197 token-bank `request_queued` nets. The context-token bits have the
+following input-pin fanouts: bits 0–7 each 2; bits 8–9 each 398; bits 10–11
+each 101; bits 12–13 each 18; bits 14–15 each 36. These are synthesized
+pin loads, not placement distances or post-route delay measurements.
+
+In particular, the reported critical source bit 13 is not the highest-fanout
+source. Do not infer that merely reducing its fanout will fix timing. The
+197-bank distributed decode/request structure is a concrete candidate for
+further investigation if final routing fails; no selector-register insertion,
+bank consolidation or other candidate modification has been performed here.
