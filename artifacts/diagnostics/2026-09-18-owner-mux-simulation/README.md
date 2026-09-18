@@ -45,3 +45,25 @@ temporary; sources and the measured load/inference results are tracked here. Can
 regeneration and image provenance are documented in the payload-reset report
 and the model-image manifest. Never substitute another source merely because
 it has the same filename; check the receipt hashes.
+
+## Ordered trace reference
+
+`trace-result.json` records a second passing run with the test-only observer
+from `sim/compiler_ddr3/reference_memory_trace.sv` and its bind file. Build
+with those two additional sources and a fresh `--Mdir`; run with
+`+TRACE_FILE=/path/to/reference.trace`. The completed run produced the same
+token, cycle count and transaction totals, and a byte-identical `run.log`.
+Neither compiler RTL nor the baseline wrapper/driver was changed.
+
+The trace has 13,116,912 ordered request/response pairs. Every response was
+also checked against the authenticated image: multiply the 128-bit line
+address by 16 and interpret the image's 16 bytes as a little-endian integer.
+All matched. The raw 935,312,356-byte trace remains in the receipt's scratch
+directory rather than Git. Its SHA-256 is recorded for subsequent comparison;
+it can be regenerated using the unchanged sources and the observer.
+
+The validation used `records()` from
+`scripts/analysis/compare_memory_traces.py` to check syntax, sequence, retained
+response address and balanced completion, followed by a per-response image
+comparison and an assertion of exactly 13,116,912 responses. This is a
+reference trace, not evidence that the physical DDR3 simulation has passed.

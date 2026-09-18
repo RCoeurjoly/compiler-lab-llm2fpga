@@ -1,0 +1,39 @@
+{
+  "status": "passed_abstract_memory_first_token_with_ordered_trace",
+  "observed_date_utc": "2026-09-18",
+  "exit_code": 0,
+  "session": 81542,
+  "observer_commit": "b2fbf8f",
+  "trace_validator_commit": "acb50af",
+  "baseline_receipt": "result.json",
+  "trace_path": "/tmp/compiler-reference-trace.41e2QX/reference.trace",
+  "trace_bytes": 935312356,
+  "trace_records": 26233824,
+  "trace_sha256": "e61bb6100af2c612f3cbd3beef0f4fff0dce3194f1590fca0cee9d0f7ed2df23",
+  "actual_token": 11,
+  "cycles_after_start": 165186630,
+  "requests": 13116912,
+  "responses": 13116912,
+  "full_image_write_readback_bytes": 4136720,
+  "candidate_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+  "executable_sha256": "8c13cca70c46b112450439124e195509e3d4d8068a71c09f6030fad5e3947097",
+  "log_sha256": "16b50b04ab6a3ecbd08895a0cd830eab9faac503951583ea5dd6dea383efb8cf",
+  "log_byte_identical_to": "run.log",
+  "observer_sha256": "652bd3a4a2cc6c28737103098127fa96d935dda435b98a31a96c099710a34c11",
+  "binding_sha256": "1ccd0372ceb07ba0cfb607a5424f685467839f2a49062274f9fc3d2e4a3c07ed",
+  "trace_validation": {
+    "exit_code": 0,
+    "ordered_alternating_requests_responses": true,
+    "response_address_matches_request": true,
+    "all_response_data_matches_image_at_line_address": true,
+    "transactions_checked": 13116912
+  },
+  "qualification_limits": [
+    "Abstract transaction memory, not the actual controller, PHY or Micron model",
+    "Wishbone host injection; PCIe ingress is not covered",
+    "No physical-DDR trace comparison has passed yet",
+    "No synthesis, routing, bitstream or board inference claim",
+    "Raw trace remains a scratch artifact at the recorded path; regenerate if unavailable"
+  ]
+}
