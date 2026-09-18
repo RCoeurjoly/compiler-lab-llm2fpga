@@ -19,11 +19,15 @@ class MicronProfileTest(unittest.TestCase):
     def run_profile(self, *extra):
         source = os.environ["UBERDDR3_SOURCE"]
         parameters = os.environ["MICRON_PARAMETERS"]
+        simulator = os.environ.get("MICRON_SIMULATOR", "iverilog")
+        simulator_args = ["--simulator", simulator]
+        if simulator == "xsim":
+            simulator_args += ["--xsim-bin", os.environ["XSIM_BIN"]]
         with tempfile.TemporaryDirectory(prefix="micron-profile-") as directory:
             result = subprocess.run(
                 ["bash", str(RUNNER), "--phase", "profile", "--work-dir", directory,
                  "--uberddr3-source", source, "--vendor-parameters", parameters,
-                 *extra], capture_output=True, text=True, timeout=120,
+                 *simulator_args, *extra], capture_output=True, text=True, timeout=120,
             )
             receipt = Path(directory) / "sources.sha256"
             return result, receipt.read_text() if receipt.exists() else ""

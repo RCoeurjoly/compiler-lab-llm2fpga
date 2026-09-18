@@ -72,3 +72,46 @@ Simulation differences remain explicit:
   second Wishbone outputs). Logs retain them; no vendor RTL has been patched.
 
 Passing these harness tests is **not** passing full startup, loading or inference.
+
+## Compiled-simulator cross-check
+
+The runner also accepts `--simulator xsim --xsim-bin PATH`. The installed path
+used here is `/home/roland/Vivado/2025.2.1/Vivado/bin`. This selects **simulation
+only**: it does not replace the production synthesis or routing flow. Execute
+outside the restricted process sandbox if XSim's local IPC fails to initialize.
+All simulator scratch files are created in the selected work directory.
+
+To repeat the six tests under XSim, add these variables to the `env` command
+above:
+
+```sh
+MICRON_SIMULATOR=xsim XSIM_BIN=/home/roland/Vivado/2025.2.1/Vivado/bin
+```
+
+All six tests passed under XSim 2025.2.1 in 32.786 seconds on 2026-09-18. XSim
+returns zero even for the deliberate `$fatal` watchdog in this setup; the
+runner's diagnostic/terminal-marker checks are therefore mandatory.
+
+A separate 100,000-cycle benchmark completed in 23.38 wall seconds. Icarus
+reached the same observation after roughly four minutes and was subsequently
+stopped to use the faster simulator; neither run passed full BIST. At that
+observation, both had state 17 (burst write), instruction 22, write counter
+38,644, read counter zero and zero recorded BIST read errors. Zero read errors
+here is **not readback evidence**: the burst-read phase had not started.
+
+The first two reset observations differ (initial instruction X versus zero,
+and reset-state entry at cycle 1 versus 2). The remaining 87 recorded
+observations match exactly, from read-training entry at cycle 58,524 through
+the 100,000-cycle observation. Full bus-trace equivalence is not claimed.
+
+Preserved benchmark logs are in
+`artifacts/diagnostics/2026-09-18-micron-startup-benchmark/` together with the
+source hashes. Original scratch locations:
+
+- Icarus: `/tmp/compiler-micron-aligned.Rgr682/run.log`, SHA-256
+  `9ffc9168151e4a8a36d1640563c6e5816c1274003414ed90cfb892a2963beb2d`.
+- XSim: `/tmp/compiler-micron-xsim.9jDRs4/benchmark-unsandboxed.log`, SHA-256
+  `5e752100a43d7715482eb5c088f05c9e90ceac704ce1d38cef45b69b032984e8`.
+
+These short benchmarks measure execution cost and agreement during startup;
+they do not authorize reducing memory geometry or bypassing full BIST.
