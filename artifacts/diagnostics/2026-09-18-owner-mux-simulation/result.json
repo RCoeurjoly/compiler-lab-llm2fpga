@@ -1,0 +1,39 @@
+{
+  "status": "passed_loaded_image_owner_mux_simulation_first_token_only",
+  "exit_code": 0,
+  "session": 82282,
+  "launch_receipt": "launch.json",
+  "harness_commit": "4da4b67",
+  "compiler_commit": "949a528",
+  "expected_token": 11,
+  "actual_token": 11,
+  "prompt_tokens": [7454, 2402, 257, 640],
+  "cycles_after_start": 165186630,
+  "requests": 13116912,
+  "responses": 13116912,
+  "full_image_write_readback_bytes": 4136720,
+  "candidate_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "executable_sha256": "0057e6b8f7ff3b976eecf3e1ec044bec640f7d425e2ddf242f03aa9833e0630e",
+  "model_image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+  "log": "run.log",
+  "log_sha256": "16b50b04ab6a3ecbd08895a0cd830eab9faac503951583ea5dd6dea383efb8cf",
+  "cycle_delta_vs_preloaded_direct_wishbone_model": 95632,
+  "checked": [
+    "Full image written through the host Wishbone port of the production owner mux",
+    "Every loaded word read back and compared to authenticated input before inference",
+    "Frozen prompt supplied to real adapter, backend, compiler core and 240-port arbiter",
+    "Production owner mux routes accelerator requests and delayed responses with periodic memory stalls",
+    "In-range read-only accelerator requests, full byte select, single outstanding request and no unmatched response",
+    "Adapter request count equals accepted accelerator requests at each sampled inference cycle",
+    "Exact token 11 after all 13116912 requests have been answered",
+    "Token retained through five cycles of output backpressure and retired by handshake"
+  ],
+  "qualification_limits": [
+    "Host loading starts at Wishbone; PCIe TLP/CSR ingress and full loader shell are not simulated",
+    "Memory is a single-clock transaction model, not physical UberDDR3, PHY, calibration or asynchronous crossings",
+    "No simultaneous host traffic during inference",
+    "Request/response totals are not ordered address/data trace hashes",
+    "Synthesis-only FSM recoding is outside this RTL simulation",
+    "One simulated first token; no final routed timing, bitstream, board inference or full autoregressive acceptance"
+  ]
+}

@@ -11,8 +11,12 @@ responses. The expected inference result remains token 11; a successful load
 alone is not inference acceptance.
 
 The corrupt-write negative control returned 2 at line 17, word 0, as expected.
-The clean load-only run returned 0. Full inference is launched but not yet
-verified in `launch.json`. All test doubles remain below the production
+The clean load-only run returned 0. Full first-token inference also returned
+0: token 11, 165,186,630 cycles and 13,116,912 requests/responses. See
+`result.json` and the complete `run.log`; `launch.json` preserves the earlier
+launch-time state. This takes 95,632 more cycles than the previous preloaded
+direct-Wishbone model and issues the same number of accelerator reads.
+All test doubles remain below the production
 Wishbone ownership boundary; PCIe and DDR3 physical interfaces are not modeled.
 
 Reproduce from the repository root using the unchanged payload-reset model:
@@ -37,7 +41,7 @@ timeout --signal=TERM --kill-after=10s 10800 \
 
 Use `--load-only` to stop after readback and `--load-only --corrupt-write`
 for the negative control (expected exit 2). The build and run directories are
-temporary; sources and the measured load results are tracked here. Candidate
+temporary; sources and the measured load/inference results are tracked here. Candidate
 regeneration and image provenance are documented in the payload-reset report
 and the model-image manifest. Never substitute another source merely because
 it has the same filename; check the receipt hashes.
