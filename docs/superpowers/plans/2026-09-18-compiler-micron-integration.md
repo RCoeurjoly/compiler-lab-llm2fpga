@@ -80,6 +80,13 @@ transaction RAM is permitted in this wrapper.
 
 ### Task 3: Replace the abstract memory in the compiler integration harness
 
+Execution refinement after the million-cycle cost measurement: prepare this
+harness before the full BIST run, then execute all gates consecutively in one
+simulation. This avoids repeating hours of natural calibration/BIST solely to
+switch testbenches. The runtime ordering remains strict: full BIST completion,
+complete image write/readback, then inference. No gate is waived by elaboration
+or the cold-start watchdog tests.
+
 **Files:** create `sim/compiler_ddr3/compiler_micron_tb.sv`; extend the runner;
 reuse the logical checks in the September 18 owner-mux wrapper/driver.
 

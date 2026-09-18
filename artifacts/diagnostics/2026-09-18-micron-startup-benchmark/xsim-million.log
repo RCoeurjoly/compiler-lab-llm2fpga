@@ -1,0 +1,198 @@
+
+****** xsim v2025.2.1 (64-bit)
+  **** SW Build 6403652 on Thu Mar 19 13:47:00 MDT 2026
+  **** IP Build 6403511 on Thu Mar 19 12:41:45 MDT 2026
+  **** SharedData Build 6403650 on Thu Mar 19 14:02:13 MDT 2026
+  **** Start of session at: Fri Sep 18 13:03:51 2026
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source xsim.dir/micron_snapshot/xsim_script.tcl
+# xsim {micron_snapshot} -testplusarg model_data+/tmp/compiler-micron-xsim-million.6KHiSY/model-data.alGd2o -testplusarg max_cycles=1000000 -autoloadwcfg -runall -onfinish quit -onerror quit
+Time resolution is 1 ps
+run -all
+
+CONTROLLER PARAMETERS:
+-----------------------------
+CONTROLLER_CLK_PERIOD = 12000
+DDR3_CLK_PERIOD = 3000
+ROW_BITS = 15
+COL_BITS = 10
+BA_BITS = 3
+BYTE_LANES = 2
+AUX_WIDTH = 4
+MICRON_SIM = 0
+ODELAY_SUPPORTED = 0
+SECOND_WISHBONE = 0
+WB2_ADDR_BITS = 7
+WB2_DATA_BITS = 32
+ECC_ENABLE = 0
+ECC_INFORMATION_BITS = 11
+WB_ERROR = 0
+
+CONTROLLER LOCALPARAMS:
+-----------------------------
+wb_addr_bits = 25
+wb_data_bits = 128
+wb_sel_bits  = 16
+wb2_sel_bits = 4
+DQ_BITS = 8
+row_bank_col = 1
+
+COMMAND SLOTS:
+-----------------------------
+READ_SLOT = 3
+WRITE_SLOT = 3
+ACTIVATE_SLOT = 2
+PRECHARGE_SLOT = 0
+REMAINING_SLOT = 1
+
+DELAYS:
+-----------------------------
+CL = 5
+CWL = 5
+PRECHARGE_TO_ACTIVATE_DELAY = 0
+ACTIVATE_TO_WRITE_DELAY = 0
+ACTIVATE_TO_READ_DELAY =  0
+ACTIVATE_TO_PRECHARGE_DELAY =  3
+ACTIVATE_TO_ACTIVATE_DELAY =  0
+READ_TO_WRITE_DELAY = 1
+READ_TO_READ_DELAY = 0
+READ_TO_PRECHARGE_DELAY = 1
+WRITE_TO_WRITE_DELAY = 0
+WRITE_TO_READ_DELAY = 3
+WRITE_TO_PRECHARGE_DELAY = 4
+STAGE2_DATA_DEPTH = 2
+READ_ACK_PIPE_WIDTH = 6
+
+
+DDR3 TOP PARAMETERS:
+-----------------------------
+CONTROLLER_CLK_PERIOD = 12000
+DDR3_CLK_PERIOD = 3000
+ROW_BITS = 15
+COL_BITS = 10
+BA_BITS = 3
+BYTE_LANES = 2
+AUX_WIDTH = 4
+WB2_ADDR_BITS = 7
+WB2_DATA_BITS = 32
+MICRON_SIM = 0
+ODELAY_SUPPORTED = 0
+SECOND_WISHBONE = 0
+WB_ERROR = 0
+BIST_MODE = 2
+ECC_ENABLE = 0
+DIC = 0
+RTT_NOM = 3
+DUAL_RANK_DIMM = 0
+End of DDR3 TOP PARAMETERS
+-----------------------------
+PASS: controller profile MICRON_SIM=0 BIST_MODE=2 address_bits=25 clocks=12000/3000
+PROGRESS: cycles=0 time_ps=12000.0 ps state=x instruction=x write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=1 time_ps=24000.0 ps state=0 instruction=0 write=0 read=0 correct=0 wrong=0
+PASS: physical clock phase alignment
+START: production reset released time_ps=114000.0 ps
+startup_tb.dut.memory.cmd_task: at time 700561500.0 ps WARNING: Load Mode 2 Auto Self Refresh is not modeled
+PROGRESS: cycles=58524 time_ps=702300000.0 ps state=1 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58549 time_ps=702600000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58550 time_ps=702612000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58559 time_ps=702720000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58566 time_ps=702804000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58567 time_ps=702816000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58576 time_ps=702924000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58583 time_ps=703008000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58584 time_ps=703020000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58593 time_ps=703128000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58600 time_ps=703212000.0 ps state=5 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58601 time_ps=703224000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58612 time_ps=703356000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58621 time_ps=703464000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58628 time_ps=703548000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58629 time_ps=703560000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58638 time_ps=703668000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58645 time_ps=703752000.0 ps state=5 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58646 time_ps=703764000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58657 time_ps=703896000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58666 time_ps=704004000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58673 time_ps=704088000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58674 time_ps=704100000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58683 time_ps=704208000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58690 time_ps=704292000.0 ps state=5 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58691 time_ps=704304000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58702 time_ps=704436000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58711 time_ps=704544000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58719 time_ps=704640000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58720 time_ps=704652000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58729 time_ps=704760000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58737 time_ps=704856000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58738 time_ps=704868000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58747 time_ps=704976000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58755 time_ps=705072000.0 ps state=5 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58756 time_ps=705084000.0 ps state=6 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58757 time_ps=705096000.0 ps state=1 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58782 time_ps=705396000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58783 time_ps=705408000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58792 time_ps=705516000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58799 time_ps=705600000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58800 time_ps=705612000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58809 time_ps=705720000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58816 time_ps=705804000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58817 time_ps=705816000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58826 time_ps=705924000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58833 time_ps=706008000.0 ps state=5 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58834 time_ps=706020000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58845 time_ps=706152000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58854 time_ps=706260000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58861 time_ps=706344000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58862 time_ps=706356000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58871 time_ps=706464000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58878 time_ps=706548000.0 ps state=5 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58879 time_ps=706560000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58890 time_ps=706692000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58899 time_ps=706800000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58906 time_ps=706884000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58907 time_ps=706896000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58916 time_ps=707004000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58923 time_ps=707088000.0 ps state=5 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58924 time_ps=707100000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58935 time_ps=707232000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58944 time_ps=707340000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58951 time_ps=707424000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58952 time_ps=707436000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58961 time_ps=707544000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58968 time_ps=707628000.0 ps state=5 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58969 time_ps=707640000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58980 time_ps=707772000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58989 time_ps=707880000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58997 time_ps=707976000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=58998 time_ps=707988000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59007 time_ps=708096000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59015 time_ps=708192000.0 ps state=2 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59016 time_ps=708204000.0 ps state=3 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59025 time_ps=708312000.0 ps state=4 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59033 time_ps=708408000.0 ps state=5 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59034 time_ps=708420000.0 ps state=6 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59035 time_ps=708432000.0 ps state=7 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59036 time_ps=708444000.0 ps state=9 instruction=13 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59090 time_ps=709092000.0 ps state=10 instruction=22 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59091 time_ps=709104000.0 ps state=11 instruction=22 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59092 time_ps=709116000.0 ps state=12 instruction=22 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59106 time_ps=709284000.0 ps state=13 instruction=22 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=59112 time_ps=709356000.0 ps state=17 instruction=22 write=0 read=0 correct=0 wrong=0
+PROGRESS: cycles=100000 time_ps=1200012000.0 ps state=17 instruction=22 write=38644 read=0 correct=0 wrong=0
+PROGRESS: cycles=200000 time_ps=2400012000.0 ps state=17 instruction=22 write=133130 read=0 correct=0 wrong=0
+PROGRESS: cycles=300000 time_ps=3600012000.0 ps state=17 instruction=22 write=227616 read=0 correct=0 wrong=0
+PROGRESS: cycles=400000 time_ps=4800012000.0 ps state=17 instruction=22 write=322101 read=0 correct=0 wrong=0
+PROGRESS: cycles=500000 time_ps=6000012000.0 ps state=17 instruction=22 write=416587 read=0 correct=0 wrong=0
+PROGRESS: cycles=600000 time_ps=7200012000.0 ps state=17 instruction=22 write=511035 read=0 correct=0 wrong=0
+PROGRESS: cycles=700000 time_ps=8400012000.0 ps state=17 instruction=22 write=605521 read=0 correct=0 wrong=0
+PROGRESS: cycles=800000 time_ps=9600012000.0 ps state=17 instruction=22 write=700007 read=0 correct=0 wrong=0
+PROGRESS: cycles=900000 time_ps=10800012000.0 ps state=17 instruction=22 write=794493 read=0 correct=0 wrong=0
+PROGRESS: cycles=1000000 time_ps=12000012000.0 ps state=17 instruction=22 write=888979 read=0 correct=0 wrong=0
+Fatal: FAIL: startup watchdog cycles=1000000 calibrated=0
+Time: 12000012 ns  Iteration: 0  Process: /startup_tb/Always34_856  Scope: startup_tb  File: /home/roland/compiler-lab-llm2fpga/sim/compiler_ddr3/startup_tb.sv Line: 55
+$finish called at time : 12000012 ns
+exit 0
+INFO: xsimkernel Simulation Memory Usage: 286540 KB (Peak: 339004 KB), Simulation CPU Usage: 350460 ms
+INFO: [Common 17-206] Exiting xsim at Fri Sep 18 13:09:44 2026...

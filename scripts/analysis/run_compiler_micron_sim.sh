@@ -3,6 +3,7 @@
 set -euo pipefail
 phase= work_dir= source_dir= parameters= negative= max_cycles=1000000000
 simulator=iverilog xsim_bin=
+model= image=
 while (($#)); do
   if (($# < 2)); then echo "missing option value: $1" >&2; exit 2; fi
   case "$1" in
@@ -14,11 +15,13 @@ while (($#)); do
     --max-cycles) max_cycles=$2 ;;
     --simulator) simulator=$2 ;;
     --xsim-bin) xsim_bin=$2 ;;
+    --model) model=$2 ;;
+    --image) image=$2 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
   shift 2
 done
-[[ $phase == profile || $phase == startup ]] || { echo "phase not implemented: $phase" >&2; exit 2; }
+case "$phase" in profile|startup|load|infer) ;; *) echo "unknown phase: $phase" >&2; exit 2 ;; esac
 [[ $simulator == iverilog || $simulator == xsim ]] || { echo "unknown simulator" >&2; exit 2; }
 if [[ $simulator == xsim ]]; then
   for tool in xvlog xelab xsim; do
@@ -42,27 +45,47 @@ work_dir=$(realpath "$work_dir")
 source_dir=$(realpath "$source_dir")
 parameters=$(realpath "$parameters")
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+if [[ $phase == load || $phase == infer ]]; then
+  python3 "$repo/scripts/analysis/verify_compiler_micron_inputs.py" --model "$model" --image "$image"
+  model=$(realpath "$model")
+  image=$(realpath "$image")
+fi
 extra=()
+plusargs=()
 case "$negative" in
   '') ;;
   wrong-geometry) extra+=(-DMICRON_PROFILE_WRONG_GEOMETRY) ;;
   shortened-startup) extra+=(-DMICRON_NEGATIVE_SHORTENED_STARTUP) ;;
   model-timing) extra+=(-DMICRON_NEGATIVE_MODEL_TIMING) ;;
+  corrupt-write) plusargs+=(corrupt_write) ;;
   *) echo "unknown negative control: $negative" >&2; exit 2 ;;
 esac
 backing=$(mktemp -d "$work_dir/model-data.XXXXXX")
 top=micron_profile_tb
 sources=("$repo/sim/compiler_ddr3/micron_profile_tb.sv" "$source_dir/testbench/ddr3.sv")
-if [[ $phase == startup ]]; then
+if [[ $phase != profile ]]; then
   top=startup_tb
+  if [[ $phase == load || $phase == infer ]]; then top=compiler_micron_tb; fi
   # Upstream RTL sets default_nettype none; analyze legacy primitive models
   # first so that directive does not leak into their implicit input net types.
   sources=("$source_dir"/testbench/models/*_model.v
-    "$repo/sim/compiler_ddr3/startup_tb.sv"
+    "$repo/sim/compiler_ddr3/$top.sv"
     "$repo/sim/compiler_ddr3/uberddr3_micron_memory.sv"
     "$source_dir/testbench/ddr3.sv" "$source_dir/rtl/ddr3_top.v"
     "$source_dir/rtl/ddr3_controller.v" "$source_dir/rtl/ddr3_phy.v")
   extra+=(-DSIM_MODEL -DNO_TEST_MODEL)
+fi
+if [[ $phase == load || $phase == infer ]]; then
+  # The generated Calyx primitive declarations also require the default net
+  # type; parse them before upstream transport files set default_nettype none.
+  sources=("$model" "${sources[@]}"
+    /nix/store/9zbn7rgdgpw2q7h92sj22h3m4b446d5a-llm_external_memory_arbiter.sv
+    /nix/store/4n5p2q9c3im9qrizysw6jcfc4ni0xc39-tinystories_1m_ddr3_backend.sv
+    /nix/store/dn9gwzarhz2kdlc9z8v7h7s6q1fpz7qr-tinystories_1m_ddr3_command_adapter.sv
+    /nix/store/5f2fppa4a3636py498f4pv5500dsizfm-task6_wishbone_owner_mux.sv)
+  plusargs+=("MODEL_BIN=$image")
+  [[ $phase != load ]] || plusargs+=(load_only)
+  sha256sum "$image" > "$work_dir/image.sha256"
 fi
 sha256sum "$source_dir/testbench/ddr3.sv" "$parameters" \
   "$repo/sim/compiler_ddr3/sim_defines.vh" \
@@ -78,14 +101,21 @@ if [[ $simulator == iverilog ]]; then
 else
   defines=()
   for define in "${extra[@]}"; do defines+=(-d "${define#-D}"); done
-  timeout --kill-after=10s 120 "$xsim_bin/xvlog" --sv "${defines[@]}" \
+  # Accept legacy input-logic net declarations without editing pinned RTL.
+  # This affects language diagnostics, not Micron runtime timing checks.
+  timeout --kill-after=10s 120 "$xsim_bin/xvlog" --sv --relax "${defines[@]}" \
     -i "$repo/sim/compiler_ddr3" -i "$(dirname "$parameters")" "${sources[@]}" \
     > "$work_dir/compile.log" 2>&1 || { cat "$work_dir/compile.log" >&2; exit 1; }
-  timeout --kill-after=10s 1800 "$xsim_bin/xelab" "work.$top" -s micron_snapshot --mt 2 \
+  # Supply a default for untimed compiler primitives, without overriding the
+  # explicit units of the Micron model or behavioral FPGA primitive delays.
+  timeout --kill-after=10s 1800 "$xsim_bin/xelab" "work.$top" -s micron_snapshot --mt 2 --timescale 1ps/1ps \
     > "$work_dir/elaborate.log" 2>&1 || { cat "$work_dir/elaborate.log" >&2; exit 1; }
   run=("$xsim_bin/xsim" micron_snapshot --R --onerror quit --onfinish quit
     --testplusarg "model_data+$backing" --testplusarg "max_cycles=$max_cycles")
 fi
+for arg in "${plusargs[@]}"; do
+  if [[ $simulator == xsim ]]; then run+=(--testplusarg "$arg"); else run+=("+$arg"); fi
+done
 set +e
 timeout --kill-after=10s 1800 "${run[@]}" \
   2>&1 | tee "$work_dir/run.log"
@@ -98,6 +128,8 @@ fi
 ((run_status == 0)) || exit "$run_status"
 marker='PASS: micron profile'
 [[ $phase != startup ]] || marker='PASS: startup calibration and BIST'
+[[ $phase != load ]] || marker='PASS: full image readback'
+[[ $phase != infer ]] || marker='PASS: compiler Micron first token=11'
 grep -Fq "$marker" "$work_dir/run.log" || {
   echo "missing terminal acceptance marker" >&2; exit 1;
 }

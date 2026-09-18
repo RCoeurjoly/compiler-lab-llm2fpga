@@ -5,7 +5,9 @@ The initial `profile` phase elaborates the actual pinned Micron model with a
 It does **not** exercise initialization, calibration, loading or inference.
 The `startup` phase instantiates the pinned controller and PHY, uses production
 waits and full BIST geometry, and requires natural calibration/BIST completion.
-The runner rejects the not-yet-implemented `load` and `infer` phases.
+The `load` and `infer` phases connect the authenticated compiler and production
+ownership mux to the physical memory harness; their full-runtime acceptance
+has **not** passed.
 
 Run from the repository root:
 
@@ -115,3 +117,44 @@ source hashes. Original scratch locations:
 
 These short benchmarks measure execution cost and agreement during startup;
 they do not authorize reducing memory geometry or bypassing full BIST.
+
+The sustained million-cycle benchmark ended at its deliberate watchdog with
+888,979 BIST writes and no reads, using 350.460 seconds of XSim CPU time. Its
+terminal status is a rejected, incomplete startup run, not a BIST pass. At this
+measured rate a single 33,554,432-address write sweep is roughly four hours;
+other BIST patterns and inference add substantial time. No long qualification
+run has yet been accepted or silently extended.
+
+## Compiler integration harness
+
+For `--phase load|infer`, also supply `--model PATH --image PATH`. The runner
+checks both inputs against the frozen pre-consolidation owner-mux receipt and
+image manifest before compilation. It uses the same pinned adapter, backend,
+240-port arbiter and owner mux as the passing abstract-memory simulation.
+
+The bench holds the accelerator and owner mux in reset until natural DDR
+calibration/full BIST completion. It then sends every image byte through host
+Wishbone writes and compares every readback line before supplying the frozen
+prompt. A host-side `$fread` buffer is stimulus, not a DDR memory preload.
+`infer` additionally requires token 11, balanced accelerator transactions and
+five cycles of output backpressure. An ordered request/response trace goes to
+`accelerator-memory.trace`; hash that completed file for a result receipt.
+`--negative-control corrupt-write` intentionally corrupts line 17 and must fail
+readback before inference. This physical readback negative control is still
+pending full-runtime execution.
+
+Two fast integration tests check that the real combined hierarchy elaborates
+and rejects an uncalibrated watchdog with zero host requests, and that a wrong
+image fails authentication before elaboration. They do not test the post-BIST
+load/inference path. Enable them with `MICRON_MODEL` and `MICRON_IMAGE` in
+addition to the other external-input variables, and run
+`python3 -m unittest discover -s tests -p test_compiler_micron_integration.py`
+inside the Nix shell.
+
+XSim uses `xvlog --relax` for pinned `input logic` declarations under
+`default_nettype none`, and `xelab --timescale 1ps/1ps` for compiler primitives
+without an explicit timescale. These options do not modify the input files or
+override explicitly declared PHY/model time units. Runtime Micron timing and
+mode-register checks remain enabled and covered by negative tests. PCIe ingress,
+the board reset shell and asynchronous clock crossings remain outside this
+Wishbone-injected simulation.
