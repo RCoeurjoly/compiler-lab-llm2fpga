@@ -213,3 +213,17 @@ The observer regression runs with
 inside the Nix development environment. A trace is a reference only after
 the associated full-image readback and authenticated first-token run pass.
 Abstract-memory traces cannot establish physical DDR or PCIe correctness.
+
+After both runs terminate, compare their traces inside the Nix environment:
+
+```sh
+python3 scripts/analysis/compare_memory_traces.py reference.trace accelerator-memory.trace
+```
+
+Exit 0 means identical, nonempty, balanced ordered transactions; exit 1 reports
+the first differing request/response or unequal length; exit 2 reports malformed,
+empty or incomplete input. The comparator streams the files without loading
+them into RAM. It stops at the first mismatch and does not validate the remaining
+suffix. A matching trace is not inference acceptance: independently require both
+runs' successful terminal status, full-image checks and authenticated token.
+Do not use this comparison to declare acceptance while either trace is growing.
