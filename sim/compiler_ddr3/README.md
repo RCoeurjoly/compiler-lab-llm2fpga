@@ -191,3 +191,25 @@ result, retain logs/trace hashes and classify the earliest failed gate before
 any implementation changes. Source changes and qualification runs remain
 separate: no bank consolidation, synthesis or routing before the required
 functional gates pass.
+# Ordered abstract-memory reference trace
+
+`reference_memory_trace.sv` is a test-only single-outstanding observer.
+Add it and `reference_memory_trace_bind.sv` to the Verilator build documented
+in `artifacts/diagnostics/2026-09-18-owner-mux-simulation/README.md`, using a
+fresh build directory, and run with `+TRACE_FILE=/path/to/reference.trace`.
+The binding observes the accelerator side of the production ownership mux;
+host model-loading traffic is deliberately excluded. Neither the compiler
+RTL nor the baseline wrapper/driver is modified.
+
+Each accepted request emits `Q <sequence> <32-bit line address>`; its response
+emits `R <sequence> <retained address> <128-bit data>`, matching the physical
+DDR testbench format. Stalled attempts do not create entries. Overlapping
+requests and responses without outstanding requests fail the simulation.
+This observer expects one initial reset and delayed responses, as used by
+these harnesses; it is not a general pipelined Wishbone monitor.
+
+The observer regression runs with
+`python3 -m unittest discover -s tests -p test_reference_memory_trace.py`
+inside the Nix development environment. A trace is a reference only after
+the associated full-image readback and authenticated first-token run pass.
+Abstract-memory traces cannot establish physical DDR or PCIe correctness.
