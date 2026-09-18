@@ -518,11 +518,17 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
   // identity and byte offset with it, not with the client's changing inputs.
   assign ext_req_valid = request_queued;
   assign ext_req_addr = queued_address;
+  // Payload is unobservable until request_queued is asserted. Capture on the
+  // enqueue edge, independently of reset, to avoid a wide reset fanout. All
+  // transaction-valid state retains reset; a stalled valid address is held.
+  always_ff @(posedge clk) begin
+    if (!pending && !request_queued)
+      queued_address <= EXT_BASE_ADDR + (addr0 * (WIDTH / 8));
+  end
   always_ff @(posedge clk) begin
     if (reset) begin
       pending <= 1'b0;
       request_queued <= 1'b0;
-      queued_address <= '0;
       response_ready <= 1'b0;
       request_index <= '0;
       response_index <= '0;
@@ -539,7 +545,6 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
       // Keep the address mux and duplicate comparison out of the wide
       // payload-register enable cone measured in the integrated design.
       if (!pending && !request_queued) begin
-        queued_address <= EXT_BASE_ADDR + (addr0 * (WIDTH / 8));
         request_index <= addr0;
       end
       if (!content_en || write_en)

@@ -119,6 +119,16 @@ class RegisteredExternalRequestTest(unittest.TestCase):
                     cell = drivers[bit]
                     self.assertIn("dff", cell["type"])
                     self.assertIn("EN", cell["connections"])
+                    if signal == "queued_address":
+                        # Invalid payload is unobservable. Reset must not add
+                        # thousands of payload reset/enable routing sinks.
+                        self.assertNotIn("SRST", cell["connections"])
+                        self.assertNotIn("ARST", cell["connections"])
+                        for enable in cell["connections"]["EN"]:
+                            self.assertFalse(
+                                leaves(enable, set()) & set(module["ports"]["reset"]["bits"]),
+                                "queued address enable depends on reset",
+                            )
                     for enable in cell["connections"]["EN"]:
                         self.assertFalse(
                             leaves(enable, set()) & forbidden,
