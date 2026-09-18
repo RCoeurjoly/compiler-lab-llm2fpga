@@ -1,0 +1,42 @@
+{
+  "status_at_observation": "running_not_accepted",
+  "runner_commit": "4d70093",
+  "started_at_utc": "2026-09-18T11:23:56Z",
+  "session": 28042,
+  "observed_xsim_pid": 1346532,
+  "work_directory": "/tmp/compiler-micron-full.nIto9M",
+  "reusable_nix_profile": "/tmp/compiler-micron-full.nIto9M/nix-shell",
+  "nix_environment": "/nix/store/agrxnkf88sgcfwi0zx7hly0lqxq4lgxb-nix-shell-env",
+  "phase": "infer",
+  "simulator": "XSim 2025.2.1",
+  "wall_seconds": 259200,
+  "max_controller_cycles": 1000000000,
+  "candidate_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+  "expected_first_token": 11,
+  "runtime_gate_order": [
+    "natural production-duration startup and full-address-space BIST_MODE=2",
+    "all 4136720 image bytes written and read back through the actual controller",
+    "frozen prompt [7454,2402,257,640], first token 11, transaction balance and held output"
+  ],
+  "unchanged": [
+    "compiler-generated accelerator RTL",
+    "pinned adapter, backend, 240-port arbiter and owner mux",
+    "pinned UberDDR3 controller and PHY",
+    "two lanes, 333/83.33 MHz, 15/10/3 geometry, MICRON_SIM=0"
+  ],
+  "uncovered": [
+    "PCIe ingress and board reset shell: host injection is at Wishbone",
+    "physical timing, electrical behavior and asynchronous clock crossings",
+    "Micron model automatic-self-refresh behavior",
+    "hardware inference and full autoregressive generation"
+  ],
+  "terminal_evidence_expected": [
+    "exit-status.txt",
+    "finished-at.txt",
+    "run.log with all acceptance markers and no model/error diagnostics",
+    "sources.sha256 and image.sha256",
+    "accelerator-memory.trace with a final recorded hash"
+  ],
+  "note": "This is a launch observation, not current-state or success evidence. Revalidate the session/process and terminal files; never restart solely because logs are quiet. No gate has passed merely because this launch record exists."
+}
