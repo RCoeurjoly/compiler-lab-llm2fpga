@@ -3347,6 +3347,7 @@ PY
             surveyPhase1
             surveyTex
             pkgs.verilator
+            pkgs.verilog
           ];
           shellHook = ''
             export SURVEY_DECLARED_TEXLIVE="${surveyTex}"

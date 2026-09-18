@@ -44,7 +44,12 @@ calibration completion, alter BIST counters or reduce the memory geometry.
 The bundled `den8192Mb`/x16 parameters have 16 row bits, unlike the board.
 Use authentic Micron 4096-Mbit/x16 parameters with 15 row bits. A local source
 is available at
-`/home/roland/Vivado/2025.2.1/data/rsb/non_default_iprepos/micron_ddr3_v2_0/hdl/4096Mb_ddr3_parameters.vh`.
+`/home/roland/Vivado/2025.2.1/data/ip/xilinx/ddr3_v1_4/data/dlib/ultrascale/ddr3_sdram/tb/ddr3_model/4096Mb_ddr3_parameters.vh`.
+Its SHA-256 is `6414a811a8feed2acd874ad68bd2e02b935b2f81fdc9a294d2f8d511e9d65941`.
+The initially identified `rsb/non_default_iprepos/micron_ddr3_v2_0` copy is
+incompatible: it initializes three ZQ timing variables that the pinned model
+continuously drives. The selected copy leaves those declarations uninitialized,
+matching the model; neither vendor source is patched.
 Check compatibility with the pinned model during elaboration. Record both
 sources and hashes; do not silently substitute the installed model or copy
 vendor files into the repository without redistribution review. The existing

@@ -40,19 +40,23 @@ substituting another model. Profile phase terminates after elaborated assertions
 - [ ] Write failing tests for the profile: expected `(rows, columns, banks,
   dq_bits) == (15,10,3,16)`, `MICRON_SIM == 0`, `BIST_MODE == 2`, and clock
   periods `(12000,3000)`. Reject the bundled 16-row-bit default.
-- [ ] Generate the explicit macro header:
+- [x] Generate the explicit macro header:
   ```verilog
   `define TWO_LANES_x8
   `define x16
   `define den4096Mb
   `define sg125
   ```
-- [ ] Compile the pinned Micron model with the authentic 4096-Mbit parameter
+- [x] Compile the pinned Micron model with the authentic 4096-Mbit parameter
   file through an explicit include path. Use `iverilog -g2012 -s micron_profile_tb`
   inside `nix develop .#default -c`; the testbench uses `$fatal` on profile
   mismatch and prints `PASS: micron profile` only after runtime assertions.
-- [ ] Run the positive profile and wrong-geometry negative control, confirm
+- [x] Run the positive profile and wrong-geometry negative control, confirm
   nonzero exit for the latter, record all model/parameter hashes and commit.
+
+Model-only elaboration is verified (three tests). Controller parameters,
+production startup and calibration are not covered by this first checkpoint.
+See `sim/compiler_ddr3/README.md` for the reproducible command and limitations.
 
 ### Task 2: Exercise production startup, calibration and BIST
 
