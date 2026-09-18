@@ -29,6 +29,38 @@ internal-state assertions strengthen induction; they are not assumptions.
 The initial output-only proof timed out at 90 seconds; the strengthened proof
 passes. This cell proof does not qualify every full-model parameterization.
 
-Full-model regeneration, exact-image simulation, synthesis/resource comparison,
-routing, timing and board inference remain required before promotion. The
-previous pinned static-counter candidate and loader baseline remain intact.
+## Full-model result
+
+The regenerated candidate from commit `949a528` completed the exact-image
+first-token simulation with exit 0 (session 87519): token **11**, **165,090,998**
+cycles, and **13,116,912** requests and responses. The complete run log is
+byte-identical (`cmp` exit 0) to the preserved
+`artifacts/diagnostics/2026-09-17-shared-ddr3-simulation/static-counter-run.log`.
+This establishes identical logged checkpoints, not an ordered transaction trace.
+
+- Generated model SHA-256: `daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a`.
+- Simulation executable SHA-256: `5d4dd71e4c518a5bd3817070687a71a68cb0ca677af3bdc8111f1de1b5677208`.
+- Run log SHA-256: `8825cbef981c840e113151902a39c72bbd646b85564614d494e2e6eec8f431db`.
+- Input hex SHA-256: `52c169a96fa2218618b3ec845b6cb86c82ca70111e1c681bbb25533a38520141`.
+- Prompt: `[7454, 2402, 257, 640]`; expected first token: `11`.
+
+The command was `timeout --signal=TERM --kill-after=10s 10800
+/tmp/compiler-ddr3-payload-reset.tywJVR/obj/Vcommand_integration_wrapper
++IMAGE=/tmp/compiler-ddr3-current.2Z9Mo4/tinystories-ddr3-lines.hex`.
+The unchanged command-integration wrapper and driver are preserved beside the
+static-counter log. This covers the real command adapter, backend, generated
+compiler core and 240-port arbiter against a preloaded fixed-latency Wishbone
+memory model. It does **not** cover PCIe loading, ownership arbitration,
+physical DDR3/calibration, asynchronous crossings, or synthesis-only FSM
+recoding. No board inference or full autoregressive claim follows.
+
+Synthesis completed with zero check problems: 53,524 LUTs, 41,283 FFs,
+245 DSP48E1, 47 RAMB36E1 and 7 RAMB18E1. Reset input-pin loads fell from
+23,598 to 20,734, at a cost of 268 LUTs and 814 FFs. No-route placement
+estimates still fail: rowstream 47.89 MHz versus 83.33 MHz required; PCIe
+56.39 MHz versus 62.5 MHz required. These are not final routed timing.
+
+The bounded three-hour seed-15 route remains running at this report's
+checkpoint (session 28013). Completed routing, passing final timing and board
+inference remain required before promotion. The previous pinned static-counter
+candidate and loader baseline remain intact.
