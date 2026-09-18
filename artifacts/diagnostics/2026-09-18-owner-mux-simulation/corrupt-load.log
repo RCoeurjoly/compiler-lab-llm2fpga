@@ -1,0 +1,2 @@
+load readback mismatch line=17 word=0
+FAIL: load readback mismatch
