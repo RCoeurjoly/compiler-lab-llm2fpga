@@ -4,6 +4,7 @@ set -euo pipefail
 phase= work_dir= source_dir= parameters= negative= max_cycles=1000000000
 simulator=iverilog xsim_bin=
 model= image=
+wall_seconds=1800
 while (($#)); do
   if (($# < 2)); then echo "missing option value: $1" >&2; exit 2; fi
   case "$1" in
@@ -17,11 +18,18 @@ while (($#)); do
     --xsim-bin) xsim_bin=$2 ;;
     --model) model=$2 ;;
     --image) image=$2 ;;
+    --wall-seconds) wall_seconds=$2 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
   shift 2
 done
 case "$phase" in profile|startup|load|infer) ;; *) echo "unknown phase: $phase" >&2; exit 2 ;; esac
+[[ $wall_seconds =~ ^[1-9][0-9]{0,5}$ ]] && ((wall_seconds <= 259200)) || {
+  echo "invalid wall budget (1..259200 seconds required)" >&2; exit 2;
+}
+if ((wall_seconds > 1800)) && [[ $phase != load && $phase != infer ]]; then
+  echo "long budget requires load or infer phase" >&2; exit 2
+fi
 [[ $simulator == iverilog || $simulator == xsim ]] || { echo "unknown simulator" >&2; exit 2; }
 if [[ $simulator == xsim ]]; then
   for tool in xvlog xelab xsim; do
@@ -91,6 +99,10 @@ sha256sum "$source_dir/testbench/ddr3.sv" "$parameters" \
   "$repo/sim/compiler_ddr3/sim_defines.vh" \
   "${sources[@]}" > "$work_dir/sources.sha256"
 cd "$work_dir"
+printf 'phase=%s\nsimulator=%s\nwall_seconds=%s\nmax_cycles=%s\n' \
+  "$phase" "$simulator" "$wall_seconds" "$max_cycles" > run-settings.txt
+trap 'code=$?; printf "%s\n" "$code" > exit-status.txt; date -u +%FT%TZ > finished-at.txt' EXIT
+date -u +%FT%TZ > started-at.txt
 if [[ $simulator == iverilog ]]; then
   timeout --kill-after=10s 120 iverilog -g2012 -s "$top" \
   -I "$repo/sim/compiler_ddr3" -I "$(dirname "$parameters")" \
@@ -117,7 +129,7 @@ for arg in "${plusargs[@]}"; do
   if [[ $simulator == xsim ]]; then run+=(--testplusarg "$arg"); else run+=("+$arg"); fi
 done
 set +e
-timeout --kill-after=10s 1800 "${run[@]}" \
+timeout --kill-after=10s "$wall_seconds" "${run[@]}" \
   2>&1 | tee "$work_dir/run.log"
 run_status=${PIPESTATUS[0]}
 set -e

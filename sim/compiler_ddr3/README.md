@@ -40,7 +40,7 @@ has been changed. PCIe ingress is not simulated here.
 ## Startup harness and limitations
 
 Use the same runner with `--phase startup`. A 1,800-second simulator wall bound
-is enforced; `--max-cycles N` additionally bounds controller cycles. Neither a
+is the default; `--max-cycles N` additionally bounds controller cycles. Neither a
 timeout nor calibration-in-progress is a pass. The startup harness observes
 state transitions, BIST counters and errors. It does not inject host requests.
 
@@ -57,6 +57,12 @@ that alignment (as does the upstream bench), with a regression assertion that
 was observed failing before the correction. This is a stimulus correction,
 not a controller/accelerator RTL change or evidence that board calibration is
 fixed. The exploratory run was stopped and is not an acceptance result.
+
+`--wall-seconds N` permits an explicit longer budget only for the combined
+`load` or `infer` phases (maximum 259,200 seconds / 72 hours). Profile and
+standalone-startup development runs remain capped at 1,800 seconds. The runner
+records its selected limits, start/finish times and exit status in the work
+directory. Missing terminal markers and model errors still reject the result.
 
 Simulation differences remain explicit:
 
@@ -167,3 +173,21 @@ watchdog with runner exit 1; XSim reported 43.760 CPU seconds. The saved
 benchmark artifact directory above. This proves neither full BIST nor model
 readback. The real memory model also warns that automatic self-refresh is not
 modeled; that coverage limitation remains, rather than being suppressed.
+
+### First full combined run budget
+
+Use a 72-hour wall cap and 1,000,000,000-controller-cycle watchdog for the
+first combined run. This is an upper limit, not a predicted completion time
+or permission to extend a timed-out job. Full BIST-2 involves roughly six
+33,554,432-address sweeps, with additional stalls for random-row accesses.
+The measured million-cycle standalone run and integrated 100,000-cycle probe
+put this in the tens-of-hours range, before inference. The combined bench
+avoids repeating startup between BIST, load/readback and token generation.
+
+Monitor the first evidenced error and disk headroom while it runs. Do not
+modify the runner or testbench in place during execution, restart a live
+process, or interpret partial BIST progress as acceptance. After a terminal
+result, retain logs/trace hashes and classify the earliest failed gate before
+any implementation changes. Source changes and qualification runs remain
+separate: no bank consolidation, synthesis or routing before the required
+functional gates pass.

@@ -27,7 +27,8 @@ class MicronProfileTest(unittest.TestCase):
             result = subprocess.run(
                 ["bash", str(RUNNER), "--phase", "profile", "--work-dir", directory,
                  "--uberddr3-source", source, "--vendor-parameters", parameters,
-                 *simulator_args, *extra], capture_output=True, text=True, timeout=120,
+                 *simulator_args, "--wall-seconds", "30", *extra],
+                capture_output=True, text=True, timeout=120,
             )
             receipt = Path(directory) / "sources.sha256"
             return result, receipt.read_text() if receipt.exists() else ""
@@ -69,6 +70,18 @@ class MicronProfileTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ERROR:", result.stdout)
         self.assertIn("Micron/model diagnostic rejected", result.stderr)
+
+    def test_unbounded_or_oversized_budget_is_rejected(self):
+        for budget in ("0", "-1", "259201", "999999999999999999999999"):
+            with self.subTest(budget=budget):
+                result, _ = self.run_profile("--wall-seconds", budget)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("invalid wall budget", result.stderr)
+
+    def test_development_phase_cannot_silently_get_full_run_budget(self):
+        result, _ = self.run_profile("--phase", "startup", "--wall-seconds", "7200")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("long budget requires load or infer phase", result.stderr)
 
 
 if __name__ == "__main__":
