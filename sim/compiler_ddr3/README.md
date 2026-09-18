@@ -158,3 +158,12 @@ override explicitly declared PHY/model time units. Runtime Micron timing and
 mode-register checks remain enabled and covered by negative tests. PCIe ingress,
 the board reset shell and asynchronous clock crossings remain outside this
 Wishbone-injected simulation.
+
+The integrated 100,000-cycle startup probe also reached BIST state 17 with
+write counter 38,644, exactly matching the standalone observation. Host and
+accelerator request counts remained zero. It stopped at the deliberate
+watchdog with runner exit 1; XSim reported 43.760 CPU seconds. The saved
+`compiler-integrated.log` and `compiler-integrated-sources.sha256` are in the
+benchmark artifact directory above. This proves neither full BIST nor model
+readback. The real memory model also warns that automatic self-refresh is not
+modeled; that coverage limitation remains, rather than being suppressed.
