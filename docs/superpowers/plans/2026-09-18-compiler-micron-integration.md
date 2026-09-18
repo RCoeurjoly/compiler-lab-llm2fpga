@@ -37,7 +37,7 @@ and `scripts/analysis/run_compiler_micron_sim.sh`.
 model, vendor parameters and image. It must reject missing inputs rather than
 substituting another model. Profile phase terminates after elaborated assertions.
 
-- [ ] Write failing tests for the profile: expected `(rows, columns, banks,
+- [x] Write failing tests for the profile: expected `(rows, columns, banks,
   dq_bits) == (15,10,3,16)`, `MICRON_SIM == 0`, `BIST_MODE == 2`, and clock
   periods `(12000,3000)`. Reject the bundled 16-row-bit default.
 - [x] Generate the explicit macro header:
@@ -54,8 +54,8 @@ substituting another model. Profile phase terminates after elaborated assertions
 - [x] Run the positive profile and wrong-geometry negative control, confirm
   nonzero exit for the latter, record all model/parameter hashes and commit.
 
-Model-only elaboration is verified (three tests). Controller parameters,
-production startup and calibration are not covered by this first checkpoint.
+Model and controller-profile elaboration guards are verified. Production
+startup/calibration completion remains a separate, unpassed gate.
 See `sim/compiler_ddr3/README.md` for the reproducible command and limitations.
 
 ### Task 2: Exercise production startup, calibration and BIST
@@ -68,8 +68,8 @@ controller clock/reset and calibration status; internally instantiates pinned
 `ddr3_top`, Micron memory and the necessary FPGA primitive models. No inferred
 transaction RAM is permitted in this wrapper.
 
-- [ ] Test rejection of missing calibration, model errors and watchdog expiry.
-- [ ] Instantiate the exact spec parameters; generate controller/DDR/quadrature/
+- [x] Test rejection of missing calibration, model errors and watchdog expiry.
+- [x] Instantiate the exact spec parameters; generate controller/DDR/quadrature/
   reference clocks at their board periods with 1-ps resolution. Keep reset
   release and startup durations observable, not forced internal state.
 - [ ] Compile and run `--phase startup` under `timeout --kill-after=10s 1800`.

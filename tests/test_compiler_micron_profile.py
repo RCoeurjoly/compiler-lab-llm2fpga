@@ -46,6 +46,26 @@ class MicronProfileTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing vendor parameters", result.stderr)
 
+    def test_startup_watchdog_does_not_accept_uncalibrated_controller(self):
+        result, _ = self.run_profile("--phase", "startup", "--max-cycles", "100")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("PASS: controller profile", result.stdout)
+        self.assertIn("PASS: physical clock phase alignment", result.stdout)
+        self.assertIn("FAIL: startup watchdog", result.stdout)
+        self.assertNotIn("PASS: startup calibration and BIST", result.stdout)
+
+    def test_shortened_bist_address_space_is_rejected(self):
+        result, _ = self.run_profile("--phase", "startup", "--negative-control",
+                                     "shortened-startup", "--max-cycles", "100")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("FAIL: controller profile", result.stdout)
+
+    def test_micron_reported_error_overrides_success_marker(self):
+        result, _ = self.run_profile("--negative-control", "model-timing")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ERROR:", result.stdout)
+        self.assertIn("Micron/model diagnostic rejected", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

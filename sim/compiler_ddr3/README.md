@@ -3,7 +3,9 @@
 The initial `profile` phase elaborates the actual pinned Micron model with a
 4-Gbit x16 parameter file and verifies geometry and strict-check settings.
 It does **not** exercise initialization, calibration, loading or inference.
-The runner rejects the not-yet-implemented `startup`, `load` and `infer` phases.
+The `startup` phase instantiates the pinned controller and PHY, uses production
+waits and full BIST geometry, and requires natural calibration/BIST completion.
+The runner rejects the not-yet-implemented `load` and `infer` phases.
 
 Run from the repository root:
 
@@ -32,3 +34,41 @@ with `--phase profile --work-dir PATH --uberddr3-source PATH
 and a unique memory backing directory. `--negative-control wrong-geometry`
 must fail. These are testbench sources only; no accelerator or transport RTL
 has been changed. PCIe ingress is not simulated here.
+
+## Startup harness and limitations
+
+Use the same runner with `--phase startup`. A 1,800-second simulator wall bound
+is enforced; `--max-cycles N` additionally bounds controller cycles. Neither a
+timeout nor calibration-in-progress is a pass. The startup harness observes
+state transitions, BIST counters and errors. It does not inject host requests.
+
+Six regression tests pass, including an uncalibrated watchdog, rejection of
+`MICRON_SIM=1`, and a real pin-level Micron initialization timing violation.
+The last test demonstrates that vendor `$display` errors must override a zero
+simulator exit and any earlier profile success message. Missing terminal
+acceptance markers also fail.
+
+The first exploratory run exposed a testbench clock-phase mistake: starting
+all clocks low puts controller rising edges halfway between DDR rising edges.
+The board PLL has zero-phase controller/DDR outputs. The harness now matches
+that alignment (as does the upstream bench), with a regression assertion that
+was observed failing before the correction. This is a stimulus correction,
+not a controller/accelerator RTL change or evidence that board calibration is
+fixed. The exploratory run was stopped and is not an acceptance result.
+
+Simulation differences remain explicit:
+
+- Ideal clocks; no physical jitter, skew, routing delay or signal-integrity model.
+- `SIM_MODEL` selects upstream behavioral FPGA I/O primitives. `NO_TEST_MODEL`
+  disables their parallel comparisons against proprietary primitive models.
+- The behavioral IDELAYCTRL asserts readiness 10 ns after reset release;
+  IDELAYE2 models a 600-ps base delay plus 78 ps per tap. This does not establish
+  real PHY electrical qualification.
+- Micron `DEBUG=0` suppresses per-beat information, not strict timing/mode errors;
+  the real-error regression passes with this setting. No memory preload,
+  calibration forcing or `MICRON_SIM` acceleration is enabled.
+- Icarus reports existing upstream width-pruning warnings and two constant-only
+  `always @*` blocks with empty sensitivity lists (disabled ECC muxes and unused
+  second Wishbone outputs). Logs retain them; no vendor RTL has been patched.
+
+Passing these harness tests is **not** passing full startup, loading or inference.
