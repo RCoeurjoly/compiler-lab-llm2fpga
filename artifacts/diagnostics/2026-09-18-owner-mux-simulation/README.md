@@ -86,7 +86,14 @@ parses and hashes one Q/R pair at a time, fsyncs a sibling temporary binary,
 then independently stream-compares every generated record with the complete
 authenticated trace before atomically replacing its destination. A malformed,
 truncated, reordered, duplicate, trailing, or hash-mismatched trace cannot
-replace an existing package. The comparison copies observed response bytes; it
-does not claim that every runtime response can be reconstructed solely from the
-immutable image bytes. The image receipt/hash binds the package to the loaded
-image, while the source trace remains the authority for all response data.
+replace an existing package. It also requires `--image`, then streams that
+artifact to verify its 4,136,720-byte length and SHA-256 against the committed
+image, token, and owner-mux receipts; caller-supplied candidate/image hashes,
+prompt, or token must exactly match those receipts.
+
+The comparison copies observed response bytes; it does not claim that every
+runtime response can be reconstructed solely from the immutable image bytes.
+The source trace remains the authority for response data, while the separately
+content-hashed image binds the package to the loaded image. Its machine-readable
+scope starts at the Wishbone transaction boundary: it validates neither PCIe
+ingress nor physical DDR3 (controller, PHY, or calibration).
