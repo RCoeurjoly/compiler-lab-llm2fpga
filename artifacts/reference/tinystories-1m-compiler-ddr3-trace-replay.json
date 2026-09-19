@@ -1,0 +1,25 @@
+{
+  "binary_artifact": "/tmp/compiler-ddr3-trace-replay.e61bb6100af2c612/compiler-ddr3-trace-replay.bin",
+  "binary_bytes": 262338240,
+  "binary_sha256": "46332a3a8d9ebf3a12d2fe968ae4e412200f9d419f3131ae46152dee26ee7d71",
+  "byte_order": "little-endian uint32 address; Wishbone lane-order response bytes",
+  "candidate_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+  "prompt": [
+    7454,
+    2402,
+    257,
+    640
+  ],
+  "record_bytes": 20,
+  "record_count": 13116912,
+  "schema": "tinystories-1m-compiler-trace-replay-v1",
+  "source_trace_sha256": "e61bb6100af2c612f3cbd3beef0f4fff0dce3194f1590fca0cee9d0f7ed2df23",
+  "token": 11,
+  "verification": {
+    "binary_sha256": "46332a3a8d9ebf3a12d2fe968ae4e412200f9d419f3131ae46152dee26ee7d71",
+    "method": "independent source-trace-to-binary stream comparison",
+    "records_compared": 13116912,
+    "source_trace_sha256": "e61bb6100af2c612f3cbd3beef0f4fff0dce3194f1590fca0cee9d0f7ed2df23"
+  }
+}

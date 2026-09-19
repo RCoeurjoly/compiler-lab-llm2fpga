@@ -67,3 +67,26 @@ The validation used `records()` from
 response address and balanced completion, followed by a per-response image
 comparison and an assertion of exactly 13,116,912 responses. This is a
 reference trace, not evidence that the physical DDR3 simulation has passed.
+
+## Authenticated streamed replay package
+
+`artifacts/reference/tinystories-1m-compiler-ddr3-trace-replay.json` is the
+compact receipt for the exact hardware replay input. It binds the frozen
+candidate `daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a`,
+the authenticated image
+`e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593`, prompt
+`[7454,2402,257,640]`, token `11`, and source trace
+`e61bb6100af2c612f3cbd3beef0f4fff0dce3194f1590fca0cee9d0f7ed2df23`.
+Its 13,116,912 replay records are 20-byte little-endian address/response
+tuples; the 262,338,240-byte binary is deliberately retained only at the
+hashed scratch-artifact path recorded by that receipt, not in Git.
+
+Create it with `scripts/analysis/build_compiler_trace_replay.py`. The converter
+parses and hashes one Q/R pair at a time, fsyncs a sibling temporary binary,
+then independently stream-compares every generated record with the complete
+authenticated trace before atomically replacing its destination. A malformed,
+truncated, reordered, duplicate, trailing, or hash-mismatched trace cannot
+replace an existing package. The comparison copies observed response bytes; it
+does not claim that every runtime response can be reconstructed solely from the
+immutable image bytes. The image receipt/hash binds the package to the loaded
+image, while the source trace remains the authority for all response data.
