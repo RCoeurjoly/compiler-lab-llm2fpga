@@ -16,6 +16,11 @@ class ReplayTopTest(unittest.TestCase):
             sources = sorted((ROOT / "third_party/task6-e368449").rglob("*.sv"))
             sources += sorted((ROOT / "third_party/task6-e368449").rglob("*.v"))
             sources += sorted((ROOT / "rtl/diagnostics").glob("*.sv"))
+            from scripts.pipeline.apply_task6_command_overlay import transform
+            shell = ROOT / "third_party/task6-e368449/fpga/rtl/task6_ypcb_uberddr3_bist_rowstream_loader_top.sv"
+            staged_shell = Path(directory) / shell.name
+            staged_shell.write_bytes(transform(shell.read_bytes()))
+            sources[sources.index(shell)] = staged_shell
             # The pinned loader uses 3-bit enum literals in a 4-bit enum.
             # Verilator accepts this legacy source; Icarus rejects it. Do not
             # rewrite the authenticated loader just for simulator convenience.

@@ -1,0 +1,646 @@
+Warning: set_property: target get_cells not supported (on line 34)
+Warning: set_property: target get_cells not supported (on line 35)
+Warning: set_property: target get_cells not supported (on line 45)
+Warning: set_property: target get_cells not supported (on line 46)
+Warning: net 'controller_clk' does not exist in design, ignoring clock constraint
+Warning: net 'clk25_raw' does not exist in design, ignoring clock constraint
+Warning: net 'clk100_raw' does not exist in design, ignoring clock constraint
+Warning: net 'clk100_90_raw' does not exist in design, ignoring clock constraint
+Warning: net 'ddr3_clk' does not exist in design, ignoring clock constraint
+Warning: net 'ddr3_clk_90' does not exist in design, ignoring clock constraint
+Warning: net 'clk200_raw' does not exist in design, ignoring clock constraint
+Warning: net 'ref_clk' does not exist in design, ignoring clock constraint
+Info: constraining clock net 'rowstream_ddr3.controller_clk' to 83.33 MHz
+Info: constraining clock net 'rowstream_ddr3.clk25_raw' to 83.33 MHz
+Info: constraining clock net 'rowstream_ddr3.clk100_raw' to 333.33 MHz
+Info: constraining clock net 'rowstream_ddr3.clk100_90_raw' to 333.33 MHz
+Info: constraining clock net 'rowstream_ddr3.ddr3_clk' to 333.33 MHz
+Info: constraining clock net 'rowstream_ddr3.ddr3_clk_90' to 333.33 MHz
+Info: constraining clock net 'rowstream_ddr3.clk200_raw' to 200.00 MHz
+Info: constraining clock net 'rowstream_ddr3.ref_clk' to 200.00 MHz
+Warning: net 'impl.rowstream_ddr3.controller_clk' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.clk25_raw' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.clk100_raw' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.clk100_90_raw' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.ddr3_clk' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.ddr3_clk_90' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.clk200_raw' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.ref_clk' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.controller_clk' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.clk25_raw' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.clk100_raw' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.clk100_90_raw' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.ddr3_clk' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.ddr3_clk_90' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.clk200_raw' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.ref_clk' does not exist in design, ignoring clock constraint
+Info: constraining clock net 'pcie_user_clk' to 62.50 MHz
+Warning: net 'impl.pcie_user_clk' does not exist in design, ignoring clock constraint
+Info: constraining clock net 'pcie_7x_top_aximm_i.pcie_7x_i.in_module_mmcm.pipe_clock_i.userclk1' to 62.50 MHz
+Warning: net 'impl.pcie_7x_top_aximm_i.pcie_7x_i.in_module_mmcm.pipe_clock_i.userclk1' does not exist in design, ignoring clock constraint
+Info: Packing constants..
+Info: Inserting IO buffers..
+Info:     IO port 'ddram_clk_n' driven by OBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk4.genblk1.OBUFDS_inst'
+Info:     IO port 'ddram_clk_p' driven by OBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk4.genblk1.OBUFDS_inst'
+Info:     IO port 'sys_clk_n' driven by IBUFDS_GTE2 'pcie_7x_top_aximm_i.refclk_ibuf'
+Info:     IO port 'sys_clk_p' driven by IBUFDS_GTE2 'pcie_7x_top_aximm_i.refclk_ibuf'
+Info:     IO port 'sys_rst_n' driven by IBUF 'pcie_7x_top_aximm_i.genblk1.sys_reset_n_ibuf'
+Info:     IO port 'ddram_dq[0]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[0].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[10]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[10].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[11]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[11].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[12]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[12].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[13]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[13].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[14]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[14].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[15]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[15].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[1]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[1].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[2]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[2].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[3]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[3].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[4]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[4].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[5]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[5].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[6]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[6].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[7]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[7].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[8]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[8].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[9]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[9].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dqs_p[0]' driven by IOBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk7[0].genblk1.IOBUFDS_dqs'
+Info:     IO port 'ddram_dqs_n[0]' driven by IOBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk7[0].genblk1.IOBUFDS_dqs'
+Info:     IO port 'ddram_dqs_p[1]' driven by IOBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk7[1].genblk1.IOBUFDS_dqs'
+Info:     IO port 'ddram_dqs_n[1]' driven by IOBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk7[1].genblk1.IOBUFDS_dqs'
+Info:     Constraining 'clk_50' to site 'IOB_X0Y174'
+Info:     Tile 'LIOB33_X0Y173'
+Info:     Constraining 'ddram_cas_n' to site 'IOB_X0Y92'
+Info:     Tile 'LIOB33_X0Y91'
+Info:     Constraining 'ddram_cke' to site 'IOB_X0Y91'
+Info:     Tile 'LIOB33_X0Y91'
+Info:     Constraining 'ddram_clk_n' to site 'IOB_X0Y93'
+Info:     Tile 'LIOB33_X0Y93'
+Info:     Constraining 'ddram_clk_p' to site 'IOB_X0Y94'
+Info:     Tile 'LIOB33_X0Y93'
+Info:     Constraining 'ddram_cs_n' to site 'IOB_X0Y80'
+Info:     Tile 'LIOB33_X0Y79'
+Info:     Constraining 'ddram_odt' to site 'IOB_X0Y83'
+Info:     Tile 'LIOB33_X0Y83'
+Info:     Constraining 'ddram_ras_n' to site 'IOB_X0Y84'
+Info:     Tile 'LIOB33_X0Y83'
+Info:     Constraining 'ddram_reset_n' to site 'IOB_X0Y138'
+Info:     Tile 'LIOB33_X0Y137'
+Info:     Constraining 'ddram_we_n' to site 'IOB_X0Y90'
+Info:     Tile 'LIOB33_X0Y89'
+Info:     Constraining 'pci_exp_rxn' to site 'IPAD_X1Y180'
+Info:     Tile 'GTX_CHANNEL_3_X309Y306'
+Info:     Constraining 'pci_exp_rxp' to site 'IPAD_X1Y181'
+Info:     Tile 'GTX_CHANNEL_3_X309Y306'
+Info:     Constraining 'pci_exp_txn' to site 'OPAD_X0Y46'
+Info:     Tile 'GTX_CHANNEL_3_X309Y306'
+Info:     Constraining 'pci_exp_txp' to site 'OPAD_X0Y47'
+Info:     Tile 'GTX_CHANNEL_3_X309Y306'
+Info:     Constraining 'sys_clk_n' to site 'IPAD_X1Y165'
+Info:     Tile 'GTX_COMMON_X309Y283'
+Info:     Constraining 'sys_clk_p' to site 'IPAD_X1Y164'
+Info:     Tile 'GTX_COMMON_X309Y283'
+Info:     Constraining 'sys_rst_n' to site 'IOB_X0Y176'
+Info:     Tile 'LIOB33_X0Y175'
+Info:     Constraining 'led[0]' to site 'IOB_X0Y221'
+Info:     Tile 'LIOB33_X0Y221'
+Info:     Constraining 'led[1]' to site 'IOB_X0Y220'
+Info:     Tile 'LIOB33_X0Y219'
+Info:     Constraining 'led[2]' to site 'IOB_X0Y222'
+Info:     Tile 'LIOB33_X0Y221'
+Info:     Constraining 'ddram_a[0]' to site 'IOB_X0Y75'
+Info:     Tile 'LIOB33_X0Y75'
+Info:     Constraining 'ddram_a[10]' to site 'IOB_X0Y79'
+Info:     Tile 'LIOB33_X0Y79'
+Info:     Constraining 'ddram_a[11]' to site 'IOB_X0Y78'
+Info:     Tile 'LIOB33_X0Y77'
+Info:     Constraining 'ddram_a[12]' to site 'IOB_X0Y86'
+Info:     Tile 'LIOB33_X0Y85'
+Info:     Constraining 'ddram_a[13]' to site 'IOB_X0Y82'
+Info:     Tile 'LIOB33_X0Y81'
+Info:     Constraining 'ddram_a[14]' to site 'IOB_X0Y88'
+Info:     Tile 'LIOB33_X0Y87'
+Info:     Constraining 'ddram_ba[0]' to site 'IOB_X0Y85'
+Info:     Tile 'LIOB33_X0Y85'
+Info:     Constraining 'ddram_ba[1]' to site 'IOB_X0Y95'
+Info:     Tile 'LIOB33_X0Y95'
+Info:     Constraining 'ddram_ba[2]' to site 'IOB_X0Y89'
+Info:     Tile 'LIOB33_X0Y89'
+Info:     Constraining 'ddram_a[1]' to site 'IOB_X0Y97'
+Info:     Tile 'LIOB33_X0Y97'
+Info:     Constraining 'ddram_a[2]' to site 'IOB_X0Y81'
+Info:     Tile 'LIOB33_X0Y81'
+Info:     Constraining 'ddram_a[3]' to site 'IOB_X0Y76'
+Info:     Tile 'LIOB33_X0Y75'
+Info:     Constraining 'ddram_a[4]' to site 'IOB_X0Y68'
+Info:     Tile 'LIOB33_X0Y67'
+Info:     Constraining 'ddram_a[5]' to site 'IOB_X0Y70'
+Info:     Tile 'LIOB33_X0Y69'
+Info:     Constraining 'ddram_a[6]' to site 'IOB_X0Y77'
+Info:     Tile 'LIOB33_X0Y77'
+Info:     Constraining 'ddram_a[7]' to site 'IOB_X0Y67'
+Info:     Tile 'LIOB33_X0Y67'
+Info:     Constraining 'ddram_a[8]' to site 'IOB_X0Y69'
+Info:     Tile 'LIOB33_X0Y69'
+Info:     Constraining 'ddram_a[9]' to site 'IOB_X0Y98'
+Info:     Tile 'LIOB33_X0Y97'
+Info:     Constraining 'ddram_dq[0]' to site 'IOB_X0Y13'
+Info:     Tile 'LIOB33_X0Y13'
+Info:     Constraining 'ddram_dq[10]' to site 'IOB_X0Y25'
+Info:     Tile 'LIOB33_X0Y25'
+Info:     Constraining 'ddram_dq[11]' to site 'IOB_X0Y29'
+Info:     Tile 'LIOB33_X0Y29'
+Info:     Constraining 'ddram_dq[12]' to site 'IOB_X0Y26'
+Info:     Tile 'LIOB33_X0Y25'
+Info:     Constraining 'ddram_dq[13]' to site 'IOB_X0Y30'
+Info:     Tile 'LIOB33_X0Y29'
+Info:     Constraining 'ddram_dq[14]' to site 'IOB_X0Y27'
+Info:     Tile 'LIOB33_X0Y27'
+Info:     Constraining 'ddram_dq[15]' to site 'IOB_X0Y35'
+Info:     Tile 'LIOB33_X0Y35'
+Info:     Constraining 'ddram_dq[1]' to site 'IOB_X0Y14'
+Info:     Tile 'LIOB33_X0Y13'
+Info:     Constraining 'ddram_dq[2]' to site 'IOB_X0Y16'
+Info:     Tile 'LIOB33_X0Y15'
+Info:     Constraining 'ddram_dq[3]' to site 'IOB_X0Y21'
+Info:     Tile 'LIOB33_X0Y21'
+Info:     Constraining 'ddram_dq[4]' to site 'IOB_X0Y15'
+Info:     Tile 'LIOB33_X0Y15'
+Info:     Constraining 'ddram_dq[5]' to site 'IOB_X0Y22'
+Info:     Tile 'LIOB33_X0Y21'
+Info:     Constraining 'ddram_dq[6]' to site 'IOB_X0Y18'
+Info:     Tile 'LIOB33_X0Y17'
+Info:     Constraining 'ddram_dq[7]' to site 'IOB_X0Y17'
+Info:     Tile 'LIOB33_X0Y17'
+Info:     Constraining 'ddram_dq[8]' to site 'IOB_X0Y28'
+Info:     Tile 'LIOB33_X0Y27'
+Info:     Constraining 'ddram_dq[9]' to site 'IOB_X0Y36'
+Info:     Tile 'LIOB33_X0Y35'
+Info:     Constraining 'ddram_dqs_p[0]' to site 'IOB_X0Y20'
+Info:     Tile 'LIOB33_X0Y19'
+Info:     Constraining 'ddram_dqs_n[0]' to site 'IOB_X0Y19'
+Info:     Tile 'LIOB33_X0Y19'
+Info:     Constraining 'ddram_dqs_p[1]' to site 'IOB_X0Y32'
+Info:     Tile 'LIOB33_X0Y31'
+Info:     Constraining 'ddram_dqs_n[1]' to site 'IOB_X0Y31'
+Info:     Tile 'LIOB33_X0Y31'
+Info: Generating input buffer for 'clk_50$ibuf$'
+Info: Generating output buffer for 'ddram_cas_n$obuf$'
+Info: Generating output buffer for 'ddram_cke$obuf$'
+Info: Generating output buffer for 'ddram_cs_n$obuf$'
+Info: Generating output buffer for 'ddram_odt$obuf$'
+Info: Generating output buffer for 'ddram_ras_n$obuf$'
+Info: Generating output buffer for 'ddram_reset_n$obuf$'
+Info: Generating output buffer for 'ddram_we_n$obuf$'
+Info:     Constraining 'pcie_7x_top_aximm_i.pcie_7x_i.gt_wrapper_gtx.pipe_wrapper_i.gtxe2_channel_i' to site 'GTXE2_CHANNEL_X0Y23'
+Info:     Tile 'GTX_CHANNEL_3_X309Y306'
+Info:     Constraining 'pcie_7x_top_aximm_i.refclk_ibuf' to site 'IBUFDS_GTE2_X0Y10/IBUFDS_GTE2'
+Info:     Tile 'GTX_COMMON_X309Y283'
+Info:     Constraining 'pcie_7x_top_aximm_i.pcie_7x_i.gt_wrapper_gtx.pipe_wrapper_i.gtxe2_common_i' to site 'GTXE2_COMMON_X0Y5'
+Info:     Tile 'GTX_COMMON_X309Y283'
+Info: Generating input buffer for 'pcie_7x_top_aximm_i.genblk1.sys_reset_n_ibuf'
+Info: Generating output buffer for 'led[0]$obuf$'
+Info: Generating output buffer for 'led[1]$obuf$'
+Info: Generating output buffer for 'led[2]$obuf$'
+Info: Generating output buffer for 'ddram_a[0]$obuf$'
+Info: Generating output buffer for 'ddram_a[10]$obuf$'
+Info: Generating output buffer for 'ddram_a[11]$obuf$'
+Info: Generating output buffer for 'ddram_a[12]$obuf$'
+Info: Generating output buffer for 'ddram_a[13]$obuf$'
+Info: Generating output buffer for 'ddram_a[14]$obuf$'
+Info: Generating output buffer for 'ddram_ba[0]$obuf$'
+Info: Generating output buffer for 'ddram_ba[1]$obuf$'
+Info: Generating output buffer for 'ddram_ba[2]$obuf$'
+Info: Generating output buffer for 'ddram_a[1]$obuf$'
+Info: Generating output buffer for 'ddram_a[2]$obuf$'
+Info: Generating output buffer for 'ddram_a[3]$obuf$'
+Info: Generating output buffer for 'ddram_a[4]$obuf$'
+Info: Generating output buffer for 'ddram_a[5]$obuf$'
+Info: Generating output buffer for 'ddram_a[6]$obuf$'
+Info: Generating output buffer for 'ddram_a[7]$obuf$'
+Info: Generating output buffer for 'ddram_a[8]$obuf$'
+Info: Generating output buffer for 'ddram_a[9]$obuf$'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[0].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[0].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[10].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[10].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[11].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[11].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[12].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[12].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[13].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[13].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[14].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[14].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[15].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[15].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[1].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[1].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[2].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[2].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[3].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[3].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[4].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[4].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[5].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[5].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[6].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[6].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[7].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[7].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[8].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[8].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[9].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[9].genblk1.IOBUF_data'
+Info:     Created 3 INVERTER cells from:
+Info:              3x INV
+Info:     Created 58 PAD cells from:
+Info:             58x PAD
+Info:     Created 1 PCIE_2_1_PCIE_2_1 cells from:
+Info:              1x PCIE_2_1
+Info: Preparing clocking...
+Info: Packing constants..
+Info: Packing cfg...
+Info:     Constraining 'pcie_7x_top_aximm_i.task6_pcie_status_i.bscan' to site 'BSCAN_X0Y0/BSCAN'
+Info:     Constraining 'rowstream_ddr3.jtag_command_shift.bscan' to site 'BSCAN_X0Y1/BSCAN'
+Info: Packing PLLs...
+Info:     Constrained PLLE2_ADV_PLLE2_ADV 'rowstream_ddr3.clock_pll' to bel 'PLLE2_ADV_X0Y3/PLLE2_ADV' based on dedicated routing
+Info: Packing Gigabit Transceivers..
+Info: Driver pcie_7x_top_aximm_i.refclk_ibuf of net pcie_7x_top_aximm_i.sys_clk is a IBUFDS_GTE2 block
+Info: Packing global buffers...
+Info:     Constrained BUFGCTRL 'rowstream_ddr3.clk100_90_bufg' to bel 'BUFGCTRL_X0Y0/BUFGCTRL' based on dedicated routing
+Info:     Constrained BUFGCTRL 'rowstream_ddr3.clk100_bufg' to bel 'BUFGCTRL_X0Y5/BUFGCTRL' based on dedicated routing
+Info:     Constrained BUFGCTRL 'rowstream_ddr3.clk200_bufg' to bel 'BUFGCTRL_X0Y6/BUFGCTRL' based on dedicated routing
+Info:     Constrained BUFGCTRL 'rowstream_ddr3.clk25_bufg' to bel 'BUFGCTRL_X0Y7/BUFGCTRL' based on dedicated routing
+Info: Packing MUX[789]s..
+Info: Packing carries..
+Info:    Grouped 1968 MUXCYs and 1968 XORCYs into 140 chains.
+Info:    Blasted 0 non-chain MUXCYs and 29 non-chain XORCYs to soft logic
+Info: Packing LUTs..
+Info:     Created 28341 SLICE_LUTX cells from:
+Info:          12752x LUT1
+Info:           2216x LUT2
+Info:           3602x LUT3
+Info:           1480x LUT4
+Info:           2387x LUT5
+Info:           5904x LUT6
+Info: Packing DRAM..
+Info:    Transformed 0 tied-low DRAM address inputs to be tied-high
+Info: Packing BRAM..
+Info: Packing DSPs..
+Info: Packing flipflops..
+Info:     Created 13036 SLICE_FFX cells from:
+Info:           4740x FDCE
+Info:              7x FDPE
+Info:           8211x FDRE
+Info:             78x FDSE
+Info:     Created 2515 SELMUX2_1 cells from:
+Info:           1881x MUXF7
+Info:            634x MUXF8
+Info: Constrained 5539 LUTFF pairs.
+
+Info: Annotating ports with timing budgets for target frequency 12.00 MHz
+Info: Checksum: 0x88e5427b
+
+Info: Device utilisation:
+Info: 	          SLICE_LUTX: 28565/597200     4%
+Info: 	           SLICE_FFX: 13036/597200     2%
+Info: 	              CARRY4:   499/74650     0%
+Info: 	          PSEUDO_GND:     1/136359     0%
+Info: 	          PSEUDO_VCC:     1/136359     0%
+Info: 	               HARD0:     0/ 3168     0%
+Info: 	            RAMB18E1:     0/ 1910     0%
+Info: 	            FIFO18E1:     0/  955     0%
+Info: 	        RAMBFIFO36E1:     0/  955     0%
+Info: 	            RAMB36E1:     4/  955     0%
+Info: 	             DSP48E1:     0/ 1920     0%
+Info: 	                 PAD:    58/  946     6%
+Info: 	       IOB33M_OUTBUF:     3/  192     1%
+Info: 	       IOB33S_OUTBUF:     3/  192     1%
+Info: 	        IOB33_OUTBUF:    44/  400    11%
+Info: 	     IOB33M_INBUF_EN:     2/  192     1%
+Info: 	     IOB33S_INBUF_EN:     0/  192     0%
+Info: 	      IOB33_INBUF_EN:    18/  400     4%
+Info: 	IOB33M_TERM_OVERRIDE:     0/  192     0%
+Info: 	IOB33S_TERM_OVERRIDE:     0/  192     0%
+Info: 	 IOB33_TERM_OVERRIDE:     0/  400     0%
+Info: 	       PULL_OR_KEEP1:     0/  784     0%
+Info: 	            IDELAYE2:    18/  400     4%
+Info: 	        OLOGICE3_TFF:     0/  400     0%
+Info: 	      OLOGICE3_OUTFF:     0/  400     0%
+Info: 	       OLOGICE3_MISR:     0/  400     0%
+Info: 	           OSERDESE2:    43/  400    10%
+Info: 	        ILOGICE3_IFF:     0/  400     0%
+Info: 	ILOGICE3_ZHOLD_DELAY:     0/  400     0%
+Info: 	           ISERDESE2:    18/  400     4%
+Info: 	               BUFIO:     0/   32     0%
+Info: 	          IDELAYCTRL:     1/    8    12%
+Info: 	            BUFGCTRL:    10/   32    31%
+Info: 	            PCIE_2_1:     1/    1   100%
+Info: 	               BSCAN:     2/    4    50%
+Info: 	                BUFG:     0/   32     0%
+Info: 	              BUFHCE:     0/  192     0%
+Info: 	            DCIRESET:     0/    1     0%
+Info: 	            DNA_PORT:     0/    1     0%
+Info: 	           EFUSE_USR:     0/    1     0%
+Info: 	           FRAME_ECC:     0/    1     0%
+Info: 	       GTXE2_CHANNEL:     1/   32     3%
+Info: 	        GTXE2_COMMON:     1/    8    12%
+Info: 	         IBUFDS_GTE2:     1/   16     6%
+Info: 	                ICAP:     0/    2     0%
+Info: 	            INVERTER:     3/  192     1%
+Info: 	          MMCME2_ADV:     1/    8    12%
+Info: 	        OLOGICE2_TFF:     0/  400     0%
+Info: 	      OLOGICE2_OUTFF:     0/  400     0%
+Info: 	           PLLE2_ADV:     1/    8    12%
+Info: 	           SELMUX2_1:  2515/225550     1%
+Info: 	             STARTUP:     0/    1     0%
+Info: 	          USR_ACCESS:     0/    1     0%
+Info: 	              BUFFER:     0/  162     0%
+Info: 	        ILOGICE2_IFF:     0/  400     0%
+Info: 	       OLOGICE2_MISR:     0/  400     0%
+
+Info: Placed 222 cells based on constraints.
+Info: Creating initial analytic placement for 29559 cells, random placement wirelen = 15110265.
+Info:     at initial placer iter 0, wirelen = 187552
+Info:     at initial placer iter 1, wirelen = 150361
+Info:     at initial placer iter 2, wirelen = 138331
+Info:     at initial placer iter 3, wirelen = 136286
+Info: Running main analytical placer.
+Info:     at iteration #1, type ALL: wirelen solved = 132811, spread = 1432078, legal = 1844679; time = 12.16s
+Info:     at iteration #2, type ALL: wirelen solved = 262835, spread = 808752, legal = 1121374; time = 8.75s
+Info:     at iteration #3, type ALL: wirelen solved = 342587, spread = 678609, legal = 1051908; time = 9.65s
+Info:     at iteration #4, type ALL: wirelen solved = 393529, spread = 644416, legal = 989932; time = 8.43s
+Info:     at iteration #5, type ALL: wirelen solved = 423408, spread = 617886, legal = 940405; time = 7.95s
+Info:     at iteration #6, type ALL: wirelen solved = 445965, spread = 607418, legal = 958780; time = 8.92s
+Info:     at iteration #7, type ALL: wirelen solved = 461337, spread = 612882, legal = 964672; time = 9.21s
+Info:     at iteration #8, type ALL: wirelen solved = 476576, spread = 594461, legal = 921597; time = 7.92s
+Info:     at iteration #9, type ALL: wirelen solved = 487468, spread = 624505, legal = 939640; time = 8.06s
+Info:     at iteration #10, type ALL: wirelen solved = 503527, spread = 625864, legal = 957901; time = 9.00s
+Info:     at iteration #11, type ALL: wirelen solved = 517650, spread = 630368, legal = 1001794; time = 10.90s
+Info:     at iteration #12, type ALL: wirelen solved = 527591, spread = 634403, legal = 980089; time = 10.42s
+Info:     at iteration #13, type ALL: wirelen solved = 541968, spread = 660392, legal = 938724; time = 7.51s
+Info: HeAP Placer Time: 124.80s
+Info:   of which solving equations: 8.36s
+Info:   of which spreading cells: 3.05s
+Info:   of which strict legalisation: 108.67s
+
+Info: Running simulated annealing placer for refinement.
+Info:   at iteration #1: temp = 0.000000, timing cost = 396067, wirelen = 921597
+Info:   at iteration #5: temp = 0.000000, timing cost = 378892, wirelen = 843179
+Info:   at iteration #10: temp = 0.000000, timing cost = 375185, wirelen = 832539
+Info:   at iteration #15: temp = 0.000000, timing cost = 374643, wirelen = 831334
+Info:   at iteration #20: temp = 0.000000, timing cost = 374557, wirelen = 830983
+Info:   at iteration #25: temp = 0.000000, timing cost = 374534, wirelen = 830892
+Info:   at iteration #30: temp = 0.000000, timing cost = 374522, wirelen = 830816
+Info:   at iteration #35: temp = 0.000000, timing cost = 374516, wirelen = 830775
+Info:   at iteration #35: temp = 0.000000, timing cost = 374516, wirelen = 830777 
+Info: SA placement time 48.81s
+
+Info: Critical path report for clock 'pcie_7x_top_aximm_i.task6_pcie_status_i.drck' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$115021.Q
+Info:  1.7  1.8    Net pcie_7x_top_aximm_i.task6_pcie_status_i.shift_q[785] budget 41.466999 ns (230,180) -> (233,154)
+Info:                Sink $auto$xilinx_dffopt.cc:341:execute$365163.A6
+Info:  0.2  2.0  Source $auto$xilinx_dffopt.cc:341:execute$365163.O6
+Info:  0.0  2.0    Net $auto$xilinx_dffopt.cc:347:execute$365164 budget 40.604000 ns (233,154) -> (233,154)
+Info:                Sink $auto$ff.cc:337:slice$115020.D
+Info:  0.1  2.1  Setup $auto$ff.cc:337:slice$115020.D
+Info: 0.4 ns logic, 1.7 ns routing
+
+Info: Critical path report for clock 'rowstream_ddr3.jtag_command_shift.drck' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$110226.Q
+Info:  2.9  3.0    Net rowstream_ddr3.jtag_command_shift.shift_q[11] budget 41.466999 ns (73,340) -> (78,277)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$307604.A1
+Info:  0.2  3.2  Source $abc$302150$auto$blifparse.cc:557:parse_blif$307604.O6
+Info:  0.0  3.2    Net $abc$302150$flatten\rowstream_ddr3.\jtag_command_shift.$0\shift_q[207:0][10] budget 38.938999 ns (78,277) -> (78,277)
+Info:                Sink $auto$ff.cc:337:slice$110225.D
+Info:  0.1  3.3  Setup $auto$ff.cc:337:slice$110225.D
+Info: 0.4 ns logic, 2.9 ns routing
+
+Info: Critical path report for clock 'rowstream_ddr3.jtag_command_shift.tck' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$110211.Q
+Info:  0.0  0.1    Net rowstream_ddr3.jtag_command_shift.toggle_tck_q budget 41.466999 ns (66,228) -> (66,228)
+Info:                Sink $auto$xilinx_dffopt.cc:332:execute$363451.A3
+Info:  0.2  0.3  Source $auto$xilinx_dffopt.cc:332:execute$363451.O6
+Info:  0.0  0.3    Net $auto$xilinx_dffopt.cc:347:execute$363452 budget 41.466000 ns (66,228) -> (66,228)
+Info:                Sink $auto$ff.cc:337:slice$110211.D
+Info:  0.1  0.4  Setup $auto$ff.cc:337:slice$110211.D
+Info: 0.4 ns logic, 0.0 ns routing
+
+Info: Critical path report for clock 'rowstream_clk' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$108778.Q
+Info:  4.7  4.8    Net rowstream_ddr3.uberddr3.ddr3_controller_inst.index_wb_data budget -0.342000 ns (14,293) -> (86,369)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$302527.A3
+Info:  0.2  5.0  Source $abc$302150$auto$blifparse.cc:557:parse_blif$302527.O6
+Info:  4.7  9.7    Net rowstream_ddr3.memory_wb_data[123] budget 0.807000 ns (86,369) -> (30,287)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314471.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.A3
+Info:  0.2  9.9  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314471.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.O6
+Info:  0.0  9.9    Net $abc$302150$auto$blifparse.cc:557:parse_blif$314471.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget -1.193000 ns (30,287) -> (30,287)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314471.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.1
+Info:  0.1 10.0  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314471.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.7 10.7    Net $abc$302150$auto$blifparse.cc:557:parse_blif$314469.A[1] budget -0.473000 ns (30,287) -> (30,290)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314469.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.A2
+Info:  0.2 10.9  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314469.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.O6
+Info:  0.0 10.9    Net $abc$302150$auto$blifparse.cc:557:parse_blif$314469.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget -1.193000 ns (30,290) -> (30,290)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314469.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.1
+Info:  0.1 11.0  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314469.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.0 11.0    Net $abc$302150$auto$blifparse.cc:557:parse_blif$314469.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget -1.193000 ns (30,290) -> (30,290)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314469.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.1
+Info:  0.1 11.1  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314469.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  0.8 11.8    Net $abc$302150$auto$blifparse.cc:557:parse_blif$314439.A[4] budget -0.562000 ns (30,290) -> (33,292)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314439.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.A5
+Info:  0.2 12.0  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314439.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.O6
+Info:  0.0 12.0    Net $abc$302150$auto$blifparse.cc:557:parse_blif$314439.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget -0.835000 ns (33,292) -> (33,292)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314439.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.1
+Info:  0.1 12.1  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314439.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.0 12.1    Net $abc$302150$auto$blifparse.cc:557:parse_blif$314439.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1 budget -0.835000 ns (33,292) -> (33,292)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314439.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.1
+Info:  0.1 12.2  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314439.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  1.1 13.3    Net $abc$302150$auto$blifparse.cc:557:parse_blif$314663.A[1] budget 0.468000 ns (33,292) -> (37,287)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314663.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.A2
+Info:  0.2 13.5  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314663.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.O6
+Info:  0.2 13.7    Net $abc$302150$auto$blifparse.cc:557:parse_blif$314663.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget -0.685000 ns (37,287) -> (37,287)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314663.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.0
+Info:  0.1 13.8  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314663.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.2 13.9    Net $abc$302150$auto$blifparse.cc:557:parse_blif$314663.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget -0.685000 ns (37,287) -> (37,287)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314663.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.0
+Info:  0.1 14.0  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314663.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  1.6 15.6    Net $techmap349297$abc$302150$auto$blifparse.cc:557:parse_blif$314662.A[3] budget 0.564000 ns (37,287) -> (33,266)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$315674.A1
+Info:  0.2 15.8  Source $abc$302150$auto$blifparse.cc:557:parse_blif$315674.O6
+Info:  1.7 17.5    Net $abc$302150$auto$opt_dff.cc:251:make_patterns_logic$93252 budget 0.564000 ns (33,266) -> (43,252)
+Info:                Sink $auto$ff.cc:337:slice$163778.CE
+Info:  0.1 17.6  Setup $auto$ff.cc:337:slice$163778.CE
+Info: 2.1 ns logic, 15.5 ns routing
+
+Info: Critical path report for clock 'pcie_user_clk' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$103402.Q
+Info:  4.9  5.0    Net pcie_ingress.ingress.awaddr_q[3] budget 0.920000 ns (98,271) -> (71,376)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$309823.A6
+Info:  0.2  5.2  Source $abc$302150$auto$blifparse.cc:557:parse_blif$309823.O6
+Info:  1.4  6.6    Net $abc$302150$auto$blifparse.cc:557:parse_blif$309819.A[0] budget -0.119000 ns (71,376) -> (61,381)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$309819.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.A1
+Info:  0.2  6.8  Source $abc$302150$auto$blifparse.cc:557:parse_blif$309819.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.O6
+Info:  0.2  6.9    Net $abc$302150$auto$blifparse.cc:557:parse_blif$309819.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget -0.998000 ns (61,381) -> (61,381)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$309819.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.0
+Info:  0.1  7.0  Source $abc$302150$auto$blifparse.cc:557:parse_blif$309819.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.2  7.2    Net $abc$302150$auto$blifparse.cc:557:parse_blif$309819.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget -0.997000 ns (61,381) -> (61,381)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$309819.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.0
+Info:  0.1  7.3  Source $abc$302150$auto$blifparse.cc:557:parse_blif$309819.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  3.4 10.6    Net $abc$302150$auto$blifparse.cc:557:parse_blif$309818.A[3] budget 1.185000 ns (61,381) -> (78,321)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$309938.A2
+Info:  0.2 10.8  Source $abc$302150$auto$blifparse.cc:557:parse_blif$309938.O6
+Info:  2.0 12.8    Net $abc$302150$auto$blifparse.cc:557:parse_blif$309936.A[2] budget 1.165000 ns (78,321) -> (73,289)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$309936.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.A1
+Info:  0.2 13.0  Source $abc$302150$auto$blifparse.cc:557:parse_blif$309936.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.O6
+Info:  0.2 13.2    Net $abc$302150$auto$blifparse.cc:557:parse_blif$309936.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget -0.692000 ns (73,289) -> (73,289)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$309936.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.0
+Info:  0.1 13.3  Source $abc$302150$auto$blifparse.cc:557:parse_blif$309936.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  0.2 13.4    Net $abc$302150$auto$blifparse.cc:557:parse_blif$309936.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget -0.692000 ns (73,289) -> (73,289)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$309936.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.0
+Info:  0.1 13.5  Source $abc$302150$auto$blifparse.cc:557:parse_blif$309936.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux8.OUT
+Info:  1.4 15.0    Net $abc$302150$auto$blifparse.cc:557:parse_blif$309930.A[2] budget 0.953000 ns (73,289) -> (71,271)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$310061.A3
+Info:  0.2 15.2  Source $abc$302150$auto$blifparse.cc:557:parse_blif$310061.O6
+Info:  0.8 15.9    Net $abc$302150$auto$blifparse.cc:557:parse_blif$310060.A[2] budget 0.540000 ns (71,271) -> (66,272)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$310060.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.A1
+Info:  0.2 16.1  Source $abc$302150$auto$blifparse.cc:557:parse_blif$310060.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0.O6
+Info:  0.2 16.3    Net $abc$302150$auto$blifparse.cc:557:parse_blif$310060.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0 budget -0.539000 ns (66,272) -> (66,272)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$310060.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.0
+Info:  0.1 16.4  Source $abc$302150$auto$blifparse.cc:557:parse_blif$310060.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux7.OUT
+Info:  2.0 18.3    Net $abc$302150$flatten\pcie_ingress.\ingress.$or$/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure/llm2fpga/fpga/rtl/task6_pcie_axil_rowstream_loader_ingress.v:732$9850_Y[489] budget 0.505000 ns (66,272) -> (106,268)
+Info:                Sink $auto$ff.cc:337:slice$105786.D
+Info:  0.1 18.4  Setup $auto$ff.cc:337:slice$105786.D
+Info: 1.9 ns logic, 16.5 ns routing
+
+Info: Critical path report for clock 'pcie_7x_top_aximm_i.pcie_7x_i.PIPE_OOBCLK_IN' (posedge -> posedge):
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$113806.Q
+Info:  0.8  0.9    Net pcie_7x_top_aximm_i.pcie_7x_i.gt_wrapper_gtx.pipe_wrapper_i.fsm[3] budget 11.544000 ns (299,105) -> (297,108)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$312941.A2
+Info:  0.2  1.1  Source $abc$302150$auto$blifparse.cc:557:parse_blif$312941.O6
+Info:  0.6  1.7    Net $techmap347566$abc$302150$auto$blifparse.cc:557:parse_blif$312940.A[0] budget 11.191000 ns (297,108) -> (297,110)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$312940.A1
+Info:  0.2  1.9  Source $abc$302150$auto$blifparse.cc:557:parse_blif$312940.O6
+Info:  0.7  2.7    Net pcie_7x_top_aximm_i.pcie_7x_i.gt_wrapper_gtx.pipe_wrapper_i.sync_txphalign budget 11.327000 ns (297,110) -> (299,108)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$315758.A4
+Info:  0.2  2.9  Source $abc$302150$auto$blifparse.cc:557:parse_blif$315758.O6
+Info:  0.5  3.4    Net $techmap350279$abc$302150$auto$blifparse.cc:557:parse_blif$315757.A[5] budget 11.234000 ns (299,108) -> (299,107)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$315757.A6
+Info:  0.2  3.6  Source $abc$302150$auto$blifparse.cc:557:parse_blif$315757.O6
+Info:  0.6  4.2    Net $techmap350280$abc$302150$auto$blifparse.cc:557:parse_blif$315756.A[5] budget 11.234000 ns (299,107) -> (297,108)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$315756.A6
+Info:  0.2  4.4  Source $abc$302150$auto$blifparse.cc:557:parse_blif$315756.O6
+Info:  0.6  5.1    Net $techmap350284$abc$302150$auto$blifparse.cc:557:parse_blif$315755.A[5] budget 11.189000 ns (297,108) -> (299,109)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$315755.A6
+Info:  0.2  5.3  Source $abc$302150$auto$blifparse.cc:557:parse_blif$315755.O6
+Info:  0.8  6.1    Net $abc$302150$auto$opt_dff.cc:251:make_patterns_logic$94371 budget 11.386000 ns (299,109) -> (299,105)
+Info:                Sink $auto$ff.cc:337:slice$113806.CE
+Info:  0.1  6.2  Setup $auto$ff.cc:337:slice$113806.CE
+Info: 1.4 ns logic, 4.8 ns routing
+
+Info: Critical path report for cross-domain path 'posedge pcie_user_clk' -> 'posedge pcie_7x_top_aximm_i.task6_pcie_status_i.drck':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$129252.Q
+Info:  2.0  2.1    Net pcie_7x_top_aximm_i.user_reset_q budget 41.466999 ns (240,172) -> (254,154)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$314002.A2
+Info:  0.2  2.3  Source $abc$302150$auto$blifparse.cc:557:parse_blif$314002.O6
+Info:  0.0  2.3    Net $abc$302150$flatten\pcie_7x_top_aximm_i.\task6_pcie_status_i.$0\shift_q[1023:0][42] budget 39.973999 ns (254,154) -> (254,154)
+Info:                Sink $auto$ff.cc:337:slice$114278.D
+Info:  0.1  2.4  Setup $auto$ff.cc:337:slice$114278.D
+Info: 0.4 ns logic, 2.0 ns routing
+
+Info: Critical path report for cross-domain path 'posedge pcie_user_clk' -> 'posedge rowstream_clk':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$112343.Q
+Info: 10.1 10.2    Net pcie_user_rst_n budget 5.800000 ns (245,154) -> (103,376)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$317641.A1
+Info:  0.2 10.4  Source $abc$302150$auto$blifparse.cc:557:parse_blif$317641.O6
+Info:  0.6 11.0    Net $abc$302150$auto$rtlil.cc:3492:NotGate$287817 budget 0.730000 ns (103,376) -> (106,376)
+Info:                Sink $auto$ff.cc:337:slice$150933.SR
+Info:  0.1 11.1  Setup $auto$ff.cc:337:slice$150933.SR
+Info: 0.4 ns logic, 10.7 ns routing
+
+Info: Critical path report for cross-domain path 'posedge rowstream_clk' -> 'posedge pcie_user_clk':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$115691.Q
+Info:  2.8  2.9    Net rowstream_ddr3.gen_tinystories_compiler_ddr3.compiler_loader_owner_mux.owner_active budget -2.254000 ns (13,246) -> (24,296)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$302253.A5
+Info:  0.2  3.1  Source $abc$302150$auto$blifparse.cc:557:parse_blif$302253.O6
+Info:  1.9  5.0    Net $abc$302150$auto$blifparse.cc:557:parse_blif$314441.A[3] budget 1.514000 ns (24,296) -> (23,262)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$304026.A2
+Info:  0.2  5.2  Source $abc$302150$auto$blifparse.cc:557:parse_blif$304026.O6
+Info:  0.0  5.2    Net rowstream_top1_debug_status[12] budget 2.335000 ns (23,262) -> (23,262)
+Info:                Sink $auto$ff.cc:337:slice$102132.D
+Info:  0.1  5.3  Setup $auto$ff.cc:337:slice$102132.D
+Info: 0.6 ns logic, 4.7 ns routing
+
+Info: Critical path report for cross-domain path 'posedge rowstream_ddr3.jtag_command_shift.drck' -> 'posedge rowstream_ddr3.jtag_command_shift.tck':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$110226.Q
+Info:  1.6  1.7    Net rowstream_ddr3.jtag_command_shift.shift_q[11] budget 83.133003 ns (73,340) -> (54,336)
+Info:                Sink $auto$ff.cc:337:slice$110668.D
+Info:  0.1  1.8  Setup $auto$ff.cc:337:slice$110668.D
+Info: 0.2 ns logic, 1.6 ns routing
+
+Info: Critical path report for cross-domain path 'posedge rowstream_ddr3.jtag_command_shift.tck' -> 'posedge rowstream_clk':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$110668.Q
+Info:  3.4  3.5    Net rowstream_ddr3.jtag_command_shift.payload_tck_q[11] budget 11.800000 ns (54,336) -> (73,396)
+Info:                Sink $auto$ff.cc:337:slice$151956.D
+Info:  0.1  3.6  Setup $auto$ff.cc:337:slice$151956.D
+Info: 0.2 ns logic, 3.4 ns routing
+
+Info: Critical path report for cross-domain path 'posedge rowstream_ddr3.jtag_command_shift.tck' -> 'posedge rowstream_ddr3.jtag_command_shift.drck':
+Info: curr total
+Info:  0.1  0.1  Source $auto$ff.cc:337:slice$110668.Q
+Info:  1.6  1.7    Net rowstream_ddr3.jtag_command_shift.payload_tck_q[11] budget 41.466999 ns (54,336) -> (73,340)
+Info:                Sink $abc$302150$auto$blifparse.cc:557:parse_blif$307603.A2
+Info:  0.2  1.9  Source $abc$302150$auto$blifparse.cc:557:parse_blif$307603.O6
+Info:  0.0  1.9    Net $abc$302150$flatten\rowstream_ddr3.\jtag_command_shift.$0\shift_q[207:0][11] budget 39.539001 ns (73,340) -> (73,340)
+Info:                Sink $auto$ff.cc:337:slice$110226.D
+Info:  0.1  2.0  Setup $auto$ff.cc:337:slice$110226.D
+Info: 0.4 ns logic, 1.6 ns routing
+
+Info: Max frequency for clock 'pcie_7x_top_aximm_i.task6_pcie_status_i.drck': 470.59 MHz (PASS at 12.00 MHz)
+Info: Max frequency for clock       'rowstream_ddr3.jtag_command_shift.drck': 300.75 MHz (PASS at 12.00 MHz)
+Info: Max frequency for clock        'rowstream_ddr3.jtag_command_shift.tck': 2500.00 MHz (PASS at 12.00 MHz)
+Info: Max frequency for clock                                'rowstream_clk': 56.74 MHz (FAIL at 83.33 MHz)
+Info: Max frequency for clock                                'pcie_user_clk': 54.26 MHz (FAIL at 62.50 MHz)
+Info: Max frequency for clock 'pcie_7x_top_aximm_i.pcie_7x_i.PIPE_OOBCLK_IN': 162.07 MHz (PASS at 12.00 MHz)
+
+Info: Max delay posedge pcie_user_clk                          -> posedge pcie_7x_top_aximm_i.task6_pcie_status_i.drck: 2.38 ns
+Info: Max delay posedge pcie_user_clk                          -> posedge rowstream_clk                               : 11.12 ns
+Info: Max delay posedge rowstream_clk                          -> posedge pcie_user_clk                               : 5.28 ns
+Info: Max delay posedge rowstream_ddr3.jtag_command_shift.drck -> posedge rowstream_ddr3.jtag_command_shift.tck       : 1.84 ns
+Info: Max delay posedge rowstream_ddr3.jtag_command_shift.tck  -> posedge rowstream_clk                               : 3.63 ns
+Info: Max delay posedge rowstream_ddr3.jtag_command_shift.tck  -> posedge rowstream_ddr3.jtag_command_shift.drck      : 2.04 ns
+
+Info: Slack histogram:
+Info:  legend: * represents 167 endpoint(s)
+Info:          + represents [1,167) endpoint(s)
+Info: [ -5625,  -1187) |*****+
+Info: [ -1187,   3251) |*********************+
+Info: [  3251,   7689) |**********************************************+
+Info: [  7689,  12127) |************************************************************ 
+Info: [ 12127,  16565) |********************+
+Info: [ 16565,  21003) | 
+Info: [ 21003,  25441) | 
+Info: [ 25441,  29879) | 
+Info: [ 29879,  34317) | 
+Info: [ 34317,  38755) | 
+Info: [ 38755,  43193) | 
+Info: [ 43193,  47631) | 
+Info: [ 47631,  52069) | 
+Info: [ 52069,  56507) | 
+Info: [ 56507,  60945) | 
+Info: [ 60945,  65383) | 
+Info: [ 65383,  69821) | 
+Info: [ 69821,  74259) | 
+Info: [ 74259,  78697) |+
+Info: [ 78697,  83135) |*************+
+Info: Checksum: 0xd766be52
+Info: Running post-placement legalisation...
+30 warnings, 0 errors

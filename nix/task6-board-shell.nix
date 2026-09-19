@@ -14,10 +14,22 @@ let
     cp -r ${../third_party/task6-e368449} third_party/task6-e368449
     python3 scripts/pipeline/materialize_task6_board_shell.py --out "$out"
   '';
+  commandSourceClosure = pkgs.runCommand "task6-board-shell-command-stage-closure" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    cp -r ${sourceClosure} "$out"
+    chmod -R u+w "$out"
+    mkdir -p scripts/pipeline rtl/diagnostics
+    cp ${../scripts/pipeline/apply_task6_command_overlay.py} scripts/pipeline/apply_task6_command_overlay.py
+    cp ${../scripts/pipeline/task6_command_overlay_pins.json} scripts/pipeline/task6_command_overlay_pins.json
+    cp ${../rtl/diagnostics/task6_normal_command_stage.sv} rtl/diagnostics/task6_normal_command_stage.sv
+    python3 scripts/pipeline/apply_task6_command_overlay.py --closure "$out"
+    cp rtl/diagnostics/task6_normal_command_stage.sv "$out/"
+  '';
   sources = builtins.filter (row: pkgs.lib.hasSuffix ".sv" row.logical_path ||
     pkgs.lib.hasSuffix ".v" row.logical_path) pins.sources;
   sourceArgs = pkgs.lib.concatMapStringsSep " "
-    (row: "${sourceClosure}/${row.logical_path}") sources;
+    (row: "${commandSourceClosure}/${row.logical_path}") sources;
   yosys = builtins.storePath "/nix/store/1g0dvnvw75fnlnk4ad586c65wfxbf5rs-yosys-with-plugins-0.66";
   replaySynthesis = pkgs.runCommand "compiler-ddr3-trace-replay-synthesis-screen" {
     nativeBuildInputs = [ pkgs.python3 ];
@@ -26,7 +38,7 @@ let
     cat > run.ys <<EOF
     read_verilog -lib +/xilinx/cells_sim.v
     read_verilog -lib +/xilinx/cells_xtra.v
-    read_verilog -sv -DTASK6_PCIE_ROWSTREAM_INGRESS_PORTS -DTASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS -DTASK6_COMPILER_DDR3_ACCELERATOR_PORTS ${sourceArgs} ${../rtl/diagnostics/compiler_ddr3_trace_replay.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_top.sv}
+    read_verilog -sv -DTASK6_PCIE_ROWSTREAM_INGRESS_PORTS -DTASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS -DTASK6_COMPILER_DDR3_ACCELERATOR_PORTS ${sourceArgs} ${commandSourceClosure}/task6_normal_command_stage.sv ${../rtl/diagnostics/compiler_ddr3_trace_replay.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_top.sv}
     hierarchy -check -top compiler_ddr3_trace_replay_top
     synth_xilinx -flatten -arch xc7 -nosrl -noiopad -top compiler_ddr3_trace_replay_top
     check
@@ -40,4 +52,4 @@ let
       "$out/yosys.log" --top compiler_ddr3_trace_replay_top
     cp run.ys "$out/"
   '';
-in { inherit sourceClosure replaySynthesis; }
+in { inherit sourceClosure commandSourceClosure replaySynthesis; }

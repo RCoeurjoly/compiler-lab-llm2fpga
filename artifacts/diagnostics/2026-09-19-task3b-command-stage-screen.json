@@ -1,0 +1,202 @@
+{
+  "schema": "task3b-normal-command-dispatch-screen-v1",
+  "status": "functional_pass_placement_timing_failed",
+  "base_commit": "a9f373570ee5dbf246d6b69dfb0f5de444f5e0ca",
+  "scope": "One authenticated normal-loader dispatch boundary; diagnostic checkpoint, not Task 4 acceptance.",
+  "source_closure": "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure",
+  "synthesis": "/nix/store/h4hdb0rwxg8ckh6wh7f2rs3li1yclscy-compiler-ddr3-trace-replay-synthesis-screen",
+  "artifacts": {
+    "netlist": {
+      "path": "/nix/store/h4hdb0rwxg8ckh6wh7f2rs3li1yclscy-compiler-ddr3-trace-replay-synthesis-screen/replay.json",
+      "sha256": "9d1c85b00604f61a51689a361fd67e9dc8f1eea035dc011c168f773f52831230",
+      "bytes": 51531139
+    },
+    "yosys_log": {
+      "path": "/nix/store/h4hdb0rwxg8ckh6wh7f2rs3li1yclscy-compiler-ddr3-trace-replay-synthesis-screen/yosys.log",
+      "sha256": "32a268e2b91f9beb9625a9db18ea4c80c6f4ee4eecd20503127b1f254f65b5e0",
+      "bytes": 5147842
+    },
+    "yosys_script": {
+      "path": "/nix/store/h4hdb0rwxg8ckh6wh7f2rs3li1yclscy-compiler-ddr3-trace-replay-synthesis-screen/run.ys",
+      "sha256": "74b516386b23fd21353a0cfa8d942324b5ab110d1c817fc9441926e147135807",
+      "bytes": 4858
+    },
+    "base_manifest": {
+      "path": "/nix/store/4066qvsccw8baaxk960v35cyczwd1385-task6-board-shell-source-closure/manifest.json",
+      "sha256": "3a97a1d8c2aa5346dca932624281981a584dd3c5aea86f12092919abca853031",
+      "bytes": 18759
+    },
+    "overlay_manifest": {
+      "path": "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure/command-overlay.json",
+      "sha256": "78ec9d7fd554f65ebec22c42419f7927baa3a9933696089eddcc7f0f51203a6f",
+      "bytes": 427
+    },
+    "xdc": {
+      "path": "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure/constraints/board.xdc",
+      "sha256": "890ebb9d0fc854c8595d3e9e67b4a4074fe42ac7682680b9c33dd1d2c8662f57",
+      "bytes": 14649
+    },
+    "pre_pack": {
+      "path": "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure/llm2fpga/scripts/task6/nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py",
+      "sha256": "42acd411f3e34ac494e56f64b12c0de81394b567d5087c1213b820040fa9d698",
+      "bytes": 1894
+    },
+    "nextpnr": {
+      "path": "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+      "sha256": "25c434b7614ade7cbdd448b4f993d1feced26296b0164f6e648ddaced7ebac16",
+      "bytes": 4449352
+    },
+    "chipdb": {
+      "path": "/nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin",
+      "sha256": "d8472bfcc19dc31686d80cc34f0d37b958c268656182537b06b3439711b105f1",
+      "bytes": 714763824
+    }
+  },
+  "profile": {
+    "byte_lanes": 2,
+    "controller_period_ps": 12000,
+    "ddr_period_ps": 3000,
+    "bist_mode": 2,
+    "tinystories_loader_only": 0,
+    "enable_pcie_top1": 0
+  },
+  "resources": {
+    "cells": 39810,
+    "luts": 16248,
+    "flip_flops": 13036,
+    "carry4": 492,
+    "ram32m": 28,
+    "ramb36e1": 4
+  },
+  "resource_delta": {
+    "cells": 514,
+    "luts": 123,
+    "flip_flops": 190,
+    "carry4": 0,
+    "ram32m": 0,
+    "ramb36e1": 0
+  },
+  "synthesis_gate": {
+    "problems": 0,
+    "watched_nets": "PASS",
+    "serialized_netlist_check": "PASS",
+    "seconds": 64.44,
+    "peak_mb": 832.15,
+    "unique_warnings": 797,
+    "total_warnings": 907
+  },
+  "placement": {
+    "exit_code": 0,
+    "seconds": 177.78,
+    "bytes": 49167,
+    "sha256": "a508f90678b9682a90ecec3ab40d3692326ee7c44975858e2f792d58a147af56",
+    "command": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=10s",
+      "600",
+      "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+      "--chipdb",
+      "/nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin",
+      "--xdc",
+      "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure/constraints/board.xdc",
+      "--json",
+      "/nix/store/h4hdb0rwxg8ckh6wh7f2rs3li1yclscy-compiler-ddr3-trace-replay-synthesis-screen/replay.json",
+      "--pre-pack",
+      "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure/llm2fpga/scripts/task6/nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py",
+      "--seed",
+      "15",
+      "--placer-budgets",
+      "--no-route",
+      "--timing-allow-fail"
+    ],
+    "log": "artifacts/diagnostics/2026-09-19-task3b-command-stage-placement.log",
+    "seed": 15,
+    "warnings": 30,
+    "errors": 0,
+    "packed_checksum": "0x88e5427b",
+    "placed_checksum": "0xd766be52",
+    "timing_qualified": false,
+    "clocks": [
+      {
+        "name": "rowstream_clk",
+        "required_mhz": 83.333333,
+        "fmax_mhz": 56.74,
+        "previous_mhz": 49.55,
+        "delta_mhz": 7.19,
+        "passes": false,
+        "logic_ns": 2.1,
+        "estimated_interconnect_ns": 15.5,
+        "approx_slack_ns": -5.624250969333804,
+        "clock": "rowstream_clk",
+        "startpoint": {
+          "cell": "$auto$ff.cc:337:slice$108778",
+          "pin": "Q",
+          "Q_bit": 621,
+          "Q_aliases": [
+            "rowstream_ddr3.uberddr3.ddr3_controller_inst.index_wb_data"
+          ],
+          "Q_loads": 353
+        },
+        "endpoint": {
+          "cell": "$auto$ff.cc:337:slice$163778",
+          "pin": "CE",
+          "Q_bit": 393,
+          "Q_aliases": [
+            "replay_bridge.core_addr[25]",
+            "replay_bridge.csr.replay.active_address[25]",
+            "replay_bridge.csr.replay.wb_addr[25]",
+            "replay_bridge.csr.wb_addr[25]"
+          ],
+          "Q_loads": 2
+        }
+      },
+      {
+        "name": "pcie_user_clk",
+        "required_mhz": 62.5,
+        "fmax_mhz": 54.26,
+        "previous_mhz": 56.98,
+        "delta_mhz": -2.72,
+        "passes": false,
+        "logic_ns": 1.9,
+        "estimated_interconnect_ns": 16.5,
+        "approx_slack_ns": -2.4297825285661645,
+        "clock": "pcie_user_clk",
+        "startpoint": {
+          "cell": "$auto$ff.cc:337:slice$103402",
+          "pin": "Q",
+          "Q_bit": 15706,
+          "Q_aliases": [
+            "pcie_ingress.ingress.awaddr_q[3]",
+            "pcie_ingress.ingress.write_word_index[1]"
+          ],
+          "Q_loads": 264
+        },
+        "endpoint": {
+          "cell": "$auto$ff.cc:337:slice$105786",
+          "pin": "D",
+          "Q_bit": 15577,
+          "Q_aliases": [
+            "pcie_ingress.ingress.m2_full_block_residual_vector_o[489]",
+            "pcie_ingress.pcie_m2_full_block_residual_vector[489]"
+          ],
+          "Q_loads": 3
+        }
+      }
+    ],
+    "coverage": "Placement estimates only. Existing missing clock aliases, JTAG/PIPE fallback clocks, hard-block/PHY and physical CDC coverage limitations remain."
+  },
+  "tests": {
+    "focused_and_adjacent_passed": 25,
+    "seconds": 31.882,
+    "reference_compared_cycles": 36389,
+    "scripted_commands": 31,
+    "consecutive_event_stream_cycles": 12,
+    "standalone_decode_metadata_checks": 1152,
+    "stage_strict_lint": "PASS",
+    "full_repository_suite_run": false,
+    "full_repository_exclusion": "Explicit no-full-flake and disk constraints; unrelated discovery tests invoke flake builds.",
+    "equivalence_scope": "Cycle-projection comparison against authenticated pre-overlay loader with one-cycle dispatch offset at idle protocol; separate busy capture/reset tests. Not an unrestricted formal equivalence proof."
+  },
+  "next_step": "STOP: neither placement target passes. No second timing change/run, no route, no placed JSON, no bitstream. Task 4 gated."
+}
