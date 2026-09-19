@@ -45,15 +45,11 @@ def _replacements(rows):
                    for row in rows), key=lambda pair: len(pair[0]), reverse=True)
 
 
-def _normalize_string(value, replacements):
-    for physical, logical in replacements:
-        value = value.replace(physical, logical)
-    return value
-
-
 _RESERVED_SOURCE_TOKEN = re.compile(r"@source/\d{2,}")
+_SOURCE_COORDINATE = r"\d+(?:\.\d+)?"
+_SOURCE_LOCATION = rf":{_SOURCE_COORDINATE}(?:-{_SOURCE_COORDINATE})?"
 _GENERATED_LOCATION = re.compile(
-    r":\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?\$\d+")
+    rf"{_SOURCE_LOCATION}\$\d+")
 _PROVENANCE_ATTRIBUTES = {"src", "module_src", "cell_src"}
 
 
@@ -109,10 +105,24 @@ def _normalize_attribute(field, value, replacements):
     if not isinstance(value, str):
         return value
     if field in _PROVENANCE_ATTRIBUTES:
-        return _normalize_string(value, replacements)
+        # Yosys source provenance is a pipe-separated list of
+        # <filename>:<line>[.<column>][-<line>[.<column>]] tokens.
+        for physical, logical in replacements:
+            source_token = re.compile(
+                rf"(^|\|){re.escape(physical)}"
+                rf"(?={_SOURCE_LOCATION}(?:\||$))")
+            value = source_token.sub(
+                lambda match: match.group(1) + logical, value)
+        return value
     if field == "hdlname":
         for physical, logical in replacements:
-            value = value.replace(f"$func${physical}", f"$func${logical}")
+            # Generated functions spell their source as
+            # $func$<filename>:<location>$<id>[.<local-name>].
+            function_token = re.compile(
+                rf"(\$func\$){re.escape(physical)}"
+                rf"(?={_GENERATED_LOCATION.pattern}(?:\.|$))")
+            value = function_token.sub(
+                lambda match: match.group(1) + logical, value)
     return value
 
 

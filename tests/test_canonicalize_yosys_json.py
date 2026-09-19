@@ -34,6 +34,7 @@ class CanonicalizeYosysJsonTest(unittest.TestCase):
                             "attributes": {
                                 "src": src,
                                 "module_src": src,
+                                "cell_src": src,
                                 "hdlname": f"helper$func${source}:1$1.value",
                             },
                             "port_directions": {"I0": "input", "O": "output"},
@@ -182,6 +183,80 @@ class CanonicalizeYosysJsonTest(unittest.TestCase):
                 right_netlist.write_text(json.dumps(right_design, indent=2) + "\n")
                 with self.assertRaisesRegex(NetlistMismatch, "canonical netlists differ"):
                     compare_netlists(left_netlist, left_script, right_netlist, right_script)
+
+    def test_metadata_requires_exact_source_location_boundaries(self):
+        extensions = {
+            "suffix_extension": lambda path, function: (
+                f"helper$func${path}.untrusted:1$7.value" if function else
+                f"{path}.untrusted:1.1-1.2"),
+            "prefix_extension": lambda path, function: (
+                f"helper$func$x{path}:1$7.value" if function else
+                f"x{path}:1.1-1.2"),
+            "neighboring_path_component": lambda path, function: (
+                f"helper$func${path}/untrusted:1$7.value" if function else
+                f"{path}/untrusted:1.1-1.2"),
+        }
+        for field in ("src", "module_src", "cell_src", "hdlname"):
+            for extension_name, extend in extensions.items():
+                with self.subTest(field=field, extension=extension_name), \
+                        tempfile.TemporaryDirectory() as temp:
+                    directory = Path(temp)
+                    left_source, left_script, left_netlist, left_design = self.fixture(
+                        directory, directory / "left")
+                    right_source, right_script, right_netlist, right_design = self.fixture(
+                        directory, directory / "right")
+                    left_cell = left_design["modules"]["top"]["cells"][
+                        next(iter(left_design["modules"]["top"]["cells"]))]
+                    right_cell = right_design["modules"]["top"]["cells"][
+                        next(iter(right_design["modules"]["top"]["cells"]))]
+                    left_cell["attributes"][field] = extend(
+                        left_source, field == "hdlname")
+                    right_cell["attributes"][field] = extend(
+                        right_source, field == "hdlname")
+                    left_netlist.write_text(json.dumps(left_design, indent=2) + "\n")
+                    right_netlist.write_text(json.dumps(right_design, indent=2) + "\n")
+
+                    with self.assertRaisesRegex(
+                            NetlistMismatch, "canonical netlists differ"):
+                        compare_netlists(
+                            left_netlist, left_script, right_netlist, right_script)
+
+    def test_generated_keys_require_exact_source_location_boundaries(self):
+        extensions = {
+            "suffix_extension": lambda path: f"{path}.untrusted:1$7.value",
+            "prefix_extension": lambda path: f"x{path}:1$7.value",
+            "neighboring_path_component": lambda path: f"{path}/untrusted:1$7.value",
+        }
+        for context in ("cells", "netnames", "public_function_netname"):
+            for extension_name, extend in extensions.items():
+                with self.subTest(context=context, extension=extension_name), \
+                        tempfile.TemporaryDirectory() as temp:
+                    directory = Path(temp)
+                    left_source, left_script, left_netlist, left_design = self.fixture(
+                        directory, directory / "left")
+                    right_source, right_script, right_netlist, right_design = self.fixture(
+                        directory, directory / "right")
+                    for source, design in ((left_source, left_design),
+                                           (right_source, right_design)):
+                        module = design["modules"]["top"]
+                        section = "netnames" if "netname" in context else "cells"
+                        objects = module[section]
+                        value = objects.pop(next(iter(objects)))
+                        generated = extend(source)
+                        if context == "public_function_netname":
+                            value["hide_name"] = 0
+                            generated = f"scope.helper$func${generated}"
+                            value["attributes"]["hdlname"] = generated
+                        else:
+                            generated = f"$not${generated}"
+                        objects[generated] = value
+                    left_netlist.write_text(json.dumps(left_design, indent=2) + "\n")
+                    right_netlist.write_text(json.dumps(right_design, indent=2) + "\n")
+
+                    with self.assertRaisesRegex(
+                            NetlistMismatch, "canonical netlists differ"):
+                        compare_netlists(
+                            left_netlist, left_script, right_netlist, right_script)
 
     def test_every_semantic_json_class_mutation_is_rejected(self):
         mutations = {

@@ -24,7 +24,7 @@
     "rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv": "3a699796d08b9cf0fbfb7647116fb5a56f7f347b5ff9615a0a1360fb2d91ecbe",
     "rtl/diagnostics/compiler_ddr3_trace_replay_top.sv": "7b5a9e5ee2576baebee6fa11289eab0abeaaa1d3abc03272e70e65b7b0a7f030",
     "scripts/analysis/check_compiler_shell_status.py": "5af31d9df3312d47a4ca4bf9e7f6d892d75cca5b64b7118df64b0641e56cb6e9",
-    "scripts/analysis/canonicalize_yosys_json.py": "f77a63b6ab90112561649abc3d95735755416d89edf290da604b92865c693842"
+    "scripts/analysis/canonicalize_yosys_json.py": "f652cfa39d2d4e9492c7af6b3a4490d0f179454ea7e8d21f49705f7f297d5b73"
   },
   "sources": [
     {"index": 0, "logical_path": "llm2fpga/fpga/rtl/task6_pcie_axil_app_status_shift.v", "sha256": "3565a634304479ad1bcf043f7452f30cb3f9d27e8fab238f32883d35ba196e8d"},
@@ -115,7 +115,7 @@
       },
       "unexplained": 0
     },
-    "meaning": "All 36 ordered source files are byte-identical. Canonicalization rejects raw @source/NN tokens and replaces authenticated physical paths only in Yosys provenance attributes (src, module_src, cell_src, generated-function hdlname), hidden generated cell/netname keys, and generated-function netname keys independently mirrored by hdlname. It never normalizes cell types, parameters, ports, connections, memories, ordinary public names, arbitrary attributes, or arbitrary strings/keys. Every remaining module, parameter, port, cell, memory, netname, bit identity, attribute, and ordering is exactly identical."
+    "meaning": "All 36 ordered source files are byte-identical. Canonicalization rejects raw @source/NN tokens and replaces an authenticated physical path only when it is a complete filename at an exact Yosys boundary: a start/pipe-delimited src, module_src, or cell_src token followed immediately by :line[.column][-line[.column]], or a generated $func$/cell/netname token followed immediately by :location$id. Generated keys must additionally be hidden or a generated-function netname independently mirrored by hdlname. Path prefixes of longer filenames, prefix extensions, neighboring path components, cell types, parameters, ports, connections, memories, ordinary public names, arbitrary attributes, and arbitrary strings/keys remain byte-significant. Every remaining module, parameter, port, cell, memory, netname, bit identity, attribute, and ordering is exactly identical."
   },
   "routed_evidence": {
     "task": "Task 3R",
