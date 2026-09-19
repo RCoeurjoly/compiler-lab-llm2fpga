@@ -1,0 +1,311 @@
+{
+  "schema": "task3d-replay-bundle-enable-screen-v1",
+  "status": "functional_equivalence_structural_pass_placement_timing_failed",
+  "commit_status": "not_created_requires_explicit_timing_failed_checkpoint_authorization",
+  "base_commit": "a54868896b83155a3c837ed2be3d857d99198d07",
+  "scope": "Exactly one zero-latency replay bundle-enable split; Task 3B overlay retained unchanged; uncommitted diagnostic experiment, Task 4 gated.",
+  "source_closure": "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure",
+  "synthesis": "/nix/store/jqn0pdjqf8nm8hjlfidvmsdym33vbq49-compiler-ddr3-trace-replay-synthesis-screen",
+  "artifacts": {
+    "netlist": {
+      "path": "/nix/store/jqn0pdjqf8nm8hjlfidvmsdym33vbq49-compiler-ddr3-trace-replay-synthesis-screen/replay.json",
+      "bytes": 50370650,
+      "sha256": "e35fbebc0dea711391a94830aa59dc4b04b3521d4c1e9eaad11733abb7cad0ba"
+    },
+    "yosys_log": {
+      "path": "/nix/store/jqn0pdjqf8nm8hjlfidvmsdym33vbq49-compiler-ddr3-trace-replay-synthesis-screen/yosys.log",
+      "bytes": 5039595,
+      "sha256": "f075d64deb1ee9b938c4cfddb665c8acae8883438ad3cb77164cfe9fa075873d"
+    },
+    "yosys_script": {
+      "path": "/nix/store/jqn0pdjqf8nm8hjlfidvmsdym33vbq49-compiler-ddr3-trace-replay-synthesis-screen/run.ys",
+      "bytes": 4858,
+      "sha256": "684e280c5373e3e5352600bacd84c1a03ed2ac5d31c17ef594220508a0b0117d"
+    },
+    "base_manifest": {
+      "path": "/nix/store/4066qvsccw8baaxk960v35cyczwd1385-task6-board-shell-source-closure/manifest.json",
+      "sha256": "3a97a1d8c2aa5346dca932624281981a584dd3c5aea86f12092919abca853031",
+      "bytes": 18759
+    },
+    "overlay_manifest": {
+      "path": "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure/command-overlay.json",
+      "sha256": "78ec9d7fd554f65ebec22c42419f7927baa3a9933696089eddcc7f0f51203a6f",
+      "bytes": 427
+    },
+    "xdc": {
+      "path": "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure/constraints/board.xdc",
+      "sha256": "890ebb9d0fc854c8595d3e9e67b4a4074fe42ac7682680b9c33dd1d2c8662f57",
+      "bytes": 14649
+    },
+    "pre_pack": {
+      "path": "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure/llm2fpga/scripts/task6/nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py",
+      "sha256": "42acd411f3e34ac494e56f64b12c0de81394b567d5087c1213b820040fa9d698",
+      "bytes": 1894
+    },
+    "nextpnr": {
+      "path": "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+      "sha256": "25c434b7614ade7cbdd448b4f993d1feced26296b0164f6e648ddaced7ebac16",
+      "bytes": 4449352
+    },
+    "chipdb": {
+      "path": "/nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin",
+      "sha256": "d8472bfcc19dc31686d80cc34f0d37b958c268656182537b06b3439711b105f1",
+      "bytes": 714763824
+    },
+    "core": {
+      "path": "rtl/diagnostics/compiler_ddr3_trace_replay.sv",
+      "sha256": "4e6bd04330d5e69d8a34bfaf04baa30dce2cb3cddca2eec975b065ea21bd6c98"
+    },
+    "placement_log": {
+      "path": "artifacts/diagnostics/2026-09-19-task3d-replay-enable-placement.log",
+      "bytes": 49990,
+      "sha256": "f4913877c5ac56138382b40c31324e388a8b46e064d55883f0772f1e30b72ce6"
+    }
+  },
+  "profile": {
+    "byte_lanes": 2,
+    "controller_period_ps": 12000,
+    "ddr_period_ps": 3000,
+    "bist_mode": 2,
+    "tinystories_loader_only": 0,
+    "enable_pcie_top1": 0
+  },
+  "resources": {
+    "cells": 39041,
+    "luts": 15891,
+    "flip_flops": 13036,
+    "carry4": 492,
+    "ram32m": 28,
+    "ramb36e1": 4
+  },
+  "resource_delta": {
+    "cells": -769,
+    "luts": -357,
+    "flip_flops": 0,
+    "carry4": 0,
+    "ram32m": 0,
+    "ramb36e1": 0
+  },
+  "equivalence": {
+    "boolean_combinations": 262144,
+    "zero_offset_cycles": 2104,
+    "symbolic_proven_points": 3338,
+    "symbolic_unproven_points": 0,
+    "focused_tests": 10,
+    "adjacent_tests": 25,
+    "final_combined_tests": 35,
+    "final_combined_seconds": 67.630,
+    "strict_core_lint": "PASS",
+    "full_slow_guard_mutation": "KILLED_STRUCTURALLY",
+    "dropped_control_guard_mutation": "KILLED_FUNCTIONALLY",
+    "dropped_calibration_guard_mutation": "KILLED_FUNCTIONALLY"
+  },
+  "structural": {
+    "module": "compiler_ddr3_trace_replay_top",
+    "bundle_bits": 160,
+    "enable_bits": [
+      25390
+    ],
+    "combinational_cone_bits": 318,
+    "leaf_bits": 147,
+    "control_only_board_leaves": true,
+    "response_independent": true,
+    "enable_drivers": [
+      {
+        "cell": "$abc$302121$auto$blifparse.cc:557:parse_blif$315528",
+        "type": "LUT6",
+        "port": "O"
+      }
+    ],
+    "enable_pin_loads": 160,
+    "enable_load_types": {
+      "FDRE.CE": 160
+    }
+  },
+  "synthesis_gate": {
+    "problems": 0,
+    "watched_nets": "PASS",
+    "serialized_netlist_check": "PASS",
+    "serialized_check_stdout_sha256": "a9dbb317eb22f236d52e0c4ee463572ef73798eac82e223197065e57c217eebe",
+    "seconds": 64.73,
+    "peak_mb": 852.19,
+    "unique_warnings": 797,
+    "total_warnings": 907
+  },
+  "placement": {
+    "attempts": 1,
+    "exit_code": 0,
+    "seconds": 180.664,
+    "command": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=10s",
+      "600",
+      "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+      "--chipdb",
+      "/nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin",
+      "--xdc",
+      "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure/constraints/board.xdc",
+      "--json",
+      "/nix/store/jqn0pdjqf8nm8hjlfidvmsdym33vbq49-compiler-ddr3-trace-replay-synthesis-screen/replay.json",
+      "--pre-pack",
+      "/nix/store/dg23phq6gylr52jzixls5v0y5i34jv5c-task6-board-shell-command-stage-closure/llm2fpga/scripts/task6/nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py",
+      "--seed",
+      "15",
+      "--placer-budgets",
+      "--no-route",
+      "--timing-allow-fail"
+    ],
+    "log": "artifacts/diagnostics/2026-09-19-task3d-replay-enable-placement.log",
+    "bytes": 49990,
+    "sha256": "f4913877c5ac56138382b40c31324e388a8b46e064d55883f0772f1e30b72ce6",
+    "seed": 15,
+    "warnings": 30,
+    "errors": 0,
+    "packed_checksum": "0x32897c33",
+    "placed_checksum": "0x787baa14",
+    "heap_seconds": 140.2,
+    "refinement_seconds": 36.37,
+    "timing_qualified": false,
+    "clocks": [
+      {
+        "clock": "rowstream_clk",
+        "startpoint": {
+          "cell": "$auto$ff.cc:337:slice$108557",
+          "pin": "Q",
+          "Q_bit": 592,
+          "Q_aliases": [
+            "rowstream_ddr3.uberddr3.ddr3_controller_inst.index_wb_data"
+          ],
+          "Q_loads": 193,
+          "connections": {
+            "C": [
+              37613
+            ],
+            "CE": [
+              23082
+            ],
+            "D": [
+              27339
+            ],
+            "Q": [
+              592
+            ],
+            "R": [
+              140
+            ]
+          }
+        },
+        "endpoint": {
+          "cell": "$auto$ff.cc:337:slice$117145",
+          "pin": "CE",
+          "Q_bit": 4649,
+          "Q_aliases": [
+            "replay_bridge.csr.pushed_count[1]",
+            "replay_bridge.csr.replay.pushed_count[1]"
+          ],
+          "Q_loads": 6,
+          "connections": {
+            "C": [
+              37613
+            ],
+            "CE": [
+              25394
+            ],
+            "D": [
+              35812
+            ],
+            "Q": [
+              4649
+            ],
+            "R": [
+              26075
+            ]
+          }
+        },
+        "fmax_mhz": 59.15,
+        "previous_mhz": 56.74,
+        "required_mhz": 83.333333,
+        "logic_ns": 2.1,
+        "estimated_interconnect_ns": 14.8,
+        "printed_total_ns": 16.9,
+        "delta_mhz": 2.41,
+        "approx_slack_ns": -4.906170704324598,
+        "passes": false
+      },
+      {
+        "clock": "pcie_user_clk",
+        "startpoint": {
+          "cell": "$auto$ff.cc:337:slice$103358",
+          "pin": "Q",
+          "Q_bit": 15361,
+          "Q_aliases": [
+            "pcie_ingress.ingress.awaddr_q[2]",
+            "pcie_ingress.ingress.write_word_index[0]"
+          ],
+          "Q_loads": 264,
+          "connections": {
+            "C": [
+              37654
+            ],
+            "CE": [
+              25314
+            ],
+            "D": [
+              22786
+            ],
+            "Q": [
+              15361
+            ],
+            "R": [
+              "0"
+            ]
+          }
+        },
+        "endpoint": {
+          "cell": "$auto$ff.cc:337:slice$105691",
+          "pin": "D",
+          "Q_bit": 14674,
+          "Q_aliases": [
+            "pcie_ingress.ingress.m2_full_block_input_vector_o[132]",
+            "pcie_ingress.pcie_m2_full_block_input_vector[132]"
+          ],
+          "Q_loads": 3,
+          "connections": {
+            "C": [
+              37654
+            ],
+            "CE": [
+              25697
+            ],
+            "D": [
+              19918
+            ],
+            "Q": [
+              14674
+            ],
+            "R": [
+              32220
+            ]
+          }
+        },
+        "fmax_mhz": 51.12,
+        "previous_mhz": 54.26,
+        "required_mhz": 62.5,
+        "logic_ns": 1.8,
+        "estimated_interconnect_ns": 17.8,
+        "printed_total_ns": 19.6,
+        "delta_mhz": -3.14,
+        "approx_slack_ns": -3.5618153364632263,
+        "passes": false
+      }
+    ]
+  },
+  "limitations": [
+    "No route, placed JSON, FASM or bitstream produced.",
+    "One seed and whole-design remapping; fmax is placement-estimated, not signoff.",
+    "Existing CDC/metastability, clock-alias/fallback-target, JTAG/PIPE and DDR PHY/DQ/DQS timing coverage limitations remain.",
+    "No full repository/full-flake suite due explicit disk/scope restriction.",
+    "Both required clocks fail; Task 4 remains gated."
+  ]
+}

@@ -31,7 +31,7 @@ module compiler_ddr3_trace_replay (
   reg active, pending;
   reg [31:0] active_address;
   reg [127:0] active_expected;
-  reg [31:0] failure;
+  reg [31:0] control_failure, failure;
 
   assign push_ready = (state==IDLE || state==RUN) && !sealed &&
                       expected_count!=0 && pushed_count<expected_count && fifo_level<16;
@@ -48,16 +48,19 @@ module compiler_ddr3_trace_replay (
   // One priority decision captures a complete first-failure record atomically.
   // Once FAIL is latched, only CLEAR (or cold reset) can change this evidence.
   always @* begin
-    failure = 0;
+    control_failure = 0;
     if (state!=FAIL) begin
-      if (state==RUN && (replay_reset || clear)) failure=32'h08;
-      else if (state==RUN && !calib_complete) failure=32'h04;
-      else if (protocol_error) failure=32'h80;
-      else if (configure && (state!=IDLE || pushed_count!=0 || sealed)) failure=32'h80;
-      else if (start && (state!=IDLE || !calib_complete || expected_count==0)) failure=32'h10;
-      else if (finish && pushed_count!=expected_count) failure=32'h20;
-      else if (push && (sealed || expected_count==0 || pushed_count>=expected_count || state==PASS)) failure=32'h40;
-      else if (response && wb_err) failure=32'h02;
+      if (state==RUN && (replay_reset || clear)) control_failure=32'h08;
+      else if (state==RUN && !calib_complete) control_failure=32'h04;
+      else if (protocol_error) control_failure=32'h80;
+      else if (configure && (state!=IDLE || pushed_count!=0 || sealed)) control_failure=32'h80;
+      else if (start && (state!=IDLE || !calib_complete || expected_count==0)) control_failure=32'h10;
+      else if (finish && pushed_count!=expected_count) control_failure=32'h20;
+      else if (push && (sealed || expected_count==0 || pushed_count>=expected_count || state==PASS)) control_failure=32'h40;
+    end
+    failure = control_failure;
+    if (state!=FAIL && control_failure==0) begin
+      if (response && wb_err) failure=32'h02;
       else if (response && wb_rdata!=active_expected) failure=32'h01;
     end
   end
@@ -71,6 +74,13 @@ module compiler_ddr3_trace_replay (
       read_pointer<=0; write_pointer<=0; active<=0; pending<=0;
       active_address<=0; active_expected<=0;
     end else if (state!=FAIL) begin
+      // response implies active, so it cannot coincide with this FIFO load.
+      // Keep the paired bundle CE independent of response ERR/data comparison;
+      // all other updates retain the complete first-failure priority decision.
+      if (control_failure==0 && state==RUN && !active && fifo_level!=0) begin
+        active_address <= fifo_address[read_pointer];
+        active_expected<=fifo_expected[read_pointer];
+      end
       // Count actual bus events even if that response is the failure event.
       if (accept) accepted_count<=accepted_count+1;
       if (response) begin
@@ -103,8 +113,6 @@ module compiler_ddr3_trace_replay (
           if (!active && fifo_level!=0) begin
             // Synchronous FIFO read into the only active request register.
             // The FIFO entry remains occupied until Wishbone acceptance.
-            active_address <= fifo_address[read_pointer];
-            active_expected<=fifo_expected[read_pointer];
             active<=1;
           end
           if (accept) begin
