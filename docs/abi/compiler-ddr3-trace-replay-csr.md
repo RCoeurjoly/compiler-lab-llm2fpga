@@ -22,6 +22,9 @@ and BVALID/BRESP remain stable until BREADY. RVALID/RDATA/RRESP remain stable
 until RREADY. One transaction per direction is buffered. All clocks and
 calibration/reset inputs are in the same clock domain; any CDC belongs outside
 this slave. Ports use active-high synchronous `reset`, unlike task6's `rst_n`.
+The separate synchronous `transport_reset` cancels buffered AXI requests and
+responses only; it neither clears replay evidence nor staged record data.
+Standalone integrations tie it low unless implementing transport cancellation.
 
 Only aligned 32-bit writes with `WSTRB=0xf` are supported. Malformed in-window
 writes return SLVERR and latch protocol FAIL; writes outside the window return
@@ -150,12 +153,22 @@ and delays subsequent COMMAND writes while such a response remains pending.
 Addresses with any bit above bit 24 set fail with Wishbone ERR without issuing
 a physical request; they are not silently truncated. PCIe runtime reset is
 synchronized to `replay_reset`; PLL cold initialization is separate.
+Runtime PCIe reset also discards the bridge's split AW/W/AR captures, loader
+forwarding state, and held B/R responses, matching the loader ingress reset.
+A four-phase cross-clock flush cancels the CSR transport and rebases both
+mailbox toggles before BAR READY can return. The request payload remains stable
+until cancellation is acknowledged; old completions cannot satisfy new requests.
+The flush also asserts `replay_reset` so even a short PCIe reset records an
+abort during RUN. It does not reset physical DDR pending-response ownership.
 
 `tests.test_compiler_ddr3_trace_replay_top` checks the fabric with unrelated
 PCIe/controller clock periods and also runs the actual pinned loader ingress,
 loader CDC, loader FSM and production mux through an eight-line BAR load/full
 readback fixture. That test models only the physical PCIe endpoint, clock
 primitives and DDR controller boundary; it is not a Micron-model run.
+Directed fabric cases use the real runtime loader reset wiring and cover
+partial requests, discarded forwarded loader responses, held B/R responses,
+each mailbox completion phase, a FIFO-blocked PUSH, and repeated reset pulses.
 
 `nix develop .#default -c python3 -m unittest -v tests.test_compiler_ddr3_trace_replay`
 tests the actual RTL and AXI-Lite interface, address/data mutations, and the

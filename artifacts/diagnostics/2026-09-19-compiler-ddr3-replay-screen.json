@@ -3,11 +3,26 @@
   "status": "screen_complete_timing_failed",
   "scope": "temporary hand-written diagnostic, not compiler-generated accelerator; no route or bitstream",
   "base_commit": "5ecbd19",
+  "fix_round": 1,
+  "reviewed_commit": "f9bcdc2e592a8da09d3d7a167d37753d6ea0c0fc",
+  "previous_screen": {
+    "netlist_sha256": "d6553f0dd4666aec28f6c6e5da4e4c7321adf07d324153dcdc3e4afe5b1cfe7a",
+    "placement_log_sha256": "1adc7e8c721368eae5a4729a5d69d5fc2d5dbe1d17fe59480b0e2bf37c54ae0a",
+    "rowstream_mhz": 46.64,
+    "pcie_mhz": 58.72,
+    "evidence_location": "reviewed_commit Git tree"
+  },
   "llm2fpga_revision": "e368449e30d5268433443c7de7a9017e5b9187ee",
   "closure": "/nix/store/4066qvsccw8baaxk960v35cyczwd1385-task6-board-shell-source-closure",
-  "synthesis": "/nix/store/vf66y345jdia3dgb2z5n24haqh91c21z-compiler-ddr3-trace-replay-synthesis-screen",
-  "netlist_sha256": "d6553f0dd4666aec28f6c6e5da4e4c7321adf07d324153dcdc3e4afe5b1cfe7a",
-  "netlist_bytes": 50335803,
+  "synthesis": "/nix/store/x9znv0z075dxj8lics03sbgwwpph0xrn-compiler-ddr3-trace-replay-synthesis-screen",
+  "netlist_sha256": "b83160ddcbca26811f3ae20fdf03a06c4207ee09f1c892c87fd3619674178345",
+  "netlist_bytes": 50935856,
+  "yosys_log_sha256": "10b6a89cb6ef84a93d2876d7da45d3d5cbfea88280a6cd90cd4821024e4f7755",
+  "yosys_script_sha256": "f13bf86d9e483b282138c3a7c2b1e61c06e80181c5ca94ec2726cf8aea0dfc48",
+  "changed_rtl_sha256": {
+    "rtl/diagnostics/compiler_ddr3_trace_replay_top.sv": "7b5a9e5ee2576baebee6fa11289eab0abeaaa1d3abc03272e70e65b7b0a7f030",
+    "rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv": "3a699796d08b9cf0fbfb7647116fb5a56f7f347b5ff9615a0a1360fb2d91ecbe"
+  },
   "final_yosys_check_problems": 0,
   "watched_nets": "PASS",
   "profile": {
@@ -17,9 +32,9 @@
     "bist_mode": 2
   },
   "resources": {
-    "cells": 38974,
-    "luts": 15875,
-    "flip_flops": 12839,
+    "cells": 39296,
+    "luts": 16125,
+    "flip_flops": 12846,
     "carry4": 492,
     "ram32m": 28,
     "ramb36e1": 4
@@ -36,10 +51,10 @@
     ],
     "timeout_seconds": 600,
     "log": "artifacts/diagnostics/2026-09-19-compiler-ddr3-replay-placement.log",
-    "log_sha256": "1adc7e8c721368eae5a4729a5d69d5fc2d5dbe1d17fe59480b0e2bf37c54ae0a",
-    "rowstream_mhz": 46.64,
+    "log_sha256": "b13c4728df6629752e3748a30fdf825fc17b822e1556d9f93a6820f4782a1332",
+    "rowstream_mhz": 49.55,
     "required_rowstream_mhz": 83.333333,
-    "pcie_mhz": 58.72,
+    "pcie_mhz": 56.98,
     "required_pcie_mhz": 62.5,
     "nextpnr_binary": "/nix/store/zq3cih2dv7nbssw9i16a137c11pcm3qi-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
     "nextpnr_binary_sha256": "d3fcd2fbaedbb5087a71ffdbe4d7d66db1e21a24a79d44c810c80c5c9adcfd0c",
@@ -51,7 +66,7 @@
     "coverage": "placement estimates only; missing aliases warned, JTAG/PIPE clocks use fallback target, new bundled-data CDC and physical I/O timing not qualified"
   },
   "tests": {
-    "focused_passed": 12,
+    "focused_passed": 14,
     "adjacent_passed": 8,
     "full_repository_suite_run": false,
     "physical_models": "PCIe endpoint, clock primitives and DDR controller are simulation-only boundary models; pinned loader and owner logic is real"

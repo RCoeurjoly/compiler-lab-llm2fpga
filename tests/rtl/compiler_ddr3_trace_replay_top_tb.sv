@@ -45,7 +45,8 @@ module compiler_ddr3_trace_replay_top_tb;
   wire host_ack,host_err,host_stall;
   task6_pcie_axil_rowstream_loader_ingress #(.COMMAND_WIDTH(208),.COMMAND_DATA_LSB(80)) loader(
     .clk(pcie_clk),
-    .rst_n(!pcie_reset),
+    // Match the board: runtime PCIe reset also discards ingress transactions.
+    .rst_n(!pcie_reset && !pcie_abort),
     .calib_complete_i(1'b1),
     .boot_done_i(1'b1),
     .ddr_debug1_i('0),
@@ -170,6 +171,34 @@ module compiler_ddr3_trace_replay_top_tb;
   end
 
   task tick; @(posedge pcie_clk); #1; endtask
+  task capture_aw(input [31:0] address);
+    @(negedge pcie_clk);s_axi_awaddr=address;s_axi_awvalid=1;
+    do @(posedge pcie_clk);while(!s_axi_awready);
+    @(negedge pcie_clk);s_axi_awvalid=0;
+  endtask
+  task capture_w(input [31:0] value);
+    @(negedge pcie_clk);s_axi_wdata=value;s_axi_wstrb=15;s_axi_wvalid=1;
+    do @(posedge pcie_clk);while(!s_axi_wready);
+    @(negedge pcie_clk);s_axi_wvalid=0;
+  endtask
+  task capture_ar(input [31:0] address);
+    @(negedge pcie_clk);s_axi_araddr=address;s_axi_arvalid=1;
+    do @(posedge pcie_clk);while(!s_axi_arready);
+    @(negedge pcie_clk);s_axi_arvalid=0;
+  endtask
+  task runtime_reset;
+    // One PCIe cycle, then allow both directions of the CDC flush to settle.
+    @(negedge pcie_clk);pcie_abort=1;tick();
+    if(s_axi_bvalid || s_axi_rvalid) $fatal(1,"runtime reset retained AXI response");
+    @(negedge pcie_clk);pcie_abort=0;
+    repeat(32) begin
+      tick();
+      if(s_axi_bvalid || s_axi_rvalid) $fatal(1,"stale response escaped reset");
+    end
+    if(!s_axi_awready || !s_axi_wready || !s_axi_arready || dut.pstate!=0)
+      $fatal(1,"runtime reset retained partial/pending AXI transaction");
+    rd('h904,1);rd(0,32'h54365043);
+  endtask
   task wr(input [31:0] address,input [31:0] data,input bit first=0);
     if(first) begin
       @(negedge pcie_clk); s_axi_wdata=data;s_axi_wstrb=15;s_axi_wvalid=1;
@@ -227,6 +256,52 @@ module compiler_ddr3_trace_replay_top_tb;
   initial begin
     #120; @(negedge pcie_clk);pcie_reset=0;@(negedge clk);reset=0;
     rd(0,32'h54365043);rd('h900,32'h52504c59);rd('h904,1);
+    capture_aw('h90c);runtime_reset();
+    wr('h910,7,1);rd('h90c,0); // new W cannot pair with the old AW
+    capture_w(99);runtime_reset();
+    wr('h90c,3);rd('h90c,3); // new AW cannot pair with the old W
+    capture_ar('h900);runtime_reset(); // buffered read/mailbox cancellation
+    capture_aw('h10);capture_w(32'hfeedface);
+    wait(dut.aw_sent && dut.w_sent);runtime_reset(); // real ingress loses response
+    wr('h10,32'h12345678);rd('h10,32'h12345678);
+    capture_ar(0);wait(dut.ar_sent);runtime_reset(); // ingress discards pending read too
+    capture_aw('h90c);capture_w(4);
+    wait(s_axi_bvalid);runtime_reset(); // held diagnostic B response
+    wr('h90c,5);rd('h90c,5);
+    capture_ar('h900);wait(s_axi_rvalid);runtime_reset(); // held diagnostic R
+    capture_aw('h10);capture_w(32'hbadcafe);
+    wait(s_axi_bvalid);runtime_reset(); // held loader B response
+    capture_ar(0);wait(s_axi_rvalid);runtime_reset(); // held loader R response
+    // Abort while each mailbox stage owns a request or completion. New
+    // reads use a different value, so an old completion cannot satisfy them.
+    for(i=0;i<4;i=i+1) begin
+      capture_ar('h900);
+      wait(dut.pstate==3);
+      case(i)
+        0: wait(dut.pstate==3);
+        1: wait(dut.dstate==2);
+        2: wait(dut.d_rvalid);
+        3: wait(dut.response_toggle==dut.req_toggle);
+      endcase
+      runtime_reset();
+    end
+    wr('h908,2);rd('h90c,0);
+    // A full FIFO leaves a CSR write pending indefinitely. Runtime reset
+    // must cancel both halves in the row-domain CSR, not just the mailbox.
+    wr('h90c,17);
+    for(i=0;i<16;i=i+1) push(0,0);
+    wr('h910,0);wr('h914,0);wr('h918,0);wr('h91c,0);wr('h920,0);
+    capture_aw('h924);capture_w(1);
+    wait(dut.csr.full_wait && dut.csr.aw_pending && dut.csr.w_pending);
+    runtime_reset();rd('h934,16);wr('h908,2);rd('h90c,0);
+    // Reassert reset during each half of the flush handshake. A late ack
+    // from the preceding assertion must never reopen an unflushed mailbox.
+    for(i=1;i<=2;i=i+1) begin
+      @(negedge pcie_clk);pcie_abort=1;tick();
+      @(negedge pcie_clk);pcie_abort=0;
+      wait(dut.flush_state==i);
+      runtime_reset();
+    end
     for(i=0;i<8;i=i+1) host(1,i,BASE+i);
     for(i=0;i<8;i=i+1) host(0,i,BASE+i);
     wr('h90c,3);push(2,BASE+2);
@@ -260,6 +335,8 @@ module compiler_ddr3_trace_replay_top_tb;
     repeat(12)tick();@(negedge pcie_clk);pcie_abort=0;
     rd('h928,3);rd('h944,8);
     if(!wb_cyc) $fatal(1,"abort released outstanding response");
+    runtime_reset();rd('h928,3);rd('h944,8);
+    rd('h938,1);rd('h93c,0);rd('h940,0); // repeated reset preserves failure evidence
     fork
       begin wr('h908,2);end
       begin

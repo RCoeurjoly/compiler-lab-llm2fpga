@@ -3,6 +3,7 @@
 module compiler_ddr3_trace_replay_tb;
   reg clk=0; always #5 clk=~clk;
   reg reset=1, replay_reset=0, calib_complete=1;
+  wire transport_reset=1'b0;
   reg [31:0] s_axi_awaddr=0, s_axi_wdata=0, s_axi_araddr=0;
   reg [3:0] s_axi_wstrb=15;
   reg s_axi_awvalid=0, s_axi_wvalid=0, s_axi_bready=0;

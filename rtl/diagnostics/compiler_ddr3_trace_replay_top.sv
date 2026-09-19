@@ -641,12 +641,44 @@ module compiler_ddr3_trace_replay_bridge (
   reg bvalid, rvalid;
   reg [1:0] bresp, rresp;
   reg [31:0] rdata;
-  assign s_axi_awready=!pcie_reset && !pcie_abort && !aw_hold && !bvalid;
-  assign s_axi_wready=!pcie_reset && !pcie_abort && !w_hold && !bvalid;
-  assign s_axi_arready=!pcie_reset && !pcie_abort && !ar_hold && !rvalid;
-  assign s_axi_bvalid=bvalid;
+  // Four-phase mailbox flush. A runtime PCIe reset discards the local AXI
+  // transport immediately, then quarantines it until the row domain has
+  // cleared its transport and acknowledged both assertion and deassertion.
+  // This also catches a reset pulse shorter than a complete CDC round trip.
+  reg [1:0] flush_state; // 0 running, 1 request flush, 2 wait for ack low
+  reg flush_ack;
+  (* ASYNC_REG = "TRUE" *) reg flush_ack_meta, flush_ack_sync;
+  (* ASYNC_REG = "TRUE" *) reg flush_meta, flush_sync;
+  wire transport_reset=pcie_reset || pcie_abort || flush_state!=0;
+  always @(posedge pcie_clk) begin
+    if(pcie_reset) begin
+      flush_state<=1; flush_ack_meta<=0; flush_ack_sync<=0;
+    end else begin
+      flush_ack_meta<=flush_ack; flush_ack_sync<=flush_ack_meta;
+      // A reset during an existing flush is already covered. Do not restart
+      // phase 2 against a still-high acknowledgement from phase 1.
+      if(pcie_abort) begin
+        if(flush_state==0) flush_state<=1;
+      end
+      else case(flush_state)
+        1: if(flush_ack_sync) flush_state<=2;
+        2: if(!flush_ack_sync) flush_state<=0;
+        default: flush_state<=0;
+      endcase
+    end
+  end
+  always @(posedge clk) begin
+    if(reset) begin flush_meta<=0; flush_sync<=0; flush_ack<=0; end
+    else begin
+      flush_meta<=flush_state==1; flush_sync<=flush_meta; flush_ack<=flush_sync;
+    end
+  end
+  assign s_axi_awready=!transport_reset && !aw_hold && !bvalid;
+  assign s_axi_wready=!transport_reset && !w_hold && !bvalid;
+  assign s_axi_arready=!transport_reset && !ar_hold && !rvalid;
+  assign s_axi_bvalid=bvalid && !transport_reset;
   assign s_axi_bresp=bresp;
-  assign s_axi_rvalid=rvalid;
+  assign s_axi_rvalid=rvalid && !transport_reset;
   assign s_axi_rresp=rresp;
   assign s_axi_rdata=rdata;
   // 0 idle, 1 loader write, 2 loader read, 3 diagnostic mailbox.
@@ -662,18 +694,22 @@ module compiler_ddr3_trace_replay_bridge (
   assign l_axi_awaddr=awaddr;
   assign l_axi_wdata=wdata;
   assign l_axi_wstrb=wstrb;
-  assign l_axi_awvalid=pstate==1 && !aw_sent;
-  assign l_axi_wvalid=pstate==1 && !w_sent;
-  assign l_axi_bready=pstate==1;
+  assign l_axi_awvalid=!transport_reset && pstate==1 && !aw_sent;
+  assign l_axi_wvalid=!transport_reset && pstate==1 && !w_sent;
+  assign l_axi_bready=!transport_reset && pstate==1;
   assign l_axi_araddr=araddr;
-  assign l_axi_arvalid=pstate==2 && !ar_sent;
-  assign l_axi_rready=pstate==2;
+  assign l_axi_arvalid=!transport_reset && pstate==2 && !ar_sent;
+  assign l_axi_rready=!transport_reset && pstate==2;
   always @(posedge pcie_clk) begin
-    if(pcie_reset) begin
+    if(transport_reset) begin
       aw_hold<=0; w_hold<=0; ar_hold<=0; bvalid<=0; rvalid<=0;
       awaddr<=0; wdata<=0; araddr<=0; wstrb<=0; bresp<=0; rresp<=0; rdata<=0;
       pstate<=0; aw_sent<=0; w_sent<=0; ar_sent<=0;
-      req_toggle<=0; req_write<=0; req_addr<=0; req_data<=0; req_strb<=0;
+      // Keep the bundled payload stable until row-side cancellation is
+      // acknowledged. Only then rebase both mailbox toggles to zero.
+      if(pcie_reset || (flush_state==1 && flush_ack_sync) || flush_state==2) begin
+        req_toggle<=0; req_write<=0; req_addr<=0; req_data<=0; req_strb<=0;
+      end
       resp_meta<=0; resp_sync<=0;
     end else begin
       resp_meta<=response_toggle; resp_sync<=resp_meta;
@@ -747,7 +783,8 @@ module compiler_ddr3_trace_replay_bridge (
     else if(physical_accept) pending<=!physical_response;
   end
   compiler_ddr3_trace_replay_csr csr (
-    .clk(clk), .reset(reset), .replay_reset(abort_sync), .calib_complete(calib_complete),
+    .clk(clk), .reset(reset), .transport_reset(flush_sync),
+    .replay_reset(abort_sync || flush_sync), .calib_complete(calib_complete),
     .s_axi_awaddr(req_addr), .s_axi_awvalid(dstate==1 && !d_aw_sent), .s_axi_awready(d_awready),
     .s_axi_wdata(req_data), .s_axi_wstrb(req_strb),
     .s_axi_wvalid(dstate==1 && !d_w_sent), .s_axi_wready(d_wready),
@@ -768,7 +805,11 @@ module compiler_ddr3_trace_replay_bridge (
       dstate<=0; d_aw_sent<=0; d_w_sent<=0; d_ar_sent<=0;
     end else begin
       req_meta<=req_toggle; req_sync<=req_meta; abort_meta<=pcie_abort; abort_sync<=abort_meta;
-      case(dstate)
+      if(flush_sync) begin
+        req_meta<=0; req_sync<=0;
+        response_toggle<=0; response_code<=0; response_data<=0;
+        dstate<=0; d_aw_sent<=0; d_w_sent<=0; d_ar_sent<=0;
+      end else case(dstate)
         0: begin
           d_aw_sent<=0; d_w_sent<=0; d_ar_sent<=0;
           if(req_sync!=response_toggle && !(req_write && req_addr==32'h908 && pending && !replay_active))

@@ -75,6 +75,16 @@ class ReplayTopTest(unittest.TestCase):
         self.assertNotEqual(run.returncode, 0)
         self.assertRegex(run.stdout, "outstanding|owner changed")
 
+    def test_runtime_transport_reset_mutation_is_detected(self):
+        run = self.simulate_fabric(("if(transport_reset) begin", "if(pcie_reset) begin"))
+        self.assertNotEqual(run.returncode, 0)
+        self.assertIn("runtime reset retained", run.stdout)
+
+    def test_row_transport_flush_mutation_is_detected(self):
+        run = self.simulate_fabric((".transport_reset(flush_sync)", ".transport_reset(1'b0)"))
+        self.assertNotEqual(run.returncode, 0)
+        self.assertRegex(run.stdout, "test timeout|read 00000904 expected 00000001 got 52504c59")
+
     def test_starvation_ownership_mutation_is_detected(self):
         run = self.simulate_fabric(("assign wb_cyc=replay_active || core_cyc || pending;",
                                     "assign wb_cyc=core_cyc || pending;"))

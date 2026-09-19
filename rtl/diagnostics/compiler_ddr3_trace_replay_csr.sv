@@ -5,7 +5,7 @@
 // write execution, BVALID/RVALID retained until the consumer acknowledges.
 // Existing task6 loader registers are not implemented or aliased here.
 module compiler_ddr3_trace_replay_csr (
-    input wire clk, reset, replay_reset, calib_complete,
+    input wire clk, reset, transport_reset, replay_reset, calib_complete,
     input wire [31:0] s_axi_awaddr,
     input wire s_axi_awvalid,
     output wire s_axi_awready,
@@ -56,12 +56,12 @@ module compiler_ddr3_trace_replay_csr (
   // finish, letting the host observe failure rather than deadlocking AXI.
   wire full_wait = is_push && !malformed && fifo_level==16 &&
                   (state==0 || state==1) && !sealed && pushed_count<expected_count;
-  wire execute = aw_pending && w_pending && !s_axi_bvalid && !full_wait;
+  wire execute = !transport_reset && aw_pending && w_pending && !s_axi_bvalid && !full_wait;
   wire valid_write = execute && in_window && !malformed;
   wire clear = valid_write && is_command && wdata==2;
-  assign s_axi_awready = !reset && !aw_pending && !s_axi_bvalid;
-  assign s_axi_wready = !reset && !w_pending && !s_axi_bvalid;
-  assign s_axi_arready = !reset && !s_axi_rvalid;
+  assign s_axi_awready = !reset && !transport_reset && !aw_pending && !s_axi_bvalid;
+  assign s_axi_wready = !reset && !transport_reset && !w_pending && !s_axi_bvalid;
+  assign s_axi_arready = !reset && !transport_reset && !s_axi_rvalid;
 
   compiler_ddr3_trace_replay replay (
     .clk(clk), .reset(reset), .replay_reset(replay_reset), .calib_complete(calib_complete),
@@ -115,6 +115,11 @@ module compiler_ddr3_trace_replay_csr (
       aw_pending<=0; w_pending<=0; awaddr<=0; wdata<=0; wstrb<=0;
       s_axi_bvalid<=0; s_axi_bresp<=0; s_axi_rvalid<=0; s_axi_rresp<=0; s_axi_rdata<=0;
       staged_address<=0; staged_expected<=0; staged_mask<=0;
+    end else if (transport_reset) begin
+      // Runtime transport cancellation must not clear replay FAIL evidence,
+      // counters, or staged data. The independent replay_reset records abort.
+      aw_pending<=0; w_pending<=0; awaddr<=0; wdata<=0; wstrb<=0;
+      s_axi_bvalid<=0; s_axi_bresp<=0; s_axi_rvalid<=0; s_axi_rresp<=0; s_axi_rdata<=0;
     end else begin
       if (s_axi_awvalid && s_axi_awready) begin awaddr<=s_axi_awaddr; aw_pending<=1; end
       if (s_axi_wvalid && s_axi_wready) begin
