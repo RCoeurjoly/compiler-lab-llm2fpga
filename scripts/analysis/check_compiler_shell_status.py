@@ -11,17 +11,23 @@ WATCHED = (
     "rowstream_tinystories_cache_misses",
     "rowstream_tinystories_debug",
     "rowstream_tinystories_stall_cycles",
+    "replay_cyc", "replay_stb", "replay_we", "replay_addr", "replay_sel",
+    "replay_accept", "replay_ack", "replay_err", "replay_rdata",
+    "req_toggle", "response_toggle", "replay_active", "pending",
 )
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
+    parser.add_argument("--top", default="task6_ypcb_pcie_uberddr3_rowstream_loader_top",
+                        choices=["task6_ypcb_pcie_uberddr3_rowstream_loader_top",
+                                 "compiler_ddr3_trace_replay_top"])
     args = parser.parse_args()
     log = args.log.read_text()
     if not re.search(r"Found and reported \d+ problems\.", log) or "End of script." not in log:
         parser.error("a completed Yosys check is required")
-    if "Checking module task6_ypcb_pcie_uberddr3_rowstream_loader_top" not in log:
+    if f"Checking module {args.top}" not in log:
         parser.error("the board top was not checked")
     failures = sorted({name for line in log.splitlines()
                        if "Warning:" in line and "has no driver" in line

@@ -1,0 +1,373 @@
+{
+  "bist_mode": 2,
+  "byte_lanes": 2,
+  "controller_period_ps": 12000,
+  "ddr_period_ps": 3000,
+  "diagnostic_window": [
+    2304,
+    2431
+  ],
+  "historical_bitstream": "/nix/store/idg9sv2180nclparxirmhy42dx4qxm0p-task6-ypcb-pcie-uberddr3-rowstream-loader-only.bit",
+  "historical_bitstream_sha256": "515c5343cd276e11d359bc57f97c7f5bd184c04982e6af91b3a298a1ea14e439",
+  "historical_constraints": "provenance/historical-clocks.py",
+  "llm2fpga_revision": "e368449e30d5268433443c7de7a9017e5b9187ee",
+  "provenance_note": "Historical PCIe is a content-addressed dirty-tree snapshot, not a clean Git revision. Never read ambient checkout. Compiler-generated accelerator is not part of this diagnostic closure.",
+  "schema": "task6-board-shell-source-closure-v1",
+  "screen_constraints": "llm2fpga/scripts/task6/nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py",
+  "sources": [
+    {
+      "bytes": 2563,
+      "logical_path": "llm2fpga/fpga/rtl/task6_pcie_axil_app_status_shift.v",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "3565a634304479ad1bcf043f7452f30cb3f9d27e8fab238f32883d35ba196e8d",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_pcie_axil_app_status_shift.v"
+    },
+    {
+      "bytes": 41259,
+      "logical_path": "llm2fpga/fpga/rtl/task6_pcie_axil_rowstream_loader_ingress.v",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "224b3a384770378a64768aaa900adcba07a3672812dd92d3b70fadf6a88315f1",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_pcie_axil_rowstream_loader_ingress.v"
+    },
+    {
+      "bytes": 42253,
+      "logical_path": "llm2fpga/fpga/rtl/task6_pcie_axil_rowstream_loader_ingress_cdc.v",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "4a2bf0a2d8fdf485f1c1359a410eb227ce29d15330d842790d5624d59d33efd1",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_pcie_axil_rowstream_loader_ingress_cdc.v"
+    },
+    {
+      "bytes": 8252,
+      "logical_path": "llm2fpga/fpga/rtl/task6_pcie_jtag_status_shift.v",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "6d0025765453e8f60b303822f8a3aaedc91b84e0f8f9f26913fec98814ca8f0c",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_pcie_jtag_status_shift.v"
+    },
+    {
+      "bytes": 2296,
+      "logical_path": "llm2fpga/fpga/rtl/task6_tinystories_loader_command_stage.sv",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "4678d34f0ba2d260f4db9fe527b1784a8972b7eff7bf64e38457cf2610dde777",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_tinystories_loader_command_stage.sv"
+    },
+    {
+      "bytes": 3928,
+      "logical_path": "llm2fpga/fpga/rtl/task6_tinystories_token_cdc.sv",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "bedf3c4af9333d914ffc0d7a1079ebac9125dbcb8e1de36dcbf9b0fe5cfadeb7",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_tinystories_token_cdc.sv"
+    },
+    {
+      "bytes": 2790,
+      "logical_path": "llm2fpga/fpga/rtl/task6_tinystories_token_collector.sv",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "c566f20b06fcd3a64d7883fefe5b27ca48a7724b7dda908240db7fbd73f3c1e3",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_tinystories_token_collector.sv"
+    },
+    {
+      "bytes": 2584,
+      "logical_path": "llm2fpga/fpga/rtl/task6_wishbone_bandwidth_counters.sv",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "2055438ace7122cca20f285d4cb006fa8870b5d35ce1a063e4eaaa54c3493baf",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_wishbone_bandwidth_counters.sv"
+    },
+    {
+      "bytes": 4261,
+      "logical_path": "llm2fpga/fpga/rtl/task6_wishbone_owner_mux.sv",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "817368f24405b7a5f7df94772f865a223ee22edb40d4e743baa298df9196bec3",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_wishbone_owner_mux.sv"
+    },
+    {
+      "bytes": 1756,
+      "logical_path": "llm2fpga/fpga/rtl/task6_ypcb_pcie_uberddr3_rowstream_loader_only_top.sv",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "681a55382827f48fcab20d15ee70c227d401596ed5ca3da90082136cc9a61d75",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_ypcb_pcie_uberddr3_rowstream_loader_only_top.sv"
+    },
+    {
+      "bytes": 25297,
+      "logical_path": "llm2fpga/fpga/rtl/task6_ypcb_pcie_uberddr3_rowstream_loader_top.sv",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "ae2a7ece118273c14b5ac84aba6e76cb0402a867432b6ae980138e82d72d4b31",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_ypcb_pcie_uberddr3_rowstream_loader_top.sv"
+    },
+    {
+      "bytes": 110695,
+      "logical_path": "llm2fpga/fpga/rtl/task6_ypcb_uberddr3_bist_rowstream_loader_top.sv",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "7f99b8c4f367b48de9b27ef9dfc0786c26d8e90e595837b04431c671f1935b17",
+      "source": "third_party/task6-e368449/fpga/rtl/task6_ypcb_uberddr3_bist_rowstream_loader_top.sv"
+    },
+    {
+      "bytes": 4206,
+      "logical_path": "llm2fpga/rtl/task6/task6_ddr3_rowstream_top1_cutout.sv",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "131d1cbb485f46f44bc82a5a582d91d3dee5c4afc1a9ef182c61f59d25997f4a",
+      "source": "third_party/task6-e368449/rtl/task6/task6_ddr3_rowstream_top1_cutout.sv"
+    },
+    {
+      "bytes": 10959,
+      "logical_path": "llm2fpga/rtl/task6/task6_ddr3_rowstream_wb_top1_reader.sv",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "17c6e72bc2c66d9bddd41813934406d13b9ed361581964ffa1e096a58ca3ec4c",
+      "source": "third_party/task6-e368449/rtl/task6/task6_ddr3_rowstream_wb_top1_reader.sv"
+    },
+    {
+      "bytes": 1769,
+      "logical_path": "llm2fpga/rtl/task6/task6_q024_topk_score_compare.sv",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "2b0164ea0e953dbcaadd768057b6f634a1d47b1ab07a6cf81c2270222f73d2cb",
+      "source": "third_party/task6-e368449/rtl/task6/task6_q024_topk_score_compare.sv"
+    },
+    {
+      "bytes": 1894,
+      "logical_path": "llm2fpga/scripts/task6/nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py",
+      "provenance": "LLM2FPGA e368449 git blob",
+      "sha256": "42acd411f3e34ac494e56f64b12c0de81394b567d5087c1213b820040fa9d698",
+      "source": "third_party/task6-e368449/scripts/task6/nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py"
+    },
+    {
+      "bytes": 8375,
+      "logical_path": "pcie/src/xilinx_pcie_mmcm.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "aba1b56cd7098fc4bc877c97341f0ddfa95e239c8ed3775aaeaf337390a57dfb",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/xilinx_pcie_mmcm.v"
+    },
+    {
+      "bytes": 5374,
+      "logical_path": "pcie/src/axil_to_al.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "9402798c01db5463f7ad974db47fb7b9b38af76807c3972ebfb2e9fe414584cd",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/axil_to_al.v"
+    },
+    {
+      "bytes": 19257,
+      "logical_path": "pcie/src/axis_pcie_to_al_us.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "90ea6652589583e595f16846dc4bd1534c26534147d245eb21ab903c5c1ae956",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/axis_pcie_to_al_us.v"
+    },
+    {
+      "bytes": 65797,
+      "logical_path": "pcie/src/pcie_7x.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "405d3fad5b87f080141cf3824333c8fa449eb18d67fe0e6bd3057456e1ac9278",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_7x.v"
+    },
+    {
+      "bytes": 16513,
+      "logical_path": "pcie/src/pcie_axi_rx.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "083d432cc6b00c1d3ad6c8a7d41659f49d3acb00bf88a6558129ad11392a577d",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_axi_rx.v"
+    },
+    {
+      "bytes": 10269,
+      "logical_path": "pcie/src/pcie_axi_tx.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "c2a64228d9daa7473a6461917c2faeeddf61c5f64128f154c5fd1835ef9c4fe7",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_axi_tx.v"
+    },
+    {
+      "bytes": 91016,
+      "logical_path": "pcie/src/pcie_block.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "51dc92552407a8237fbedfe9644cd317126a2a7838c30f1f3827aba4972117dd",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_block.v"
+    },
+    {
+      "bytes": 4286,
+      "logical_path": "pcie/src/pcie_brams.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "444a3bcf0a622c233c2ca607fcb87f6e7e7925e75b2e53b9fef593e1b148060e",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_brams.v"
+    },
+    {
+      "bytes": 17394,
+      "logical_path": "pcie/src/pcie_tx_thrtl_ctl.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "292ac8a4ee5602b29a31d42c136f2008240c2268cdc38b5b280730b1c6920578",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_tx_thrtl_ctl.v"
+    },
+    {
+      "bytes": 63797,
+      "logical_path": "pcie/src/pipe_wrapper_gtx.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "033f0d12ea9f9ed1111b6185e9f42b7a54e662d49d55fa2851adbb149aeafc89",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pipe_wrapper_gtx.v"
+    },
+    {
+      "bytes": 29564,
+      "logical_path": "pcie/src/aximm-minimal/pcie_7x_top_aximm.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "490349d6cfe5cf4bd8c80c3cceaf5ea40b2de93dfe051f3f02942ed1345f95ae",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/aximm-minimal/pcie_7x_top_aximm.v"
+    },
+    {
+      "bytes": 4204,
+      "logical_path": "pcie/src/pcie_reset_ready.v",
+      "provenance": "historical loader immutable transformed PCIe snapshot",
+      "sha256": "a185319272ff3794a640d9d7a97e0170d52f094760fa4c0636a3f193285bd9b2",
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_reset_ready.v"
+    },
+    {
+      "bytes": 28222,
+      "logical_path": "uberddr3/rtl/ddr3_top.v",
+      "provenance": "UberDDR3 GPL-3.0-or-later per pinned LICENSE and RTL headers; production baseline patches unchanged",
+      "sha256": "eb56493ec8710f1e4e25db8895ade588038064d710d14e52f22a26f5d962dcd8",
+      "source": "/nix/store/i51l5i03r7vw52aajgh0nxqj0w94v8cj-task6-ypcb-uberddr3-source/rtl/ddr3_top.v"
+    },
+    {
+      "bytes": 381408,
+      "logical_path": "uberddr3/rtl/ddr3_controller.v",
+      "provenance": "UberDDR3 GPL-3.0-or-later per pinned LICENSE and RTL headers; production baseline patches unchanged",
+      "sha256": "6ca6fa3dd49e6fb36ed1d29306a077abd73f48bb022888e00eaee1b00eef7642",
+      "source": "/nix/store/i51l5i03r7vw52aajgh0nxqj0w94v8cj-task6-ypcb-uberddr3-source/rtl/ddr3_controller.v"
+    },
+    {
+      "bytes": 79230,
+      "logical_path": "uberddr3/rtl/ddr3_phy.v",
+      "provenance": "UberDDR3 GPL-3.0-or-later per pinned LICENSE and RTL headers; production baseline patches unchanged",
+      "sha256": "8dd21c08a1549f57ee7d773b46346010658147d0cf7cc547c4025476df31114b",
+      "source": "/nix/store/i51l5i03r7vw52aajgh0nxqj0w94v8cj-task6-ypcb-uberddr3-source/rtl/ddr3_phy.v"
+    },
+    {
+      "bytes": 11569,
+      "logical_path": "uberddr3/rtl/ecc/ecc_dec.sv",
+      "provenance": "UberDDR3 GPL-3.0-or-later per pinned LICENSE and RTL headers; production baseline patches unchanged",
+      "sha256": "6d140ec22788d835ff789c5cc2c11057f8b909dbe0ff010534a339479737e54d",
+      "source": "/nix/store/i51l5i03r7vw52aajgh0nxqj0w94v8cj-task6-ypcb-uberddr3-source/rtl/ecc/ecc_dec.sv"
+    },
+    {
+      "bytes": 8048,
+      "logical_path": "uberddr3/rtl/ecc/ecc_enc.sv",
+      "provenance": "UberDDR3 GPL-3.0-or-later per pinned LICENSE and RTL headers; production baseline patches unchanged",
+      "sha256": "a4452c4e93bb124130075b82b94d7c5ec47decc1e5c1d0fb95e8f36c0f91ed7f",
+      "source": "/nix/store/i51l5i03r7vw52aajgh0nxqj0w94v8cj-task6-ypcb-uberddr3-source/rtl/ecc/ecc_enc.sv"
+    },
+    {
+      "bytes": 14649,
+      "logical_path": "constraints/board.xdc",
+      "provenance": "historical loader derivation",
+      "sha256": "890ebb9d0fc854c8595d3e9e67b4a4074fe42ac7682680b9c33dd1d2c8662f57",
+      "source": "/nix/store/ppnarr616qy3dp42r46xf7hb8x4x4m3x-task6-ypcb-pcie-uberddr3-rowstream-loader.xdc"
+    },
+    {
+      "bytes": 1617,
+      "logical_path": "provenance/historical-clocks.py",
+      "provenance": "historical loader derivation",
+      "sha256": "061059e6e6705a2ae58b1827ca1c3358b93e803b5f5293cd20218d95c4bb42b7",
+      "source": "/nix/store/fdr5pzaiip9n6yfcaj41d6rhmd6iivci-nextpnr_ypcb_uberddr3_clock_constraints.py"
+    },
+    {
+      "bytes": 6769,
+      "logical_path": "provenance/b0b21kl4vnjv95jqgz744lplxsbklqad-task6-ypcb-pcie-uberddr3-rowstream-loader-only-yosys.json.drv",
+      "provenance": "immutable derivation: exact source/tool/build arguments",
+      "sha256": "cbcbeae21818baa277ab1f7cbb73a94c15fd421c41622632b517cb9aa65c9cce",
+      "source": "/nix/store/b0b21kl4vnjv95jqgz744lplxsbklqad-task6-ypcb-pcie-uberddr3-rowstream-loader-only-yosys.json.drv"
+    },
+    {
+      "bytes": 2814,
+      "logical_path": "provenance/kai3fzswycqyzgxya1nawg7ay4p5gsim-task6-ypcb-pcie-uberddr3-rowstream-loader-only.fasm.drv",
+      "provenance": "immutable derivation: exact source/tool/build arguments",
+      "sha256": "c5d1c3d3f23b04f399d1ae59e0b4c7140cae7c364bc948ecbc69351515181e2e",
+      "source": "/nix/store/kai3fzswycqyzgxya1nawg7ay4p5gsim-task6-ypcb-pcie-uberddr3-rowstream-loader-only.fasm.drv"
+    },
+    {
+      "bytes": 3420,
+      "logical_path": "provenance/r0yqwh1jihsmqs1hy7g2blxbmpfjxz76-task6-ypcb-pcie-uberddr3-rowstream-loader-only.bit.drv",
+      "provenance": "immutable derivation: exact source/tool/build arguments",
+      "sha256": "b18894ab9c5bb79f89b5b9affe8c6cc1f6ea1535da04a92b73cbcf08c75f75ca",
+      "source": "/nix/store/r0yqwh1jihsmqs1hy7g2blxbmpfjxz76-task6-ypcb-pcie-uberddr3-rowstream-loader-only.bit.drv"
+    },
+    {
+      "bytes": 2148,
+      "logical_path": "provenance/kjhv5qn0w4m68z4fgbr440681sd4c826-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress.drv",
+      "provenance": "immutable derivation: exact source/tool/build arguments",
+      "sha256": "cc1814438c7a37ca193696153de03587b1ebea339b8d79c32223225298cfe75f",
+      "source": "/nix/store/kjhv5qn0w4m68z4fgbr440681sd4c826-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress.drv"
+    },
+    {
+      "bytes": 2070,
+      "logical_path": "provenance/fk86lk01gsah1xdqlj5ppislhp85fdmb-task6-ypcb-uberddr3-source.drv",
+      "provenance": "immutable derivation: exact source/tool/build arguments",
+      "sha256": "9449ba31d7e41023d279c23067e40c862fad3a29249141e9ff4a8408d1640ae6",
+      "source": "/nix/store/fk86lk01gsah1xdqlj5ppislhp85fdmb-task6-ypcb-uberddr3-source.drv"
+    },
+    {
+      "bytes": 3150,
+      "logical_path": "provenance/3ipmxvbq6agk0ga19yj1aisszjwadkj9-yosys-with-plugins-0.66.drv",
+      "provenance": "immutable derivation: exact source/tool/build arguments",
+      "sha256": "2f25483cdef11153677f3819f273a5ffceec9e7e964c830c128c0d17f9a04cd3",
+      "source": "/nix/store/3ipmxvbq6agk0ga19yj1aisszjwadkj9-yosys-with-plugins-0.66.drv"
+    },
+    {
+      "bytes": 2522,
+      "logical_path": "provenance/g138pa95pn2iw34rddxjdjfp2f99vpa3-nextpnr-xilinx-0.8.2.drv",
+      "provenance": "immutable derivation: exact source/tool/build arguments",
+      "sha256": "1d1946a3216c67bc16e1ee1f9e4f6c2df98aaf4ebc5963519383365e575eaa98",
+      "source": "/nix/store/g138pa95pn2iw34rddxjdjfp2f99vpa3-nextpnr-xilinx-0.8.2.drv"
+    },
+    {
+      "logical_path": "uberddr3/LICENSE",
+      "source": "/nix/store/i51l5i03r7vw52aajgh0nxqj0w94v8cj-task6-ypcb-uberddr3-source/LICENSE",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "bytes": 35149,
+      "provenance": "Pinned upstream GPL-3.0 license; separate from compiler output provenance"
+    }
+  ],
+  "tool_source_pins": {
+    "nextpnrXilinxFork": {
+      "lastModified": 1772047723,
+      "narHash": "sha256-/9PY2NFl2mn7ZH41aOHRHSHAnYAif3eV+Ea53geU5S8=",
+      "ref": "stable-backports",
+      "rev": "4ef2518428b33f160ff93d38c781f08cc3a41566",
+      "revCount": 3126,
+      "submodules": true,
+      "type": "git",
+      "url": "https://github.com/RCoeurjoly/nextpnr-xilinx"
+    },
+    "nix-eda": {
+      "lastModified": 1773303822,
+      "narHash": "sha256-Aey3PT/xisIHj8y696NiS65xzNxpW5rDzm2iK9X2DSw=",
+      "owner": "fossi-foundation",
+      "repo": "nix-eda",
+      "rev": "691472a25cf4d6c1a6e9975b9149f32deba6e0c7",
+      "type": "github"
+    },
+    "openXC7": {
+      "lastModified": 1773160997,
+      "narHash": "sha256-TkqLbtg/KU3Jn9ptgvxUiW9brya7Hf+qo3vX2OgM1AI=",
+      "owner": "RCoeurjoly",
+      "repo": "toolchain-nix",
+      "rev": "aebe5a3cf24ddd84818fb9a96daa96b8b76c796b",
+      "type": "github"
+    },
+    "pcie7x": {
+      "lastModified": 1781182804,
+      "narHash": "sha256-KtdpvAq6kJU/OZzjULNOIoB0tIhCwh4CG4UCoTzUw14=",
+      "path": "/home/roland/pcie_7x",
+      "type": "path"
+    },
+    "uberDdr3": {
+      "lastModified": 1781237513,
+      "narHash": "sha256-zTLCfObBGd9Zi5IlwhiQUCFh0OM3kPQI3NAZmcoLvUA=",
+      "owner": "RCoeurjoly",
+      "repo": "UberDDR3",
+      "rev": "4a51b9671347130759c9980d6756918f084e2124",
+      "type": "github"
+    },
+    "yosys": {
+      "lastModified": 1773229666,
+      "narHash": "sha256-xr3tx5Vd3bWwHt/wikCBxNEINUGGKyPOzpQnnIKUt5M=",
+      "ref": "refs/heads/main",
+      "rev": "4716f4410f1508cad384d2f8542ada9f61bb7339",
+      "revCount": 16802,
+      "submodules": true,
+      "type": "git",
+      "url": "https://github.com/YosysHQ/yosys"
+    }
+  },
+  "uberddr3_revision": "4a51b9671347130759c9980d6756918f084e2124"
+}

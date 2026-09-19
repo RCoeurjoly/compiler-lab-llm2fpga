@@ -3,3 +3,5 @@ artifacts/comparison/tinystories-1m-exact-frontier-determinism-flat-scf/run-2/fl
 reproducers/flat-scf/flat.scf.mlir -diff
 artifacts/comparison/tinystories-1m-exact-memref-pass-evidence/** -diff
 reproducers/tinystories-1m-exact-flat-scf-memref/task3-earliest-remaining/pass.* -diff
+# Preserve the raw tool log byte-for-byte for its recorded SHA-256.
+artifacts/diagnostics/2026-09-19-compiler-ddr3-replay-placement.log -whitespace

@@ -28,6 +28,7 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
+        task6BoardShell = import ./nix/task6-board-shell.nix { inherit pkgs; };
         task3MainPackages =
           inputs.task3-main-pipeline.packages.${system};
         task3MainLib = inputs.task3-main-pipeline.lib.${system};
@@ -2983,6 +2984,8 @@ PY
           '';
       in {
         packages = {
+          task6-board-shell-source-closure = task6BoardShell.sourceClosure;
+          compiler-ddr3-trace-replay-synthesis-screen = task6BoardShell.replaySynthesis;
           inherit circt mlir torchMlir yosysPkg modelRegistryJson surveyPython
             surveyPhase1
             llm2fpgaMlirPasses llm2fpgaTorchMlirPasses

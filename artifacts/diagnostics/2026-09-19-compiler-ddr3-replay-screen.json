@@ -1,0 +1,59 @@
+{
+  "schema": "compiler-ddr3-replay-integration-screen-v1",
+  "status": "screen_complete_timing_failed",
+  "scope": "temporary hand-written diagnostic, not compiler-generated accelerator; no route or bitstream",
+  "base_commit": "5ecbd19",
+  "llm2fpga_revision": "e368449e30d5268433443c7de7a9017e5b9187ee",
+  "closure": "/nix/store/4066qvsccw8baaxk960v35cyczwd1385-task6-board-shell-source-closure",
+  "synthesis": "/nix/store/vf66y345jdia3dgb2z5n24haqh91c21z-compiler-ddr3-trace-replay-synthesis-screen",
+  "netlist_sha256": "d6553f0dd4666aec28f6c6e5da4e4c7321adf07d324153dcdc3e4afe5b1cfe7a",
+  "netlist_bytes": 50335803,
+  "final_yosys_check_problems": 0,
+  "watched_nets": "PASS",
+  "profile": {
+    "byte_lanes": 2,
+    "controller_period_ps": 12000,
+    "ddr_period_ps": 3000,
+    "bist_mode": 2
+  },
+  "resources": {
+    "cells": 38974,
+    "luts": 15875,
+    "flip_flops": 12839,
+    "carry4": 492,
+    "ram32m": 28,
+    "ramb36e1": 4
+  },
+  "placement": {
+    "exit_code": 0,
+    "errors": 0,
+    "warnings": 30,
+    "seed": 15,
+    "args": [
+      "--placer-budgets",
+      "--no-route",
+      "--timing-allow-fail"
+    ],
+    "timeout_seconds": 600,
+    "log": "artifacts/diagnostics/2026-09-19-compiler-ddr3-replay-placement.log",
+    "log_sha256": "1adc7e8c721368eae5a4729a5d69d5fc2d5dbe1d17fe59480b0e2bf37c54ae0a",
+    "rowstream_mhz": 46.64,
+    "required_rowstream_mhz": 83.333333,
+    "pcie_mhz": 58.72,
+    "required_pcie_mhz": 62.5,
+    "nextpnr_binary": "/nix/store/zq3cih2dv7nbssw9i16a137c11pcm3qi-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+    "nextpnr_binary_sha256": "d3fcd2fbaedbb5087a71ffdbe4d7d66db1e21a24a79d44c810c80c5c9adcfd0c",
+    "chipdb": "/nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin",
+    "chipdb_sha256": "d8472bfcc19dc31686d80cc34f0d37b958c268656182537b06b3439711b105f1",
+    "xdc_sha256": "890ebb9d0fc854c8595d3e9e67b4a4074fe42ac7682680b9c33dd1d2c8662f57",
+    "pre_pack_sha256": "42acd411f3e34ac494e56f64b12c0de81394b567d5087c1213b820040fa9d698",
+    "timing_qualified": false,
+    "coverage": "placement estimates only; missing aliases warned, JTAG/PIPE clocks use fallback target, new bundled-data CDC and physical I/O timing not qualified"
+  },
+  "tests": {
+    "focused_passed": 12,
+    "adjacent_passed": 8,
+    "full_repository_suite_run": false,
+    "physical_models": "PCIe endpoint, clock primitives and DDR controller are simulation-only boundary models; pinned loader and owner logic is real"
+  }
+}

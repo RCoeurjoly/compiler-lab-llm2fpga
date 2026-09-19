@@ -10,6 +10,7 @@ module compiler_ddr3_trace_replay_tb;
   wire s_axi_awready, s_axi_wready, s_axi_bvalid, s_axi_arready, s_axi_rvalid;
   wire [1:0] s_axi_bresp, s_axi_rresp;
   wire [31:0] s_axi_rdata;
+  wire replay_active;
   wire wb_cyc, wb_stb, wb_we;
   wire [31:0] wb_addr;
   wire [15:0] wb_sel;

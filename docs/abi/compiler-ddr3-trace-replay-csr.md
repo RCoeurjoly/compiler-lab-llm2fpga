@@ -140,6 +140,23 @@ Wire runtime replay resets to `replay_reset`, not to this cold-reset input.
 
 ## Verification scope
 
+The board integration is `compiler_ddr3_trace_replay_top`. Its wrapper routes
+only `0x900`–`0x97f` to a bundled-data request/response CDC mailbox; all other
+addresses reach the unchanged loader ingress. The CSR's `replay_active` output
+is an integration signal, not a new BAR register. The wrapper reserves the
+production owner mux throughout RUN, including FIFO starvation. It keeps the
+memory cycle owned until any already-accepted response drains after FAIL,
+and delays subsequent COMMAND writes while such a response remains pending.
+Addresses with any bit above bit 24 set fail with Wishbone ERR without issuing
+a physical request; they are not silently truncated. PCIe runtime reset is
+synchronized to `replay_reset`; PLL cold initialization is separate.
+
+`tests.test_compiler_ddr3_trace_replay_top` checks the fabric with unrelated
+PCIe/controller clock periods and also runs the actual pinned loader ingress,
+loader CDC, loader FSM and production mux through an eight-line BAR load/full
+readback fixture. That test models only the physical PCIe endpoint, clock
+primitives and DDR controller boundary; it is not a Micron-model run.
+
 `nix develop .#default -c python3 -m unittest -v tests.test_compiler_ddr3_trace_replay`
 tests the actual RTL and AXI-Lite interface, address/data mutations, and the
 pinned production ownership mux. The latter is an explicit Nix-store input,

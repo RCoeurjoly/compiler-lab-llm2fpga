@@ -1,0 +1,436 @@
+Warning: set_property: target get_cells not supported (on line 34)
+Warning: set_property: target get_cells not supported (on line 35)
+Warning: set_property: target get_cells not supported (on line 45)
+Warning: set_property: target get_cells not supported (on line 46)
+Warning: net 'controller_clk' does not exist in design, ignoring clock constraint
+Warning: net 'clk25_raw' does not exist in design, ignoring clock constraint
+Warning: net 'clk100_raw' does not exist in design, ignoring clock constraint
+Warning: net 'clk100_90_raw' does not exist in design, ignoring clock constraint
+Warning: net 'ddr3_clk' does not exist in design, ignoring clock constraint
+Warning: net 'ddr3_clk_90' does not exist in design, ignoring clock constraint
+Warning: net 'clk200_raw' does not exist in design, ignoring clock constraint
+Warning: net 'ref_clk' does not exist in design, ignoring clock constraint
+Info: constraining clock net 'rowstream_ddr3.controller_clk' to 83.33 MHz
+Info: constraining clock net 'rowstream_ddr3.clk25_raw' to 83.33 MHz
+Info: constraining clock net 'rowstream_ddr3.clk100_raw' to 333.33 MHz
+Info: constraining clock net 'rowstream_ddr3.clk100_90_raw' to 333.33 MHz
+Info: constraining clock net 'rowstream_ddr3.ddr3_clk' to 333.33 MHz
+Info: constraining clock net 'rowstream_ddr3.ddr3_clk_90' to 333.33 MHz
+Info: constraining clock net 'rowstream_ddr3.clk200_raw' to 200.00 MHz
+Info: constraining clock net 'rowstream_ddr3.ref_clk' to 200.00 MHz
+Warning: net 'impl.rowstream_ddr3.controller_clk' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.clk25_raw' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.clk100_raw' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.clk100_90_raw' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.ddr3_clk' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.ddr3_clk_90' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.clk200_raw' does not exist in design, ignoring clock constraint
+Warning: net 'impl.rowstream_ddr3.ref_clk' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.controller_clk' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.clk25_raw' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.clk100_raw' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.clk100_90_raw' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.ddr3_clk' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.ddr3_clk_90' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.clk200_raw' does not exist in design, ignoring clock constraint
+Warning: net 'isolated_ddr3.ref_clk' does not exist in design, ignoring clock constraint
+Info: constraining clock net 'pcie_user_clk' to 62.50 MHz
+Warning: net 'impl.pcie_user_clk' does not exist in design, ignoring clock constraint
+Info: constraining clock net 'pcie_7x_top_aximm_i.pcie_7x_i.in_module_mmcm.pipe_clock_i.userclk1' to 62.50 MHz
+Warning: net 'impl.pcie_7x_top_aximm_i.pcie_7x_i.in_module_mmcm.pipe_clock_i.userclk1' does not exist in design, ignoring clock constraint
+Info: Packing constants..
+Info: Inserting IO buffers..
+Info:     IO port 'ddram_clk_n' driven by OBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk4.genblk1.OBUFDS_inst'
+Info:     IO port 'ddram_clk_p' driven by OBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk4.genblk1.OBUFDS_inst'
+Info:     IO port 'sys_clk_n' driven by IBUFDS_GTE2 'pcie_7x_top_aximm_i.refclk_ibuf'
+Info:     IO port 'sys_clk_p' driven by IBUFDS_GTE2 'pcie_7x_top_aximm_i.refclk_ibuf'
+Info:     IO port 'sys_rst_n' driven by IBUF 'pcie_7x_top_aximm_i.genblk1.sys_reset_n_ibuf'
+Info:     IO port 'ddram_dq[0]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[0].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[10]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[10].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[11]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[11].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[12]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[12].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[13]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[13].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[14]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[14].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[15]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[15].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[1]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[1].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[2]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[2].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[3]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[3].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[4]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[4].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[5]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[5].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[6]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[6].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[7]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[7].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[8]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[8].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dq[9]' driven by IOBUF 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[9].genblk1.IOBUF_data'
+Info:     IO port 'ddram_dqs_p[0]' driven by IOBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk7[0].genblk1.IOBUFDS_dqs'
+Info:     IO port 'ddram_dqs_n[0]' driven by IOBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk7[0].genblk1.IOBUFDS_dqs'
+Info:     IO port 'ddram_dqs_p[1]' driven by IOBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk7[1].genblk1.IOBUFDS_dqs'
+Info:     IO port 'ddram_dqs_n[1]' driven by IOBUFDS 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk7[1].genblk1.IOBUFDS_dqs'
+Info:     Constraining 'clk_50' to site 'IOB_X0Y174'
+Info:     Tile 'LIOB33_X0Y173'
+Info:     Constraining 'ddram_cas_n' to site 'IOB_X0Y92'
+Info:     Tile 'LIOB33_X0Y91'
+Info:     Constraining 'ddram_cke' to site 'IOB_X0Y91'
+Info:     Tile 'LIOB33_X0Y91'
+Info:     Constraining 'ddram_clk_n' to site 'IOB_X0Y93'
+Info:     Tile 'LIOB33_X0Y93'
+Info:     Constraining 'ddram_clk_p' to site 'IOB_X0Y94'
+Info:     Tile 'LIOB33_X0Y93'
+Info:     Constraining 'ddram_cs_n' to site 'IOB_X0Y80'
+Info:     Tile 'LIOB33_X0Y79'
+Info:     Constraining 'ddram_odt' to site 'IOB_X0Y83'
+Info:     Tile 'LIOB33_X0Y83'
+Info:     Constraining 'ddram_ras_n' to site 'IOB_X0Y84'
+Info:     Tile 'LIOB33_X0Y83'
+Info:     Constraining 'ddram_reset_n' to site 'IOB_X0Y138'
+Info:     Tile 'LIOB33_X0Y137'
+Info:     Constraining 'ddram_we_n' to site 'IOB_X0Y90'
+Info:     Tile 'LIOB33_X0Y89'
+Info:     Constraining 'pci_exp_rxn' to site 'IPAD_X1Y180'
+Info:     Tile 'GTX_CHANNEL_3_X309Y306'
+Info:     Constraining 'pci_exp_rxp' to site 'IPAD_X1Y181'
+Info:     Tile 'GTX_CHANNEL_3_X309Y306'
+Info:     Constraining 'pci_exp_txn' to site 'OPAD_X0Y46'
+Info:     Tile 'GTX_CHANNEL_3_X309Y306'
+Info:     Constraining 'pci_exp_txp' to site 'OPAD_X0Y47'
+Info:     Tile 'GTX_CHANNEL_3_X309Y306'
+Info:     Constraining 'sys_clk_n' to site 'IPAD_X1Y165'
+Info:     Tile 'GTX_COMMON_X309Y283'
+Info:     Constraining 'sys_clk_p' to site 'IPAD_X1Y164'
+Info:     Tile 'GTX_COMMON_X309Y283'
+Info:     Constraining 'sys_rst_n' to site 'IOB_X0Y176'
+Info:     Tile 'LIOB33_X0Y175'
+Info:     Constraining 'led[0]' to site 'IOB_X0Y221'
+Info:     Tile 'LIOB33_X0Y221'
+Info:     Constraining 'led[1]' to site 'IOB_X0Y220'
+Info:     Tile 'LIOB33_X0Y219'
+Info:     Constraining 'led[2]' to site 'IOB_X0Y222'
+Info:     Tile 'LIOB33_X0Y221'
+Info:     Constraining 'ddram_a[0]' to site 'IOB_X0Y75'
+Info:     Tile 'LIOB33_X0Y75'
+Info:     Constraining 'ddram_a[10]' to site 'IOB_X0Y79'
+Info:     Tile 'LIOB33_X0Y79'
+Info:     Constraining 'ddram_a[11]' to site 'IOB_X0Y78'
+Info:     Tile 'LIOB33_X0Y77'
+Info:     Constraining 'ddram_a[12]' to site 'IOB_X0Y86'
+Info:     Tile 'LIOB33_X0Y85'
+Info:     Constraining 'ddram_a[13]' to site 'IOB_X0Y82'
+Info:     Tile 'LIOB33_X0Y81'
+Info:     Constraining 'ddram_a[14]' to site 'IOB_X0Y88'
+Info:     Tile 'LIOB33_X0Y87'
+Info:     Constraining 'ddram_ba[0]' to site 'IOB_X0Y85'
+Info:     Tile 'LIOB33_X0Y85'
+Info:     Constraining 'ddram_ba[1]' to site 'IOB_X0Y95'
+Info:     Tile 'LIOB33_X0Y95'
+Info:     Constraining 'ddram_ba[2]' to site 'IOB_X0Y89'
+Info:     Tile 'LIOB33_X0Y89'
+Info:     Constraining 'ddram_a[1]' to site 'IOB_X0Y97'
+Info:     Tile 'LIOB33_X0Y97'
+Info:     Constraining 'ddram_a[2]' to site 'IOB_X0Y81'
+Info:     Tile 'LIOB33_X0Y81'
+Info:     Constraining 'ddram_a[3]' to site 'IOB_X0Y76'
+Info:     Tile 'LIOB33_X0Y75'
+Info:     Constraining 'ddram_a[4]' to site 'IOB_X0Y68'
+Info:     Tile 'LIOB33_X0Y67'
+Info:     Constraining 'ddram_a[5]' to site 'IOB_X0Y70'
+Info:     Tile 'LIOB33_X0Y69'
+Info:     Constraining 'ddram_a[6]' to site 'IOB_X0Y77'
+Info:     Tile 'LIOB33_X0Y77'
+Info:     Constraining 'ddram_a[7]' to site 'IOB_X0Y67'
+Info:     Tile 'LIOB33_X0Y67'
+Info:     Constraining 'ddram_a[8]' to site 'IOB_X0Y69'
+Info:     Tile 'LIOB33_X0Y69'
+Info:     Constraining 'ddram_a[9]' to site 'IOB_X0Y98'
+Info:     Tile 'LIOB33_X0Y97'
+Info:     Constraining 'ddram_dq[0]' to site 'IOB_X0Y13'
+Info:     Tile 'LIOB33_X0Y13'
+Info:     Constraining 'ddram_dq[10]' to site 'IOB_X0Y25'
+Info:     Tile 'LIOB33_X0Y25'
+Info:     Constraining 'ddram_dq[11]' to site 'IOB_X0Y29'
+Info:     Tile 'LIOB33_X0Y29'
+Info:     Constraining 'ddram_dq[12]' to site 'IOB_X0Y26'
+Info:     Tile 'LIOB33_X0Y25'
+Info:     Constraining 'ddram_dq[13]' to site 'IOB_X0Y30'
+Info:     Tile 'LIOB33_X0Y29'
+Info:     Constraining 'ddram_dq[14]' to site 'IOB_X0Y27'
+Info:     Tile 'LIOB33_X0Y27'
+Info:     Constraining 'ddram_dq[15]' to site 'IOB_X0Y35'
+Info:     Tile 'LIOB33_X0Y35'
+Info:     Constraining 'ddram_dq[1]' to site 'IOB_X0Y14'
+Info:     Tile 'LIOB33_X0Y13'
+Info:     Constraining 'ddram_dq[2]' to site 'IOB_X0Y16'
+Info:     Tile 'LIOB33_X0Y15'
+Info:     Constraining 'ddram_dq[3]' to site 'IOB_X0Y21'
+Info:     Tile 'LIOB33_X0Y21'
+Info:     Constraining 'ddram_dq[4]' to site 'IOB_X0Y15'
+Info:     Tile 'LIOB33_X0Y15'
+Info:     Constraining 'ddram_dq[5]' to site 'IOB_X0Y22'
+Info:     Tile 'LIOB33_X0Y21'
+Info:     Constraining 'ddram_dq[6]' to site 'IOB_X0Y18'
+Info:     Tile 'LIOB33_X0Y17'
+Info:     Constraining 'ddram_dq[7]' to site 'IOB_X0Y17'
+Info:     Tile 'LIOB33_X0Y17'
+Info:     Constraining 'ddram_dq[8]' to site 'IOB_X0Y28'
+Info:     Tile 'LIOB33_X0Y27'
+Info:     Constraining 'ddram_dq[9]' to site 'IOB_X0Y36'
+Info:     Tile 'LIOB33_X0Y35'
+Info:     Constraining 'ddram_dqs_p[0]' to site 'IOB_X0Y20'
+Info:     Tile 'LIOB33_X0Y19'
+Info:     Constraining 'ddram_dqs_n[0]' to site 'IOB_X0Y19'
+Info:     Tile 'LIOB33_X0Y19'
+Info:     Constraining 'ddram_dqs_p[1]' to site 'IOB_X0Y32'
+Info:     Tile 'LIOB33_X0Y31'
+Info:     Constraining 'ddram_dqs_n[1]' to site 'IOB_X0Y31'
+Info:     Tile 'LIOB33_X0Y31'
+Info: Generating input buffer for 'clk_50$ibuf$'
+Info: Generating output buffer for 'ddram_cas_n$obuf$'
+Info: Generating output buffer for 'ddram_cke$obuf$'
+Info: Generating output buffer for 'ddram_cs_n$obuf$'
+Info: Generating output buffer for 'ddram_odt$obuf$'
+Info: Generating output buffer for 'ddram_ras_n$obuf$'
+Info: Generating output buffer for 'ddram_reset_n$obuf$'
+Info: Generating output buffer for 'ddram_we_n$obuf$'
+Info:     Constraining 'pcie_7x_top_aximm_i.pcie_7x_i.gt_wrapper_gtx.pipe_wrapper_i.gtxe2_channel_i' to site 'GTXE2_CHANNEL_X0Y23'
+Info:     Tile 'GTX_CHANNEL_3_X309Y306'
+Info:     Constraining 'pcie_7x_top_aximm_i.refclk_ibuf' to site 'IBUFDS_GTE2_X0Y10/IBUFDS_GTE2'
+Info:     Tile 'GTX_COMMON_X309Y283'
+Info:     Constraining 'pcie_7x_top_aximm_i.pcie_7x_i.gt_wrapper_gtx.pipe_wrapper_i.gtxe2_common_i' to site 'GTXE2_COMMON_X0Y5'
+Info:     Tile 'GTX_COMMON_X309Y283'
+Info: Generating input buffer for 'pcie_7x_top_aximm_i.genblk1.sys_reset_n_ibuf'
+Info: Generating output buffer for 'led[0]$obuf$'
+Info: Generating output buffer for 'led[1]$obuf$'
+Info: Generating output buffer for 'led[2]$obuf$'
+Info: Generating output buffer for 'ddram_a[0]$obuf$'
+Info: Generating output buffer for 'ddram_a[10]$obuf$'
+Info: Generating output buffer for 'ddram_a[11]$obuf$'
+Info: Generating output buffer for 'ddram_a[12]$obuf$'
+Info: Generating output buffer for 'ddram_a[13]$obuf$'
+Info: Generating output buffer for 'ddram_a[14]$obuf$'
+Info: Generating output buffer for 'ddram_ba[0]$obuf$'
+Info: Generating output buffer for 'ddram_ba[1]$obuf$'
+Info: Generating output buffer for 'ddram_ba[2]$obuf$'
+Info: Generating output buffer for 'ddram_a[1]$obuf$'
+Info: Generating output buffer for 'ddram_a[2]$obuf$'
+Info: Generating output buffer for 'ddram_a[3]$obuf$'
+Info: Generating output buffer for 'ddram_a[4]$obuf$'
+Info: Generating output buffer for 'ddram_a[5]$obuf$'
+Info: Generating output buffer for 'ddram_a[6]$obuf$'
+Info: Generating output buffer for 'ddram_a[7]$obuf$'
+Info: Generating output buffer for 'ddram_a[8]$obuf$'
+Info: Generating output buffer for 'ddram_a[9]$obuf$'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[0].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[0].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[10].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[10].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[11].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[11].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[12].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[12].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[13].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[13].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[14].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[14].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[15].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[15].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[1].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[1].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[2].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[2].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[3].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[3].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[4].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[4].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[5].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[5].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[6].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[6].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[7].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[7].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[8].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[8].genblk1.IOBUF_data'
+Info: Generating input buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[9].genblk1.IOBUF_data'
+Info: Generating output buffer for 'rowstream_ddr3.uberddr3.ddr3_phy_inst.genblk5[9].genblk1.IOBUF_data'
+Info:     Created 3 INVERTER cells from:
+Info:              3x INV
+Info:     Created 58 PAD cells from:
+Info:             58x PAD
+Info:     Created 1 PCIE_2_1_PCIE_2_1 cells from:
+Info:              1x PCIE_2_1
+Info: Preparing clocking...
+Info: Packing constants..
+Info: Packing cfg...
+Info:     Constraining 'pcie_7x_top_aximm_i.task6_pcie_status_i.bscan' to site 'BSCAN_X0Y0/BSCAN'
+Info:     Constraining 'rowstream_ddr3.jtag_command_shift.bscan' to site 'BSCAN_X0Y1/BSCAN'
+Info: Packing PLLs...
+Info:     Constrained PLLE2_ADV_PLLE2_ADV 'rowstream_ddr3.clock_pll' to bel 'PLLE2_ADV_X0Y3/PLLE2_ADV' based on dedicated routing
+Info: Packing Gigabit Transceivers..
+Info: Driver pcie_7x_top_aximm_i.refclk_ibuf of net pcie_7x_top_aximm_i.sys_clk is a IBUFDS_GTE2 block
+Info: Packing global buffers...
+Info:     Constrained BUFGCTRL 'rowstream_ddr3.clk100_90_bufg' to bel 'BUFGCTRL_X0Y0/BUFGCTRL' based on dedicated routing
+Info:     Constrained BUFGCTRL 'rowstream_ddr3.clk100_bufg' to bel 'BUFGCTRL_X0Y5/BUFGCTRL' based on dedicated routing
+Info:     Constrained BUFGCTRL 'rowstream_ddr3.clk200_bufg' to bel 'BUFGCTRL_X0Y6/BUFGCTRL' based on dedicated routing
+Info:     Constrained BUFGCTRL 'rowstream_ddr3.clk25_bufg' to bel 'BUFGCTRL_X0Y7/BUFGCTRL' based on dedicated routing
+Info: Packing MUX[789]s..
+Info: Packing carries..
+Info:    Grouped 1968 MUXCYs and 1968 XORCYs into 140 chains.
+Info:    Blasted 0 non-chain MUXCYs and 29 non-chain XORCYs to soft logic
+Info: Packing LUTs..
+Info:     Created 27923 SLICE_LUTX cells from:
+Info:          12433x LUT1
+Info:           2344x LUT2
+Info:           3611x LUT3
+Info:           1363x LUT4
+Info:           2256x LUT5
+Info:           5916x LUT6
+Info: Packing DRAM..
+Info:    Transformed 0 tied-low DRAM address inputs to be tied-high
+Info: Packing BRAM..
+Info: Packing DSPs..
+Info: Packing flipflops..
+Info:     Created 12839 SLICE_FFX cells from:
+Info:           4550x FDCE
+Info:              7x FDPE
+Info:           8205x FDRE
+Info:             77x FDSE
+Info:     Created 2278 SELMUX2_1 cells from:
+Info:           1680x MUXF7
+Info:            598x MUXF8
+Info: Constrained 5796 LUTFF pairs.
+
+Info: Annotating ports with timing budgets for target frequency 12.00 MHz
+Info: Checksum: 0xabcb80b8
+
+Info: Device utilisation:
+Info: 	          SLICE_LUTX: 28147/597200     4%
+Info: 	           SLICE_FFX: 12839/597200     2%
+Info: 	              CARRY4:   499/74650     0%
+Info: 	          PSEUDO_GND:     1/136359     0%
+Info: 	          PSEUDO_VCC:     1/136359     0%
+Info: 	               HARD0:     0/ 3168     0%
+Info: 	            RAMB18E1:     0/ 1910     0%
+Info: 	            FIFO18E1:     0/  955     0%
+Info: 	        RAMBFIFO36E1:     0/  955     0%
+Info: 	            RAMB36E1:     4/  955     0%
+Info: 	             DSP48E1:     0/ 1920     0%
+Info: 	                 PAD:    58/  946     6%
+Info: 	       IOB33M_OUTBUF:     3/  192     1%
+Info: 	       IOB33S_OUTBUF:     3/  192     1%
+Info: 	        IOB33_OUTBUF:    44/  400    11%
+Info: 	     IOB33M_INBUF_EN:     2/  192     1%
+Info: 	     IOB33S_INBUF_EN:     0/  192     0%
+Info: 	      IOB33_INBUF_EN:    18/  400     4%
+Info: 	IOB33M_TERM_OVERRIDE:     0/  192     0%
+Info: 	IOB33S_TERM_OVERRIDE:     0/  192     0%
+Info: 	 IOB33_TERM_OVERRIDE:     0/  400     0%
+Info: 	       PULL_OR_KEEP1:     0/  784     0%
+Info: 	            IDELAYE2:    18/  400     4%
+Info: 	        OLOGICE3_TFF:     0/  400     0%
+Info: 	      OLOGICE3_OUTFF:     0/  400     0%
+Info: 	       OLOGICE3_MISR:     0/  400     0%
+Info: 	           OSERDESE2:    43/  400    10%
+Info: 	        ILOGICE3_IFF:     0/  400     0%
+Info: 	ILOGICE3_ZHOLD_DELAY:     0/  400     0%
+Info: 	           ISERDESE2:    18/  400     4%
+Info: 	               BUFIO:     0/   32     0%
+Info: 	          IDELAYCTRL:     1/    8    12%
+Info: 	            BUFGCTRL:    10/   32    31%
+Info: 	            PCIE_2_1:     1/    1   100%
+Info: 	               BSCAN:     2/    4    50%
+Info: 	                BUFG:     0/   32     0%
+Info: 	              BUFHCE:     0/  192     0%
+Info: 	            DCIRESET:     0/    1     0%
+Info: 	            DNA_PORT:     0/    1     0%
+Info: 	           EFUSE_USR:     0/    1     0%
+Info: 	           FRAME_ECC:     0/    1     0%
+Info: 	       GTXE2_CHANNEL:     1/   32     3%
+Info: 	        GTXE2_COMMON:     1/    8    12%
+Info: 	         IBUFDS_GTE2:     1/   16     6%
+Info: 	                ICAP:     0/    2     0%
+Info: 	            INVERTER:     3/  192     1%
+Info: 	          MMCME2_ADV:     1/    8    12%
+Info: 	        OLOGICE2_TFF:     0/  400     0%
+Info: 	      OLOGICE2_OUTFF:     0/  400     0%
+Info: 	           PLLE2_ADV:     1/    8    12%
+Info: 	           SELMUX2_1:  2278/225550     1%
+Info: 	             STARTUP:     0/    1     0%
+Info: 	          USR_ACCESS:     0/    1     0%
+Info: 	              BUFFER:     0/  162     0%
+Info: 	        ILOGICE2_IFF:     0/  400     0%
+Info: 	       OLOGICE2_MISR:     0/  400     0%
+
+Info: Placed 222 cells based on constraints.
+Info: Creating initial analytic placement for 28924 cells, random placement wirelen = 14818012.
+Info:     at initial placer iter 0, wirelen = 181917
+Info:     at initial placer iter 1, wirelen = 148416
+Info:     at initial placer iter 2, wirelen = 138585
+Info:     at initial placer iter 3, wirelen = 136358
+Info: Running main analytical placer.
+Info:     at iteration #1, type ALL: wirelen solved = 132663, spread = 1435571, legal = 1833397; time = 14.74s
+Info:     at iteration #2, type ALL: wirelen solved = 253478, spread = 876176, legal = 1153045; time = 8.89s
+Info:     at iteration #3, type ALL: wirelen solved = 319836, spread = 735919, legal = 1010093; time = 7.62s
+Info:     at iteration #4, type ALL: wirelen solved = 398994, spread = 634260, legal = 920186; time = 8.43s
+Info:     at iteration #5, type ALL: wirelen solved = 432672, spread = 621467, legal = 876345; time = 7.17s
+Info:     at iteration #6, type ALL: wirelen solved = 457708, spread = 611539, legal = 846732; time = 5.57s
+Info:     at iteration #7, type ALL: wirelen solved = 475870, spread = 613896, legal = 871057; time = 6.42s
+Info:     at iteration #8, type ALL: wirelen solved = 491839, spread = 629197, legal = 822738; time = 4.59s
+Info:     at iteration #9, type ALL: wirelen solved = 510348, spread = 632112, legal = 809836; time = 4.09s
+Info:     at iteration #10, type ALL: wirelen solved = 527267, spread = 663225, legal = 848393; time = 3.90s
+Info:     at iteration #11, type ALL: wirelen solved = 538621, spread = 653347, legal = 782864; time = 2.89s
+Info:     at iteration #12, type ALL: wirelen solved = 556020, spread = 658307, legal = 804149; time = 3.07s
+Info:     at iteration #13, type ALL: wirelen solved = 563452, spread = 680482, legal = 787953; time = 2.49s
+Info:     at iteration #14, type ALL: wirelen solved = 589187, spread = 684552, legal = 814016; time = 2.91s
+Info:     at iteration #15, type ALL: wirelen solved = 599594, spread = 703993, legal = 797623; time = 2.36s
+Info:     at iteration #16, type ALL: wirelen solved = 613133, spread = 703196, legal = 788891; time = 2.17s
+Info: HeAP Placer Time: 95.08s
+Info:   of which solving equations: 10.79s
+Info:   of which spreading cells: 3.86s
+Info:   of which strict legalisation: 74.28s
+
+Info: Running simulated annealing placer for refinement.
+Info:   at iteration #1: temp = 0.000000, timing cost = 389616, wirelen = 782864
+Info:   at iteration #5: temp = 0.000000, timing cost = 367902, wirelen = 727700
+Info:   at iteration #10: temp = 0.000000, timing cost = 365776, wirelen = 724613
+Info:   at iteration #15: temp = 0.000000, timing cost = 365298, wirelen = 724124
+Info:   at iteration #20: temp = 0.000000, timing cost = 365205, wirelen = 724010
+Info:   at iteration #22: temp = 0.000000, timing cost = 365147, wirelen = 724005 
+Info: SA placement time 32.52s
+
+Info: Max frequency for clock 'pcie_7x_top_aximm_i.task6_pcie_status_i.drck': 428.27 MHz (PASS at 12.00 MHz)
+Info: Max frequency for clock       'rowstream_ddr3.jtag_command_shift.drck': 314.96 MHz (PASS at 12.00 MHz)
+Info: Max frequency for clock        'rowstream_ddr3.jtag_command_shift.tck': 2500.00 MHz (PASS at 12.00 MHz)
+Info: Max frequency for clock                                'rowstream_clk': 46.64 MHz (FAIL at 83.33 MHz)
+Info: Max frequency for clock                                'pcie_user_clk': 58.72 MHz (FAIL at 62.50 MHz)
+Info: Max frequency for clock 'pcie_7x_top_aximm_i.pcie_7x_i.PIPE_OOBCLK_IN': 156.74 MHz (PASS at 12.00 MHz)
+
+Info: Max delay posedge pcie_user_clk                          -> posedge pcie_7x_top_aximm_i.task6_pcie_status_i.drck: 2.75 ns
+Info: Max delay posedge pcie_user_clk                          -> posedge rowstream_clk                               : 11.81 ns
+Info: Max delay posedge rowstream_clk                          -> posedge pcie_user_clk                               : 5.91 ns
+Info: Max delay posedge rowstream_ddr3.jtag_command_shift.drck -> posedge rowstream_ddr3.jtag_command_shift.tck       : 1.80 ns
+Info: Max delay posedge rowstream_ddr3.jtag_command_shift.tck  -> posedge rowstream_clk                               : 2.70 ns
+Info: Max delay posedge rowstream_ddr3.jtag_command_shift.tck  -> posedge rowstream_ddr3.jtag_command_shift.drck      : 2.01 ns
+
+Info: Slack histogram:
+Info:  legend: * represents 188 endpoint(s)
+Info:          + represents [1,188) endpoint(s)
+Info: [ -9440,  -4811) |*****+
+Info: [ -4811,   -182) |****+
+Info: [  -182,   4447) |**********************+
+Info: [  4447,   9076) |************************************************************ 
+Info: [  9076,  13705) |*********************************+
+Info: [ 13705,  18334) |***********+
+Info: [ 18334,  22963) | 
+Info: [ 22963,  27592) | 
+Info: [ 27592,  32221) | 
+Info: [ 32221,  36850) | 
+Info: [ 36850,  41479) | 
+Info: [ 41479,  46108) | 
+Info: [ 46108,  50737) | 
+Info: [ 50737,  55366) | 
+Info: [ 55366,  59995) | 
+Info: [ 59995,  64624) | 
+Info: [ 64624,  69253) | 
+Info: [ 69253,  73882) | 
+Info: [ 73882,  78511) |+
+Info: [ 78511,  83140) |***********+
+Info: Checksum: 0x8e476081
+Info: Running post-placement legalisation...
+30 warnings, 0 errors

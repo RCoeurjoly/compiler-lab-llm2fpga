@@ -23,6 +23,7 @@ module compiler_ddr3_trace_replay_csr (
     output reg s_axi_rvalid,
     input wire s_axi_rready,
     output reg [1:0] s_axi_rresp,
+    output wire replay_active,
     output wire wb_cyc, wb_stb, wb_we,
     output wire [31:0] wb_addr,
     output wire [15:0] wb_sel,
@@ -36,6 +37,7 @@ module compiler_ddr3_trace_replay_csr (
   reg [127:0] staged_expected;
   reg [4:0] staged_mask;
   wire [1:0] state;
+  assign replay_active = state == 1;
   wire sealed, starved, push_ready;
   wire [4:0] fifo_level;
   wire [31:0] expected_count, pushed_count, accepted_count, response_count, checked_count;
