@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "name": "task3h-m2-static-word-banking-same-edge",
+  "base_revision": "e368449e30d5268433443c7de7a9017e5b9187ee",
+  "input_sha256": "224b3a384770378a64768aaa900adcba07a3672812dd92d3b70fadf6a88315f1",
+  "output_sha256": "d3974d466d6e13c895d888d09fb63d8725a15be72756736dae948d30b4b3acea",
+  "latency_cycles": 0,
+  "retained_m2_bits": 1024,
+  "compensation_enabled_input_unchanged": true
+}

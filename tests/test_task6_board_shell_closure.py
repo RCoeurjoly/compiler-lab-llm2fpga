@@ -1,7 +1,10 @@
 """Fail closed on wrong board-shell identities, not merely familiar basenames."""
 import copy
+import hashlib
 import importlib.util
 from pathlib import Path
+import os
+import subprocess
 import tempfile
 import unittest
 
@@ -50,6 +53,23 @@ class BoardShellClosureTest(unittest.TestCase):
             manifest["sources"][0]["source"] = source
             with self.subTest(source=source), self.assertRaises(ValueError):
                 module.verify_manifest(manifest)
+
+    def test_nix_materializes_authenticated_m2_production_closure(self):
+        env = dict(os.environ)
+        env.setdefault("XDG_CACHE_HOME", "/tmp/task3s-nix-cache")
+        result = subprocess.run(
+            ["nix", "build", ".#task6-board-shell-m2-source-closure",
+             "--impure", "--no-link", "--print-out-paths"],
+            cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        closure = Path(result.stdout.strip().splitlines()[-1])
+        ingress = closure / "llm2fpga/fpga/rtl/task6_pcie_axil_rowstream_loader_ingress.v"
+        self.assertEqual(
+            hashlib.sha256(ingress.read_bytes()).hexdigest(),
+            "d3974d466d6e13c895d888d09fb63d8725a15be72756736dae948d30b4b3acea")
+        self.assertEqual(
+            hashlib.sha256((closure / "m2-banking-overlay.json").read_bytes()).hexdigest(),
+            "a7172b30624d64101a18784f65748b0801d4e5e22f1ff0a8a85d8d039699ac63")
 
 
 if __name__ == "__main__":

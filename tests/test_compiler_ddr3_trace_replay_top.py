@@ -21,6 +21,11 @@ class ReplayTopTest(unittest.TestCase):
             staged_shell = Path(directory) / shell.name
             staged_shell.write_bytes(transform(shell.read_bytes()))
             sources[sources.index(shell)] = staged_shell
+            from scripts.pipeline.apply_task6_m2_banking_overlay import transform as bank_transform
+            ingress = shell.with_name("task6_pcie_axil_rowstream_loader_ingress.v")
+            banked_ingress = Path(directory) / ingress.name
+            banked_ingress.write_bytes(bank_transform(ingress.read_bytes()))
+            sources[sources.index(ingress)] = banked_ingress
             # The pinned loader uses 3-bit enum literals in a 4-bit enum.
             # Verilator accepts this legacy source; Icarus rejects it. Do not
             # rewrite the authenticated loader just for simulator convenience.
@@ -57,6 +62,10 @@ class ReplayTopTest(unittest.TestCase):
                        ROOT / "third_party/task6-e368449/fpga/rtl/task6_wishbone_owner_mux.sv",
                        ROOT / "third_party/task6-e368449/fpga/rtl/task6_pcie_axil_rowstream_loader_ingress.v",
                        ROOT / "tests/rtl/compiler_ddr3_trace_replay_top_tb.sv"]
+            from scripts.pipeline.apply_task6_m2_banking_overlay import transform as bank_transform
+            banked_ingress = Path(directory) / sources[4].name
+            banked_ingress.write_bytes(bank_transform(sources[4].read_bytes()))
+            sources[4] = banked_ingress
             if mutation:
                 old, new = mutation
                 text = top.read_text()

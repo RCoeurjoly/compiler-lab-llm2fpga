@@ -2985,6 +2985,7 @@ PY
       in {
         packages = {
           task6-board-shell-source-closure = task6BoardShell.sourceClosure;
+          task6-board-shell-m2-source-closure = task6BoardShell.m2SourceClosure;
           compiler-ddr3-trace-replay-synthesis-screen = task6BoardShell.replaySynthesis;
           inherit circt mlir torchMlir yosysPkg modelRegistryJson surveyPython
             surveyPhase1
