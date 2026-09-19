@@ -29,7 +29,12 @@ class M2CandidateProvenanceTest(unittest.TestCase):
                          "d7b3ec7cddb4d08caa270838d208e62879a51b1fdcb3cd14582a8c34c6d30009")
         self.assertEqual(proof["difference_classes"], {
             "ordering": 0, "source_path_keys": 76,
-            "source_path_values": 16116, "unexplained": 0})
+            "source_path_values": 16116,
+            "metadata_values": {
+                "src": 16023, "module_src": 46, "cell_src": 43,
+                "generated_function_hdlname": 4},
+            "generated_keys": {"cells": 1, "netnames": 75},
+            "unexplained": 0})
         self.assertEqual(len(receipt["sources"]), 36)
         self.assertTrue(all(len(row["sha256"]) == 64 for row in receipt["sources"]))
         self.assertEqual(receipt["profile"]["seed"], 15)

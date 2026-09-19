@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import shlex
 
 
@@ -50,27 +51,102 @@ def _normalize_string(value, replacements):
     return value
 
 
-def _normalize(value, replacements):
+_RESERVED_SOURCE_TOKEN = re.compile(r"@source/\d{2,}")
+_GENERATED_LOCATION = re.compile(
+    r":\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?\$\d+")
+_PROVENANCE_ATTRIBUTES = {"src", "module_src", "cell_src"}
+
+
+def _reject_reserved_tokens(value, path=()):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if _RESERVED_SOURCE_TOKEN.search(key):
+                raise NetlistMismatch(
+                    f"reserved canonical source token in raw key at {path!r}")
+            _reject_reserved_tokens(child, path + (key,))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            _reject_reserved_tokens(child, path + (index,))
+    elif isinstance(value, str) and _RESERVED_SOURCE_TOKEN.search(value):
+        raise NetlistMismatch(
+            f"reserved canonical source token in raw value at {path!r}")
+
+
+def _normalize_generated_key(key, child, context, replacements):
+    if context not in ("cells", "netnames") or not isinstance(child, dict):
+        return key
+    result = key
+    for physical, logical in replacements:
+        function_marker = f"$func${physical}"
+        attributes = child.get("attributes", {})
+        hdlname = attributes.get("hdlname") if isinstance(attributes, dict) else None
+        public_generated_function = (
+            context == "netnames" and child.get("hide_name") == 0 and
+            isinstance(hdlname, str) and function_marker in key and
+            function_marker in hdlname and
+            key.split(function_marker, 1)[1] ==
+            hdlname.split(function_marker, 1)[1] and
+            _GENERATED_LOCATION.match(key.split(function_marker, 1)[1]))
+        if child.get("hide_name") != 1 and not public_generated_function:
+            continue
+        start = 0
+        while True:
+            index = result.find(physical, start)
+            if index < 0:
+                break
+            prefix = result[:index]
+            suffix = result[index + len(physical):]
+            generated_prefix = re.search(r"\$[^$\s]*\$$", prefix)
+            if generated_prefix and _GENERATED_LOCATION.match(suffix):
+                result = result[:index] + logical + suffix
+                start = index + len(logical)
+            else:
+                start = index + len(physical)
+    return result
+
+
+def _normalize_attribute(field, value, replacements):
+    if not isinstance(value, str):
+        return value
+    if field in _PROVENANCE_ATTRIBUTES:
+        return _normalize_string(value, replacements)
+    if field == "hdlname":
+        for physical, logical in replacements:
+            value = value.replace(f"$func${physical}", f"$func${logical}")
+    return value
+
+
+def _normalize(value, replacements, path=()):
     if isinstance(value, dict):
         result = {}
+        context = path[-1] if path else None
         for key, child in value.items():
-            normalized_key = _normalize_string(key, replacements)
+            normalized_key = _normalize_generated_key(
+                key, child, context, replacements)
             if normalized_key in result:
                 raise NetlistMismatch(f"source-path normalization collides at key: {normalized_key}")
-            result[normalized_key] = _normalize(child, replacements)
+            if context == "attributes":
+                normalized_child = _normalize_attribute(key, child, replacements)
+            else:
+                normalized_child = _normalize(child, replacements, path + (normalized_key,))
+            result[normalized_key] = normalized_child
         return result
     if isinstance(value, list):
-        return [_normalize(child, replacements) for child in value]
-    if isinstance(value, str):
-        return _normalize_string(value, replacements)
+        return [_normalize(child, replacements, path + (index,))
+                for index, child in enumerate(value)]
     return value
 
 
 def _classify(left, right, left_replacements, right_replacements, counts):
+    _classify_at(left, right, left_replacements, right_replacements, counts, ())
+
+
+def _classify_at(left, right, left_replacements, right_replacements, counts, path):
     if isinstance(left, dict) and isinstance(right, dict):
-        left_items = [(_normalize_string(key, left_replacements), key, value)
+        context = path[-1] if path else None
+        left_items = [(_normalize_generated_key(key, value, context, left_replacements), key, value)
                       for key, value in left.items()]
-        right_items = [(_normalize_string(key, right_replacements), key, value)
+        right_items = [(_normalize_generated_key(key, value, context, right_replacements), key, value)
                        for key, value in right.items()]
         if [item[0] for item in left_items] != [item[0] for item in right_items]:
             counts["ordering"] += 1
@@ -84,22 +160,30 @@ def _classify(left, right, left_replacements, right_replacements, counts):
             right_raw_key, right_value = right_by_key[key]
             if left_raw_key != right_raw_key:
                 counts["source_path_keys"] += 1
-            _classify(left_value, right_value, left_replacements,
-                      right_replacements, counts)
+                counts["generated_keys"][context] += 1
+            _classify_at(left_value, right_value, left_replacements,
+                         right_replacements, counts, path + (key,))
         return
     if isinstance(left, list) and isinstance(right, list):
         if len(left) != len(right):
             counts["unexplained"] += 1
             return
         for left_value, right_value in zip(left, right):
-            _classify(left_value, right_value, left_replacements,
-                      right_replacements, counts)
+            _classify_at(left_value, right_value, left_replacements,
+                         right_replacements, counts, path + (0,))
         return
     if left != right:
-        if (isinstance(left, str) and isinstance(right, str) and
-                _normalize_string(left, left_replacements) ==
-                _normalize_string(right, right_replacements)):
+        field = path[-1] if path else None
+        is_attribute = len(path) >= 2 and path[-2] == "attributes"
+        normalized_left = (_normalize_attribute(field, left, left_replacements)
+                           if is_attribute else left)
+        normalized_right = (_normalize_attribute(field, right, right_replacements)
+                            if is_attribute else right)
+        if normalized_left == normalized_right and left != right:
             counts["source_path_values"] += 1
+            label = ("generated_function_hdlname" if field == "hdlname"
+                     else field)
+            counts["metadata_values"][label] += 1
         else:
             counts["unexplained"] += 1
 
@@ -115,6 +199,8 @@ def compare_netlists(left_netlist, left_script, right_netlist, right_script):
 
     left_raw, right_raw = left_netlist.read_bytes(), right_netlist.read_bytes()
     left_design, right_design = json.loads(left_raw), json.loads(right_raw)
+    _reject_reserved_tokens(left_design)
+    _reject_reserved_tokens(right_design)
     left_replacements, right_replacements = _replacements(left_rows), _replacements(right_rows)
     left_canonical = _normalize(left_design, left_replacements)
     right_canonical = _normalize(right_design, right_replacements)
@@ -122,6 +208,10 @@ def compare_netlists(left_netlist, left_script, right_netlist, right_script):
     right_bytes = json.dumps(right_canonical, sort_keys=True, separators=(",", ":")).encode()
 
     counts = {"source_path_values": 0, "source_path_keys": 0,
+              "metadata_values": {"src": 0, "module_src": 0,
+                                  "cell_src": 0,
+                                  "generated_function_hdlname": 0},
+              "generated_keys": {"cells": 0, "netnames": 0},
               "ordering": 0, "unexplained": 0}
     _classify(left_design, right_design, left_replacements,
               right_replacements, counts)
