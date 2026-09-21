@@ -26,3 +26,12 @@ Evidence:
 
 The reusable transform is
 `scripts/pipeline/legalize_xc7_primitive_json.py`.
+
+The additional `nextpnr-ram64d-placement-terminated.log` records the next
+mapped-shell experiment. The 192 temporary `RAMD64E` cells were converted to
+`RAM64X1D`, the dual-port LUTRAM form handled by this pinned XC7 packer.
+Packing completed and reported 290,186 LUTs, 209,350 FFs, 13 RAMB18E1, and 46
+RAMB36E1, with PCIe, two BSCAN endpoints, and the fixed 30 MHz target still
+present. The process then terminated during the main analytical placer before
+placement/routing, FASM, or a bitstream existed. This is diagnostic evidence,
+not an implementation or hardware result.

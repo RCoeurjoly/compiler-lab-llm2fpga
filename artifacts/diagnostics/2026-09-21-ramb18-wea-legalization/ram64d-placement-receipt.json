@@ -1,0 +1,27 @@
+{
+  "experiment": "ramd64e-to-ram64x1d-mapped-shell-placement",
+  "converted_json_sha256": "b79c148167c9d2ff3b71be94f6c0f1981132fe18f59077b0df02bafde0197842",
+  "converted_cells": 192,
+  "primitive_conversion": {
+    "from": "RAMD64E",
+    "to": "RAM64X1D",
+    "write_address": "WADR[0:5] -> A[0:5]",
+    "read_address": "RADR[0:5] -> DPRA[0:5]",
+    "write_data": "I -> D",
+    "write_clock": "CLK -> WCLK",
+    "write_enable": "WE -> WE",
+    "read_data": "O -> DPO"
+  },
+  "nextpnr": {
+    "version": "0.8.2",
+    "chipdb_sha256": "d8472bfcc19dc31686d80cc34f0d37b958c268656182537b06b3439711b105f1",
+    "seed": 15,
+    "target_mhz": 30,
+    "timing_allow_fail": true,
+    "result": "terminated_during_main_analytical_placement",
+    "log_sha256": "309b548ae52fb028f89096afc8eb6b58f9373e274041b3a6e11a8998b3c81e14",
+    "fasm_produced": false,
+    "routed_json_produced": false
+  },
+  "interpretation": "RAMD64E primitive packing was bypassed; the mapped shell remains too large or expensive for this placement attempt. No board claim is made."
+}
