@@ -6,6 +6,7 @@
     "path": "/tmp/compiler-backend-staged-json6.json",
     "sha256": "55f8d92e5f4058dc3c9f814ea109bf940bb9f1897b4f02d57ae363e5824bf05b",
     "bytes": 130023424,
+    "retention": "ephemeral artifact removed after hashing when the host filesystem reached 100%; receipt remains, but the netlist is not a deliverable",
     "modules": 823,
     "backend_cells": 2,
     "main_cells": 41425
