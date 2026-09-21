@@ -1,0 +1,23 @@
+{
+  "schema": "staged-mapping-backend-frontier-v1",
+  "status": "MEMORY_LOWERING_AND_PRIMITIVE_TIMING_FRONTIER",
+  "scope": "exact compiler-generated main staged outside the validated PCIe/UberDDR3 shell",
+  "experiments": [
+    {
+      "flow": "memory_map then ABC9 LUT6",
+      "timebox_seconds": 180,
+      "result": "memory_map did not complete; ABC9 was not reached"
+    },
+    {
+      "flow": "explicit memories retained then ABC9 LUT6",
+      "timebox_seconds": 180,
+      "result": "ABC9 rejected SRLC32E primitive box without timing/connectivity metadata"
+    },
+    {
+      "flow": "explicit memories retained then classic ABC LUT6",
+      "wall_time_seconds": 23.21,
+      "result": "completed but extracted zero eligible gates; generic arithmetic/logic legalization remains pending"
+    }
+  ],
+  "interpretation": "The staged boundary is working, but the next compiler/backend work must lower explicit memories and generic operations with a target-aware, bounded pass; changing PCIe, DDR3, or model arithmetic would not address this evidence."
+}
