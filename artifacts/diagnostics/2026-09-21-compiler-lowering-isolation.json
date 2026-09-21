@@ -1,0 +1,48 @@
+{
+  "schema": "compiler-lowering-isolation-v1",
+  "status": "COMPILER_MAIN_ELABORATES_SHELL_LOWERING_TIMEBOXED",
+  "model": {
+    "path": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv",
+    "sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a"
+  },
+  "observations": [
+    {
+      "scope": "exact generated main, read_verilog + hierarchy + proc + opt + stat",
+      "result": "PASS",
+      "wall_time_seconds": 14,
+      "main_local_cells_after_proc_opt": 7516,
+      "main_local_wires": 16642,
+      "main_submodules": 2747,
+      "external_memory_bank_instances": 197,
+      "control_state_width_bits": 402
+    },
+    {
+      "scope": "full PCIe/UberDDR3 shell, flattened, generic lowering",
+      "result": "TIMEBOX",
+      "wall_time_seconds": 600,
+      "last_observed_pass": "SHARE",
+      "interpretation": "SAT-based resource sharing prevents a mapped-netlist frontier"
+    },
+    {
+      "scope": "full PCIe/UberDDR3 shell, hierarchical (no flatten, no share)",
+      "result": "TIMEBOX",
+      "wall_time_seconds": 300,
+      "last_observed_pass": "PROC_MUX",
+      "interpretation": "The raw shell source closure also dominates generic process lowering"
+    },
+    {
+      "scope": "exact generated main, no FSM extraction/no share custom flow",
+      "result": "TIMEBOX",
+      "wall_time_seconds": 180,
+      "last_observed_pass": "OPT",
+      "interpretation": "Technology mapping needs a staged or precompiled boundary; this is not a semantic failure"
+    }
+  ],
+  "next_action": "Preserve the validated PCIe/UberDDR3 shell as a locked synthesis boundary and develop a compiler-owned staged netlist flow; do not change model arithmetic or transport based only on these timeouts.",
+  "claims": {
+    "compiler_main_functional_simulation": "already authenticated elsewhere",
+    "pci_ddr3_transport_replay": "already authenticated elsewhere",
+    "compiler_first_token_hardware": "not claimed",
+    "fit_or_timing": "not claimed"
+  }
+}
