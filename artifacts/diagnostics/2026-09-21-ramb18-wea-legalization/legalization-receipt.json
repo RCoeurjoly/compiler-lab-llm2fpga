@@ -1,0 +1,24 @@
+{
+  "schema": "llm2fpga.xc7-primitive-json-legalization.v1",
+  "status": "PASS",
+  "input": "/tmp/t4-composed-lutramd-pdirs.json",
+  "input_sha256": "20fb104f91c192d0185e63c60cb95ff364a1cd53cab9646e72beec48fb8ed34c",
+  "output": "/tmp/t4-composed-lutramd-legalized.json",
+  "output_sha256": "2d27dea2a72be57726d9a74a4bd603bfc9b0d5e259860f3a6370daecc0be163e",
+  "scope": "RAMB18E1 WEA lanes only",
+  "changed": [
+    {
+      "module": "$paramod$09e1238301018d26d81237603e96615ec4f58742\\seq_mem_d1_bram",
+      "cell": "mem.0.0",
+      "write_width_a": 9,
+      "removed_wea_lanes": 3
+    },
+    {
+      "module": "$paramod$1caacc49aa94f4d91c9010ac3bd018a1dad63691\\seq_mem_d1_bram",
+      "cell": "mem.0.0",
+      "write_width_a": 9,
+      "removed_wea_lanes": 3
+    }
+  ],
+  "changed_cells": 2
+}

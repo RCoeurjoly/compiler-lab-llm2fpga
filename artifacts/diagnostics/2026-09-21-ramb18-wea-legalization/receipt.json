@@ -1,0 +1,46 @@
+{
+  "schema": "llm2fpga.ramb18-wea-legalization-checkpoint.v1",
+  "status": "PASS_BRAM_PACKING_STOPPED_PLACEMENT",
+  "platform_profile": {
+    "device": "xc7k480tffg1156-1",
+    "seed": 15,
+    "target_mhz": 30,
+    "ddr_lanes": 2,
+    "ddr_clock_mhz": 333,
+    "ddr_user_clock_mhz": 83.33,
+    "transport": "PCIe"
+  },
+  "compiler_source_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+  "diagnosis": {
+    "first_failure": "RAMB18E1 WEA2 duplicate during nextpnr BRAM packing",
+    "failing_cell": "gen_compiler_command_adapter.compiler_command_adapter.core.compiler_core.c_fc_input_codes_i8.mem.0.0",
+    "evidence": "The mapped cell serialized four WEA lanes although WRITE_WIDTH_A used one or two; nextpnr expands used lanes to physical WEA0..WEA3.",
+    "fix_scope": "Remove unused RAMB18E1 WEA lanes only, based on WRITE_WIDTH_A."
+  },
+  "legalization": {
+    "script": "scripts/pipeline/legalize_xc7_primitive_json.py",
+    "receipt_sha256": "81626d866455bcc5c8a56697601e6d2ab72793979a2ceb4b15ba521cece6fc66",
+    "changed_cells": 2
+  },
+  "gates": {
+    "nextpnr_frontend": "pass",
+    "pcie_ddr3_primitive_packing": "pass",
+    "bram_packing": "pass",
+    "placement": "fail_unmapped_generic_shell_logic",
+    "timing": "not_run",
+    "fasm_bitstream": "not_run",
+    "hardware": "not_run"
+  },
+  "logs": {
+    "bram_pass_log": {
+      "path": "nextpnr-bram-pass-placement-failure.log",
+      "sha256": "d42891908afb5a5e813e7570b7d695cef2b7ccc089aa7c2cc35c559a6b7a7419"
+    },
+    "generic_shell_log": {
+      "path": "nextpnr-generic-shell-placement-failure.log",
+      "sha256": "69191c5426168f96a0840fc3bc717a44514acf6d36215f0fcdf9063a5fad0822"
+    }
+  },
+  "claim_boundary": "This is an implementation diagnostic only; it does not establish fit, timing closure, bitstream programming, DDR3 calibration, PCIe image load, or board inference."
+}
