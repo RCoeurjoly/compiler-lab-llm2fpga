@@ -1,0 +1,39 @@
+{
+  "schema": "compiler-target-aware-libmap-frontier-v1",
+  "status": "PASS_COMPILER_SYNTHESIS_FRONTIER",
+  "scope": "Exact compiler-generated TinyStories-1M backend, staged hierarchical Yosys lowering",
+  "model_source_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "implementation_source": "compiler-generated main plus llm_external_memory_arbiter; no kev-gpt RTL reuse",
+  "hierarchical_memory_libmap": {
+    "wall_time_seconds": 18.06,
+    "top": "tinystories_1m_ddr3_backend",
+    "preserved_submodules": ["main", "llm_external_memory_arbiter"],
+    "total_cells_including_submodules": 21514,
+    "blockram_sdp": 24,
+    "blockram_tdp": 35,
+    "lutram_sp": 52,
+    "multipliers": 38,
+    "memories_remaining": 0,
+    "processes_remaining": 0
+  },
+  "target_aware_arithmetic_and_abc": {
+    "wall_time_seconds": 61.70,
+    "abc_command": "abc -lut 6",
+    "total_cells_including_submodules": 133272,
+    "lut_primitives": 91917,
+    "dsp48e1": 255,
+    "blockram_sdp": 24,
+    "blockram_tdp": 35,
+    "lutram_sp": 52,
+    "memories_remaining": 0,
+    "processes_remaining": 0,
+    "preserved_submodules": ["main", "llm_external_memory_arbiter"]
+  },
+  "interpretation": "The compiler-generated backend now has a bounded, target-aware technology-mapping frontier: memories are legalized to Xilinx BRAM/LUTRAM and arithmetic to DSP48E1, with generic logic reduced by ABC. This is not a completed board design and does not prove PCIe/UberDDR3 composition, placement, routing, timing, bitstream generation, or hardware inference.",
+  "next_gate": "Map or pack the remaining LUT logic, then compose this compiler frontier with the locked PCIe-to-UberDDR3 shell under bounded synthesis and timing checks.",
+  "reproducibility": {
+    "flow": "nix develop . -c yosys",
+    "timeout_seconds": 240,
+    "temporary_outputs": "Ephemeral Yosys logs/scripts only; no large netlist artifact retained because of disk pressure"
+  }
+}
