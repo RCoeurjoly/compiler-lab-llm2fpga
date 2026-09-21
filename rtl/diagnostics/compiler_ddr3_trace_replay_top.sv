@@ -192,15 +192,17 @@ module compiler_ddr3_trace_replay_top #(
   wire [24:0] replay_addr;
   wire [15:0] replay_sel;
   wire [127:0] replay_rdata;
-  // Reuse the board's PLL cold reset; never tap the raw PCIe reset pad behind
-  // the endpoint's existing IBUF. PCIe reset itself is a runtime replay abort.
+  // Preserve the original row-domain-ready synchronizer. Keep local PCIe BAR
+  // reset independent of DDR, and request a cross-domain flush only after the
+  // row clock/reset domain has demonstrably become live.
   (* ASYNC_REG = "TRUE" *) reg [1:0] replay_pcie_init = 2'b00;
   always @(posedge pcie_user_clk or negedge rowstream_rst_n) begin
     if (!rowstream_rst_n) replay_pcie_init <= 2'b00;
     else replay_pcie_init <= {replay_pcie_init[0], 1'b1};
   end
   compiler_ddr3_trace_replay_bridge replay_bridge (
-    .pcie_clk(pcie_user_clk), .pcie_reset(!replay_pcie_init[1]), .pcie_abort(pcie_user_reset),
+    .pcie_clk(pcie_user_clk), .pcie_reset(!pcie_user_cfg_rst_n),
+    .pcie_abort(pcie_user_reset && replay_pcie_init[1]),
     .clk(rowstream_clk), .reset(!rowstream_rst_n), .calib_complete(rowstream_calib_complete),
     .wb_cyc(replay_cyc), .wb_stb(replay_stb), .wb_we(replay_we), .wb_addr(replay_addr),
     .wb_sel(replay_sel), .wb_stall(!replay_accept), .wb_ack(replay_ack),
@@ -652,7 +654,10 @@ module compiler_ddr3_trace_replay_bridge (
   wire transport_reset=pcie_reset || pcie_abort || flush_state!=0;
   always @(posedge pcie_clk) begin
     if(pcie_reset) begin
-      flush_state<=1; flush_ack_meta<=0; flush_ack_sync<=0;
+      // The PCIe-domain state is reset locally.  Start a cross-domain flush
+      // later through pcie_abort only if the row clock is actually available;
+      // otherwise waiting for flush_ack would permanently deadlock BAR reads.
+      flush_state<=0; flush_ack_meta<=0; flush_ack_sync<=0;
     end else begin
       flush_ack_meta<=flush_ack; flush_ack_sync<=flush_ack_meta;
       // A reset during an existing flush is already covered. Do not restart
@@ -691,6 +696,10 @@ module compiler_ddr3_trace_replay_bridge (
   reg [31:0] response_data;
   reg [1:0] response_code;
   (* ASYNC_REG = "TRUE" *) reg resp_meta, resp_sync;
+  // axis_pcie_to_al_us preserves the absolute host address. Decode this
+  // 4-KiB BAR by aperture offset, matching the legacy loader CSR behavior.
+  wire [11:0] aw_offset = awaddr[11:0];
+  wire [11:0] ar_offset = araddr[11:0];
   assign l_axi_awaddr=awaddr;
   assign l_axi_wdata=wdata;
   assign l_axi_wstrb=wstrb;
@@ -722,13 +731,13 @@ module compiler_ddr3_trace_replay_bridge (
         0: begin
           aw_sent<=0; w_sent<=0; ar_sent<=0;
           if(aw_hold && w_hold && !bvalid) begin
-            if(awaddr>=32'h900 && awaddr<32'h980) begin
-              req_write<=1; req_addr<=awaddr; req_data<=wdata; req_strb<=wstrb;
+            if(aw_offset>=12'h900 && aw_offset<12'h980) begin
+              req_write<=1; req_addr<={20'd0,aw_offset}; req_data<=wdata; req_strb<=wstrb;
               req_toggle<=!req_toggle; pstate<=3;
             end else pstate<=1;
           end else if(ar_hold && !rvalid) begin
-            if(araddr>=32'h900 && araddr<32'h980) begin
-              req_write<=0; req_addr<=araddr; req_data<=0; req_strb<=0;
+            if(ar_offset>=12'h900 && ar_offset<12'h980) begin
+              req_write<=0; req_addr<={20'd0,ar_offset}; req_data<=0; req_strb<=0;
               req_toggle<=!req_toggle; pstate<=3;
             end else pstate<=2;
           end

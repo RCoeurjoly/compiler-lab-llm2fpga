@@ -2,10 +2,14 @@
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 RECEIPT = ROOT / "artifacts/reference/compiler-ddr3-trace-replay-m2-candidate-provenance.json"
+# Task 3S is an immutable historical checkpoint. Task 4 legitimately extends
+# shared flake/Nix sources and binds those later bytes in its successor receipt.
+CHECKPOINT = "d690beee7d37eb47743c420cfccf57c26ed26b57"
 
 
 class M2CandidateProvenanceTest(unittest.TestCase):
@@ -14,8 +18,12 @@ class M2CandidateProvenanceTest(unittest.TestCase):
         receipt = json.loads(RECEIPT.read_text())
         self.assertEqual(receipt["schema"], "compiler-ddr3-trace-replay-m2-candidate-v1")
         self.assertEqual(receipt["status"], "canonical-netlist-identity-proven")
+        historical_receipt = subprocess.check_output(
+            ["git", "show", f"{CHECKPOINT}:artifacts/reference/compiler-ddr3-trace-replay-m2-candidate-provenance.json"], cwd=ROOT)
+        self.assertEqual(RECEIPT.read_bytes(), historical_receipt)
         for path, expected in receipt["tracked_inputs"].items():
-            self.assertEqual(hashlib.sha256((ROOT / path).read_bytes()).hexdigest(), expected, path)
+            content = subprocess.check_output(["git", "show", f"{CHECKPOINT}:{path}"], cwd=ROOT)
+            self.assertEqual(hashlib.sha256(content).hexdigest(), expected, path)
         self.assertEqual(receipt["transform"]["input_sha256"],
                          "224b3a384770378a64768aaa900adcba07a3672812dd92d3b70fadf6a88315f1")
         self.assertEqual(receipt["transform"]["output_sha256"],

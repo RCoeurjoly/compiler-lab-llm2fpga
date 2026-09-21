@@ -1,0 +1,67 @@
+{
+  "artifacts": {
+    "backend": {
+      "bytes": 35271,
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/scripts/pipeline/run_compiler_ddr3_trace_replay.py",
+      "sha256": "e3f5d0494cffb4c9b9c22efec05597ab254f4abc11755a111e74e7e41c68ef7f"
+    },
+    "bitstream": {
+      "bytes": 18735152,
+      "path": "/home/roland/LLM2FPGA/artifacts/task6/openxc7-pcie-smoke-good/task6-ypcb-pcie7x-smoke-vivado-lane0-loc-debug.bit",
+      "sha256": "276442d6348b330b55b8e8bde55e5a409456abfc869be014d767eb3a53ee7bab"
+    },
+    "cold_cycle_controller": {
+      "bytes": 8873,
+      "path": "/usr/local/libexec/ypcb_thunderbolt_deferred_auth.py",
+      "sha256": "a188e99a87233e8591c67d9d6f2c82e243004e262253686ade7e018ec8f39095"
+    },
+    "cold_cycle_wrapper": {
+      "bytes": 269,
+      "path": "/usr/local/sbin/ypcb-thunderbolt-cold-cycle",
+      "sha256": "2870b3ef5def65a7d8ede7e1a45cfb7503e093719d5366fe407cb47ebd545f4c"
+    },
+    "harness": {
+      "bytes": 8402,
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/scripts/pipeline/run_pcie_smoke_lifecycle.py",
+      "sha256": "4aa7f82ca13e623e36bf98d44c2b294f8d280e1f249d267e1fae3425b8e25e4b"
+    },
+    "lifecycle_dependency": {
+      "bytes": 3029,
+      "path": "/usr/local/libexec/ypcb_pcie_power.py",
+      "sha256": "3f6a844bb7c25383ab1c5c574f3b1ef54c740ce3f315b9155804609ef7c2ea25"
+    },
+    "lifecycle_probe": {
+      "bytes": 12404,
+      "path": "/usr/local/libexec/ypcb_pcie_recover.py",
+      "sha256": "25a8e0fb244958e39b4854dcc4f38b2a570d818dbb90f75cc3ea01d8ac9949a6"
+    },
+    "programmer": {
+      "bytes": 4770720,
+      "path": "/nix/store/39xij3c8kp29nkldm436g8im3rqb8jaj-openfpgaloader-3ae5e5e-bpi-full-verify/bin/openFPGALoader",
+      "sha256": "8686c42aabac9d720f128741d3f6fe27de8b8b9e5615f02c3d1450d78b759740"
+    },
+    "programmer_bpi_bridge_patch": {
+      "bytes": 423,
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/patches/openfpgaloader/0001-defer-bpi-bridge.patch",
+      "sha256": "0a5218abb83de98f40c27d8cd80e3e3ef56346064345a52825b192158e7b3b47"
+    },
+    "programmer_bridge": {
+      "bytes": 132631,
+      "path": "/nix/store/39xij3c8kp29nkldm436g8im3rqb8jaj-openfpgaloader-3ae5e5e-bpi-full-verify/share/openFPGALoader/bpiOverJtag_xc7k480tffg1156.bit.gz",
+      "sha256": "c8f3e306cbd789926284ec221769c426473b724ad349ccd42c620a35b1ec9ec2"
+    },
+    "programmer_full_verify_patch": {
+      "bytes": 7433,
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/patches/openfpgaloader/0002-full-bpi-verification.patch",
+      "sha256": "9633bc2fcddadf633e66114e0077248104a0a386eadeae1fba7edaa2770d24f7"
+    },
+    "programmer_nix": {
+      "bytes": 909,
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/nix/compiler-replay-programmer.nix",
+      "sha256": "78e98de1be5a4837cb1bfdb6bfc0cf063065725d0eb20b7746d0c64969da4f9c"
+    }
+  },
+  "payload_bytes": 18735004,
+  "programmer_commit": "3ae5e5e4a5f055d12f6079616cb1ec1d67bf30f1",
+  "schema": "pcie-smoke-lifecycle-manifest-v1"
+}

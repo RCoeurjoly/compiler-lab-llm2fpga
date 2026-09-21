@@ -1,0 +1,20 @@
+#!/bin/bash
+set -euo pipefail
+if [[ "$(id -u)" != "$(id -u roland)" ]]; then
+  echo "ypcb-tapo-cycle must run as user roland" >&2
+  exit 2
+fi
+if [[ "$#" -ne 0 ]]; then
+  echo "usage: ypcb-tapo-cycle" >&2
+  exit 2
+fi
+set -a
+# shellcheck disable=SC1091
+source /home/roland/.config/task6-pcie/tapo.env
+set +a
+PY=/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/python
+COMMON=(-I -B /usr/local/libexec/ypcb_tapo_p115_power.py --backend tapo --host 192.168.1.136 --env-file /home/roland/.config/task6-pcie/tapo.env)
+"$PY" "${COMMON[@]}" --state off --expect-state off
+sleep 10
+"$PY" "${COMMON[@]}" --state on --expect-state on
+sleep 45

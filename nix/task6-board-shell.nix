@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, bitstreamPkgs ? pkgs, openXC7Packages ? null }:
 let
   pins = builtins.fromJSON (builtins.readFile ../scripts/pipeline/task6_board_shell_pins.json);
   storeInputs = map (row: builtins.storePath
@@ -36,10 +36,20 @@ let
     cp ${../scripts/pipeline/task6_m2_banking_overlay_pins.json} scripts/pipeline/task6_m2_banking_overlay_pins.json
     python3 scripts/pipeline/apply_task6_m2_banking_overlay.py --closure "$out"
   '';
+  replayObserverSourceClosure = pkgs.runCommand "task6-board-shell-replay-pcie-cfg-observer-source-closure" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    cp -r ${m2SourceClosure} "$out"
+    chmod -R u+w "$out"
+    mkdir -p scripts/pipeline
+    cp ${../scripts/pipeline/apply_task6_pcie_cfg_observer_overlay.py} scripts/pipeline/apply_task6_pcie_cfg_observer_overlay.py
+    cp ${../scripts/pipeline/task6_pcie_cfg_observer_overlay_pins.json} scripts/pipeline/task6_pcie_cfg_observer_overlay_pins.json
+    python3 scripts/pipeline/apply_task6_pcie_cfg_observer_overlay.py --closure "$out"
+  '';
   sources = builtins.filter (row: pkgs.lib.hasSuffix ".sv" row.logical_path ||
     pkgs.lib.hasSuffix ".v" row.logical_path) pins.sources;
   sourceArgs = pkgs.lib.concatMapStringsSep " "
-    (row: "${m2SourceClosure}/${row.logical_path}") sources;
+    (row: "${replayObserverSourceClosure}/${row.logical_path}") sources;
   yosys = builtins.storePath "/nix/store/1g0dvnvw75fnlnk4ad586c65wfxbf5rs-yosys-with-plugins-0.66";
   replaySynthesis = pkgs.runCommand "compiler-ddr3-trace-replay-synthesis-screen" {
     nativeBuildInputs = [ pkgs.python3 ];
@@ -62,4 +72,126 @@ let
       "$out/yosys.log" --top compiler_ddr3_trace_replay_top
     cp run.ys "$out/"
   '';
-in { inherit sourceClosure commandSourceClosure m2SourceClosure replaySynthesis; }
+  # Preserve the only timing-passing synthesis result and patch just the
+  # authenticated PCIe reset/flush cone.  Re-running monolithic ABC for this
+  # integration-only change remaps the unrelated DDR critical path.
+  replayTimingBaseline = builtins.storePath
+    "/nix/store/iwy6sw36cskqqywj58jpg3f71c84qcm1-compiler-ddr3-trace-replay-synthesis-screen";
+  replayResetPatched = pkgs.runCommand "compiler-ddr3-trace-replay-reset-patched" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    mkdir -p "$out"
+    python3 ${../scripts/pipeline/patch_replay_pcie_reset_netlist.py} \
+      ${replayTimingBaseline}/replay.json "$out/replay.json" "$out/patch-receipt.json"
+  '';
+  replayBarOffsetPatched = pkgs.runCommand "compiler-ddr3-trace-replay-bar-offset-patched" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    mkdir -p "$out"
+    python3 ${../scripts/pipeline/patch_replay_pcie_bar_offset_netlist.py} \
+      ${replayResetPatched}/replay.json "$out/replay.json" "$out/patch-receipt.json"
+  '';
+  replayBarObserverResetPatched = pkgs.runCommand "compiler-ddr3-trace-replay-bar-observer-reset-patched" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    mkdir -p "$out"
+    REPLAY_RESET_PATCH_TOOL=${../scripts/pipeline/patch_replay_pcie_reset_netlist.py} \
+      python3 ${../scripts/pipeline/patch_replay_pcie_bar_probe_netlist.py} \
+      ${replayTimingBaseline}/replay.json "$out/replay.json" "$out/patch-receipt.json"
+  '';
+  # Exact Task 3R executable/chipdb; route the production serialization once.
+  nextpnr = builtins.storePath "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2";
+  chipdb = builtins.storePath "/nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2";
+  replayRoute = pkgs.runCommand "compiler-ddr3-trace-replay-route" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    mkdir -p "$out"
+    ulimit -c 0
+    ulimit -f 400000
+    test -s ${replayBarOffsetPatched}/patch-receipt.json
+    echo '25c434b7614ade7cbdd448b4f993d1feced26296b0164f6e648ddaced7ebac16  ${nextpnr}/bin/nextpnr-xilinx' | sha256sum -c -
+    echo 'd8472bfcc19dc31686d80cc34f0d37b958c268656182537b06b3439711b105f1  ${chipdb}/xc7k480tffg1156.bin' | sha256sum -c -
+    echo '890ebb9d0fc854c8595d3e9e67b4a4074fe42ac7682680b9c33dd1d2c8662f57  ${m2SourceClosure}/constraints/board.xdc' | sha256sum -c -
+    echo '42acd411f3e34ac494e56f64b12c0de81394b567d5087c1213b820040fa9d698  ${m2SourceClosure}/llm2fpga/scripts/task6/nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py' | sha256sum -c -
+    timeout --signal=TERM --kill-after=10s 1200 ${nextpnr}/bin/nextpnr-xilinx \
+      --chipdb ${chipdb}/xc7k480tffg1156.bin \
+      --xdc ${m2SourceClosure}/constraints/board.xdc \
+      --json ${replayBarOffsetPatched}/replay.json \
+      --pre-pack ${m2SourceClosure}/llm2fpga/scripts/task6/nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py \
+      --pre-place ${../scripts/pipeline/replay_pcie_clock_topology.py} \
+      --seed 15 --placer-budgets --timing-allow-fail --fasm "$out/replay.fasm" \
+      2>&1 | tee "$out/route.log"
+    python3 ${../scripts/analysis/check_compiler_replay_route.py} "$out/route.log" "$out/route.json"
+    sha256sum "$out/replay.fasm" > "$out/replay.fasm.sha256"
+  '';
+  replayBarObserverRoute = pkgs.runCommand "compiler-ddr3-trace-replay-bar-observer-route" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    mkdir -p "$out"
+    ulimit -c 0
+    ulimit -f 400000
+    test -s ${replayResetPatched}/patch-receipt.json
+    echo '25c434b7614ade7cbdd448b4f993d1feced26296b0164f6e648ddaced7ebac16  ${nextpnr}/bin/nextpnr-xilinx' | sha256sum -c -
+    echo 'd8472bfcc19dc31686d80cc34f0d37b958c268656182537b06b3439711b105f1  ${chipdb}/xc7k480tffg1156.bin' | sha256sum -c -
+    echo '890ebb9d0fc854c8595d3e9e67b4a4074fe42ac7682680b9c33dd1d2c8662f57  ${m2SourceClosure}/constraints/board.xdc' | sha256sum -c -
+    echo '42acd411f3e34ac494e56f64b12c0de81394b567d5087c1213b820040fa9d698  ${m2SourceClosure}/llm2fpga/scripts/task6/nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py' | sha256sum -c -
+    timeout --signal=TERM --kill-after=10s 1200 ${nextpnr}/bin/nextpnr-xilinx \
+      --chipdb ${chipdb}/xc7k480tffg1156.bin \
+      --xdc ${m2SourceClosure}/constraints/board.xdc \
+      --json ${replayResetPatched}/replay.json \
+      --pre-pack ${m2SourceClosure}/llm2fpga/scripts/task6/nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py \
+      --pre-place ${../scripts/pipeline/replay_pcie_clock_topology.py} \
+      --pre-route ${../scripts/pipeline/replay_pcie_bar_probe_pre_route.py} \
+      --seed 15 --placer-budgets --timing-allow-fail --fasm "$out/replay.fasm" \
+      2>&1 | tee "$out/route.log"
+    python3 ${../scripts/analysis/check_compiler_replay_route.py} "$out/route.log" "$out/route.json"
+    grep -q 'TASK4_BAR_PROBE_PRE_ROUTE_PASS consumers=14' "$out/route.log"
+    cp ${replayResetPatched}/patch-receipt.json "$out/reset-patch-receipt.json"
+    sha256sum "$out/replay.fasm" > "$out/replay.fasm.sha256"
+  '';
+  prjxray = openXC7Packages.prjxray;
+  fasm = openXC7Packages.fasm;
+  pythonDeps = bitstreamPkgs.python312.withPackages (ps: [
+    ps.pyyaml ps.simplejson ps.intervaltree ps.pyjson5 ps.progressbar2
+  ]);
+  patchedDb = pkgs.runCommand "compiler-replay-prjxray-db-lioi3-compat" {
+    nativeBuildInputs = [ pkgs.patch ];
+  } ''
+    original=${nextpnr}/share/nextpnr/external/prjxray-db
+    echo "d74bb512c56af57510ce89b351f1bf666e96196e20c8b1bc18e8521fe45bdd61  $original/kintex7/segbits_lioi3_tbytesrc.db" | sha256sum -c -
+    echo '197e2f126a6f3917c1ceca62394acd957397679538df077f7119de97c28e05bc  ${../patches/prjxray-db/0001-kintex7-add-lioi3-tbytesrc-oclkm-imux31.patch}' | sha256sum -c -
+    # Symlink unchanged data to conserve disk; replace only our generated link.
+    cp -rs "$original" "$out"
+    chmod u+w "$out/kintex7"
+    cp --remove-destination "$original/kintex7/segbits_lioi3_tbytesrc.db" "$out/kintex7/segbits_lioi3_tbytesrc.db"
+    chmod u+w "$out/kintex7/segbits_lioi3_tbytesrc.db"
+    cd "$out"
+    patch --no-backup-if-mismatch -p1 < ${../patches/prjxray-db/0001-kintex7-add-lioi3-tbytesrc-oclkm-imux31.patch}
+    echo '7108c7c92097d591e404852ce5eb18a6ed1851352d399eb29c1bd7eed3ffd710  kintex7/segbits_lioi3_tbytesrc.db' | sha256sum -c -
+  '';
+  dbRoot = "${patchedDb}/kintex7";
+  replayBitstream = pkgs.runCommand "compiler-ddr3-trace-replay-bitstream" {
+    nativeBuildInputs = [ fasm prjxray pythonDeps ];
+  } ''
+    mkdir -p "$out"
+    export PYTHONPATH="${fasm}/lib/python3.12/site-packages:${pythonDeps}/${bitstreamPkgs.python312.sitePackages}:${prjxray}/usr/share/python3"
+    export PRJXRAY_PYTHON_DIR="${prjxray}/usr/share/python3"
+    export PRJXRAY_DB_DIR="${dbRoot}"
+    timeout --kill-after=10s 600 bash ${../scripts/pipeline/build_and_validate_xc7_bitstream.sh} \
+      ${replayRoute}/replay.fasm "$out/replay.bit" "$out/replay.frames" \
+      ${dbRoot} ${dbRoot}/xc7k480tffg1156-1/part.yaml
+    sha256sum "$out/replay.bit" > "$out/replay.bit.sha256"
+  '';
+  replayBarObserverBitstream = pkgs.runCommand "compiler-ddr3-trace-replay-bar-observer-bitstream" {
+    nativeBuildInputs = [ fasm prjxray pythonDeps ];
+  } ''
+    mkdir -p "$out"
+    export PYTHONPATH="${fasm}/lib/python3.12/site-packages:${pythonDeps}/${bitstreamPkgs.python312.sitePackages}:${prjxray}/usr/share/python3"
+    export PRJXRAY_PYTHON_DIR="${prjxray}/usr/share/python3"
+    export PRJXRAY_DB_DIR="${dbRoot}"
+    timeout --kill-after=10s 600 bash ${../scripts/pipeline/build_and_validate_xc7_bitstream.sh} \
+      ${replayBarObserverRoute}/replay.fasm "$out/replay.bit" "$out/replay.frames" \
+      ${dbRoot} ${dbRoot}/xc7k480tffg1156-1/part.yaml
+    sha256sum "$out/replay.bit" > "$out/replay.bit.sha256"
+  '';
+in { inherit sourceClosure commandSourceClosure m2SourceClosure replayObserverSourceClosure replaySynthesis replayTimingBaseline replayResetPatched replayBarOffsetPatched replayRoute replayBitstream replayBarObserverResetPatched replayBarObserverRoute replayBarObserverBitstream patchedDb; }

@@ -1,0 +1,242 @@
+--- a/src/bpiFlash.hpp
++++ b/src/bpiFlash.hpp
+@@ -36,6 +36,9 @@
+ 	 */
+ 	bool read(uint8_t *data, uint32_t addr, uint32_t len);
+ 
++	/* Full byte-addressed readback; throws at first mismatch/read failure. */
++	bool verify(uint32_t addr, const uint8_t *data, uint32_t len);
++
+ 	/*!
+ 	 * \brief Write data to flash (handles erase internally)
+ 	 * \param[in] addr: start address (word address)
+@@ -120,7 +123,7 @@
+ 	 * \brief Wait for operation to complete
+ 	 * \return true if completed successfully
+ 	 */
+-	bool wait_ready(uint32_t timeout_ms = 10000);
++	bool wait_ready(uint32_t word_addr, uint32_t timeout_ms = 10000);
+ 
+ 	/*!
+ 	 * \brief Unlock a block for programming/erase
+--- a/src/bpiFlash.cpp
++++ b/src/bpiFlash.cpp
+@@ -288,19 +288,19 @@
+ 	return true;
+ }
+ 
+-bool BPIFlash::wait_ready(uint32_t timeout_ms)
++bool BPIFlash::wait_ready(uint32_t word_addr, uint32_t timeout_ms)
+ {
+ 	uint32_t elapsed = 0;
+ 	const uint32_t poll_interval = 10;
+ 
+ 	/* Issue read status command */
+-	bpi_write(0, FLASH_CMD_READ_STATUS);
++	bpi_write(word_addr, FLASH_CMD_READ_STATUS);
+ 	usleep(100);
+ 
+ 	while (elapsed < timeout_ms) {
+-		uint16_t status = bpi_read(0);
++		uint16_t status = bpi_read(word_addr);
+ 
+-		/* Intel CFI status register is 8 bits, upper byte undefined */
++		/* MT28GU SR7 is device-wide ready; mode commands select a partition. */
+ 		uint8_t sr = status & 0xFF;
+ 
+ 		if (sr & SR_READY) {
+@@ -308,11 +308,11 @@
+ 				char buf[64];
+ 				snprintf(buf, sizeof(buf), "BPI Flash error: status = 0x%02x", sr);
+ 				printError(buf);
+-				bpi_write(0, FLASH_CMD_CLEAR_STATUS);
++				bpi_write(word_addr, FLASH_CMD_CLEAR_STATUS);
+ 				return false;
+ 			}
+ 			/* Return to read array mode */
+-			bpi_write(0, FLASH_CMD_READ_ARRAY);
++			bpi_write(word_addr, FLASH_CMD_READ_ARRAY);
+ 			return true;
+ 		}
+ 
+@@ -350,7 +350,7 @@
+ 	usleep(100);
+ 	bpi_write(word_addr, FLASH_CMD_CONFIRM);
+ 
+-	if (!wait_ready(30000)) {
++	if (!wait_ready(word_addr, 30000)) {
+ 		printError("Block erase failed");
+ 		return false;
+ 	}
+@@ -401,14 +401,16 @@
+ 		printInfo("Reading " + std::to_string(len) + " bytes from 0x" +
+ 			std::to_string(addr));
+ 
+-	/* Ensure read array mode */
+-	bpi_write(0, FLASH_CMD_READ_ARRAY);
+-	usleep(100);
+-
+ 	ProgressBar progress("Reading", len, 50, _verbose > 0);
+ 
+ 	for (uint32_t i = 0; i < len; i += 2) {
+ 		uint32_t word_addr = (addr + i) >> 1;
++		/* MT28GU512 has eight 8-MiB partitions. READ_ARRAY is local
++		 * to its addressed partition, including when a read crosses one. */
++		if (i == 0 || (word_addr % 0x400000u) == 0) {
++			bpi_write(word_addr, FLASH_CMD_READ_ARRAY);
++			usleep(100);
++		}
+ 		uint16_t word = bpi_read(word_addr);
+ 
+ 		data[i] = reverseByte((word >> 8) & 0xFF);
+@@ -423,6 +425,42 @@
+ 	return true;
+ }
+ 
++bool BPIFlash::verify(uint32_t addr, const uint8_t *data, uint32_t len)
++{
++	if (!data || !len || (addr & 1) || addr > 64u * 1024 * 1024 ||
++		len > 64u * 1024 * 1024 - addr)
++		throw std::runtime_error("BPI full verification invalid range");
++	std::vector<uint8_t> actual(4096);
++	for (uint32_t offset = 0; offset < len;) {
++		uint32_t chunk = len - offset;
++		if (chunk > actual.size()) chunk = actual.size();
++		try {
++			if (!read(actual.data(), addr + offset, chunk))
++				throw std::runtime_error("read returned failure");
++		} catch (const std::exception &e) {
++			char location[96];
++			snprintf(location, sizeof(location),
++				"BPI full verification read failed at chunk 0x%08x: ", addr + offset);
++			throw std::runtime_error(std::string(location) + e.what());
++		}
++		for (uint32_t i = 0; i < chunk; ++i) {
++			if (actual[i] != data[offset + i]) {
++				char message[160];
++				snprintf(message, sizeof(message),
++					"BPI full verification mismatch at 0x%08x: expected 0x%02x actual 0x%02x",
++					addr + offset + i, data[offset + i], actual[i]);
++				throw std::runtime_error(message);
++			}
++		}
++		offset += chunk;
++	}
++	char message[128];
++	snprintf(message, sizeof(message),
++		"BPI full verification passed: %u bytes at 0x%08x", len, addr);
++	printInfo(message);
++	return true;
++}
++
+ bool BPIFlash::write(uint32_t addr, const uint8_t *data, uint32_t len)
+ {
+ 	char buf[128];
+@@ -505,7 +543,7 @@
+ 		}
+ 
+ 		/* Buffered Program Setup - sent to block/colony base address */
+-		bpi_write(0, FLASH_CMD_CLEAR_STATUS);
++		bpi_write(block_word_addr, FLASH_CMD_CLEAR_STATUS);
+ 		bpi_write(block_word_addr, FLASH_CMD_BUFFERED_PRG);
+ 		bpi_write(block_word_addr, chunk_words - 1);
+ 
+@@ -525,7 +563,7 @@
+ 		bpi_write(block_word_addr, FLASH_CMD_CONFIRM);
+ 
+ 		/* Wait for program to complete */
+-		if (!wait_ready(5000)) {
++		if (!wait_ready(block_word_addr, 5000)) {
+ 			char buf[64];
+ 			snprintf(buf, sizeof(buf), "Buffered program failed at address 0x%06x", byte_addr);
+ 			printError(buf);
+@@ -539,15 +577,15 @@
+ 			progress.display(offset);
+ 	}
+ 
+-	/* Return to read array mode */
+-	bpi_write(0, FLASH_CMD_READ_ARRAY);
++	/* Each completed buffer restored its own partition to array mode. */
++	bpi_write(addr >> 1, FLASH_CMD_READ_ARRAY);
+ 
+ 	progress.done();
+ 
+ 	/* Verify first 32 words */
+ 	printInfo("Verifying first 32 words...");
+ 	usleep(1000);
+-	bpi_write(0, FLASH_CMD_READ_ARRAY);
++	bpi_write(addr >> 1, FLASH_CMD_READ_ARRAY);
+ 	usleep(100);
+ 
+ 	bool verify_ok = true;
+@@ -558,7 +596,7 @@
+ 			b1 = data[i + 1];
+ 		uint16_t expected = (reverseByte(b0) << 8) | reverseByte(b1);
+ 
+-		uint16_t actual = bpi_read(i >> 1);
++		uint16_t actual = bpi_read((addr + i) >> 1);
+ 		if (actual != expected) {
+ 			char buf[128];
+ 			snprintf(buf, sizeof(buf), "Verify FAIL at 0x%04x: expected 0x%04x, got 0x%04x",
+@@ -576,6 +614,7 @@
+ 		printInfo("Verification passed for first 32 words");
+ 	} else {
+ 		printError("Verification FAILED!");
++		return false;
+ 	}
+ 
+ 	printInfo("BPI flash programming complete");
+diff --git a/src/xilinx.cpp b/src/xilinx.cpp
+--- a/src/xilinx.cpp
++++ b/src/xilinx.cpp
+@@ -813,5 +813,8 @@
+ 	if (!_bpi_flash->write(offset, data, length)) {
+ 		throw std::runtime_error("BPI flash programming failed");
+ 	}
++	if (_verify && !_bpi_flash->verify(offset, data, length)) {
++		throw std::runtime_error("BPI full verification failed");
++	}
+ 
+ 	printInfo("BPI flash programming complete");
+diff --git a/src/main.cpp b/src/main.cpp
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -989,1 +989,1 @@
+-			("verify", "Verify write operation (SPI Flash only)",
++			("verify", "Verify complete write operation (SPI/BPI Flash)",
+diff --git a/src/ftdipp_mpsse.cpp b/src/ftdipp_mpsse.cpp
+--- a/src/ftdipp_mpsse.cpp
++++ b/src/ftdipp_mpsse.cpp
+@@ -526,3 +526,3 @@
+ 				string(ftdi_get_error_string(_ftdi)) + ")");
+-		return ret;
++		throw std::runtime_error("MPSSE short/failed write");
+ 	}
+@@ -537,2 +537,3 @@
+ 	int num_read = 0;
++	unsigned zero_reads = 0;
+ 	unsigned char *p = rx_buff;
+@@ -544,3 +545,3 @@
+ 				string(ftdi_get_error_string(_ftdi)) + ")");
+-		return ret;
++		throw std::runtime_error("MPSSE read command failed");
+ 	}
+@@ -551,3 +552,3 @@
+ 				string(ftdi_get_error_string(_ftdi)) + ")");
+-		return ret;
++		throw std::runtime_error("MPSSE read flush failed");
+ 	}
+@@ -557,4 +558,10 @@
+-		if (n < 0) {
+-			fprintf(stderr, "Error: ftdi_read_data in %s", __func__);
+-			return -1;
++		if (n < 0 || n > len) {
++			throw std::runtime_error("MPSSE failed read: remaining " +
++				std::to_string(len) + " actual " + std::to_string(n));
+ 		}
++		if (n == 0) {
++			if (++zero_reads >= 16)
++				throw std::runtime_error("MPSSE read stalled without progress");
++		} else {
++			zero_reads = 0;
++		}

@@ -1,0 +1,98 @@
+{
+  "schema": "compiler-ddr3-trace-replay-bitstream-v1",
+  "status": "ROUTE_AND_BITSTREAM_PASS",
+  "hardware_qualified": false,
+  "scope": "temporary exact compiler-derived DDR3 replay diagnostic, not inference",
+  "profile": {
+    "byte_lanes": 2,
+    "controller_period_ps": 12000,
+    "ddr_period_ps": 3000,
+    "pcie_clock_mhz": 62.5,
+    "bist_mode": 2,
+    "seed": 15
+  },
+  "route": {
+    "legal": true,
+    "checksum": "0xc09ef13a",
+    "rowstream_fmax_mhz": 92.09,
+    "rowstream_required_mhz": 83.333333,
+    "pcie_fmax_mhz": 83.77,
+    "pcie_required_mhz": 62.5,
+    "derivation": "/nix/store/m0hk01s3zw3vs33rmn2mgh14n9rcchay-compiler-ddr3-trace-replay-route.drv"
+  },
+  "conversion": {
+    "decoded_configuration_bits": 880384,
+    "derivation": "/nix/store/lkmg1j64p6lwzzbnipmr2fdp43v6nwy7-compiler-ddr3-trace-replay-bitstream.drv"
+  },
+  "timing_coverage_limitations": [
+    "Fabric timing passes only the pinned nextpnr timing model, not complete device timing signoff.",
+    "DDR DQ/DQS electrical timing, generated-clock phase/skew, hard blocks and CDC safety are not fully qualified.",
+    "Decoded configuration is not hardware calibration, BIST, image load/readback, replay or inference acceptance."
+  ],
+  "artifacts": {
+    "bitstream": {
+      "path": "/nix/store/6k4f5g3rn7krxy5pa3wbm4mskgxmzqpn-compiler-ddr3-trace-replay-bitstream/replay.bit",
+      "bytes": 18735174,
+      "sha256": "0d5d38823984898bb79cde61a05a967281aef01de186d4657cc0c63002236c22"
+    },
+    "decoded_bits": {
+      "path": "/nix/store/6k4f5g3rn7krxy5pa3wbm4mskgxmzqpn-compiler-ddr3-trace-replay-bitstream/replay.bit.decoded-bits",
+      "bytes": 43046144,
+      "sha256": "f2e7651800350ff5e50feae62acb139afa87fd72c96a6aef1d96a07d7002a488"
+    },
+    "fasm": {
+      "path": "/nix/store/ynhjbhnxr7mv376aymzaqb3ppfn57h1f-compiler-ddr3-trace-replay-route/replay.fasm",
+      "bytes": 21997470,
+      "sha256": "f097785f9f9461443243ad91a7743bb6b83488265030e55bf9847a8fadec7f45"
+    },
+    "route_log": {
+      "path": "/nix/store/ynhjbhnxr7mv376aymzaqb3ppfn57h1f-compiler-ddr3-trace-replay-route/route.log",
+      "bytes": 159631,
+      "sha256": "699a3c3a998fe11f5c43d3434a8c412abbc31e30b94a64a2db1f603273ff406d"
+    },
+    "route_acceptance": {
+      "path": "/nix/store/ynhjbhnxr7mv376aymzaqb3ppfn57h1f-compiler-ddr3-trace-replay-route/route.json",
+      "bytes": 295,
+      "sha256": "da34cae7a2e58b491ea5615fb6367476f21ff562f5db5d9c44007768aab4de26"
+    },
+    "baseline_netlist": {
+      "path": "/nix/store/iwy6sw36cskqqywj58jpg3f71c84qcm1-compiler-ddr3-trace-replay-synthesis-screen/replay.json",
+      "bytes": 44427002,
+      "sha256": "f24399228ba1009fbf1c890c01bfc670c140919479ca5df5d82c41c2c3c40e22"
+    },
+    "patched_netlist": {
+      "path": "/nix/store/a9896aw5h22y5dzp61n89dg3zxxnla4x-compiler-ddr3-trace-replay-reset-patched/replay.json",
+      "bytes": 53629901,
+      "sha256": "87890ea1abd22d6f3086aaa882fb7caa6c99d2f28d5756336ab3832f020d91f6"
+    },
+    "netlist_patch_receipt": {
+      "path": "/nix/store/a9896aw5h22y5dzp61n89dg3zxxnla4x-compiler-ddr3-trace-replay-reset-patched/patch-receipt.json",
+      "bytes": 791,
+      "sha256": "59df490d145b9d6f465eec9fc58a8b9831acc13c8fb057d1d1ed61bcc9b33c9e"
+    },
+    "nextpnr": {
+      "path": "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+      "bytes": 4449352,
+      "sha256": "25c434b7614ade7cbdd448b4f993d1feced26296b0164f6e648ddaced7ebac16"
+    },
+    "chipdb": {
+      "path": "/nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin",
+      "bytes": 714763824,
+      "sha256": "d8472bfcc19dc31686d80cc34f0d37b958c268656182537b06b3439711b105f1"
+    },
+    "programmer": {
+      "path": "/nix/store/39xij3c8kp29nkldm436g8im3rqb8jaj-openfpgaloader-3ae5e5e-bpi-full-verify/bin/openFPGALoader",
+      "bytes": 4770720,
+      "sha256": "8686c42aabac9d720f128741d3f6fe27de8b8b9e5615f02c3d1450d78b759740"
+    },
+    "runner": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/scripts/pipeline/run_compiler_ddr3_trace_replay.py",
+      "bytes": 49742,
+      "sha256": "206cbb28c540d0f5380421c8a268e03ac0e0238e515cecaef323291da35867f0"
+    }
+  },
+  "bpi_programmer": {
+    "verification": "full-readback-v1",
+    "payload_bytes": 18735004
+  }
+}

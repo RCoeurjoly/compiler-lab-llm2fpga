@@ -1,0 +1,15 @@
+diff --git a/src/xilinx.cpp b/src/xilinx.cpp
+index 549fe00..54d6311 100644
+--- a/src/xilinx.cpp
++++ b/src/xilinx.cpp
+@@ -693,6 +693,10 @@ bool Xilinx::post_flash_access()
+ 
+ bool Xilinx::prepare_flash_access()
+ {
++	if (_is_bpi_board) {
++		printInfo("BPI flash board: defer bridge loading to BPI path");
++		return true;
++	}
+ 	bool ret = false;
+ 	if (_skip_load_bridge) {
+ 		printInfo("Skip loading bridge for spiOverjtag");

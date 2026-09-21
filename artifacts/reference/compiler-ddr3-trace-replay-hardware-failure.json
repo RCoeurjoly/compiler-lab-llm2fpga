@@ -1,0 +1,34 @@
+{
+  "schema": "compiler-ddr3-trace-replay-hardware-failure-v1",
+  "status": "FAIL",
+  "hardware_qualified": false,
+  "scope": "Compiler-derived DDR3 replay diagnostic, not inference",
+  "attempt": "20260920-full-verify",
+  "first_failing_gate": "program_bpi_full_verification",
+  "programmer_returncode": 1,
+  "failure": "BPI full verification mismatch at 0x00800001: expected 0x00 actual 0x01",
+  "not_attempted": ["cold_cycle", "pcie_lifecycle", "mmio", "calibration_bist", "image_load_readback", "replay"],
+  "host_boot_id_unchanged": "265bb206-073e-4921-8b66-5053084a5874",
+  "postfailure_isolation": {
+    "device_name": "Helios 5S",
+    "uuid": "c4148780-0010-1ed9-ffff-ffffffffffff",
+    "authorized": "0",
+    "endpoint_10ee_0480_present": false
+  },
+  "evidence_directory": ".superpowers/sdd/2026-09-18-compiler-micron-integration",
+  "evidence_sha256": {
+    "task-4-hardware-bpi-20260920-full-verify.json": "377508aa5402b7de429dee541191c59d7ef61cbe622eaf190555245f2f069554",
+    "task-4-hardware-bpi-20260920-full-verify.json.worker.json": "81f4d03819e18a822d9c6bbb714a822d799def54ae6a3a3399c928cc23700681",
+    "task-4-hardware-bpi-20260920-full-verify.json.program.log": "b3820cebba6a2df095326b74da0d8d4d89ec349b673a0715750b3690aff56c47",
+    "task-4-postfailure-isolation.json": "8882a65b2a74a5b6d5fcf5e4f945330b3e7b54577c80335e9bb3b2cf0abd3c8a",
+    "task-4-first-attempt-bitstream-input.json": "5939cb099c0869953d5cd99ffbba29f97bfcb75a66719676ce801c140abe53ca",
+    "task-4-first-attempt-runner.py": "f270399fb716eead534ca69640b26352a59c2e4211862099c3a8342aeb6b51a9"
+  },
+  "attempt_programmer_sha256": "7871c4e86598171fc906612d494318e1c57f6715412714e4a8708909b1cffb3d",
+  "attempt_patch": {
+    "path": "/nix/store/5jh5rnll12n3qmvckzlnxnvrvaimp0nb-0002-full-bpi-verification.patch",
+    "sha256": "11951132870215703ad913cf89c9c69a9ac0663e90b0b1e79d02af8b665a74b0"
+  },
+  "diagnosis": "Partition-local read mode defect reproduces exact status-word signature in unchanged-C++ model; array corruption beyond partition zero is not established",
+  "followup": "Software-only partition-addressing repair; no retry or second hardware read authorized by this receipt"
+}

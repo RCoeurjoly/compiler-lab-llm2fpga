@@ -2,7 +2,9 @@
 
 - Before starting a change, run `scripts/agent/pre_final_check.sh`. If the
   worktree is dirty, stop and inventory the existing work before adding more.
-- For each change, create a commit before the final response.
+- For each change, create a commit immediately after verification and before
+  starting the next change or sending the final response. Never leave a
+  completed change mixed with later work in a dirty worktree.
 - Install the repository hooks with `scripts/agent/install_git_hooks.sh`. The
   pre-commit hook rejects partial commits that leave unstaged or untracked
   files behind.

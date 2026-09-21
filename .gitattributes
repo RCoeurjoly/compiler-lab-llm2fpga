@@ -7,3 +7,6 @@ reproducers/tinystories-1m-exact-flat-scf-memref/task3-earliest-remaining/pass.*
 artifacts/diagnostics/2026-09-19-compiler-ddr3-replay-placement.log -whitespace
 artifacts/diagnostics/2026-09-19-task3b-command-stage-placement.log -whitespace
 artifacts/diagnostics/2026-09-19-task3d-replay-enable-placement.log -whitespace
+# Unified-diff context preserves upstream tabs and blank context lines.
+patches/openfpgaloader/0001-defer-bpi-bridge.patch -whitespace
+patches/openfpgaloader/0002-full-bpi-verification.patch -whitespace

@@ -198,6 +198,9 @@ module compiler_ddr3_trace_replay_top_tb;
     if(!s_axi_awready || !s_axi_wready || !s_axi_arready || dut.pstate!=0)
       $fatal(1,"runtime reset retained partial/pending AXI transaction");
     rd('h904,1);rd(0,32'h54365043);
+    // The PCIe decoder presents the absolute BAR address. Diagnostic decode
+    // must use the aperture offset, just like the legacy loader CSR block.
+    rd(32'h74000900,32'h52504c59);
   endtask
   task wr(input [31:0] address,input [31:0] data,input bit first=0);
     if(first) begin

@@ -1,0 +1,1 @@
+roland ALL=(root) NOPASSWD: /usr/local/sbin/ypcb-thunderbolt-isolate-for-programming ""

@@ -8,6 +8,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReplayTopTest(unittest.TestCase):
+    def test_pcie_bar_boundary_does_not_add_a_timing_disruptive_bscan(self):
+        """BAR evidence is carried by the overlaid existing USER1 status chain."""
+        text = (ROOT / "rtl/diagnostics/compiler_ddr3_trace_replay_top.sv").read_text()
+        self.assertNotIn("compiler_pcie_bar_status_shift", text)
+
+    def test_pcie_transport_reset_does_not_depend_on_ddr_pll_lock(self):
+        """A failed DDR PLL must not turn an enumerated BAR into all-ones reads."""
+        text = (ROOT / "rtl/diagnostics/compiler_ddr3_trace_replay_top.sv").read_text()
+        self.assertIn(".pcie_reset(!pcie_user_cfg_rst_n)", text)
+        self.assertIn("always @(posedge pcie_user_clk or negedge rowstream_rst_n)", text)
+        self.assertIn(".pcie_abort(pcie_user_reset && replay_pcie_init[1])", text)
+
     def test_full_pinned_loader_shell_bar_fixture(self):
         tb = ROOT / "tests/rtl/compiler_ddr3_trace_replay_board_tb.sv"
         self.assertTrue(tb.exists(), "full board loader-shell fixture is missing")

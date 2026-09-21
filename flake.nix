@@ -28,7 +28,11 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        task6BoardShell = import ./nix/task6-board-shell.nix { inherit pkgs; };
+        task6BoardShell = import ./nix/task6-board-shell.nix {
+          inherit pkgs;
+          bitstreamPkgs = import inputs.task3-main-pipeline.inputs.nixpkgs { inherit system; };
+          openXC7Packages = inputs.task3-main-pipeline.inputs.openXC7.packages.${system};
+        };
         task3MainPackages =
           inputs.task3-main-pipeline.packages.${system};
         task3MainLib = inputs.task3-main-pipeline.lib.${system};
@@ -2987,6 +2991,25 @@ PY
           task6-board-shell-source-closure = task6BoardShell.sourceClosure;
           task6-board-shell-m2-source-closure = task6BoardShell.m2SourceClosure;
           compiler-ddr3-trace-replay-synthesis-screen = task6BoardShell.replaySynthesis;
+          compiler-ddr3-trace-replay-route = task6BoardShell.replayRoute;
+          compiler-ddr3-trace-replay-bitstream = task6BoardShell.replayBitstream;
+          compiler-ddr3-trace-replay-bar-observer-route = task6BoardShell.replayBarObserverRoute;
+          compiler-ddr3-trace-replay-bar-observer-bitstream = task6BoardShell.replayBarObserverBitstream;
+          compiler-ddr3-trace-replay-database = task6BoardShell.patchedDb;
+          compiler-ddr3-replay-programmer = import ./nix/compiler-replay-programmer.nix { inherit pkgs; };
+          compiler-ddr3-mmio32 = pkgs.stdenv.mkDerivation {
+            pname = "compiler-ddr3-mmio32";
+            version = "1";
+            dontUnpack = true;
+            nativeBuildInputs = [ pkgs.stdenv.cc ];
+            buildPhase = ''
+              $CC -O2 -fPIC -shared ${./scripts/host/ypcb_mmio32.c} -o libypcb_mmio32.so
+            '';
+            installPhase = ''
+              mkdir -p $out/lib
+              cp libypcb_mmio32.so $out/lib/
+            '';
+          };
           inherit circt mlir torchMlir yosysPkg modelRegistryJson surveyPython
             surveyPhase1
             llm2fpgaMlirPasses llm2fpgaTorchMlirPasses

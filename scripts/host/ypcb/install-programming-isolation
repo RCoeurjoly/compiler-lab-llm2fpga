@@ -1,0 +1,39 @@
+#!/bin/bash
+set -euo pipefail
+
+if [[ "$#" -ne 0 ]]; then
+  echo "usage: sudo scripts/host/ypcb/install-programming-isolation" >&2
+  exit 2
+fi
+if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+  echo "error: one-time installation must run as root" >&2
+  exit 2
+fi
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+CONTROLLER="$SCRIPT_DIR/ypcb_thunderbolt_isolate.py"
+WRAPPER="$SCRIPT_DIR/ypcb-thunderbolt-isolate-for-programming"
+SUDOERS_SOURCE="$SCRIPT_DIR/ypcb-thunderbolt-isolate.sudoers"
+
+for source in "$CONTROLLER" "$WRAPPER" "$SUDOERS_SOURCE"; do
+  [[ -f "$source" && ! -L "$source" ]] || {
+    echo "error: missing or symbolic source: $source" >&2
+    exit 1
+  }
+done
+
+# Validate the exact narrow policy before changing any installed file.
+/usr/sbin/visudo -cf "$SUDOERS_SOURCE"
+
+/usr/bin/install -o root -g root -m 0755 "$CONTROLLER" \
+  /usr/local/libexec/ypcb_thunderbolt_isolate.py
+/usr/bin/install -o root -g root -m 0755 "$WRAPPER" \
+  /usr/local/sbin/ypcb-thunderbolt-isolate-for-programming
+/usr/bin/install -o root -g root -m 0440 "$SUDOERS_SOURCE" \
+  /etc/sudoers.d/ypcb-thunderbolt-isolate
+
+/usr/sbin/visudo -cf /etc/sudoers.d/ypcb-thunderbolt-isolate
+/usr/bin/sha256sum \
+  /usr/local/libexec/ypcb_thunderbolt_isolate.py \
+  /usr/local/sbin/ypcb-thunderbolt-isolate-for-programming \
+  /etc/sudoers.d/ypcb-thunderbolt-isolate

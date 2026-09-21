@@ -1,0 +1,20 @@
+{
+  "schema": "task6-pcie-cfg-observer-overlay-v1",
+  "files": {
+    "pcie/src/pcie_7x.v": {
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/pcie_7x.v",
+      "input_sha256": "405d3fad5b87f080141cf3824333c8fa449eb18d67fe0e6bd3057456e1ac9278",
+      "output_sha256": "70ca0d6a340d2b2f2e9cf26d75401d4536d38f1cd4ba101b46d283bd1c157dbd"
+    },
+    "pcie/src/aximm-minimal/pcie_7x_top_aximm.v": {
+      "source": "/nix/store/9vmyxy1dvk9cl1jznk171cvmd8ksmhr5-task6-pcie7x-source-vivado-lane0-loc-rowstream-ingress/src/aximm-minimal/pcie_7x_top_aximm.v",
+      "input_sha256": "490349d6cfe5cf4bd8c80c3cceaf5ea40b2de93dfe051f3f02942ed1345f95ae",
+      "output_sha256": "aaec9993b000f7a6c193b2ddafcaec91aa6ce8184078d5977ade00e51b1f11a0"
+    },
+    "llm2fpga/fpga/rtl/task6_pcie_jtag_status_shift.v": {
+      "source": "third_party/task6-e368449/fpga/rtl/task6_pcie_jtag_status_shift.v",
+      "input_sha256": "6d0025765453e8f60b303822f8a3aaedc91b84e0f8f9f26913fec98814ca8f0c",
+      "output_sha256": "5ec01a46b9b14f5df49d2415b24f29c0a2e72b3577ff66e0ae59509d7ae943b8"
+    }
+  }
+}
