@@ -557,10 +557,14 @@ def loader_command(device, opcode, address, data, timeout, interval):
 
 
 def load_and_verify(device, image_path, timeout, interval, receipt):
+    # The integrated YPCB loader's legacy four-beat packet path drops the
+    # first beat at packet boundaries.  Single-beat packets exercise the same
+    # authenticated loader/DDR3 path and have passed complete hardware
+    # readback; keep this conservative mode as the production default.
     receipt["load"] = progress = {"bytes_loaded": 0, "bytes_read_back": 0}
     with Path(image_path).open("rb") as stream:
         line = 0
-        while packet := stream.read(64):
+        while packet := stream.read(16):
             if len(packet) % 16:
                 raise ValueError("image is not complete 128-bit lines")
             for slot in range(len(packet) // 16):

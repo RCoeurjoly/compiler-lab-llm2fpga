@@ -1,0 +1,54 @@
+{
+  "schema": "compiler-ddr3-pcie-hardware-pass-v1",
+  "status": "PASS_TRANSPORT_AND_TRACE_REPLAY",
+  "scope": "compiler-pipeline TinyStories-1M exact image over PCIe to UberDDR3; no kev-gpt RTL",
+  "endpoint": {
+    "bdf": "0000:42:00.0",
+    "identity": "0x54365043",
+    "version": 3,
+    "bar0": "0x74000000",
+    "bridge_window": "0x74000000-0x740fffff",
+    "link": "2.5 GT/s x1"
+  },
+  "profile": {
+    "ddr3_lanes": 2,
+    "ddr3_clock_mhz": 83.333,
+    "pcie_clock_mhz": 62.5,
+    "bist_mode": 2,
+    "bist_done_state": 23
+  },
+  "image": {
+    "bytes": 4136720,
+    "sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "load_mode": "single-128-bit-beat-packets",
+    "readback_bytes": 4136720,
+    "readback_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "elapsed_seconds": 33.78713049799262
+  },
+  "replay": {
+    "records": 13116912,
+    "accepted": 13116912,
+    "responded": 13116912,
+    "checked": 13116912,
+    "errors": 0,
+    "first_mismatch_index": 4294967295,
+    "terminal_state": 2,
+    "flags": 5,
+    "elapsed_seconds": 176.92901077600254
+  },
+  "negative_evidence": {
+    "four_beat_packet_mode": {
+      "result": "FAIL",
+      "symptom": "first beat of packet boundaries read back as zero",
+      "first_mismatch_line": 188
+    },
+    "response_echo": {
+      "result": "transient_stale_response",
+      "handling": "bounded retry was diagnostic only; complete single-beat run required zero retries"
+    }
+  },
+  "inference": {
+    "first_token": "not_claimed",
+    "full_autoregressive": false
+  }
+}
