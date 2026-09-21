@@ -744,6 +744,20 @@
             '';
           };
 
+        # Compose an independently mapped compiler netlist into the pinned
+        # platform boundary.  The exact compiler RTL remains a runtime-
+        # authenticated input; this wrapper only makes the checked JSON
+        # composer reproducible through the flake.
+        composeMappedYosysJson =
+          let sourceRoot = builtins.path { path = ./.; name = "llm2fpga-source"; };
+          in pkgs.writeShellApplication {
+            name = "compose-mapped-yosys-json";
+            runtimeInputs = [ python pkgs.coreutils ];
+            text = ''
+              exec ${python}/bin/python3 ${sourceRoot}/scripts/pipeline/compose_mapped_yosys_json.py "$@"
+            '';
+          };
+
         # Explicit package-aware export entry point.  The authenticated
         # package remains a runtime input (it is not silently replaced by the
         # HuggingFace/FP32 adapter and is not copied into the flake).
@@ -3330,6 +3344,7 @@ PY
             pipelineStagePackagesNoHandshake."tiny-stories-1m-baseline-float-calyx-sv";
           "tinystories-1m-authenticated-package-lowering" =
             authenticatedPackageLowering;
+          "compose-mapped-yosys-json" = composeMappedYosysJson;
           "tinystories-1m-package-aware-export" = packageAwareExport;
         }
           // quantizedLinalgDiagnosticPackages // pipelineAliasPackages
@@ -3343,6 +3358,10 @@ PY
         apps."tinystories-1m-authenticated-package-lowering" = {
           type = "app";
           program = "${authenticatedPackageLowering}/bin/tinystories-1m-authenticated-package-lowering";
+        };
+        apps."compose-mapped-yosys-json" = {
+          type = "app";
+          program = "${composeMappedYosysJson}/bin/compose-mapped-yosys-json";
         };
         apps."tinystories-1m-package-aware-export" = {
           type = "app";
