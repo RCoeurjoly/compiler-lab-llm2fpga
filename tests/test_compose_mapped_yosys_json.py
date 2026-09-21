@@ -1,8 +1,6 @@
 import importlib.util
-import json
+import unittest
 from pathlib import Path
-
-import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,26 +28,31 @@ def design(*, boundary_ports=None, include_primitive=True, include_top=True):
     return {"creator": "test", "modules": modules}
 
 
-def test_replaces_stub_and_preserves_explicit_primitive_collision():
-    platform = design()
-    compiler = design(include_top=False)
-    compiler["modules"]["LUT5"] = {"ports": {"O": {"direction": "output", "bits": [1]}}, "cells": {}}
-    result, receipt = MODULE.compose(
-        platform, compiler, top="top", boundary="adapter", platform_wins={"LUT5"}
-    )
-    assert result["modules"]["adapter"] == compiler["modules"]["adapter"]
-    assert result["modules"]["LUT5"] == platform["modules"]["LUT5"]
-    assert receipt["replaced_modules"] == ["adapter"]
-    assert receipt["collisions"] == ["LUT5", "adapter"]
+class ComposeMappedJsonTest(unittest.TestCase):
+    def test_replaces_stub_and_preserves_explicit_primitive_collision(self):
+        platform = design()
+        compiler = design(include_top=False)
+        compiler["modules"]["LUT5"] = {"ports": {"O": {"direction": "output", "bits": [1]}}, "cells": {}}
+        result, receipt = MODULE.compose(
+            platform, compiler, top="top", boundary="adapter", platform_wins={"LUT5"}
+        )
+        self.assertEqual(result["modules"]["adapter"], compiler["modules"]["adapter"])
+        self.assertEqual(result["modules"]["LUT5"], platform["modules"]["LUT5"])
+        self.assertEqual(receipt["replaced_modules"], ["adapter"])
+        self.assertEqual(receipt["collisions"], ["LUT5", "adapter"])
 
 
-def test_rejects_unlisted_collision():
-    with pytest.raises(ValueError, match="platform-wins"):
-        MODULE.compose(design(), design(include_top=False), top="top", boundary="adapter", platform_wins=set())
+    def test_rejects_unlisted_collision(self):
+        with self.assertRaisesRegex(ValueError, "platform-wins"):
+            MODULE.compose(design(), design(include_top=False), top="top", boundary="adapter", platform_wins=set())
 
 
-def test_rejects_boundary_abi_mismatch():
-    compiler = design(include_top=False)
-    compiler["modules"]["adapter"]["ports"]["extra"] = {"direction": "input", "bits": [4]}
-    with pytest.raises(ValueError, match="port signature"):
-        MODULE.compose(design(), compiler, top="top", boundary="adapter", platform_wins={"LUT5"})
+    def test_rejects_boundary_abi_mismatch(self):
+        compiler = design(include_top=False)
+        compiler["modules"]["adapter"]["ports"]["extra"] = {"direction": "input", "bits": [4]}
+        with self.assertRaisesRegex(ValueError, "port signature"):
+            MODULE.compose(design(), compiler, top="top", boundary="adapter", platform_wins={"LUT5"})
+
+
+if __name__ == "__main__":
+    unittest.main()
