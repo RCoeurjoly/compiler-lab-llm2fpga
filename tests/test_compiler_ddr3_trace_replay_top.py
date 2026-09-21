@@ -20,6 +20,10 @@ class ReplayTopTest(unittest.TestCase):
         self.assertIn("always @(posedge pcie_user_clk or negedge rowstream_rst_n)", text)
         self.assertIn(".pcie_abort(pcie_user_reset && replay_pcie_init[1])", text)
 
+    def test_transport_shell_is_a_staged_synthesis_boundary(self):
+        text = (ROOT / "rtl/diagnostics/compiler_ddr3_trace_replay_top.sv").read_text()
+        self.assertRegex(text, r"\(\*\s*keep_hierarchy\s*=\s*\"yes\"\s*\*\)\s*task6_ypcb_uberddr3_bist_rowstream_loader_top")
+
     def test_full_pinned_loader_shell_bar_fixture(self):
         tb = ROOT / "tests/rtl/compiler_ddr3_trace_replay_board_tb.sv"
         self.assertTrue(tb.exists(), "full board loader-shell fixture is missing")

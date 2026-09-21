@@ -214,7 +214,7 @@ module compiler_ddr3_trace_replay_top #(
     if (!rowstream_rst_n) replay_pcie_init <= 2'b00;
     else replay_pcie_init <= {replay_pcie_init[0], 1'b1};
   end
-  compiler_ddr3_trace_replay_bridge replay_bridge (
+  (* keep_hierarchy = "yes" *) compiler_ddr3_trace_replay_bridge replay_bridge (
     .pcie_clk(pcie_user_clk), .pcie_reset(!pcie_user_cfg_rst_n),
     .pcie_abort(pcie_user_reset && replay_pcie_init[1]),
     .clk(rowstream_clk), .reset(!rowstream_rst_n), .calib_complete(rowstream_calib_complete),
@@ -240,7 +240,7 @@ module compiler_ddr3_trace_replay_top #(
     .s_axi_rready(bar_rready), .l_axi_rready(s_axi_rready)
   );
 
-  pcie_7x_top_aximm #(
+  (* keep_hierarchy = "yes" *) pcie_7x_top_aximm #(
     .NO_RESET(0),
     .ENABLE_GEN2(0),
     .GT_DEVICE("GTX"),
@@ -548,7 +548,11 @@ module compiler_ddr3_trace_replay_top #(
     end
   endgenerate
 
-  task6_ypcb_uberddr3_bist_rowstream_loader_top #(
+  // Keep the validated PCIe/UberDDR3 transport as a staged synthesis
+  // boundary.  Re-lowering this source closure together with the compiler
+  // core is the measured PROC_MUX timebox; the boundary does not alter any
+  // transport signal or timing parameter.
+  (* keep_hierarchy = "yes" *) task6_ypcb_uberddr3_bist_rowstream_loader_top #(
     .BYTE_LANES(DDR_BYTE_LANES),
     .JTAG_CHAIN(3),
     .JTAG_COMMAND_CHAIN(2),
