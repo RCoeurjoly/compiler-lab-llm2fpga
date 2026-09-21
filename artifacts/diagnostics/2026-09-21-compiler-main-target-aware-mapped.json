@@ -1,0 +1,52 @@
+{
+  "schema": "compiler-main-target-aware-mapped-v1",
+  "status": "PASS_MEMORY_LIBMAP_AND_ABC",
+  "scope": "Current authenticated compiler-generated TinyStories-1M main module only; no PCIe/UberDDR3 shell composition",
+  "compiler_source": {
+    "path": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv",
+    "sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a"
+  },
+  "flow": [
+    "proc",
+    "opt",
+    "memory_dff",
+    "opt_mem",
+    "opt_clean",
+    "memory -nomap -nosat -nowiden",
+    "memory_libmap (Xilinx BRAM/LUTRAM libraries)",
+    "techmap",
+    "opt",
+    "abc -lut 6",
+    "opt_clean",
+    "check",
+    "write_json"
+  ],
+  "artifacts": {
+    "mapped_json_sha256": "0570a479fc0489241b842442e2430946f08a82ae9a58651c3dd5b2bf4d2c757c",
+    "mapped_json_gzip": "artifacts/diagnostics/2026-09-21-compiler-main-target-aware-mapped.json.gz",
+    "mapped_json_gzip_sha256": "39c05520096428a3dac7ae4dfe6e7ed150578615e079dcd7dc49af728faa235b"
+  },
+  "counts": {
+    "modules": 394,
+    "main_cells": 8767,
+    "all_cells_including_submodules": 49985,
+    "lut_cells": 5932,
+    "lutram_cells": 52,
+    "dff_cells": 16725,
+    "compiler_bram_wrapper_cells": 0,
+    "unresolved_external_memory_cells": 240
+  },
+  "warnings": [
+    "Yosys reports done_buf replacement and undriven bits in generated BRAM wrapper outputs; check completed without a fatal error.",
+    "Arithmetic remains in compiler-defined parameterized modules; this is not a complete DSP48E1 technology map."
+  ],
+  "not_proven": [
+    "PCIe/UberDDR3 composition",
+    "nextpnr placement or routing",
+    "timing closure",
+    "bitstream generation",
+    "DDR3 calibration or PCIe image load",
+    "first-token hardware inference"
+  ],
+  "next_gate": "Compose this retained compiler boundary with the separately mapped platform shell and run a bounded platform-aware legalization pass."
+}
