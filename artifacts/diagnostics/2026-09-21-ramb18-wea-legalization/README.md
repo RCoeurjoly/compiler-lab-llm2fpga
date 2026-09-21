@@ -35,3 +35,43 @@ RAMB36E1, with PCIe, two BSCAN endpoints, and the fixed 30 MHz target still
 present. The process then terminated during the main analytical placer before
 placement/routing, FASM, or a bitstream existed. This is diagnostic evidence,
 not an implementation or hardware result.
+
+A second bounded run with `--no-tmdriv` and a ten-minute timeout reproduced the
+same termination point (`Running main analytical placer`) byte-for-byte in the
+captured log. It produced no routed JSON or FASM either; this rules out timing
+driven placement as the sole cause of the observed stop.
+
+The alternative `--placer sa` was also bounded and stopped after 180 seconds:
+it had placed only 4,000 of 499,605 cells (about 133 cells/s) during initial
+placement. It is therefore not a viable fast-iteration workaround for this
+netlist; no output bitstream was produced.
+
+Setting `OMP_NUM_THREADS=1` for the default HeAP placer reproduces the same
+placement log and endpoint within the bounded run. The log hash is identical
+to the timing-driven and `--no-tmdriv` runs, so OpenMP parallelism is not the
+observed cause.
+
+The locally rebuilt nextpnr-xilinx (including the available HeAP fixed-child
+patch) was then run with the same inputs. It produced the identical log hash
+and stopped at the same analytical-placer boundary, so that patch does not
+resolve this mapped-shell failure either.
+
+The fast-path was then corrected to map both sides of the boundary
+independently. Yosys target-mapped the platform shell in 30.31 seconds, and
+the compiler boundary was separately legalized: the compiler arbiter and
+command adapter were ABC-mapped, compiler LUT/FF cells were converted to XC7
+primitives, BRAM wrappers were converted with `brams_xc6v_map.v`, and the 192
+LUTRAM banks were converted to the pinned nextpnr-compatible `RAM64X1D`
+form. The port-signature checker was also corrected to compare direction and
+width rather than module-local Yosys bit IDs.
+
+The resulting composed netlist contains 240,365 slice LUTs, 51,920 slice FFs,
+52 RAMB36E1, 14 RAMB18E1, PCIe, two BSCAN endpoints, and the unchanged
+two-lane 333/83.33 MHz DDR3 shell. nextpnr packing completes and HeAP
+placement starts on 264,636 cells. HeAP completes after 272.8 seconds and the
+simulated-annealing refinement reaches iteration 5, but the bounded run ended
+before routing and emitted no routed JSON, FASM, bitstream, timing report, or
+hardware result. The diagnostic netlist SHA-256 is
+`ec0f63bbe05bbac176537c11b5c702f37392fe35f2422186ba5db72774e1df49`; the
+captured nextpnr log SHA-256 is
+`f6a9bdc559c7135130c0e8b3ec660c323d5b8ab521398cb9c06f9a37f04f8a68`.

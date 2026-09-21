@@ -31,9 +31,13 @@ def _port_signature(module: dict[str, Any]) -> dict[str, tuple[Any, ...]]:
     for name, port in ports.items():
         if not isinstance(port, dict):
             raise ValueError(f"invalid port record for {name}")
+        # Port bit IDs are local to each Yosys module.  They are not part of
+        # the cross-module ABI and normally differ after independently
+        # mapping the platform and compiler.  Compare direction and width;
+        # the parent cell connections carry the actual boundary nets.
         signature[str(name)] = (
             port.get("direction"),
-            tuple(port.get("bits", [])),
+            len(port.get("bits", [])),
         )
     return signature
 

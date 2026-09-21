@@ -18,8 +18,29 @@
     "seed": 15,
     "target_mhz": 30,
     "timing_allow_fail": true,
-    "result": "terminated_during_main_analytical_placement",
+    "result": "terminated_during_main_analytical_placement_reproduced_without_timing_driven_placement",
     "log_sha256": "309b548ae52fb028f89096afc8eb6b58f9373e274041b3a6e11a8998b3c81e14",
+    "reproduction_log_sha256": "309b548ae52fb028f89096afc8eb6b58f9373e274041b3a6e11a8998b3c81e14",
+    "timeout_seconds": 600,
+    "timing_driven_placement_reproduction": false,
+    "sa_placer": {
+      "timeout_seconds": 180,
+      "cells_to_place": 499605,
+      "cells_placed_before_stop": 4000,
+      "log_sha256": "93888be8b542c40ece583e5b1c65ed64e0469ad0b92e9edb1b9d36d8f779a314",
+      "result": "bounded_and_stopped_during_initial_placement"
+    },
+    "omp1_heapp_placer": {
+      "environment": "OMP_NUM_THREADS=1",
+      "timeout_seconds": 180,
+      "log_sha256": "309b548ae52fb028f89096afc8eb6b58f9373e274041b3a6e11a8998b3c81e14",
+      "result": "same_main_analytical_placer_endpoint"
+    },
+    "local_patched_nextpnr": {
+      "source_revision": "32e8b798520d90e1130afe95908f04cf52125cf6",
+      "log_sha256": "309b548ae52fb028f89096afc8eb6b58f9373e274041b3a6e11a8998b3c81e14",
+      "result": "same_main_analytical_placer_endpoint"
+    },
     "fasm_produced": false,
     "routed_json_produced": false
   },
