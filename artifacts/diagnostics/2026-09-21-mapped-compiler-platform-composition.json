@@ -1,0 +1,49 @@
+{
+  "schema": "mapped-compiler-platform-composition-v1",
+  "status": "PASS_MAPPED_BOUNDARY_COMPOSITION",
+  "scope": "Fast-path composition of independently mapped compiler RTL with the already mapped PCIe/UberDDR3 shell",
+  "compiler_source_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "stages": {
+    "compiler_mapping": {
+      "wall_time_seconds": 61.44,
+      "status": "completed_and_json_exported",
+      "target_resources": {
+        "dsp48e1": 255,
+        "blockram_sdp": 24,
+        "blockram_tdp": 35,
+        "lutram_sp": 52,
+        "lut_primitives": 91951
+      }
+    },
+    "platform_shell_mapping": {
+      "wall_time_seconds": 71.70,
+      "status": "completed_with_compiler_adapter_blackboxed",
+      "top": "compiler_ddr3_trace_replay_top",
+      "cells_including_submodules": 33277,
+      "shell_submodules": 3
+    },
+    "mapped_boundary_flatten": {
+      "wall_time_seconds": 2.80,
+      "status": "completed",
+      "top": "compiler_ddr3_trace_replay_top",
+      "cells_including_submodules": 177634,
+      "submodules_remaining": 5,
+      "memories_remaining": 0,
+      "processes_remaining": 0,
+      "compiler_dsp48e1": 255,
+      "compiler_blockram_sdp": 24,
+      "compiler_blockram_tdp": 35,
+      "compiler_lutram_sp": 52
+    }
+  },
+  "interpretation": "The compiler and platform can be composed after independent target-aware mapping without entering the unbounded whole-shell PROC path. This is the required fast-iteration direction. The temporary JSON was not retained because the host filesystem reached zero free space; the result is therefore a diagnostic frontier, not an authenticated nextpnr input.",
+  "not_proven": [
+    "nextpnr placement or routing",
+    "timing closure",
+    "bitstream generation",
+    "DDR3 calibration on this composed artifact",
+    "PCIe image load/readback on this composed artifact",
+    "first-token hardware inference"
+  ],
+  "next_gate": "Make the mapped-boundary composition reproducible as a Nix derivation with retained compact provenance and a nextpnr-compatible netlist, then run constrained placement before programming hardware."
+}
