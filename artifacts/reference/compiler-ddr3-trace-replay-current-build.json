@@ -1,0 +1,37 @@
+{
+  "schema": "compiler-ddr3-trace-replay-current-build-v1",
+  "status": "ROUTE_AND_BITSTREAM_PASS_HARDWARE_PENDING",
+  "hardware_qualified": false,
+  "scope": "current compiler-generated PCIe+UberDDR3 replay diagnostic; no hardware claim",
+  "source_commit": "0f73a61",
+  "profile": {
+    "byte_lanes": 2,
+    "controller_period_ps": 12000,
+    "ddr_period_ps": 3000,
+    "pcie_clock_mhz": 62.5,
+    "bist_mode": 2,
+    "seed": 15
+  },
+  "synthesis": {
+    "netlist_sha256": "05edb5047a549e2da573008419283a7a1aec1df957ee802495664d45e4cc618c"
+  },
+  "route": {
+    "legal": true,
+    "rowstream_fmax_mhz": 83.82,
+    "rowstream_required_mhz": 83.333333,
+    "pcie_fmax_mhz": 95.46,
+    "pcie_required_mhz": 62.5,
+    "fasm_sha256": "a8ac514627d9cb088e6c8677e86e3302507bbf785abb97e4617a7ef1a5d42a61",
+    "scope": "pinned fabric timing model only; not DDR/PHY/CDC/electrical signoff"
+  },
+  "bitstream": {
+    "sha256": "effd210f87f1ad2d7c490cfc2105aef21be2406fa0a41f859e466d11438b8156",
+    "bytes": 18735174,
+    "frames_sha256": "7cc0e22156ec65052dc9928bc4fa219ac33dcfc50ffd6f4d66871149d8df44c7"
+  },
+  "hardware": {
+    "programmed": false,
+    "blocker": "openFPGALoader could not see the FTDI programmer (device not found)",
+    "not_started": ["DDR3 calibration", "BIST", "PCIe image load/readback", "trace replay", "inference"]
+  }
+}
