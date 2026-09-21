@@ -1,0 +1,24 @@
+{
+  "schema": "staged-compiler-lowering-frontier-v1",
+  "status": "LOWERING_PASS_JSON_PRIMITIVE_LEGALIZATION_PENDING",
+  "model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "scope": "compiler-generated main plus transport-neutral arbiter/backend only; PCIe/UberDDR3 source closure excluded",
+  "flow": {
+    "commands": ["proc", "check", "select main; flatten", "opt -fast -full", "techmap cmp2lut/cmp2lcu", "alumacc", "memory -nomap"],
+    "wall_time_seconds": 31,
+    "result": "PASS through generic lowering"
+  },
+  "main_frontier": {
+    "local_cells": 49562,
+    "alu": 489,
+    "macc_v2": 38,
+    "mem_v2": 36,
+    "dff": 36,
+    "dffe": 257,
+    "mux": 2249,
+    "wires": 67293,
+    "wire_bits": 509618
+  },
+  "remaining_issue": "The JSON backend requires emitted Xilinx primitive definitions (for example FDCE/CFGLUT5) to be loaded and processed after technology mapping; no semantic, transport, fit, timing, or hardware claim is made.",
+  "next_action": "Make primitive-definition loading a reproducible staged-backend step, then map this compiler module independently before composition with the locked shell."
+}
