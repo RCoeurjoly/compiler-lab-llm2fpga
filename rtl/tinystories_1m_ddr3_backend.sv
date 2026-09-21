@@ -43,7 +43,11 @@ module tinystories_1m_ddr3_backend #(
   wire [239:0] ext_mem_rsp_valid;
   wire [15359:0] ext_mem_rsp_data;
 
-  main compiler_core (
+  // Preserve the compiler/transport cut during staged synthesis.  The
+  // generated main and the audited arbiter must be lowered independently;
+  // flattening them into the PCIe/DDR3 shell recreates the unbounded generic
+  // process and arithmetic pass observed in the integration diagnostic.
+  (* keep_hierarchy = "yes" *) main compiler_core (
     .start(start), .valid(valid), .token_index(token_index),
     .prompt_0(prompt_0), .prompt_1(prompt_1), .prompt_2(prompt_2),
     .prompt_3(prompt_3), .done(done), .token_id(token_id),
@@ -57,7 +61,7 @@ module tinystories_1m_ddr3_backend #(
 
   assign wb_we = 1'b0;
 
-  llm_external_memory_arbiter #(
+  (* keep_hierarchy = "yes" *) llm_external_memory_arbiter #(
     .PORTS(240), .ADDRESS_BITS(WB_ADDR_BITS), .DATA_BITS(64),
     .WB_DATA_BITS(128)
   ) memory_arbiter (

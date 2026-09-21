@@ -21,6 +21,11 @@ class TinyStoriesDdr3BackendContractTest(unittest.TestCase):
         for port in ("start", "valid", "prompt_0", "prompt_1", "prompt_2", "prompt_3", "token_index", "done", "token_id"):
             self.assertRegex(source, rf"\b{port}\b")
 
+    def test_compiler_and_transport_boundaries_request_preserved_hierarchy(self):
+        source = RTL.read_text()
+        self.assertRegex(source, r"\(\*\s*keep_hierarchy\s*=\s*\"yes\"\s*\*\)\s*main\s+compiler_core")
+        self.assertRegex(source, r"\(\*\s*keep_hierarchy\s*=\s*\"yes\"\s*\*\)\s*llm_external_memory_arbiter")
+
 
 if __name__ == "__main__":
     unittest.main()
