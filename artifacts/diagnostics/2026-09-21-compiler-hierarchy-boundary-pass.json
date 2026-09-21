@@ -1,0 +1,15 @@
+{
+  "schema": "compiler-hierarchy-boundary-pass-v1",
+  "status": "PASS",
+  "scope": "RTL-only Yosys hierarchy check for the exact compiler backend",
+  "command": "read_verilog exact model + llm_external_memory_arbiter + tinystories_1m_ddr3_backend; hierarchy; proc; flatten; stat",
+  "wall_time_seconds": 6.48,
+  "top": {
+    "name": "tinystories_1m_ddr3_backend",
+    "local_cells": 0,
+    "preserved_submodules": ["main", "llm_external_memory_arbiter"],
+    "ports": 20,
+    "port_bits": 268
+  },
+  "interpretation": "Yosys honors keep_hierarchy and leaves both the compiler-generated main and the transport arbiter as synthesis boundaries after flattening the wrapper. This enables staged lowering; it does not yet prove technology mapping, fit, timing, bitstream generation, or hardware inference."
+}
