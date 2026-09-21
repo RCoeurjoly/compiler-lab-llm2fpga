@@ -1,0 +1,52 @@
+{
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+  "limitations": [
+    "No synthesis timing report.",
+    "No routed FASM or bitstream.",
+    "No programming or board inference.",
+    "Temporary mapping files are prototypes, not yet a committed compiler pass."
+  ],
+  "mapping": {
+    "bram_map": "Yosys brams_xc6v_map.v -> RAMB36E1/RAMB18E1",
+    "lutram_map": "temporary target-aware techmap RAM64X1S/RAM128X1S -> RAMD64E",
+    "map_sources": {
+      "ram128x1s-to-ramd64e.v": "5c89904cc54b7e86aae3e5c5aee242a23a19d2cab851e58abd15a9918fcc0e3c",
+      "ram64x1s-to-ramd64e.v": "8611bd108b600b5365f370b98de3e96fd463b6f367d6a608e2ab8efc0afaefc2"
+    },
+    "ram128x1s_remaining": 0,
+    "ram32m_cells": 4,
+    "ram64x1s_remaining": 0,
+    "ramb18e1_cells": 2,
+    "ramb36e1_cells": 8,
+    "ramd64e_cells": 192
+  },
+  "model_source_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "nextpnr": {
+    "chipdb": "/nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin",
+    "chipdb_sha256": "d8472bfcc19dc31686d80cc34f0d37b958c268656182537b06b3439711b105f1",
+    "earlier_gates": [
+      "PCIe/UberDDR3 shell elaborated",
+      "compiler boundary composed",
+      "target BRAM cells accepted through frontend",
+      "DRAM packing completed"
+    ],
+    "executable": "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+    "executable_sha256": "25c434b7614ade7cbdd448b4f993d1feced26296b0164f6e648ddaced7ebac16",
+    "exit_code": 134,
+    "first_failure": "Packing BRAM; assertion port.net == nullptr at /build/source/common/design_utils.cc:93",
+    "log": "nextpnr.log",
+    "log_sha256": "0597353219ec099ca9a6256edfe98716911410477c2b0d1f92e8aa0b21f41085"
+  },
+  "platform_profile": {
+    "ddr_clock_mhz": 333,
+    "ddr_lanes": 2,
+    "ddr_user_clock_mhz": 83.33,
+    "device": "xc7k480tffg1156-1",
+    "freq_mhz": 30,
+    "seed": 15,
+    "transport": "PCIe"
+  },
+  "schema": "llm2fpga.compiler_target_primitive_nextpnr_diagnostic.v1",
+  "scope": "Bounded implementation diagnostic; no bitstream or hardware claim.",
+  "status": "FAIL_NEXTPNR_BRAM_PACK_ASSERTION"
+}
