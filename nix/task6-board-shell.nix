@@ -72,11 +72,12 @@ let
       "$out/yosys.log" --top compiler_ddr3_trace_replay_top
     cp run.ys "$out/"
   '';
-  # Preserve the only timing-passing synthesis result and patch just the
-  # authenticated PCIe reset/flush cone.  Re-running monolithic ABC for this
-  # integration-only change remaps the unrelated DDR critical path.
-  replayTimingBaseline = builtins.storePath
-    "/nix/store/iwy6sw36cskqqywj58jpg3f71c84qcm1-compiler-ddr3-trace-replay-synthesis-screen";
+  # Route the current compiler-generated top, not a historical synthesis JSON.
+  # A pinned netlist can silently discard RTL integration fixes (and was the
+  # reason the previous replay bitstream did not contain the current PCIe
+  # bridge).  The synthesis screen remains bounded and is now the provenance
+  # source for every replay bitstream.
+  replayTimingBaseline = replaySynthesis;
   replayResetPatched = pkgs.runCommand "compiler-ddr3-trace-replay-reset-patched" {
     nativeBuildInputs = [ pkgs.python3 ];
   } ''
@@ -84,13 +85,10 @@ let
     python3 ${../scripts/pipeline/patch_replay_pcie_reset_netlist.py} \
       ${replayTimingBaseline}/replay.json "$out/replay.json" "$out/patch-receipt.json"
   '';
-  replayBarOffsetPatched = pkgs.runCommand "compiler-ddr3-trace-replay-bar-offset-patched" {
-    nativeBuildInputs = [ pkgs.python3 ];
-  } ''
-    mkdir -p "$out"
-    python3 ${../scripts/pipeline/patch_replay_pcie_bar_offset_netlist.py} \
-      ${replayResetPatched}/replay.json "$out/replay.json" "$out/patch-receipt.json"
-  '';
+  # The current synthesis has already eliminated the absolute BAR high bits;
+  # applying the historical bit-disconnect patch would be both unnecessary and
+  # unauthenticated.  Preserve the reset-patch receipt as the route input.
+  replayBarOffsetPatched = replayResetPatched;
   replayBarObserverResetPatched = pkgs.runCommand "compiler-ddr3-trace-replay-bar-observer-reset-patched" {
     nativeBuildInputs = [ pkgs.python3 ];
   } ''

@@ -59,6 +59,16 @@ PROFILES = {
         "reset_connections": {"I0": [158], "I1": [159], "I2": [160],
                               "I3": [161], "O": [153]},
     },
+    "05edb5047a549e2da573008419283a7a1aec1df957ee802495664d45e4cc618c": {
+        "source_sha256": "05edb5047a549e2da573008419283a7a1aec1df957ee802495664d45e4cc618c",
+        "transport_reset_lut": "$abc$268294$auto$blifparse.cc:557:parse_blif$268349",
+        "replay_pcie_init_bits": [36453, 197],
+        "raw_cfg_reset_bit": 191,
+        "transport_reset_bit": 186,
+        "reset_type": "LUT2",
+        "reset_init": "1011",
+        "reset_connections": {"I0": [191], "I1": [192], "O": [186]},
+    },
 }
 
 
