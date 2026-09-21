@@ -1,0 +1,20 @@
+{
+  "schema": "compiler-dsp-mapping-frontier-v1",
+  "status": "DSP_RULE_VALIDATED_FULL_MAIN_MAPPING_TIMEBOXED",
+  "scope": "exact compiler-generated TinyStories-1M main, no transport or RTL changes",
+  "model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "rule_validation": {
+    "input": "64x64 unsigned multiply",
+    "yosys_rule": "mul2dsp.v + xilinx/xc7_dsp_map.v",
+    "definitions": ["DSP_A_MAXWIDTH=25", "DSP_B_MAXWIDTH=18", "DSP_NAME=$__MUL25X18"],
+    "result": "12 DSP48E1 cells",
+    "wall_time_seconds": 0.09
+  },
+  "full_main": {
+    "flow": "proc/opt, explicit DSP mapping, ALUMACC, memory lowering, arithmetic technology mapping",
+    "wall_timebox_seconds": 300,
+    "last_observed_pass": "xilinx arithmetic technology mapping",
+    "result": "no JSON emitted before timeout"
+  },
+  "interpretation": "The DSP rule is usable, but arithmetic mapping of the complete unchanged compiler main remains too large for the bounded iteration window. No resource, fit, timing, bitstream, or hardware inference claim follows."
+}
