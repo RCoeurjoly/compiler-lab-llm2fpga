@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$#" -ne 0 ]]; then
+  echo "usage: sudo scripts/host/ypcb/install-pcie-lifecycle-policy" >&2
+  exit 2
+fi
+if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+  echo "error: one-time policy installation must run as root" >&2
+  exit 2
+fi
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+BRIDGE_HELPER="$SCRIPT_DIR/ypcb-pcie-bridge-permissions"
+RULE="$SCRIPT_DIR/60-task6-ypcb-pcie.rules"
+for source in "$BRIDGE_HELPER" "$RULE"; do
+  [[ -f "$source" && ! -L "$source" ]] || { echo "error: missing or symbolic source: $source" >&2; exit 1; }
+done
+
+/usr/bin/install -o root -g root -m 0755 "$BRIDGE_HELPER" \
+  /usr/local/libexec/task6-pcie/task6-pcie-bridge-permissions
+/usr/bin/install -o root -g root -m 0644 "$RULE" \
+  /etc/udev/rules.d/60-task6-ypcb-pcie.rules
+/usr/bin/udevadm control --reload-rules
+/usr/bin/udevadm settle --timeout=10
+echo "installed automatic PCIe bridge Memory Space recovery"

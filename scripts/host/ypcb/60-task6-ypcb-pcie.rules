@@ -1,0 +1,4 @@
+# YPCB-00338-1P1 Task 6 PCIe endpoint and Thunderbolt bridge.
+# Both helpers run as root from udev; user-facing gates remain unprivileged.
+ACTION=="add|change", SUBSYSTEM=="pci", KERNEL=="0000:42:00.0", ATTR{vendor}=="0x10ee", ATTR{device}=="0x0480", ATTR{subsystem_vendor}=="0x10ee", RUN+="/usr/local/libexec/task6-pcie/task6-pcie-pci-permissions %p"
+ACTION=="add|change", SUBSYSTEM=="pci", KERNEL=="0000:41:00.0", ATTR{vendor}=="0x8086", ATTR{device}=="0x5786", ATTR{subsystem_vendor}=="0x2222", ATTR{subsystem_device}=="0x1111", RUN+="/usr/local/libexec/task6-pcie/task6-pcie-bridge-permissions %p"

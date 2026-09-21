@@ -98,3 +98,22 @@ sudo -n /usr/local/sbin/ypcb-thunderbolt-isolate-for-programming
 
 The existing deferred-authorization cold-cycle remains responsible for
 power-cycling and restoring authorization after fully verified BPI programming.
+
+## Automatic PCIe bridge recovery
+
+The Thunderbolt bridge loses PCI Memory Space Enable during a cold-cycle. The
+old policy delegated only `rescan`, which left the endpoint enumerated but
+returned all-ones for every BAR read until a user manually ran `setpci`.
+
+Install the reviewed udev policy once:
+
+```bash
+cd /home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec
+sudo scripts/host/ypcb/install-pcie-lifecycle-policy
+```
+
+After that installation, bridge `0000:41:00.0` is identity-checked and its
+Memory Space Enable bit is restored automatically on every add/change event.
+The endpoint BAR permissions and bridge rescan delegation remain unchanged.
+Normal PCIe gates and Tapo cold-cycles no longer require a user-facing
+`sudo setpci` or recovery script.

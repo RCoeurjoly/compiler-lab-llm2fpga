@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This helper is executed by udev as root.  It is deliberately narrow: it
+# accepts only the fixed Helios/YPCB bridge and changes only PCI COMMAND bit 1
+# (Memory Space Enable).  It makes the post-cold-cycle bridge state
+# deterministic without requiring a user-facing sudo setpci command.
+
+DEVPATH_ARG="${1:-}"
+GROUP_NAME="${TASK6_PCIE_GROUP:-plugdev}"
+SYSFS_ROOT="/sys"
+BRIDGE_BDF="0000:41:00.0"
+
+fail() {
+  echo "ypcb-pcie-bridge-permissions: $*" >&2
+  exit 1
+}
+
+[[ -n "$DEVPATH_ARG" ]] || fail "missing udev devpath argument"
+[[ "$DEVPATH_ARG" == /devices/* ]] || fail "refusing non-device devpath: $DEVPATH_ARG"
+BRIDGE_DIR="${SYSFS_ROOT}${DEVPATH_ARG}"
+[[ "$(basename "$BRIDGE_DIR")" == "$BRIDGE_BDF" ]] || fail "refusing non-Task6 bridge: $BRIDGE_DIR"
+[[ -d "$BRIDGE_DIR" ]] || fail "missing bridge: $BRIDGE_DIR"
+
+for attr in vendor device subsystem_vendor subsystem_device; do
+  [[ -f "$BRIDGE_DIR/$attr" ]] || fail "missing bridge attribute: $attr"
+done
+[[ "$(<"$BRIDGE_DIR/vendor")" == 0x8086 ]] || fail "unexpected vendor"
+[[ "$(<"$BRIDGE_DIR/device")" == 0x5786 ]] || fail "unexpected device"
+[[ "$(<"$BRIDGE_DIR/subsystem_vendor")" == 0x2222 ]] || fail "unexpected subsystem vendor"
+[[ "$(<"$BRIDGE_DIR/subsystem_device")" == 0x1111 ]] || fail "unexpected subsystem device"
+getent group "$GROUP_NAME" >/dev/null || fail "missing group: $GROUP_NAME"
+
+if [[ -e "$BRIDGE_DIR/rescan" ]]; then
+  chgrp "$GROUP_NAME" "$BRIDGE_DIR/rescan"
+  chmod 0220 "$BRIDGE_DIR/rescan"
+fi
+
+command_before="$(/usr/bin/setpci -s "$BRIDGE_BDF" COMMAND 2>/dev/null || true)"
+[[ "$command_before" =~ ^[0-9A-Fa-f]{4}$ ]] || fail "unreadable bridge COMMAND"
+command_after="$(printf '%04x' $((0x$command_before | 0x0002)))"
+if [[ "${command_before,,}" != "$command_after" ]]; then
+  /usr/bin/setpci -s "$BRIDGE_BDF" "COMMAND=$command_after"
+fi
+command_check="$(/usr/bin/setpci -s "$BRIDGE_BDF" COMMAND 2>/dev/null || true)"
+[[ "$command_check" =~ ^[0-9A-Fa-f]{4}$ ]] || fail "bridge COMMAND became unreadable"
+(( (0x$command_check & 0x0002) != 0 )) || fail "bridge Memory Space Enable did not stick"
