@@ -1,0 +1,38 @@
+{
+  "schema": "llm2fpga.compiler_pcie_uberddr3_boundary_elaboration.v1",
+  "status": "PASS_COMPILER_PLATFORM_BOUNDARY_ELABORATION",
+  "scope": "Structural Yosys JSON elaboration only; not synthesis, placement, timing, bitstream, or hardware inference.",
+  "top": "compiler_ddr3_trace_replay_top",
+  "compiler_accelerator_enabled": true,
+  "implementation_source": "compiler-generated TinyStories-1M RTL; kev-gpt RTL not used",
+  "compiler_model_source": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv",
+  "compiler_model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "authenticated_image": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/image.bin",
+  "authenticated_image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+  "platform_source_closure": "/nix/store/rlw4yzrqhavc7la9hrdng2l1khwklrfn-task6-board-shell-m2-production-source-closure",
+  "platform_profile": {
+    "ddr_lanes": 2,
+    "ddr_clock_mhz": 333,
+    "ddr_user_clock_mhz": 83.33,
+    "transport": "PCIe"
+  },
+  "json_artifact": "artifacts/diagnostics/2026-09-21-compiler-pcie-uberddr3-boundary-yosys.json.gz",
+  "json_gzip_sha256": "eb7f59f9034274fcc9ebdef6cbf76704bb7e72ee6b73c78657a1df1d8a66515c",
+  "json_uncompressed_sha256": "43ffcd2175a39592a2d4d945a5acc707497ed02657d2a222d6fbd40f4d16bed4",
+  "module_count": 856,
+  "top_cell_count": 15,
+  "required_instances": {
+    "compiler_command_adapter": true,
+    "compiler_backend": true,
+    "compiler_main": true,
+    "external_memory_arbiter": true,
+    "pcie_shell": true,
+    "uberddr3_shell": true
+  },
+  "command": "Yosys 0.66: pinned shell closure + compiler model/backend/adapter; chparam ENABLE_COMPILER_ACCELERATOR=1; proc/opt; Xilinx simulation primitive bodies blackboxed for JSON serialization.",
+  "diagnostic_limitations": [
+    "Xilinx primitives were blackboxed after elaboration for JSON serialization.",
+    "No memory_libmap/ABC/techmap/placement/timing was run on this complete platform.",
+    "No PCIe ingress, DDR3 calibration, image load/readback, trace replay, bitstream programming, or hardware inference was run."
+  ]
+}
