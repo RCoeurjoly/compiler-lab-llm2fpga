@@ -1,0 +1,35 @@
+{
+  "schema": "composed-memory-legalization-frontier-v1",
+  "status": "STOPPED_BEFORE_MEMORY_LEGALIZATION",
+  "scope": "Bounded target-aware Yosys pass on the compiler-generated accelerator composed with PCIe/UberDDR3",
+  "top": "compiler_ddr3_trace_replay_top",
+  "parameters": {
+    "ENABLE_COMPILER_ACCELERATOR": 1,
+    "DDR_BYTE_LANES": 2,
+    "CONTROLLER_CLK_PERIOD_PS": 12000,
+    "DDR3_CLK_PERIOD_PS": 3000,
+    "BIST_MODE_PARAM": 2
+  },
+  "command_stages": [
+    "hierarchy -check",
+    "proc",
+    "opt",
+    "memory_dff",
+    "memory -nomap -nosat -nowiden",
+    "memory_libmap",
+    "clean",
+    "check",
+    "stat"
+  ],
+  "observation": {
+    "last_observed_stage": "proc",
+    "yosys_end_marker": false,
+    "statistics_reached": false,
+    "log_bytes": 11314819,
+    "log_sha256": "90495d82dda4306c27cc08e71bdd919785e3d09215f7652d88b11739b5c0bd1f",
+    "bounded_timeout_seconds": 240
+  },
+  "interpretation": "The full composed hierarchy is structurally valid, but applying generic process lowering to the PCIe/UberDDR3 shell and compiler core together did not reach memory legalization within the bounded observation. This does not establish a design or functional failure; it establishes that whole-composition generic lowering is not a viable fast-iteration gate.",
+  "decision": "Keep the compiler and platform synthesis boundaries separate. Reuse the already completed compiler target-aware mapping frontier and the proven platform shell artifacts, then compose only at a mapped/netlist boundary rather than re-running generic proc over the complete shell.",
+  "next_gate": "Produce a reproducible mapped compiler netlist artifact and connect it to the locked shell through an explicit boundary for bounded fit/timing screening."
+}
