@@ -1,0 +1,34 @@
+{
+  "schema": "compiler-ddr3-trace-replay-hardware-failure-v2",
+  "status": "FAIL",
+  "captured_at": "2026-09-21T07:15:32.322Z",
+  "scope": "PCIe BAR completion localization after automatic bridge policy repair",
+  "bitstream": {
+    "path": "/nix/store/nhy0r32ysbb3xhyzcfalsjh8rgacjvbg-compiler-ddr3-trace-replay-bitstream/replay.bit",
+    "sha256": "3659f4ed78fe3c8abbe6c7248558f778231c3378469cca76e2dfd31b0fc8acad"
+  },
+  "host_policy": {
+    "bridge_helper_sha256": "b29f2c666572e1baa954136889f435c128b6a4d873b6030bf159eb2dff102335",
+    "udev_rule_sha256": "5f21505face4aca19e8562fcc35bcddca9c59f2bb5fe11ca41144bba405d796f",
+    "bridge_bdf": "0000:41:00.0",
+    "bridge_command": "0407",
+    "endpoint_bdf": "0000:42:00.0",
+    "endpoint_command": "0002",
+    "resource0": "root:plugdev 0660"
+  },
+  "bar_probe": {
+    "access": "aligned_32_bit_mmio",
+    "offsets": ["0x0", "0x4", "0x8", "0x34", "0x54", "0x200", "0x900", "0x904", "0x928", "0x92c"],
+    "values": ["0xffffffff", "0xffffffff", "0xffffffff", "0xffffffff", "0xffffffff", "0xffffffff", "0xffffffff", "0xffffffff", "0xffffffff", "0xffffffff"],
+    "result": "no_completion"
+  },
+  "root_port": {
+    "bdf": "0000:00:07.2",
+    "secondary_status": "MAbort+"
+  },
+  "localization": {
+    "first_failed_gate": "PCIe endpoint BAR completion",
+    "not_started": ["DDR3 calibration", "BIST", "image load/readback", "trace replay", "accelerator inference"],
+    "interpretation": "Bridge forwarding and BAR permissions are valid; the integrated diagnostic bitstream does not complete PCIe MMIO."
+  }
+}
