@@ -1,0 +1,45 @@
+{
+  "schema": "compiler-pcie-uberddr3-structural-elaboration-v1",
+  "status": "PASS_STRUCTURAL_COMPOSITION",
+  "scope": "Bounded Yosys elaboration of the compiler-generated TinyStories-1M adapter with the pinned PCIe/UberDDR3 YPCB shell",
+  "compiler_source_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "sources": {
+    "compiler_main": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv",
+    "compiler_backend": "rtl/tinystories_1m_ddr3_backend.sv",
+    "compiler_adapter": "rtl/tinystories_1m_ddr3_command_adapter.sv",
+    "memory_arbiter": "rtl/memory/llm_external_memory_arbiter.sv",
+    "platform_shell": "pinned task6-board-shell-m2-production-source-closure",
+    "top": "rtl/diagnostics/compiler_ddr3_trace_replay_top.sv"
+  },
+  "defines": [
+    "TASK6_PCIE_ROWSTREAM_INGRESS_PORTS",
+    "TASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS",
+    "TASK6_COMPILER_DDR3_ACCELERATOR_PORTS"
+  ],
+  "parameters": {
+    "ENABLE_COMPILER_ACCELERATOR": 1,
+    "DDR_BYTE_LANES": 2,
+    "CONTROLLER_CLK_PERIOD_PS": 12000,
+    "DDR3_CLK_PERIOD_PS": 3000,
+    "BIST_MODE_PARAM": 2,
+    "TINYSTORIES_ENABLE_COMPILER_DDR3": 1
+  },
+  "yosys": {
+    "version": "0.66",
+    "wall_time_seconds": 6.76,
+    "top": "compiler_ddr3_trace_replay_top",
+    "status": "hierarchy_check_passed",
+    "total_cells_including_submodules": 25531,
+    "memories": 70,
+    "processes": 1541,
+    "submodules": [
+      "tinystories_1m_ddr3_command_adapter",
+      "compiler_ddr3_trace_replay_bridge",
+      "task6_ypcb_uberddr3_bist_rowstream_loader_top",
+      "pcie_7x_top_aximm",
+      "task6_pcie_axil_rowstream_loader_ingress_cdc"
+    ]
+  },
+  "interpretation": "The compiler-generated implementation is structurally connected to the unchanged PCIe/UberDDR3 shell at the RTL hierarchy boundary. This proves source closure and parameterized port compatibility only; it does not prove memory transaction correctness, synthesis legalization, placement, routing, timing, bitstream generation, calibration, or board inference.",
+  "next_gate": "Run a bounded staged synthesis of this composed top, preserving compiler and platform hierarchy boundaries, then inspect resource/timing feasibility before any bitstream attempt."
+}
