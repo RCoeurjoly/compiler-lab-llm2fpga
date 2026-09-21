@@ -5,6 +5,7 @@
 module compiler_ddr3_trace_replay_top #(
   parameter int DDR_BYTE_LANES = 2,
   parameter bit ENABLE_PCIE_TOP1 = 1'b0,
+  parameter bit ENABLE_COMPILER_ACCELERATOR = 1'b0,
   parameter bit TINYSTORIES_LOADER_ONLY = 1'b0,
   parameter int TINYSTORIES_TMAX = 32,
   parameter bit TINYSTORIES_ENABLE_ENGINE = 1'b0,
@@ -146,6 +147,12 @@ module compiler_ddr3_trace_replay_top #(
   wire rowstream_tinystories_token_valid;
   wire rowstream_tinystories_token_ready;
   wire [15:0] rowstream_tinystories_token_id;
+  wire compiler_prompt_ready, compiler_token_valid, compiler_token_ready;
+  wire [15:0] compiler_token_id;
+  wire compiler_busy, compiler_error;
+  wire [7:0] compiler_error_code;
+  wire [62:0] compiler_debug_status;
+  wire [31:0] compiler_request_count;
 `endif
 
   wire [3:0] pcie_led;
@@ -189,9 +196,16 @@ module compiler_ddr3_trace_replay_top #(
   wire bar_rvalid;
   wire bar_rready;
   wire replay_cyc, replay_stb, replay_we, replay_accept, replay_ack, replay_err;
+  wire selected_compiler_accept, selected_compiler_ack, selected_compiler_err;
+  wire [127:0] selected_compiler_rdata;
   wire [24:0] replay_addr;
   wire [15:0] replay_sel;
   wire [127:0] replay_rdata;
+  wire compiler_accel_cyc, compiler_accel_stb, compiler_accel_we;
+  wire [24:0] compiler_accel_addr;
+  wire [15:0] compiler_accel_sel;
+  wire compiler_accel_accept, compiler_accel_ack, compiler_accel_err;
+  wire [127:0] compiler_accel_rdata;
   // Preserve the original row-domain-ready synchronizer. Keep local PCIe BAR
   // reset independent of DDR, and request a cross-domain flush only after the
   // row clock/reset domain has demonstrably become live.
@@ -205,8 +219,8 @@ module compiler_ddr3_trace_replay_top #(
     .pcie_abort(pcie_user_reset && replay_pcie_init[1]),
     .clk(rowstream_clk), .reset(!rowstream_rst_n), .calib_complete(rowstream_calib_complete),
     .wb_cyc(replay_cyc), .wb_stb(replay_stb), .wb_we(replay_we), .wb_addr(replay_addr),
-    .wb_sel(replay_sel), .wb_stall(!replay_accept), .wb_ack(replay_ack),
-    .wb_err(replay_err), .wb_rdata(replay_rdata),
+    .wb_sel(replay_sel), .wb_stall(!selected_compiler_accept), .wb_ack(selected_compiler_ack),
+    .wb_err(selected_compiler_err), .wb_rdata(selected_compiler_rdata),
     .s_axi_awaddr(bar_awaddr), .l_axi_awaddr(s_axi_awaddr),
     .s_axi_awvalid(bar_awvalid), .l_axi_awvalid(s_axi_awvalid),
     .s_axi_awready(bar_awready), .l_axi_awready(s_axi_awready),
@@ -361,21 +375,76 @@ module compiler_ddr3_trace_replay_top #(
     ,.rowstream_tinystories_prompt_o(rowstream_tinystories_prompt)
     ,.rowstream_tinystories_start_o(rowstream_tinystories_start)
     ,.rowstream_tinystories_clear_o(rowstream_tinystories_clear)
-    ,.rowstream_tinystories_prompt_ready_i(rowstream_tinystories_prompt_ready)
-    ,.rowstream_tinystories_busy_i(rowstream_tinystories_busy)
-    ,.rowstream_tinystories_error_i(rowstream_tinystories_error)
-    ,.rowstream_tinystories_error_code_i(rowstream_tinystories_error_code)
-    ,.rowstream_tinystories_debug_i(rowstream_tinystories_debug[31:0])
+    ,.rowstream_tinystories_prompt_ready_i(ENABLE_COMPILER_ACCELERATOR ? compiler_prompt_ready : rowstream_tinystories_prompt_ready)
+    ,.rowstream_tinystories_busy_i(ENABLE_COMPILER_ACCELERATOR ? compiler_busy : rowstream_tinystories_busy)
+    ,.rowstream_tinystories_error_i(ENABLE_COMPILER_ACCELERATOR ? compiler_error : rowstream_tinystories_error)
+    ,.rowstream_tinystories_error_code_i(ENABLE_COMPILER_ACCELERATOR ? compiler_error_code : rowstream_tinystories_error_code)
+    ,.rowstream_tinystories_debug_i(ENABLE_COMPILER_ACCELERATOR ? compiler_debug_status[31:0] : rowstream_tinystories_debug[31:0])
     ,.rowstream_tinystories_bridge_error_i(rowstream_tinystories_bridge_error)
-    ,.rowstream_tinystories_requests_i(rowstream_tinystories_requests)
+    ,.rowstream_tinystories_requests_i(ENABLE_COMPILER_ACCELERATOR ? compiler_request_count : rowstream_tinystories_requests)
     ,.rowstream_tinystories_cache_hits_i(rowstream_tinystories_cache_hits)
     ,.rowstream_tinystories_cache_misses_i(rowstream_tinystories_cache_misses)
     ,.rowstream_tinystories_stall_cycles_i(rowstream_tinystories_stall_cycles)
-    ,.rowstream_tinystories_token_valid_i(rowstream_tinystories_token_valid)
-    ,.rowstream_tinystories_token_ready_o(rowstream_tinystories_token_ready)
-    ,.rowstream_tinystories_token_id_i(rowstream_tinystories_token_id)
+    ,.rowstream_tinystories_token_valid_i(ENABLE_COMPILER_ACCELERATOR ? compiler_token_valid : rowstream_tinystories_token_valid)
+    ,.rowstream_tinystories_token_ready_o(ENABLE_COMPILER_ACCELERATOR ? compiler_token_ready : rowstream_tinystories_token_ready)
+    ,.rowstream_tinystories_token_id_i(ENABLE_COMPILER_ACCELERATOR ? compiler_token_id : rowstream_tinystories_token_id)
 `endif
   );
+
+  // The physical rowstream owner mux has one accelerator slot.  In compiler
+  // mode it services the generated accelerator; otherwise it services the
+  // diagnostic trace replayer.  Both consumers observe the same registered
+  // response, while the inactive requester remains quiescent.
+  assign compiler_accel_accept = selected_compiler_accept;
+  assign compiler_accel_ack = selected_compiler_ack;
+  assign compiler_accel_err = selected_compiler_err;
+  assign compiler_accel_rdata = selected_compiler_rdata;
+  assign replay_accept = selected_compiler_accept;
+  assign replay_ack = selected_compiler_ack;
+  assign replay_err = selected_compiler_err;
+  assign replay_rdata = selected_compiler_rdata;
+
+`ifdef TASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS
+  generate if (ENABLE_COMPILER_ACCELERATOR) begin : gen_compiler_command_adapter
+    tinystories_1m_ddr3_command_adapter compiler_command_adapter (
+      .clk(rowstream_clk), .reset(!rowstream_rst_n),
+      .clear(rowstream_tinystories_clear),
+      .prompt_valid(rowstream_tinystories_prompt),
+      .prompt_ready(compiler_prompt_ready),
+      .prompt_token(rowstream_tinystories_prompt_token),
+      .start(rowstream_tinystories_start),
+      .token_valid(compiler_token_valid), .token_ready(compiler_token_ready),
+      .token_id(compiler_token_id), .busy(compiler_busy),
+      .error(compiler_error), .error_code(compiler_error_code),
+      .request_count(compiler_request_count),
+      .wb_cyc(compiler_accel_cyc), .wb_stb(compiler_accel_stb),
+      .wb_we(compiler_accel_we), .wb_addr(compiler_accel_addr),
+      .wb_sel(compiler_accel_sel), .wb_accept(compiler_accel_accept),
+      .wb_ack(compiler_accel_ack), .wb_err(compiler_accel_err),
+      .wb_rdata(compiler_accel_rdata));
+    assign compiler_debug_status = 63'd0;
+  end else begin : gen_no_compiler_command_adapter
+    assign compiler_prompt_ready = 1'b0;
+    assign compiler_token_valid = 1'b0;
+    assign compiler_token_id = 16'd0;
+    assign compiler_busy = 1'b0;
+    assign compiler_error = 1'b0;
+    assign compiler_error_code = 8'd0;
+    assign compiler_request_count = 32'd0;
+    assign compiler_debug_status = 63'd0;
+    assign compiler_accel_cyc = 1'b0;
+    assign compiler_accel_stb = 1'b0;
+    assign compiler_accel_we = 1'b0;
+    assign compiler_accel_addr = 25'd0;
+    assign compiler_accel_sel = 16'd0;
+  end endgenerate
+`else
+  assign compiler_accel_cyc = 1'b0;
+  assign compiler_accel_stb = 1'b0;
+  assign compiler_accel_we = 1'b0;
+  assign compiler_accel_addr = 25'd0;
+  assign compiler_accel_sel = 16'd0;
+`endif
 
   generate
     if (ENABLE_PCIE_MLP_SELFTEST) begin : gen_pcie_mlp_selftest
@@ -505,11 +574,16 @@ module compiler_ddr3_trace_replay_top #(
     ,.TINYSTORIES_DIRECT_ACCELERATOR_OWNER(TINYSTORIES_DIRECT_ACCELERATOR_OWNER)
     ,.TINYSTORIES_ENABLE_COMPILER_DDR3(1'b1)
   ) rowstream_ddr3 (
-    .compiler_wb_cyc_i(replay_cyc), .compiler_wb_stb_i(replay_stb),
-    .compiler_wb_we_i(replay_we), .compiler_wb_addr_i(replay_addr),
-    .compiler_wb_data_i(128'd0), .compiler_wb_sel_i(replay_sel),
-    .compiler_wb_accept_o(replay_accept), .compiler_wb_ack_o(replay_ack),
-    .compiler_wb_err_o(replay_err), .compiler_wb_rdata_o(replay_rdata),
+    .compiler_wb_cyc_i(ENABLE_COMPILER_ACCELERATOR ? compiler_accel_cyc : replay_cyc),
+    .compiler_wb_stb_i(ENABLE_COMPILER_ACCELERATOR ? compiler_accel_stb : replay_stb),
+    .compiler_wb_we_i(ENABLE_COMPILER_ACCELERATOR ? compiler_accel_we : replay_we),
+    .compiler_wb_addr_i(ENABLE_COMPILER_ACCELERATOR ? compiler_accel_addr : replay_addr),
+    .compiler_wb_data_i(128'd0),
+    .compiler_wb_sel_i(ENABLE_COMPILER_ACCELERATOR ? compiler_accel_sel : replay_sel),
+    .compiler_wb_accept_o(selected_compiler_accept),
+    .compiler_wb_ack_o(selected_compiler_ack),
+    .compiler_wb_err_o(selected_compiler_err),
+    .compiler_wb_rdata_o(selected_compiler_rdata),
     .clk50(clk_50),
     .SYS_RSTN(sys_rst_n),
     .ddram_a(ddram_a),

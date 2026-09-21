@@ -1,0 +1,32 @@
+{
+  "schema": "compiler-accelerator-top-synthesis-frontier-v1",
+  "status": "ELABORATION_PASS_SYNTHESIS_TIMEBOX_EXCEEDED",
+  "scope": "real compiler-generated TinyStories-1M main integrated into the proven PCIe/UberDDR3 shell",
+  "compiler_model": {
+    "path": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv",
+    "sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+    "interface": "240 external 64-bit memory request/response ports; four 16-bit prompt words; token_id"
+  },
+  "top": {
+    "path": "rtl/diagnostics/compiler_ddr3_trace_replay_top.sv",
+    "sha256": "83dfa270629094ebbe1c6159620eee66d8aec7a41074d19fb1c232518ea4870a",
+    "parameter": "ENABLE_COMPILER_ACCELERATOR=1"
+  },
+  "shell": {
+    "pcie": "validated pcie_7x_top_aximm path",
+    "ddr3": "validated UberDDR3 two-lane 333/83.33 MHz path",
+    "memory_boundary": "tinystories_1m_ddr3_backend plus llm_external_memory_arbiter",
+    "command_boundary": "tinystories_1m_ddr3_command_adapter"
+  },
+  "elaboration": {
+    "result": "read_verilog and hierarchy resolved the generated main, adapter, arbiter, PCIe, and UberDDR3 modules",
+    "synthesis_pass_reached": "FSM extraction after proc/opt",
+    "wall_timebox_minutes": 5,
+    "termination": "explicitly stopped at the bounded diagnostic timebox; no fit or timing claim"
+  },
+  "hardware": {
+    "full_image_readback": "PASS",
+    "exact_trace_replay": "PASS",
+    "compiler_first_token": "not_programmed; no claim"
+  }
+}
