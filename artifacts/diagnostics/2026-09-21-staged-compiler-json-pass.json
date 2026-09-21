@@ -1,0 +1,32 @@
+{
+  "schema": "staged-compiler-json-pass-v1",
+  "status": "PASS_GENERIC_JSON_INTERMEDIATE",
+  "model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "artifact": {
+    "path": "/tmp/compiler-backend-staged-json6.json",
+    "sha256": "55f8d92e5f4058dc3c9f814ea109bf940bb9f1897b4f02d57ae363e5824bf05b",
+    "bytes": 130023424,
+    "modules": 823,
+    "backend_cells": 2,
+    "main_cells": 41425
+  },
+  "flow": {
+    "scope": "compiler-generated main plus transport-neutral backend/arbiter; PCIe/UberDDR3 source closure excluded",
+    "wall_time_seconds": 24.64,
+    "primitive_legalization": "all emitted Xilinx simulation primitives processed after mapping"
+  },
+  "main_cell_types": {
+    "$and": 13135,
+    "$not": 6473,
+    "$or": 5717,
+    "$mux": 2249,
+    "$logic_and": 2001,
+    "$xnor": 1891,
+    "$sdffe": 1484,
+    "$sdff": 1148,
+    "$alu": 489,
+    "$macc_v2": 38,
+    "$mem_v2": 36
+  },
+  "limitations": "This is an intermediate generic JSON, not a nextpnr-ready mapped netlist; no fit, timing, bitstream, or hardware inference claim follows."
+}
