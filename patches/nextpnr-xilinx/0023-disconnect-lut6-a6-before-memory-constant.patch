@@ -1,18 +1,10 @@
 --- a/xilinx/arch_place.cc
 +++ b/xilinx/arch_place.cc
-@@
-                     if (!lut6->ports.count(id_A6)) {
-                         lut6->ports[id_A6].name = id_A6;
-                         lut6->ports[id_A6].type = PORT_IN;
-                     }
+@@ -666,1 +666,2 @@ void Arch::fixupPlacement()
+-                    connect_port(getCtx(), nets[id("$PACKER_VCC_NET")].get(), lut6, id_A6);
 +                    disconnect_port(getCtx(), lut6, id_A6);
-                    // Memory/SRL LUTs require the sixth input tied high;
-                    // clear any pre-existing constant connection first.
-                     connect_port(getCtx(), nets[id("$PACKER_VCC_NET")].get(), lut6, id_A6);
-@@
-                 if (!lut6->ports.count(id_A6)) {
-                     lut6->ports[id_A6].name = id_A6;
-                     lut6->ports[id_A6].type = PORT_IN;
-                 }
++                    connect_port(getCtx(), nets[id("$PACKER_VCC_NET")].get(), lut6, id_A6);
+@@ -727,1 +728,2 @@ void Arch::fixupPlacement()
+-                connect_port(getCtx(), nets[id("$PACKER_VCC_NET")].get(), lut6, id_A6);
 +                disconnect_port(getCtx(), lut6, id_A6);
-                 connect_port(getCtx(), nets[id("$PACKER_VCC_NET")].get(), lut6, id_A6);
++                connect_port(getCtx(), nets[id("$PACKER_VCC_NET")].get(), lut6, id_A6);
