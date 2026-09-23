@@ -47,8 +47,8 @@ class PcieBridgePermissionsPolicyTests(unittest.TestCase):
             'setpci',
             'resource0',
             'plugdev',
-            'chgrp',
             'chmod',
+            'setfacl',
         ):
             self.assertIn(required, text)
         self.assertNotIn("reset_subordinate", text)

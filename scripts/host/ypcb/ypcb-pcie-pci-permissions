@@ -40,8 +40,12 @@ resource_line="$(head -n 1 "$ENDPOINT_DIR/resource" 2>/dev/null || true)"
 # and PCI decode have been validated.  The user is already a member of the
 # established plugdev group used by the Digilent programmer.
 getent group plugdev >/dev/null || fail "missing plugdev group"
-chgrp plugdev "$RESOURCE0" || fail "cannot set BAR0 group"
 chmod 0660 "$RESOURCE0" || fail "cannot set BAR0 mode"
+if command -v setfacl >/dev/null 2>&1; then
+  setfacl -m u:roland:rw "$RESOURCE0" || fail "cannot grant BAR0 ACL"
+else
+  chgrp plugdev "$RESOURCE0" || fail "cannot set BAR0 group"
+fi
 
 command_before="$(/usr/bin/setpci -s "$ENDPOINT_BDF" COMMAND 2>/dev/null || true)"
 [[ "$command_before" =~ ^[0-9A-Fa-f]{4}$ ]] || fail "unreadable endpoint COMMAND"
