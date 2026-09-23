@@ -1,0 +1,24 @@
+{
+  "schema": "ypcb-jtag-sram-program-v1",
+  "status": "PASS_PROGRAM_PENDING_PCI_DECODE",
+  "captured_at": "2026-09-23T19:03:00+02:00",
+  "programming": {
+    "method": "openFPGALoader SRAM over Digilent HS3",
+    "cable": "digilent_hs3",
+    "idcode": "0x23751093",
+    "device": "xc7k480t",
+    "bitstream": "/nix/store/2lla0fwzm7y2kn0y9wbljlwmd7vpmhmc-compiler-ddr3-trace-replay-bitstream/replay.bit",
+    "bitstream_sha256": "a6683622793ac1975de4615ca4bd8ee271fd74b0684080f7e579d2203e301690",
+    "result": "Done; ISC_DONE=1, INIT=1"
+  },
+  "post_program_gate": {
+    "endpoint": "0000:42:00.0",
+    "vendor_device": "10ee:0480",
+    "bar0": "0x74000000",
+    "pci_command": "0x0000",
+    "required_command": "0x0006",
+    "bar_read": "EIO",
+    "next_action": "privileged setpci -s 0000:42:00.0 COMMAND=0006"
+  },
+  "hardware_validated": false
+}
