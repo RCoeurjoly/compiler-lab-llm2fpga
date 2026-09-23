@@ -1,0 +1,37 @@
+{
+  "schema": "compiler-full-accelerator-route-v2",
+  "status": "ROUTE_TIMEOUT_BEFORE_FASM",
+  "scope": "compiler-generated TinyStories-1M accelerator with registered external-memory boundary",
+  "configuration": {
+    "seed": 15,
+    "rowstream_required_mhz": 83.33,
+    "pcie_required_mhz": 62.5,
+    "ddr3_profile": "two-lane-333/83.33",
+    "freq_argument_mhz": 83.33,
+    "timeout_seconds": 1200
+  },
+  "inputs": {
+    "synthesis_netlist": {
+      "path": "/tmp/compiler-full-accelerator-route/full-pipeline-compatible.json",
+      "sha256": "5326a10360e58707c2c73297b7be2e41ec7f78479343aae0956bf8ca19fc77b6"
+    },
+    "route_log": {
+      "path": "/tmp/compiler-full-route-current/route.log",
+      "sha256": "7c69c968257c0bda6fda33b92f1412667ca0bec2774ff6f3cac6fb49a66c503a"
+    },
+    "nextpnr": {
+      "path": "/nix/store/4ygzs95w9pyaskxhina081xdn4c32zi3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+      "sha256": "879f0956df6ff058ceefb9b2390efcab5862a509c556c353698070fcf721168e"
+    },
+    "chipdb_sha256": "d8472bfcc19dc31686d80cc34f0d37b958c268656182537b06b3439711b105f1",
+    "xdc_sha256": "890ebb9d0fc854c8595d3e9e67b4a4074fe42ac7682680b9c33dd1d2c8662f57",
+    "prepack_sha256": "42acd411f3e34ac494e56f64b12c0de81394b567d5087c1213b820040fa9d698",
+    "preplace_sha256": "edb22365220f005a1416bed5c2a773c4ebdeb80dcfd84fcd925e5b0f47621d06"
+  },
+  "placement_timing_before_route": {
+    "rowstream_fmax_mhz": 37.09,
+    "pcie_user_fmax_mhz": 40.88,
+    "fasm_produced": false
+  },
+  "interpretation": "The registered compiler boundary is not yet a qualified implementation. Seed-15 router2 timed out before FASM; placement timing is below both required clocks. No hardware or inference claim follows."
+}
