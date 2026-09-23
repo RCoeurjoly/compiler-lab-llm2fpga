@@ -1,0 +1,43 @@
+{
+  "schema": "compiler-ddr3-live-image-integrity-frontier-v1",
+  "status": "FAIL_FIRST_READBACK_DIVERGENCE",
+  "scope": "SRAM-programmed compiler DDR3 trace-replay diagnostic bitstream",
+  "bitstream_sha256": "500e0df3e96b3194b142b79c0b5bec94557ccfa1941d4dbc5afa2c2f6604621d",
+  "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+  "image_bytes": 4136720,
+  "transport": {
+    "endpoint": "0000:42:00.0",
+    "bar0": "0x74000000",
+    "link": "2.5 GT/s x1",
+    "ddr3_status": "0x61",
+    "loader_status_before": "0x3",
+    "bist_state": "0x17",
+    "sram_programming": "PASS"
+  },
+  "load": {
+    "method": "single-beat opcode 0x0f plus opcode 0x10 commit",
+    "lines_loaded": 258545,
+    "bytes_loaded": 4136720,
+    "command_errors": 0,
+    "bounded_probes": [
+      {"range_lines": [0, 4096], "status": "PASS"},
+      {"range_lines": [4096, 65536], "status": "PASS"},
+      {"range_lines": [65536, 258545], "status": "PASS"}
+    ]
+  },
+  "readback": {
+    "first_mismatch_line": 185,
+    "first_mismatch_byte": 2960,
+    "expected": "01000000000000000100000000000000",
+    "actual": "00000000000000000000000000000000",
+    "adjacent_mismatches": [185, 186, 187, 325, 326, 327, 391, 434, 435, 466, 467],
+    "rewriting_lines_183_190": "did_not_correct_all_mismatches",
+    "classification": "ordered DDR3 loader commit/read response frontier; not PCIe enumeration or calibration"
+  },
+  "exclusions": [
+    "full authenticated trace replay",
+    "compiler accelerator first-token inference",
+    "RTL fix",
+    "BPI full-readback completion"
+  ]
+}
