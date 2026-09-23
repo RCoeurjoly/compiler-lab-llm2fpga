@@ -50,6 +50,20 @@
     "arbiter_function_self_percent": 1.18,
     "interpretation": "The simulator spends nearly all sampled time repeatedly evaluating one generated combinational assignment, indicating a delta-cycle/event-scheduling explosion in the compiler-generated control graph rather than a DDR transaction deadlock."
   },
+  "iteration_probes": {
+    "verilator_without_timing_scheduler": {
+      "cycles": 100000,
+      "wall_seconds": 57.10,
+      "result": "no_token_bounded_probe",
+      "interpretation": "The manually clocked transaction wrapper does not need delayed-event scheduling, but disabling Verilator timing improves throughput only modestly."
+    },
+    "registered_q_output_enable_experiment": {
+      "cycles": 100000,
+      "wall_seconds": 60.90,
+      "result": "no_token_bounded_probe",
+      "interpretation": "Registering the profiled q_output_q16_16 content enable is slower and was not adopted; it was a diagnostic experiment, not an RTL change."
+    }
+  },
   "interpretation": "The consolidated path does not show a response mismatch or adapter error. The bounded probe demonstrates very low transaction-level simulation throughput; the long run stopped at the last observed checkpoint after no log progress for more than seven minutes. This is neither first-token success nor a hardware/PCIe/physical-DDR3 claim.",
   "next_action": "Instrument the first state/request transition where consolidated simulation progress collapses before rerunning full inference."
 }
