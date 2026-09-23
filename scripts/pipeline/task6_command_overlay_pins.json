@@ -2,8 +2,8 @@
   "schema": 1,
   "name": "task3b-normal-command-dispatch-one-cycle",
   "base_revision": "e368449e30d5268433443c7de7a9017e5b9187ee",
-  "input_sha256": "d76c3d0509405e93547cbba3ce7ad8835ae262f91bc2a0a1456915aea333ecb9",
-  "output_sha256": "79df87d929c52bccd6d2e8f2cb15acc4fd52b7b9ffc1d235ed959b71d3c47d2b",
+  "input_sha256": "2be78ed3b71972939a0ccf9a3545e8d74662b6be4e2cb525c1ae0192f9f35ef5",
+  "output_sha256": "14840632812f897607f3d99c6969a49ce920c12ff81c6de0c3dc4e6e49c6e058",
   "stage_sha256": "b67ad23d81c55a89fce6203978d9a166e9e9b748c5d38c383c90784a133ed7af",
   "latency_rowstream_cycles": 1
 }
