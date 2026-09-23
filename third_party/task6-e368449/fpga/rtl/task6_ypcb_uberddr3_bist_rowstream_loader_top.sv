@@ -335,9 +335,25 @@ module task6_ypcb_uberddr3_bist_rowstream_loader_top #(
   logic jtag_command_event_from_shift;
   logic [15:0] jtag_command_count;
 `ifdef TASK6_PCIE_ROWSTREAM_INGRESS_PORTS
+  // Keep the PCIe command bundle local to the controller clock domain before
+  // it fans out through the loader decoder.  The ingress has already aligned
+  // payload/event, so this is a latency-only pipeline stage; it preserves the
+  // command ABI while preventing the wide cross-wrapper event path from
+  // becoming the rowstream critical path.
+  logic [JTAG_COMMAND_WIDTH - 1:0] pcie_command_payload_q;
+  logic pcie_command_event_q;
+  always_ff @(posedge controller_clk or negedge rst_n) begin
+    if (!rst_n) begin
+      pcie_command_payload_q <= '0;
+      pcie_command_event_q <= 1'b0;
+    end else begin
+      pcie_command_payload_q <= pcie_command_payload_i;
+      pcie_command_event_q <= pcie_command_event_i;
+    end
+  end
   wire [JTAG_COMMAND_WIDTH - 1:0] jtag_command_payload =
-    pcie_command_event_i ? pcie_command_payload_i : jtag_command_payload_from_shift;
-  wire jtag_command_event = pcie_command_event_i | jtag_command_event_from_shift;
+    pcie_command_event_q ? pcie_command_payload_q : jtag_command_payload_from_shift;
+  wire jtag_command_event = pcie_command_event_q | jtag_command_event_from_shift;
   logic pcie_loader_done_sticky_q;
   logic pcie_loader_error_sticky_q;
   logic pcie_loader_last_accepted_sticky_q;
