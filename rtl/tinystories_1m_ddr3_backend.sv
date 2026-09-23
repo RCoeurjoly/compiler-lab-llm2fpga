@@ -59,7 +59,15 @@ module tinystories_1m_ddr3_backend #(
     .ext_mem_rsp_data(ext_mem_rsp_data)
   );
 
-  assign wb_we = 1'b0;
+  wire arb_wb_cyc;
+  wire arb_wb_stb;
+  wire arb_wb_we;
+  wire [WB_ADDR_BITS-1:0] arb_wb_addr;
+  wire [WB_DATA_BITS/8-1:0] arb_wb_sel;
+  wire arb_wb_accept;
+  wire arb_wb_ack;
+  wire arb_wb_err;
+  wire [WB_DATA_BITS-1:0] arb_wb_rdata;
 
   (* keep_hierarchy = "yes" *) llm_external_memory_arbiter #(
     .PORTS(240), .ADDRESS_BITS(WB_ADDR_BITS), .DATA_BITS(64),
@@ -68,9 +76,25 @@ module tinystories_1m_ddr3_backend #(
     .clk(clk), .rst(reset),
     .req_valid(ext_mem_req_valid), .req_ready(ext_mem_req_ready),
     .req_addr(ext_mem_req_addr), .rsp_valid(ext_mem_rsp_valid),
-    .rsp_data(ext_mem_rsp_data), .wb_cyc(wb_cyc), .wb_stb(wb_stb),
-    .wb_addr(wb_addr), .wb_sel(wb_sel), .wb_accept(wb_accept),
-    .wb_ack(wb_ack), .wb_err(wb_err), .wb_rdata(wb_rdata)
+    .rsp_data(ext_mem_rsp_data), .wb_cyc(arb_wb_cyc), .wb_stb(arb_wb_stb),
+    .wb_addr(arb_wb_addr), .wb_sel(arb_wb_sel), .wb_accept(arb_wb_accept),
+    .wb_ack(arb_wb_ack), .wb_err(arb_wb_err), .wb_rdata(arb_wb_rdata)
+  );
+
+  // Register the compiler/DDR owner boundary. This preserves the external
+  // memory ABI while preventing the 240-way compiler arbiter from driving the
+  // physical DDR controller's acceptance path combinationally.
+  (* keep_hierarchy = "yes" *) llm_wishbone_pipeline #(
+    .ADDRESS_BITS(WB_ADDR_BITS), .DATA_BITS(WB_DATA_BITS)
+  ) memory_wishbone_pipeline (
+    .clk(clk), .rst(reset),
+    .m_cyc(arb_wb_cyc), .m_stb(arb_wb_stb), .m_we(arb_wb_we),
+    .m_addr(arb_wb_addr), .m_sel(arb_wb_sel),
+    .m_accept(arb_wb_accept), .m_ack(arb_wb_ack), .m_err(arb_wb_err),
+    .m_rdata(arb_wb_rdata),
+    .s_cyc(wb_cyc), .s_stb(wb_stb), .s_we(wb_we), .s_addr(wb_addr),
+    .s_sel(wb_sel), .s_accept(wb_accept), .s_ack(wb_ack), .s_err(wb_err),
+    .s_rdata(wb_rdata)
   );
 endmodule
 

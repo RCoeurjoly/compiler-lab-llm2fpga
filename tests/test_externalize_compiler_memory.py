@@ -28,6 +28,12 @@ class ExternalizeCompilerMemoryTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "memory instance"):
             externalize_memory(SOURCE, "missing")
 
+    def test_dynamic_calyx_memory_can_be_bound_to_same_external_abi(self):
+        dynamic = SOURCE.replace("seq_mem_d1_bram", "dyn_mem_d1", 1)
+        result = externalize_memory(dynamic, "weights")
+        self.assertIn("seq_mem_d1_external", result.source)
+        self.assertNotIn("dyn_mem_d1 #(.IDX_SIZE(4)", result.source)
+
     def test_multiple_memories_share_indexed_external_vectors(self):
         result = externalize_memories(SOURCE, ["weights", "other"], {"weights": 4096, "other": 8192})
         self.assertIn("output logic [1:0] ext_mem_req_valid", result.source)
@@ -43,6 +49,14 @@ class ExternalizeCompilerMemoryTest(unittest.TestCase):
     def test_external_initializers_are_removed_without_touching_bram_state(self):
         static = ('$readmemh("image-weights.hex", weights.mem);\n'
                   '$readmemh("image-other.hex", other.mem);\n')
+        result = remove_static_initializers(static, ["weights"])
+        self.assertNotIn("weights.mem", result)
+        self.assertIn("other.mem", result)
+
+    def test_generated_data_path_read_and_write_initializers_are_removed(self):
+        static = ('$readmemh({DATA, "/weights.dat"}, weights.mem);\n'
+                  '$writememh({DATA, "/weights.out"}, weights.mem);\n'
+                  '$readmemh({DATA, "/other.dat"}, other.mem);\n')
         result = remove_static_initializers(static, ["weights"])
         self.assertNotIn("weights.mem", result)
         self.assertIn("other.mem", result)
