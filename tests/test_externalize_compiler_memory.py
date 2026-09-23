@@ -16,6 +16,13 @@ SOURCE = """module main(\n  input logic clk,\n  input logic reset\n);\nlogic [3:
 
 
 class ExternalizeCompilerMemoryTest(unittest.TestCase):
+    def test_shared_controller_uses_fixed_bound_muxes(self):
+        from scripts.analysis import externalize_compiler_memory as em
+
+        self.assertNotIn("addr0[bank_index * IDX_SIZE +:", em._BANKED_EXTERNAL_MODULE)
+        self.assertNotIn("read_data[queued_bank * WIDTH +:", em._BANKED_EXTERNAL_MODULE)
+        self.assertIn("for (integer i = 0; i < BANKS; i = i + 1)", em._BANKED_EXTERNAL_MODULE)
+
     def test_shared_controller_routes_one_bank_request_and_response(self):
         self.assertIsNotNone(__import__("shutil").which("verilator"))
         testbench = r'''

@@ -692,6 +692,7 @@ _BANKED_EXTERNAL_MODULE = r'''module seq_mem_d1_shared_banks #(
   logic [7:0] queued_bank;
   logic [31:0] queued_address;
   logic [2:0] response_byte_offset;
+  logic [31:0] selected_address;
   integer bank_index;
 
   assign ext_req_valid = request_queued;
@@ -699,8 +700,13 @@ _BANKED_EXTERNAL_MODULE = r'''module seq_mem_d1_shared_banks #(
 
   always_comb begin
     bank_index = 0;
+    selected_address = '0;
     for (integer i = 0; i < BANKS; i = i + 1)
-      if (content_en[i] && !write_en[i]) bank_index = i;
+      if (content_en[i] && !write_en[i]) begin
+        bank_index = i;
+        selected_address = BANK_BASES[i * 32 +: 32]
+            + (addr0[i * IDX_SIZE +: IDX_SIZE] * (WIDTH / 8));
+      end
   end
 
   always_ff @(posedge clk) begin
@@ -715,18 +721,20 @@ _BANKED_EXTERNAL_MODULE = r'''module seq_mem_d1_shared_banks #(
     end else begin
       done <= '0;
       if (pending && ext_rsp_valid) begin
-        read_data[queued_bank * WIDTH +: WIDTH] <=
-            ext_rsp_data >> (response_byte_offset * 8);
-        done[queued_bank] <= 1'b1;
+        for (integer i = 0; i < BANKS; i = i + 1)
+          if (queued_bank == i) begin
+            read_data[i * WIDTH +: WIDTH] <=
+                ext_rsp_data >> (response_byte_offset * 8);
+            done[i] <= 1'b1;
+          end
         pending <= 1'b0;
       end else if (ext_req_valid && ext_req_ready) begin
         pending <= 1'b1;
         request_queued <= 1'b0;
         response_byte_offset <= ext_req_addr[2:0];
       end else if (!pending && !request_queued && (|content_en)) begin
-        queued_bank <= bank_index[7:0];
-        queued_address <= BANK_BASES[bank_index * 32 +: 32]
-            + (addr0[bank_index * IDX_SIZE +: IDX_SIZE] * (WIDTH / 8));
+        queued_bank <= bank_index;
+        queued_address <= selected_address;
         request_queued <= 1'b1;
       end
     end
