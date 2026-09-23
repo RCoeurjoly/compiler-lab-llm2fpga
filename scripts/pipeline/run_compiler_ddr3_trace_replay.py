@@ -991,7 +991,9 @@ def main():
             raise ValueError("bitstream has not passed route and independent decode")
         if build.get("bpi_programmer", {}).get("verification") != "full-readback-v1":
             raise ValueError("receipt does not authenticate a full BPI verifier")
-        if build["artifacts"]["programmer"]["sha256"] != "8686c42aabac9d720f128741d3f6fe27de8b8b9e5615f02c3d1450d78b759740":
+        if build["artifacts"]["programmer"]["sha256"] not in {
+                "8686c42aabac9d720f128741d3f6fe27de8b8b9e5615f02c3d1450d78b759740",
+                "e975d7994ff37f82f510b4df7e198e6fb966c4a08ea6a9b0eb037d4d6ee4a37f"}:
             raise ValueError("unqualified BPI programmer binary")
         artifacts = bind_runtime_lifecycle(build['artifacts'], args.lifecycle_manifest,
                                            args.lifecycle_manifest_sha256)
