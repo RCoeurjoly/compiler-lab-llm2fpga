@@ -1,0 +1,26 @@
+{
+  "schema": "compiler-ddr3-yosys-first-token-simulation-v1",
+  "status": "PASS_FIRST_TOKEN_SIMULATION_ONLY",
+  "implementation": {
+    "compiler_source_sha256": "54189d2622e598fa6758352f3b11a19c838fa2e3b62a96675403b8902bf78164",
+    "yosys_proc_netlist_sha256": "6d4ceae30f93a87e32c295033d84785426b39c57a3e79db4ccfb9da2003cac0e",
+    "wrapper_sha256": "5b632d1a8b18f3ea22c8fa1c83014396612a4b0b8d9c11e04653101a77f7a512",
+    "wrapper": "transaction-level fast external-memory wrapper; no Micron PHY model"
+  },
+  "model": {
+    "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "prompt": [7454, 2402, 257, 640],
+    "expected_first_token": 11
+  },
+  "simulation": {
+    "deterministic_x_contract": {"x_assign": 0, "x_initial": 0},
+    "cycle_bound": 200000000,
+    "token": 11,
+    "token_cycle_window": [165000000, 166000000],
+    "sampled_balanced_checkpoints": true,
+    "sampled_final_checkpoint": {"cycles": 165000000, "requests": 16322359, "responses": 16322358},
+    "runtime": "20:03.61",
+    "exit_code": 0
+  },
+  "interpretation": "The compiler-generated consolidated design, after standard Yosys process lowering, produces the authenticated first token under deterministic synthesis-equivalent inactive-value semantics in a transaction-level memory simulation. This does not validate PCIe ingress, physical DDR3 calibration, bitstream timing, or board inference."
+}
