@@ -1,0 +1,16 @@
+timestamp=2026-09-23T12:06:20.903646+02:00 event=auth_mode_disabled
+timestamp=2026-09-23T12:06:20.904135+02:00 event=helios_already_deauthorized
+timestamp=2026-09-23T12:07:16.665993+02:00 event=power_cycle_completed
+timestamp=2026-09-23T12:07:16.666684+02:00 event=helios_reappeared_unauthorized
+timestamp=2026-09-23T12:07:16.666737+02:00 event=fpga_boot_settle_started
+timestamp=2026-09-23T12:07:46.667079+02:00 event=fpga_boot_settle_completed
+timestamp=2026-09-23T12:07:46.964452+02:00 event=helios_authorized
+timestamp=2026-09-23T12:07:46.977227+02:00 event=auth_mode_restored
+{
+  "authorization": "authorized",
+  "deauthorization": "already_deauthorized",
+  "device_name": "Helios 5S",
+  "restored_auth_mode": "disabled",
+  "status": "authorized",
+  "uuid": "c4148780-0010-1ed9-ffff-ffffffffffff"
+}

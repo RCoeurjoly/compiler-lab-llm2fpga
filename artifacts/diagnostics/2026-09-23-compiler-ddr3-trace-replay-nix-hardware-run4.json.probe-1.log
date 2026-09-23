@@ -1,0 +1,32 @@
+{
+  "classification": "pcie_ready",
+  "actions": [],
+  "details": {
+    "snapshot": {
+      "bridge_exists": true,
+      "endpoint_exists": true,
+      "config_words": [
+        "0002",
+        "10ee",
+        "0480",
+        "00",
+        "10ee",
+        "abcd",
+        "74000000"
+      ],
+      "config_stable": true,
+      "resource0": true,
+      "resource_writable": true,
+      "link_stable": true,
+      "link_speed": "2.5 GT/s PCIe",
+      "link_width": "1",
+      "bridge_memory_ranges": [
+        [
+          1946157056,
+          1947205631
+        ]
+      ],
+      "bar_contained": true
+    }
+  }
+}
