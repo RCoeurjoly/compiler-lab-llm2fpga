@@ -85,6 +85,70 @@ endmodule
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
             self.assertIn("PASS: shared bank", run.stdout)
 
+    def test_shared_controller_production_197_bank_edges(self):
+        """Exercise the generated production bank width and edge slots."""
+        self.assertIsNotNone(__import__("shutil").which("verilator"))
+        banks = 197
+        bases = [0x1000 + i * 0x40 for i in range(banks)]
+        base_literal = "{" + ", ".join(f"32'h{value:08x}" for value in reversed(bases)) + "}"
+        testbench = f'''
+module tb;
+  localparam integer BANKS = {banks};
+  logic clk=0; always #5 clk=~clk;
+  logic reset=1;
+  logic [BANKS*14-1:0] addr0='0;
+  logic [BANKS-1:0] content_en='0, write_en='0;
+  wire [BANKS-1:0] done;
+  wire [BANKS*8-1:0] read_data;
+  logic [BANKS*8-1:0] write_data='0;
+  wire ext_req_valid;
+  wire [31:0] ext_req_addr;
+  logic ext_req_ready=0, ext_rsp_valid=0;
+  logic [63:0] ext_rsp_data=0;
+  seq_mem_d1_shared_banks #(
+    .BANKS(BANKS), .WIDTH(8), .SIZE(16384), .IDX_SIZE(14),
+    .BANK_BASES({base_literal})
+  ) dut (.*);
+  task tick; @(posedge clk); #1; endtask
+  initial begin
+    repeat (2) tick();
+    @(negedge clk); reset=0; content_en[0]=1'b1; addr0[13:0]=14'd3;
+    tick();
+    if (!ext_req_valid || ext_req_addr != 32'h1000 + 32'd3)
+      $fatal(1, "bank 0 edge request mismatch: %h", ext_req_addr);
+    repeat (2) begin
+      @(negedge clk); addr0[13:0]=14'd77; content_en[0]=1'b1;
+      tick();
+      if (!ext_req_valid || ext_req_addr != 32'h1000 + 32'd3)
+        $fatal(1, "bank 0 request changed under backpressure: %h", ext_req_addr);
+    end
+    @(negedge clk); ext_req_ready=1; tick();
+    @(negedge clk); ext_req_ready=0; ext_rsp_data=64'h000000005a000000; ext_rsp_valid=1; tick();
+    if (!done[0] || |done[BANKS-1:1] || read_data[7:0] != 8'h5a)
+      $fatal(1, "bank 0 response mismatch");
+    @(negedge clk); ext_rsp_valid=0; content_en='0; content_en[BANKS-1]=1'b1;
+    addr0[(BANKS-1)*14 +: 14]=14'd9; tick();
+    if (!ext_req_valid || ext_req_addr != 32'h1000 + 32'(BANKS-1)*32'h40 + 32'd9)
+      $fatal(1, "bank 196 edge request mismatch: %h", ext_req_addr);
+    $display("PASS: production 197-bank edge routing");
+    $finish;
+  end
+  initial begin #1000; $fatal(1, "production bank test timed out"); end
+endmodule
+'''
+        with tempfile.TemporaryDirectory(prefix="shared-bank-controller-197-") as directory:
+            path = Path(directory)
+            (path / "tb.sv").write_text(_BANKED_EXTERNAL_MODULE + testbench)
+            build = subprocess.run(
+                ["verilator", "--binary", "--timing", "-Wno-fatal", "--top-module", "tb", "tb.sv"],
+                cwd=path, capture_output=True, text=True, timeout=120,
+            )
+            self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+            run = subprocess.run([str(path / "obj_dir/Vtb")], cwd=path,
+                                 capture_output=True, text=True, timeout=10)
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+            self.assertIn("PASS: production 197-bank", run.stdout)
+
     def test_token_weight_banks_use_one_shared_request_controller(self):
         source = SOURCE.replace("weights", "token_weight_codes_i8_b0").replace(
             "other", "token_weight_codes_i8_b1"
