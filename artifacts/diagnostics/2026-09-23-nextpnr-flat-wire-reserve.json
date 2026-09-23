@@ -21,5 +21,22 @@
     "route_log_terminal_observation": "placement startup reached analytical placer; no FASM or timing report observed within bounded run"
   },
   "status": "diagnostic_inconclusive",
+  "replay_baseline": {
+    "netlist_sha256": "bbbb6b6fe3000510e94b11fbe008f9df06bc577547a15455fd396fcd42f19d4f",
+    "route_result": "FASM emitted",
+    "fasm_sha256": "4ca2d52ffa7747c0851f7ceb525eddc43352de696898b7e606e8425eef0a5c76",
+    "post_route_rowstream_fmax_mhz": 97.54,
+    "post_route_pcie_user_fmax_mhz": 76.51,
+    "post_route_pcie_to_rowstream_delay_ns": 8.97
+  },
+  "full_accelerator_route": {
+    "timeout_seconds": 1200,
+    "route_log": "/tmp/compiler-full-route-flatreserve2/route.log",
+    "result": "timeout_router2_no_fasm",
+    "placement_rowstream_fmax_mhz": 37.09,
+    "placement_pcie_user_fmax_mhz": 40.88,
+    "placement_pcie_to_rowstream_delay_ns": 19.42,
+    "router_progress": "iter=1 wires=4105680 overused=214936 overuse=267333"
+  },
   "interpretation": "The patch addresses a measured multi-gigabyte allocator hotspot in nextpnr router2 setup_wires and compiles successfully. The bounded full-design route did not yet reach timing or FASM, so no claim of improved routing, timing closure, bitstream, or hardware inference is made."
 }
