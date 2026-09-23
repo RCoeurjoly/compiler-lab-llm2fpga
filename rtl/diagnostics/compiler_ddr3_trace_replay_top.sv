@@ -6,6 +6,10 @@ module compiler_ddr3_trace_replay_top #(
   parameter int DDR_BYTE_LANES = 2,
   parameter bit ENABLE_PCIE_TOP1 = 1'b0,
   parameter bit ENABLE_COMPILER_ACCELERATOR = 1'b0,
+  // The trace CSR is required only by the temporary exact-sequence replay
+  // diagnostic. Production inference keeps the PCIe loader/command path but
+  // removes this wide debug register bank from the timing-critical design.
+  parameter bit ENABLE_TRACE_REPLAY_CSR = 1'b1,
   parameter bit TINYSTORIES_LOADER_ONLY = 1'b0,
   parameter int TINYSTORIES_TMAX = 32,
   parameter bit TINYSTORIES_ENABLE_ENGINE = 1'b0,
@@ -214,7 +218,9 @@ module compiler_ddr3_trace_replay_top #(
     if (!rowstream_rst_n) replay_pcie_init <= 2'b00;
     else replay_pcie_init <= {replay_pcie_init[0], 1'b1};
   end
-  (* keep_hierarchy = "yes" *) compiler_ddr3_trace_replay_bridge replay_bridge (
+  (* keep_hierarchy = "yes" *) compiler_ddr3_trace_replay_bridge #(
+    .ENABLE_TRACE_CSR(ENABLE_TRACE_REPLAY_CSR)
+  ) replay_bridge (
     .pcie_clk(pcie_user_clk), .pcie_reset(!pcie_user_cfg_rst_n),
     .pcie_abort(pcie_user_reset && replay_pcie_init[1]),
     .clk(rowstream_clk), .reset(!rowstream_rst_n), .calib_complete(rowstream_calib_complete),
@@ -672,7 +678,9 @@ endmodule
 // in flight; AW/W are captured independently and B/R are retained independently.
 // Physical pending responses survive diagnostic aborts. A subsequent CLEAR is
 // held until the pending response drains; no response can leak to a new run.
-module compiler_ddr3_trace_replay_bridge (
+module compiler_ddr3_trace_replay_bridge #(
+  parameter bit ENABLE_TRACE_CSR = 1'b1
+) (
   input wire pcie_clk, pcie_reset, pcie_abort,
   input wire clk, reset, calib_complete,
   input wire [31:0] s_axi_awaddr,
@@ -810,13 +818,23 @@ module compiler_ddr3_trace_replay_bridge (
           aw_sent<=0; w_sent<=0; ar_sent<=0;
           if(aw_hold && w_hold && !bvalid) begin
             if(aw_offset>=12'h900 && aw_offset<12'h980) begin
-              req_write<=1; req_addr<={20'd0,aw_offset}; req_data<=wdata; req_strb<=wstrb;
-              req_toggle<=!req_toggle; pstate<=3;
+              if (ENABLE_TRACE_CSR) begin
+                req_write<=1; req_addr<={20'd0,aw_offset}; req_data<=wdata; req_strb<=wstrb;
+                req_toggle<=!req_toggle; pstate<=3;
+              end else begin
+                // Trace offsets are intentionally unavailable in production;
+                // complete the AXI request deterministically with DECERR.
+                bvalid<=1; bresp<=2'b11; aw_hold<=0; w_hold<=0; pstate<=0;
+              end
             end else pstate<=1;
           end else if(ar_hold && !rvalid) begin
             if(ar_offset>=12'h900 && ar_offset<12'h980) begin
-              req_write<=0; req_addr<={20'd0,ar_offset}; req_data<=0; req_strb<=0;
-              req_toggle<=!req_toggle; pstate<=3;
+              if (ENABLE_TRACE_CSR) begin
+                req_write<=0; req_addr<={20'd0,ar_offset}; req_data<=0; req_strb<=0;
+                req_toggle<=!req_toggle; pstate<=3;
+              end else begin
+                rvalid<=1; rresp<=2'b11; rdata<=32'd0; ar_hold<=0; pstate<=0;
+              end
             end else pstate<=2;
           end
         end
@@ -857,6 +875,25 @@ module compiler_ddr3_trace_replay_bridge (
   wire invalid_address=|core_addr[31:25];
   wire physical_accept=wb_cyc && wb_stb && !wb_stall;
   wire physical_response=wb_ack || wb_err;
+  // Register the external-memory response bundle before it re-enters the
+  // replay CSR state machine.  The three signals must cross together: a
+  // response is accepted one controller cycle later, with the same data and
+  // error code.  This preserves ordered trace semantics while breaking the
+  // measured CSR-state -> compiler-rdata critical path.
+  reg wb_ack_q, wb_err_q;
+  reg [127:0] wb_rdata_q;
+  always @(posedge clk) begin
+    if (reset) begin
+      wb_ack_q <= 1'b0;
+      wb_err_q <= 1'b0;
+      wb_rdata_q <= 128'd0;
+    end else begin
+      wb_ack_q <= wb_ack;
+      wb_err_q <= wb_err;
+      if (wb_ack || wb_err)
+        wb_rdata_q <= wb_rdata;
+    end
+  end
   // Keep the accelerator CYC high through FIFO starvation and late responses.
   // The unmodified production owner mux waits for a host CYC already in flight.
   assign wb_cyc=replay_active || core_cyc || pending;
@@ -869,7 +906,9 @@ module compiler_ddr3_trace_replay_bridge (
     else if(pending && physical_response) pending<=0;
     else if(physical_accept) pending<=!physical_response;
   end
-  compiler_ddr3_trace_replay_csr csr (
+  compiler_ddr3_trace_replay_csr #(
+    .ENABLE_TRACE_CSR(ENABLE_TRACE_CSR)
+  ) csr (
     .clk(clk), .reset(reset), .transport_reset(flush_sync),
     .replay_reset(abort_sync || flush_sync), .calib_complete(calib_complete),
     .s_axi_awaddr(req_addr), .s_axi_awvalid(dstate==1 && !d_aw_sent), .s_axi_awready(d_awready),
@@ -881,9 +920,9 @@ module compiler_ddr3_trace_replay_bridge (
     .replay_active(replay_active), .wb_cyc(core_cyc), .wb_stb(core_stb), .wb_we(core_we),
     .wb_addr(core_addr), .wb_sel(core_sel),
     .wb_stall(invalid_address ? 1'b0 : (wb_stall || pending)),
-    .wb_ack(wb_ack && (pending || physical_accept)),
-    .wb_err((wb_err && (pending || physical_accept)) || (core_cyc && core_stb && invalid_address)),
-    .wb_rdata(wb_rdata)
+    .wb_ack(wb_ack_q),
+    .wb_err(wb_err_q || (core_cyc && core_stb && invalid_address)),
+    .wb_rdata(wb_rdata_q)
   );
   always @(posedge clk) begin
     if(reset) begin

@@ -69,6 +69,33 @@ PROFILES = {
         "reset_init": "1011",
         "reset_connections": {"I0": [191], "I1": [192], "O": [186]},
     },
+    # Current Nix synthesis keeps the replay bridge hierarchical.  The
+    # transport-reset LUT is therefore addressed in the child module and its
+    # PCIe reset input is the bridge-local bit 3 (top-level bit 7994).
+    "f742f9c8fc3dfe28ce7fdf9625308c73aee1c34407bd355a5131a1b3ca85488e": {
+        "source_sha256": "f742f9c8fc3dfe28ce7fdf9625308c73ee1c34407bd355a5131a1b3ca85488e",
+        "transport_reset_lut": "$abc$281284$auto$blifparse.cc:557:parse_blif$282094",
+        "replay_pcie_init_bits": [11504, 7966],
+        "raw_cfg_reset_bit": 7994,
+        "transport_reset_bit": 1844,
+        "reset_type": "LUT4",
+        "reset_init": "1111111111111110",
+        "reset_connections": {"I0": [1740], "I1": [1741], "I2": [4], "I3": [3], "O": [1844]},
+        "hierarchical_bridge": True,
+        "bridge_pcie_reset_bit": 3,
+    },
+    "570b384ab2e3a7c5e43e3b5e6f171c03fd3960eaf77e110910c9d4f3b965fc1d": {
+        "source_sha256": "570b384ab2e3a7c5e43e3b5e6f171c03fd3960eaf77e110910c9d4f3b965fc1d",
+        "transport_reset_lut": "$abc$281425$auto$blifparse.cc:557:parse_blif$282255",
+        "replay_pcie_init_bits": [11504, 7966],
+        "raw_cfg_reset_bit": 7994,
+        "transport_reset_bit": 2130,
+        "reset_type": "LUT4",
+        "reset_init": "1111111111111110",
+        "reset_connections": {"I0": [2022], "I1": [2023], "I2": [4], "I3": [3], "O": [2130]},
+        "hierarchical_bridge": True,
+        "bridge_pcie_reset_bit": 3,
+    },
 }
 
 
@@ -95,12 +122,24 @@ def patch_document(document, profile=None):
 
     _require_equal(netnames["replay_pcie_init"]["bits"], profile["replay_pcie_init_bits"],
                    "row-ready synchronizer")
-    _require_equal(netnames["replay_bridge.transport_reset"]["bits"],
-                   [profile["transport_reset_bit"]], "transport reset net")
-    _require_equal(netnames["pcie_7x_top_aximm_i.user_reset_q"]["bits"],
-                   [profile["raw_cfg_reset_bit"]], "raw PCIe configuration reset")
-
-    reset_lut = cells[profile["transport_reset_lut"]]
+    if profile.get("hierarchical_bridge"):
+        bridge_cell = cells["replay_bridge"]
+        bridge_module = document["modules"][bridge_cell["type"]]
+        bridge_netnames = bridge_module["netnames"]
+        bridge_cells = bridge_module["cells"]
+        _require_equal(bridge_netnames["transport_reset"]["bits"],
+                       [profile["transport_reset_bit"]], "transport reset net")
+        _require_equal(bridge_netnames["pcie_reset"]["bits"],
+                       [profile["bridge_pcie_reset_bit"]], "bridge PCIe reset")
+        _require_equal(cells["pcie_7x_top_aximm_i"]["connections"]["task6_user_cfg_rst_n_o"],
+                       [7993], "raw PCIe configuration reset")
+        reset_lut = bridge_cells[profile["transport_reset_lut"]]
+    else:
+        _require_equal(netnames["replay_bridge.transport_reset"]["bits"],
+                       [profile["transport_reset_bit"]], "transport reset net")
+        _require_equal(netnames["pcie_7x_top_aximm_i.user_reset_q"]["bits"],
+                       [profile["raw_cfg_reset_bit"]], "raw PCIe configuration reset")
+        reset_lut = cells[profile["transport_reset_lut"]]
     expected_directions = {
         port: ("output" if port == "O" else "input")
         for port in profile["reset_connections"]
@@ -117,7 +156,10 @@ def patch_document(document, profile=None):
     reset_lut["parameters"]["INIT"] = "10"
     reset_lut["port_directions"] = {"I0": "input", "O": "output"}
     reset_lut["connections"] = {
-        "I0": [profile["raw_cfg_reset_bit"]], "O": [profile["transport_reset_bit"]]
+        "I0": ([profile["bridge_pcie_reset_bit"]]
+                if profile.get("hierarchical_bridge")
+                else [profile["raw_cfg_reset_bit"]]),
+        "O": [profile["transport_reset_bit"]],
     }
 
     receipt = {
