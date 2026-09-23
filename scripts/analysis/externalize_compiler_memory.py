@@ -20,6 +20,11 @@ _INSTANCE = re.compile(
     r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\((?P<body>.*?)\);",
     re.DOTALL,
 )
+_EXTERNAL_INSTANCE = re.compile(
+    r"(?<!module )(?P<kind>seq_mem_d1_external)\s*#\s*\((?P<params>.*?)\)\s*"
+    r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\((?P<body>.*?)\);",
+    re.DOTALL,
+)
 _BANK_CONTENT_ASSIGNMENT = re.compile(
     r"(?m)^(?P<prefix>[ \t]*assign\s+token_weight_codes_i8_b(?P<index>\d+)_content_en\s*=\s*)"
     r"(?P<rhs>[^;]+);"
@@ -603,7 +608,10 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
   logic pending;
   logic request_queued;
   logic [31:0] queued_address;
-  logic [IDX_SIZE-1:0] request_index;
+  // Keep the captured local index visible to structural timing audits.  It is
+  // not on the external request payload, but removing it would make the
+  // capture-enable proof impossible to inspect after Yosys optimization.
+  (* keep *) logic [IDX_SIZE-1:0] request_index;
   // A DDR3 response supplies one 64-bit lane.  Narrow elements may start at
   // any byte offset within that lane, so retain the request offset until the
   // one-cycle response arrives.
@@ -658,6 +666,185 @@ endmodule
 '''
 
 
+_BANKED_EXTERNAL_MODULE = r'''module seq_mem_d1_shared_banks #(
+    parameter integer BANKS = 197,
+    parameter integer WIDTH = 8,
+    parameter integer SIZE = 16384,
+    parameter integer IDX_SIZE = 14,
+    parameter [BANKS * 32 - 1:0] BANK_BASES = '0
+) (
+    input wire clk,
+    input wire reset,
+    input wire [BANKS * IDX_SIZE - 1:0] addr0,
+    input wire [BANKS - 1:0] content_en,
+    output logic [BANKS - 1:0] done,
+    output logic [BANKS * WIDTH - 1:0] read_data,
+    input wire [BANKS * WIDTH - 1:0] write_data,
+    input wire [BANKS - 1:0] write_en,
+    output wire ext_req_valid,
+    input wire ext_req_ready,
+    output wire [31:0] ext_req_addr,
+    input wire ext_rsp_valid,
+    input wire [63:0] ext_rsp_data
+);
+  logic pending;
+  logic request_queued;
+  logic [7:0] queued_bank;
+  logic [31:0] queued_address;
+  logic [2:0] response_byte_offset;
+  integer bank_index;
+
+  assign ext_req_valid = request_queued;
+  assign ext_req_addr = queued_address;
+
+  always_comb begin
+    bank_index = 0;
+    for (integer i = 0; i < BANKS; i = i + 1)
+      if (content_en[i] && !write_en[i]) bank_index = i;
+  end
+
+  always_ff @(posedge clk) begin
+    if (reset) begin
+      pending <= 1'b0;
+      request_queued <= 1'b0;
+      queued_bank <= '0;
+      queued_address <= '0;
+      response_byte_offset <= '0;
+      done <= '0;
+      read_data <= '0;
+    end else begin
+      done <= '0;
+      if (pending && ext_rsp_valid) begin
+        read_data[queued_bank * WIDTH +: WIDTH] <=
+            ext_rsp_data >> (response_byte_offset * 8);
+        done[queued_bank] <= 1'b1;
+        pending <= 1'b0;
+      end else if (ext_req_valid && ext_req_ready) begin
+        pending <= 1'b1;
+        request_queued <= 1'b0;
+        response_byte_offset <= ext_req_addr[2:0];
+      end else if (!pending && !request_queued && (|content_en)) begin
+        queued_bank <= bank_index[7:0];
+        queued_address <= BANK_BASES[bank_index * 32 +: 32]
+            + (addr0[bank_index * IDX_SIZE +: IDX_SIZE] * (WIDTH / 8));
+        request_queued <= 1'b1;
+      end
+    end
+  end
+endmodule
+'''
+
+
+_BANK_NAME = re.compile(r"^token_weight_codes_i8_b(?P<index>\d+)$")
+
+
+def consolidate_token_weight_banks(
+    source: str,
+    bank_names: list[str] | tuple[str, ...],
+    base_addresses: dict[str, int],
+) -> ExternalizationResult:
+    """Replace the generated token-bank controllers with one shared controller.
+
+    The external-memory vector ABI is retained.  Each bank keeps its generated
+    address/content/read-data/done signals, while only the selected bank is
+    presented to one request/response slot.  This is deliberately limited to
+    the authenticated token-weight bank naming and width contract.
+    """
+
+    names = tuple(bank_names)
+    if len(names) < 2 or len(set(names)) != len(names):
+        raise ValueError("shared bank controller requires at least two unique banks")
+    parsed = []
+    for name in names:
+        match = _BANK_NAME.fullmatch(name)
+        if match is None:
+            raise ValueError(f"unsupported token bank name {name!r}")
+        parsed.append((int(match.group("index")), name))
+    parsed.sort()
+    if [index for index, _ in parsed] != list(range(len(parsed))):
+        raise ValueError("token-weight banks must be contiguous from b0")
+    names = tuple(name for _, name in parsed)
+    if any(name not in base_addresses for name in names):
+        raise ValueError("missing token-bank base address")
+
+    # Permit the pass to be used directly on the pre-externalized compiler
+    # source in focused tests; production invokes it after all 240 slots are
+    # externalized.
+    if not all(re.search(rf"\bseq_mem_d1_external\s*#.*?\b{re.escape(name)}\s*\(", source, re.DOTALL)
+               for name in names):
+        result = externalize_memories(source, list(names), base_addresses)
+        source = result.source
+
+    matches = {m.group("name"): m for m in _EXTERNAL_INSTANCE.finditer(source) if m.group("name") in names}
+    if set(matches) != set(names):
+        raise ValueError("all token banks must be externalized before consolidation")
+    widths = {_parameter(matches[name].group("params"), "WIDTH") for name in names}
+    idx_sizes = {_parameter(matches[name].group("params"), "IDX_SIZE") for name in names}
+    sizes = {_parameter(matches[name].group("params"), "SIZE") for name in names}
+    if widths != {8} or len(idx_sizes) != 1 or len(sizes) != 1:
+        raise ValueError("token banks must share WIDTH=8, IDX_SIZE and SIZE")
+    idx_size = next(iter(idx_sizes))
+    size = next(iter(sizes))
+
+    slots: dict[str, int] = {}
+    for name, match in matches.items():
+        body = match.group("body")
+        slot = re.search(r"\.ext_req_valid\(ext_mem_req_valid\[(\d+)\]\)", body)
+        if slot is None:
+            raise ValueError(f"missing external slot for {name}")
+        slots[name] = int(slot.group(1))
+    if len(set(slots.values())) != len(names):
+        raise ValueError("token banks must occupy distinct external slots")
+    shared_slot = slots[names[0]]
+
+    first = matches[names[0]]
+    bank_vectors = {
+        "addr0": ", ".join(f"{name}_addr0" for name in reversed(names)),
+        "content_en": ", ".join(f"{name}_content_en" for name in reversed(names)),
+        "done": ", ".join(f"{name}_done" for name in reversed(names)),
+        "read_data": ", ".join(f"{name}_read_data" for name in reversed(names)),
+        "write_data": ", ".join(f"{name}_write_data" for name in reversed(names)),
+        "write_en": ", ".join(f"{name}_write_en" for name in reversed(names)),
+    }
+    bases = ", ".join(f"32'h{base_addresses[name]:08x}" for name in reversed(names))
+    replacement = (
+        f"seq_mem_d1_shared_banks #(\n"
+        f"  .BANKS({len(names)}), .WIDTH(8), .SIZE({size}), .IDX_SIZE({idx_size}),\n"
+        f"  .BANK_BASES({{{bases}}})\n"
+        f") token_weight_codes_i8_banked (\n"
+        f"  .clk(clk), .reset(reset),\n"
+        f"  .addr0({{{bank_vectors['addr0']}}}),\n"
+        f"  .content_en({{{bank_vectors['content_en']}}}),\n"
+        f"  .done({{{bank_vectors['done']}}}),\n"
+        f"  .read_data({{{bank_vectors['read_data']}}}),\n"
+        f"  .write_data({{{bank_vectors['write_data']}}}),\n"
+        f"  .write_en({{{bank_vectors['write_en']}}}),\n"
+        f"  .ext_req_valid(ext_mem_req_valid[{shared_slot}]),\n"
+        f"  .ext_req_ready(ext_mem_req_ready[{shared_slot}]),\n"
+        f"  .ext_req_addr(ext_mem_req_addr[{shared_slot * 32 + 31}:{shared_slot * 32}]),\n"
+        f"  .ext_rsp_valid(ext_mem_rsp_valid[{shared_slot}]),\n"
+        f"  .ext_rsp_data(ext_mem_rsp_data[{shared_slot * 64 + 63}:{shared_slot * 64}])\n"
+        f");"
+    )
+    disabled_slots = "\n".join(
+        f"assign ext_mem_req_valid[{slots[name]}] = 1'b0;\n"
+        f"assign ext_mem_req_addr[{slots[name] * 32 + 31}:{slots[name] * 32}] = 32'd0;"
+        for name in names[1:]
+    )
+    rewritten = source
+    for name in names:
+        rewritten = rewritten.replace(matches[name].group(0), "", 1)
+    # Re-find the first instance location after removals and insert the shared
+    # controller before the next module declaration.
+    module_pos = rewritten.find("endmodule", rewritten.find("module main"))
+    if module_pos < 0:
+        raise ValueError("main module end not found")
+    rewritten = rewritten[:module_pos] + replacement + "\n" + disabled_slots + "\n" + rewritten[module_pos:]
+    if "module seq_mem_d1_shared_banks" not in rewritten:
+        rewritten = _BANKED_EXTERNAL_MODULE + "\n" + rewritten
+    return ExternalizationResult(rewritten, names[0], 8, names, tuple(8 for _ in names))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True)
@@ -672,6 +859,11 @@ def main() -> int:
         "--skip-static-counter-canonicalization",
         action="store_true",
         help="preserve a non-static Calyx lowering without requiring the static-counter form",
+    )
+    parser.add_argument(
+        "--consolidate-token-weight-banks",
+        action="store_true",
+        help="replace the authenticated 197 token-weight controllers with one shared controller",
     )
     args = parser.parse_args()
     source = args.input.read_text(encoding="utf-8")
@@ -698,11 +890,22 @@ def main() -> int:
             bases,
             canonicalize_counter=not args.skip_static_counter_canonicalization,
         )
+        if args.consolidate_token_weight_banks:
+            bank_names = sorted(
+                (name for name in names if _BANK_NAME.fullmatch(name)),
+                key=lambda name: int(_BANK_NAME.fullmatch(name).group("index")),
+            )
+            if len(bank_names) != 197:
+                parser.error("--consolidate-token-weight-banks requires exactly 197 token banks")
+            result = consolidate_token_weight_banks(result.source, bank_names, bases)
         result_source = result.source
         report = {
             "memory_count": len(names),
             "memory_names": names,
             "output_sha256": hashlib.sha256(result_source.encode("utf-8")).hexdigest(),
+            "token_weight_bank_controller": (
+                "shared" if args.consolidate_token_weight_banks else "per-bank"
+            ),
         }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(result_source, encoding="utf-8")
