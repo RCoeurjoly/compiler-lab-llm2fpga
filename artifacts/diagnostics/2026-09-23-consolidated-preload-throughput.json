@@ -1,0 +1,32 @@
+{
+  "status": "POST_LOAD_PROGRESS_SIMULATION_THROUGHPUT_BLOCKER",
+  "date": "2026-09-23",
+  "candidate_source": {
+    "path": "/tmp/compiler-consolidated-model.sv",
+    "sha256": "54189d2622e598fa6758352f3b11a19c838fa2e3b62a96675403b8902bf78164"
+  },
+  "authenticated_image": {
+    "path": "/tmp/t4-known-good/external/image.bin",
+    "bytes": 4136720,
+    "sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"
+  },
+  "probe": {
+    "type": "simulation_only_internal_image_preload",
+    "binary": "/tmp/compiler-ddr3-consolidated-sim/preload-1000",
+    "binary_sha256": "5aa1868f8560b89295bbc51a2290e1a5f42adbf8a01e537da59d8d875def2e42",
+    "cycles": 1000,
+    "accepted_requests": 78,
+    "responses": 78,
+    "wall_seconds": 0.78,
+    "estimated_cycles_per_second": 1282.05,
+    "estimated_first_token_cycles": 165186630,
+    "estimated_first_token_wall_hours": 35.79,
+    "result": "accelerator advances after image preload; token not reached in short probe"
+  },
+  "interpretation": [
+    "The post-load path is not immediately deadlocked: requests and responses advance in lockstep.",
+    "The current consolidated Verilator model is too slow for the full first-token run under the existing cycle-level harness.",
+    "This does not prove hardware behavior, PCIe ingress, physical UberDDR3, timing closure, or token correctness."
+  ],
+  "next_gate": "Use a faster-equivalent diagnostic (transaction/request trace checkpointing or a cycle-reduced model that preserves the authenticated boundary) before any RTL change."
+}
