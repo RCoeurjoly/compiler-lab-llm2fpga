@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "schema": "compiler-ddr3-consolidated-bank-address-map-v1",
+  "bank_count": 197,
+  "source_sha256": "54189d2622e598fa6758352f3b11a19c838fa2e3b62a96675403b8902bf78164",
+  "manifest_sha256": "1891a310e31817550cb85005b3e08de4159c3a392ba5ed4776b342d03fd12f98",
+  "first_base": 601872,
+  "last_base": 2371344,
+  "all_manifest_offsets_match": true,
+  "qualification_limits": [
+    "Address-map equivalence only; no full accelerator token result",
+    "No PCIe ingress, physical UberDDR3, synthesis, routing, bitstream, or board claim"
+  ]
+}
