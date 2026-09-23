@@ -1,0 +1,35 @@
+{
+  "schema": "compiler-ddr3-fixed-image-integrity-v1",
+  "status": "PASS_FULL_IMAGE_LOAD_READBACK",
+  "fix": {
+    "location": "scripts/pipeline/run_compiler_ddr3_trace_replay.py",
+    "description": "stage every single-beat opcode 0x0f packet at FIFO slot 0; carry the DDR3 line address only in opcode 0x10",
+    "cause": "absolute line addresses aliased staging slots 1..3, producing stale lines 185-187 and the repeated hardware pattern",
+    "compiler_accelerator_changed": false,
+    "pcie_ddr3_rtl_changed": false
+  },
+  "simulation": {
+    "fixture": "tests/test_compiler_ddr3_512_fixture.py",
+    "lines": 512,
+    "production_opcodes": ["0x0f", "0x10", "0x06"],
+    "status": "PASS"
+  },
+  "hardware": {
+    "bitstream_sha256": "500e0df3e96b3194b142b79c0b5bec94557ccfa1941d4dbc5afa2c2f6604621d",
+    "endpoint": "0000:42:00.0",
+    "bar0": "0x74000000",
+    "link": "2.5 GT/s x1",
+    "ddr3_status": "0x61",
+    "bist_state": "0x17",
+    "bytes_loaded": 4136720,
+    "bytes_read_back": 4136720,
+    "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "status": "PASS"
+  },
+  "scope_exclusions": [
+    "compiler accelerator first-token inference",
+    "trace replay",
+    "BPI boot qualification",
+    "autoregressive generation"
+  ]
+}

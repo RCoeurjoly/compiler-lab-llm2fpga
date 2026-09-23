@@ -569,7 +569,12 @@ def load_and_verify(device, image_path, timeout, interval, receipt):
                 raise ValueError("image is not complete 128-bit lines")
             for slot in range(len(packet) // 16):
                 data = packet[slot * 16:(slot + 1) * 16]
-                echo = loader_command(device, 15, slot, data, timeout, interval)
+                # Opcode 0x0f addresses the staging FIFO slot, not DDR3.
+                # Single-beat packets always use slot zero; opcode 0x10
+                # carries the actual DDR3 line address. Using the absolute
+                # line here aliases slots 1..3 and caused the evidenced
+                # line-185/186/187 stale readback.
+                echo = loader_command(device, 15, 0, data, timeout, interval)
                 if echo != data:
                     raise RuntimeError(f"loader slot echo mismatch at line {line + slot}")
             loader_command(device, 16, line | ((len(packet) // 16) << 29), b"", timeout, interval)

@@ -20,6 +20,12 @@ class CompilerDdr3512FixtureTest(unittest.TestCase):
         source = (ROOT / "tests/rtl/compiler_ddr3_trace_replay_board_tb.sv").read_text()
         self.assertEqual(source.count("for(i=0;i<8;i=i+1)"), 2)
         source = source.replace("for(i=0;i<8;i=i+1)", "for(i=0;i<512;i=i+1)")
+        source = source.replace(
+            " integer i;\n localparam [127:0] BASE=128'hffeeddcc_bbaa9988_77665544_33221100;",
+            " integer i;\n task production_command(input [31:0] address,input [127:0] data);\n   begin command(8'h0f,0,data); command(8'h10,address | 32'h20000000,0); end\n endtask\n localparam [127:0] BASE=128'hffeeddcc_bbaa9988_77665544_33221100;")
+        source = source.replace(
+            "for(i=0;i<512;i=i+1) command(1,i,BASE+i);\n   for(i=0;i<512;i=i+1) begin\n     command(2,i,0);",
+            "for(i=0;i<512;i=i+1) production_command(i,BASE+i);\n   for(i=0;i<512;i=i+1) begin\n     command(8'h06,i,0);")
         # The parent fixture intentionally has only 32 words.  Enlarge only
         # this temporary behavioral memory; production RTL is untouched.
         source = source.replace("memory[0:31]", "memory[0:511]")
