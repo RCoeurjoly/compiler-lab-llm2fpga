@@ -1,0 +1,39 @@
+{
+  "schema": "compiler-ddr3-trace-replay-bitstream-v1",
+  "status": "ROUTE_AND_BITSTREAM_PASS",
+  "hardware_qualified": false,
+  "scope": "Nix-built compiler DDR3 diagnostic after compiler-only command-boundary register; hardware qualification pending; not inference",
+  "profile": {
+    "byte_lanes": 2,
+    "controller_period_ps": 12000,
+    "ddr_period_ps": 3000,
+    "pcie_clock_mhz": 62.5,
+    "bist_mode": 2,
+    "seed": 15
+  },
+  "route": {
+    "legal": true,
+    "rowstream_fmax_mhz": 96.54,
+    "rowstream_required_mhz": 83.333333,
+    "pcie_fmax_mhz": 72.48,
+    "pcie_required_mhz": 62.5,
+    "derivation": "/nix/store/dixb568ymhc2iwmiyrf45wpar2w1c2dc-compiler-ddr3-trace-replay-route"
+  },
+  "bpi_programmer": {
+    "verification": "full-readback-v1",
+    "payload_bytes": 18735004,
+    "scope": "Full payload readback with partition-addressed verification"
+  },
+  "artifacts": {
+    "bitstream": {
+      "path": "/nix/store/rzxx58y90yz0p3l4kqsspgpy74csbl18-compiler-ddr3-trace-replay-bitstream/replay.bit",
+      "bytes": 18735174,
+      "sha256": "867217d2bb198e7f940e34ec63a72be0eaa9a433631c479fdfc89166df11dc7f"
+    },
+    "programmer": {
+      "path": "/nix/store/5vmpyj6qrz4708r3nbb1ij3wpiykvazk-openfpgaloader-3ae5e5e-bpi-full-verify/bin/openFPGALoader",
+      "bytes": 4770720,
+      "sha256": "c2ca6f387f2118c5a22eb83e8e122ddab2c9224f2180c2308c01bb794f6dfd75"
+    }
+  }
+}
