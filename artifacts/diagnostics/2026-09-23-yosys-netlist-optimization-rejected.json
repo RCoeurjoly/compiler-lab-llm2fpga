@@ -1,0 +1,72 @@
+{
+  "status": "rejected",
+  "purpose": "Bounded optimization probe for the consolidated compiler-generated DDR3 integration RTL",
+  "source_sha256": "54189d2622e598fa6758352f3b11a19c838fa2e3b62a96675403b8902bf78164",
+  "optimized_netlist_sha256": "b0cc304f587a2ff2057bf800617e04efa57cc78f7257d25ee4dd6396fbee27ac",
+  "probe": {
+    "cycles": 100000,
+    "prompt_tokens": [7454, 2402, 257, 640],
+    "expected_first_token": 11,
+    "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"
+  },
+  "authenticated_rtl": {
+    "requests": 2866,
+    "responses": 2866,
+    "runtime_seconds": "57-59"
+  },
+  "yosys_netlist": {
+    "wrapper": "phase-stalled temporary wrapper (comparison invalid against authenticated baseline)",
+    "requests": 2926,
+    "responses": 2926,
+    "runtime_seconds": 0.75,
+    "exit_status": 5,
+    "token_valid": false
+  },
+  "exact_fast_wrapper_probe": {
+    "wrapper": "/tmp/compiler-ddr3-consolidated-sim/fast-wrapper.sv",
+    "optimized_netlist_sha256": "6d4ceae30f93a87e32c295033d84785426b39c57a3e79db4ccfb9da2003cac0e",
+    "cycles": 100000,
+    "requests": 2932,
+    "responses": 2932,
+    "runtime_seconds": 0.76,
+    "token_valid": false,
+    "authenticated_source_requests": 2866,
+    "interpretation": "With the exact fast-wrapper contract, Yosys still changes the bounded request trace (2932 versus 2866), so the optimization remains rejected."
+  },
+  "exact_fast_wrapper_proc_only_probe": {
+    "transform": "Yosys proc only, without opt",
+    "cycles": 100000,
+    "requests": 2932,
+    "responses": 2932,
+    "runtime_seconds": 1.47,
+    "token_valid": false,
+    "interpretation": "The first semantics-changing stage is process lowering itself; later opt passes are not required to produce the trace divergence."
+  },
+  "exact_fast_wrapper_source_x0_probe": {
+    "transform": "unchanged source RTL, Verilator --x-assign 0 --x-initial 0",
+    "cycles": 100000,
+    "requests": 2932,
+    "responses": 2932,
+    "runtime_seconds": 57.48,
+    "token_valid": false,
+    "interpretation": "The proc-only 2932 trace matches deterministic X=0 source simulation. The prior 2866 trace relies on Verilator's default four-state behavior; it is not a synthesis-equivalent reference until the X contract is resolved."
+  },
+  "formal_mode_probe": {
+    "read_verilog_formal": true,
+    "cycles": 100000,
+    "requests": 2926,
+    "responses": 2926,
+    "runtime_seconds": 0.74,
+    "interpretation": "Formal-mode parsing does not restore the authenticated 2866-request trace; the mismatch is not explained solely by ordinary X handling."
+  },
+  "verilator_x_flags_probe": {
+    "flags": ["--x-assign", "0", "--x-initial", "0"],
+    "cycles": 100000,
+    "requests": 2926,
+    "responses": 2926,
+    "runtime_seconds": 57.25,
+    "interpretation": "Changing Verilator's X materialization does not change the trace or materially improve runtime."
+  },
+  "decision": "Do not use the optimized netlist for semantic acceptance. It changes the ordered memory transaction trace, despite a large runtime reduction; investigate four-state/X and initialization preservation before retrying.",
+  "next_step": "Compare the first divergent request/state between the source Verilator model and a transformation that preserves generated RTL semantics; do not run hardware or claim first-token success."
+}
