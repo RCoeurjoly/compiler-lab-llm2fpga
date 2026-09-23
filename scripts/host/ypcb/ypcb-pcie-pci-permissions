@@ -36,6 +36,13 @@ RESOURCE0="$ENDPOINT_DIR/resource0"
 resource_line="$(head -n 1 "$ENDPOINT_DIR/resource" 2>/dev/null || true)"
 [[ "$resource_line" =~ ^0x[0-9a-f]+[[:space:]]+0x[0-9a-f]+[[:space:]]+0x[0-9a-f]+$ ]] || fail "endpoint BAR0 resource is not assigned"
 
+# BAR access is intentionally granted only after identity, BAR assignment,
+# and PCI decode have been validated.  The user is already a member of the
+# established plugdev group used by the Digilent programmer.
+getent group plugdev >/dev/null || fail "missing plugdev group"
+chgrp plugdev "$RESOURCE0" || fail "cannot set BAR0 group"
+chmod 0660 "$RESOURCE0" || fail "cannot set BAR0 mode"
+
 command_before="$(/usr/bin/setpci -s "$ENDPOINT_BDF" COMMAND 2>/dev/null || true)"
 [[ "$command_before" =~ ^[0-9A-Fa-f]{4}$ ]] || fail "unreadable endpoint COMMAND"
 command_after="$(printf '%04x' $((0x$command_before | 0x0006)))"
