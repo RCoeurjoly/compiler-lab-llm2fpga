@@ -24,6 +24,15 @@ class ReplayTopTest(unittest.TestCase):
         text = (ROOT / "rtl/diagnostics/compiler_ddr3_trace_replay_top.sv").read_text()
         self.assertRegex(text, r"\(\*\s*keep_hierarchy\s*=\s*\"yes\"\s*\*\)\s*task6_ypcb_uberddr3_bist_rowstream_loader_top")
 
+    def test_trace_csr_is_optional_for_production_timing(self):
+        text = (ROOT / "rtl/diagnostics/compiler_ddr3_trace_replay_top.sv").read_text()
+        self.assertIn("parameter bit ENABLE_TRACE_REPLAY_CSR = 1'b1", text)
+        self.assertIn(".ENABLE_TRACE_CSR(ENABLE_TRACE_REPLAY_CSR)", text)
+        self.assertIn("Trace offsets are intentionally unavailable in production", text)
+        csr = (ROOT / "rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv").read_text()
+        self.assertIn("parameter bit ENABLE_TRACE_CSR = 1'b1", csr)
+        self.assertIn("gen_no_trace_replay", csr)
+
     def test_full_pinned_loader_shell_bar_fixture(self):
         tb = ROOT / "tests/rtl/compiler_ddr3_trace_replay_board_tb.sv"
         self.assertTrue(tb.exists(), "full board loader-shell fixture is missing")

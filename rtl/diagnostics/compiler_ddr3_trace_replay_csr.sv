@@ -4,7 +4,9 @@
 // Follows task6 ingress semantics: independent AW/W holding registers, one
 // write execution, BVALID/RVALID retained until the consumer acknowledges.
 // Existing task6 loader registers are not implemented or aliased here.
-module compiler_ddr3_trace_replay_csr (
+module compiler_ddr3_trace_replay_csr #(
+    parameter bit ENABLE_TRACE_CSR = 1'b1
+) (
     input wire clk, reset, transport_reset, replay_reset, calib_complete,
     input wire [31:0] s_axi_awaddr,
     input wire s_axi_awvalid,
@@ -37,7 +39,7 @@ module compiler_ddr3_trace_replay_csr (
   reg [127:0] staged_expected;
   reg [4:0] staged_mask;
   wire [1:0] state;
-  assign replay_active = state == 1;
+  assign replay_active = ENABLE_TRACE_CSR && state == 1;
   wire sealed, starved, push_ready;
   wire [4:0] fifo_level;
   wire [31:0] expected_count, pushed_count, accepted_count, response_count, checked_count;
@@ -56,13 +58,14 @@ module compiler_ddr3_trace_replay_csr (
   // finish, letting the host observe failure rather than deadlocking AXI.
   wire full_wait = is_push && !malformed && fifo_level==16 &&
                   (state==0 || state==1) && !sealed && pushed_count<expected_count;
-  wire execute = !transport_reset && aw_pending && w_pending && !s_axi_bvalid && !full_wait;
+  wire execute = ENABLE_TRACE_CSR && !transport_reset && aw_pending && w_pending && !s_axi_bvalid && !full_wait;
   wire valid_write = execute && in_window && !malformed;
   wire clear = valid_write && is_command && wdata==2;
-  assign s_axi_awready = !reset && !transport_reset && !aw_pending && !s_axi_bvalid;
-  assign s_axi_wready = !reset && !transport_reset && !w_pending && !s_axi_bvalid;
-  assign s_axi_arready = !reset && !transport_reset && !s_axi_rvalid;
+  assign s_axi_awready = ENABLE_TRACE_CSR && !reset && !transport_reset && !aw_pending && !s_axi_bvalid;
+  assign s_axi_wready = ENABLE_TRACE_CSR && !reset && !transport_reset && !w_pending && !s_axi_bvalid;
+  assign s_axi_arready = ENABLE_TRACE_CSR && !reset && !transport_reset && !s_axi_rvalid;
 
+  generate if (ENABLE_TRACE_CSR) begin : gen_trace_replay
   compiler_ddr3_trace_replay replay (
     .clk(clk), .reset(reset), .replay_reset(replay_reset), .calib_complete(calib_complete),
     .clear(clear), .start(valid_write && is_command && wdata==1),
@@ -78,6 +81,28 @@ module compiler_ddr3_trace_replay_csr (
     .wb_cyc(wb_cyc), .wb_stb(wb_stb), .wb_we(wb_we), .wb_addr(wb_addr), .wb_sel(wb_sel),
     .wb_stall(wb_stall), .wb_ack(wb_ack), .wb_err(wb_err), .wb_rdata(wb_rdata)
   );
+  end else begin : gen_no_trace_replay
+    assign state = 2'd0;
+    assign sealed = 1'b0;
+    assign starved = 1'b0;
+    assign push_ready = 1'b0;
+    assign fifo_level = 5'd0;
+    assign expected_count = 32'd0;
+    assign pushed_count = 32'd0;
+    assign accepted_count = 32'd0;
+    assign response_count = 32'd0;
+    assign checked_count = 32'd0;
+    assign error_bits = 32'd0;
+    assign first_index = 32'd0;
+    assign first_address = 32'd0;
+    assign first_expected = 128'd0;
+    assign first_actual = 128'd0;
+    assign wb_cyc = 1'b0;
+    assign wb_stb = 1'b0;
+    assign wb_we = 1'b0;
+    assign wb_addr = 32'd0;
+    assign wb_sel = 16'd0;
+  end endgenerate
 
   reg [31:0] read_value;
   reg read_invalid;

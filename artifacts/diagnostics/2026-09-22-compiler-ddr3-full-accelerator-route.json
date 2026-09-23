@@ -1,0 +1,115 @@
+{
+  "schema": "compiler-ddr3-full-accelerator-route-v1",
+  "status": "ROUTE_FAILED_TIMING_AND_POST_PLACEMENT_ASSERTION",
+  "scope": "compiler-generated TinyStories-1M main integrated with PCIe/UberDDR3 shell",
+  "inputs": {
+    "generated_external_sv": "/tmp/t4-known-good/dynamic/model.dynamic.external.regenerated.sv",
+    "generated_external_sv_sha256": "373ae31e6b3843ea0cb82614bcdbc7321aa4dbc5388831341dceef0a46dd9ab9",
+    "synthesis_json": "/tmp/compiler-full-accelerator-synthesis/full-nonflatten.json",
+    "synthesis_json_bytes": 116391936,
+    "compatible_json": "/tmp/compiler-full-accelerator-route/full-compatible.json",
+    "ram_compatibility_map_sha256": "e4b5694d54180b715125f25b664b997ddf3ed20693805e619bf83a9cf8b79e67"
+  },
+  "configuration": {
+    "compiler_accelerator_enabled": true,
+    "flatten": false,
+    "seed": 15,
+    "byte_lanes": 2,
+    "controller_period_ps": 12000,
+    "ddr_period_ps": 3000,
+    "pcie_clock_mhz": 62.5,
+    "rowstream_required_mhz": 83.333333
+  },
+  "synthesis": {
+    "status": "PASS",
+    "netlist_sha256": "not_published_from_temporary_screen"
+  },
+  "placement_route": {
+    "cells_placed": 122123,
+    "rowstream_fmax_mhz": 35.40,
+    "pcie_user_fmax_mhz": 32.75,
+    "timing_status": "FAIL",
+    "failure": "nextpnr-xilinx assertion port.net == nullptr during post-placement legalisation",
+    "route_log": "/tmp/compiler-full-accelerator-route/route3.log",
+    "registered_wishbone_diagnostic": {
+      "netlist": "/tmp/compiler-full-accelerator-route/full-pipeline-compatible.json",
+      "placer": "heap",
+      "force": true,
+      "seed": 15,
+      "rowstream_fmax_mhz": 43.12,
+      "pcie_user_fmax_mhz": 52.12,
+      "failure": "nextpnr-xilinx assertion port.net == nullptr during post-placement legalisation",
+      "fasm_produced": false,
+      "route_log": "/tmp/compiler-full-accelerator-route/pipeline-force-route.log",
+      "interpretation": "--force does not make this a valid implementation; timing still fails and the same legalization assertion aborts the run"
+    },
+    "flatten_diagnostic": {
+      "netlist": "/tmp/compiler-full-accelerator-route/full-pipeline-flat-compatible.json",
+      "synthesis_transform": "hierarchy -top compiler_ddr3_trace_replay_top; flatten; opt_clean",
+      "placer": "heap",
+      "seed": 15,
+      "rowstream_fmax_mhz": 27.49,
+      "pcie_user_fmax_mhz": 37.03,
+      "failure": "nextpnr-xilinx assertion port.net == nullptr during post-placement legalisation",
+      "fasm_produced": false,
+      "route_log": "/tmp/compiler-full-accelerator-route/pipeline-flat-route.log",
+      "interpretation": "Flattening preserves the failure and reduces timing; it is rejected as an implementation strategy"
+    },
+    "no_timing_driven_diagnostic": {
+      "netlist": "/tmp/compiler-full-accelerator-route/full-pipeline-compatible.json",
+      "placer": "heap",
+      "no_timing_driven": true,
+      "seed": 15,
+      "rowstream_fmax_mhz": 35.93,
+      "pcie_user_fmax_mhz": 37.40,
+      "failure": "nextpnr-xilinx assertion port.net == nullptr during post-placement legalisation",
+      "fasm_produced": false,
+      "route_log": "/tmp/compiler-full-accelerator-route/pipeline-notmdriv-route.log",
+      "interpretation": "Disabling timing-driven placement preserves the legalization failure and does not meet either fixed clock requirement"
+    },
+    "known_pcie_meta_source_legalization_diagnostic": {
+      "source_commit": "32e8b798520d90e1130afe95908f04cf52125cf6",
+      "source_worktree_diff_sha256": "fcf11b57f8be684570e10196e79d3aa4b72af8311aced2501474fdfc000c71f2",
+      "patches": [
+        "patches/nextpnr-xilinx/0023-disconnect-lut6-a6-before-memory-constant.patch",
+        "patches/nextpnr-xilinx/0024-drop-constant-a6-on-lut5.patch"
+      ],
+      "nextpnr_sha256": "879f0956df6ff058ceefb9b2390efcab5862a509c556c353698070fcf721168e",
+      "netlist": "/tmp/compiler-full-accelerator-route/full-pipeline-compatible.json",
+      "seed": 15,
+      "rowstream_fmax_mhz": 42.09,
+      "pcie_user_fmax_mhz": 51.40,
+      "legalization": "PASSED",
+      "route_stage": "router2 main router loop",
+      "fasm_produced": false,
+      "route_log": "/tmp/compiler-full-accelerator-route/pipeline-known-source-patched.log",
+      "interpretation": "Using the PCIe-meta source that matches the known-good shell plus the two legalization patches removes the post-placement assertion. The bounded run stopped during router2 before FASM; timing still fails both fixed clocks. This is a tool-path diagnostic, not a qualified implementation."
+    },
+    "reproducible_pcie_meta_tool_diagnostic": {
+      "flake_input": "task3-main/flake.nix:nextpnrXilinxFork",
+      "source_ref": "openxc7-stable-pcie-meta",
+      "source_revision": "32e8b798520d90e1130afe95908f04cf52125cf6",
+      "patches": [
+        "patches/nextpnr-xilinx/0023-disconnect-lut6-a6-before-memory-constant.patch",
+        "patches/nextpnr-xilinx/0024-drop-constant-a6-on-lut5.patch"
+      ],
+      "nextpnr_sha256": "4b86f3f971ca0b57d589c0e646dba18439b958f327ee4270d7d67c137e417334",
+      "netlist": "/tmp/compiler-full-accelerator-route/full-pipeline-compatible.json",
+      "seed": 15,
+      "failure_stage": "router2 main router loop",
+      "fasm_produced": false,
+      "route_log": "/tmp/compiler-full-accelerator-route/pipeline-repro-patched.log",
+      "interpretation": "The reproducible pinned tool builds and reaches placement without the previous legalization assertion, but the bounded route terminated in router2 before FASM. No timing or hardware acceptance claim is made."
+    },
+    "production_trace_csr_elision_diagnostic": {
+      "top_parameter": "ENABLE_TRACE_REPLAY_CSR=0",
+      "top_rtl_sha256": "570dc0344c82ce26877583f9a26102858b36ae516f67c0db3d5d8c74f568e204",
+      "csr_rtl_sha256": "7193cacfa53c21241b04274d3ccfbf6795614edd9022bfe97778a54776167019",
+      "scope": "Remove only the temporary replay CSR from the production timing path; retain PCIe AXI loader forwarding and return DECERR for diagnostic offsets.",
+      "yosys_check": "PASS: standalone bridge elaboration and proc/opt with ENABLE_TRACE_CSR=0",
+      "full_synthesis": "NOT_COMPLETED: bounded full-design rerun was terminated before emitting a netlist",
+      "interpretation": "The production-mode boundary is syntactically and structurally valid in isolation. It has not yet produced a full accelerator netlist or timing result."
+    }
+  },
+  "interpretation": "The compiler-generated accelerator now reaches placement, but does not fit the fixed timing constraints and triggers a deterministic nextpnr legalization assertion. PCIe/UberDDR3 transport remains hardware-proven by the separate exact replay receipt."
+}

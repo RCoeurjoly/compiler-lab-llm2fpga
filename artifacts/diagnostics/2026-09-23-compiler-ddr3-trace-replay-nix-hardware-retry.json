@@ -1,0 +1,27 @@
+{
+  "backend": {},
+  "checkpoint_path": "artifacts/diagnostics/2026-09-23-compiler-ddr3-trace-replay-nix-hardware-retry.json.worker.json.snapshot.json",
+  "elapsed_seconds": 0.08844086201861501,
+  "error": "hardware worker exit 1 (negative value is terminating signal)",
+  "evidence_capacity": {
+    "maximum_receipt_bytes": 262144,
+    "minimum_runtime_headroom_bytes": 67108864,
+    "reserved_bytes": 8388608
+  },
+  "last_stage": "authentication",
+  "schema": "compiler-ddr3-trace-replay-hardware-v1",
+  "scope": "exact compiler-derived DDR3 replay diagnostic; not inference",
+  "stage": "hardware_worker",
+  "status": "FAIL",
+  "supervisor": {
+    "cleanup": {
+      "group_terminated": false,
+      "owned_processes": [],
+      "signal_denials": [],
+      "worker_returncode": 1
+    },
+    "elapsed_seconds": 0.21890264505054802,
+    "interrupted_signal": null,
+    "worker_receipt": "artifacts/diagnostics/2026-09-23-compiler-ddr3-trace-replay-nix-hardware-retry.json.worker.json"
+  }
+}

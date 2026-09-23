@@ -1,0 +1,370 @@
+{
+  "schema": "tinystories-1m-packed-image-externalization-v1",
+  "status": "PASS_BOUNDED_EXTERNALIZATION",
+  "scope": "diagnostic compiler-generated two-token RTL only; no hardware claim",
+  "source_model_image": {
+    "manifest": "artifacts/diagnostics/tinystories-1m-ddr3-model-image-manifest.json",
+    "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "tensor_count": 240
+  },
+  "generated_layout": {
+    "rtl": "/tmp/t4-narrow2-calyx/model.sv",
+    "memory_count": 117,
+    "packed_token_code_banks": 25,
+    "packed_token_code_lanes": 8,
+    "token_scale_banks": 25,
+    "note": "The regenerated production RTL does not contain the historical 197 token_weight_codes_i8_b* instances. The packed image is derived from those authenticated logical bytes; it is not kev-gpt RTL or a new model."
+  },
+  "derived_image": {
+    "manifest": "/tmp/t4-narrow2-manifest2.json",
+    "image": "/tmp/t4-narrow2-image2.bin",
+    "manifest_sha256": "e1b70131a4772049386d7e438b85924b29f3da20f0f2a8139f6ac6c8dcd5be6e",
+    "image_sha256": "5aa5232db4b5423ea829484da580ec68b45827c4c11dd8ed39c4d692f580b83a",
+    "tensor_count": 89,
+    "image_bytes": 4002704,
+    "transformation": "row-major 197x16384 INT8 banks -> 25 banks of 16384 little-endian 8-lane 64-bit words; four 16384-entry scale banks -> 25 banks of 2048 32-bit rows; zero-pad only outside the authenticated vocabulary"
+  },
+  "externalized_rtl": {
+    "source": "/tmp/t4-narrow2-external2.sv",
+    "sha256": "89d3e967d76cf927349cf1f6d7106b8f599a02e75535a47ae34797405b549641",
+    "memory_count": 89,
+    "verilator_lint": "PASS_WARNINGS_ONLY",
+    "yosys_proc_opt_stat": "PASS"
+  },
+  "verification": {
+    "focused_tests": "35/35 PASS",
+    "transaction_level_simulation": {
+      "compile": "Icarus and Verilator PASS",
+      "first_observed_runtime_gate": "compiler FSM reaches LM-head GEMV read-operands (state 386/387) and issues balanced external requests",
+      "result": "TOKEN_MISMATCH",
+      "diagnostic": "completed at 211097431 cycles with token=640 (expected 11); model_best_token=640, token0=640, token1=640, selected=640, model_step=2, context_length=6, lm_output_counter=50257",
+      "interpretation": "The mismatch is in the generated computation/data path, not token selection. An A/B run using the prior external-memory handshake also produced token=640, so the new request-queue handshake is not yet implicated. The current production candidate enables the previously unverified narrowed arithmetic (40-bit code/scale products, 48-bit GEMV MAC, and 53-bit requant products), whereas the authenticated BRAM compiler baseline uses 64-bit products; this is now the leading generator-level comparison to test, not yet an approved fix. PCIe and physical DDR3 remain outside this simulation gate."
+    },
+    "hardware_inference": "NOT_RUN",
+    "synthesis": "NOT_RUN",
+    "placement_timing": "NOT_RUN",
+    "model_image_equivalence": "packed code-byte mapping checked against all 25 banks; scale packing checked against the original 4-bank logical sequence",
+    "packed_bram_isolation": {
+      "status": "TOKEN_MISMATCH",
+      "rtl": "/tmp/t4-narrow2-calyx/model.sv",
+      "memory_mode": "seq_mem_d1 BRAM arrays preloaded from the same 89-tensor authenticated image",
+      "observed_first_selected_token": 640,
+      "expected_first_token": 11,
+      "cycles_to_first_selection": 85949360,
+      "interpretation": "The packed compiler-generated RTL itself selects 640 before external-memory replacement. This moves the primary fault boundary earlier than PCIe/DDR3 and rules out the external response adapter as the sole cause. The previous un-packed BRAM production baseline selected 11."
+    },
+    "packed_vs_unpacked_embedding_probe": {
+      "status": "MATCHED_INITIAL_CHECKPOINTS",
+      "comparison": "old unpacked BRAM baseline versus current packed compiler RTL",
+      "prompt_token": 7454,
+      "columns_compared": 6,
+      "fields": ["signed_code", "scale", "product", "rounded_product", "embedding_sum"],
+      "observed_rows": [
+        {"column": 0, "signed_code": 71, "scale": 36794, "product": 0, "rounded_product": 0, "embedding_sum": 0},
+        {"column": 1, "signed_code": -64, "scale": 36794, "product": 2612374, "rounded_product": 10205, "embedding_sum": 17646},
+        {"column": 2, "signed_code": -31, "scale": 36794, "product": -2354816, "rounded_product": -9199, "embedding_sum": -14372},
+        {"column": 3, "signed_code": -7, "scale": 36794, "product": -1140614, "rounded_product": -4456, "embedding_sum": -9842},
+        {"column": 4, "signed_code": 40, "scale": 36794, "product": -257558, "rounded_product": -1006, "embedding_sum": 2325},
+        {"column": 5, "signed_code": 10, "scale": 36794, "product": 1471760, "rounded_product": 5749, "embedding_sum": 8796}
+      ],
+      "interpretation": "Packed token embedding extraction and arithmetic agree with the passing unpacked baseline for the first six columns; the first divergence is therefore later than this embedding checkpoint. No RTL fix has been applied."
+    },
+    "packed_lm_weight_probe": {
+      "status": "MATCHED_SAMPLED_CODES",
+      "comparison": "current packed compiler RTL LM-head read stream versus authenticated unpacked byte rows",
+      "samples": [
+        {"output": 0, "k": 0, "code": -44},
+        {"output": 0, "k": 1, "code": 37},
+        {"output": 0, "k": 2, "code": -2},
+        {"output": 1, "k": 0, "code": 27},
+        {"output": 1, "k": 1, "code": -12},
+        {"output": 1, "k": 2, "code": -25},
+        {"output": 2, "k": 0, "code": 64},
+        {"output": 2, "k": 1, "code": -96},
+        {"output": 2, "k": 2, "code": -91}
+      ],
+      "interpretation": "The sampled packed LM-head code extraction also agrees with the corresponding unpacked rows. The remaining first-divergence search is therefore at LM-head activation/scale timing or later arithmetic/argmax state, not the authenticated packed image bytes."
+    },
+    "internal_completion_probe": {
+      "token_id": 640,
+      "model_best_token": 640,
+      "model_token0": 640,
+      "model_token1": 640,
+      "model_token_select": 640,
+      "cycles": 211097431
+    },
+    "lm_input_alias_ab_probe": {
+      "generator_change": "removed only the production alias lm_input_codes_i8 -> q_input_codes_i8; all other packing, scheduling, transport, and arithmetic settings unchanged",
+      "generated_futil": "PASS: lm_input_codes_i8 and q_input_codes_i8 are distinct external memories",
+      "regression_tests": "21/21 PASS",
+      "bram_result": {
+        "status": "TOKEN_MISMATCH",
+        "observed_first_selected_token": 640,
+        "expected_first_token": 11,
+        "cycles_to_first_selection": 92899417
+      },
+      "interpretation": "The LM-input memory alias is a real boundary defect but is not sufficient to explain the mismatch; removing it alone still selects 640. No claim of an accepted RTL fix is made."
+    },
+    "wide_arithmetic_diagnostic": {
+      "method": "temporary compiler-generated packed production variant with narrow_products disabled; no tracked RTL or transport change",
+      "bram_result": {
+        "status": "TOKEN_MISMATCH",
+        "observed_first_selected_token": 13,
+        "expected_first_token": 11
+      },
+      "interpretation": "Restoring 64-bit arithmetic changes the result from 640 to 13, proving arithmetic narrowing contributes, but it does not by itself restore the reference token. The remaining divergence is now localized to the packed production LM-head activation/scale or argmax path."
+    },
+    "all_runtime_aliases_disabled_probe": {
+      "method": "temporary compiler-generated packed production variant with the complete runtime alias map disabled; packed model image and narrowed arithmetic retained",
+      "bram_result": {
+        "status": "TOKEN_MISMATCH",
+        "observed_first_selected_token": 640,
+        "expected_first_token": 11,
+        "cycles_to_first_selection": 92899417
+      },
+      "interpretation": "Removing the complete alias set does not change the narrowed result. Aliasing is therefore not the sole cause; the remaining comparison must cover packed production arithmetic and LM-head dataflow together."
+    },
+    "wide_arithmetic_no_alias_probe": {
+      "method": "temporary packed production variant with both the complete runtime alias map disabled and narrow_products disabled",
+      "bram_result": {
+        "status": "TOKEN_MISMATCH",
+        "observed_first_selected_token": 13,
+        "expected_first_token": 11,
+        "cycles_to_first_selection": 92945489
+      },
+      "interpretation": "The full-width result remains 13 with aliases removed. The remaining mismatch is not caused by runtime-buffer aliasing; packed production dataflow or its LM-head integration remains the active localization target."
+    },
+    "final_ln_input_boundary_probe": {
+      "comparison": "passing unpacked compiler baseline versus packed full-width production diagnostic",
+      "baseline": {
+        "final_output_q16_16_first_four": [-39398, -2491863, -379630, -1134663],
+        "lm_input_codes_first_four_unsigned_bytes": [246, 128, 195, 128],
+        "lm_input_scale_q8_24_first": 993682,
+        "cycle": 49768707,
+        "fsm_window": 386
+      },
+      "packed_full_width": {
+        "final_output_q16_16_first_four_unsigned_i64": [18446744073709483773, 109425, 125439, 18446744073709265840],
+        "final_output_q16_16_first_four_signed": [-67843, 109425, 125439, -285776],
+        "lm_input_scale_q8_24_first": 993682,
+        "cycle": 50184006,
+        "fsm_window": "LM Q/DQ entry"
+      },
+      "interpretation": "The LM-head scale is identical, but final-output values already diverge before LM Q/DQ and packed weight access. The earliest remaining fault is in the packed production transformer/final-layer-normalization dataflow, not the LM-head, external-memory adapter, PCIe, or DDR3."
+    },
+    "first_ln1_row_accumulation_probe": {
+      "comparison": "passing unpacked compiler BRAM baseline versus packed full-width production diagnostic",
+      "boundary": "first ln1_output_q16_16 final-row write",
+      "baseline": {
+        "cycle": 55070,
+        "block_input_row_320_383_fnv1a64": 7831381220033479828,
+        "ln1_output_first_four": [-8268147, -4399900, -6720138, -6768899],
+        "mean": 17646,
+        "variance": 42950,
+        "sqrt_root": 207,
+        "row_sum": 1129344,
+        "sum_add": 1145946,
+        "gamma_addr": 63,
+        "gamma_read": 76498,
+        "beta_addr": 63,
+        "beta_read": -1030
+      },
+      "packed_full_width": {
+        "cycle": 57199,
+        "block_input_row_320_383_fnv1a64": 7831381220033479828,
+        "ln1_output_first_four_signed": [-59673, 43620, 0, 0],
+        "mean": 261,
+        "variance": 63551516,
+        "sqrt_root": 7971,
+        "row_sum": 16736,
+        "sum_add": 33338,
+        "gamma_addr": 63,
+        "gamma_read": 76498,
+        "beta_addr": 63,
+        "beta_read_unsigned32": 4294966266
+      },
+      "interpretation": "The complete 64-word block-input row hash matches and gamma/beta reads match, so the first divergence is not model-image loading or the LN parameters. Mean/variance/row accumulation are already different at the first ln1 boundary; the packed production schedule is consuming or committing the row-sum sequence differently. This is the current critical-path RTL/compiler evidence. No fix applied."
+    },
+    "first_ln1_read_response_timing_probe": {
+      "boundary": "read_block_input -> accumulate_row_sum",
+      "baseline_observed": {
+        "fsm": 1,
+        "flat_addresses": [0, 1, 2, 3, 4, 5, 6],
+        "block_input_read_data": [17646, 17646, 17646, 17646, 17646, 17646, 17646],
+        "sum_add": [17646, 35292, 52938, 70584, 88230, 105876, 123522],
+        "interpretation": "The baseline consumer advances the address but repeatedly consumes the first synchronous-memory response."
+      },
+      "packed_full_width_observed": {
+        "fsm": 2,
+        "flat_addresses": [0, 1, 2, 3, 4, 5, 6],
+        "block_input_read_data": [17646, -14372, -6568, 2325, 8796, 1154, 3324],
+        "sum_add": [17646, 3274, -6568, -4243, 4553, 5707, 9031],
+        "ordered_trace_records": 64,
+        "ordered_trace_fnv1a64": 8281986172592539694
+      },
+      "baseline_ordered_trace_records": 64,
+      "baseline_ordered_trace_fnv1a64": 15076088045902987321,
+      "interpretation": "The packed design consumes changing responses while the authenticated baseline consumes the held first response. This is the earliest evidenced divergence and identifies the required fix domain: make the compiler-owned external-memory read/response protocol explicit and preserve the validated one-cycle response semantics. No accelerator or transport fix has been applied."
+    },
+    "first_ln1_response_latch_hypothesis_probe": {
+      "status": "HYPOTHESIS_REJECTED",
+      "artifact": "/tmp/t4-wide-diagnostic/model-latched.sv",
+      "change": "Temporary compiler-generated response register written by read_block_input and read_output_operands; consumers use the registered response.",
+      "observed": {
+        "phase_boundary_cycle": 56656,
+        "input_row_fnv1a64": 7831381220033479828,
+        "row_sum_first_response": 17646,
+        "row_sum_second_response": 3274,
+        "mean": 263,
+        "sqrt_root": 7971,
+        "ln1_first_words": [145580, -54348],
+        "expected_mean": 17646,
+        "expected_ln1_first_words": [-8268147, -4399900]
+      },
+      "interpretation": "The latch changes the generated schedule but does not restore the authenticated LayerNorm boundary: the second response is still consumed as a changing value and the mean remains 263 rather than 17646. This temporary response-latch hypothesis is rejected as sufficient evidence for a tracked fix; PCIe, DDR3, and accelerator RTL remain unchanged."
+    },
+    "first_ln1_two_stage_response_capture_probe": {
+      "status": "HYPOTHESIS_REJECTED",
+      "artifact": "/tmp/t4-wide-diagnostic/model-two-stage.sv",
+      "change": "Temporary compiler-generated sequential groups issue the memory read, then capture the registered memory output, then consume the captured response.",
+      "observed": {
+        "phase_boundary_cycle": 55648,
+        "input_row_fnv1a64": 7831381220033479828,
+        "block_memory_first_words": [17646, -14372, -6568, 2325],
+        "mean": 261,
+        "sqrt_root": 7971,
+        "ln1_first_words": [-67673, 43620],
+        "expected_mean": 17646,
+        "expected_ln1_first_words": [-8268147, -4399900]
+      },
+      "interpretation": "Separating request and capture removes the first latch's one-cycle NBA error but still produces the packed response stream and the same wrong LayerNorm boundary. Response timing alone is therefore not the root cause; the next localization step must explain the packed block-input address/image semantics. No tracked RTL or transport fix was applied."
+    },
+    "first_ln1_held_first_response_per_row_probe": {
+      "status": "PARTIAL_MATCH_THEN_REJECTED",
+      "artifact": "/tmp/t4-wide-diagnostic/model-held-first.sv",
+      "change": "Temporary compiler-generated response selection captures the first response at column zero and reuses it for subsequent column accumulations.",
+      "observed": {
+        "first_row_sum_sequence": [17646, 35292, 52938, 70584, 88230, 105876, 123522],
+        "expected_baseline_first_row_sum_sequence": [17646, 35292, 52938, 70584, 88230, 105876, 123522],
+        "phase_boundary_cycle": 22368,
+        "input_row_fnv1a64": 7831381220033479828,
+        "ln1_first_words": [-3119, 1821],
+        "expected_ln1_first_words": [-8268147, -4399900]
+      },
+      "interpretation": "Holding the first response reproduces the archived baseline's first-row accumulation trace, but the complete LayerNorm boundary still mismatches. The response-hold rule is not sufficient as a compiler fix and remains temporary diagnostic evidence only."
+    },
+    "first_ln1_held_accumulation_direct_output_probe": {
+      "status": "HYPOTHESIS_REJECTED",
+      "artifact": "/tmp/t4-wide-diagnostic/model-held-first-direct-output.sv",
+      "change": "Temporary held-first response behavior is retained for mean/variance accumulation, while normalization numerator consumes the direct memory response.",
+      "observed": {
+        "phase_boundary_cycle": 55128,
+        "input_row_fnv1a64": 7831381220033479828,
+        "ln1_first_words": [-3119, 3807583],
+        "expected_ln1_first_words": [-8268147, -4399900],
+        "row0_mean": 17646,
+        "row0_variance": 42950
+      },
+      "interpretation": "Changing only the normalization-output handoff does not restore the authenticated LayerNorm result. The response-hold hypothesis is rejected as the primary fix; the next step is a cycle-aligned baseline/packed trace of the normalization numerator and affine operands."
+    },
+    "first_ln1_global_response_hold_probe": {
+      "status": "PASS_LN1_BOUNDARY",
+      "artifact": "/tmp/t4-wide-diagnostic/model-held-global.sv",
+      "change": "Temporary compiler-generated response register captures only the first block-input response for the complete LayerNorm operation; mean/variance use the held response, while normalization uses the direct memory response.",
+      "observed": {
+        "phase_boundary_cycle": 55583,
+        "input_row_fnv1a64": 7831381220033479828,
+        "mean": 17646,
+        "variance": 42950,
+        "sqrt_root": 207,
+        "ln1_first_words": [-8268147, -4399900, -6720138, -6768899],
+        "expected_ln1_first_words": [-8268147, -4399900, -6720138, -6768899]
+      },
+      "interpretation": "The compiler-generated global response-hold schedule reproduces the authenticated ln_1 output boundary bit-for-bit. This is the first evidence-backed critical-path fix candidate; it remains temporary until emitted by the tracked compiler and validated through the next checkpoint."
+    },
+    "tracked_ln1_global_response_hold_probe": {
+      "status": "INVALID_ROW_SELECTION",
+      "artifact": "/tmp/t4-tracked-response.sv",
+      "compiler_futil_sha256": "0ec9cfb9759d422d206b139ceba389cd7ea7b672c069915a920bf35d88bb9b50",
+      "observed": {
+        "phase_boundary_cycle": 55583,
+        "probed_row_base": 320,
+        "authenticated_row_base": 192,
+        "input_row_fnv1a64": 7831381220033479828,
+        "mean": 17646,
+        "variance": 42950,
+        "sqrt_root": 207,
+        "ln1_first_words": [-8268147, -4399900, -6720138, -6768899]
+      },
+      "interpretation": "This probe inspected row base 320 (the fifth/padded context row) rather than the authenticated final prompt row base 192. It is not evidence for a response-protocol fix and must not be used to justify an RTL change."
+    },
+    "original_compiler_authenticated_ln1_probe": {
+      "status": "PASS_LN1_BOUNDARY",
+      "artifact": "/tmp/t4-original-response.sv",
+      "compiler_futil_sha256": "72bba30e5bff642d81bf295147e7ddb0b95bb6f847661539c9a96f49f0cb9b12",
+      "observed": {
+        "phase_boundary_cycle": 53600,
+        "authenticated_row_base": 192,
+        "input_first_words": [18950, -1272, 6403, -388],
+        "ln1_first_words": [140797, -9292],
+        "expected_input_first_words": [18950, -1272, 6403, -388],
+        "expected_ln1_first_words": [140797, -9292],
+        "mean": 261,
+        "sqrt_root": 7971
+      },
+      "interpretation": "The unmodified compiler-generated RTL reproduces the authenticated final-prompt-row input and ln_1 boundary. The prior response-hold change was withdrawn as a misindexed diagnostic hypothesis; full first-token simulation remains to be rerun with this corrected row selection."
+    },
+    "tracked_q_requant_wire_fix_first_token_probe": {
+      "status": "PASS_FIRST_TOKEN_SIMULATION",
+      "fix": "Connect <prefix>_rounded_product.out to <prefix>_rounded_product_wide.in in the narrow 53-bit requantization path before sign-extending to the 64-bit memory ABI.",
+      "artifact": "/tmp/t4-fixed-response.sv",
+      "compiler_futil_sha256": "a390eb19ba739018ddb1a7f9962db7c119c119a9d543dd9793b2f8cbb60539bd",
+      "generated_sv_sha256": "0536b91ad1ca27f08f5c5325d74370dc1261bd8cd393e4d0baf1c052dd82fc36",
+      "observed": {
+        "first_token": 11,
+        "expected_first_token": 11,
+        "cycles": 85986358,
+        "first_block_output_first_words": [8387, 878, 3025, -5004],
+        "first_q_output_first_words": [-13594, 6489, -8875, -30803],
+        "first_ln1_boundary": "bit_exact"
+      },
+      "interpretation": "The first evidenced divergence was a compiler-generated unconnected sign-extension input, not PCIe or DDR3. Connecting it restores the Q projection, the first transformer-block output, and the complete first-token simulation. This remains a transaction-level semantic simulation only; synthesis, routing, physical DDR3/PCIe ingress, and board inference remain unverified."
+    },
+    "held_block_input_ab_probe": {
+      "method": "temporary harness-only forcing of block_input read_addr=0 before each rising edge; no tracked RTL change",
+      "validity": "REJECTED_AS_CAUSAL_EVIDENCE",
+      "result": {
+        "first_selected_token": 1360,
+        "cycles_to_first_selection": 92679399,
+        "status": "TOKEN_MISMATCH"
+      },
+      "interpretation": "The run selected 1360, but the phase trace did not demonstrate that read_addr forcing changed the effective response stream. Treat this as an instrumentation checkpoint only, not evidence that a global response hold is causal or sufficient."
+    },
+    "first_ln1_only_response_hold_probe": {
+      "method": "temporary harness-only block_input read-address hold for the first row_sum window, then normal reads; no tracked RTL change",
+      "validity": "REJECTED_AS_CAUSAL_EVIDENCE",
+      "result": {
+        "first_selected_token": 13,
+        "cycles_to_first_selection": 92945489,
+        "status": "TOKEN_MISMATCH"
+      },
+      "interpretation": "The result remained 13, but the phase trace showed the effective read stream was unchanged; the harness assignment did not override the synchronous memory state as intended. This is not a valid causal A/B. The observed row-sum response mismatch remains the actionable evidence; a proper transaction-level probe is required before any fix."
+    },
+    "tracked_first_token_response_protocol_probe": {
+      "status": "INVALID_INPUT_CONTEXT",
+      "artifact": "/tmp/t4-tracked-response.sv",
+      "compiler_futil_sha256": "0ec9cfb9759d422d206b139ceba389cd7ea7b672c069915a920bf35d88bb9b50",
+      "harness": "/tmp/t4-wide-diagnostic/fullprobe.cpp",
+      "bounded_cycle_limit": 100000000,
+      "observed": {
+        "first_selected_token": 3909,
+        "expected_first_token": 11,
+        "cycles_to_first_selection": 85983337,
+        "probe_token_index": 0,
+        "authenticated_token_index": 3,
+        "ln1_boundary_passed": true
+      },
+      "interpretation": "The result is not comparable with the authenticated first-token oracle because the diagnostic supplied prompt token index 0 instead of the required final prompt token index 3. The observed first block input corresponded to the index-0 vector. This run is retained only as a harness-contract failure; the corrected index-3 run is required before judging the compiler RTL."
+    }
+  }
+}

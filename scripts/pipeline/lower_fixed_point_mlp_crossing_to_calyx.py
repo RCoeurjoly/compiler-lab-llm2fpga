@@ -1272,24 +1272,30 @@ def _requantize_phase(
     dequantized_q16: str,
     count: int,
     channels: int,
+    narrow_products: bool = False,
 ) -> tuple[list[str], list[str], str]:
     count_width = count.bit_length()
     address_width = (count - 1).bit_length()
     channel_width = (channels - 1).bit_length()
+    # The authenticated reachable-domain certificate bounds every
+    # accumulator*Q8.24-scale product below 2**52.  Keep the diagnostic
+    # default at 64 bits, but use a signed 53-bit post-scale datapath in the
+    # production model and explicitly restore the 64-bit memory ABI.
+    product_width = 53 if narrow_products else 64
     cells = [
         f"{prefix}_entry_counter = std_reg({count_width});",
         f"{prefix}_entry_lt = std_lt({count_width});",
         f"{prefix}_increment_entry = std_add({count_width});",
         f"{prefix}_entry_address = std_slice({count_width}, {address_width});",
         f"{prefix}_channel_address = std_slice({count_width}, {channel_width});",
-        f"{prefix}_real_product = std_smult_pipe(64);",
-        f"{prefix}_product_negative = std_slt(64);",
-        f"{prefix}_product_negate = std_ssub(64);",
-        f"{prefix}_product_abs = std_mux(64);",
-        f"{prefix}_product_bias = std_sadd(64);",
-        f"{prefix}_product_shift = std_rsh(64);",
-        f"{prefix}_rounded_product_negate = std_ssub(64);",
-        f"{prefix}_rounded_product = std_mux(64);",
+        f"{prefix}_real_product = std_smult_pipe({product_width});",
+        f"{prefix}_product_negative = std_slt({product_width});",
+        f"{prefix}_product_negate = std_ssub({product_width});",
+        f"{prefix}_product_abs = std_mux({product_width});",
+        f"{prefix}_product_bias = std_sadd({product_width});",
+        f"{prefix}_product_shift = std_rsh({product_width});",
+        f"{prefix}_rounded_product_negate = std_ssub({product_width});",
+        f"{prefix}_rounded_product = std_mux({product_width});",
         f"{prefix}_real_q16 = std_reg(64);",
         f"{prefix}_bias_add = std_sadd(64);",
         f"{prefix}_post_q16 = std_reg(64);",
@@ -1306,6 +1312,28 @@ def _requantize_phase(
     # The Q/DQ phase owns its own traversal. The rescale phase first populates
     # post_q16 for all entries; the second traversal consumes that hardware memory.
     cells.extend(qdq_cells)
+    if narrow_products:
+        cells.extend([
+            f"{prefix}_rounded_product_wide = std_signext({product_width}, 64);",
+            f"{prefix}_accumulator_product = std_slice(64, {product_width});",
+            f"{prefix}_scale_product = std_slice(64, {product_width});",
+        ])
+        product_left = f"{prefix}_accumulator_product.out"
+        product_right = f"{prefix}_scale_product.out"
+        rounded_product = f"{prefix}_rounded_product_wide.out"
+        input_adapters = (
+            f"      {prefix}_accumulator_product.in = {accumulators}.read_data;\n"
+            f"      {prefix}_scale_product.in = {weight_scales}.read_data;\n"
+        )
+    else:
+        product_left = f"{accumulators}.read_data"
+        product_right = f"{weight_scales}.read_data"
+        rounded_product = f"{prefix}_rounded_product.out"
+        input_adapters = ""
+    multiply_inputs = (
+        f"{input_adapters}      {prefix}_real_product.left = {product_left};\n"
+        f"      {prefix}_real_product.right = {product_right};"
+    )
     wires = [
         f"""{prefix}_entry_address.in = {prefix}_entry_counter.out;
     {prefix}_channel_address.in = {prefix}_entry_counter.out;
@@ -1324,29 +1352,29 @@ def _requantize_phase(
       {prefix}_read_inputs[done] = ({accumulators}.done & {weight_scales}.done & {biases}.done) ? 1'd1;
     }}
     group {prefix}_multiply_real {{
-      {prefix}_real_product.left = {accumulators}.read_data;
-      {prefix}_real_product.right = {weight_scales}.read_data;
+{multiply_inputs}
       {prefix}_real_product.go = 1'd1;
       {prefix}_multiply_real[done] = {prefix}_real_product.done;
     }}
     group {prefix}_round_real {{
       {prefix}_product_negative.left = {prefix}_real_product.out;
-      {prefix}_product_negative.right = 64'd0;
-      {prefix}_product_negate.left = 64'd0;
+      {prefix}_product_negative.right = {product_width}'d0;
+      {prefix}_product_negate.left = {product_width}'d0;
       {prefix}_product_negate.right = {prefix}_real_product.out;
       {prefix}_product_abs.cond = {prefix}_product_negative.out;
       {prefix}_product_abs.tru = {prefix}_product_negate.out;
       {prefix}_product_abs.fal = {prefix}_real_product.out;
       {prefix}_product_bias.left = {prefix}_product_abs.out;
-      {prefix}_product_bias.right = 64'd2147483648;
+      {prefix}_product_bias.right = {product_width}'d2147483648;
       {prefix}_product_shift.left = {prefix}_product_bias.out;
-      {prefix}_product_shift.right = 64'd32;
-      {prefix}_rounded_product_negate.left = 64'd0;
+      {prefix}_product_shift.right = {product_width}'d32;
+      {prefix}_rounded_product_negate.left = {product_width}'d0;
       {prefix}_rounded_product_negate.right = {prefix}_product_shift.out;
       {prefix}_rounded_product.cond = {prefix}_product_negative.out;
       {prefix}_rounded_product.tru = {prefix}_rounded_product_negate.out;
       {prefix}_rounded_product.fal = {prefix}_product_shift.out;
-      {prefix}_real_q16.in = {prefix}_rounded_product.out;
+      {f'{prefix}_rounded_product_wide.in = {prefix}_rounded_product.out;' if narrow_products else ''}
+      {prefix}_real_q16.in = {rounded_product};
       {prefix}_real_q16.write_en = 1'd1;
       {prefix}_round_real[done] = {prefix}_real_q16.done;
     }}

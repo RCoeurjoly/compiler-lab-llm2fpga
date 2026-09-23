@@ -1,0 +1,769 @@
+{
+  "artifacts": {
+    "bitstream": {
+      "bytes": 18735174,
+      "path": "/nix/store/vkphrmb3w5h9yjdc4al3jnr6fp4906gf-compiler-ddr3-trace-replay-bitstream/replay.bit",
+      "sha256": "500e0df3e96b3194b142b79c0b5bec94557ccfa1941d4dbc5afa2c2f6604621d"
+    },
+    "cold_cycle_controller": {
+      "bytes": 8873,
+      "path": "/usr/local/libexec/ypcb_thunderbolt_deferred_auth.py",
+      "sha256": "a188e99a87233e8591c67d9d6f2c82e243004e262253686ade7e018ec8f39095"
+    },
+    "cold_cycle_wrapper": {
+      "bytes": 208,
+      "path": "/usr/local/sbin/ypcb-thunderbolt-cold-cycle",
+      "sha256": "fd5204da90cb9df14efe64421062d2309dcaed08517397b8866ea410d1c0ed0f"
+    },
+    "controller_python": {
+      "bytes": 8020928,
+      "path": "/usr/bin/python3",
+      "sha256": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f"
+    },
+    "image": {
+      "bytes": 4136720,
+      "path": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/image.bin",
+      "sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"
+    },
+    "lifecycle_dependency": {
+      "bytes": 3029,
+      "path": "/usr/local/libexec/ypcb_pcie_power.py",
+      "sha256": "3f6a844bb7c25383ab1c5c574f3b1ef54c740ce3f315b9155804609ef7c2ea25"
+    },
+    "lifecycle_probe": {
+      "bytes": 12404,
+      "path": "/usr/local/libexec/ypcb_pcie_recover.py",
+      "sha256": "25a8e0fb244958e39b4854dcc4f38b2a570d818dbb90f75cc3ea01d8ac9949a6"
+    },
+    "mmio32_library": {
+      "bytes": 15112,
+      "path": "/nix/store/g2v46g8icb0b77g0zsva6s2148945gz4-compiler-ddr3-mmio32-1/lib/libypcb_mmio32.so",
+      "sha256": "b07c207fdccb28ffa777404d7ba3f2f738bd1fdcff4066f708e44e15a97c718a"
+    },
+    "programmer": {
+      "bytes": 4776528,
+      "path": "/nix/store/ddc0dpsyg2aga6ipzx16hxp1r6g8dfbx-openfpgaloader-3ae5e5e-bpi-full-verify/bin/openFPGALoader",
+      "sha256": "e975d7994ff37f82f510b4df7e198e6fb966c4a08ea6a9b0eb037d4d6ee4a37f"
+    },
+    "replay": {
+      "bytes": 262338240,
+      "path": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/compiler-ddr3-trace-replay.bin",
+      "sha256": "46332a3a8d9ebf3a12d2fe968ae4e412200f9d419f3131ae46152dee26ee7d71"
+    },
+    "runner": {
+      "bytes": 51995,
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/scripts/pipeline/run_compiler_ddr3_trace_replay.py",
+      "sha256": "9c2f5592286b81202e5208d52022910c2e70d7456fbdc76eedf05713f276d9ca"
+    },
+    "runtime:.gitignore": {
+      "bytes": 1,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/.gitignore",
+      "sha256": "684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1"
+    },
+    "runtime:.lock": {
+      "bytes": 0,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "runtime:CACHEDIR.TAG": {
+      "bytes": 43,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/CACHEDIR.TAG",
+      "sha256": "5953156d7e0c564a427251316eaf26f8870e6483ae2197f916b630e4f93e31ae"
+    },
+    "runtime:bin/activate": {
+      "bytes": 4082,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/activate",
+      "sha256": "5ecc5f3131d8b76b2132e062da01f3493441a6e42e09f53ad8363d039a0534fd"
+    },
+    "runtime:bin/activate.bat": {
+      "bytes": 2662,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/activate.bat",
+      "sha256": "fca98296bdd4f12b17e16627a7f5affff805ca1c42da62973f9d6fc607fdca88"
+    },
+    "runtime:bin/activate.csh": {
+      "bytes": 2612,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/activate.csh",
+      "sha256": "68df50524981c90159a5d345caf89d41d71639c0a5b94b6a3cd7c4731c1c3ea7"
+    },
+    "runtime:bin/activate.fish": {
+      "bytes": 4323,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/activate.fish",
+      "sha256": "c45fda9dc8f8b1831122ae5fab2129f183fa5e680958468eb199eec8f1667aff"
+    },
+    "runtime:bin/activate.nu": {
+      "bytes": 3938,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/activate.nu",
+      "sha256": "3cb6c7ca7a4cf214d6a7fe873f60cebd5cd57b12910629f7f4fe68d7c0ed6585"
+    },
+    "runtime:bin/activate.ps1": {
+      "bytes": 2765,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/activate.ps1",
+      "sha256": "78e92217a9380caaccc1a7fe0a5623a878b9ed72f515c42f718c06c908742563"
+    },
+    "runtime:bin/activate.xsh": {
+      "bytes": 3867,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/activate.xsh",
+      "sha256": "df312406d0948f4d7aabfda405ebf28b4b59a1099a8d8f16759e15eefff0a910"
+    },
+    "runtime:bin/activate_this.py": {
+      "bytes": 2383,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/activate_this.py",
+      "sha256": "90997a8dd17abebcf4bac8140e8ff6cdc47c65e72a9274936b8a66dab7ddfa06"
+    },
+    "runtime:bin/deactivate.bat": {
+      "bytes": 1730,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/deactivate.bat",
+      "sha256": "13ea86073a9ee43a66e3549312599dd47ff315758b4ca5a0406faf041fb82300"
+    },
+    "runtime:bin/pydoc.bat": {
+      "bytes": 1219,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/pydoc.bat",
+      "sha256": "09f9608d478fa48a9e49af8f413cfeaab47773effd185433088b7688ce75890e"
+    },
+    "runtime:lib/python3.12/site-packages/CHANGELOG.md": {
+      "bytes": 50677,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/CHANGELOG.md",
+      "sha256": "9da47a43edb5d793ed553e8f8d122c0d2b3ff5f2a2bc931c0cfde7e61bde8e9f"
+    },
+    "runtime:lib/python3.12/site-packages/LICENSE": {
+      "bytes": 1078,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/LICENSE",
+      "sha256": "91eb20a3240951a22839870e6dfc1ac6324fbcf686a0ed7bcbce9882080b7f89"
+    },
+    "runtime:lib/python3.12/site-packages/README.md": {
+      "bytes": 3545,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/README.md",
+      "sha256": "82f4010ea32b34558d5d3a2b1bda10641272bf2bddab31cd0df989ba6bafedc8"
+    },
+    "runtime:lib/python3.12/site-packages/__pycache__/_virtualenv.cpython-312.pyc": {
+      "bytes": 4751,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/__pycache__/_virtualenv.cpython-312.pyc",
+      "sha256": "dfd7f9499db20e0b67b95d676996592f3b613d0f00f56aab2a5806bc26eab984"
+    },
+    "runtime:lib/python3.12/site-packages/_virtualenv.pth": {
+      "bytes": 18,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/_virtualenv.pth",
+      "sha256": "69ac3d8f27e679c81b94ab30b3b56e9cd138219b1ba94a1fa3606d5a76a1433d"
+    },
+    "runtime:lib/python3.12/site-packages/_virtualenv.py": {
+      "bytes": 5246,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/_virtualenv.py",
+      "sha256": "cfb3db86aaa53bb62b5ff764970bec2d71c9228590a0ebec57f6ec926cc0bf1a"
+    },
+    "runtime:lib/python3.12/site-packages/tapo-0.9.0.dist-info/INSTALLER": {
+      "bytes": 2,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo-0.9.0.dist-info/INSTALLER",
+      "sha256": "e6184ce10e266134fdcfa401e8f1a95005bcd4f18d16b62b757323e2833fe9a9"
+    },
+    "runtime:lib/python3.12/site-packages/tapo-0.9.0.dist-info/METADATA": {
+      "bytes": 5055,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo-0.9.0.dist-info/METADATA",
+      "sha256": "9eb886a044c6bc1d3fb582af5d36de5895ba90585e32ff7d3d84506551bc0780"
+    },
+    "runtime:lib/python3.12/site-packages/tapo-0.9.0.dist-info/RECORD": {
+      "bytes": 9552,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo-0.9.0.dist-info/RECORD",
+      "sha256": "25736fde3751293bf5348e6d9fe4a5f443b7587b7050a727212051cf286d12cc"
+    },
+    "runtime:lib/python3.12/site-packages/tapo-0.9.0.dist-info/REQUESTED": {
+      "bytes": 0,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo-0.9.0.dist-info/REQUESTED",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "runtime:lib/python3.12/site-packages/tapo-0.9.0.dist-info/WHEEL": {
+      "bytes": 109,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo-0.9.0.dist-info/WHEEL",
+      "sha256": "9746cfa6e8cb2256457b816767b8cb5d99cfac8573b7a5d1bf53e51bc0cc2da9"
+    },
+    "runtime:lib/python3.12/site-packages/tapo-0.9.0.dist-info/licenses/LICENSE": {
+      "bytes": 1078,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo-0.9.0.dist-info/licenses/LICENSE",
+      "sha256": "91eb20a3240951a22839870e6dfc1ac6324fbcf686a0ed7bcbce9882080b7f89"
+    },
+    "runtime:lib/python3.12/site-packages/tapo-0.9.0.dist-info/sboms/tapo-py.cyclonedx.json": {
+      "bytes": 308489,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo-0.9.0.dist-info/sboms/tapo-py.cyclonedx.json",
+      "sha256": "222a8292c64a635f97bc690b5f5bf1c3a949fb61729c18e54358f0851e81c817"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/__init__.py": {
+      "bytes": 100,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/__init__.py",
+      "sha256": "889ba2c2d65e7c4a7a248813f57191296e32b7ac9603458f200cf19eefe46fb5"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/__init__.pyi": {
+      "bytes": 900,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/__init__.pyi",
+      "sha256": "60ff53df4b8e207de529b503aa8c886a33cd5be95041f51ff00ab62573f8f981"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/__pycache__/__init__.cpython-312.pyc": {
+      "bytes": 331,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/__pycache__/__init__.cpython-312.pyc",
+      "sha256": "fbd4ec5fec7be476f98744c1761244436afb0f2cd29f89c0c53f3a6beec16c5b"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/api_client.pyi": {
+      "bytes": 23366,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/api_client.pyi",
+      "sha256": "79c5c0ac5eca73220a524308a95230f540f159d574653b031e4153e895dfdc8f"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/camera_ptz_handler.pyi": {
+      "bytes": 4024,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/camera_ptz_handler.pyi",
+      "sha256": "0e6216e71d4794e4b26586c2d2096dd19f6a479e68a1c83871a86de184e55d5f"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/color_light_handler.pyi": {
+      "bytes": 2942,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/color_light_handler.pyi",
+      "sha256": "493af470ea1e4c2eacaf958d474eee8b845a07aed9824733216e0c9022703b8c"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/debug_ext.pyi": {
+      "bytes": 626,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/debug_ext.pyi",
+      "sha256": "f24935c73aa3c49820bce616031780b8c1cab692761679ba39a2e963207f0ce1"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/device_discovery.pyi": {
+      "bytes": 662,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/device_discovery.pyi",
+      "sha256": "5db68b5290811940ca15c1b30307e526e82e6db510c43d7011090200eb57e9a9"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/device_discovery_raw.pyi": {
+      "bytes": 711,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/device_discovery_raw.pyi",
+      "sha256": "564cc19c51673a70a32c3050f56fcbe973ace3e511d2aaa401a491bd9ff0ec18"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/device_management_ext.pyi": {
+      "bytes": 1324,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/device_management_ext.pyi",
+      "sha256": "d1a94c0a09f7c7341d7ccdd63ef3509fc9c4bbf61a8ae12fc653e7828149353f"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/device_type.pyi": {
+      "bytes": 854,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/device_type.pyi",
+      "sha256": "05cb021f289efa9a457523f23bd763da3da290833f6080246ab2e7ce2de684e5"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/discovery_raw_result.pyi": {
+      "bytes": 311,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/discovery_raw_result.pyi",
+      "sha256": "3769952b9a9d73d2ed22c4ff714aae677021655ef7bf1dca960b9e10601be11f"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/discovery_result.pyi": {
+      "bytes": 8159,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/discovery_result.pyi",
+      "sha256": "887cd5ac4f623a8ec02e5345df5d3b8e4e1b3c775775ec65e747a570569ef42e"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/hub_handler.pyi": {
+      "bytes": 11284,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/hub_handler.pyi",
+      "sha256": "58d1f7888b48275c07d19c7daecbbf25ffea9fda2aada1616f62cb1e753b8864"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/ke100_handler.pyi": {
+      "bytes": 2060,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/ke100_handler.pyi",
+      "sha256": "6dcf45813d1748936203a600d594fc902f82ca0263595f955d2c09ab7bc70f2d"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/light_handler.pyi": {
+      "bytes": 1671,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/light_handler.pyi",
+      "sha256": "07915e847e455e625a838d2337d0bc63e51f2e5f6dbc3004d33cfa921deb2147"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/on_off_ext.pyi": {
+      "bytes": 248,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/on_off_ext.pyi",
+      "sha256": "ff70253ab457d50f6f54534e81713325604fe54e04b69adcdbbd9a8212ce4fe9"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/plug_energy_monitoring_handler.pyi": {
+      "bytes": 3012,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/plug_energy_monitoring_handler.pyi",
+      "sha256": "b0975073a0be5211ec1ac887684d0fcd6ab0ad17962abec99a725074f55df765"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/plug_handler.pyi": {
+      "bytes": 1278,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/plug_handler.pyi",
+      "sha256": "097b58ded3636837eac3e69eeac8061ff4bd085f70332e5abd3ad45929660651"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/power_strip_energy_monitoring_handler.pyi": {
+      "bytes": 3766,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/power_strip_energy_monitoring_handler.pyi",
+      "sha256": "41411b0b4ab01a1b6779795e2d095c79637b51e5c63fb8c0a3b16a854b4f31e9"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/power_strip_handler.pyi": {
+      "bytes": 3598,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/power_strip_handler.pyi",
+      "sha256": "7794e28a9f3fd0ebc9444179f5df2465df12d69134a43a915db062c84a086ab6"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/power_strip_plug_energy_monitoring_handler.pyi": {
+      "bytes": 2842,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/power_strip_plug_energy_monitoring_handler.pyi",
+      "sha256": "cae3380f1777eb06c40d683639bf696f901d1198b9d56e335cfd250c05380a07"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/power_strip_plug_handler.pyi": {
+      "bytes": 935,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/power_strip_plug_handler.pyi",
+      "sha256": "9832119764656aa2d3f10607af8b1b2f4dfcc3661c57c87f8e735a5d261a8a2b"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/refresh_session_ext.pyi": {
+      "bytes": 222,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/refresh_session_ext.pyi",
+      "sha256": "3cc66eac4e4dbe95b77487dfc264940e42a2c8c8563783822617e343b5758b06"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/requests/__init__.py": {
+      "bytes": 0,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/requests/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/requests/__init__.pyi": {
+      "bytes": 236,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/requests/__init__.pyi",
+      "sha256": "42ba9883d5a29b7be0906cc0718760d79abec5a38b33c90558e17a014482b0d2"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/requests/energy_data_interval.pyi": {
+      "bytes": 438,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/requests/energy_data_interval.pyi",
+      "sha256": "773460069fd2d4dc6a402dbc46f453a564a2342a46cb6374b374f5f4ac8854ec"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/requests/play_alarm.pyi": {
+      "bytes": 2333,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/requests/play_alarm.pyi",
+      "sha256": "ee7042c02cf3bac663f3659729e24efc673815bb5b6a90bc7db49554c4457232"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/requests/power_data_interval.pyi": {
+      "bytes": 630,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/requests/power_data_interval.pyi",
+      "sha256": "11adf51c2d5fd9c4ff17c6b843691cf8d32a021d14fa59a1261f63c2c0e8f7b6"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/requests/segment_effect_rule.pyi": {
+      "bytes": 2784,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/requests/segment_effect_rule.pyi",
+      "sha256": "fd4840ac542f565c4f3f77da6cbf56e95e8d65892e8ca61cd289dca0c83268e6"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/requests/set_device_info/__init__.py": {
+      "bytes": 0,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/requests/set_device_info/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/requests/set_device_info/__init__.pyi": {
+      "bytes": 79,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/requests/set_device_info/__init__.pyi",
+      "sha256": "64d3cda6efcecdab2f9f586e74538c6ab91e1524ec80c72a33dee5e8f50d87c8"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/requests/set_device_info/color.pyi": {
+      "bytes": 1402,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/requests/set_device_info/color.pyi",
+      "sha256": "ae2842d92e0eebb367963bb5e13f5bca32ac582b620807ac26f773519438574b"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/requests/set_device_info/color_light.pyi": {
+      "bytes": 2742,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/requests/set_device_info/color_light.pyi",
+      "sha256": "52902f1c723a0586f15f4489e09c8964eff71c436129518ccd699b444ffbe1f6"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/requests/set_device_info/lighting_effect.pyi": {
+      "bytes": 3978,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/requests/set_device_info/lighting_effect.pyi",
+      "sha256": "314888a46e71bf133f9010dd679a02a10fb11f6a865da8cc2ccadcd200179a19"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/__init__.py": {
+      "bytes": 0,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/__init__.pyi": {
+      "bytes": 520,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/__init__.pyi",
+      "sha256": "5bf1b6cf2172f23c15830b94225309e3e85fb9ccc591d18a4741693cf1cf59da"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_component_list_result.pyi": {
+      "bytes": 366,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_component_list_result.pyi",
+      "sha256": "549788efb6e5f32ff7331a63123bfdca3f71891419becc6247ab59f5db49ae63"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/__init__.py": {
+      "bytes": 0,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/__init__.pyi": {
+      "bytes": 299,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/__init__.pyi",
+      "sha256": "0d7d908dc20e2d8e92377f1380708168482045a2f989c0e1c233c078dc0591b6"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/hub_result.pyi": {
+      "bytes": 602,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/hub_result.pyi",
+      "sha256": "56926878783e40d0fa03e6d4dc60b7b05c769f0b8f1471b4094c385db633f2c3"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/ke100_result.pyi": {
+      "bytes": 902,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/ke100_result.pyi",
+      "sha256": "6536c72df16d21e51be71683c3a11159d27e732591a4e86f79aded2fe5002cff"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/other_result.pyi": {
+      "bytes": 208,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/other_result.pyi",
+      "sha256": "8a48786a327dfca9c1669cd7b21512e57db516c45317f4afe1c141b20edb43a4"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/s200_result.pyi": {
+      "bytes": 420,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/s200_result.pyi",
+      "sha256": "f93b6175ddea495e0b1be26a9785f44de0cb1cb858ac490ef309e17da6d75e03"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/s210_result.pyi": {
+      "bytes": 464,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/s210_result.pyi",
+      "sha256": "b996f75f3788f888f7f449f58b4a90e075789ba9e84855550fc133fba3289660"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/status.pyi": {
+      "bytes": 120,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/status.pyi",
+      "sha256": "573b22de9e1af16e766be2f7efba24ceff002e88a5a6d017fa0dac4d87865e0b"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/t100_result.pyi": {
+      "bytes": 442,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/t100_result.pyi",
+      "sha256": "2905b138086142fc4725a8ac8101ed896acac419ff209bbde0cdc49099b6cc56"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/t110_result.pyi": {
+      "bytes": 434,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/t110_result.pyi",
+      "sha256": "b67b101f4eee1c146b2ae5d7a6d992f9c80a35f9878af7889404976ba8b39d21"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/t300_result.pyi": {
+      "bytes": 664,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/t300_result.pyi",
+      "sha256": "f2f8f11326abd0053ebe72d707c637d50ce4a39fc5102ce8e8328daadd0e1393"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/t31x_result.pyi": {
+      "bytes": 2580,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/t31x_result.pyi",
+      "sha256": "2ad3298cf83166d52705aa23b28a644d0bff6e9035f0db7a31fbb61ba84b3577"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/temperature_unit.pyi": {
+      "bytes": 140,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_hub_result/temperature_unit.pyi",
+      "sha256": "9fb0f2e2cd53da33586fefcc4e61fc197392827824a76e28c903b1bfc53c4374"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_power_strip_result/__init__.py": {
+      "bytes": 0,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_power_strip_result/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_power_strip_result/__init__.pyi": {
+      "bytes": 127,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_power_strip_result/__init__.pyi",
+      "sha256": "78300b07be9f844d59e232a8041b6061850bae8b7124b6fb9bcafd5480f9e29a"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_power_strip_result/auto_off_status.pyi": {
+      "bytes": 85,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_power_strip_result/auto_off_status.pyi",
+      "sha256": "ead1557aa751716407a519c9c8bffb8471c73dc8def23730a855916dec1d4641"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_power_strip_result/power_strip_plug_energy_monitoring_result.pyi": {
+      "bytes": 1610,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_power_strip_result/power_strip_plug_energy_monitoring_result.pyi",
+      "sha256": "fe6704e22265161f1f4f1e48d3aa3af087f92d287d3529a20341d795e9850738"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/child_device_list_power_strip_result/power_strip_plug_result.pyi": {
+      "bytes": 1281,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/child_device_list_power_strip_result/power_strip_plug_result.pyi",
+      "sha256": "f8ae7687d786ef1fd7ee9f3ac4af707759b160dd3a694ff456b3ccf0a91edca8"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/component_list_result.pyi": {
+      "bytes": 299,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/component_list_result.pyi",
+      "sha256": "ec193dc0636ce21dfa4c8ca24728fa4c58527c7ef94c6fca619cc7475fbc1f9d"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/current_power_result.pyi": {
+      "bytes": 199,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/current_power_result.pyi",
+      "sha256": "cae7b5b36544f4c3c0ad9a4ed711f45cba21b60cdbb7a35e7126a3db6e2118ac"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/__init__.py": {
+      "bytes": 0,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/__init__.pyi": {
+      "bytes": 441,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/__init__.pyi",
+      "sha256": "6abefc72e4742f4842456332516e01d1d07af634bee0f2ab08c86d11b5341d30"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/basic.pyi": {
+      "bytes": 428,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/basic.pyi",
+      "sha256": "e6a0471938d8791540ab33ac3c4d015cf824e0e70e91db2b2304996910ea0f83"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/camera.pyi": {
+      "bytes": 693,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/camera.pyi",
+      "sha256": "52d13b20da35e62d55ff145c2da02bfe0ea764ef6c6e0ddb6f92d8a5c99060cb"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/color_light.pyi": {
+      "bytes": 1172,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/color_light.pyi",
+      "sha256": "865bbf6a2373de584e2b9f871db141ebbb020a3109da6acc39bb5a7bcbd18816"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/default_plug_state.pyi": {
+      "bytes": 460,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/default_plug_state.pyi",
+      "sha256": "946e431d0e54f29c4a60666bc5aeeb483648e3523b004681fa7665ef92b646c3"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/default_state.pyi": {
+      "bytes": 455,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/default_state.pyi",
+      "sha256": "56ded614ae92f4654fe0723a7b47cdc81fe19fa23f9163e5211919ba90f7c70e"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/device_info_ext.pyi": {
+      "bytes": 569,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/device_info_ext.pyi",
+      "sha256": "ef973b0105711beb10621c795a4e1a318f3e7d5ea083b52a82183344082f82a0"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/hub.pyi": {
+      "bytes": 299,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/hub.pyi",
+      "sha256": "2e9878aab86b0f8226f619c6b22701788c285b0be43b834b9e1f0e4ad60f75bf"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/light.pyi": {
+      "bytes": 861,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/light.pyi",
+      "sha256": "01333b773f3b20e6a2bcf426903c1a84882d0ecfa9184ce2ba6bc3e32534d8e8"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/plug.pyi": {
+      "bytes": 529,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/plug.pyi",
+      "sha256": "eac492c151e62fd839a0deb7efd17004e448a5c98f953a3f0019f5b2a7fdf5e3"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/plug_energy_monitoring.pyi": {
+      "bytes": 995,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/plug_energy_monitoring.pyi",
+      "sha256": "2298cd85bcea8277e1dd24922c9835e9bdad0c2751d80f48d4db8db069ef15e1"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/power_status.pyi": {
+      "bytes": 391,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/power_status.pyi",
+      "sha256": "7c912710fe1941841173c0527c1d6f6a52757e7a93a172c8a537023ab00355aa"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/power_strip.pyi": {
+      "bytes": 245,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/power_strip.pyi",
+      "sha256": "a0be913e3a38583a3d3e23d48ae709ee26af03fdda146adfbaa8dc5d493274cb"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/rgb_light_strip.pyi": {
+      "bytes": 1002,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/rgb_light_strip.pyi",
+      "sha256": "cfbc17774280dcdc495a43d01b891b9fb940636ec9d30202f83dbe2bcb02d109"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_info_result/rgbic_light_strip.pyi": {
+      "bytes": 1146,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_info_result/rgbic_light_strip.pyi",
+      "sha256": "9ca4484326318fb9412b29a628c0a9d1dacae32a1f00418c608a8d704452fdfc"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_usage_energy_monitoring_result.pyi": {
+      "bytes": 463,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_usage_energy_monitoring_result.pyi",
+      "sha256": "c437ae8bbd0b108d7b27befdb59a0d2ee5bcc7fde66049d7b3acddc9ca82f7cc"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/device_usage_result.pyi": {
+      "bytes": 523,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/device_usage_result.pyi",
+      "sha256": "721022935e7b56a399ea77bec84976e8996573da9d60cb7868277f1966bfb73e"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/energy_data_result.pyi": {
+      "bytes": 944,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/energy_data_result.pyi",
+      "sha256": "14e02c9c9269187725b7ad2a0e632fe6d3810727335598df64d8c09f7bd33ebc"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/energy_usage_result.pyi": {
+      "bytes": 1008,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/energy_usage_result.pyi",
+      "sha256": "0d18ff6992d72e0cf7315ef631d33c44ba0d111b926f8bdcfc05dce5707b5f78"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/power_data_result.pyi": {
+      "bytes": 803,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/power_data_result.pyi",
+      "sha256": "426d5587298f0b7287e65b3eae370599c7a2b9dfeef3e4a24047913ca9bf2f27"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/preset.pyi": {
+      "bytes": 411,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/preset.pyi",
+      "sha256": "6605bac67ece6f0e18dba2d36206cfb977510d488086b03e02b8b2cc844ee4af"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/rtsp_stream_url.pyi": {
+      "bytes": 416,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/rtsp_stream_url.pyi",
+      "sha256": "6c2f4c0ef74dc8cebde7f9fa2d835e8bc70fec39ca633d86a03a95e6603ea389"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/responses/snapshot.pyi": {
+      "bytes": 265,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/responses/snapshot.pyi",
+      "sha256": "bba4e05239d12fbcd24e23745092dd29e2c5d7daeec5543198568c07faa8420a"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/rgb_light_strip_handler.pyi": {
+      "bytes": 2836,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/rgb_light_strip_handler.pyi",
+      "sha256": "7ffb228fc6de75d509dde5feb60fd9dd952276e28fe684a42e1a1637e7645360"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/rgbic_light_strip_handler.pyi": {
+      "bytes": 3782,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/rgbic_light_strip_handler.pyi",
+      "sha256": "9897ff7b0841d469166530332ac09fd201e6493176fd2d7200574604c3a92e90"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/s200_handler.pyi": {
+      "bytes": 1975,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/s200_handler.pyi",
+      "sha256": "8de970af9665a677c40b079ffbce1d9fd7fbd7c418cf2ffad6ae0fbbbfb1ebf1"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/s210_handler.pyi": {
+      "bytes": 893,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/s210_handler.pyi",
+      "sha256": "736c52f0f28e9c5a06a639ed9ea3f4fc61db8fbb1f87a2957f7cfbd239f57e08"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/t100_handler.pyi": {
+      "bytes": 1683,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/t100_handler.pyi",
+      "sha256": "8514bb4efb8e115d544a5332b9d83484b32dbdae05be7c1ce86d57be1c0700b8"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/t110_handler.pyi": {
+      "bytes": 1703,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/t110_handler.pyi",
+      "sha256": "46295f9f846b98ec31f7fb81438a78c2763f1aa8ec61a1f793f07ea6c12e66e1"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/t300_handler.pyi": {
+      "bytes": 1697,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/t300_handler.pyi",
+      "sha256": "7489fb05934bb2c5adc46dcdf0656360fa3e48931b419bbbe2b9d8243f941890"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/t31x_handler.pyi": {
+      "bytes": 1108,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/t31x_handler.pyi",
+      "sha256": "a706b3ebf5696627dece90d01fe8fb2cf235e91d0df71adc0d6112b3e33701cf"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/tapo.cpython-312-x86_64-linux-gnu.so": {
+      "bytes": 22142824,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/tapo.cpython-312-x86_64-linux-gnu.so",
+      "sha256": "9f5a5929b3ca2fde91dcd68a76c9ed1a8f3a87fad0d4e99363b7b4de6502c6e8"
+    },
+    "runtime:lib/python3.12/site-packages/tapo/to_dict_ext.pyi": {
+      "bytes": 320,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/lib/python3.12/site-packages/tapo/to_dict_ext.pyi",
+      "sha256": "0836fffa1e862ee407db3e6222143e5cccf35dc7cb3caa44e8b86bca7dff4992"
+    },
+    "runtime:pyvenv.cfg": {
+      "bytes": 113,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/pyvenv.cfg",
+      "sha256": "77549be9376e7102cdb3f26ef54ada1bd9696376a2deb8f615f6c1a55f26c14a"
+    },
+    "runtime_manifest": {
+      "bytes": 2109,
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/artifacts/reference/pcie-runtime-lifecycle-manifest.json",
+      "runtime_tree": {
+        "entries": 123,
+        "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv",
+        "sha256": "48f91b0f5cd7d6fa2e60a319006bb172f00671f600cdce8ab3d18b41aacf4cca"
+      },
+      "sha256": "a2229e97de0ae00afde609799057f37d9401c25398e9f5fdf4b560fdbfe4956d"
+    },
+    "source": {
+      "bytes": 1426,
+      "path": "artifacts/reference/compiler-ddr3-trace-replay-nix-20260923-bitstream-minimal.json",
+      "sha256": "775031aba63f94ae50061e9100385c846d0cfcdcf5c236920770fb94b82f0118"
+    },
+    "tapo_power_script": {
+      "bytes": 8696,
+      "path": "/usr/local/libexec/ypcb_tapo_p115_power.py",
+      "sha256": "db25a6bd8efb0da1a7d2dd02ad1cf8252ea241d07f47a8faf38cdee7b9289548"
+    },
+    "tapo_python": {
+      "bytes": 8020928,
+      "path": "/home/roland/.local/share/ypcb-tapo-runtime/venv/bin/python",
+      "sha256": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f"
+    },
+    "tapo_wrapper": {
+      "bytes": 635,
+      "path": "/usr/local/libexec/ypcb-tapo-cycle",
+      "sha256": "a7d88192a14c9e27e5efd9e73c83375fe53e02b7b77f661bb5faeb678eb96c8f"
+    }
+  },
+  "backend": {
+    "boot_id_before": "265bb206-073e-4921-8b66-5053084a5874",
+    "disk_admission_before_program": {
+      "minimum_free_bytes": 67108864,
+      "observed_free_bytes": {
+        "/home/roland/.local/share/ypcb-tapo-runtime/venv": 21118627840,
+        "artifacts/diagnostics": 21118627840
+      }
+    },
+    "isolate-for-programming": {
+      "argv": [
+        "sudo",
+        "-n",
+        "/usr/local/sbin/ypcb-thunderbolt-isolate-for-programming"
+      ],
+      "bytes": 294,
+      "invoked": true,
+      "log": "artifacts/diagnostics/2026-09-23-compiler-ddr3-trace-replay-nix-hardware-run3.json.isolate-for-programming.log",
+      "log_limit_exceeded": false,
+      "returncode": 0,
+      "sha256": "d6eba87ba7271500c6d646b8728c2ddc721379a1ec37ce562fb6515c72539dcb"
+    },
+    "isolation": {
+      "authorized": "0",
+      "device_name": "Helios 5S",
+      "unique_id": "c4148780-0010-1ed9-ffff-ffffffffffff"
+    },
+    "isolation_transition": {
+      "authorization": "already_deauthorized",
+      "device": "1-1",
+      "device_name": "Helios 5S",
+      "endpoint": "absent",
+      "endpoint_bdf": "0000:42:00.0",
+      "status": "isolated_for_programming",
+      "timestamp": "2026-09-23T10:48:42.131071+02:00",
+      "uuid": "c4148780-0010-1ed9-ffff-ffffffffffff"
+    },
+    "program": {
+      "argv": [
+        "/nix/store/ddc0dpsyg2aga6ipzx16hxp1r6g8dfbx-openfpgaloader-3ae5e5e-bpi-full-verify/bin/openFPGALoader",
+        "-b",
+        "ypcb003381p1",
+        "-c",
+        "digilent_hs3",
+        "--ftdi-serial",
+        "210299BF3824",
+        "--write-flash",
+        "--verify",
+        "/nix/store/vkphrmb3w5h9yjdc4al3jnr6fp4906gf-compiler-ddr3-trace-replay-bitstream/replay.bit"
+      ],
+      "bytes": 183354,
+      "invoked": true,
+      "log": "artifacts/diagnostics/2026-09-23-compiler-ddr3-trace-replay-nix-hardware-run3.json.program.log",
+      "log_limit_exceeded": false,
+      "returncode": 1,
+      "sha256": "8616826d2e765644106562863dc05d9e4d039defdf244dfe224cd031d23c2b65"
+    }
+  },
+  "checkpoint_path": "artifacts/diagnostics/2026-09-23-compiler-ddr3-trace-replay-nix-hardware-run3.json.worker.json.snapshot.json",
+  "elapsed_seconds": 1578.6979744949494,
+  "error": "RuntimeError: BPI write/full verification failed or missing exact completion evidence",
+  "evidence_capacity": {
+    "maximum_receipt_bytes": 262144,
+    "minimum_runtime_headroom_bytes": 67108864,
+    "reserved_bytes": 8388608
+  },
+  "isolation": {
+    "authorized": "0",
+    "device_name": "Helios 5S",
+    "unique_id": "c4148780-0010-1ed9-ffff-ffffffffffff"
+  },
+  "isolation_transition": {
+    "authorization": "already_deauthorized",
+    "device": "1-1",
+    "device_name": "Helios 5S",
+    "endpoint": "absent",
+    "endpoint_bdf": "0000:42:00.0",
+    "status": "isolated_for_programming",
+    "timestamp": "2026-09-23T10:48:42.131071+02:00",
+    "uuid": "c4148780-0010-1ed9-ffff-ffffffffffff"
+  },
+  "schema": "compiler-ddr3-trace-replay-hardware-v1",
+  "scope": "exact compiler-derived DDR3 replay diagnostic; not inference",
+  "stage": "program",
+  "status": "FAIL"
+}

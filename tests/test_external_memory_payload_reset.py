@@ -18,7 +18,7 @@ module miter(input clk, reset, content_en, write_en, ext_req_ready,
   wire av, bv, ad, bd;
   wire [31:0] aa, ba;
   wire [7:0] ar, br;
-  wire [13:0] ast, bst;
+  wire [8:0] ast, bst;
   seq_mem_d1_external #(.WIDTH(8), .SIZE(16), .IDX_SIZE(4),
       .EXT_BASE_ADDR(19)) a(.clk(clk), .reset(reset), .addr0(addr0),
       .content_en(content_en), .write_en(write_en), .write_data(8'b0),
@@ -60,8 +60,8 @@ class PayloadResetEquivalenceTest(unittest.TestCase):
                     "output wire [13:0] proof_state, input wire [63:0] ext_rsp_data",
                 ).replace(
                     "endmodule",
-                    "assign proof_state = {pending, request_queued, response_ready, "
-                    "request_index, response_index, response_byte_offset};\nendmodule",
+                    "assign proof_state = {pending, request_queued, request_index, "
+                    "response_byte_offset};\nendmodule",
                 )
             (path / "miter.sv").write_text(
                 observe_state(em._EXTERNAL_MODULE) + observe_state(reference.read_text()) + MITER)

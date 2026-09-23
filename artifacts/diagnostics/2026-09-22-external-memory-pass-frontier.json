@@ -1,0 +1,477 @@
+{
+  "schema": "tinystories-1m-external-memory-pass-frontier-v1",
+  "status": "SOURCE_WEIGHT_SET_EXTERNALIZATION_PASS_RUNTIME_SET_BLOCKED",
+  "scope": "transaction-level compiler-generated SV experiment; no PCIe, DDR3, synthesis, or hardware claim",
+  "contract": {
+    "model": "TinyStories-1M",
+    "generation_steps": 1,
+    "prompt": [7454, 2402, 257, 640],
+    "expected_first_token": 11,
+    "futil_sha256": "a390eb19ba739018ddb1a7f9962db7c119c119a9d543dd9793b2f8cbb60539bd"
+  },
+  "generated_sv": {
+    "path": "/tmp/t4-corrected-prod/model.sv",
+    "sha256": "06f44384cb6c846152f9e4e1482225143bc8de72f19feefaceb0a046b0788220"
+  },
+  "externalizer_initializer_fix": {
+    "status": "FOCUSED_TEST_PASS",
+    "change": "remove generated $readmemh/$writememh calls with DATA-concatenated paths for selected external memories",
+    "test": "tests.test_externalize_compiler_memory",
+    "tests_passed": 6,
+    "hardware_or_inference_claim": false
+  },
+  "all_declared_memories": {
+    "count": 118,
+    "status": "REJECTED_BY_PASS",
+    "first_unsupported_memory": "block_input_q16_16",
+    "error": "unsupported static external-read schedule for block_input_q16_16"
+  },
+  "authenticated_weight_set": {
+    "count": 65,
+    "status": "PASS_TRANSFORM",
+    "output_sha256": "d6a113a720711ce8ee4408f5d83069a3c38a5e04b9c72c779535e2ec56aad6a1",
+    "output_bytes": 1436050,
+    "selection": "all compiler-declared source memories whose authenticated name contains weight"
+  },
+  "immutable_model_partition": {
+    "status": "PASS_TRANSFORM_AND_IVERILOG_ELABORATION",
+    "memory_count": 87,
+    "output_sha256": "f1e78ec5cc36f6cd69032aa7caf1004b5e6de56b03ec3d67aee2004feec48d38",
+    "output_bytes": 1449026,
+    "elaboration": "Nix-provided iverilog -g2012 -s main",
+    "excluded_static_schedule_memories": ["zero_bias_q16_16", "gelu_lut_q12"],
+    "partition": "authenticated immutable model memories externalized; runtime activation/context memories retained internally"
+  },
+  "behavioral_simulation": {
+    "status": "FAIL_FIRST_EXTERNAL_RESPONSE_DIVERGENCE",
+    "simulator": "Nix-provided Verilator 5.022",
+    "sv_sha256": "a08671749cb2f3dcb0347d1b6a022433d4ac94d65ac4f9550ace4d2b8fda4227",
+    "response_image": "/tmp/t4-narrow2-image2-64.hex",
+    "first_observed_progress_cycle": 1200000,
+    "tool_timestamp": "12440745000",
+    "checkpoint": "v_input_qdq_divide",
+    "left": 518822752000,
+    "right": 0,
+    "diagnostic": "generated primitive assertion: Remainder computed and golden outputs do not match",
+    "interpretation": "The external response image/address packing is not yet proven equivalent to the corrected one-step artifact. This is an integration/data-binding failure at the first external response checkpoint; no accelerator RTL change was made."
+  },
+  "packed_image_retry": {
+    "status": "TIMEBOX_EXPIRED_NO_DIVERGENCE_OBSERVED",
+    "simulator": "Nix-provided Verilator 5.022",
+    "response_image_sha256": "5686f3ebb6f3a4ef82bb63d4d793f5116936ab07b8cd6d496d7ad8e42867cbc2",
+    "response_image_words": 515810,
+    "observed_progress_cycles": 19000000,
+    "timeout_seconds": 120,
+    "first_mismatch": null,
+    "interpretation": "Repacking authenticated source-memory binaries using the proven per-memory base addresses removed the earlier arithmetic assertion through 19 million cycles, but the one-step run did not reach done before the bounded wall time. This is positive localization evidence, not a token-11 pass."
+  },
+  "optimized_long_run": {
+    "status": "TIMEBOX_EXPIRED_NO_DIVERGENCE_OBSERVED",
+    "simulator": "Nix-provided Verilator 5.022, generated C++ -O3",
+    "observed_progress_cycles": 100000000,
+    "last_state": 387,
+    "last_state_meaning": "lm_gemv_read_operands -> static-parallel k loop",
+    "first_mismatch": null,
+    "timeout_seconds": 600,
+    "interpretation": "The exact compiler-generated external-memory simulation reached the LM-head GEMV without a semantic assertion or response mismatch, but the bounded run ended before done. The remaining cost is the full-vocabulary token GEMV under external-memory latency."
+  },
+  "direct_cpp_harness": {
+    "status": "TIMEBOX_EXPIRED",
+    "simulator": "Direct Verilator C++ top-level harness, -O3",
+    "timeout_seconds": 300,
+    "first_mismatch": null,
+    "token": null,
+    "interpretation": "Removing SystemVerilog testbench timing overhead did not complete the full externalized LM-head within 300 seconds. This is a performance/iteration limitation of the current behavioral harness, not evidence of functional success or failure."
+  },
+  "direct_cpp_corrected_response_pipeline": {
+    "status": "TIMEBOX_EXPIRED_NO_DIVERGENCE_OBSERVED",
+    "simulator": "Direct Verilator C++ top-level harness, -O3, one-cycle response pipeline",
+    "model_sv_sha256": "a08671749cb2f3dcb0347d1b6a022433d4ac94d65ac4f9550ace4d2b8fda4227",
+    "observed_progress_cycles": 40000000,
+    "timeout_seconds": 300,
+    "first_mismatch": null,
+    "token": null,
+    "harness_correction": "responses are held for the following cycle after request acceptance; prior direct harness incorrectly cleared the response before the generated external-memory primitive sampled it",
+    "interpretation": "The corrected transaction-level harness now makes sustained progress through the current compiler-generated model without a semantic mismatch, but did not reach token completion within the bounded wall time."
+  },
+  "historical_reference": {
+    "status": "PRIOR_CANDIDATE_PASS_NOT_CURRENT_ARTIFACT",
+    "receipt": "artifacts/diagnostics/2026-09-17-shared-ddr3-simulation/selected-completion-result.json",
+    "token": 11,
+    "requests": 13116912,
+    "generated_accelerator_sha256": "eefbc34e60006e01f7d33b405298d6cea5c3bb122552fa338665b34db5c948cf",
+    "current_generated_futil_sha256": "a390eb19ba739018ddb1a7f9962db7c119c119a9d543dd9793b2f8cbb60539bd",
+    "use": "reference for harness architecture only; not credited to the corrected current compiler artifact"
+  },
+  "shared_arbiter_retry": {
+    "status": "PARTIAL_RUN_NO_ERROR",
+    "architecture": "compiler-generated main -> 87-port shared external-memory arbiter -> fixed-latency 128-bit Wishbone image model",
+    "simulator": "Nix-provided Verilator 5.022, generated C++ -O3",
+    "model_sv_sha256": "a08671749cb2f3dcb0347d1b6a022433d4ac94d65ac4f9550ace4d2b8fda4227",
+    "image_hex_sha256": "6a1ed62412604cf77d36eb34f7022ce299e168928977b178d2be7dfbf435552b",
+    "backend_sha256": "73fff89f00d80a75ffb8de3f670990854b39a6ac5f7ffe22630b07e27c009717",
+    "adapter_sha256": "bf594e2f638c44f6bd9b46237b769a7269e028750f5f79a3db110adf1ac16380",
+    "wrapper_sha256": "103ffcbda9b0090af6700973a419cc5d26df268c5ea417d96a7d59d453087d04",
+    "observed_cycles": 1000000,
+    "accepted_requests": 81344,
+    "responses": 81344,
+    "first_mismatch": null,
+    "token": null,
+    "interpretation": "The proven shared-arbiter topology accepts and returns current-artifact transactions without error. The run was deliberately stopped after the bounded checkpoint because this topology is too slow for full first-token completion in the interactive iteration budget."
+  },
+  "shared_arbiter_no_timing_retry": {
+    "status": "NO_SPEEDUP_OBSERVED",
+    "simulator": "Verilator direct C++ driver without timing engine, -O3",
+    "observed_cycles": 1000000,
+    "accepted_requests": 81344,
+    "responses": 81344,
+    "interpretation": "Removing timing scheduling did not materially improve the one-million-cycle checkpoint; the dominant cost is the generated combinational model/arbiter evaluation. No RTL or arithmetic change was made."
+  },
+  "shared_arbiter_threaded_retry": {
+    "status": "TIMEBOX_EXPIRED_BEFORE_CHECKPOINT",
+    "simulator": "Verilator 5.022 generated C++ with --threads 4, -O3",
+    "wall_time_seconds": 30,
+    "observed_progress": "startup line only; one-million-cycle progress line was not reached",
+    "first_mismatch": null,
+    "interpretation": "Model-level Verilator threading did not improve the bounded interactive run; no RTL, transport, image, or arithmetic change was made."
+  },
+  "production_schedule_external_run": {
+    "status": "TOKEN_MISMATCH",
+    "simulator": "Direct Verilator C++ top-level harness, validated production BRAM/LUTRAM schedule",
+    "model_sv_sha256": "822e901c4758eb615264653c3d2f0e7a06a2adb39b05e1c5292838de6ff09ec7",
+    "image_sha256": "e36f550e19f8b0a56977620cdc87772fa9b91415f51558ce677d62229b832280",
+    "memory_count": 87,
+    "observed_cycles": 106011712,
+    "token": 0,
+    "model_best_token": 640,
+    "token0": 640,
+    "token1": 0,
+    "lm_output_counter": 50257,
+    "first_mismatch": "authenticated first-token argmax",
+    "interpretation": "Using the production two-cycle BRAM/LUTRAM schedule with the corrected non-overlapping width-compacted external image still selects 640. The earlier packed-production boundary probe localizes the first divergence to the packed transformer LayerNorm row accumulation, before LM-head, PCIe, or DDR3."
+  },
+  "exact_passing_baseline_external_run": {
+    "status": "TOKEN_MISMATCH",
+    "simulator": "Direct Verilator C++ top-level harness, exact compiler-generated first-token baseline with immutable memories externalized",
+    "model_sv_sha256": "5d350d8e1e4d46a317f636de9fe80bba0fbc564c39bfe0a37c7630a442fd310b",
+    "image_sha256": "e36f550e19f8b0a56977620cdc87772fa9b91415f51558ce677d62229b832280",
+    "memory_count": 87,
+    "observed_cycles": 99053014,
+    "token": 0,
+    "model_best_token": 640,
+    "token0": 640,
+    "token1": 0,
+    "lm_output_counter": 50257,
+    "first_mismatch": "authenticated first-token argmax",
+    "interpretation": "Externalizing the previously passing compiler-generated baseline still selects 640, so the external-memory transformation or image/address ABI itself changes semantics even without the production two-cycle schedule. The earlier 11-token result remains valid only for the internal-memory baseline. The next comparison must capture the first external read address/data against the corresponding internal-memory read, before any accelerator RTL fix."
+  },
+  "prompt_memory_external_run": {
+    "status": "TOKEN_MISMATCH",
+    "simulator": "Direct Verilator C++ top-level harness, exact baseline with prompt_tokens externalized",
+    "model_sv_sha256": "b6a31d41c1683e30580a46d12c0595415b5ad8a799f104b4aace8c3545f76df8",
+    "image_sha256": "ac77f038ac98341bff0fb820314893b79bec69fcee3dc54debff6d03ef22ac8c",
+    "memory_count": 88,
+    "observed_cycles": 99053014,
+    "token": 0,
+    "model_best_token": 640,
+    "token0": 640,
+    "token1": 0,
+    "lm_output_counter": 50257,
+    "first_mismatch": "authenticated first-token argmax",
+    "interpretation": "Adding prompt_tokens as an external read-only memory did not restore token 11. The omission was real—the generated RTL reads prompt_tokens from memory rather than the prompt ports—but it is not the sole ABI defect. The next gate is a cycle-accurate internal-versus-external read/response trace, beginning with prompt_tokens and the first LayerNorm operands."
+  },
+  "prompt_static_wait_probe": {
+    "status": "REJECTED_DEADLOCK",
+    "change": "temporary gate of fsm_write_en until prompt_tokens_done",
+    "observed": "no ten-million-cycle progress checkpoint within 60 seconds",
+    "interpretation": "Gating the global FSM write enable is not the correct legalization point; it prevents progress rather than merely waiting for the prompt response. No tracked RTL change was made."
+  },
+  "prompt_local_pending_wait_probe": {
+    "status": "TOKEN_MISMATCH",
+    "change": "temporary gate of fsm_write_en only while prompt_tokens external request_queued/pending",
+    "observed": "token=640, model_best_token=640, cycles=99053022",
+    "interpretation": "The local pending-state gate preserves progress but does not restore token 11. It is not an accepted fix; no tracked RTL change was made."
+  },
+  "token_banks_internal_ab": {
+    "status": "TOKEN_MISMATCH",
+    "simulator": "Direct Verilator C++ top-level harness, 38 external memories with all 50 token-weight banks internally preloaded",
+    "model_sv_sha256": "99f837cdb451b362eed5426d0f997ec3dc4e3f9dc27f930f651458215d091b94",
+    "image_sha256": "a00ddc746df5ffeb64f9ad3714692376fe35fee8ab74c9cc99e4c4fb338428e7",
+    "observed_cycles": 98951525,
+    "token": 0,
+    "model_best_token": 640,
+    "token0": 640,
+    "token1": 0,
+    "first_mismatch": "authenticated first-token argmax",
+    "interpretation": "With authenticated token-code and token-scale banks preloaded internally, the result remains 640. Bank externalization is therefore not the sole cause; the mismatch persists in the shared external read/response behavior of the other model memories."
+  },
+  "embedding_only_external_ab": {
+    "status": "TOKEN_MISMATCH",
+    "simulator": "Direct Verilator C++ top-level harness, prompt and positional embedding memories externalized; all other authenticated memories internally preloaded",
+    "model_sv_sha256": "c2e0c420c3a613627cea29c06dff94644a9470d5713c53baafa153745506736d",
+    "image_sha256": "d7cfbaad9391bd92177918192dbc4a973267943a140ebb8043bd1a2ecad8f213",
+    "memory_count": 3,
+    "observed_cycles": 85987559,
+    "token": 0,
+    "model_best_token": 640,
+    "token0": 640,
+    "token1": 0,
+    "first_mismatch": "authenticated first-token argmax",
+    "interpretation": "Externalizing only prompt_tokens, position_weight_codes_i8, and position_weight_scale_q8_24 still selects 640. The mismatch is not caused solely by the earliest embedding memories; the shared external read/response interaction remains the active boundary."
+  },
+  "prompt_only_binding_trace": {
+    "status": "INVALID_STALE_ARTIFACT",
+    "simulator": "Bounded direct Verilator C++ trace accidentally run against a stale temporary SV filename",
+    "model_sv_sha256": "9bb92cba57116e877814523bcb540b965e7ba1889bafcc6bcbdfd465ebb1122e",
+    "image_sha256": "99b074c24bc3b60bdc5bb0ece4160bfc6a0c9774923741b01ca5ed0568aa039f",
+    "trace_sha256": "889a6fff7716cee254a1087836c06f948749c514ec82b064302edd6eee17e39f",
+    "requested_memory": "prompt_tokens",
+    "actual_external_instance": "q_weight_codes_i8 in stale model.external-1.sv",
+    "observed": "The inspected stale file did not correspond to the fixed1p generator output; it must not be used as evidence about the externalizer.",
+    "interpretation": "Superseded by the correctly generated prompt-only trace below.",
+    "next_action": "Use model.fixed1p-external.sv and its matching image for the diagnostic."
+  },
+  "prompt_only_correct_trace": {
+    "status": "TRACE_TIMEOUT_AFTER_FOUR_READS",
+    "simulator": "Bounded direct Verilator C++ trace of model.fixed1p-external.sv",
+    "model_sv_sha256": "3674fd684d3bd5d7b179bf9920897fd5321bc42724c79039fdc80602e2dec5a8",
+    "image_sha256": "99b074c24bc3b60bdc5bb0ece4160bfc6a0c9774923741b01ca5ed0568aa039f",
+    "trace_sha256": "e91373c924615453ffbfadb4c817a6abcee664f8a0341e3cd3061d058c929de5",
+    "external_instance": "prompt_tokens",
+    "observed_requests": [
+      {"cycle": 36, "address": 0, "response_data": "0x0280010109621d1e"},
+      {"cycle": 41, "address": 2, "response_data": "0x000280010109621d"},
+      {"cycle": 46, "address": 4, "response_data": "0x0000000002800101"},
+      {"cycle": 51, "address": 6, "response_data": "0x0000000000000280"}
+    ],
+    "observed_cycles": 2000001,
+    "interpretation": "The corrected name binding emits the expected 2-byte prompt addresses and image data, but the generated design makes no fifth request and never completes within the bounded run. The first localized failure is now the prompt static-read completion/scheduler handshake, before model arithmetic or DDR3.",
+    "next_action": "Compare prompt_tokens_done, response_valid, fsm_write_en, and the static wait state cycle-by-cycle against the internal baseline; fix only the evidenced completion handshake."
+  },
+  "prompt_static_completion_fix_probe": {
+    "status": "TIMEOUT_AFTER_FOUR_READS",
+    "model_sv_sha256": "1b683ab58591414c6a35bcb1a7c00b5f1ffd7426daf14a05d872163acb045d2d",
+    "trace_sha256": "f939b1d9c4eec190643e716452811818c01d7542010fea74194b29f6d967b0a2",
+    "change": "Guard-alias resolution plus prompt_tokens_done wired to early_reset_static_seq0_done_in",
+    "observed_cycles": 2000001,
+    "observed_requests": 4,
+    "interpretation": "The external prompt completion pulse is visible, but the full generated FSM still stops after the fourth read. The single completion-input repair is insufficient; the next trace must include the global FSM write-enable cone and all wrapper/early-reset completion inputs at the first stall.",
+    "accepted": false
+  },
+  "prompt_first_fsm_stall_trace": {
+    "status": "FSM_GUARD_CONE_STALL",
+    "trace_sha256": "01a313488f5dd80d7fa5bc68cfda0c5ba7cdeb32595ed40c39bf18f8dbc8dcca",
+    "observed": "prompt_tokens_done pulses at cycles 37, 42, 47, and 52; fsm_out advances through 0..4 through cycle 72; early_reset_static_seq0_done_out pulses with each response; g1570 and fsm_write_en drop to zero at cycle 73 and remain zero; ud3_out remains zero. At the first post-read boundary, every late static go output in the g1570 chain (seq52/53/54, par16, seq56/57/58/59/60/61, par19, seq65/68/69, par21, seq72/73) is zero.",
+    "interpretation": "The prompt response itself is accepted, but the generated top-level FSM loses its active go cone immediately after the fourth read. This is a compiler-generated control-cone stall, not an external payload mismatch.",
+    "next_action": "Trace the earlier model-step/outer-wrapper go and done outputs that feed the g1570 chain at cycles 72/73 and compare them with the internal-memory baseline before adding any further legalization."
+  },
+  "prompt_state1_hold_probe": {
+    "status": "TRACE_TIMEOUT_AFTER_FOUR_READS",
+    "model_sv_sha256": "9561c446e67d62547641ee901755dcd1c642d232ea1aed5fbef38ec5c5f93475",
+    "trace_sha256": "abadaf2c4c740831445bcbea4917bd1119f2f7da2fb7075811d847026d962542",
+    "change": "Hold the audited prompt static read window at fsm_out == 1 until prompt_tokens_done",
+    "observed_requests": [{"cycle": 36, "address": 0}, {"cycle": 44, "address": 2}, {"cycle": 52, "address": 4}, {"cycle": 60, "address": 6}],
+    "observed_cycles": 2000001,
+    "interpretation": "The state-1 hold changes request spacing and preserves all four prompt responses, but the top-level FSM still fails to enter the next computation phase. This is not an accepted fix; the post-prompt outer control transition remains the blocker.",
+    "accepted": false
+  },
+  "prompt_state2_hold_probe": {
+    "status": "TRACE_TIMEOUT_AFTER_FOUR_READS",
+    "model_sv_sha256": "710c2bcd67b3b5f017c88345af17fb5214ad16c4906cca61d6dfa3e95e1fe937",
+    "trace_sha256": "eba2798ae3e891e5f0f2c24718397a1cf7c9501c5a9663e3a6edffb20d9caacd",
+    "change": "Hold fsm_out == 2 until prompt_tokens_done, without requiring prompt_tokens_content_en",
+    "observed_requests": [{"cycle": 36, "address": 0}, {"cycle": 43, "address": 2}, {"cycle": 50, "address": 4}, {"cycle": 57, "address": 6}],
+    "observed_cycles": 2000001,
+    "interpretation": "The response wait is now placed at the generated completion state and changes request spacing, but the outer FSM still does not enter the next computation phase. The completion transition requires a broader generated control-path trace; this pass change is not accepted.",
+    "accepted": false
+  },
+  "prompt_same_cycle_response_probe": {
+    "status": "TRACE_TIMEOUT_AFTER_ONE_READ",
+    "trace_sha256": "b21e57ab5000ba4cfe0faeb51e411f131bcdfb888e9f59bb36c852ec44933213",
+    "change": "Harness-only response presented on the request's rising edge",
+    "observed_cycles": 2000001,
+    "observed_requests": 1,
+    "interpretation": "The external primitive requires a distinct request-acceptance cycle before a response; same-cycle response is invalid and is not an RTL fix.",
+    "accepted": false
+  },
+  "single_q_weight_external_progress_probe": {
+    "status": "PROGRESS_NO_TOKEN_WITHIN_BOUND",
+    "model_sv_sha256": "2bff7bf7fb2b8d2b01c73243b9ec26da16be802851c5b955430c39a26821492b",
+    "image_sha256": "6278292370dbac4c7036996ff4996137aeaea115a210b13b4501c8557a661ac3",
+    "trace_sha256": "20197c08b1608fa4d737a25b3b7e72c0afec97a97678a9ea3cf7f7f5769a1e17",
+    "external_memory": "q_weight_codes_i8",
+    "observed_cycles": 2000001,
+    "observed_requests": 64,
+    "interpretation": "With prompt_tokens internal and only q_weight_codes_i8 external, the generated design progresses through the weight-read sequence rather than stalling after prompt initialization. It does not establish first-token success within the short bound, but isolates the prompt static-memory legalization as the earlier blocker.",
+    "accepted": false
+  },
+  "single_q_weight_external_long_probe": {
+    "status": "NO_TOKEN_WITHIN_10M_CYCLES",
+    "model_sv_sha256": "2bff7bf7fb2b8d2b01c73243b9ec26da16be802851c5b955430c39a26821492",
+    "image_sha256": "6278292370dbac4c7036996ff4996137aeaea115a210b13b4501c8557a661ac3",
+    "trace_sha256": "3a5bca9a47432f0a38f7840615168df2883f9aa765ccae317b3bb7e6582ce12e",
+    "external_memory": "q_weight_codes_i8",
+    "observed_cycles": 10000000,
+    "observed_requests": 64,
+    "interpretation": "The q-weight-only externalization continues past the prompt phase and reaches the bounded 10M-cycle progress marker, but no token is produced. This confirms that prompt externalization is an earlier control-path blocker; it does not yet validate the complete external-memory schedule or first-token arithmetic.",
+    "accepted": false
+  },
+  "internal_control_baseline": {
+    "status": "BASELINE_CAPTURED",
+    "simulator": "Existing compiler-generated BRAM Verilator model",
+    "trace_sha256": "35da875737868571a2dceb69dbdca57188608c9c64ea07360e5e755a83fa9b1f",
+    "observed": "comb_reg59_out falls from 1 to 0 at cycle 47; while_wrapper_early_reset_static_seq0_done_in is asserted; fsm_write_en remains disabled while the outer model-step completion propagates.",
+    "interpretation": "The internal baseline inserts a post-prompt completion phase before model computation. This is the reference control behavior for externalization.",
+    "accepted": true
+  },
+  "prompt_wait_state3_probe": {
+    "status": "TRACE_TIMEOUT_AFTER_TWO_READS",
+    "model_sv_sha256": "149bd52716bc2a74a47a0b05fff90b515776d7d3ce8a9aec1be18b04b7f1c673",
+    "trace_sha256": "d5d400349e5b1731515ebb5e8ba93d932964b5fd93244b66fae4852e2920346e",
+    "observed_requests": [{"cycle": 36, "address": 0}, {"cycle": 42, "address": 4}],
+    "observed_cycles": 2000001,
+    "interpretation": "Holding the generated FSM at state 3 until a response is visible prevents the required prompt sequence from issuing all four reads; this schedule is rejected.",
+    "accepted": false
+  },
+  "prompt_wait_state4_probe": {
+    "status": "TRACE_TIMEOUT_AFTER_FOUR_READS",
+    "model_sv_sha256": "92cdae613bea482eaa50a74d4838855409c6a244db4d4863d01a9ad834ff1ec3",
+    "trace_sha256": "d27525b86ed31512e61d741cca486cb3a24ea99ffb3f858d964e979f06b66e35",
+    "observed_requests": [{"cycle": 36, "address": 0}, {"cycle": 41, "address": 2}, {"cycle": 46, "address": 4}, {"cycle": 51, "address": 6}],
+    "observed_cycles": 2000001,
+    "interpretation": "Holding state 4 preserves all four requests but leaves the FSM waiting at state 4 because comb_reg59_out never reaches the internal baseline's post-prompt zero; changing only the wait state is insufficient.",
+    "accepted": false
+  },
+  "prompt_terminal_wrapper_done_probe": {
+    "status": "TRACE_TIMEOUT_AFTER_FOUR_READS",
+    "model_sv_sha256": "710c2bcd67b3b5f017c88345af17fb5214ad16c4906cca61d6dfa3e95e1fe937",
+    "trace_sha256": "081c097dab9c71624145231315521038c489a815e15c8fc3697e7387fc36f881",
+    "observed_requests": [{"cycle": 36, "address": 0}, {"cycle": 43, "address": 2}, {"cycle": 50, "address": 4}, {"cycle": 57, "address": 6}],
+    "interpretation": "A prompt-last-address wrapper-done override does not repair the scheduler; the FSM remains held at state 2. This speculative terminal shortcut is rejected.",
+    "accepted": false
+  },
+  "prompt_hold_guard_control_probe": {
+    "status": "TRACE_TIMEOUT_AFTER_MODEL_STEP_HANDSHAKE",
+    "model_sv_sha256": "21b35c621b5ec61b7c5e373593b41b1043d5fc7650f818fb0461dd8455ee687d",
+    "trace_sha256": "c73a9421bb4ca42401cf91d3d58fa04432e86e8714a4fc062ad0cf5739f424a4",
+    "observed": "Four prompt reads complete; model_row reaches 8; comb_reg59 falls to 0 and wrapper completion asserts at cycle 77; model_step writes at cycle 78 and reports done at cycle 79. The static-sequence go cone then remains low while the outer FSM re-arms only in periodic 0→1→2→3 loops (first at cycle 101); no next model-step write occurs before the bounded 2,000,001-cycle timeout.",
+    "interpretation": "The content-enable hold repairs the first prompt completion boundary, but the next generated outer-wrapper transition is also latency-sensitive and its static-sequence go dependency is not restored. This is the next evidenced control boundary; no full external-memory fix is claimed.",
+    "accepted": false
+  },
+  "prompt_hold_guard_20m_probe": {
+    "status": "NO_TOKEN_WITHIN_20M_CYCLES",
+    "model_sv_sha256": "21b35c621b5ec61b7c5e373593b41b1043d5fc7650f818fb0461dd8455ee687d",
+    "trace_sha256": "48035e54cbdd7f82ee3d5fcf34948314dc62aa1b5a8c24ce060a5b7a68f17130",
+    "observed_cycles": 20000001,
+    "observed_requests": 4,
+    "interpretation": "Extending the repaired prompt/control diagnostic from 2M to 20M cycles produces no token and no additional external request. The longer bound rules out a merely short timeout; the generated outer control path is genuinely not reaching computation completion.",
+    "accepted": false
+  },
+  "prompt_completion_pulse_probe": {
+    "status": "ABORTED_NO_TOKEN",
+    "model_sv_sha256": "b36c4ef8b171538b03a37cd6a13885cd49c34daf01c0b1a1dec35e8c1657c854",
+    "trace_sha256": "ef31563864abc03332e173c6c303048f6db10d07a45dc5c58f0fbb27c34da579",
+    "observed_requests": [{"cycle": 36, "address": 0}, {"cycle": 42, "address": 2}, {"cycle": 48, "address": 4}, {"cycle": 54, "address": 6}],
+    "change": "Diagnostic one-cycle pulse on the falling edge of comb_reg59 for while_wrapper_early_reset_static_seq0_done_in",
+    "interpretation": "The pulse candidate preserves all four prompt reads but the bounded harness aborts before producing a token; it is not accepted as an RTL/pass fix without a reproducible terminal trace.",
+    "accepted": false
+  },
+  "prompt_completion_pulse_runtime_probe": {
+    "status": "TRACE_TIMEOUT_AFTER_PROMPT",
+    "model_sv_sha256": "b36c4ef8b171538b03a37cd6a13885cd49c34daf01c0b1a1dec35e8c1657c854",
+    "trace_sha256": "e65476a7e1d31fb894c9cec3172711e73a9107bce31ef5215a755c0834333a24",
+    "observed": "With q_weight_codes_i8 restored in the harness preload, the corrected pulse candidate emits the four prompt reads at cycles 36, 42, 48, and 54, continues through the post-completion control path, and reaches the 20,000,001-cycle bound without producing a token.",
+    "observed_cycles": 20000001,
+    "observed_requests": 4,
+    "interpretation": "The earlier apparent termination was simulator cost, not a crash. This is now a valid negative result: the pulse candidate repairs prompt completion sufficiently to issue all four reads, but the generated post-prompt control/data path still does not reach first-token completion. It is rejected as an accelerator fix until the first post-prompt divergence is localized.",
+    "accepted": false
+  },
+  "post_prompt_control_divergence": {
+    "status": "FIRST_DIVERGENCE_LOCALIZED",
+    "external_control_trace_sha256": "d45a29ac4ab61b8b25330a2bf720346f23fef4e0f17b2b4c8120e609a6443f28",
+    "internal_control_trace_sha256": "b4088363ad41fb19087caac5dbe5b4c9458b33075aec119a947ffef30773b7c4",
+    "observed": "The internal BRAM baseline has comb_reg59=0 from cycle 85 onward after the model-step completion. The external pulse trace returns comb_reg59=1 at cycle 85; model_step remains 0, while wrapper_step_done pulses at cycles 93, 97, 101, ... and no external request follows the four prompt reads.",
+    "interpretation": "The earliest evidenced post-prompt divergence is the generated static-sequence/completion re-arm boundary, before q-weight address generation or accelerator arithmetic. This points to a missing/incorrect latency adaptation in the externalized static schedule, not a PCIe or DDR response-data mismatch.",
+    "accepted": true
+  },
+  "post_prompt_arithmetic_assertion": {
+    "status": "DOWNSTREAM_INVALID_DATA",
+    "model_sv_sha256": "b36c4ef8b171538b03a37cd6a13885cd49c34daf01c0b1a1dec35e8c1657c854",
+    "observed": "A shorter pulse-candidate run reaches normalize_divide with divisor zero and triggers the generated Verilator self-check (left=22198784, right=0, computed remainder=22198784).",
+    "interpretation": "This is downstream of the already-localized post-prompt control divergence and is not evidence of a fixed-point arithmetic defect. It confirms that the candidate must not be accepted or taken to hardware until the generated schedule supplies valid operands.",
+    "accepted": false
+  },
+  "post_prompt_row01_suppression_probe": {
+    "status": "REJECTED_NO_TOKEN",
+    "model_sv_sha256": "697db58841feea83d5e8b2f360acf6a3a15601a0be52783168c1a470aca4216d",
+    "trace_sha256": "e65476a7e1d31fb894c9cec3172711e73a9107bce31ef5215a755c0834333a24",
+    "observed_cycles": 20000001,
+    "observed_requests": 4,
+    "change": "Temporary generated-source suppression of the first post-prompt model_row condition-01 go pulse, selected from the BRAM-vs-external control divergence.",
+    "interpretation": "The probe still times out after four prompt reads with no token. Suppressing that single row re-arm does not restore the complete schedule; the control adaptation must preserve the generated wrapper/early-reset handshake rather than mask one write.",
+    "accepted": false
+  },
+  "nested_fsm0_prompt_stall_probe": {
+    "status": "REJECTED_NO_TOKEN",
+    "model_sv_sha256": "e908dcdcafaa5b442721657ac71fb87014f4f1f76946447c57c44d7a6fba0a6b",
+    "trace_sha256": "e65476a7e1d31fb894c9cec3172711e73a9107bce31ef5215a755c0834333a24",
+    "observed_cycles": 20000001,
+    "observed_requests": 4,
+    "change": "Temporary generated-source gate on fsm0_write_en while the external prompt read is pending; fsm0 is the nested controller containing the prompt/model-row schedule.",
+    "interpretation": "Gating the nested controller alone does not restore first-token progress. The latency adaptation must preserve the complete generated wrapper handshake and cannot be reduced to a single outer- or inner-FSM write-enable gate.",
+    "accepted": false
+  },
+  "request_accepted_prompt_wait_probe": {
+    "status": "REJECTED_NO_TOKEN",
+    "model_sv_sha256": "a4a7c66f69cb8c86a569b67cdb609fbdf55be040fd82f628d33bf1050be35116",
+    "trace_sha256": "ded305499484fa805b01ea5ce856dc879b9ee1d1fc8434cebe99b7c8b5af303a",
+    "observed_cycles": 20000001,
+    "observed_requests": 4,
+    "observed_request_cycles": [36, 44, 52, 60],
+    "change": "Temporary request-valid latch held the outer and nested generated controllers until prompt_tokens_done, covering the interval where content_en had already dropped.",
+    "interpretation": "This fixes the previously uncovered pending interval and changes prompt spacing from six to eight cycles, but still does not reach first-token completion. The remaining divergence is downstream of request acceptance and requires the complete generated wrapper handshake, not only a memory-wait latch.",
+    "accepted": false
+  },
+  "level_done_request_wait_probe": {
+    "status": "REJECTED_NO_TOKEN",
+    "model_sv_sha256": "d13cfa879a6a3c0072b05b61aeba445f5879088aef1f5a1c4f7517c5771f9739",
+    "trace_sha256": "ded305499484fa805b01ea5ce856dc879b9ee1d1fc8434cebe99b7c8b5af303a",
+    "observed_cycles": 20000001,
+    "observed_requests": 4,
+    "observed_request_cycles": [36, 44, 52, 60],
+    "change": "The request-valid pending latch was tested with the original level-completion candidate rather than the falling-edge pulse candidate.",
+    "interpretation": "The same eight-cycle prompt spacing and no-token result occur with level completion. The edge-vs-level completion choice is not the remaining blocker; the generated invocation/loop contract must be lowered elastically.",
+    "accepted": false
+  },
+  "delayed_external_done_probe": {
+    "status": "REJECTED_NO_TOKEN",
+    "model_sv_sha256": "8a1deed9f066f13562344a5288aa448f553d0315c46a6b6fe1a483cbb76b8d6a",
+    "trace_sha256": "24ce2c5078b339c33b1ca3d63d158109b05daaecc32763d05b6a67e9ddafce7d",
+    "observed_cycles": 20000001,
+    "observed_requests": 4,
+    "observed_request_cycles": [36, 42, 48, 54],
+    "change": "Temporary external-memory primitive delayed done by one cycle after read_data capture, matching seq_mem_d1_bram's nominal data-before-done relationship.",
+    "interpretation": "The one-cycle data/done alignment change does not restore first-token progress. The remaining fault is in the generated invocation/loop control contract, not simply response edge alignment.",
+    "accepted": false
+  },
+  "deferred_window_done_probe": {
+    "status": "REJECTED_REQUEST_ORDER",
+    "model_sv_sha256": "9973d132968b4ffa0de1776cd0fc23973846727b47571d9c373da24fb967e92d",
+    "trace_sha256": "b9b376f44d8b139db2c2928476084228647e00a220598c9cda5f6fa257d3b25f",
+    "observed_request_prefix": [{"cycle": 36, "address": 0}, {"cycle": 47, "address": 4}],
+    "change": "Temporary external primitive retained response data and deferred done until content_en re-entered.",
+    "interpretation": "The generated schedule advances its address state while the read window is closed; deferring completion without an explicit request/address hold skips address 2. This rejects the adapter and confirms that completion, address progression, and content-window control must be lowered as one elastic operation.",
+    "accepted": false
+  },
+  "elastic_prompt_combined_probe": {
+    "status": "REJECTED_DEADLOCK_AFTER_FIRST_REQUEST",
+    "model_sv_sha256": "79f18a23030c7a184ad2b6a1c6a45cfb57ce610ed2ff4df01153594ba1bf7334",
+    "trace_sha256": "493c858c50752c8bc37d1161db7ac3d8497125bfd79062905513cadf8da00165",
+    "observed_request_prefix": [{"cycle": 36, "address": 0}],
+    "change": "Combined request-valid controller stall with response retention/deferred completion.",
+    "interpretation": "The combined adapter deadlocks after the first request because stalling the generated controllers prevents the content window from reopening, which is required to consume deferred completion. This confirms that the solution must be a generated elastic invoke/return protocol, not mutually gated memory and controller shims.",
+    "accepted": false
+  },
+  "interpretation": "The existing post-backend pass can transform immutable memories and can issue correct external prompt requests, but it cannot safely retrofit variable latency onto the already-scheduled static Calyx invocation. Completion, address progression, and content-window control are coupled: independent done delays, request latches, FSM gates, and response retention each either preserve the wrong schedule, skip an address, or deadlock. No speculative RTL fix or hardware claim follows from these probes.",
+  "next_gate": "Introduce an explicit elastic memory operation before Calyx scheduling (or an equivalent compiler-owned invoke/return component) for the exact prompt/read contract. Its go/done protocol must own address hold, one response per accepted request, stable returned data, and loop progression. Re-run the four-row fixture first, then the exact TinyStories prompt trace; do not continue post-generated-SV shims."
+}

@@ -326,7 +326,7 @@ def _block_phases(block, attention, mlp, *, narrow_products: bool = False, rows:
         if qdq:
             phases.append(mlp._activation_qdq_phase(f"{prefix}_input_qdq", source, f"{prefix}_input_scale_q8_24", f"{prefix}_input_codes_i8", f"{prefix}_input_q16_16", rows * inputs, inputs, narrow_products=narrow_products))
         phases.append(mlp._gemv_phase(f"{prefix}_gemv", f"{prefix}_input_codes_i8", f"{prefix}_input_scale_q8_24", f"{prefix}_weight_codes_i8", f"{prefix}_accumulator_i64", rows, inputs, outputs, narrow_products=narrow_products))
-        phases.append(mlp._requantize_phase(f"{prefix}_requant", f"{prefix}_accumulator_i64", f"{prefix}_weight_scale_q8_24", bias, f"{prefix}_output_scale_q8_24", f"{prefix}_post_weight_rescale_bias_q16_16", f"{prefix}_output_codes_i8", f"{prefix}_output_q16_16", rows * outputs, outputs))
+        phases.append(mlp._requantize_phase(f"{prefix}_requant", f"{prefix}_accumulator_i64", f"{prefix}_weight_scale_q8_24", bias, f"{prefix}_output_scale_q8_24", f"{prefix}_post_weight_rescale_bias_q16_16", f"{prefix}_output_codes_i8", f"{prefix}_output_q16_16", rows * outputs, outputs, narrow_products=narrow_products))
     for prefix in ("q", "k", "v"):
         projection(prefix, "ln1_output_q16_16", 64, 64, "zero_bias_q16_16")
     phases.append(loop_geometry(attention._initialize_causal_slots_phase(), "causal_zero_counter", "causal_zero_lt", "causal_zero_increment", "causal_zero_address", rows * rows * 16))
@@ -1164,7 +1164,11 @@ import "primitives/memories/seq.futil";
                 "k_output_codes_i8": "q_input_codes_i8",
                 "v_output_codes_i8": "q_input_codes_i8",
                 "out_output_codes_i8": "q_input_codes_i8",
-                "lm_input_codes_i8": "q_input_codes_i8",
+                # Keep the LM-head input codes separate.  The LM Q/DQ phase
+                # consumes final_output_q16_16 after the last transformer
+                # block; unlike the serial projection buffers above, it is
+                # live across the LM-head handoff.  Reusing q_input_codes_i8
+                # changes the observed LM boundary before the first token.
                 "c_proj_output_codes_i8": "c_fc_input_codes_i8",
                 "c_proj_input_codes_i8": "c_fc_output_codes_i8",
                 # GELU has consumed c_fc_output_q16_16 before the c_proj

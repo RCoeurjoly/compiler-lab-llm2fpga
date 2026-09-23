@@ -1,0 +1,39 @@
+{
+  "schema": "compiler-ddr3-backend-pipeline-smoke-v1",
+  "status": "PASS_BOUNDED_INTERFACE_SMOKE",
+  "scope": "Exact regenerated compiler TinyStories-1M main through the 240-port external-memory arbiter and registered Wishbone stage",
+  "does_not_claim": [
+    "first-token result",
+    "PCIe ingress",
+    "physical DDR3",
+    "timing closure",
+    "board inference"
+  ],
+  "inputs": {
+    "generated_external_sv": "/tmp/t4-known-good/dynamic/model.dynamic.external.regenerated.sv",
+    "generated_external_sv_sha256": "373ae31e6b3843ea0cb82614bcdbc7321aa4dbc5388831341dceef0a46dd9ab9",
+    "backend_rtl_sha256": "dea1b57c3b746e5a6f79e12594481001fd697ba8e8e82c1ba2ceff62cdf21978",
+    "arbiter_rtl_sha256": "f8e42248a165fd053c28a2860879863ae64daa82275cf1e90ee7ad00895bac9e",
+    "wishbone_pipeline_rtl_sha256": "a0aff73e855fe17553740fada030ace7c1b1198dc63757dcbb6cca706299c508",
+    "prompt": [7454, 2402, 257, 640]
+  },
+  "tool": {
+    "verilator": "5.022",
+    "mode": "--binary --timing -Wno-fatal -j 4"
+  },
+  "stimulus": {
+    "reset_cycles": 20,
+    "start_protocol": "start held high; valid asserted four cycles later",
+    "cycles": 10000,
+    "wishbone_response": "registered accept followed by registered acknowledgement; zero data"
+  },
+  "observed": {
+    "requests": 1468,
+    "acknowledgements": 1468,
+    "request_response_balance": true,
+    "errors": 0,
+    "done": false,
+    "token_id": 0
+  },
+  "interpretation": "The exact regenerated compiler core is electrically connected to the compiler-owned arbiter and registered DDR boundary for bounded traffic. The zero-data responder and bounded duration intentionally cannot establish model semantics or first-token correctness."
+}

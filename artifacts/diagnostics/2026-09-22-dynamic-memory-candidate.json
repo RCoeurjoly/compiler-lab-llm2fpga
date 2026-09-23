@@ -1,0 +1,23 @@
+{
+  "schema": "llm2fpga-dynamic-external-memory-candidate-v1",
+  "status": "pre_request_static_control_stall",
+  "scope": "exact TinyStories-1M compiler Futil, 87 external image memories, local dynamic prompt memory",
+  "compiler_path": {
+    "latency_pass": "scripts/pipeline/legalize_external_memory_latency.py",
+    "calyx_primitive": "dyn_mem_d1",
+    "externalized_memory_count": 87,
+    "prompt_memory": "dyn_mem_d1 local, not part of PCIe/DDR image"
+  },
+  "evidence": {
+    "dynamic_sv_sha256": "c8847148453fc91c112c766824bc58f2c7ec2842a2c06607ee2471d1f5c12e5e",
+    "external_sv_sha256": "4283b38f1aff73e7b86e7b11878bded14e4183e26b74cf64bab5daec3eaf74c",
+    "prompt_completion": "model_read_prompt_done_in = prompt_tokens_done",
+    "first_external_request": false,
+    "first_stalled_state": "fsm0=2",
+    "bounded_run_seconds": 30,
+    "bounded_run_exit": 124,
+    "bounded_run_log": "/tmp/t4-corrected-prod/dynamic88-external87.run.log"
+  },
+  "interpretation": "The dyn_mem_d1 legalization preserves the local prompt read completion, but Calyx still emits a separate nested static-sequence completion that prevents the top-level controller from reaching the first external-memory request. This candidate does not test PCIe/DDR3 data correctness yet.",
+  "next_gate": "Remove or legalize the first nested static sequence in the compiler-owned control before judging external memory. The four-row fixture must reach its first request with a variable response delay; then rerun the exact model candidate."
+}

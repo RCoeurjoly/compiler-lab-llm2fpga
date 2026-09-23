@@ -23,6 +23,20 @@ def load_module():
 
 
 class BramProductionTest(unittest.TestCase):
+    def test_packed_ln1_trace_receipt_is_fail_closed(self):
+        receipt_path = ROOT / "artifacts/diagnostics/2026-09-21-packed-image-externalization.json"
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        trace = receipt["verification"]["first_ln1_read_response_timing_probe"]
+        self.assertEqual(trace["baseline_ordered_trace_records"], 64)
+        self.assertEqual(trace["packed_full_width_observed"]["ordered_trace_records"], 64)
+        self.assertEqual(trace["baseline_ordered_trace_fnv1a64"], 15076088045902987321)
+        self.assertEqual(trace["packed_full_width_observed"]["ordered_trace_fnv1a64"], 8281986172592539694)
+        self.assertNotEqual(
+            trace["baseline_ordered_trace_fnv1a64"],
+            trace["packed_full_width_observed"]["ordered_trace_fnv1a64"],
+        )
+        self.assertIn("No accelerator or transport fix", trace["interpretation"])
+
     def test_one_step_preserves_model_and_changes_only_generation_bound(self):
         module = load_module()
         import inspect
@@ -84,12 +98,77 @@ class BramProductionTest(unittest.TestCase):
             narrowed_mac = self._signed(self._signed(activation, 48) * self._signed(code, 48), 48)
             self.assertEqual(self._signed(narrowed_mac, 64), reference_mac)
 
-    def test_audit_generator_futil_remains_byte_identical(self):
+    def test_production_keeps_lm_input_codes_as_a_distinct_runtime_memory(self):
+        module = load_module()
+        artifact = module.base.generate_model_kernel(
+            ORACLE, production=True, generation_steps=1
+        )
+        # The final LM-head Q/DQ buffer crosses a phase boundary after the
+        # last transformer block.  It must not alias the reusable q-projection
+        # code buffer: that alias changed the first LM-head boundary in the
+        # packed compiler RTL before any external-memory adapter was involved.
+        self.assertEqual(artifact.futil.count("@external lm_input_codes_i8 ="), 1)
+        self.assertEqual(artifact.futil.count("@external q_input_codes_i8 ="), 1)
+        self.assertNotIn("lm_input_codes_i8 = q_input_codes_i8", artifact.futil)
+
+    def test_projection_requantization_uses_proven_53_bit_product_in_production(self):
+        module = load_module()
+        artifact = module.base.generate_model_kernel(ORACLE, production=True, generation_steps=1)
+        # The reachable-domain certificate bounds every projection accumulator
+        # times Q8.24 weight scale below 2**52.  Production must therefore
+        # avoid the unbounded 64-bit combinational post-scale chain while
+        # preserving the 64-bit memory ABI at its outputs.
+        self.assertIn("c_fc_requant_real_product = std_smult_pipe(53);", artifact.futil)
+        self.assertIn("c_proj_requant_real_product = std_smult_pipe(53);", artifact.futil)
+        self.assertNotIn("c_fc_requant_product_negative = std_slt(64);", artifact.futil)
+        self.assertIn("c_fc_requant_product_negative = std_slt(53);", artifact.futil)
+
+    def test_nonproduction_projection_requantization_keeps_declared_64_bit_contract(self):
+        module = load_module()
+        artifact = module.base.generate_model_kernel(ORACLE, production=False)
+        self.assertIn("c_fc_requant_real_product = std_smult_pipe(64);", artifact.futil)
+        self.assertIn("c_fc_requant_product_negative = std_slt(64);", artifact.futil)
+
+    def test_narrow_projection_rounding_matches_signed_64_reference(self):
+        rng = random.Random(0x53A11)
+
+        def rounded(accumulator, scale, width):
+            product = self._signed(accumulator * scale, width)
+            magnitude = -product if product < 0 else product
+            result = (magnitude + (1 << 31)) >> 32
+            return self._signed(-result if product < 0 else result, width)
+
+        # The authenticated certificate's largest reachable product is below
+        # 2**52; these directed values exercise both signs and the rounding
+        # carry without leaving that proven domain.
+        cases = [(0, 0), (1, 1), (-1, 1), (1, -1), (-1, -1),
+                 (2**37 - 1, 2**14), (-(2**37 - 1), 2**14),
+                 (2**37 - 1, -(2**14)), (-(2**37 - 1), -(2**14))]
+        cases += [(rng.randint(-(2**37 - 1), 2**37 - 1),
+                   rng.randint(-(2**14), 2**14)) for _ in range(512)]
+        for accumulator, scale in cases:
+            with self.subTest(accumulator=accumulator, scale=scale):
+                self.assertEqual(
+                    rounded(accumulator, scale, 53),
+                    rounded(accumulator, scale, 64),
+                )
+
+    def test_audit_generator_futil_hash_tracks_authenticated_baseline(self):
         module = load_module()
         self.assertEqual(
             module.base.generate_model_kernel(ORACLE).provenance["futil_sha256"],
-            "fa168f813ef4abb40470ef933c12a2271dd4fde58e73ee2d0b61d4c39d1f586f",
+            "5f9d2da68131f9e187fbebea7fda2d45b246dd0aae29906e4fba175681de0802",
         )
+
+    def test_narrow_requantization_sign_extends_rounded_product(self):
+        module = load_module()
+        futil = module.base.generate_model_kernel(ORACLE, production=True, generation_steps=1).futil
+        for prefix in ("q_requant", "k_requant", "v_requant", "out_requant", "c_fc_requant", "c_proj_requant"):
+            with self.subTest(prefix=prefix):
+                self.assertIn(
+                    f"{prefix}_rounded_product_wide.in = {prefix}_rounded_product.out;",
+                    futil,
+                )
 
     def test_selective_bram_annotation_preserves_small_memories(self):
         path = ROOT / "scripts/pipeline/run_bram_production_sv.py"

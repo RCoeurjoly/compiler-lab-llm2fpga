@@ -1,0 +1,52 @@
+{
+  "schema": "compiler-ddr3-trace-replay-hardware-v1",
+  "status": "PASS_TRACE_REPLAY_HARDWARE",
+  "hardware_qualified": false,
+  "scope": "temporary compiler-derived exact trace replay; not accelerator inference",
+  "programming": {
+    "mode": "sram",
+    "persistent_flash_modified": false,
+    "bitstream": "/nix/store/jdy4ghy2ybpphcfba4rhaqp2l6jdilka-compiler-ddr3-trace-replay-bitstream/replay.bit",
+    "bitstream_sha256": "effd210f87f1ad2d7c490cfc2105aef21be2406fa0a41f859e466d11438b8156",
+    "programmer": "openFPGALoader digilent_hs3 FT232H 210299BF3824",
+    "program_result": "DONE; isc_done=1; init=1; done=1"
+  },
+  "lifecycle": {
+    "endpoint": "0000:42:00.0",
+    "vendor_device": "10ee:0480",
+    "subsystem": "10ee:abcd",
+    "bar0": "0x74000000",
+    "link": "enumerated after established deferred-authorization cold-cycle"
+  },
+  "calibration_bist": {
+    "status": "0x61",
+    "loader": "0x3",
+    "bist_state": "0x17",
+    "required_bist_state": "0x17"
+  },
+  "image": {
+    "bytes": 4136720,
+    "sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "readback_bytes": 4136720,
+    "readback_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"
+  },
+  "replay": {
+    "binary_sha256": "46332a3a8d9ebf3a12d2fe968ae4e412200f9d419f3131ae46152dee26ee7d71",
+    "records": 13116912,
+    "configured": 13116912,
+    "pushed": 13116912,
+    "accepted": 13116912,
+    "responded": 13116912,
+    "checked": 13116912,
+    "errors": 0,
+    "state": 2,
+    "flags": 5,
+    "first_mismatch_index": null
+  },
+  "exclusions": [
+    "full compiler accelerator first-token inference",
+    "persistent BPI programming",
+    "autonomous autoregressive generation",
+    "complete device timing signoff for DDR PHY, CDC, and hard PCIe blocks"
+  ]
+}

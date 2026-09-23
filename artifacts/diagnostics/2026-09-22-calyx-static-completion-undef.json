@@ -1,0 +1,30 @@
+{
+  "schema": "llm2fpga-calyx-static-completion-undef-v1",
+  "status": "localized_compiler_completion_boundary",
+  "scope": "exact TinyStories-1M compiler-generated external-memory candidate",
+  "source": {
+    "futil_sha256": "a390eb19ba739018ddb1a7f9962db7c119c119a9d543dd9793b2f8cbb60539bd",
+    "generated_sv_sha256": "c25661fe8a900029a779d7db27c202f5ce84d20ba098b012a7b5027bee37771e",
+    "generated_sv": "/tmp/t4-corrected-prod/model.external-4.sv"
+  },
+  "evidence": [
+    {
+      "signal": "prompt_tokens_done",
+      "meaning": "real external-memory completion signal",
+      "evidence": "seq_mem_d1 instance connects .done(prompt_tokens_done)"
+    },
+    {
+      "signal": "early_reset_static_seq0_done_in",
+      "meaning": "nested static-sequence completion input",
+      "evidence": "assign early_reset_static_seq0_done_in = ud3_out"
+    },
+    {
+      "signal": "ud3_out",
+      "meaning": "unresolved Calyx completion placeholder",
+      "evidence": "ud3 is instantiated as undef #( .WIDTH(1) )"
+    }
+  ],
+  "interpretation": "The generated Calyx schedule loses the prompt read completion at a nested static-sequence boundary. Delaying or latching the external memory response after SV generation cannot repair a completion input that is already undefined.",
+  "consequence": "This is a compiler scheduling/lowering defect, not evidence of a PCIe or UberDDR3 transport failure.",
+  "next_gate": "Preserve an explicit completion value through Calyx scheduling for the four-row exact memory fixture, then regenerate the TinyStories candidate and require prompt_tokens_done (or an equivalent compiler-owned elastic invoke/return completion) to drive the nested sequence before external-memory simulation."
+}
