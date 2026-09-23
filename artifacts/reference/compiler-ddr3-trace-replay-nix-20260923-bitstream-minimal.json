@@ -26,9 +26,9 @@
       "sha256": "500e0df3e96b3194b142b79c0b5bec94557ccfa1941d4dbc5afa2c2f6604621d"
     },
     "programmer": {
-      "path": "/nix/store/ddc0dpsyg2aga6ipzx16hxp1r6g8dfbx-openfpgaloader-3ae5e5e-bpi-full-verify/bin/openFPGALoader",
-      "bytes": 4776528,
-      "sha256": "e975d7994ff37f82f510b4df7e198e6fb966c4a08ea6a9b0eb037d4d6ee4a37f"
+      "path": "/nix/store/5vmpyj6qrz4708r3nbb1ij3wpiykvazk-openfpgaloader-3ae5e5e-bpi-full-verify/bin/openFPGALoader",
+      "bytes": 4770720,
+      "sha256": "c2ca6f387f2118c5a22eb83e8e122ddab2c9224f2180c2308c01bb794f6dfd75"
     }
   }
 }

@@ -68,7 +68,7 @@
  		printError("Block erase failed");
  		return false;
  	}
-@@ -401,14 +401,16 @@
+@@ -401,14 +401,20 @@
  		printInfo("Reading " + std::to_string(len) + " bytes from 0x" +
  			std::to_string(addr));
  
@@ -85,6 +85,10 @@
 +		if (i == 0 || (word_addr % 0x400000u) == 0) {
 +			bpi_write(word_addr, FLASH_CMD_READ_ARRAY);
 +			usleep(100);
++			/* A partition mode transition returns one stale/status word on
++			 * the first read; discard it before consuming array data. */
++			if (word_addr != 0 && (word_addr % 0x400000u) == 0)
++				(void)bpi_read(word_addr);
 +		}
  		uint16_t word = bpi_read(word_addr);
  

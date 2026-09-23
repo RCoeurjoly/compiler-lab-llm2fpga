@@ -993,7 +993,8 @@ def main():
             raise ValueError("receipt does not authenticate a full BPI verifier")
         if build["artifacts"]["programmer"]["sha256"] not in {
                 "8686c42aabac9d720f128741d3f6fe27de8b8b9e5615f02c3d1450d78b759740",
-                "e975d7994ff37f82f510b4df7e198e6fb966c4a08ea6a9b0eb037d4d6ee4a37f"}:
+                "e975d7994ff37f82f510b4df7e198e6fb966c4a08ea6a9b0eb037d4d6ee4a37f",
+                "c2ca6f387f2118c5a22eb83e8e122ddab2c9224f2180c2308c01bb794f6dfd75"}:
             raise ValueError("unqualified BPI programmer binary")
         artifacts = bind_runtime_lifecycle(build['artifacts'], args.lifecycle_manifest,
                                            args.lifecycle_manifest_sha256)

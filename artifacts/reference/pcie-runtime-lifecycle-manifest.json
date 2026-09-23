@@ -26,9 +26,9 @@
       "sha256": "25a8e0fb244958e39b4854dcc4f38b2a570d818dbb90f75cc3ea01d8ac9949a6"
     },
     "runner": {
-      "bytes": 51995,
+      "bytes": 52079,
       "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/scripts/pipeline/run_compiler_ddr3_trace_replay.py",
-      "sha256": "9c2f5592286b81202e5208d52022910c2e70d7456fbdc76eedf05713f276d9ca"
+      "sha256": "defa364ca45ccd7ac31b9ba82e05f0b3a40e94144953d79169f93c5b27ba50b4"
     },
     "tapo_power_script": {
       "bytes": 8696,
