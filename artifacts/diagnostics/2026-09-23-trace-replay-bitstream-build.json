@@ -1,0 +1,24 @@
+{
+  "schema": "compiler-ddr3-trace-replay-bitstream-build-v1",
+  "status": "PASS_BUILD_ROUTE_BITSTREAM",
+  "derivation": "compiler-ddr3-trace-replay-bitstream",
+  "bitstream_store_path": "/nix/store/2lla0fwzm7y2kn0y9wbljlwmd7vpmhmc-compiler-ddr3-trace-replay-bitstream",
+  "bitstream_sha256": "a6683622793ac1975de4615ca4bd8ee271fd74b0684080f7e579d2203e301690",
+  "frames_sha256": "a240215edcb0900541b688606fb8dc4b6825e24594569228cdb6f671118fada8",
+  "route": {
+    "store_path": "/nix/store/vgwyyn234nhmq6qhgfnrl6g0r3acwg2d-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "5b5babb95da42b3651eacf875276a94af41d70282d77001323d565ad8f8352e1",
+    "legal_route": true,
+    "rowstream_clk_fmax_mhz": 100.47,
+    "rowstream_clk_required_mhz": 83.333333,
+    "pcie_user_clk_fmax_mhz": 69.35,
+    "pcie_user_clk_required_mhz": 62.5,
+    "scope": "pinned fabric timing model; not DDR/PHY/CDC/electrical signoff"
+  },
+  "profile": {
+    "ddr3": "UberDDR3 two-lane 333/83.33 MHz",
+    "pcie": "validated PCIe 7x platform",
+    "nextpnr_seed": 15
+  },
+  "interpretation": "The diagnostic trace-replay bitstream is reproducibly synthesized, legally routed, timing-passing in the pinned fabric model, and bitstream-validated. It is not the full accelerator and has not yet been programmed or tested on YPCB."
+}
