@@ -36,6 +36,21 @@ class PcieBridgePermissionsPolicyTests(unittest.TestCase):
         self.assertIn("/usr/local/libexec/task6-pcie/task6-pcie-bridge-permissions", text)
         self.assertIn("/etc/udev/rules.d/60-task6-ypcb-pcie.rules", text)
 
+    def test_endpoint_helper_is_fixed_identity_and_decode_only(self):
+        text = (HOST / "ypcb-pcie-pci-permissions").read_text()
+        for required in (
+            'ENDPOINT_BDF="0000:42:00.0"',
+            '0x10ee',
+            '0x0480',
+            '0xabcd',
+            '0x0006',
+            'setpci',
+            'resource0',
+        ):
+            self.assertIn(required, text)
+        self.assertNotIn("reset_subordinate", text)
+        self.assertNotIn("authorized=", text)
+
 
 if __name__ == "__main__":
     unittest.main()

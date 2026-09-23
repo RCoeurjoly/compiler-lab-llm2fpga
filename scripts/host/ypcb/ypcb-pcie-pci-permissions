@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Executed by udev as root.  This is deliberately narrower than a generic
+# PCI recovery tool: it accepts only the fixed YPCB endpoint and enables only
+# PCI memory and bus-master decoding after an FPGA SRAM/BPI reprogramming.
+DEVPATH_ARG="${1:-}"
+SYSFS_ROOT="/sys"
+ENDPOINT_BDF="0000:42:00.0"
+
+fail() {
+  echo "ypcb-pcie-pci-permissions: $*" >&2
+  exit 1
+}
+
+[[ -n "$DEVPATH_ARG" ]] || fail "missing udev devpath argument"
+[[ "$DEVPATH_ARG" == /devices/* ]] || fail "refusing non-device devpath: $DEVPATH_ARG"
+ENDPOINT_DIR="${SYSFS_ROOT}${DEVPATH_ARG}"
+[[ "$(basename "$ENDPOINT_DIR")" == "$ENDPOINT_BDF" ]] || fail "refusing non-Task6 endpoint: $ENDPOINT_DIR"
+[[ -d "$ENDPOINT_DIR" ]] || fail "missing endpoint: $ENDPOINT_DIR"
+
+read_attr() {
+  local name="$1" value
+  [[ -f "$ENDPOINT_DIR/$name" ]] || fail "missing endpoint attribute: $name"
+  value="$(<"$ENDPOINT_DIR/$name")"
+  printf '%s' "${value,,}"
+}
+
+[[ "$(read_attr vendor)" == 0x10ee ]] || fail "unexpected endpoint vendor"
+[[ "$(read_attr device)" == 0x0480 ]] || fail "unexpected endpoint device"
+[[ "$(read_attr subsystem_vendor)" == 0x10ee ]] || fail "unexpected subsystem vendor"
+[[ "$(read_attr subsystem_device)" == 0xabcd ]] || fail "endpoint subsystem is not stable yet"
+
+RESOURCE0="$ENDPOINT_DIR/resource0"
+[[ -e "$RESOURCE0" ]] || fail "endpoint BAR0 resource is absent"
+resource_line="$(head -n 1 "$ENDPOINT_DIR/resource" 2>/dev/null || true)"
+[[ "$resource_line" =~ ^0x[0-9a-f]+[[:space:]]+0x[0-9a-f]+[[:space:]]+0x[0-9a-f]+$ ]] || fail "endpoint BAR0 resource is not assigned"
+
+command_before="$(/usr/bin/setpci -s "$ENDPOINT_BDF" COMMAND 2>/dev/null || true)"
+[[ "$command_before" =~ ^[0-9A-Fa-f]{4}$ ]] || fail "unreadable endpoint COMMAND"
+command_after="$(printf '%04x' $((0x$command_before | 0x0006)))"
+if [[ "${command_before,,}" != "$command_after" ]]; then
+  /usr/bin/setpci -s "$ENDPOINT_BDF" "COMMAND=$command_after"
+fi
+command_check="$(/usr/bin/setpci -s "$ENDPOINT_BDF" COMMAND 2>/dev/null || true)"
+[[ "$command_check" =~ ^[0-9A-Fa-f]{4}$ ]] || fail "endpoint COMMAND became unreadable"
+(( (0x$command_check & 0x0006) == 0x0006 )) || fail "endpoint memory/bus-master decode did not stick"

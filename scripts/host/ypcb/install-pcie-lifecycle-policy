@@ -12,13 +12,16 @@ fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 BRIDGE_HELPER="$SCRIPT_DIR/ypcb-pcie-bridge-permissions"
+ENDPOINT_HELPER="$SCRIPT_DIR/ypcb-pcie-pci-permissions"
 RULE="$SCRIPT_DIR/60-task6-ypcb-pcie.rules"
-for source in "$BRIDGE_HELPER" "$RULE"; do
+for source in "$BRIDGE_HELPER" "$ENDPOINT_HELPER" "$RULE"; do
   [[ -f "$source" && ! -L "$source" ]] || { echo "error: missing or symbolic source: $source" >&2; exit 1; }
 done
 
 /usr/bin/install -o root -g root -m 0755 "$BRIDGE_HELPER" \
   /usr/local/libexec/task6-pcie/task6-pcie-bridge-permissions
+/usr/bin/install -o root -g root -m 0755 "$ENDPOINT_HELPER" \
+  /usr/local/libexec/task6-pcie/task6-pcie-pci-permissions
 /usr/bin/install -o root -g root -m 0644 "$RULE" \
   /etc/udev/rules.d/60-task6-ypcb-pcie.rules
 /usr/bin/udevadm control --reload-rules
