@@ -1,0 +1,215 @@
+{
+  "schema": "compiler-ddr3-trace-replay-bitstream-v1",
+  "status": "ROUTE_AND_BITSTREAM_PASS",
+  "hardware_qualified": false,
+  "scope": "Nix-built exact compiler-derived DDR3 replay diagnostic; hardware qualification pending; not inference",
+  "historical_candidate_commit": "5d4498f",
+  "profile": {
+    "byte_lanes": 2,
+    "controller_period_ps": 12000,
+    "ddr_period_ps": 3000,
+    "pcie_clock_mhz": 62.5,
+    "bist_mode": 2,
+    "seed": 15
+  },
+  "route": {
+    "attempts": 1,
+    "legal": true,
+    "checksum": "nix-qf0ps72f0fx4938cqdkw0dz1nrx69bxb",
+    "rowstream_fmax_mhz": 100.47,
+    "rowstream_required_mhz": 83.333333,
+    "pcie_fmax_mhz": 69.35,
+    "pcie_required_mhz": 62.5,
+    "warnings": 0,
+    "errors": 0,
+    "derivation": "/nix/store/lwldxcyvjwwwxn5ga8cwls089231irwl-compiler-ddr3-trace-replay-route.drv"
+  },
+  "conversion": {
+    "attempts": 1,
+    "initial_failure": null,
+    "initial_failure_log_sha256": null,
+    "authorized_retry": "Only existing authenticated LLM2FPGA one-line database compatibility patch; unchanged FASM/RTL/route/tools",
+    "database_base_nar_sha256": "sha256-D7WsMbrg1H2ZPd8AQgP1bkFCQ3drICnHSraXwIY0roo=",
+    "database_path": "/nix/store/z67bdqgdkvfm1w334jg0c8jdc11hngmp-compiler-replay-prjxray-db-lioi3-compat/kintex7",
+    "database_target_before_sha256": "d74bb512c56af57510ce89b351f1bf666e96196e20c8b1bc18e8521fe45bdd61",
+    "database_target_after_sha256": "7108c7c92097d591e404852ce5eb18a6ed1851352d399eb29c1bd7eed3ffd710",
+    "part": "xc7k480tffg1156-1",
+    "part_file_sha256": "9f2b1b922e5c4f799445b2e1c9c4da4078213d50c3c7ec2f8603fba77af4f7c5",
+    "decoded_configuration_bits": 880384,
+    "derivation": "/nix/store/hnmcyijvl0rfsb82ywpldsdsl0h3w126-compiler-ddr3-trace-replay-bitstream.drv"
+  },
+  "timing_coverage_limitations": [
+    "Both reported fabric clocks pass only the pinned nextpnr timing model, not complete device timing signoff.",
+    "OSERDES, ISERDES, IDELAY, IDELAYCTRL, PLL, MMCM, GTX, PCIe hard blocks and BRAM lack complete timing coverage.",
+    "DDR DQ/DQS electrical timing and generated-clock phase/skew are not qualified.",
+    "Recovery/removal, metastability and CDC safety are not proven by cross-domain maximum-delay reports.",
+    "Thirty route warnings remain: missing clock aliases and unsupported LOC targets.",
+    "The six conservative Task 3H structural failures remain; accepted routed timing is the explicit basis for proceeding.",
+    "Decoded bitstream configuration is not hardware calibration, BIST, load/readback, replay or inference acceptance.",
+    "This receipt is Nix-derived; store paths and derivation identity are authoritative for the listed artifacts."
+  ],
+  "artifacts": {
+    "bitstream": {
+      "path": "/nix/store/vkphrmb3w5h9yjdc4al3jnr6fp4906gf-compiler-ddr3-trace-replay-bitstream/replay.bit",
+      "bytes": 18735174,
+      "sha256": "500e0df3e96b3194b142b79c0b5bec94557ccfa1941d4dbc5afa2c2f6604621d"
+    },
+    "decoded_bits": {
+      "path": "/nix/store/vkphrmb3w5h9yjdc4al3jnr6fp4906gf-compiler-ddr3-trace-replay-bitstream/replay.bit.decoded-bits",
+      "bytes": 43046144,
+      "sha256": "fa1b848244fd5c9fbc8a130dee43030b976f0ae9dae0970f058b45a3081734e9"
+    },
+    "fasm": {
+      "path": "/nix/store/qf0ps72f0fx4938cqdkw0dz1nrx69bxb-compiler-ddr3-trace-replay-route/replay.fasm",
+      "bytes": 21180207,
+      "sha256": "5b5babb95da42b3651eacf875276a94af41d70282d77001323d565ad8f8352e1"
+    },
+    "route_log": {
+      "path": "/nix/store/qf0ps72f0fx4938cqdkw0dz1nrx69bxb-compiler-ddr3-trace-replay-route/route.log",
+      "bytes": 166494,
+      "sha256": "94dd22c3c0c9ce78985e7a52f791469c293e765cacb131b478a4d9a4b2ddd290"
+    },
+    "route_acceptance": {
+      "path": "/nix/store/qf0ps72f0fx4938cqdkw0dz1nrx69bxb-compiler-ddr3-trace-replay-route/route.json",
+      "bytes": 296,
+      "sha256": "74840e21e6a7886157d16961415dd58b3e5567d421bc09af23574762eac755f6"
+    },
+    "netlist": {
+      "path": "/nix/store/jic740dz6f1dhqqzhk2gr0772sb24jhj-compiler-ddr3-trace-replay-synthesis-screen/replay.json",
+      "bytes": 44825498,
+      "sha256": "570b384ab2e3a7c5e43e3b5e6f171c03fd3960eaf77e110910910c9d4f3b965fc1d"
+    },
+    "nextpnr": {
+      "path": "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+      "bytes": 4449352,
+      "sha256": "25c434b7614ade7cbdd448b4f993d1feced26296b0164f6e648ddaced7ebac16"
+    },
+    "chipdb": {
+      "path": "/nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin",
+      "bytes": 714763824,
+      "sha256": "d8472bfcc19dc31686d80cc34f0d37b958c268656182537b06b3439711b105f1"
+    },
+    "fasm2frames": {
+      "path": "/nix/store/9img7k11vlgg1i0nl7lqqljjzvjvvgbp-prjxray-bdbc665852b82f589ff775a8f6498542dbec0a07/bin/fasm2frames",
+      "bytes": 9720,
+      "sha256": "6bf47e47cf133faee78e887ed8cfdd961fe83a7b116c686bc28f45fd971d99ec"
+    },
+    "xc7frames2bit": {
+      "path": "/nix/store/9img7k11vlgg1i0nl7lqqljjzvjvvgbp-prjxray-bdbc665852b82f589ff775a8f6498542dbec0a07/bin/xc7frames2bit",
+      "bytes": 1301992,
+      "sha256": "605c957e878d35e20a40493e1ef0c2c7c905ef83e056b1ca6e491972d05fe54d"
+    },
+    "bitread": {
+      "path": "/nix/store/9img7k11vlgg1i0nl7lqqljjzvjvvgbp-prjxray-bdbc665852b82f589ff775a8f6498542dbec0a07/bin/bitread",
+      "bytes": 1178328,
+      "sha256": "06d3130b3b597c4823aba8012057ae6612e96df9b5ada0a7a0c12bdc552e26b3"
+    },
+    "programmer": {
+      "path": "/nix/store/39xij3c8kp29nkldm436g8im3rqb8jaj-openfpgaloader-3ae5e5e-bpi-full-verify/bin/openFPGALoader",
+      "bytes": 4770720,
+      "sha256": "8686c42aabac9d720f128741d3f6fe27de8b8b9e5615f02c3d1450d78b759740"
+    },
+    "lifecycle_probe": {
+      "path": "/usr/local/libexec/ypcb_pcie_recover.py",
+      "bytes": 12404,
+      "sha256": "25a8e0fb244958e39b4854dcc4f38b2a570d818dbb90f75cc3ea01d8ac9949a6"
+    },
+    "lifecycle_dependency": {
+      "path": "/usr/local/libexec/ypcb_pcie_power.py",
+      "bytes": 3029,
+      "sha256": "3f6a844bb7c25383ab1c5c574f3b1ef54c740ce3f315b9155804609ef7c2ea25"
+    },
+    "build_flake": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/flake.nix",
+      "bytes": 163495,
+      "sha256": "1936fc0707bf87698f81daba84f2d7e22ee7ef8a73ce7c53f228e4056eda5457"
+    },
+    "build_nix": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/nix/task6-board-shell.nix",
+      "bytes": 7617,
+      "sha256": "d53efdbcbaf204e3b93844798f0818e9e34b39a16d94470533b4e22ef8b31cea"
+    },
+    "runner": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/scripts/pipeline/run_compiler_ddr3_trace_replay.py",
+      "bytes": 35271,
+      "sha256": "e3f5d0494cffb4c9b9c22efec05597ab254f4abc11755a111e74e7e41c68ef7f"
+    },
+    "route_checker": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/scripts/analysis/check_compiler_replay_route.py",
+      "bytes": 1888,
+      "sha256": "15f02535124ac65190659dec47abb9f2342a0e921ce60f5c40ec4d042d9b7f08"
+    },
+    "bitstream_validator": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/scripts/pipeline/build_and_validate_xc7_bitstream.sh",
+      "bytes": 1202,
+      "sha256": "4d8a0162b439e9cfd1c0c6d7a8a8a5b6915499b9fed96c4b32553c7c84f54b59"
+    },
+    "database_patch": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/patches/prjxray-db/0001-kintex7-add-lioi3-tbytesrc-oclkm-imux31.patch",
+      "bytes": 652,
+      "sha256": "197e2f126a6f3917c1ceca62394acd957397679538df077f7119de97c28e05bc"
+    },
+    "candidate_provenance": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/artifacts/reference/compiler-ddr3-trace-replay-m2-candidate-provenance.json",
+      "bytes": 12080,
+      "sha256": "36df50e09b90ec9f06e1685baee57b7476c468ff32d873d6dd852f8320a32eeb"
+    },
+    "programmer_nix": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/nix/compiler-replay-programmer.nix",
+      "bytes": 909,
+      "sha256": "78e98de1be5a4837cb1bfdb6bfc0cf063065725d0eb20b7746d0c64969da4f9c"
+    },
+    "programmer_bpi_bridge_patch": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/patches/openfpgaloader/0001-defer-bpi-bridge.patch",
+      "bytes": 423,
+      "sha256": "0a5218abb83de98f40c27d8cd80e3e3ef56346064345a52825b192158e7b3b47"
+    },
+    "programmer_full_verify_patch": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/patches/openfpgaloader/0002-full-bpi-verification.patch",
+      "bytes": 7433,
+      "sha256": "9633bc2fcddadf633e66114e0077248104a0a386eadeae1fba7edaa2770d24f7"
+    },
+    "cold_cycle_wrapper": {
+      "path": "/usr/local/sbin/ypcb-thunderbolt-cold-cycle",
+      "bytes": 269,
+      "sha256": "2870b3ef5def65a7d8ede7e1a45cfb7503e093719d5366fe407cb47ebd545f4c"
+    },
+    "cold_cycle_controller": {
+      "path": "/usr/local/libexec/ypcb_thunderbolt_deferred_auth.py",
+      "bytes": 8873,
+      "sha256": "a188e99a87233e8591c67d9d6f2c82e243004e262253686ade7e018ec8f39095"
+    },
+    "image": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/.superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/image.bin",
+      "bytes": 4136720,
+      "sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"
+    },
+    "input_recovery": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/.superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/recovery-completion.json",
+      "bytes": 2475,
+      "sha256": "5af4fb3a826ce5d91b0bf4149474ef8813a6c8807ecc0deb95eee9a4bb3cb293"
+    },
+    "raw_trace": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/.superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/reference.trace",
+      "bytes": 935312356,
+      "sha256": "e61bb6100af2c612f3cbd3beef0f4fff0dce3194f1590fca0cee9d0f7ed2df23"
+    },
+    "replay": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/.superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/compiler-ddr3-trace-replay.bin",
+      "bytes": 262338240,
+      "sha256": "46332a3a8d9ebf3a12d2fe968ae4e412200f9d419f3131ae46152dee26ee7d71"
+    },
+    "programmer_bridge": {
+      "path": "/nix/store/39xij3c8kp29nkldm436g8im3rqb8jaj-openfpgaloader-3ae5e5e-bpi-full-verify/share/openFPGALoader/bpiOverJtag_xc7k480tffg1156.bit.gz",
+      "bytes": 132631,
+      "sha256": "c8f3e306cbd789926284ec221769c426473b724ad349ccd42c620a35b1ec9ec2"
+    }
+  },
+  "bpi_programmer": {
+    "source_commit": "3ae5e5e4a5f055d12f6079616cb1ec1d67bf30f1",
+    "source_nar_sha256": "sha256-dP7wrBVWM06pg7JeQ6Joi39yiuDrTFOuqCIF+yzdnwk=",
+    "verification": "full-readback-v1",
+    "payload_bytes": 18735004,
+    "scope": "Full payload readback; partition-addressed array/status/error/cleanup commands; device-wide SR7 readiness; fail-closed FTDI; software successor pending independent review, no hardware acceptance"
+  }
+}
