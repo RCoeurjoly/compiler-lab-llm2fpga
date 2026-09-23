@@ -1,0 +1,34 @@
+{
+  "schema": "compiler-ddr3-trace-replay-bitstream-v1",
+  "status": "ROUTE_AND_BITSTREAM_PASS",
+  "hardware_qualified": false,
+  "scope": "Nix-built exact compiler-derived DDR3 replay diagnostic; hardware qualification pending; not inference",
+  "historical_candidate_commit": "5d4498f",
+  "profile": {
+    "byte_lanes": 2,
+    "controller_period_ps": 12000,
+    "ddr_period_ps": 3000,
+    "pcie_clock_mhz": 62.5,
+    "bist_mode": 2,
+    "seed": 15
+  },
+  "bpi_programmer": {
+    "source_commit": "3ae5e5e4a5f055d12f6079616cb1ec1d67bf30f1",
+    "source_nar_sha256": "sha256-dP7wrBVWM06pg7JeQ6Joi39yiuDrTFOuqCIF+yzdnwk=",
+    "verification": "full-readback-v1",
+    "payload_bytes": 18735004,
+    "scope": "Full payload readback; partition-addressed array/status/error/cleanup commands; device-wide SR7 readiness; fail-closed FTDI; software successor pending independent review, no hardware acceptance"
+  },
+  "artifacts": {
+    "bitstream": {
+      "path": "/nix/store/vkphrmb3w5h9yjdc4al3jnr6fp4906gf-compiler-ddr3-trace-replay-bitstream/replay.bit",
+      "bytes": 18735174,
+      "sha256": "500e0df3e96b3194b142b79c0b5bec94557ccfa1941d4dbc5afa2c2f6604621d"
+    },
+    "programmer": {
+      "path": "/nix/store/ddc0dpsyg2aga6ipzx16hxp1r6g8dfbx-openfpgaloader-3ae5e5e-bpi-full-verify/bin/openFPGALoader",
+      "bytes": 4776528,
+      "sha256": "e975d7994ff37f82f510b4df7e198e6fb966c4a08ea6a9b0eb037d4d6ee4a37f"
+    }
+  }
+}
