@@ -23,6 +23,15 @@
     "short_probe_wall_seconds": 59.065,
     "short_probe_exit_code": 124
   },
+  "simulator_optimization_probe": {
+    "model_recompiled": "generated Verilator C++ with OPT_FAST=-O3; RTL and memory model unchanged",
+    "cycles": 100000,
+    "requests": 2866,
+    "responses": 2866,
+    "wall_seconds": 58.250,
+    "exit_code": 124,
+    "interpretation": "Compiler optimization changed throughput by less than two percent; generated RTL evaluation, not driver compilation, dominates."
+  },
   "interpretation": "The consolidated path does not show a response mismatch or adapter error. The bounded probe demonstrates very low transaction-level simulation throughput; the long run stopped at the last observed checkpoint after no log progress for more than seven minutes. This is neither first-token success nor a hardware/PCIe/physical-DDR3 claim.",
   "next_action": "Instrument the first state/request transition where consolidated simulation progress collapses before rerunning full inference."
 }
