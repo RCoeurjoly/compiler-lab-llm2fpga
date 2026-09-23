@@ -1,0 +1,42 @@
+{
+  "schema": "compiler-ddr3-bank-consolidation-v1",
+  "status": "IMPLEMENTED_SEMANTIC_GATES_PASS_FULL_LOAD_SIMULATION_PENDING",
+  "scope": "compiler-generated TinyStories-1M external-memory RTL; no PCIe, physical DDR3, bitstream, or board claim",
+  "model": {
+    "name": "TinyStories-1M",
+    "source": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv",
+    "source_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+    "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "prompt": [7454, 2402, 257, 640],
+    "expected_first_token": 11
+  },
+  "transformation": {
+    "pass": "scripts/analysis/externalize_compiler_memory.py::consolidate_token_weight_banks",
+    "bank_count": 197,
+    "external_memory_slots": 240,
+    "shared_slot": "bank-0 source slot",
+    "other_bank_slots": "196 request-valid/address slices tied inactive",
+    "output_sha256": "54189d2622e598fa6758352f3b11a19c838fa2e3b62a96675403b8902bf78164",
+    "output_bytes": 1891008,
+    "implementation_commits": ["125cc0a", "59aac8c"]
+  },
+  "verification": {
+    "focused_tests": {
+      "command": "nix develop -c python -m unittest tests.test_externalize_compiler_memory tests.test_external_memory_payload_reset tests.test_external_memory_registered_request tests.test_external_memory_stream_validity",
+      "tests_passed": 15,
+      "status": "PASS"
+    },
+    "shared_controller_behavior": "PASS: one-bank address selection, backpressure stability, response byte routing, and bank handoff",
+    "verilator_lint": "PASS with pre-existing width/timescale warnings",
+    "read_hierarchy": "PASS",
+    "yosys_optimizer": "baseline and consolidated candidate both abort in the pinned optimizer with std::out_of_range; not attributed to consolidation",
+    "simulation_binary_sha256": "de15caae6e919bb6a0e5c1e248d575d67872b1197fd72054d9d6fd719222509c"
+  },
+  "remaining_gates": [
+    "complete loaded-image transaction simulation and exact token 11",
+    "authenticated ordered trace comparison",
+    "synthesis and constrained routing",
+    "PCIe/UberDDR3 hardware image load/readback",
+    "diagnostic trace replay and first-token board inference"
+  ]
+}
