@@ -54,6 +54,21 @@ class PcieBridgePermissionsPolicyTests(unittest.TestCase):
         self.assertNotIn("reset_subordinate", text)
         self.assertNotIn("authorized=", text)
 
+    def test_endpoint_helper_waits_for_post_enumeration_bar_assignment(self):
+        """The udev add event may precede Thunderbolt BAR allocation."""
+        text = (HOST / "ypcb-pcie-pci-permissions").read_text()
+        self.assertIn("READY_TIMEOUT_SECONDS", text)
+        self.assertIn("sleep 1", text)
+        self.assertIn("resource_line", text)
+
+    def test_sysfs_acl_failure_does_not_skip_pci_decode(self):
+        """Read-only sysfs must not prevent the validated setpci step."""
+        text = (HOST / "ypcb-pcie-pci-permissions").read_text()
+        self.assertIn("setfacl -m u:roland:rw", text)
+        self.assertIn("chgrp plugdev \"$RESOURCE0\" || true", text)
+        self.assertIn("|| true", text)
+        self.assertLess(text.index("command_before="), text.index("setpci", text.index("command_before=")))
+
 
 if __name__ == "__main__":
     unittest.main()

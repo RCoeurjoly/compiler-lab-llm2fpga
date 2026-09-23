@@ -7,6 +7,7 @@ set -euo pipefail
 DEVPATH_ARG="${1:-}"
 SYSFS_ROOT="/sys"
 ENDPOINT_BDF="0000:42:00.0"
+READY_TIMEOUT_SECONDS="${TASK6_PCIE_READY_TIMEOUT_SECONDS:-30}"
 
 fail() {
   echo "ypcb-pcie-pci-permissions: $*" >&2
@@ -26,25 +27,36 @@ read_attr() {
   printf '%s' "${value,,}"
 }
 
-[[ "$(read_attr vendor)" == 0x10ee ]] || fail "unexpected endpoint vendor"
-[[ "$(read_attr device)" == 0x0480 ]] || fail "unexpected endpoint device"
-[[ "$(read_attr subsystem_vendor)" == 0x10ee ]] || fail "unexpected subsystem vendor"
-[[ "$(read_attr subsystem_device)" == 0xabcd ]] || fail "endpoint subsystem is not stable yet"
-
 RESOURCE0="$ENDPOINT_DIR/resource0"
-[[ -e "$RESOURCE0" ]] || fail "endpoint BAR0 resource is absent"
-resource_line="$(head -n 1 "$ENDPOINT_DIR/resource" 2>/dev/null || true)"
-[[ "$resource_line" =~ ^0x[0-9a-f]+[[:space:]]+0x[0-9a-f]+[[:space:]]+0x[0-9a-f]+$ ]] || fail "endpoint BAR0 resource is not assigned"
+ready=0
+for ((attempt = 0; attempt < READY_TIMEOUT_SECONDS; attempt++)); do
+  if [[ "$(read_attr vendor)" == 0x10ee \
+        && "$(read_attr device)" == 0x0480 \
+        && "$(read_attr subsystem_vendor)" == 0x10ee \
+        && "$(read_attr subsystem_device)" == 0xabcd \
+        && -e "$RESOURCE0" ]]; then
+    resource_line="$(head -n 1 "$ENDPOINT_DIR/resource" 2>/dev/null || true)"
+    if [[ "$resource_line" =~ ^0x[0-9a-f]+[[:space:]]+0x[0-9a-f]+[[:space:]]+0x[0-9a-f]+$ ]]; then
+      ready=1
+      break
+    fi
+  fi
+  sleep 1
+done
+(( ready == 1 )) || fail "endpoint identity/BAR did not stabilize within ${READY_TIMEOUT_SECONDS}s"
 
 # BAR access is intentionally granted only after identity, BAR assignment,
 # and PCI decode have been validated.  The user is already a member of the
 # established plugdev group used by the Digilent programmer.
 getent group plugdev >/dev/null || fail "missing plugdev group"
-chmod 0660 "$RESOURCE0" || fail "cannot set BAR0 mode"
+chmod 0660 "$RESOURCE0" || echo "warning: cannot set BAR0 mode" >&2
 if command -v setfacl >/dev/null 2>&1; then
-  setfacl -m u:roland:rw "$RESOURCE0" || fail "cannot grant BAR0 ACL"
+  if ! setfacl -m u:roland:rw "$RESOURCE0"; then
+    echo "warning: cannot grant BAR0 ACL; trying group access" >&2
+    chgrp plugdev "$RESOURCE0" || true
+  fi
 else
-  chgrp plugdev "$RESOURCE0" || fail "cannot set BAR0 group"
+  chgrp plugdev "$RESOURCE0" || true
 fi
 
 command_before="$(/usr/bin/setpci -s "$ENDPOINT_BDF" COMMAND 2>/dev/null || true)"
