@@ -1,0 +1,36 @@
+{
+  "schema": "compiler-ddr3-live-image-load-failure-v1",
+  "status": "FAIL_LOADER_STATE_AFTER_6016_BYTES",
+  "scope": "live trace-replay diagnostic image; no accelerator inference claim",
+  "hardware": {
+    "endpoint": "0000:42:00.0",
+    "vendor_device": "10ee:0480",
+    "subsystem": "10ee:abcd",
+    "bar0": "0x74000000",
+    "pci_command": "0006",
+    "link": "2.5 GT/s x1"
+  },
+  "calibration_bist_before_load": {
+    "status": "0x61",
+    "loader": "0x3",
+    "state": "0x17"
+  },
+  "image": {
+    "bytes": 4136720,
+    "sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"
+  },
+  "load": {
+    "bytes_loaded": 6016,
+    "bytes_read_back": 0,
+    "failure": "posted-write drain read returned all ones"
+  },
+  "registers_after_failure": {
+    "status": "0x65",
+    "loader": "0x37",
+    "loader_count": "0x2f2",
+    "bist_state": "0x17",
+    "replay_state": "0x0",
+    "replay_flags": "0x1"
+  },
+  "interpretation": "PCIe identity/BAR and DDR3 calibration remained valid; the loader entered an error state during the partial image load. A cold cycle is required before retrying."
+}
