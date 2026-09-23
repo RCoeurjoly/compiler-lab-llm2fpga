@@ -1,0 +1,28 @@
+{
+  "schema": "compiler-ddr3-response-trace-v1",
+  "status": "PASS_AUTHENTICATED_TRACE",
+  "source": {
+    "compiler_source_sha256": "54189d2622e598fa6758352f3b11a19c838fa2e3b62a96675403b8902bf78164",
+    "yosys_netlist_sha256": "6d4ceae30f93a87e32c295033d84785426b39c57a3e79db4ccfb9da2003cac0e",
+    "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "prompt": [7454, 2402, 257, 640],
+    "deterministic_x_contract": {"x_assign": 0, "x_initial": 0}
+  },
+  "trace": {
+    "record_format": "little-endian uint32 address followed by 128-bit little-endian response data",
+    "record_bytes": 20,
+    "record_count": 16333872,
+    "bytes": 326677440,
+    "sha256": "b70edf764294b9707ad602fa6a23c4f26e23d3eaf08f460bf008c23a9ededaf9"
+  },
+  "simulation": {
+    "token": 11,
+    "token_cycle": 165092533,
+    "requests": 16333872,
+    "responses": 16333872,
+    "runtime": "20:06.94",
+    "wrapper": "boundary-instrumented transaction-level external-memory model",
+    "hardware_validated": false
+  },
+  "interpretation": "This is the authenticated compiler-generated memory response sequence for the deterministic first-token simulation. It is ready for the temporary PCIe/UberDDR3 trace-replay diagnostic, but has not yet been loaded or replayed on YPCB."
+}
