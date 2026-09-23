@@ -1,0 +1,9 @@
+--- a/common/router2.cc
++++ b/common/router2.cc
+@@ -214,6 +214,7 @@
+         size_t wire_count = 0;
+         for (auto wire : ctx->getWires())
+             (void)wire, ++wire_count;
+         wire_to_idx.reserve(wire_count);
++        flat_wires.reserve(wire_count);
+         for (auto wire : ctx->getWires()) {

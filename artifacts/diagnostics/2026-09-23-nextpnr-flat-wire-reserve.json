@@ -1,0 +1,25 @@
+{
+  "schema": "nextpnr-router2-flat-wire-reserve-v1",
+  "source_patch": {
+    "path": "patches/nextpnr-xilinx/0038-router2-reserve-flat-wire-storage.patch",
+    "sha256": "dd55f289def3535daac88c2ba204db39f511ed20d4d9c5722810b40581d1f74e",
+    "change": "reserve flat_wires to the enumerated wire count before push_back"
+  },
+  "evidence": {
+    "massif_standard_peak_heap_bytes": 5468828634,
+    "massif_top_allocation": "Router2::setup_wires flat_wires vector reallocation",
+    "massif_top_allocation_bytes": 2415919104,
+    "patched_binary": "/tmp/nextpnr-flatreserve-build/nextpnr-xilinx",
+    "patched_binary_sha256": "e82868cf04800a229e503f14ef5be735167d1ae2addc61ec8a589ee041d986fc",
+    "netlist": "/tmp/compiler-full-accelerator-route/full-pipeline-compatible.json",
+    "netlist_sha256": "5326a10360e58707c2c73297b7be2e41ec7f78479343aae0956bf8ca19fc77b6",
+    "seed": 15,
+    "required_rowstream_mhz": 83.33,
+    "required_pcie_mhz": 62.5,
+    "route_timeout_seconds": 600,
+    "route_log": "/tmp/compiler-full-route-flatreserve/route.log",
+    "route_log_terminal_observation": "placement startup reached analytical placer; no FASM or timing report observed within bounded run"
+  },
+  "status": "diagnostic_inconclusive",
+  "interpretation": "The patch addresses a measured multi-gigabyte allocator hotspot in nextpnr router2 setup_wires and compiles successfully. The bounded full-design route did not yet reach timing or FASM, so no claim of improved routing, timing closure, bitstream, or hardware inference is made."
+}
