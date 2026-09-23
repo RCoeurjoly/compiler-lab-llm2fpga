@@ -1,0 +1,16 @@
+{
+  "schema": "ypcb-programmer-detect-v1",
+  "status": "FAIL_FTDI_OPEN",
+  "captured_at": "2026-09-23T19:02:00+02:00",
+  "programmer": {
+    "path": "/nix/store/5vmpyj6qrz4708r3nbb1ij3wpiykvazk-openfpgaloader-3ae5e5e-bpi-full-verify/bin/openFPGALoader",
+    "operation": "--detect",
+    "privilege": "non-root"
+  },
+  "result": {
+    "stdout": "empty",
+    "stderr": "open_device: failed to initialize ftdi; JTAG init failed",
+    "interpretation": "The programmer is not accessible to the current unprivileged process. No programming or board mutation was attempted."
+  },
+  "hardware_validated": false
+}
