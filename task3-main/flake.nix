@@ -34,7 +34,7 @@
     openXC7.url = "github:RCoeurjoly/toolchain-nix";
     nextpnrXilinxFork = {
       url =
-        "git+https://github.com/RCoeurjoly/nextpnr-xilinx?ref=stable-backports&submodules=1";
+        "git+https://github.com/RCoeurjoly/nextpnr-xilinx?ref=openxc7-stable-pcie-meta&submodules=1";
       flake = false;
     };
     ypcbHack = {
@@ -166,7 +166,14 @@
         openXC7Packages = openXC7.packages.${system};
         openXC7Fasm = openXC7Packages.fasm;
         openXC7Nextpnr = openXC7Packages.nextpnr-xilinx.overrideAttrs
-          (_: { src = nextpnrXilinxFork; });
+          (_: {
+            src = nextpnrXilinxFork;
+            patches = [
+              ../patches/nextpnr-xilinx/0023-disconnect-lut6-a6-before-memory-constant.patch
+              ../patches/nextpnr-xilinx/0024-drop-constant-a6-on-lut5.patch
+              ../patches/nextpnr-xilinx/0037-router2-reserve-wire-index-storage.patch
+            ];
+          });
         openXC7Chipdb = openXC7Packages.nextpnr-xilinx-chipdb.kintex7.override {
           chipdbFootprints = [ "xc7k480tffg1156" ];
           "nextpnr-xilinx" = openXC7Nextpnr;
