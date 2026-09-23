@@ -96,6 +96,21 @@ PROFILES = {
         "hierarchical_bridge": True,
         "bridge_pcie_reset_bit": 3,
     },
+    # The compiler-only command-boundary register causes synthesis to
+    # renumber the hierarchical reset LUT. Keep this exact netlist profile
+    # authenticated rather than using a heuristic cell/bit search.
+    "bbbb6b6fe3000510e94b11fbe008f9df06bc577547a15455fd396fcd42f19d4f": {
+        "source_sha256": "bbbb6b6fe3000510e94b11fbe008f9df06bc577547a15455fd396fcd42f19d4f",
+        "transport_reset_lut": "$abc$282204$auto$blifparse.cc:557:parse_blif$283034",
+        "replay_pcie_init_bits": [11504, 7966],
+        "raw_cfg_reset_bit": 7994,
+        "transport_reset_bit": 2130,
+        "reset_type": "LUT4",
+        "reset_init": "1111111111111110",
+        "reset_connections": {"I0": [2022], "I1": [2023], "I2": [4], "I3": [3], "O": [2130]},
+        "hierarchical_bridge": True,
+        "bridge_pcie_reset_bit": 3,
+    },
 }
 
 
