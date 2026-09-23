@@ -1,6 +1,6 @@
 {
   "schema": "compiler-ddr3-bank-consolidation-v1",
-  "status": "IMPLEMENTED_SEMANTIC_GATES_PASS_FULL_LOAD_SIMULATION_PENDING",
+  "status": "FULL_IMAGE_LOAD_READBACK_PASS_INFERENCE_TIMEBOX",
   "scope": "compiler-generated TinyStories-1M external-memory RTL; no PCIe, physical DDR3, bitstream, or board claim",
   "model": {
     "name": "TinyStories-1M",
@@ -31,6 +31,18 @@
     "read_hierarchy": "PASS",
     "yosys_optimizer": "baseline and consolidated candidate both abort in the pinned optimizer with std::out_of_range; not attributed to consolidation",
     "simulation_binary_sha256": "de15caae6e919bb6a0e5c1e248d575d67872b1197fd72054d9d6fd719222509c"
+    ,"owner_mux_simulation": {
+      "status": "FULL_IMAGE_READBACK_PASS_INFERENCE_TIMEBOX",
+      "wall_time_seconds": 1800,
+      "exit_code": 124,
+      "full_image_write_readback_bytes": 4136720,
+      "expected_first_token": 11,
+      "actual_first_token": null,
+      "requests": null,
+      "responses": null,
+      "log": "/tmp/compiler-ddr3-consolidated-sim/run.log",
+      "interpretation": "The exact image loaded and read back through the owner-mux transaction model. The run timed out during accelerator inference before token output; this is not a token mismatch or hardware claim."
+    }
   },
   "remaining_gates": [
     "complete loaded-image transaction simulation and exact token 11",
