@@ -342,18 +342,32 @@ module task6_ypcb_uberddr3_bist_rowstream_loader_top #(
   // becoming the rowstream critical path.
   logic [JTAG_COMMAND_WIDTH - 1:0] pcie_command_payload_q;
   logic pcie_command_event_q;
+  logic [JTAG_COMMAND_WIDTH - 1:0] pcie_command_payload_qq;
+  logic pcie_command_event_qq;
   always_ff @(posedge controller_clk or negedge rst_n) begin
     if (!rst_n) begin
       pcie_command_payload_q <= '0;
       pcie_command_event_q <= 1'b0;
+      pcie_command_payload_qq <= '0;
+      pcie_command_event_qq <= 1'b0;
     end else begin
       pcie_command_payload_q <= pcie_command_payload_i;
       pcie_command_event_q <= pcie_command_event_i;
+      pcie_command_payload_qq <= pcie_command_payload_q;
+      pcie_command_event_qq <= pcie_command_event_q;
     end
   end
+  // The compiler-generated accelerator has a wider command/decode cone than
+  // the loader-only path. Give only that mode one additional registered
+  // boundary; the established loader/JTAG mode retains its one-cycle ABI.
+  wire compiler_command_event = TINYSTORIES_ENABLE_COMPILER_DDR3
+    ? pcie_command_event_qq : pcie_command_event_q;
+  wire [JTAG_COMMAND_WIDTH - 1:0] compiler_command_payload =
+    TINYSTORIES_ENABLE_COMPILER_DDR3
+      ? pcie_command_payload_qq : pcie_command_payload_q;
   wire [JTAG_COMMAND_WIDTH - 1:0] jtag_command_payload =
-    pcie_command_event_q ? pcie_command_payload_q : jtag_command_payload_from_shift;
-  wire jtag_command_event = pcie_command_event_q | jtag_command_event_from_shift;
+    compiler_command_event ? compiler_command_payload : jtag_command_payload_from_shift;
+  wire jtag_command_event = compiler_command_event | jtag_command_event_from_shift;
   logic pcie_loader_done_sticky_q;
   logic pcie_loader_error_sticky_q;
   logic pcie_loader_last_accepted_sticky_q;
