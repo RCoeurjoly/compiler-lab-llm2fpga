@@ -1,0 +1,43 @@
+{
+  "schema": "compiler-full-accelerator-trace-csr-comparison-v1",
+  "scope": "placement-only comparison of compiler-generated TinyStories-1M DDR3/PCIe integration variants",
+  "purpose": "separate diagnostic trace-CSR timing cost from the remaining compiler/DDR implementation cost",
+  "common": {
+    "seed": 15,
+    "device": "xc7k480tffg1156",
+    "ddr3_profile": "two-lane-333/83.33",
+    "compiler_rtl": "compiler-generated TinyStories-1M external-memory implementation",
+    "transport": "PCIe plus UberDDR3 shell",
+    "acceptance_status": "diagnostic only; no FASM or hardware claim"
+  },
+  "variants": [
+    {
+      "name": "current_registered_boundary",
+      "log": "/tmp/compiler-full-route-current/route.log",
+      "rowstream_fmax_mhz": 37.09,
+      "pcie_user_fmax_mhz": 40.88,
+      "pcie_to_rowstream_delay_ns": 19.42,
+      "rowstream_to_pcie_delay_ns": 9.89,
+      "route_result": "router2 timeout before FASM"
+    },
+    {
+      "name": "trace_csr_elided_no_tmdriv",
+      "log": "/tmp/compiler-full-accelerator-route/full-production-no-trace-no-tmdriv.log",
+      "rowstream_fmax_mhz": 39.86,
+      "pcie_user_fmax_mhz": 55.76,
+      "pcie_to_rowstream_delay_ns": 5.86,
+      "rowstream_to_pcie_delay_ns": 4.68,
+      "route_result": "router2 did not emit FASM in the bounded diagnostic"
+    },
+    {
+      "name": "trace_csr_elided_lutram",
+      "log": "/tmp/compiler-full-accelerator-route/full-production-no-trace-lutram-route.log",
+      "rowstream_fmax_mhz": 39.22,
+      "pcie_user_fmax_mhz": 65.79,
+      "pcie_to_rowstream_delay_ns": 6.58,
+      "rowstream_to_pcie_delay_ns": 4.78,
+      "route_result": "router2 did not emit FASM in the bounded diagnostic"
+    }
+  ],
+  "finding": "Eliding diagnostic trace CSR logic reduces the PCIe-user-to-rowstream delay from 19.42 ns to 5.86--6.58 ns and raises PCIe timing to 55.76--65.79 MHz, but rowstream remains about 39 MHz versus the required 83.33 MHz. The remaining timing blocker is therefore not explained by the trace CSR alone; it is in the compiler/DDR-side implementation and/or its placement. No RTL change is authorized by this comparison."
+}
