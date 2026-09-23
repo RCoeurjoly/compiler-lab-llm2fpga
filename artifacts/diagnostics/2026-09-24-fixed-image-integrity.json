@@ -24,6 +24,12 @@
     "bytes_loaded": 4136720,
     "bytes_read_back": 4136720,
     "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "bounded_512_line_gate": {
+      "lines": 512,
+      "bytes": 8192,
+      "sha256": "5aa3e197e325beac12787b9ad0c9de407780614da4f5973b3dc346b551b213cb",
+      "status": "PASS"
+    },
     "status": "PASS"
   },
   "scope_exclusions": [
