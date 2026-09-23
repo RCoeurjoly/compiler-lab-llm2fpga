@@ -32,6 +32,14 @@
     "exit_code": 124,
     "interpretation": "Compiler optimization changed throughput by less than two percent; generated RTL evaluation, not driver compilation, dominates."
   },
+  "state_probe": {
+    "checkpoints": [
+      {"cycles": 100000, "requests": 2866, "responses": 2866, "bank_pending": 0, "bank_request_queued": 0, "arbiter_state": 0, "arbiter_owner": 31, "wishbone_pending": 0},
+      {"cycles": 200000, "requests": 8580, "responses": 8579, "bank_pending": 0, "bank_request_queued": 0, "arbiter_state": 2, "arbiter_owner": 31, "wishbone_pending": 1},
+      {"cycles": 300000, "requests": 15674, "responses": 15674, "bank_pending": 0, "bank_request_queued": 0, "arbiter_state": 0, "arbiter_owner": 31, "wishbone_pending": 0}
+    ],
+    "interpretation": "The memory arbiter continues to make progress and the consolidated token-bank controller is idle at these checkpoints; no request deadlock or unmatched response was observed. The dominant cost is the generated core/arbiter evaluation rate, with the consolidated bank path not active in these sampled states."
+  },
   "interpretation": "The consolidated path does not show a response mismatch or adapter error. The bounded probe demonstrates very low transaction-level simulation throughput; the long run stopped at the last observed checkpoint after no log progress for more than seven minutes. This is neither first-token success nor a hardware/PCIe/physical-DDR3 claim.",
   "next_action": "Instrument the first state/request transition where consolidated simulation progress collapses before rerunning full inference."
 }
