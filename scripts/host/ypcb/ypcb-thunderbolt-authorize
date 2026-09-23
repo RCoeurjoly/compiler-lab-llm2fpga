@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# udev invokes this helper as root. Authorize only the exact YPCB Helios
+# device; never turn this into a general Thunderbolt auto-authorizer.
+DEVPATH_ARG="${1:-}"
+EXPECTED_DEVPATH="/devices/pci0000:00/0000:00:0d.3/domain1/1-0/1-1"
+EXPECTED_VENDOR="0x5a"
+EXPECTED_DEVICE="0xde86"
+EXPECTED_UNIQUE_ID="c4148780-0010-1ed9-ffff-ffffffffffff"
+fail() { echo "ypcb-thunderbolt-authorize: $*" >&2; exit 1; }
+[[ -n "$DEVPATH_ARG" ]] || fail "missing udev devpath"
+[[ "$DEVPATH_ARG" == "$EXPECTED_DEVPATH" || "$DEVPATH_ARG" == "$EXPECTED_DEVPATH/" ]] || fail "unexpected devpath: $DEVPATH_ARG"
+SYSFS="/sys${DEVPATH_ARG%/}"
+[[ -d "$SYSFS" ]] || fail "device is absent: $SYSFS"
+[[ "$(<"$SYSFS/vendor")" == "$EXPECTED_VENDOR" ]] || fail "vendor mismatch"
+[[ "$(<"$SYSFS/device")" == "$EXPECTED_DEVICE" ]] || fail "device mismatch"
+[[ "$(<"$SYSFS/unique_id")" == "$EXPECTED_UNIQUE_ID" ]] || fail "unique ID mismatch"
+authorization="$SYSFS/authorized"
+[[ -w "$authorization" ]] || fail "authorization control is not writable"
+if [[ "$(<"$authorization")" != 1 ]]; then printf '1\n' >"$authorization"; fi
+[[ "$(<"$authorization")" == 1 ]] || fail "authorization did not stick"
