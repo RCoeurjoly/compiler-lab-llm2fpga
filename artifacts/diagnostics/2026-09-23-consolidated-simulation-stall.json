@@ -1,0 +1,28 @@
+{
+  "schema": "compiler-ddr3-consolidated-simulation-stall-v1",
+  "status": "DIAGNOSTIC_TERMINATED_NO_TOKEN",
+  "scope": "compiler-generated TinyStories-1M consolidated external-memory RTL; transaction-level model only",
+  "model": {
+    "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "candidate_sha256": "54189d2622e598fa6758352f3b11a19c838fa2e3b62a96675403b8902bf78164",
+    "prompt": [7454, 2402, 257, 640],
+    "expected_first_token": 11
+  },
+  "run": {
+    "driver": "/tmp/compiler-ddr3-consolidated-sim/stall-driver",
+    "termination": "explicit_interrupt_after_stationary_4m_checkpoint",
+    "exit_code": 130,
+    "checkpoint_cycles": 4000000,
+    "checkpoint_requests": 252356,
+    "checkpoint_responses": 252356,
+    "checkpoint_token_valid": false,
+    "checkpoint_error": false,
+    "short_probe_cycles": 100000,
+    "short_probe_requests": 2866,
+    "short_probe_responses": 2866,
+    "short_probe_wall_seconds": 59.065,
+    "short_probe_exit_code": 124
+  },
+  "interpretation": "The consolidated path does not show a response mismatch or adapter error. The bounded probe demonstrates very low transaction-level simulation throughput; the long run stopped at the last observed checkpoint after no log progress for more than seven minutes. This is neither first-token success nor a hardware/PCIe/physical-DDR3 claim.",
+  "next_action": "Instrument the first state/request transition where consolidated simulation progress collapses before rerunning full inference."
+}
