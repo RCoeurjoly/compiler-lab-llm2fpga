@@ -78,6 +78,14 @@
       "responses": 2926,
       "result": "rejected",
       "interpretation": "Replacing 345 disabled-path 'x mux arms with zero does not improve runtime and changes the request trace versus the baseline (2866 requests); four-state don't-care behavior is not assumed equivalent."
+    },
+    "q_output_enable_cse_experiment": {
+      "cycles": 100000,
+      "wall_seconds": 57.29,
+      "requests": 2926,
+      "responses": 2926,
+      "result": "rejected",
+      "interpretation": "Factoring the q_output static-read predicate into a wire does not improve runtime and changes the bounded trace versus the baseline; this generated design is sensitive to control scheduling and the CSE is not promoted."
     }
   },
   "interpretation": "The consolidated path does not show a response mismatch or adapter error. The bounded probe demonstrates very low transaction-level simulation throughput; the long run stopped at the last observed checkpoint after no log progress for more than seven minutes. This is neither first-token success nor a hardware/PCIe/physical-DDR3 claim.",
