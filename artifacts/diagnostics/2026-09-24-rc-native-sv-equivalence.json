@@ -1,0 +1,25 @@
+{
+  "schema": "llm2fpga.rc-native-sv-equivalence.v1",
+  "status": "blocked-unobservable-sv-output",
+  "target": "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence",
+  "command": "XDG_CACHE_HOME=/tmp/rc-nix-cache nix build .#tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence --no-link -L",
+  "nix_build_exit_code": 0,
+  "generated_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+  "equivalence_report_sha256": "10618c09aa0b36dab476d49fb5243e7cd59a71ed3698ef8ab5db660182655dd9",
+  "equivalence": {
+    "attempted": false,
+    "reason": "generated main top exposes only clk/reset/go/done; no functional output ports",
+    "pytorch_reference_output_i8": [
+      [
+        [-2, 76]
+      ]
+    ],
+    "input_token_ids": [[3]]
+  },
+  "diagnosis": "The compiler path now emits native SV, but its top-level Calyx component hides the functional result behind internal/external memory ports. A compiler-owned output-interface lowering or generated wrapper is required before RC functional equivalence and board integration.",
+  "source_paths": {
+    "model_calyx_mlir": "/nix/store/aqdcxjngxsivqhspa0vf1ipi4hk84369-tinystories-representative-core-w4a8-integer-calyx/model.calyx.mlir",
+    "generated_sv": "/nix/store/wad3fb272r9mzr4mfqzc06c9gwhm1a6k-tinystories-representative-core-w4a8-integer-calyx-native-sv/sv/main.sv",
+    "report": "/nix/store/80svbn7w49zpzrpldknd3xyghvbnyd86-tinystories-representative-core-w4a8-integer-sv-equivalence/report.json"
+  }
+}
