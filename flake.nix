@@ -66,7 +66,11 @@
         circtLlvm = circtPkgs.libllvm;
 
         nixEdaPkgs = nix-eda.packages.${system};
-        yosysPkgBase = nixEdaPkgs.yosys;
+        yosysPkgBase = (nixEdaPkgs.yosys.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [
+            ./patches/yosys/0001-xilinx-dsp-initialize-pattern-detect-parameter.patch
+          ];
+        }));
         yosysPkgPlugins = with nixEdaPkgs;
           [ yosys-sby yosys-eqy yosys-slang ] ++ pkgs.lib.optionals
           (pkgs.lib.lists.any (el: el == system) yosys-ghdl.meta.platforms)
