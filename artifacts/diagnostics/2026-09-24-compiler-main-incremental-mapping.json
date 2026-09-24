@@ -1,0 +1,27 @@
+{
+  "schema": "compiler-main-incremental-mapping-v1",
+  "status": "STANDALONE_INCREMENTAL_MAPPING_PASS",
+  "scope": "standalone unchanged compiler-generated TinyStories-1M main; no PCIe/UberDDR3 composition",
+  "model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "tool": {
+    "path": "/nix/store/477lcja0ri0hdn8c6vcmikr0f3rlyhqv-yosys-dspfix2-with-plugins-0.66/bin/yosys",
+    "binary_sha256": "ec8053b861a65f70a925229ae84143084897fe0ffc947a895b20f7c6b18c0910"
+  },
+  "stages": [
+    {"name": "coarse", "status": "PASS", "bytes": 22573078, "sha256": "627f9c6e6914c49eae39b101cefae65bbd14f8ef0b26cafb6a337e7dd57951f5"},
+    {"name": "xilinx_dsp", "status": "PASS", "bytes": 22572572, "sha256": "707b3a8b8f052cb79735ab2a47340d8e6b0465061efae78ff24309068bd4c3b9"},
+    {"name": "map_memory", "status": "PASS", "bytes": 22630713, "sha256": "7034f9ccdd348769dba3fbe6a8d0aa21424e99bc2daa49a6814f5ac7f87ac0e0"},
+    {"name": "map_cells", "status": "PASS", "bytes": 51657643, "sha256": "e1dccce66d2b1cb3ed045cabec70f95e89e30b15a07e75ad5e7dcc02f910d858"},
+    {"name": "map_ffs", "status": "PASS", "bytes": 51684180, "sha256": "3cdd53bc5c7e950d8250c7eddc361ddf161f9409fabc4d30e511598eab174e7c"},
+    {"name": "map_luts", "status": "PASS", "bytes": 34107672, "sha256": "33ccaac14259d2dd3d6bbd20bbd7b374942ba0c673157c5f6df6228dd4dfdbbb"}
+  ],
+  "mapped_main": {
+    "cells": 6456,
+    "fdre": 88,
+    "lut2_lut6": 6129,
+    "muxf7": 185,
+    "muxf8": 53,
+    "external_memory_submodules": 240
+  },
+  "interpretation": "The compiler-generated main can be carried through bounded incremental Xilinx mapping when each stage consumes the prior JSON checkpoint. This proves a viable fast implementation boundary for the accelerator alone; it does not prove shell composition, placement, routing, timing, bitstream generation, or hardware inference."
+}
