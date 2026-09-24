@@ -1,0 +1,49 @@
+{
+  "schema": "llm2fpga.rc-ddr3-shell-route-bitstream-pass.v1",
+  "status": "pass",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "top": "compiler_ddr3_trace_replay_top",
+  "configuration": {
+    "ENABLE_COMPILER_ACCELERATOR": 1,
+    "ENABLE_COMPILER_GENERATED_RC": 1,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "ddr_clock_period_ps": 3000,
+    "seed": 15,
+    "timing_allow_fail_diagnostic_option": true
+  },
+  "route": {
+    "status": "completed",
+    "errors": 0,
+    "warnings": 23,
+    "final_rowstream_max_frequency_mhz": 87.87,
+    "final_rowstream_required_mhz": 83.33,
+    "final_pcie_user_max_frequency_mhz": 88.98,
+    "final_pcie_user_required_mhz": 62.5,
+    "final_timing": "pass"
+  },
+  "bitstream": {
+    "status": "validated",
+    "decoded_configuration_bits": 880384,
+    "part": "xc7k480tffg1156-1"
+  },
+  "tools": {
+    "nextpnr_xilinx": "0.8.2",
+    "fasm2frames": "prjxray bdbc665852b82f589ff775a8f6498542dbec0a07",
+    "route_wall_timeout_seconds": 300,
+    "bitstream_wall_timeout_seconds": 180
+  },
+  "hashes": {
+    "synthesis_json_sha256": "7c47badbc0c831a79c3346fd7698116bd033a82c0b09bc8f97ccfee5e05e48bd",
+    "route_fasm_sha256": "a5ed5d9fde1d0cc109b36300d0bc8fce2388c81c2749a90a628d26e357ea8613",
+    "route_log_sha256": "2ec125b73487b8e9869fd9052be7ed5e22e111159b1784edff82647f8acbb6ba",
+    "bitstream_sha256": "1c8583bf32e4d4353264798b0d498a5cb5f35baf584dc7dbcb120bed637a6ad3",
+    "frames_sha256": "be4faeecd20ad0d1a7b7ec11b86f1d532a17d5d7682572e34d634df83a59cfbe",
+    "decoded_bits_sha256": "9865471cdd45d6ba30d473c9dc4230cbba294d9f1fb4fa7dd5cc0fa00e6d1d07"
+  },
+  "limitations": [
+    "The bitstream has not been programmed into YPCB in this checkpoint.",
+    "PCIe enumeration, DDR3 calibration/BIST, image loading, and board inference remain unverified.",
+    "This RC milestone does not establish full TinyStories-1M or autoregressive board acceptance."
+  ]
+}
