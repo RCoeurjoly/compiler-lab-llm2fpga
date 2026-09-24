@@ -1,0 +1,44 @@
+{
+  "schema": "compiler-ddr3-fulltop-fine-frontier-v1",
+  "status": "SYNTHESIS_TIMEBOX_AT_FINE_OPTIMIZATION",
+  "top": "compiler_ddr3_trace_replay_top",
+  "compiler_model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "input": {
+    "post_dsp_checkpoint": {
+      "path": "/tmp/compiler-fulltop-postdsp.il",
+      "sha256": "880c5a0aa222cb3649bac588fa8dd0b5bcaabc5bfa6ec2a922a707834d493919",
+      "bytes": 43031613
+    },
+    "memory_map_checkpoint": {
+      "path": "/tmp/compiler-fulltop-memory.il",
+      "sha256": "f177c9429dfe409def6c24759b87d1355f7beaadf4f0a80842c207eceaecd598",
+      "bytes": 82779751
+    }
+  },
+  "tool": {
+    "path": "/nix/store/477lcja0ri0hdn8c6vcmikr0f3rlyhqv-yosys-dspfix2-with-plugins-0.66/bin/yosys",
+    "sha256": "ec8053b861a65f70a925229ae84143084897fe0ffc947a895b20f7c6b18c0910"
+  },
+  "probe": {
+    "stages_completed": [
+      "flatten_and_prepare",
+      "xc7_dsp_mapping",
+      "xc7_lutram_bram_memory_mapping"
+    ],
+    "stage_at_bound": "opt -fast after memory_map",
+    "limit_seconds": 90,
+    "return_code": 124,
+    "log": {
+      "path": "/tmp/compiler-fulltop-fine.log",
+      "sha256": "9a4308c1b3bee5c7574a1b9f3e2921af731fa77934d6516faa1cd55097f569fc",
+      "bytes": 489439,
+      "last_checkpoint": "7.101 Executing OPT_EXPR pass (perform const folding)"
+    },
+    "checkpoint": "not produced",
+    "netlist": "not produced",
+    "timing": "not measured",
+    "pnr": "not run",
+    "bitstream": "not produced"
+  },
+  "interpretation": "The unchanged compiler-generated TinyStories-1M plus PCIe/UberDDR3 composition now passes bounded DSP and memory technology-mapping checkpoints. The next bounded implementation bottleneck is fine optimization after memory mapping; this is an implementation-time frontier, not a functional simulation failure. No compiler, accelerator, PCIe, or DDR3 RTL was changed."
+}
