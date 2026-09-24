@@ -1,0 +1,45 @@
+{
+  "schema": "tinystories-compiler-pcie-uberddr3-memory-map-nextpnr-frontier-v1",
+  "status": "routing-timeout-no-fasm",
+  "design": "compiler-generated TinyStories-1M plus PCIe plus UberDDR3",
+  "profile": "two-lane DDR3 333/83.33 MHz; PCIe clocks unchanged; seed 15",
+  "netlists": {
+    "mapped": {
+      "path": "/tmp/compiler-fulltop-selected.json",
+      "sha256": "717476ec6d5d57837b45f84c45534d9b6eefeab157555267940635fac0a26758"
+    },
+    "dram_compat": {
+      "path": "/tmp/compiler-fulltop-selected-dramcompat2.json",
+      "sha256": "941c178d383292d7e6a77c5a8139b342df1d8e6e21b8c14b2efc0f80fb584017"
+    }
+  },
+  "mapping_evidence": {
+    "block_input_q16_16": "RAM64M",
+    "attention_residual_q16_16": "RAM64M",
+    "block_output_q16_16": "RAM64M",
+    "remaining_RAMB36E1_in_main": 39,
+    "unsupported_RAM64X1S_fixed_by": "fpga/compat/nextpnr_dram_compat_map.v"
+  },
+  "nextpnr": {
+    "binary": "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+    "exit_code": 124,
+    "wall_limit_seconds": 600,
+    "stage_reached": "routing",
+    "packing": "passed",
+    "timing_loop_abort": false,
+    "fasm_written": false,
+    "log": "/tmp/compiler-fulltop-selected-dramcompat2-nextpnr.log"
+  },
+  "interpretation": {
+    "progress": "The BRAM combinational-loop and RAM64X1S primitive blockers are both bypassed by evidence-backed mapping changes.",
+    "not_yet_proven": [
+      "route completion",
+      "timing closure",
+      "bitstream programming",
+      "DDR3 calibration",
+      "PCIe image load",
+      "first-token hardware inference"
+    ],
+    "next_action": "Run one longer bounded router attempt with the same netlist, constraints, seed, and transport; do not change RTL or timing profile."
+  }
+}
