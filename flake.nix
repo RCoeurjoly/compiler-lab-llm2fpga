@@ -67,7 +67,7 @@
 
         nixEdaPkgs = nix-eda.packages.${system};
         yosysPkgBase = (nixEdaPkgs.yosys.overrideAttrs (old: {
-          pname = "yosys-dspfix";
+          pname = "yosys-dspfix2";
           # Keep patched-tool rebuilds from exhausting the host while
           # diagnosing the generated-top DSP mapper.
           enableParallelBuilding = false;
