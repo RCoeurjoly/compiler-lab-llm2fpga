@@ -1,0 +1,44 @@
+{
+  "schema": "compiler-ddr3-placement-strategy-frontier-v1",
+  "status": "PLACEMENT_ONLY_COMPARISON",
+  "scope": "unchanged compiler-generated TinyStories-1M netlist with exact pinned YPCB PCIe/UberDDR3 constraints",
+  "netlist": {
+    "path": "/tmp/compiler-csr0-nofsm-compat2.json",
+    "sha256": "1a7ebe107aba3a3a740097c9e37018a0f150e87a21cb8bb136aeed20847c70ed"
+  },
+  "tools": {
+    "nextpnr": "/nix/store/bhf0sqg4dsrbp0i52j5pb633s97xib7m-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+    "nextpnr_sha256": "4b86f3f971ca0b57d589c0e646dba18439b958f327ee4270d7d67c137e417334",
+    "chipdb": "/nix/store/8s95bdz7d69facix9k7h99dfw2chah45-nextpnr-xilinx-chipdb-0.8.2/xc7k480tffg1156.bin",
+    "board_xdc": "/nix/store/rlw4yzrqhavc7la9hrdng2l1khwklrfn-task6-board-shell-m2-production-source-closure/constraints/board.xdc",
+    "board_xdc_sha256": "890ebb9d0fc854c8595d3e9e67b4a4074fe42ac7682680b9c33dd1d2c8662f57",
+    "clock_script_sha256": "42acd411f3e34ac494e56f64b12c0de81394b567d5087c1213b820040fa9d698",
+    "seed": 15,
+    "profile": "two-lane DDR3 333/83.33 MHz, PCIe 62.5 MHz"
+  },
+  "experiments": {
+    "heap": {
+      "placer": "heap",
+      "route": "disabled",
+      "return_code": 0,
+      "log": "/tmp/compiler-csr0-nofsm-heap-noroute.out",
+      "log_sha256": "9dbb4d8a6c698441a9d18dc693a327f82ab8d7bdef7609a5d451b86463fd764c",
+      "fmax_mhz": {
+        "rowstream_clk": 42.28,
+        "pcie_user_clk": 99.90
+      },
+      "interpretation": "Placement completed, but rowstream remains far below 83.33 MHz."
+    },
+    "sa": {
+      "placer": "sa",
+      "route": "disabled",
+      "termination": "manually interrupted after initial placement reached 26500/123624 cells",
+      "return_code": 130,
+      "log": "/tmp/compiler-csr0-nofsm-sa-noroute.out",
+      "log_sha256": "59bd042064399b3d8da7d1c231adcb929828aa89f923cd42945690b8ec28929d",
+      "fmax_mhz": null,
+      "interpretation": "Standalone SA placement is too slow for the bounded iteration loop on this netlist; no timing result was claimed."
+    }
+  },
+  "conclusion": "With the exact board closure, heap placement improves rowstream timing from the prior 36.95 MHz estimate to 42.28 MHz, but placement strategy alone does not approach the fixed 83.33 MHz requirement. A compiler/backend structural change is required before another full route attempt is justified."
+}
