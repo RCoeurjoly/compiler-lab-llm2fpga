@@ -1,0 +1,28 @@
+{
+  "schema": "compiler-ddr3-nix-source-closure-v1",
+  "status": "SOURCE_CLOSURE_PASS_SYNTHESIS_INTERRUPTED",
+  "scope": "Nix synthesis screen for the real compiler-generated TinyStories-1M accelerator",
+  "model": {
+    "path": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv",
+    "sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+    "tracked_commit": "690d68b"
+  },
+  "build": {
+    "target": ".#compiler-ddr3-trace-replay-synthesis-screen",
+    "mode": "nix build --impure -L",
+    "source_files": [
+      "model.sv",
+      "rtl/memory/llm_external_memory_arbiter.sv",
+      "rtl/memory/llm_wishbone_pipeline.sv",
+      "rtl/tinystories_1m_ddr3_backend.sv",
+      "rtl/tinystories_1m_ddr3_command_adapter.sv",
+      "rtl/diagnostics/compiler_ddr3_trace_replay_top.sv"
+    ],
+    "parameter": "ENABLE_COMPILER_ACCELERATOR=1",
+    "evaluation": "PASS; derivation entered the build",
+    "synthesis": "interrupted while the bounded Yosys synthesis was still running",
+    "netlist": "not produced",
+    "bitstream": "not produced"
+  },
+  "interpretation": "The Nix closure now exercises the real compiler accelerator instead of silently building the replay-only shell. The implementation timebox remains unresolved."
+}
