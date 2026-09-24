@@ -50,6 +50,17 @@ let
     pkgs.lib.hasSuffix ".v" row.logical_path) pins.sources;
   sourceArgs = pkgs.lib.concatMapStringsSep " "
     (row: "${replayObserverSourceClosure}/${row.logical_path}") sources;
+  # The production implementation screen must include the actual
+  # compiler-generated accelerator and its transport-neutral DDR3 boundary.
+  # Keeping these paths explicit makes it impossible for the derivation to
+  # silently fall back to the trace-replay-only shell.
+  compilerSourceArgs = pkgs.lib.concatStringsSep " " [
+    "${../.superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv}"
+    "${../rtl/memory/llm_external_memory_arbiter.sv}"
+    "${../rtl/memory/llm_wishbone_pipeline.sv}"
+    "${../rtl/tinystories_1m_ddr3_backend.sv}"
+    "${../rtl/tinystories_1m_ddr3_command_adapter.sv}"
+  ];
   yosys = builtins.storePath "/nix/store/1g0dvnvw75fnlnk4ad586c65wfxbf5rs-yosys-with-plugins-0.66";
   replaySynthesis = pkgs.runCommand "compiler-ddr3-trace-replay-synthesis-screen" {
     nativeBuildInputs = [ pkgs.python3 ];
@@ -58,7 +69,8 @@ let
     cat > run.ys <<EOF
     read_verilog -lib +/xilinx/cells_sim.v
     read_verilog -lib +/xilinx/cells_xtra.v
-    read_verilog -sv -DTASK6_PCIE_ROWSTREAM_INGRESS_PORTS -DTASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS -DTASK6_COMPILER_DDR3_ACCELERATOR_PORTS ${sourceArgs} ${m2SourceClosure}/task6_normal_command_stage.sv ${../rtl/diagnostics/compiler_ddr3_trace_replay.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_top.sv}
+    read_verilog -sv -DTASK6_PCIE_ROWSTREAM_INGRESS_PORTS -DTASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS -DTASK6_COMPILER_DDR3_ACCELERATOR_PORTS ${sourceArgs} ${compilerSourceArgs} ${m2SourceClosure}/task6_normal_command_stage.sv ${../rtl/diagnostics/compiler_ddr3_trace_replay.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_top.sv}
+    chparam -set ENABLE_COMPILER_ACCELERATOR 1 compiler_ddr3_trace_replay_top
     hierarchy -check -top compiler_ddr3_trace_replay_top
     synth_xilinx -flatten -arch xc7 -nosrl -noiopad -top compiler_ddr3_trace_replay_top
     check
