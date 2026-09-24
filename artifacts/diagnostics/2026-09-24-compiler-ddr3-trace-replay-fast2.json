@@ -1,0 +1,103 @@
+{
+  "artifacts": {
+    "bitstream": {
+      "path": "/nix/store/vkphrmb3w5h9yjdc4al3jnr6fp4906gf-compiler-ddr3-trace-replay-bitstream/replay.bit",
+      "sha256": "500e0df3e96b3194b142b79c0b5bec94557ccfa1941d4dbc5afa2c2f6604621d"
+    },
+    "image": {
+      "bytes": 4136720,
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/.superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/image.bin",
+      "sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"
+    },
+    "mmio32_library": {
+      "path": "/nix/store/g2v46g8icb0b77g0zsva6s2148945gz4-compiler-ddr3-mmio32-1/lib/libypcb_mmio32.so",
+      "sha256": "b07c207fdccb28ffa777404d7ba3f2f738bd1fdcff4066f708e44e15a97c718a"
+    },
+    "replay": {
+      "bytes": 262338240,
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/.superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/compiler-ddr3-trace-replay.bin",
+      "sha256": "46332a3a8d9ebf3a12d2fe968ae4e412200f9d419f3131ae46152dee26ee7d71"
+    },
+    "runner": {
+      "path": "/home/roland/compiler-lab-llm2fpga/.worktrees/compiler-micron-integration-exec/scripts/pipeline/run_compiler_ddr3_trace_replay.py",
+      "sha256": "6b6fcb76c1e35c01b74445bb46fd433b34b44961ddaffa7215dca27233f7fc57"
+    }
+  },
+  "calibration_bist": {
+    "bist_mode": 2,
+    "loader": 55,
+    "required_done_state": 23,
+    "state": 23,
+    "status": 101
+  },
+  "checkpoint_path": "/tmp/2026-09-24-compiler-ddr3-trace-replay-fast2.snapshot.json",
+  "completed_at": "2026-09-24T06:35:52Z",
+  "csr_identity": {
+    "bist": 23,
+    "ddr3_status": "0x17",
+    "loader": "0x37",
+    "magic": "0x54365043",
+    "replay_magic": "0x52504c59",
+    "replay_version": 1,
+    "status": "0x65",
+    "version": "0x3"
+  },
+  "endpoint": "0000:42:00.0",
+  "image_bytes": 4136720,
+  "load": {
+    "bytes_loaded": 4136720,
+    "bytes_read_back": 4136720,
+    "sha256_readback": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593"
+  },
+  "programming": "existing live SRAM diagnostic bitstream; no RTL or bitstream change",
+  "record_count": 13116912,
+  "replay": {
+    "accepted": 13116912,
+    "checked": 13116912,
+    "configured": 13116912,
+    "errors": 0,
+    "fifo_level": 0,
+    "first_actual": "00000000000000000000000000000000",
+    "first_address": 0,
+    "first_expected": "00000000000000000000000000000000",
+    "first_index": 4294967295,
+    "flags": 5,
+    "pushed": 13116912,
+    "responded": 13116912,
+    "state": 2
+  },
+  "replay_final": {
+    "accepted": 13116912,
+    "checked": 13116912,
+    "configured": 13116912,
+    "errors": 0,
+    "fifo_level": 0,
+    "first_actual": "00000000000000000000000000000000",
+    "first_address": 0,
+    "first_expected": "00000000000000000000000000000000",
+    "first_index": 4294967295,
+    "flags": 5,
+    "pushed": 13116912,
+    "responded": 13116912,
+    "state": 2
+  },
+  "replay_progress": {
+    "accepted": 13107200,
+    "checked": 13107200,
+    "configured": 13116912,
+    "errors": 0,
+    "fifo_level": 0,
+    "first_actual": "00000000000000000000000000000000",
+    "first_address": 0,
+    "first_expected": "00000000000000000000000000000000",
+    "first_index": 4294967295,
+    "flags": 11,
+    "pushed": 13107200,
+    "responded": 13107200,
+    "state": 1
+  },
+  "schema": "compiler-ddr3-trace-replay-hardware-v1",
+  "scope": "exact compiler-derived DDR3 replay diagnostic; not inference",
+  "stage": "complete",
+  "status": "PASS"
+}
