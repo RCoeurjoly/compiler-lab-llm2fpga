@@ -30,5 +30,34 @@
     "fasm": "not produced",
     "bitstream": "not produced"
   },
+  "bounded_comparisons": [
+    {
+      "name": "router2",
+      "limit_seconds": 300,
+      "return_code": 124,
+      "stage_at_bound": "main router loop",
+      "fasm": "not produced",
+      "interpretation": "The alternative router did not reach a completed route within the shorter bound; no improvement was observed."
+    },
+    {
+      "name": "heap_placer_router1",
+      "limit_seconds": 600,
+      "return_code": 124,
+      "stage_at_bound": "routing",
+      "last_iteration": 131000,
+      "last_remaining_arcs": 341376,
+      "last_router_seconds": 218.78,
+      "fasm": "not produced",
+      "interpretation": "Heap placement with router1 was behind the baseline router1 frontier at the same fixed seed/profile."
+    },
+    {
+      "name": "timing_driven_sa_early_probe",
+      "stage_at_bound": "initial placement",
+      "termination": "operator-interrupted after early progress check",
+      "progress": "5000/133752 cells placed",
+      "fasm": "not produced",
+      "interpretation": "Timing-driven placement was substantially slower on this host and was stopped before routing; it is not a candidate fast path."
+    }
+  ],
   "interpretation": "The distributed-memory mapping removed the prior compiler-memory combinational-loop blocker, and the compatibility map removed the RAM64X1S packing blocker. The unchanged integrated compiler accelerator plus PCIe/UberDDR3 composition reaches placement and active routing under the fixed profile, but this bounded router run did not converge. This is an implementation convergence frontier; it is not evidence of PCIe, DDR3, or accelerator functional failure."
 }
