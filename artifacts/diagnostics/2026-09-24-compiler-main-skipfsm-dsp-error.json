@@ -1,0 +1,28 @@
+{
+  "date": "2026-09-24",
+  "status": "TOOL_FRONTIER_YOSYS_XILINX_DSP_ERROR",
+  "scope": "standalone compiler-generated TinyStories-1M main",
+  "rtl": {
+    "path": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv",
+    "sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a"
+  },
+  "command": [
+    "yosys",
+    "-p",
+    "read_verilog -nomeminit -sv model.sv; hierarchy -top main; proc; check; flatten; tribuf -logic; deminout; opt_expr; opt_clean; check; opt -nodffe -nosdff; opt; wreduce; peepopt; opt_clean; clean; sort; synth_xilinx -run map_dsp:check -flatten -arch xc7 -nosrl -noiopad -top main; write_json /tmp/compiler-main-skipfsm.json"
+  ],
+  "limits": {
+    "wall_seconds": 300,
+    "virtual_memory_mb": 8000,
+    "file_size_mb": 180
+  },
+  "result": {
+    "exit_status": 1,
+    "phase": "17.5 XILINX_DSP",
+    "error": "Accessing non existing parameter \\USE_PATTERN_DETECT",
+    "netlist_emitted": false,
+    "host_freeze": false
+  },
+  "interpretation": "This is a bounded tool-flow failure in the Yosys/Xilinx DSP mapper, not evidence of a semantic mismatch in the compiler-generated accelerator. A Yosys/plugin patch or a bounded no-DSP comparison is permitted; no RTL or model change is implied.",
+  "next_action": "Reproduce against the exact pinned Yosys/plugin derivation, locate the USE_PATTERN_DETECT parameter access, and patch or gate it with a focused regression before any integrated synthesis retry."
+}
