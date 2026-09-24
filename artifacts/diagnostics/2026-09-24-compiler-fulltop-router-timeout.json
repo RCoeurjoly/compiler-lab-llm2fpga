@@ -1,0 +1,34 @@
+{
+  "schema": "compiler-ddr3-fulltop-router-frontier-v1",
+  "status": "ROUTING_TIMEBOX_EXCEEDED",
+  "top": "compiler_ddr3_trace_replay_top",
+  "compiler_model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "netlist": {
+    "path": "/tmp/compiler-fulltop-selected-dramcompat2.json",
+    "sha256": "941c178d383292d7e6a77c5a8139b342df1d8e6e21b8c14b2efc0f80fb584017",
+    "bytes": 126936209,
+    "compatibility_map": "fpga/compat/nextpnr_dram_compat_map.v"
+  },
+  "tool": {
+    "nextpnr": "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+    "profile": {
+      "device": "xc7k480tffg1156-1",
+      "seed": 15,
+      "router": "router1",
+      "no_tmdriv": true,
+      "timing_allow_fail": true
+    }
+  },
+  "probe": {
+    "command_log": "/tmp/compiler-fulltop-selected-dramcompat2-long-nextpnr.log",
+    "limit_seconds": 1200,
+    "return_code": 124,
+    "stage_at_bound": "routing",
+    "last_iteration": 422000,
+    "last_remaining_arcs": 216330,
+    "last_router_seconds": 996.88,
+    "fasm": "not produced",
+    "bitstream": "not produced"
+  },
+  "interpretation": "The distributed-memory mapping removed the prior compiler-memory combinational-loop blocker, and the compatibility map removed the RAM64X1S packing blocker. The unchanged integrated compiler accelerator plus PCIe/UberDDR3 composition reaches placement and active routing under the fixed profile, but this bounded router run did not converge. This is an implementation convergence frontier; it is not evidence of PCIe, DDR3, or accelerator functional failure."
+}
