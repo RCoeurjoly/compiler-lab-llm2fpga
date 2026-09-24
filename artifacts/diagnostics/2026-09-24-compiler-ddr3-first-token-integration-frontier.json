@@ -1,0 +1,41 @@
+{
+  "schema": "compiler-ddr3-first-token-integration-frontier-v1",
+  "status": "SIMULATION_AND_TRANSPORT_PASS_IMPLEMENTATION_PENDING",
+  "scope": "unchanged compiler-generated TinyStories-1M accelerator with PCIe/UberDDR3 YPCB integration",
+  "model": {
+    "path": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv",
+    "sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+    "image_sha256": "e44d9bac0ddcf267cb2b41eb6f0aee623bacfb28809d9dffb7edc0319c43e593",
+    "prompt": [7454, 2402, 257, 640],
+    "expected_first_token": 11
+  },
+  "simulation": {
+    "receipt": "artifacts/diagnostics/2026-09-23-yosys-first-token-simulation.json",
+    "receipt_sha256": "a3bc796d9ccd0e86c93cf5d1291031457f4119f80dcbf67a1307e8d86ce724ed",
+    "status": "PASS_FIRST_TOKEN_SIMULATION_ONLY",
+    "token": 11,
+    "requests": 16322359,
+    "responses": 16322358
+  },
+  "hardware_transport": {
+    "receipt": "artifacts/diagnostics/2026-09-24-compiler-ddr3-trace-replay-fast2.json",
+    "receipt_sha256": "bbcbb1085cf585eeefc4beba69d80e8f4fd0697fc8d94eb943626ac338df4a5b",
+    "status": "PASS",
+    "records": 13116912,
+    "errors": 0,
+    "state": 2
+  },
+  "rtl_contract": {
+    "top_sha256": "0c4a63aa837a8c94857164f7994c2ae7f0e77f674d1cf47ae868230b9e8fc693",
+    "backend_sha256": "dea1b57c3b746e5a6f79e12594481001fd697ba8e8e82c1ba2ceff62cdf21978",
+    "command_adapter_sha256": "b60998389d4a1ee669c57ae6e06c6d9e7289f98eb180396199e9448678aca976",
+    "focused_nix_tests": "14/14 passed: tests.test_tinystories_1m_ddr3_command_adapter tests.test_compiler_ddr3_trace_replay_top"
+  },
+  "implementation_frontier": {
+    "compiler_accelerator_bitstream": "not produced",
+    "known_route_result": "timing/legalization failure; no FASM",
+    "last_failure": "full compiler-generated top synthesis/implementation is not bounded enough for this host",
+    "next_action": "bounded structural reduction or tool-supported incremental implementation; no speculative accelerator, PCIe, or DDR3 changes"
+  },
+  "interpretation": "The exact compiler RTL contract and the physical PCIe+DDR3 platform are independently proven. The remaining unproven edge is implementation of their unchanged full accelerator composition and board token-11 inference."
+}
