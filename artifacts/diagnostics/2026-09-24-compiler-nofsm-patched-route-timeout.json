@@ -19,6 +19,17 @@
     "sha256": "1a7ebe107aba3a3a740097c9e37018a0f150e87a21cb8bb136aeed20847c70ed",
     "bytes": 126995011
   },
+  "mapped_cell_frontier": {
+    "main_cells": 71433,
+    "main_nets": 70642,
+    "main_fdre": 28581,
+    "main_lut_cells": 31268,
+    "main_carry4": 3376,
+    "main_dsp48e1": 245,
+    "main_ram64m": 528,
+    "shell_and_interconnect_cells": 33390,
+    "interpretation": "The compiler-generated main dominates the mapped design and has roughly one net per cell, with thousands of carry cells and 245 DSPs; the shell is not the dominant cell population."
+  },
   "tool": {
     "nextpnr": "/nix/store/bhf0sqg4dsrbp0i52j5pb633s97xib7m-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
     "sha256": "4b86f3f971ca0b57d589c0e646dba18439b958f327ee4270d7d67c137e417334",
