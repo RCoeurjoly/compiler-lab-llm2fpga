@@ -1,0 +1,28 @@
+{
+  "schema": "compiler-main-longest-path-frontier-v1",
+  "status": "STATIC_CRITICAL_STRUCTURE_IDENTIFIED",
+  "scope": "mapped compiler-generated TinyStories-1M main, isolated from PCIe/UberDDR3 shell",
+  "netlist": {
+    "path": "/tmp/compiler-csr0-nofsm-compat2.json",
+    "sha256": "1a7ebe107aba3a3a740097c9e37018a0f150e87a21cb8bb136aeed20847c70ed"
+  },
+  "tool": {
+    "yosys": "/nix/store/a6pq8qqwl7cq8f96zmq2dcap2qy79cbc-yosys-dspfix2-0.66/bin/yosys",
+    "log": "/tmp/compiler-main-ltp.log",
+    "log_sha256": "0465f03eb1a0248acf9d84207c19a49055bee7283f6ca9c520a5c422beabcfa4"
+  },
+  "analysis": {
+    "command": "read_json; hierarchy -top main -purge_lib; flatten; opt_clean; ltp -noff",
+    "longest_topological_path_nodes": 4633,
+    "path_start": "valid",
+    "path_features": [
+      "model-valid FSM and layer-2 state",
+      "attention residual memory read",
+      "ln_2 variance/square/normalization arithmetic",
+      "multiple carry-chain multiply/add structures",
+      "v_requant_qdq_divide dividend/divisor and compare logic"
+    ],
+    "dominant_named_region": "v_requant_qdq_divide and preceding ln_2/attention arithmetic"
+  },
+  "interpretation": "The compiler-generated main contains a very long combinational topological path through layer arithmetic and requantization/division logic. This is consistent with the 42.28 MHz rowstream placement estimate and identifies a concrete compiler/backend optimization target; no RTL or transport change was made."
+}
