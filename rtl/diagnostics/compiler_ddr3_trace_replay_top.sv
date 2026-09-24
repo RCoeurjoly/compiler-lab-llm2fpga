@@ -157,6 +157,7 @@ module compiler_ddr3_trace_replay_top #(
   wire [7:0] compiler_error_code;
   wire [62:0] compiler_debug_status;
   wire [31:0] compiler_request_count;
+  wire ingress_tinystories_token_ready;
 `endif
 
   wire [3:0] pcie_led;
@@ -392,10 +393,18 @@ module compiler_ddr3_trace_replay_top #(
     ,.rowstream_tinystories_cache_misses_i(rowstream_tinystories_cache_misses)
     ,.rowstream_tinystories_stall_cycles_i(rowstream_tinystories_stall_cycles)
     ,.rowstream_tinystories_token_valid_i(ENABLE_COMPILER_ACCELERATOR ? compiler_token_valid : rowstream_tinystories_token_valid)
-    ,.rowstream_tinystories_token_ready_o(ENABLE_COMPILER_ACCELERATOR ? compiler_token_ready : rowstream_tinystories_token_ready)
+    ,.rowstream_tinystories_token_ready_o(ingress_tinystories_token_ready)
     ,.rowstream_tinystories_token_id_i(ENABLE_COMPILER_ACCELERATOR ? compiler_token_id : rowstream_tinystories_token_id)
 `endif
   );
+
+`ifdef TASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS
+  // The ingress has one token-ready output.  Route it explicitly to the
+  // selected consumer; connecting an output port to a ternary expression
+  // leaves the compiler-side net undriven in Yosys.
+  assign compiler_token_ready = ENABLE_COMPILER_ACCELERATOR ? ingress_tinystories_token_ready : 1'b0;
+  assign rowstream_tinystories_token_ready = ENABLE_COMPILER_ACCELERATOR ? 1'b0 : ingress_tinystories_token_ready;
+`endif
 
   // The physical rowstream owner mux has one accelerator slot.  In compiler
   // mode it services the generated accelerator; otherwise it services the

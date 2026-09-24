@@ -81,6 +81,11 @@ module tinystories_1m_ddr3_backend #(
     .wb_ack(arb_wb_ack), .wb_err(arb_wb_err), .wb_rdata(arb_wb_rdata)
   );
 
+  // The generated memory contract is read-only.  The arbiter intentionally
+  // has no write-enable output, so make that invariant explicit at the
+  // Wishbone boundary instead of leaving an undriven control net.
+  assign arb_wb_we = 1'b0;
+
   // Register the compiler/DDR owner boundary. This preserves the external
   // memory ABI while preventing the 240-way compiler arbiter from driving the
   // physical DDR controller's acceptance path combinationally.
