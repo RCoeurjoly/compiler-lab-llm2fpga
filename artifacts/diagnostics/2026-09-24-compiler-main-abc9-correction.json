@@ -1,0 +1,36 @@
+{
+  "schema": "compiler-main-abc9-correction-v1",
+  "status": "CORRECTS_PRIOR_OBSERVATION_TIMEOUT_RECEIPT",
+  "supersedes": "artifacts/diagnostics/2026-09-24-compiler-main-abc9-frontier.json",
+  "reason": "The command session was still running when the initial observation returned; later authoritative log inspection shows all three module-isolated ABC9 probes completed before their timeout limits.",
+  "probes": [
+    {
+      "name": "default_abc9",
+      "log": "/tmp/compiler-main-abc9.log",
+      "log_sha256": "84fb7433396bc8c3f76cfd2bba059f3bcdb65768beb649918439f01badc3ca82",
+      "yosys_logfile_hash": "9892f3d900",
+      "result": "completed",
+      "yosys_reported_seconds": 75.27,
+      "peak_memory_bytes": 1669570560
+    },
+    {
+      "name": "33ns_delay_target",
+      "log": "/tmp/compiler-main-abc9-33ns.log",
+      "log_sha256": "c9a3461a0aac8b7d83c9f1f94cb6625fc22421859e75d471aaa3f874332e19bd",
+      "yosys_logfile_hash": "4b55321ded",
+      "result": "completed",
+      "yosys_reported_seconds": 73.65,
+      "peak_memory_bytes": 1662900019
+    },
+    {
+      "name": "reduced_abc_script",
+      "log": "/tmp/compiler-main-abc9-min.log",
+      "log_sha256": "36365db08f0cfe7ea7a7bb8d465ac7b2524c64230392ba1f205baf3bf135dde1",
+      "yosys_logfile_hash": "459f38a0be",
+      "result": "completed",
+      "yosys_reported_seconds": 66.16,
+      "peak_memory_bytes": 1706837606
+    }
+  ],
+  "interpretation": "The isolated compiler main ABC9 stage is bounded and completes. The full-top implementation remains the relevant integration test; its current P&R frontier is recorded separately."
+}
