@@ -31,7 +31,11 @@
     "last_iteration": 416000,
     "last_remaining_arcs": 219231,
     "last_router_seconds": 1266.88,
+    "initial_placement_timing_mhz": {
+      "rowstream_clk": 36.95,
+      "pcie_user_clk": 81.77
+    },
     "fasm": "not produced"
   },
-  "interpretation": "The patched nextpnr path avoids the prior post-placement assertion and actively routes the unchanged compiler/PCIe/UberDDR3 composition, but the fixed bounded run timed out with substantial unrouted connectivity and no FASM. This is an implementation-convergence failure; simulation and PCIe/UberDDR3 transport evidence remain separate and passing."
+  "interpretation": "The patched nextpnr path avoids the prior post-placement assertion and actively routes the unchanged compiler/PCIe/UberDDR3 composition, but the fixed bounded run timed out with substantial unrouted connectivity and no FASM. Initial placement already estimated rowstream_clk at 36.95 MHz versus the required 83.33 MHz (PCIe at 81.77 MHz versus 62.5 MHz), so route completion alone would not establish timing closure. This is an implementation-convergence and timing failure; simulation and PCIe/UberDDR3 transport evidence remain separate and passing."
 }
