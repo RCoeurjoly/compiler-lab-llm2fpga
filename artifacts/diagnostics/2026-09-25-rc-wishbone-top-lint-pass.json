@@ -1,0 +1,45 @@
+{
+  "schema": "llm2fpga.rc-wishbone-top-lint-pass.v1",
+  "status": "pass",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "pipeline": "PyTorch -> Torch-MLIR -> Linalg -> SCF/flat-SCF -> LLM2FPGA passes -> Calyx -> native SystemVerilog",
+  "generated_top": "tinystories_integer_rc_wb_top",
+  "transport_adapter": "llm_compiler_memory_wb_adapter",
+  "immutable_external_ports": [
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+    31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
+    46, 47, 48, 49, 52, 53, 54, 55, 56
+  ],
+  "local_ports": {
+    "token_input": 50,
+    "result": 51,
+    "compiler_scratch_and_outputs": "57..82"
+  },
+  "token_memory": {
+    "width_bits": 64,
+    "depth": 2,
+    "packed_input_width_bits": 128
+  },
+  "wishbone": {
+    "data_bits": 128,
+    "single_outstanding": true,
+    "profile": "validated UberDDR3 user boundary"
+  },
+  "checks": [
+    "generator completed against the pinned flat-SCF ABI and exported tensors",
+    "Verilator lint passed with exact compiler-generated main.sv",
+    "all 55 immutable ports fit the adapter's 64-bit response lane"
+  ],
+  "hashes": {
+    "generated_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+    "flat_scf_sha256": "b241f747f5d07e4c8612f4164320cd44eb2f5cd3506ee50e1aaf2d5e9cbbb7f6",
+    "adapter_source_sha256": "f72873de212722bb263ab0d22cd999bd4f907cb28b0bf6bdc15af2618948fad6",
+    "generator_source_sha256": "957a1d64c49a41d4f4921f7a5068ad424db56ecadfb5f78f9bfaed015cf7dad2"
+  },
+  "limitations": [
+    "This is a generated-top structural/lint gate, not a complete inference simulation.",
+    "PCIe ingress, physical DDR3 calibration, placement, bitstream programming, and board inference remain unverified."
+  ],
+  "next_step": "Drive the Wishbone boundary from the validated PCIe/UberDDR3 YPCB top and run exact-image transaction-level inference with all 55 external memories."
+}
