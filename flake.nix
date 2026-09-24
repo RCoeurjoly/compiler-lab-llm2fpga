@@ -3012,6 +3012,7 @@ PY
         packages = {
           task6-board-shell-source-closure = task6BoardShell.sourceClosure;
           task6-board-shell-m2-source-closure = task6BoardShell.m2SourceClosure;
+          compiler-ddr3-trace-replay-elaboration = task6BoardShell.replayElaboration;
           compiler-ddr3-trace-replay-synthesis-screen = task6BoardShell.replaySynthesis;
           compiler-ddr3-trace-replay-route = task6BoardShell.replayRoute;
           compiler-ddr3-trace-replay-bitstream = task6BoardShell.replayBitstream;

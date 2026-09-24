@@ -62,6 +62,29 @@ let
     "${../rtl/tinystories_1m_ddr3_command_adapter.sv}"
   ];
   yosys = builtins.storePath "/nix/store/1g0dvnvw75fnlnk4ad586c65wfxbf5rs-yosys-with-plugins-0.66";
+  # Fast feedback target for the same production source closure.  This keeps
+  # hierarchy/elaboration failures separate from the much slower global
+  # synthesis screen and emits a reusable parameterized RTLIL checkpoint.
+  replayElaboration = pkgs.runCommand "compiler-ddr3-trace-replay-elaboration" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    mkdir -p "$out"
+    cat > run.ys <<EOF
+    read_verilog -lib +/xilinx/cells_sim.v
+    read_verilog -lib +/xilinx/cells_xtra.v
+    read_verilog -sv -DTASK6_PCIE_ROWSTREAM_INGRESS_PORTS -DTASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS -DTASK6_COMPILER_DDR3_ACCELERATOR_PORTS ${sourceArgs} ${compilerSourceArgs} ${m2SourceClosure}/task6_normal_command_stage.sv ${../rtl/diagnostics/compiler_ddr3_trace_replay.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_top.sv}
+    chparam -set ENABLE_COMPILER_ACCELERATOR 1 compiler_ddr3_trace_replay_top
+    hierarchy -check -top compiler_ddr3_trace_replay_top
+    proc
+    opt_clean
+    check
+    write_rtlil $out/compiler-top.il
+    EOF
+    timeout 120 ${yosys}/bin/yosys -Q -s run.ys > "$out/yosys.log" 2>&1
+    test -s "$out/compiler-top.il"
+    grep -q 'Checking module compiler_ddr3_trace_replay_top' "$out/yosys.log"
+    cp run.ys "$out/"
+  '';
   replaySynthesis = pkgs.runCommand "compiler-ddr3-trace-replay-synthesis-screen" {
     nativeBuildInputs = [ pkgs.python3 ];
   } ''
@@ -204,4 +227,4 @@ let
       ${dbRoot} ${dbRoot}/xc7k480tffg1156-1/part.yaml
     sha256sum "$out/replay.bit" > "$out/replay.bit.sha256"
   '';
-in { inherit sourceClosure commandSourceClosure m2SourceClosure replayObserverSourceClosure replaySynthesis replayTimingBaseline replayResetPatched replayBarOffsetPatched replayRoute replayBitstream replayBarObserverResetPatched replayBarObserverRoute replayBarObserverBitstream patchedDb; }
+in { inherit sourceClosure commandSourceClosure m2SourceClosure replayObserverSourceClosure replayElaboration replaySynthesis replayTimingBaseline replayResetPatched replayBarOffsetPatched replayRoute replayBitstream replayBarObserverResetPatched replayBarObserverRoute replayBarObserverBitstream patchedDb; }
