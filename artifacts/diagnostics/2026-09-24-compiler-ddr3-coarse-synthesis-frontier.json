@@ -1,0 +1,28 @@
+{
+  "schema": "compiler-ddr3-coarse-synthesis-frontier-v1",
+  "status": "BOUNDARY_FAILURE_BEFORE_NETLIST",
+  "scope": "unchanged compiler-generated TinyStories-1M top with PCIe/UberDDR3 shell; production trace CSR disabled",
+  "compiler_model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "profile": {
+    "ddr_byte_lanes": 2,
+    "controller_period_ps": 12000,
+    "ddr_period_ps": 3000,
+    "pcie_clock_mhz": 62.5,
+    "trace_csr_enabled": false
+  },
+  "method": {
+    "tool": "yosys-with-plugins-0.66",
+    "phase": "synth_xilinx -run coarse:coarse",
+    "wall_limit_seconds": 300,
+    "host_freeze_avoided": true
+  },
+  "result": {
+    "rtl_parse_and_hierarchy": "reached compiler-generated main and shell",
+    "netlist_emitted": false,
+    "first_error": "Non-constant enable $memwr$\\idelay_dqs_cntvaluein$ ... in memory initialization ... ddr3_controller.v:721",
+    "failure_class": "UberDDR3 controller memory/init lowering boundary",
+    "compiler_accelerator_modified": false,
+    "pci_or_ddr_rtl_modified": false
+  },
+  "interpretation": "The next implementation experiment must isolate or legalize this existing UberDDR3 memory-initialization lowering path before FSM extraction or routing. The authenticated transaction-level token-11 simulation and physical PCIe+DDR3 trace replay remain unchanged and passing."
+}
