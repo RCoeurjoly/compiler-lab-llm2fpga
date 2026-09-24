@@ -1,0 +1,24 @@
+{
+  "schema": "compiler-ddr3-skipfsm-timebox-v1",
+  "status": "MAPPING_OPTIMIZATION_TIMEBOX_EXCEEDED",
+  "scope": "unchanged compiler-generated TinyStories-1M top with PCIe/UberDDR3 shell",
+  "model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "tool": {
+    "yosys": "0.66",
+    "read_verilog_option": "-nomeminit",
+    "fsm_phase": "explicitly skipped",
+    "virtual_memory_cap_bytes": 8000000000,
+    "timeout_seconds": 300,
+    "exit_status": 124
+  },
+  "result": {
+    "coarse_and_dsp_mapping": "advanced beyond coarse flow",
+    "later_global_optimization": "active at timeout",
+    "netlist_emitted": false,
+    "host_freeze": false,
+    "observed_cells_in_main": 38810,
+    "compiler_accelerator_modified": false,
+    "transport_or_ddr_rtl_modified": false
+  },
+  "interpretation": "Skipping FSM extraction alone is insufficient: the global optimization/mux reduction pass over the compiler-generated network remains too expensive for a fast iteration loop. The next experiment must use a hierarchical or pass-selective Yosys boundary rather than another unconstrained full run."
+}
