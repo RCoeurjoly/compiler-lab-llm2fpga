@@ -38,6 +38,19 @@
       "log_sha256": "59bd042064399b3d8da7d1c231adcb929828aa89f923cd42945690b8ec28929d",
       "fmax_mhz": null,
       "interpretation": "Standalone SA placement is too slow for the bounded iteration loop on this netlist; no timing result was claimed."
+    },
+    "heap_constraint_weight_10": {
+      "placer": "heap plus timing-driven SA refinement",
+      "cstrweight": 10,
+      "route": "disabled",
+      "return_code": 0,
+      "log": "/tmp/compiler-csr0-nofsm-cstr10-noroute.out",
+      "log_sha256": "e1fffe44cf7b48b3261e1025c3e38b7ec5bb41ca7e59df8a1f3d53aa4084d9e8",
+      "fmax_mhz": {
+        "rowstream_clk": 39.90,
+        "pcie_user_clk": 87.95
+      },
+      "interpretation": "Increasing constraint weight prioritizes the failing clock but worsens both measured margins; placement weighting alone is not a solution."
     }
   },
   "conclusion": "With the exact board closure, heap placement improves rowstream timing from the prior 36.95 MHz estimate to 42.28 MHz, but placement strategy alone does not approach the fixed 83.33 MHz requirement. A compiler/backend structural change is required before another full route attempt is justified."
