@@ -17,7 +17,11 @@ module compiler_ddr3_trace_replay_top #(
   parameter bit TINYSTORIES_DIRECT_ACCELERATOR_OWNER = 1'b0,
   parameter bit ENABLE_PCIE_MLP_SELFTEST = 1'b0,
   parameter bit ENABLE_PCIE_MLP_ACCEL = ENABLE_PCIE_MLP_SELFTEST,
-  parameter bit ENABLE_PCIE_M2_FULL_BLOCK_ACCEL = 1'b0
+  parameter bit ENABLE_PCIE_M2_FULL_BLOCK_ACCEL = 1'b0,
+  // Select the compiler-generated RC transport shell.  The legacy command
+  // adapter remains the default diagnostic path; this option never reuses its
+  // compute RTL.
+  parameter bit ENABLE_COMPILER_GENERATED_RC = 1'b0
 ) (
   output wire        pci_exp_txp,
   output wire        pci_exp_txn,
@@ -158,6 +162,14 @@ module compiler_ddr3_trace_replay_top #(
   wire [62:0] compiler_debug_status;
   wire [31:0] compiler_request_count;
   wire ingress_tinystories_token_ready;
+  // Ports of the compiler-generated RC wrapper.  The wrapper is supplied by
+  // the pipeline build; this top only connects its transport and token ABI.
+  wire rc_done;
+  wire rc_wb_cyc, rc_wb_stb;
+  wire [31:0] rc_wb_addr;
+  wire [15:0] rc_wb_sel;
+  wire [7:0] rc_result0, rc_result1;
+  wire [127:0] rc_token_data = {112'd0, rowstream_tinystories_prompt_token};
 `endif
 
   wire [3:0] pcie_led;
@@ -421,23 +433,55 @@ module compiler_ddr3_trace_replay_top #(
 
 `ifdef TASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS
   generate if (ENABLE_COMPILER_ACCELERATOR) begin : gen_compiler_command_adapter
-    tinystories_1m_ddr3_command_adapter compiler_command_adapter (
-      .clk(rowstream_clk), .reset(!rowstream_rst_n),
-      .clear(rowstream_tinystories_clear),
-      .prompt_valid(rowstream_tinystories_prompt),
-      .prompt_ready(compiler_prompt_ready),
-      .prompt_token(rowstream_tinystories_prompt_token),
-      .start(rowstream_tinystories_start),
-      .token_valid(compiler_token_valid), .token_ready(compiler_token_ready),
-      .token_id(compiler_token_id), .busy(compiler_busy),
-      .error(compiler_error), .error_code(compiler_error_code),
-      .request_count(compiler_request_count),
-      .wb_cyc(compiler_accel_cyc), .wb_stb(compiler_accel_stb),
-      .wb_we(compiler_accel_we), .wb_addr(compiler_accel_addr),
-      .wb_sel(compiler_accel_sel), .wb_accept(compiler_accel_accept),
-      .wb_ack(compiler_accel_ack), .wb_err(compiler_accel_err),
-      .wb_rdata(compiler_accel_rdata));
-    assign compiler_debug_status = 63'd0;
+    if (ENABLE_COMPILER_GENERATED_RC) begin : gen_compiler_generated_rc
+      // This instance is the generated pipeline artifact, not a handwritten
+      // compute replacement.  The surrounding top supplies only reset,
+      // prompt/token framing, and the validated DDR3 Wishbone transport.
+      tinystories_integer_rc_wb_top compiler_generated_rc (
+        .clk(rowstream_clk), .reset(!rowstream_rst_n),
+        .go(rowstream_tinystories_start), .token_data(rc_token_data),
+        .done(rc_done),
+        .wb_cyc(rc_wb_cyc), .wb_stb(rc_wb_stb), .wb_addr(rc_wb_addr),
+        .wb_sel(rc_wb_sel), .wb_accept(compiler_accel_accept),
+        .wb_ack(compiler_accel_ack), .wb_err(compiler_accel_err),
+        .wb_rdata(compiler_accel_rdata),
+        .result0(rc_result0), .result1(rc_result1));
+      assign compiler_prompt_ready = 1'b1;
+      assign compiler_token_valid = rc_done;
+      assign compiler_token_id = {rc_result1, rc_result0};
+      // The generated RC currently exposes completion rather than a separate
+      // busy signal.  Keep this diagnostic shell quiescent between commands;
+      // a production autoregressive wrapper must add an explicit busy/ready
+      // contract before board acceptance.
+      assign compiler_busy = 1'b0;
+      assign compiler_error = compiler_accel_err;
+      assign compiler_error_code = compiler_accel_err ? 8'h01 : 8'h00;
+      assign compiler_request_count = 32'd0;
+      assign compiler_debug_status = 63'd0;
+      assign compiler_accel_cyc = rc_wb_cyc;
+      assign compiler_accel_stb = rc_wb_stb;
+      assign compiler_accel_we = 1'b0;
+      assign compiler_accel_addr = rc_wb_addr[24:0];
+      assign compiler_accel_sel = rc_wb_sel;
+    end else begin : gen_legacy_command_adapter
+      tinystories_1m_ddr3_command_adapter compiler_command_adapter (
+        .clk(rowstream_clk), .reset(!rowstream_rst_n),
+        .clear(rowstream_tinystories_clear),
+        .prompt_valid(rowstream_tinystories_prompt),
+        .prompt_ready(compiler_prompt_ready),
+        .prompt_token(rowstream_tinystories_prompt_token),
+        .start(rowstream_tinystories_start),
+        .token_valid(compiler_token_valid), .token_ready(compiler_token_ready),
+        .token_id(compiler_token_id), .busy(compiler_busy),
+        .error(compiler_error), .error_code(compiler_error_code),
+        .request_count(compiler_request_count),
+        .wb_cyc(compiler_accel_cyc), .wb_stb(compiler_accel_stb),
+        .wb_we(compiler_accel_we), .wb_addr(compiler_accel_addr),
+        .wb_sel(compiler_accel_sel), .wb_accept(compiler_accel_accept),
+        .wb_ack(compiler_accel_ack), .wb_err(compiler_accel_err),
+        .wb_rdata(compiler_accel_rdata));
+      assign compiler_debug_status = 63'd0;
+    end
   end else begin : gen_no_compiler_command_adapter
     assign compiler_prompt_ready = 1'b0;
     assign compiler_token_valid = 1'b0;

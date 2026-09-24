@@ -98,6 +98,27 @@ def _render_top(rtl, *, external_ports: tuple[int, ...], token_port: int,
                 f"    end",
                 f"  end",
             ])
+        elif number == token_port:
+            # The token input is a local read-only memory.  Keep both the
+            # storage and its generated-memory handshake in one sequential
+            # process: Yosys cannot lower a continuous assignment into an
+            # unpacked memory, although simulators commonly accept it.
+            local_services.extend([
+                f"  always_ff @(posedge clk) begin : service_token_{number}",
+                f"    if (reset) begin",
+                f"      mem{number}[0] <= '0; mem{number}[1] <= '0;",
+                f"      a{number}_done <= 1'b0; a{number}_rdata <= '0;",
+                f"    end else begin",
+                f"      mem{number}[0] <= token_data[0 +: {token_width}];",
+                f"      mem{number}[1] <= token_data[{token_width} +: {token_width}];",
+                f"      a{number}_done <= 1'b0;",
+                f"      if (a{number}_en && !a{number}_we) begin",
+                f"        a{number}_rdata <= mem{number}[a{number}_addr];",
+                f"        a{number}_done <= 1'b1;",
+                f"      end",
+                f"    end",
+                f"  end",
+            ])
         else:
             local_services.extend([
                 f"  always_ff @(posedge clk) begin : service_mem_{number}",
@@ -144,8 +165,6 @@ def _render_top(rtl, *, external_ports: tuple[int, ...], token_port: int,
         "    .wb_accept(wb_accept), .wb_ack(wb_ack), .wb_err(wb_err), .wb_rdata(wb_rdata));",
         *external_wires,
         *local_services,
-        *[f"  assign mem{token_port}[{index}] = token_data[{index * token_width} +: {token_width}];"
-          for index in range(token_depth)],
         f"  assign result0 = mem{result_port}[0];",
         f"  assign result1 = mem{result_port}[1];",
         "  initial begin",

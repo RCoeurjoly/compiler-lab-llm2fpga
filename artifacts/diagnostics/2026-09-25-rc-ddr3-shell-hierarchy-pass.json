@@ -1,0 +1,40 @@
+{
+  "schema": "llm2fpga.rc-ddr3-shell-hierarchy-pass.v1",
+  "status": "pass",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "pipeline": "PyTorch -> Torch-MLIR -> Linalg -> SCF/flat-SCF -> LLM2FPGA passes -> Calyx -> native SystemVerilog",
+  "generated_compute_module": "main_1",
+  "generated_transport_wrapper": "tinystories_integer_rc_wb_top",
+  "board_shell": "compiler_ddr3_trace_replay_top",
+  "configuration": {
+    "ENABLE_COMPILER_ACCELERATOR": 1,
+    "ENABLE_COMPILER_GENERATED_RC": 1,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "ddr_clock_period_ps": 3000,
+    "BIST_MODE_PARAM": 2
+  },
+  "checks": [
+    "Yosys frontend parsed the PCIe/UberDDR3 shell and generated RC wrapper",
+    "Yosys hierarchy check reached the compiler-generated RC instance",
+    "Yosys emitted RTLIL without an unresolved generated-RC module",
+    "exact all-memory Wishbone transaction simulation returned 0x4cfe"
+  ],
+  "hashes": {
+    "generated_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+    "generated_wrapper_sha256": "a078c1bfbe493729d3a8703f02f924fa9c5c62efe01e8d129d400e4d31f07a67",
+    "wrapper_generator_sha256": "73216627a84c9bfb62f8366ccf050040fb1949ab71cb0290ec6d9ee28eb57cef",
+    "board_shell_sha256": "a7f1a03fe02b25d9d731a88460ba8af8b3c2d3714f01695b4736f7ca0afc9edc",
+    "hierarchy_rtlil_sha256": "4dd7765d1cad1d7382a53cdb87a1f20fdc46dd44743d6c93fefddc76f6977dc3"
+  },
+  "tools": {
+    "yosys": "0.66",
+    "verilator": "5.044",
+    "verilator_build_wall_seconds": 69.103
+  },
+  "limitations": [
+    "The hierarchy check is elaboration only; no synthesis, placement, timing closure, or bitstream is claimed.",
+    "The transaction simulation models Wishbone responses and does not validate PCIe ingress or physical DDR3 calibration.",
+    "The generated RC wrapper exposes completion but not a production busy/ready autoregressive contract; board acceptance remains pending."
+  ]
+}
