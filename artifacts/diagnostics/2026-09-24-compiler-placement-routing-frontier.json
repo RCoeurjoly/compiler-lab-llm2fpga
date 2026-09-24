@@ -1,0 +1,41 @@
+{
+  "schema": "compiler-ddr3-placement-routing-frontier-v1",
+  "status": "PLACEMENT_PASS_ROUTING_UNVERIFIED",
+  "top": "compiler_ddr3_trace_replay_top",
+  "profile": "YPCB board XDC, two-lane DDR3 333/83.33 MHz, PCIe constraints, seed 15",
+  "placement_checkpoint": {
+    "command_mode": "--no-tmdriv --no-route",
+    "json": {
+      "path": "/tmp/compiler-fulltop-placement.json",
+      "sha256": "206e014f2a7133e4a8c13e62e875b2da335a11da9a07ec25613619f9c3a2ec08",
+      "bytes": 305339551
+    },
+    "log": {
+      "path": "/tmp/compiler-fulltop-placement.log",
+      "sha256": "63a14e25630a43ee97ac955b20b1418f3cfc9e323546ebd1436b7d20441105a7",
+      "bytes": 2861237
+    },
+    "result": "83,468 cells placed; 983 warnings; 0 errors; placement checksum 0x8c804924"
+  },
+  "full_flow_probe": {
+    "command_mode": "--no-tmdriv --timing-allow-fail",
+    "log": {
+      "path": "/tmp/compiler-fulltop-notmdriv.log",
+      "sha256": "93fd60e4e2499e2102b41b9bacc86f40de61c6c1c26e6184497a73d8b0d115ee",
+      "bytes": 2862282
+    },
+    "last_stage": "Running router2 / Setting up routing resources / Running main router loop",
+    "fasm": "not produced",
+    "result": "terminated after no observable router progress; routing and timing remain unverified"
+  },
+  "restart_probe": {
+    "command_mode": "--no-place using placement JSON",
+    "log": {
+      "path": "/tmp/compiler-fulltop-route.log",
+      "sha256": "7c1335d2661611312936b851116accf494f593c2e8ceed305dd8ddf3771cf82a",
+      "bytes": 3724
+    },
+    "result": "nextpnr assertion during repack; placement JSON is not a valid packed restart input"
+  },
+  "interpretation": "The unchanged compiler-generated PCIe/UberDDR3 design has a reproducible placed checkpoint. The remaining implementation gate is routing; no bitstream or hardware inference claim is made."
+}
