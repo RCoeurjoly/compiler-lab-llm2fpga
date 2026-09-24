@@ -1,0 +1,25 @@
+{
+  "schema": "compiler-main-longest-path-attribution-v1",
+  "status": "STATIC_REGION_ATTRIBUTION",
+  "source_receipt": "artifacts/diagnostics/2026-09-24-compiler-main-ltp-frontier.json",
+  "path_nodes": 4633,
+  "named_region_occurrences": {
+    "v_requant_qdq_divide": 333,
+    "v_input_qdq_divide": 283,
+    "ln2_normalize_divide": 145,
+    "final_normalize_divide": 144,
+    "normalize_divide": 144,
+    "causal_divide": 79,
+    "c_fc_input_qdq_divide": 77,
+    "out_input_qdq_divide": 77,
+    "q_input_qdq_divide": 77,
+    "c_fc_requant_qdq_divide": 76,
+    "c_proj_input_qdq_divide": 76,
+    "c_proj_requant_qdq_divide": 76,
+    "out_requant_qdq_divide": 76,
+    "q_requant_qdq_divide": 76,
+    "v_gemv_accumulator": 64,
+    "v_gemv_add_left": 63
+  },
+  "interpretation": "The path attribution is dominated by repeated generated requantization/normalization/division regions and v-GEMV accumulation, not by one isolated divider instance. Because ltp -noff collapses sequential boundaries, these counts identify generated structure for backend investigation but are not a cycle-level critical-path proof."
+}
