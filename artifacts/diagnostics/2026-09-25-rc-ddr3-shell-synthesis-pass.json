@@ -1,0 +1,52 @@
+{
+  "schema": "llm2fpga.rc-ddr3-shell-synthesis-pass.v1",
+  "status": "pass",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "top": "compiler_ddr3_trace_replay_top",
+  "configuration": {
+    "ENABLE_COMPILER_ACCELERATOR": 1,
+    "ENABLE_COMPILER_GENERATED_RC": 1,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "ddr_clock_period_ps": 3000,
+    "BIST_MODE_PARAM": 2
+  },
+  "checks": [
+    "synth_xilinx -flatten -arch xc7 completed",
+    "post-synthesis check completed",
+    "post-synthesis resource statistics emitted",
+    "JSON netlist emitted"
+  ],
+  "resources_including_submodules": {
+    "LUT1": 84,
+    "LUT2": 2128,
+    "LUT3": 3208,
+    "LUT4": 1138,
+    "LUT5": 1430,
+    "LUT6": 4253,
+    "FDCE": 6280,
+    "FDRE": 8329,
+    "CARRY4": 470,
+    "RAMB36E1": 4,
+    "DSP48E1": 0,
+    "PCIE_2_1": 1,
+    "BSCANE2": 2
+  },
+  "tools": {
+    "yosys": "0.66",
+    "wall_seconds": 95.54,
+    "peak_memory_mb": 587.61,
+    "file_size_cap_bytes": 184320000
+  },
+  "hashes": {
+    "synthesis_json_sha256": "7c47badbc0c831a79c3346fd7698116bd033a82c0b09bc8f97ccfee5e05e48bd",
+    "synthesis_log_sha256": "e32d2f2f83bc94cd9e102ca4f828bfedc674c54de3b6b7139f5052baeefdfa9d",
+    "board_shell_sha256": "a7f1a03fe02b25d9d731a88460ba8af8b3c2d3714f01695b4736f7ca0afc9edc",
+    "generated_wrapper_generator_sha256": "73216627a84c9bfb62f8366ccf050040fb1949ab71cb0290ec6d9ee28eb57cef"
+  },
+  "limitations": [
+    "Synthesis is not placement, routing, timing closure, bitstream generation, or board programming.",
+    "PCIe ingress and physical DDR3 calibration/BIST remain unverified for this RC-selected image.",
+    "No autoregressive multi-token hardware result is claimed."
+  ]
+}
