@@ -185,12 +185,34 @@ if [[ -n "$fix_sv_roundeven_overflow" ]]; then
 fi
 
 if [[ -n "$fix_sv_divsqrt_handshake" ]]; then
-  python3 "$fix_sv_divsqrt_handshake" \
-    "$output_dir/sv/main.sv" "$output_dir/sv/main.divsqrt.sv" \
-    "$output_dir/divsqrt-handshake-receipt.json"
-  mv "$output_dir/sv/main.divsqrt.sv" "$output_dir/sv/main.sv"
-  grep -q "LLM2FPGA_COMPLETE" "$output_dir/sv/main.sv"
-  test -s "$output_dir/divsqrt-handshake-receipt.json"
+  if grep -Eq '^[[:space:]]*module[[:space:]]+std_divSqrtFN\b' "$output_dir/sv/main.sv"; then
+    python3 "$fix_sv_divsqrt_handshake" \
+      "$output_dir/sv/main.sv" "$output_dir/sv/main.divsqrt.sv" \
+      "$output_dir/divsqrt-handshake-receipt.json"
+    mv "$output_dir/sv/main.divsqrt.sv" "$output_dir/sv/main.sv"
+    grep -q "LLM2FPGA_COMPLETE" "$output_dir/sv/main.sv"
+    test -s "$output_dir/divsqrt-handshake-receipt.json"
+  else
+    # Integer Calyx profiles legitimately emit no floating-point divider.
+    # Keep the stage auditable without forcing a float-only repair helper to
+    # accept an unrelated module shape.
+    python3 - "$output_dir/sv/main.sv" "$output_dir/divsqrt-handshake-receipt.json" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_bytes()
+Path(sys.argv[2]).write_text(json.dumps({
+    "schema": "llm2fpga.sv-divsqrt-handshake-repair.v1",
+    "status": "skipped",
+    "reason": "no std_divSqrtFN module in generated integer profile",
+    "input_sv_sha256": hashlib.sha256(source).hexdigest(),
+    "output_sv_sha256": hashlib.sha256(source).hexdigest(),
+    "repair_count": 0,
+}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+  fi
 fi
 
 if [[ "${CALYX_SKIP_RESOURCE_REPORT:-0}" == "1" ]]; then

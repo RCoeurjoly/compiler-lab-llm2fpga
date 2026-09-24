@@ -428,6 +428,7 @@
           "hw_to_hw_clean.sh"
           "linalg_to_cf.sh"
           "lower_exact_serial_gemv_to_calyx.py"
+          "materialize_zero_seed_copies.py"
           "mlir_op_stats.sh"
           "normalize_calyx_for_export.py"
           "normalize_futil_float_constants.py"
