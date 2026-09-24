@@ -1,0 +1,31 @@
+{
+  "schema": "llm2fpga.implementation.frontier.v1",
+  "date": "2026-09-24",
+  "design": "compiler-generated TinyStories-1M PCIe+UberDDR3 top",
+  "candidate": {
+    "netlist": "/tmp/compiler-fulltop-default-ready2.json",
+    "netlist_sha256": "d0f45997537706c3d423eade03ef6a2a3effc3cbb2c252db8516ac19bddd07",
+    "yosys": "/nix/store/477lcja0ri0hdn8c6vcmikr0f3rlyhqv-yosys-dspfix2-with-plugins-0.66/bin/yosys",
+    "nextpnr": "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+    "seed": 15,
+    "profile": "two-lane DDR3 333/83.33 MHz; PCIe clocks unchanged"
+  },
+  "command": "nextpnr-xilinx --chipdb xc7k480tffg1156.bin --xdc board.xdc --json compiler-fulltop-default-ready2.json --pre-pack nextpnr_ypcb_uberddr3_two_lane_clock_constraints.py --pre-place replay_pcie_clock_topology.py --seed 15 --no-tmdriv --router router1 --timing-allow-fail --ignore-loops --fasm compiler-fulltop-default-ignoreloops.fasm",
+  "result": {
+    "status": "PLACER_FRONTIER_NO_FASM",
+    "exit_code": 0,
+    "fasm_written": false,
+    "timing_qualified": false,
+    "hardware_eligible": false,
+    "notes": [
+      "Packing completed and placement entered the analytical placer.",
+      "The diagnostic run used --ignore-loops solely to bypass timing-loop analysis; it is not an acceptance configuration.",
+      "The process terminated during placement before routing or FASM generation; no bitstream was produced."
+    ]
+  },
+  "comparison": {
+    "without_ignore_loops": "nextpnr aborted at timing annotation with combinatorial-loop diagnostics in compiler_command_adapter.prompt_words write muxes.",
+    "interpretation": "The default ABC9 netlist does not yet establish a routable implementation. This is an implementation/netlist frontier, not evidence of a PCIe, DDR3, or accelerator functional failure."
+  },
+  "required_next_step": "Keep PCIe/DDR3/accelerator RTL unchanged; isolate the prompt_words memory lowering/loop source in the generated netlist or synthesis flow before another full P&R attempt."
+}
