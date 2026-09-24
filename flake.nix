@@ -67,6 +67,9 @@
 
         nixEdaPkgs = nix-eda.packages.${system};
         yosysPkgBase = (nixEdaPkgs.yosys.overrideAttrs (old: {
+          # Keep patched-tool rebuilds from exhausting the host while
+          # diagnosing the generated-top DSP mapper.
+          enableParallelBuilding = false;
           patches = (old.patches or [ ]) ++ [
             ./patches/yosys/0001-xilinx-dsp-initialize-pattern-detect-parameter.patch
           ];
