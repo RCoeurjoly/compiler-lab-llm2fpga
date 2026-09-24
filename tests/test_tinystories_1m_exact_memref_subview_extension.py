@@ -95,6 +95,22 @@ RANK_ONE_REINTERPRET_CONTROL = """module {
 }
 """
 
+RANK_THREE_SIZE_ONE_COLLAPSE_CONTROL = """module {
+  func.func @rank_three_size_one_collapse(%source: memref<48xf32>, %i0: index, %i1: index) -> f32 {
+    %view = memref.reinterpret_cast %source to
+      offset: [0], sizes: [1, 8, 6], strides: [48, 6, 1]
+      : memref<48xf32> to memref<1x8x6xf32>
+    %slice = memref.subview %view[0, 7, 0] [1, 1, 6] [1, 1, 1]
+      : memref<1x8x6xf32> to memref<1x1x6xf32, strided<[48, 6, 1], offset: 42>>
+    %collapsed = memref.collapse_shape %slice [[0, 1], [2]]
+      : memref<1x1x6xf32, strided<[48, 6, 1], offset: 42>> into memref<1x6xf32, strided<[48, 1], offset: 42>>
+    %loaded = memref.load %collapsed[%i0, %i1]
+      : memref<1x6xf32, strided<[48, 1], offset: 42>>
+    return %loaded : f32
+  }
+}
+"""
+
 RANK_REDUCING_REINTERPRET_CONTROL = """module {
   func.func @rank_reducing_reinterpret(%source: memref<8x8xi64>, %i: index) -> i64 {
     %slice = memref.subview %source[1, 0] [1, 8] [1, 1]
@@ -470,6 +486,7 @@ class ExactStaticSubviewExtensionTest(unittest.TestCase):
         coefficients: list[int],
         offset: int,
         upper_bounds: list[int],
+        expected_base_type: str = "memref<64xi64>",
     ) -> None:
         completed, output = run_text(source)
         self.assertEqual(
@@ -480,7 +497,7 @@ class ExactStaticSubviewExtensionTest(unittest.TestCase):
         self.assertNotIn("memref.subview", output)
         self.assertNotIn("memref.reinterpret_cast", output)
         self.assertNotIn("memref.collapse_shape", output)
-        self.assertIn("memref<64xi64>", output)
+        self.assertIn(expected_base_type, output)
         domains = [
             {
                 "name": f"i{dimension}",
@@ -523,6 +540,15 @@ class ExactStaticSubviewExtensionTest(unittest.TestCase):
             coefficients=[2],
             offset=0,
             upper_bounds=[4],
+        )
+
+    def test_rank_three_size_one_collapse_composes_static_strides(self) -> None:
+        self.assert_single_load_mapping(
+            RANK_THREE_SIZE_ONE_COLLAPSE_CONTROL,
+            coefficients=[48, 1],
+            offset=42,
+            upper_bounds=[1, 6],
+            expected_base_type="memref<48xf32>",
         )
 
     def test_rank_reducing_reinterpret_chain_remains_explicit(self) -> None:

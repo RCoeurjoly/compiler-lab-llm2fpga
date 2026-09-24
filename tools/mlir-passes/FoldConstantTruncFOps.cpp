@@ -603,32 +603,70 @@ private:
       auto resultType = collapse.getResult().getType();
       if (!sourceView || !resultType.hasStaticShape())
         return std::nullopt;
-
-      if (sourceView->strides == getIdentityStrides(sourceView->shape))
-        return StaticMemRefView{sourceView->base, sourceView->offset,
-                                SmallVector<int64_t>(resultType.getShape()),
-                                getIdentityStrides(resultType)};
-
       auto reassociation = collapse.getReassociationIndices();
-      if (reassociation.size() != 1)
-        return std::nullopt;
-      const ReassociationIndices &group = reassociation.front();
-      if (sourceView->shape.size() != 2 ||
-          sourceView->strides.size() != 2 || sourceView->shape[0] <= 0 ||
-          sourceView->shape[1] != 1 || sourceView->strides[0] <= 0 ||
-          sourceView->strides[1] != 1 || group.size() != 2 || group[0] != 0 ||
-          group[1] != 1 ||
-          resultType.getRank() != 1 ||
-          resultType.getShape().front() != sourceView->shape[0])
+      if (reassociation.empty() ||
+          reassociation.size() != unsigned(resultType.getRank()) ||
+          sourceView->shape.size() != sourceView->strides.size())
         return std::nullopt;
 
+      // A collapsed group is representable by one affine stride when all
+      // non-unit source dimensions are contiguous.  Unit dimensions do not
+      // contribute to the collapsed coordinate and may carry arbitrary
+      // strides, which is important for slices such as [1, 1, 6] with
+      // source strides [48, 6, 1].
       SmallVector<int64_t> resultStrides;
+      resultStrides.reserve(reassociation.size());
+      unsigned expectedSourceDim = 0;
+      for (unsigned resultDim = 0; resultDim < reassociation.size();
+           ++resultDim) {
+        const ReassociationIndices &group = reassociation[resultDim];
+        if (group.empty() || group.front() != expectedSourceDim)
+          return std::nullopt;
+        for (unsigned index = 0; index < group.size(); ++index) {
+          if (group[index] != expectedSourceDim + index ||
+              group[index] >= sourceView->shape.size() ||
+              sourceView->shape[group[index]] <= 0)
+            return std::nullopt;
+        }
+        expectedSourceDim += group.size();
+
+        int64_t collapsedSize = 1;
+        for (uint64_t sourceDim : group) {
+          std::optional<int64_t> nextSize =
+              llvm::checkedMul(collapsedSize, sourceView->shape[sourceDim]);
+          if (!nextSize)
+            return std::nullopt;
+          collapsedSize = *nextSize;
+        }
+        if (resultType.getShape()[resultDim] != collapsedSize)
+          return std::nullopt;
+
+        SmallVector<unsigned> nonUnitDims;
+        for (uint64_t sourceDim : group)
+          if (sourceView->shape[sourceDim] != 1)
+            nonUnitDims.push_back(sourceDim);
+        int64_t stride = sourceView->strides[group.front()];
+        if (!nonUnitDims.empty()) {
+          stride = sourceView->strides[nonUnitDims.back()];
+          for (size_t index = 0; index + 1 < nonUnitDims.size(); ++index) {
+            unsigned left = nonUnitDims[index];
+            unsigned right = nonUnitDims[index + 1];
+            std::optional<int64_t> expectedStride = llvm::checkedMul(
+                sourceView->strides[right], sourceView->shape[right]);
+            if (!expectedStride || sourceView->strides[left] != *expectedStride)
+              return std::nullopt;
+          }
+        }
+        resultStrides.push_back(stride);
+      }
+      if (expectedSourceDim != sourceView->shape.size())
+        return std::nullopt;
+
       int64_t resultOffset = 0;
-      if (failed(resultType.getStridesAndOffset(resultStrides, resultOffset)) ||
-          !isStatic(resultStrides) || ShapedType::isDynamic(resultOffset) ||
-          resultStrides.size() != 1 ||
-          resultStrides.front() != sourceView->strides[group.front()] ||
-          resultOffset != sourceView->offset)
+      SmallVector<int64_t> declaredStrides;
+      if (failed(resultType.getStridesAndOffset(declaredStrides, resultOffset)) ||
+          !isStatic(declaredStrides) || ShapedType::isDynamic(resultOffset) ||
+          declaredStrides != resultStrides || resultOffset != sourceView->offset)
         return std::nullopt;
 
       return StaticMemRefView{
