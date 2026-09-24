@@ -1,0 +1,23 @@
+{
+  "schema": "compiler-main-dspfix-timebox-v1",
+  "status": "DSP_MAPPING_PASSED_GLOBAL_OPTIMIZATION_TIMEBOX_EXCEEDED",
+  "scope": "standalone unchanged compiler-generated TinyStories-1M main",
+  "model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "tool": {
+    "path": "/nix/store/477lcja0ri0hdn8c6vcmikr0f3rlyhqv-yosys-dspfix2-with-plugins-0.66/bin/yosys",
+    "version": "0.66",
+    "binary_sha256": "ec8053b861a65f70a925229ae84143084897fe0ffc947a895b20f7c6b18c0910",
+    "patch": "c6298d3dd: xilinx_dsp omitted USE_PATTERN_DETECT default",
+    "wall_limit_seconds": 180,
+    "virtual_memory_limit_bytes": 8000000000
+  },
+  "result": {
+    "dsp_mapper_error": "not observed",
+    "exit_status": 124,
+    "netlist_emitted": false,
+    "first_timeout_boundary": "later global optimization after DSP mapping",
+    "compiler_accelerator_modified": false,
+    "pci_or_ddr_rtl_modified": false
+  },
+  "interpretation": "The verified DSP mapper fix removes the previous USE_PATTERN_DETECT failure. The unchanged compiler main still exceeds the bounded synthesis timebox during later optimization, so no implementation or hardware claim is made."
+}
