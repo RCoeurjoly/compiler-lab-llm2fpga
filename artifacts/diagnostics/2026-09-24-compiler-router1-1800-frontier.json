@@ -1,0 +1,22 @@
+{
+  "schema": "compiler-ddr3-router1-1800-frontier-v1",
+  "status": "ROUTING_CONVERGENCE_TIMEBOX_EXPIRED",
+  "top": "compiler_ddr3_trace_replay_top",
+  "profile": "YPCB board XDC, two-lane DDR3 333/83.33 MHz, PCIe constraints, seed 15, --no-tmdriv",
+  "router": "nextpnr-xilinx router1",
+  "limit_seconds": 1800,
+  "log": {
+    "path": "/tmp/compiler-fulltop-router1-1800.log",
+    "sha256": "9844809614e8934fd31a5e00219884cd51606e0f880d37e0077b35afa1ffa5af",
+    "bytes": 2915090
+  },
+  "routing_frontier": {
+    "iterations": 598000,
+    "initial_arcs": 434404,
+    "remaining_arcs": 197236,
+    "router_reported_seconds": 1593.60
+  },
+  "fasm": "not produced",
+  "timing": "not qualified",
+  "interpretation": "The stable router1 path continues to reduce unrouted arcs without crashing, but route convergence is too slow for the current bound. This is the only remaining implementation frontier observed after compiler synthesis, packing, and placement."
+}
