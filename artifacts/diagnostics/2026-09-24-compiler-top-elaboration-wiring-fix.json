@@ -1,0 +1,37 @@
+{
+  "schema": "compiler-ddr3-elaboration-wiring-fix-v1",
+  "status": "ELABORATION_CHECK_COMPLETED_WITH_LEGACY_WARNINGS",
+  "scope": "real compiler-generated TinyStories-1M accelerator in the PCIe/UberDDR3 top",
+  "compiler_model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "implementation": {
+    "commit": "3aa1991",
+    "changes": [
+      "Tie the read-only compiler Wishbone write-enable low.",
+      "Route PCIe ingress token-ready through an explicit selected-consumer net."
+    ]
+  },
+  "nix_target": ".#compiler-ddr3-trace-replay-elaboration",
+  "rtlil": {
+    "path": "result/compiler-top.il",
+    "sha256": "f53a9dcbf76941ab0bc7f3d58b280b7bb9c6f94c150531ec23b6fcdac2cef4f1",
+    "bytes": 42820320
+  },
+  "yosys": {
+    "elapsed_seconds": 41.41,
+    "peak_memory_mb": 593.60,
+    "check_problems_before": 3774,
+    "check_problems_after": 3772,
+    "targeted_warnings_removed": [
+      "tinystories_1m_ddr3_backend.arb_wb_we",
+      "compiler_ddr3_trace_replay_top.compiler_token_ready"
+    ],
+    "remaining_warnings": "Existing PCIe primitive/configuration nets and generated read-only memory write-data ports; not treated as implementation or hardware success."
+  },
+  "tests": {
+    "python_contract_tests": "not runnable: host lacks pytest, iverilog, and verilator; unittest discovered 14 tests but simulator-dependent cases could not start"
+  },
+  "limitations": [
+    "No synthesis netlist, timing report, route, FASM/bitstream, programming, or board token result.",
+    "The remaining Yosys check warnings require separate ownership analysis before being treated as defects."
+  ]
+}
