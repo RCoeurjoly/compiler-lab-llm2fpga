@@ -1,0 +1,24 @@
+{
+  "schema": "llm2fpga.rc-autoregressive-interface-gap.v1",
+  "status": "blocked_by_model_contract",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "evidence": {
+    "input_token_ids": [[3]],
+    "pytorch_output_i8": [[[-2, 76]]],
+    "pytorch_output_shape": [1, 1, 2],
+    "generated_compute_top": "main_1",
+    "generated_wrapper_outputs": ["result0[7:0]", "result1[7:0]"],
+    "shell_diagnostic_mapping": "token_id = {result1,result0}"
+  },
+  "finding": "The Representative Core produces a two-element int8 block result, not a vocabulary token ID or logits. Feeding those bytes back as a token would change the model contract and cannot serve as an autoregressive equivalence test.",
+  "completed_gates": [
+    "exact PyTorch/reference equivalence for the fixed RC vector",
+    "transaction-level external-memory simulation",
+    "PCIe/UberDDR3 shell synthesis, routing, and bitstream generation"
+  ],
+  "next_required_gate": "Define a compiler-owned token-output interface (or select a TinyStories token-step RC fixture) whose PyTorch oracle emits the same token semantics as the board command ABI, then repeat multi-token simulation before hardware acceptance.",
+  "limitations": [
+    "No multi-token autoregressive claim is made for this two-output diagnostic RC.",
+    "The bitstream has not been programmed because the HS3/JTAG device is currently unavailable."
+  ]
+}
