@@ -1,0 +1,30 @@
+{
+  "schema": "tinystories-compiler-pcie-uberddr3-annotated-synthesis-frontier-v1",
+  "status": "timed-out-before-netlist",
+  "derivation": "compiler-ddr3-trace-replay-synthesis-screen",
+  "components": [
+    "compiler-generated TinyStories-1M accelerator",
+    "PCIe endpoint/bridge",
+    "UberDDR3 controller/PHY"
+  ],
+  "input_annotation": {
+    "commit": "f39798c",
+    "elaboration": "passed",
+    "distributed_lutram_attribute_present": true
+  },
+  "implementation": {
+    "wall_time_limit_seconds": 600,
+    "exit_code": 124,
+    "output_json": false,
+    "nextpnr_attempted": false,
+    "log_sha256": "23e6e0b074dadf6fd00b331e4aef600891e394f12f905a5b9b9b994f1e9bc986",
+    "last_observed_stage": "FSM_INFO during synth_xilinx prepare",
+    "log_bytes": 184320000
+  },
+  "interpretation": {
+    "conclusion": "The annotated source reaches integrated Yosys synthesis, but this bounded production derivation times out in FSM reporting before memory mapping and emits no implementation netlist.",
+    "not_a_success": true,
+    "not_a_transport_failure": true,
+    "next_action": "Use the already-proven staged compiler netlist flow to apply the same annotation before memory_libmap, then run semantic equivalence and normal nextpnr; keep the bounded derivation timeout as a separate fast-iteration limitation."
+  }
+}
