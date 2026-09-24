@@ -1,0 +1,28 @@
+{
+  "artifact": "compiler-generated TinyStories-derived Representative Core",
+  "pipeline": "PyTorch -> Torch-MLIR -> Linalg -> SCF/flat-SCF -> LLM2FPGA passes -> Calyx -> native SystemVerilog",
+  "target": "xc7k480t",
+  "top": "main",
+  "profile": "direct compiler-generated core resource baseline; PCIe and UberDDR3 platform not included",
+  "derivation": "/nix/store/h85xy9zrwibkc4nislb356dpflqmf12d-tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-xc7k480t-utilization",
+  "design_json": "/nix/store/92cf47jdgxjfgm35ycqq0bdsi27gfdz9-tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-xc7k480t.json",
+  "sha256": {
+    "summary.json": "2aee495c6ca364a1581e88bedb58c3fd4f7e1043dee01182867419e1a8544ff1",
+    "summary.txt": "3874c1342843bcadda017b1ce5d14a4e347947018718048c7b59d97de9e90994",
+    "stat.json": "72c753e19a76aabaeb39d4730124cd786abafcbf37e4e382f9b9e8708a2f3189",
+    "design_json": "4e82c669582eaa84d114ddccdc966ba635a471fea5d6793ce2c28bc90613cf9c"
+  },
+  "resources": {
+    "slices_lower_bound": {"used": 531, "capacity": 74650, "percent": 0.71},
+    "clb_luts": {"used": 4246, "capacity": 298600, "percent": 1.42},
+    "clb_ffs": {"used": 645, "capacity": 597200, "percent": 0.11},
+    "dsp": {"used": 0, "capacity": 1920, "percent": 0.0},
+    "bram36": {"used": 0, "capacity": 955, "percent": 0.0}
+  },
+  "status": "mapped resource baseline passed",
+  "limitations": [
+    "This is not a timing report.",
+    "This is not a routed bitstream.",
+    "This does not validate PCIe, DDR3 calibration/BIST, image loading, or board inference."
+  ]
+}
