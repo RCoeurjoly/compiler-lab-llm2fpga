@@ -54,8 +54,16 @@ let
   # compiler-generated accelerator and its transport-neutral DDR3 boundary.
   # Keeping these paths explicit makes it impossible for the derivation to
   # silently fall back to the trace-replay-only shell.
+  compilerAnnotatedSource = pkgs.runCommand "compiler-generated-model-lutram-annotated" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    mkdir -p "$out"
+    python3 ${../scripts/pipeline/annotate_compiler_lutram.py} \
+      ${../.superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv} \
+      "$out/model.sv" "$out/annotation.json"
+  '';
   compilerSourceArgs = pkgs.lib.concatStringsSep " " [
-    "${../.superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv}"
+    "${compilerAnnotatedSource}/model.sv"
     "${../rtl/memory/llm_external_memory_arbiter.sv}"
     "${../rtl/memory/llm_wishbone_pipeline.sv}"
     "${../rtl/tinystories_1m_ddr3_backend.sv}"
