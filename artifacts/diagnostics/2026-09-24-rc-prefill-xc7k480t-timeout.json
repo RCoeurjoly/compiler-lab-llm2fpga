@@ -1,0 +1,22 @@
+{
+  "schema": "llm2fpga.rc-prefill-xc7k480t-timeout.v1",
+  "model": "tinystories-w4a8-rc-serving-mask10-vocab6-width2",
+  "pipeline": "PyTorch -> Torch-MLIR -> Linalg -> SCF/flat-SCF -> LLM2FPGA passes -> Calyx -> native SystemVerilog",
+  "phase": "prefill-8",
+  "target": "xc7k480t",
+  "status": "bounded_timeout",
+  "derivation": "/nix/store/1ggh1pmsks3iksx59d4kjhzhngfphncz-prefill-8-xc7k480t-evidence.drv",
+  "command": "nix build .#tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-xc7k480t-evidence --no-link -L",
+  "toolchain": {
+    "nextpnr": "0.8.2 patched fork",
+    "part": "xc7k480tffg1156-1",
+    "constraint_profile": "existing RC probe XDC"
+  },
+  "observed": [
+    "The nextpnr-xilinx toolchain and Kintex-7 chip database built successfully.",
+    "The evidence derivation entered synthesis/P&R but emitted no progress output for approximately ten minutes.",
+    "The run was terminated at the bounded iteration limit before a mapped or routed receipt was produced."
+  ],
+  "interpretation": "This is a tool-timeout diagnostic, not timing-failure or board evidence.",
+  "next_action": "Use the faster compiler-generated RC/on-chip path for integration experiments and profile the prefill P&R stage before retrying."
+}
