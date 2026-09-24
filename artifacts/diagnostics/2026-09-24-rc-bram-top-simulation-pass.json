@@ -1,0 +1,30 @@
+{
+  "schema": "llm2fpga.rc-bram-top-simulation-pass.v1",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "pipeline": "PyTorch -> Torch-MLIR -> Linalg -> SCF/flat-SCF -> LLM2FPGA passes -> Calyx -> native SystemVerilog",
+  "status": "pass",
+  "top": "tinystories_integer_rc_bram_top",
+  "source_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+  "flat_scf": "/nix/store/x9i8b529csdirybr6m9py896wskcagwz-tinystories-representative-core-w4a8-integer-flat-scf/flat.scf.mlir",
+  "generated_top_sha256": "a2767221216368f372b8d5ade171e809ba28656b57671488a2e5038656862749",
+  "generated_manifest_sha256": "e1346e5b255a12670cdb474ad683a7234ffc273c155658b9b3051ff79d6868de",
+  "simulation": {
+    "tool": "Verilator 5.022 from project Nix environment",
+    "normalizer": "scripts/pipeline/run_rc_serving_w4a8_sv.py::normalize_simulation_sv",
+    "invocation_protocol": "go held high until generated done",
+    "result_port": 51,
+    "result_bytes_little_endian": "fe4c",
+    "expected_i8": [-2, 76],
+    "self_check": "RC_BRAM_TOP_PASS result=4cfe"
+  },
+  "coverage": [
+    "All 83 generated SV memory ports are connected through the compiler memory ABI.",
+    "50 buffers and one token input are initialized from the exported PyTorch program.",
+    "Compiler global constants are initialized from flat-SCF bindings.",
+    "Output port 51 is exposed as result0/result1."
+  ],
+  "limitations": [
+    "This is simulation of the BRAM/LUTRAM wrapper, not a bitstream or board run.",
+    "The wrapper exposes a fixed RC result, not yet PCIe or DDR3 transport."
+  ]
+}
