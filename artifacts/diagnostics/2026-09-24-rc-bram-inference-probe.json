@@ -1,0 +1,35 @@
+{
+  "schema": "llm2fpga.rc-bram-inference-probe.v1",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "pipeline": "PyTorch -> Torch-MLIR -> Linalg -> SCF/flat-SCF -> LLM2FPGA passes -> Calyx -> native SystemVerilog",
+  "target": "xc7k480t",
+  "top": "main",
+  "status": "synthesis_completed",
+  "command_profile": "staged synth_xilinx with FSM reconstruction avoided; full XC7 technology mapping",
+  "source_sv": "/nix/store/8dfzm6nrjnmlh9a9dr4r6ndzwrj8bzgx-tinystories-representative-core-w4a8-integer-calyx-native-sv/sv/main.sv",
+  "source_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+  "tool": {
+    "yosys": "/nix/store/f1q0w7rd0a4ny4hqvfxlhs4cmariidcy-yosys-0.62/bin/yosys",
+    "yosys_slang": "/nix/store/07xn6zd11qvkp8h65gwycfisr3x9hk4f-yosys-slang/share/yosys/plugins/slang.so"
+  },
+  "artifacts": {
+    "stat_sha256": "252fae835bf7bba94ee0b2b24849750f05d86ee57c3b7f456c549b23ae13447b",
+    "mapped_json_sha256": "f3d86f6e493bcb3416e74da1681e59134a3b3b55145ec6fb9a06184507004be5",
+    "log_sha256": "b21e11ff05df012b11bf8539cf9e53a2e9c7caf8ca81b4823265fee6003d5eaf"
+  },
+  "result": {
+    "exit_status": 0,
+    "memory_cells_after_mapping": 0,
+    "bram36": 0,
+    "dsp": 0,
+    "lut6": 1430,
+    "fdre": 645,
+    "carry4": 38,
+    "mapped_cells": 5853
+  },
+  "interpretation": [
+    "The compiler-generated RC is small enough to remain entirely in on-chip logic/LUTRAM for this fixture.",
+    "No BRAM primitive was inferred by this recipe; this is not a DDR3 design and does not yet prove board integration.",
+    "A later BRAM-packing or memory-externalization pass must be measured separately rather than inferred from this result."
+  ]
+}
