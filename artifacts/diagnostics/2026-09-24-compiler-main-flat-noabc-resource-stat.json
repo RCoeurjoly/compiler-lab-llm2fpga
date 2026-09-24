@@ -1,0 +1,34 @@
+{
+  "schema": "compiler-ddr3-flat-noabc-resource-stat-v1",
+  "status": "COMPOSITION_RESOURCE_COUNT_ONLY",
+  "checkpoint": {
+    "path": "/tmp/compiler-backend-flat-noabc.il",
+    "sha256": "d9479ef2d572c07db4dd5ab4810e1fdf148bf617cd296004c02d9e30246f546b",
+    "bytes": 156959203
+  },
+  "tool": {
+    "path": "result/bin/yosys",
+    "sha256": "ec8053b861a65f70a925229ae84143084897fe0ffc947a895b20f7c6b18c0910",
+    "command": "read_rtlil checkpoint; hierarchy -check -top tinystories_1m_ddr3_backend; stat -json",
+    "elapsed_seconds": 1.29,
+    "peak_memory_mb": 413.68
+  },
+  "design_counts": {
+    "cells": 269233,
+    "wire_bits": 978511,
+    "flip_flop_cells": 23335,
+    "ramb18e1": 28,
+    "ram32m": 50,
+    "and_cells": 100334,
+    "mux_cells": 27926,
+    "or_cells": 41770,
+    "xor_cells": 59938,
+    "not_cells": 10799
+  },
+  "interpretation": [
+    "The checkpoint is structurally readable and hierarchically valid with the unchanged DDR3 backend.",
+    "The Boolean-cell counts are not post-ABC LUT counts; they cannot establish YPCB fit or timing.",
+    "No synthesis, constrained routing, FASM/bitstream, programming, or hardware token result is established."
+  ],
+  "next_action": "Use the fast checkpoint to test bounded LUT legalization/resource estimation, then proceed to implementation only if a bounded path is available."
+}
