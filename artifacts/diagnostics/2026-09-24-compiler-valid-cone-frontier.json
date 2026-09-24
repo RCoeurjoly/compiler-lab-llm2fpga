@@ -1,0 +1,23 @@
+{
+  "schema": "compiler-main-valid-cone-frontier-v1",
+  "status": "CONTROL_CONE_ATTRIBUTION",
+  "scope": "mapped compiler-generated TinyStories-1M main",
+  "netlist": {
+    "path": "/tmp/compiler-csr0-nofsm-compat2.json",
+    "sha256": "1a7ebe107aba3a3a740097c9e37018a0f150e87a21cb8bb136aeed20847c70ed"
+  },
+  "analysis": {
+    "input": "main.valid",
+    "reachable_cells_overapprox": 68244,
+    "reachable_nets_overapprox": 129275,
+    "reachable_types": {
+      "FDRE": 28581,
+      "LUT": 31268,
+      "CARRY4": 3376,
+      "DSP48E1": 245,
+      "RAM64M": 528
+    },
+    "path_observation": "The longest structural path starts at valid and enters model_valid_not_out before traversing generated LayerNorm/attention/requantization state."
+  },
+  "interpretation": "The generated valid/control cone reaches most of main, making control distribution and enable/fanout a stronger backend target than the isolated divider. Counts are conservative overapproximations from mapped connectivity and do not constitute a timing proof."
+}
