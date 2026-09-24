@@ -1,0 +1,40 @@
+{
+  "schema": "tinystories-compiler-pcie-uberddr3-memory-mapping-diagnostic-v1",
+  "status": "blocked-before-route",
+  "scope": {
+    "compiler_generated_accelerator": true,
+    "pcie_transport_present": true,
+    "uberddr3_present": true,
+    "hardware_claim": false
+  },
+  "evidence": {
+    "techmapped_netlist": "/tmp/compiler-fulltop-default-ready2.json",
+    "techmapped_netlist_sha256": "d0f45997537706c3d423eade03ef6a2a3effc3cbb2c252db8516ac19bddd07",
+    "model_source": "/nix/store/ys2s4nmiqf5xg370jfm8pd3rndqr0a9m-model.sv",
+    "model_source_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+    "nextpnr_packed_netlist": "/tmp/compiler-fulltop-default-packed.json",
+    "nextpnr_packed_netlist_sha256": "fece6caf084689da115c0be5f4f7e8397557bc4cbf12329673edf097370eefee",
+    "scc_count": 2,
+    "compiler_scc_size_nets": 542,
+    "compiler_scc_cell_counts": {
+      "SLICE_LUTX": 773,
+      "CARRY4": 32,
+      "RAMB36E1_RAMB36E1": 3
+    },
+    "compiler_scc_bram_cells": [
+      "gen_compiler_command_adapter.compiler_command_adapter.core.compiler_core.block_output_q16_16.mem.0.0",
+      "gen_compiler_command_adapter.compiler_command_adapter.core.compiler_core.attention_residual_q16_16.mem.0.0",
+      "gen_compiler_command_adapter.compiler_command_adapter.core.compiler_core.block_input_q16_16.mem.0.0"
+    ]
+  },
+  "diagnosis": {
+    "first_observed_gate": "nextpnr timing analysis before routing",
+    "failure": "normal packing/P&R rejects combinational loops; --ignore-loops only permits a diagnostic packed netlist",
+    "cause": "the integrated memory mapping removed the generated sequential read-output staging for three intermediate memories and mapped them to asynchronous RAMB36 outputs, closing a combinational data cycle",
+    "source_cycle": "block_output_q16_16_read_data -> block_input_q16_16.mem -> arithmetic/attention_residual_q16_16.mem -> arithmetic -> block_output_q16_16_read_data",
+    "prompt_words_reproducer": "passed standalone at 83.333333 MHz; prompt register indexing is not sufficient to explain the integrated failure",
+    "semantic_change_applied": false,
+    "transport_change_applied": false
+  },
+  "next_action": "trace the exact memory-libmap/checkpoint path and preserve or deliberately remap the registered intermediate-memory read outputs, then rerun equivalence and normal nextpnr without ignore-loops"
+}
