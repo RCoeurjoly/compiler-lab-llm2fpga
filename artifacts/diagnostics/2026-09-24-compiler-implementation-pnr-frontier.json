@@ -1,0 +1,60 @@
+{
+  "schema": "compiler-ddr3-implementation-pnr-frontier-v1",
+  "status": "PNR_ABORTED_DURING_PLACEMENT_REFINEMENT",
+  "top": "compiler_ddr3_trace_replay_top",
+  "compiler_model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "synthesis": {
+    "method": "bounded ABC9 script followed by Xilinx LUT/FF mapping; no accelerator, PCIe, or DDR3 RTL changes",
+    "rtlil": {
+      "path": "/tmp/compiler-fulltop-luts-min.il",
+      "sha256": "8bfc1750cd5a6da89a499e07f0beec2e3e1e7c8c5f2bdd698f99f1258af16f24",
+      "bytes": 134286198
+    },
+    "json_before_final_lowering": {
+      "path": "/tmp/compiler-fulltop-luts-min.json",
+      "sha256": "8dae3eefc383bdd80c08a2fd1bc5da809135d1f9f3cde3ca4e58ad134679bf6d",
+      "bytes": 185160910
+    },
+    "abc9_log": {
+      "path": "/tmp/compiler-fulltop-luts-min.log",
+      "sha256": "4357cf2c3d5920458c401743a697766af029bb8d2c10eb3c1e8d0e6380111301"
+    },
+    "result": "complete; Xilinx primitive RTLIL/JSON produced"
+  },
+  "final_lowering": {
+    "actions": [
+      "memory_map for residual prompt_words memory",
+      "Xilinx LUT/FF legalization for post-memory generic cells",
+      "RAM64X1S to RAM64X1D compatibility mapping",
+      "blackbox library pruning"
+    ],
+    "json": {
+      "path": "/tmp/compiler-fulltop-luts-min-ready10.json",
+      "sha256": "dde8f3f2ae168c7958ccd8642b9ec7ee8f029f6174e727612a8c412902d57c7a",
+      "bytes": 135792557
+    }
+  },
+  "nextpnr": {
+    "version_path": "/nix/store/hjlrgmcpj3g17r6d8z700v791q0g1vv3-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+    "chipdb": "xc7k480tffg1156.bin",
+    "profile": "two-lane DDR3 333/83.33 MHz, seed 15, existing board XDC and PCIe topology pre-place",
+    "log": {
+      "path": "/tmp/compiler-fulltop-ready10-nextpnr.log",
+      "sha256": "95692ef52a371abbd87760dbdd6ba63b1b227b33251b4450648d181c5e140b46",
+      "bytes": 2792569
+    },
+    "resource_report": {
+      "slice_lutx": "98361/597200 (16%)",
+      "slice_ffx": "46616/597200 (7%)",
+      "carry4": "5702/74650 (7%)",
+      "ramb36e1": "46/955 (4%)",
+      "dsp48e1": "245/1920 (12%)",
+      "pcie_2_1": "1/1 (100%)",
+      "bscan": "2/4 (50%)"
+    },
+    "placement": "224 constrained cells placed; analytical placer completed; process terminated before routing/FASM",
+    "fasm": "not produced",
+    "timing": "not qualified"
+  },
+  "interpretation": "The compiler-generated accelerator plus PCIe/UberDDR3 composition is now synthesized into a packable Xilinx primitive netlist and reaches constrained placement with moderate LUT, FF, BRAM, and DSP usage. The current blocker is nextpnr placement refinement/termination, not source elaboration or primitive compatibility."
+}
