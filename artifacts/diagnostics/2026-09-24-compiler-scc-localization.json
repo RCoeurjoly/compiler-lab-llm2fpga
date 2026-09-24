@@ -1,0 +1,24 @@
+{
+  "schema": "llm2fpga.implementation.scc-localization.v1",
+  "date": "2026-09-24",
+  "design": "compiler-generated TinyStories-1M PCIe+UberDDR3 top",
+  "candidate": {
+    "netlist": "/tmp/compiler-fulltop-default-ready2.json",
+    "netlist_sha256": "d0f45997537706c3d423eade03ef6a2a3effc3cbb2c252db8516ac19bddd07",
+    "yosys": "/nix/store/477lcja0ri0hdn8c6vcmikr0f3rlyhqv-yosys-dspfix2-with-plugins-0.66/bin/yosys",
+    "command": "read_json; hierarchy -top compiler_ddr3_trace_replay_top; scc -nofeedback"
+  },
+  "result": {
+    "status": "NO_MULTI_CELL_COMBINATIONAL_SCC",
+    "scc_count": 0,
+    "log_sha256": "c045d980312eb6bb013ccb84ef3e5dc23b83bf7ef1f4ac2cb5b59b8dd1d2fedc",
+    "runtime_seconds": 2.90,
+    "peak_memory_bytes": 1491353600
+  },
+  "interpretation": {
+    "nextpnr_observation": "Timing analysis reports combinational loops and lists prompt_words write-mux fanin before routing.",
+    "yosys_observation": "The elaborated default-ABC9 netlist has no multi-cell combinational SCCs when sequential feedback is excluded.",
+    "conclusion": "The current blocker is introduced or exposed during nextpnr packing/timing analysis (or by primitive timing semantics), not proven to be a source-level combinational loop in the compiler-generated netlist. No accelerator, PCIe, or DDR3 RTL change is justified by this evidence."
+  },
+  "next_step": "Obtain a minimal packed-netlist reproducer or inspect nextpnr primitive timing/loop handling for the prompt_words RAM/mux path; preserve the current compiler and transport RTL while doing so."
+}
