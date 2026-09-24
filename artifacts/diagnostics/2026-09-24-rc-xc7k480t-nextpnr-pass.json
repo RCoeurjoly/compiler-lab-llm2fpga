@@ -1,0 +1,39 @@
+{
+  "schema": "llm2fpga.rc-xc7k480t-nextpnr-pass.v1",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "pipeline": "PyTorch -> Torch-MLIR -> Linalg -> SCF/flat-SCF -> LLM2FPGA passes -> Calyx -> native SystemVerilog",
+  "target": "xc7k480tffg1156-1",
+  "top": "main",
+  "status": "placed_and_routed",
+  "clock_constraint_mhz": 12.0,
+  "post_route_max_frequency_mhz": 102.44,
+  "timing_status": "pass",
+  "derivation": "/nix/store/ixx4wniscc2l6dynmjcn40r8gfk0c5f4-tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-xc7k480t-nextpnr-utilization",
+  "toolchain": {
+    "nextpnr_url": "https://github.com/RCoeurjoly/nextpnr-xilinx",
+    "nextpnr_revision": "32e8b798520d90e1130afe95908f04cf52125cf6",
+    "chipdb": "xc7k480tffg1156.bin"
+  },
+  "resources": {
+    "slice_lutx": {"used": 5200, "capacity": 597200},
+    "slice_ffx": {"used": 645, "capacity": 597200},
+    "carry4": {"used": 38, "capacity": 74650},
+    "ramb18e1": {"used": 0, "capacity": 1910},
+    "ramb36e1": {"used": 0, "capacity": 955},
+    "dsp48e1": {"used": 0, "capacity": 1920},
+    "bscan": {"used": 0, "capacity": 4}
+  },
+  "sha256": {
+    "manifest.json": "727d9222d1c28e9aeb015e4f557d7c9e56ca4fac8ef52cc13579c0731eef810d",
+    "route.json": "7bd3fa32ba7ca7302c627093b589f9a6118107e3fed08d80f5e6dea108b9e0ee",
+    "nextpnr.log": "67d3359f30e07be93423421900077f93a9fa351b25a3cce04013fdb56c38cbb1",
+    "summary.json": "2aee495c6ca364a1581e88bedb58c3fd4f7e1043dee01182867419e1a8544ff1",
+    "stat.json": "72c753e19a76aabaeb39d4730124cd786abafcbf37e4e382f9b9e8708a2f3189",
+    "design.fasm": "2d97aeb06ef3481ad70058362a706f71e6664129ed53bca42fd48ca0dd250db3"
+  },
+  "limitations": [
+    "This is the direct compiler-generated RC core with probe I/O, not the YPCB PCIe+UberDDR3 top.",
+    "No bitstream programming or board inference is claimed.",
+    "The core uses no inferred BRAM in this small fixture."
+  ]
+}
