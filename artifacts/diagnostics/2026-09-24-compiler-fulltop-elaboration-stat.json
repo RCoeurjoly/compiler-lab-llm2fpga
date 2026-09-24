@@ -1,0 +1,35 @@
+{
+  "schema": "compiler-ddr3-fulltop-elaboration-stat-v1",
+  "status": "ELABORATION_AND_STAT_PASS_SYNTHESIS_PENDING",
+  "top": "compiler_ddr3_trace_replay_top",
+  "compiler_model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "checkpoint": {
+    "path": "result/compiler-top.il",
+    "sha256": "f53a9dcbf76941ab0bc7f3d58b280b7bb9c6f94c150531ec23b6fcdac2cef4f1",
+    "bytes": 42820320
+  },
+  "tool": {
+    "path": "/nix/store/477lcja0ri0hdn8c6vcmikr0f3rlyhqv-yosys-dspfix2-with-plugins-0.66/bin/yosys",
+    "sha256": "ec8053b861a65f70a925229ae84143084897fe0ffc947a895b20f7c6b18c0910",
+    "elapsed_seconds": 0.52,
+    "peak_memory_mb": 161.86
+  },
+  "design_counts": {
+    "cells": 56713,
+    "wire_bits": 817407,
+    "ports": 13134,
+    "port_bits": 249038,
+    "memories": 62,
+    "memory_bits": 1747764,
+    "processes": 0,
+    "multipliers": 527,
+    "flip_flops": 3944
+  },
+  "implementation": {
+    "synthesis_screen": "bounded run did not produce a netlist before interruption",
+    "timing": "not measured",
+    "pnr": "not attempted",
+    "bitstream": "not produced"
+  },
+  "interpretation": "This is the baseline for the actual compiler+PCIe+UberDDR3 composition, not the replay-only shell."
+}
