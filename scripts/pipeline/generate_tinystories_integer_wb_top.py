@@ -79,17 +79,20 @@ def _render_top(rtl, *, external_ports: tuple[int, ...], token_port: int,
         ])
         if number in external_index:
             index = external_index[number]
-            shift = max(0, (port.width // 8).bit_length() - 1)
+            element_bytes = max(1, (port.width + 7) // 8)
             external_wires.extend([
                 f"  assign ext_req_valid[{index}] = a{number}_en && !a{number}_we;",
-                f"  assign ext_req_addr[{index * 32} +: 32] = ({{{{{32 - addr_width}{{1'b0}}}}, a{number}_addr}} << {shift});",
+                f"  logic [2:0] ext_offset{number}_q;",
+                f"  assign ext_req_addr[{index * 32} +: 32] = ({{{{{32 - addr_width}{{1'b0}}}}, a{number}_addr}} * {element_bytes});",
                 f"  wire [63:0] ext_data{number} = ext_rsp_data[{index * 64} +: 64];",
+                f"  wire [63:0] ext_shifted{number} = ext_data{number} >> (ext_offset{number}_q * 8);",
                 f"  always_ff @(posedge clk) begin",
-                f"    if (reset) begin a{number}_done <= 1'b0; a{number}_rdata <= '0; end",
+                f"    if (reset) begin a{number}_done <= 1'b0; a{number}_rdata <= '0; ext_offset{number}_q <= 3'd0; end",
                 f"    else begin",
                 f"      a{number}_done <= 1'b0;",
+                f"      if (ext_req_valid[{index}] && ext_req_ready[{index}]) ext_offset{number}_q <= ((a{number}_addr * {element_bytes}) & 7);",
                 f"      if (ext_rsp_valid[{index}]) begin",
-                f"        a{number}_rdata <= ext_data{number}[{port.width - 1}:0];",
+                f"        a{number}_rdata <= ext_shifted{number}[{port.width - 1}:0];",
                 f"        a{number}_done <= 1'b1;",
                 f"      end",
                 f"    end",
@@ -181,7 +184,10 @@ def main() -> None:
         if shape != memory.shape and not (shape == () and memory.shape == (1,)):
             raise ValueError(f"arg_mem_{number} shape {shape} != {memory.shape}")
         if number in external_ports:
-            (args.out_dir / f"mem{number}.hex").write_text(
+            words = "\n".join(helpers.memory_words(payload, width=memory.width)) + "\n"
+            (args.out_dir / f"mem{number}.hex").write_text(words, encoding="ascii")
+        elif number == token_port:
+            (args.out_dir / "token.hex").write_text(
                 "\n".join(helpers.memory_words(payload, width=memory.width)) + "\n", encoding="ascii"
             )
         input_manifest.append({"port": number, "dtype": dtype, "shape": list(shape), "external": number in external_ports,
