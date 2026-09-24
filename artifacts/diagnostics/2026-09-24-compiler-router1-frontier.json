@@ -1,0 +1,28 @@
+{
+  "schema": "compiler-ddr3-router1-frontier-v1",
+  "status": "ROUTING_PROGRESS_TIMEBOX_EXPIRED",
+  "top": "compiler_ddr3_trace_replay_top",
+  "profile": "YPCB board XDC, two-lane DDR3 333/83.33 MHz, PCIe constraints, seed 15, --no-tmdriv",
+  "router": "nextpnr-xilinx router1",
+  "probes": [
+    {
+      "limit_seconds": 300,
+      "log": "/tmp/compiler-fulltop-router1.log",
+      "log_sha256": "496a269f8bfe23f1308c5e2b79fd482db6a80fa30304a0ecfb2fe6a20f2ad62c",
+      "log_bytes": 2867922,
+      "return_code": 124,
+      "routing_frontier": "62,000 iterations; approximately 404,834 remaining arcs"
+    },
+    {
+      "limit_seconds": 900,
+      "log": "/tmp/compiler-fulltop-router1-900.log",
+      "log_sha256": "6c6e9390270a97a8175aadfce04c12a5818f231828cc3899a7fa0012544c1d76",
+      "log_bytes": 2892650,
+      "return_code": 124,
+      "routing_frontier": "343,000 iterations; 283,127 remaining arcs"
+    }
+  ],
+  "fasm": "not produced",
+  "timing": "not qualified",
+  "interpretation": "Router1 is stable and makes monotonic routing progress on the unchanged compiler-generated PCIe/UberDDR3 design, unlike the earlier router2 abort. The remaining blocker is route convergence/runtime; no accelerator, PCIe, DDR3, clock, or constraint RTL was changed."
+}
