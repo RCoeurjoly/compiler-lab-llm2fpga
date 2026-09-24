@@ -14,6 +14,9 @@ WATCHED = (
     "replay_cyc", "replay_stb", "replay_we", "replay_addr", "replay_sel",
     "replay_accept", "replay_ack", "replay_err", "replay_rdata",
     "req_toggle", "response_toggle", "replay_active", "pending",
+    # Compiler-mode DDR3 and token handoff controls. These must remain driven
+    # even though unrelated legacy PCIe primitive warnings are tolerated.
+    "arb_wb_we", "compiler_token_ready",
 )
 
 
