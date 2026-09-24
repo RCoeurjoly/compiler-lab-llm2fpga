@@ -1,0 +1,27 @@
+{
+  "schema": "llm2fpga.rc-external-probe-pnr-diagnostic.v1",
+  "status": "diagnostic-failure-before-placement",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "top": "tinystories_integer_rc_external_probe_top",
+  "pipeline": "PyTorch -> Torch-MLIR -> Linalg -> SCF/flat-SCF -> LLM2FPGA passes -> Calyx -> native SystemVerilog",
+  "synthesis": {
+    "status": "pass",
+    "tool": "Yosys 0.66",
+    "result": "Kintex-7 synth_xilinx completed and produced a JSON netlist"
+  },
+  "nextpnr": {
+    "status": "not_started",
+    "tool": "nextpnr-xilinx 0.8.2",
+    "chip": "xc7k480tffg1156",
+    "seed": 15,
+    "error": "port clk of type PAD has no IOSTANDARD property",
+    "localization": "The temporary probe shell has no PACKAGE_PIN assignments; nextpnr rejects its unconstrained top-level pads before placement/routing."
+  },
+  "interpretation": [
+    "This is a probe-shell constraint failure, not an accelerator timing result.",
+    "No YPCB package pins were invented for the diagnostic external-memory ports.",
+    "No board programming, PCIe, DDR3, or hardware inference claim is made."
+  ],
+  "preceding_gate": "artifacts/diagnostics/2026-09-25-rc-external-memory-probe-pass.json",
+  "next_step": "Embed the generated request/response boundary inside the validated YPCB platform top, where PCIe/DDR3 package constraints already exist, then run constrained synthesis and placement."
+}
