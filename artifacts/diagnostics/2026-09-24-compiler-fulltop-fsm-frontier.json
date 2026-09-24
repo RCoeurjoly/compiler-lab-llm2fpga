@@ -1,0 +1,24 @@
+{
+  "schema": "compiler-ddr3-fulltop-synthesis-stage-frontier-v1",
+  "status": "SYNTHESIS_TIMEBOX_AT_FSM_EXTRACT",
+  "top": "compiler_ddr3_trace_replay_top",
+  "compiler_model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "input": {
+    "path": "result/compiler-top.il",
+    "sha256": "f53a9dcbf76941ab0bc7f3d58b280b7bb9c6f94c150531ec23b6fcdac2cef4f1"
+  },
+  "tool": {
+    "path": "/nix/store/477lcja0ri0hdn8c6vcmikr0f3rlyhqv-yosys-dspfix2-with-plugins-0.66/bin/yosys",
+    "sha256": "ec8053b861a65f70a925229ae84143084897fe0ffc947a895b20f7c6b18c0910"
+  },
+  "command": "read_rtlil; hierarchy -check; synth_xilinx -flatten -arch xc7 -nosrl -noiopad -top compiler_ddr3_trace_replay_top",
+  "bounded_run": {
+    "limit_seconds": 120,
+    "log": "/tmp/compiler-fulltop-synth-120.log",
+    "last_completed_stage": "FSM_DETECT",
+    "active_stage_at_bound": "FSM_EXTRACT",
+    "netlist": "not produced",
+    "timing": "not measured"
+  },
+  "interpretation": "The full implementation path is dominated by generic FSM extraction after compiler/PCIe/UberDDR3 elaboration. No accelerator, PCIe, or DDR3 RTL was changed for this diagnostic."
+}
