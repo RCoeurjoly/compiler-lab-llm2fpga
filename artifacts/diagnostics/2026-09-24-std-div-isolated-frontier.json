@@ -1,0 +1,25 @@
+{
+  "schema": "compiler-std-div-isolated-frontier-v1",
+  "status": "ISOLATED_SYNTHESIS_PASS",
+  "scope": "generated std_div_pipe WIDTH=64, isolated from TinyStories main and PCIe/UberDDR3 shell",
+  "source": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv",
+  "tool": {
+    "yosys": "/nix/store/a6pq8qqwl7cq8f96zmq2dcap2qy79cbc-yosys-dspfix2-0.66/bin/yosys",
+    "log": "/tmp/std-div-isolated.log",
+    "log_sha256": "30094803585d2ac7f26d2fc56828e60fe00351bc91b8ed05777885a56a257b43"
+  },
+  "synthesis": {
+    "top": "std_div_pipe",
+    "family": "xc7",
+    "lut2": 35,
+    "lut3": 15,
+    "lut4": 36,
+    "lut5": 65,
+    "lut6": 23,
+    "carry4": 12,
+    "fdre": 224,
+    "fdse": 1,
+    "longest_topological_path_nodes": 244
+  },
+  "interpretation": "The divider is a modest isolated block (244-node structural path, 12 CARRY4, 224 FDRE). The integrated 4,633-node path is therefore not explained by the divider alone; surrounding generated LayerNorm, attention, requantization, and control composition/fanout must be analyzed before changing divider semantics. No RTL or transport change was made."
+}
