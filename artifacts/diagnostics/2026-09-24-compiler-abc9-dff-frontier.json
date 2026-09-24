@@ -1,0 +1,22 @@
+{
+  "schema": "compiler-abc9-dff-frontier-v1",
+  "status": "SYNTHESIS_TIMEBOX_EXCEEDED",
+  "scope": "same no-FSM compiler-generated TinyStories-1M/PCIe/UberDDR3 synthesis inputs; ABC9 sequential optimization probe",
+  "input_rtlil": {
+    "path": "/tmp/compiler-csr0-nofsm-ffs.il",
+    "sha256": "e79950dd49663d969d1d6abd3cda4b96f94b4fc5c454876e8d2fe3b8c64da9f3"
+  },
+  "tool": {
+    "yosys": "/nix/store/a6pq8qqwl7cq8f96zmq2dcap2qy79cbc-yosys-dspfix2-0.66/bin/yosys",
+    "script": "/tmp/compiler-csr0-nofsm-luts-dff.ys",
+    "log": "/tmp/compiler-csr0-nofsm-luts-dff.log",
+    "log_sha256": "f7a8a5390e7692294fd7e0aecbae261e84ddc56ecaa0ba1b5e1a94eb0fdffc72"
+  },
+  "experiment": {
+    "pass": "abc9 -dff -W 300",
+    "termination": "manually interrupted after ABC9 remained in mapping without producing RTLIL",
+    "output_artifact": null,
+    "semantic_or_timing_result": null
+  },
+  "interpretation": "Sequential ABC9 optimization is not compatible with the current full-design fast iteration budget: it did not complete mapping where the non-dff route completes in minutes. It is not a justified next path without a smaller, bounded fixture. No RTL or transport change was made."
+}
