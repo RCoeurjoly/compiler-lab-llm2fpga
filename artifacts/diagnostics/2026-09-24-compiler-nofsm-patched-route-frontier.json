@@ -1,0 +1,48 @@
+{
+  "schema": "compiler-ddr3-nofsm-patched-route-frontier-v1",
+  "status": "ROUTING_FRONTIER_NO_FASM",
+  "scope": "compiler-generated TinyStories-1M accelerator with unchanged PCIe/UberDDR3 shell",
+  "configuration": {
+    "enable_compiler_accelerator": 1,
+    "enable_trace_replay_csr": 0,
+    "seed": 15,
+    "byte_lanes": 2,
+    "ddr_profile_mhz": 333.33,
+    "rowstream_required_mhz": 83.333333,
+    "pcie_required_mhz": 62.5,
+    "fsm_optimization": "omitted; process lowering retained"
+  },
+  "netlist": {
+    "path": "/tmp/compiler-csr0-nofsm-compat2.json",
+    "sha256": "1a7ebe107aba3a3a740097c9e37018a0f150e87a21cb8bb136aeed20847c70ed",
+    "bytes": 126995011
+  },
+  "tool": {
+    "nextpnr": "/nix/store/bhf0sqg4dsrbp0i52j5pb633s97xib7m-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+    "sha256": "4b86f3f971ca0b57d589c0e646dba18439b958f327ee4270d7d67c137e417334",
+    "legalization_patch": "PCIe-meta A6 LUT constant legalization patches"
+  },
+  "synthesis_flow": {
+    "prepare_without_fsm_seconds": 78.29,
+    "dsp_and_coarse_seconds": 34.54,
+    "memory_map_seconds": 25.19,
+    "fine_seconds": 133.95,
+    "abc9_seconds": 111.29,
+    "json_and_compatibility_seconds": 12.0,
+    "memory_mapping": "three compiler transient memories forced to distributed LUTRAM before memory_libmap"
+  },
+  "route_probe": {
+    "command_log": "/tmp/compiler-csr0-nofsm-patched-nextpnr.log",
+    "termination": "operator-interrupted bounded probe",
+    "last_iteration": 246000,
+    "last_remaining_arcs": 272288,
+    "last_router_seconds": 549.52,
+    "fasm": "not produced",
+    "unpatched_comparison": {
+      "tool_sha256": "d8472bfcc19dc31686d80cc34f0d37b958c268656182537b06b3439711b105f1",
+      "failure": "port.net == nullptr during post-placement legalization",
+      "return_code": 134
+    }
+  },
+  "interpretation": "Omitting the pathological FSM optimization and using the known PCIe-meta legalization-patched nextpnr removes the earlier synthesis timeout and post-placement assertion. The unchanged compiler/PCIe/UberDDR3 composition reaches active routing, but this bounded run did not converge to FASM. This is an implementation-tool frontier, not a functional or transport failure."
+}
