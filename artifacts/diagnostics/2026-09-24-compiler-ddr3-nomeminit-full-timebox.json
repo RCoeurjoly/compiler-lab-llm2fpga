@@ -1,0 +1,22 @@
+{
+  "schema": "compiler-ddr3-nomeminit-full-timebox-v1",
+  "status": "FSM_EXTRACTION_TIMEBOX_EXCEEDED",
+  "scope": "unchanged compiler-generated TinyStories-1M top with PCIe/UberDDR3 shell",
+  "model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "tool": {
+    "yosys": "0.66",
+    "read_verilog_option": "-nomeminit",
+    "virtual_memory_cap_bytes": 8000000000,
+    "timeout_seconds": 300,
+    "exit_status": 124
+  },
+  "result": {
+    "uberddr3_init_failure": "removed by tool option",
+    "fsm_extraction": "still active at timeout",
+    "netlist_emitted": false,
+    "host_freeze": false,
+    "compiler_accelerator_modified": false,
+    "transport_or_ddr_rtl_modified": false
+  },
+  "interpretation": "The -nomeminit legalization exposes the next bottleneck: generic Yosys FSM extraction/control optimization of the compiler-generated design. Full mapping is not yet a viable iteration loop; a bounded compiler/tool pass or hierarchical synthesis boundary is required before routing."
+}
