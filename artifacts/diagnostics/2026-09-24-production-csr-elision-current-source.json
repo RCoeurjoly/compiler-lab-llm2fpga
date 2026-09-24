@@ -1,0 +1,31 @@
+{
+  "schema": "compiler-ddr3-production-csr-elision-current-source-v1",
+  "status": "SYNTHESIS_TIMEBOX_EXCEEDED",
+  "scope": "unchanged compiler-generated TinyStories-1M accelerator with PCIe/UberDDR3 shell",
+  "top": {
+    "module": "compiler_ddr3_trace_replay_top",
+    "source_sha256": "2f3e50c59292a8d200b8af9c0101a90718d7e269b4b4b16e74e05e1da43d5fe2",
+    "parameters": {
+      "ENABLE_COMPILER_ACCELERATOR": 1,
+      "ENABLE_TRACE_REPLAY_CSR": 0
+    }
+  },
+  "configuration": {
+    "seed": 15,
+    "byte_lanes": 2,
+    "ddr_profile_mhz": 333.33,
+    "rowstream_required_mhz": 83.333333,
+    "pcie_required_mhz": 62.5
+  },
+  "probe": {
+    "yosys": "/nix/store/477lcja0ri0hdn8c6vcmikr0f3rlyhqv-yosys-dspfix2-with-plugins-0.66/bin/yosys",
+    "script": "/tmp/compiler-accelerator-csr0-current.ys",
+    "log": "/tmp/compiler-accelerator-csr0-current.log",
+    "limit_seconds": 600,
+    "return_code": 124,
+    "stage_at_bound": "synth_xilinx technology mapping",
+    "netlist": "not produced",
+    "fasm": "not attempted"
+  },
+  "interpretation": "Eliding only the temporary replay CSR is a valid production-mode boundary and preserves PCIe AXI loading, but the current compiler source still does not complete full Yosys synthesis within the bounded host time. This negative result rules out CSR elision alone as the implementation unblock; it is not a functional, PCIe, DDR3, or accelerator mismatch."
+}
