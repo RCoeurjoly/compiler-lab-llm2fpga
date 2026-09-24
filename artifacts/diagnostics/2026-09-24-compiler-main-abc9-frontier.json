@@ -1,0 +1,52 @@
+{
+  "schema": "compiler-main-abc9-frontier-v1",
+  "status": "SYNTHESIS_TIMEBOX_AT_COMPILER_MAIN_ABC9",
+  "top": "compiler_ddr3_trace_replay_top",
+  "module": "main",
+  "compiler_model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "input": {
+    "path": "/tmp/compiler-fulltop-ffs.il",
+    "sha256": "6a774f7506f6be9f07f360f7cf7c6e581605aa9bca879bc28dfee86b08ec9bd2",
+    "bytes": 229989875
+  },
+  "module_frontier": {
+    "and_gates": 172901,
+    "wires": 584056,
+    "inputs": 58848,
+    "outputs": 63607
+  },
+  "tool": {
+    "path": "/nix/store/477lcja0ri0hdn8c6vcmikr0f3rlyhqv-yosys-dspfix2-with-plugins-0.66/bin/yosys",
+    "sha256": "ec8053b861a65f70a925229ae84143084897fe0ffc947a895b20f7c6b18c0910"
+  },
+  "probes": [
+    {
+      "name": "default_abc9",
+      "limit_seconds": 90,
+      "return_code": 124,
+      "log": "/tmp/compiler-main-abc9.log",
+      "log_sha256": "84fb7433396bc8c3f76cfd2bba059f3bcdb65768beb649918439f01badc3ca82",
+      "log_bytes": 127650,
+      "last_stage": "ABC9"
+    },
+    {
+      "name": "33ns_delay_target",
+      "limit_seconds": 90,
+      "return_code": 124,
+      "log": "/tmp/compiler-main-abc9-33ns.log",
+      "log_sha256": "c9a3461a0aac8b7d83c9f1f94cb6625fc22421859e75d471aaa3f874332e19bd",
+      "log_bytes": 127674,
+      "last_stage": "ABC9"
+    },
+    {
+      "name": "reduced_abc_script",
+      "limit_seconds": 90,
+      "return_code": 124,
+      "log": "/tmp/compiler-main-abc9-min.log",
+      "log_sha256": "36505d059ac12d70aa9a101f038679c27671f7f3e9d87a451816acf92a6f03c0",
+      "log_bytes": 122365,
+      "last_stage": "ABC9"
+    }
+  ],
+  "interpretation": "The compiler-generated accelerator logic, after unchanged DSP/memory/cell/FF mapping, is the dominant bounded synthesis frontier. Changing the ABC9 delay target or script did not complete the module within 90 seconds. PCIe and DDR3 were not implicated, and no RTL or transport source was changed."
+}
