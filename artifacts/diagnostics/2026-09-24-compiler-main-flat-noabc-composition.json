@@ -1,0 +1,39 @@
+{
+  "schema": "compiler-ddr3-flat-noabc-composition-v1",
+  "status": "COMPOSITION_PASS_IMPLEMENTATION_DIAGNOSTIC_ONLY",
+  "scope": "unchanged compiler-generated TinyStories-1M accelerator composed with the unchanged DDR3 backend",
+  "model": {
+    "path": ".superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv",
+    "sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a"
+  },
+  "tool": {
+    "path": "result/bin/yosys",
+    "sha256": "ec8053b861a65f70a925229ae84143084897fe0ffc947a895b20f7c6b18c0910"
+  },
+  "source_checkpoint": {
+    "path": "/tmp/compiler-main-flat-luts-noabc.il",
+    "sha256": "681185ff5c90f3180fec152ec09d701c22cb0be3c32f34c2d5813ade07ca07aa",
+    "bytes": 171125703
+  },
+  "composed_checkpoint": {
+    "path": "/tmp/compiler-backend-flat-noabc.il",
+    "sha256": "d9479ef2d572c07db4dd5ab4810e1fdf148bf617cd296004c02d9e30246f546b",
+    "bytes": 156959203
+  },
+  "stages": {
+    "parameter_preserving_coarse_checkpoint": "PASS",
+    "flatten_and_opt_clean": "PASS",
+    "xilinx_dsp_mapping": "PASS",
+    "memory_mapping": "PASS",
+    "cell_mapping": "PASS",
+    "ff_mapping": "PASS",
+    "noabc_lut_techmap": "PASS",
+    "compiler_plus_ddr3_backend_hierarchy": "PASS"
+  },
+  "limitations": [
+    "ABC LUT optimization was not completed within the bounded timebox; the no-ABC checkpoint is an implementation diagnostic, not a timing or fit result.",
+    "No synthesized netlist, constrained route, FASM/bitstream, programming, or board inference is established by this receipt.",
+    "The unchanged backend composition reports an undriven arb_wb_we signal; this is recorded for investigation and was not modified here."
+  ],
+  "next_action": "Use this composable checkpoint to establish a bounded implementation path, then measure resources/timing before any board attempt."
+}
