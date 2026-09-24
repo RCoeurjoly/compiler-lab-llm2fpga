@@ -1,0 +1,36 @@
+{
+  "schema": "tinystories-compiler-registered-intermediate-memory-map-experiment-v1",
+  "status": "passed-diagnostic",
+  "input": {
+    "rtlil": "/tmp/compiler-fulltop-coarse.il",
+    "rtlil_sha256": "963292ecf1f242727316d0af2aa826fc35effc7d000f7a052d64e71dfde3ae0e",
+    "top": "main",
+    "selected_memories": [
+      "block_input_q16_16.mem",
+      "attention_residual_q16_16.mem",
+      "block_output_q16_16.mem"
+    ]
+  },
+  "command": "read_rtlil; hierarchy -top main; setattr ram_style=distributed on the three selected memories; memory_libmap -logic-cost-rom 0.015625 with Xilinx LUTRAM and BRAM libraries",
+  "output": {
+    "rtlil": "/tmp/compiler-memory-selected-lut.il",
+    "rtlil_sha256": "53b3ae0dd6b2e7089cd83b7f52946f1ee0d7ce9fa46f83db28af9446044f8f35",
+    "mapped_cell_type": "$__XILINX_LUTRAM_SDP_",
+    "registered_read_output_preserved": true,
+    "registered_read_output_cell": "$sdffe",
+    "selected_memory_bram_cells": 0,
+    "selected_memory_lutram_cells": 15,
+    "post_techmap_scc_count": 1,
+    "post_techmap_scc_contains_selected_bram": false
+  },
+  "interpretation": {
+    "finding": "The generated sequential read staging survives when the three transient memories are explicitly constrained to LUTRAM before memory_libmap.",
+    "not_yet_proven": [
+      "full integrated PCIe+UberDDR3 synthesis with this mapping",
+      "functional equivalence after production mapping",
+      "normal nextpnr timing/route",
+      "bitstream or hardware inference"
+    ],
+    "next_action": "Integrate this mapping policy into the production Nix/Yosys derivation, then rerun exact simulation/equivalence and normal nextpnr without ignore-loops."
+  }
+}
