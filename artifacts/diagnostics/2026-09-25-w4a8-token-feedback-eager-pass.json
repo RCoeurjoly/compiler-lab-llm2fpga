@@ -1,0 +1,27 @@
+{
+  "schema": "llm2fpga.w4a8-token-feedback-eager-pass.v1",
+  "status": "pass",
+  "model": "tinystories-w4a8-rc-serving-integrated",
+  "pipeline_role": "candidate token-semantic compiler RC contract",
+  "checks": [
+    "lowest-index greedy token feedback",
+    "returned cache passed to the next decode",
+    "three-phase eager observation contract",
+    "one reloadable exported program"
+  ],
+  "observed": {
+    "prompt_token_ids": [0, 1, 2, 3, 4, 5, 0, 1],
+    "phase_tokens": [1, 2, 0],
+    "cache_lengths": [8, 9, 10],
+    "logit_width": 6,
+    "cache_leaves_per_phase": 4,
+    "exported_program_count": 1
+  },
+  "command": "python3 -m unittest tests.test_rc_serving_w4a8_integrated.RcServingW4A8IntegratedTest.test_forward_uses_lowest_argmax_token_feedback tests.test_rc_serving_w4a8_integrated.RcServingW4A8IntegratedTest.test_forward_passes_returned_cache_to_the_next_call tests.test_rc_serving_w4a8_integrated.RcServingW4A8IntegratedTest.test_run_integrated_eager_builds_the_contract_observation tests.test_rc_serving_w4a8_integrated.RcServingW4A8IntegratedTest.test_integrated_conversion_saves_one_reloadable_program",
+  "limitations": [
+    "This receipt is eager PyTorch/export-contract evidence, not generated-RTL simulation.",
+    "No PCIe, DDR3, synthesis, placement, bitstream, or board inference is claimed.",
+    "The existing integer RC bitstream remains a separate diagnostic artifact and is not token-semantic."
+  ],
+  "next_step": "Lower the integrated W4A8 token-semantic program through the compiler path and expose its phase outputs through a generated wrapper before hardware integration."
+}
