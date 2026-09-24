@@ -1,0 +1,17 @@
+{
+  "schema": "compiler-ddr3-fulltop-skipfsm-frontier-v1",
+  "status": "SKIPFSM_ADVANCED_TO_TECHMAP_NO_CHECKPOINT",
+  "top": "compiler_ddr3_trace_replay_top",
+  "compiler_model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "input_sha256": "f53a9dcbf76941ab0bc7f3d58b280b7bb9c6f94c150531ec23b6fcdac2cef4f1",
+  "tool_sha256": "ec8053b861a65f70a925229ae84143084897fe0ffc947a895b20f7c6b18c0910",
+  "probe": {
+    "fsm_extraction": "omitted",
+    "dsp_mapping": "completed",
+    "next_stage": "Xilinx TECHMAP after DSP packing",
+    "log_sha256": "c8c025f32877581a3ab77e1038a17dc04932f24759d1f4aa4158e82cea0a4830",
+    "log_bytes": 5255686,
+    "checkpoint": "not produced"
+  },
+  "interpretation": "FSM extraction is not the sole implementation bottleneck. Omitting it advances the unchanged composition to technology mapping, which remains unbounded on this host. No compiler, PCIe, or DDR3 RTL was changed for this probe."
+}
