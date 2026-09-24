@@ -1,0 +1,33 @@
+{
+  "schema": "llm2fpga.rc-bram-top-xc7k480t-pass.v1",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "top": "tinystories_integer_rc_bram_top",
+  "pipeline": "PyTorch -> Torch-MLIR -> Linalg -> SCF/flat-SCF -> LLM2FPGA passes -> Calyx -> native SystemVerilog",
+  "status": "placed_and_routed",
+  "target": "xc7k480tffg1156-1",
+  "clock_constraint_mhz": 30.0,
+  "post_route_max_frequency_mhz": 70.19,
+  "timing_status": "pass",
+  "source_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+  "generated_top_sha256": "a2767221216368f372b8d5ade171e809ba28656b57671488a2e5038656862749",
+  "artifacts_sha256": {
+    "wrapper_json": "d70ec5af1d60ed7f65118163a57f06644c52d67e64a74991f2fdd20c07f8c40b",
+    "wrapper_stat": "99c14982bb164bed7f50bbf6769fbd2b363e68bca01ad33027035ae528801101",
+    "nextpnr_log": "328b3597ca24473c47db3a9ec20c6a1af387e70b9403b18f3a73951794be1ff8",
+    "design_fasm": "f1ca99a92de95db187442716fb7e424f0f9d59bc19a10b43ce8386acba0792fa"
+  },
+  "resources": {
+    "slice_lutx": {"used": 10351, "capacity": 597200},
+    "slice_ffx": {"used": 1905, "capacity": 597200},
+    "carry4": {"used": 96, "capacity": 74650},
+    "ramb18e1": {"used": 0, "capacity": 1910},
+    "ramb36e1": {"used": 0, "capacity": 955},
+    "dsp48e1": {"used": 13, "capacity": 1920}
+  },
+  "constraints": "30 MHz probe clock plus control/output I/O standards; result pins are not yet mapped to the YPCB PCIe/JTAG ABI",
+  "limitations": [
+    "This is a compiler-generated BRAM/LUTRAM integration wrapper with probe I/O, not the final YPCB PCIe+UberDDR3 top.",
+    "No bitstream programming or board inference is claimed.",
+    "The generated memories remain LUT/distributed resources in this fixture; DDR3 externalization is still a separate pass."
+  ]
+}
