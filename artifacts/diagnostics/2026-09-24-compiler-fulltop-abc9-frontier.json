@@ -1,0 +1,39 @@
+{
+  "schema": "compiler-ddr3-fulltop-abc9-frontier-v1",
+  "status": "SYNTHESIS_TIMEBOX_AT_ABC9",
+  "top": "compiler_ddr3_trace_replay_top",
+  "compiler_model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "input": {
+    "path": "/tmp/compiler-fulltop-ffs.il",
+    "sha256": "6a774f7506f6be9f07f360f7cf7c6e581605aa9bca879bc28dfee86b08ec9bd2",
+    "bytes": 229989875
+  },
+  "tool": {
+    "path": "/nix/store/477lcja0ri0hdn8c6vcmikr0f3rlyhqv-yosys-dspfix2-with-plugins-0.66/bin/yosys",
+    "sha256": "ec8053b861a65f70a925229ae84143084897fe0ffc947a895b20f7c6b18c0910"
+  },
+  "probe": {
+    "stages_completed": [
+      "xc7_dsp_mapping",
+      "xc7_lutram_bram_memory_mapping",
+      "fine_srl_and_logic_techmap",
+      "ff_and_cell_mapping",
+      "abc9_partition_1"
+    ],
+    "stage_at_bound": "abc9 partition 2",
+    "limit_seconds": 180,
+    "return_code": 124,
+    "log": {
+      "path": "/tmp/compiler-fulltop-luts.log",
+      "sha256": "775d57c5c203ac0efa1971eb4d676c2cf9cdbe0f63bd2e9730318cdc9e8e2ba5",
+      "bytes": 166016,
+      "last_checkpoint": "6.20.5 Executing ABC9"
+    },
+    "checkpoint": "not produced",
+    "netlist": "not produced",
+    "timing": "not measured",
+    "pnr": "not run",
+    "bitstream": "not produced"
+  },
+  "interpretation": "The unchanged compiler-generated TinyStories-1M plus PCIe/UberDDR3 composition advances through technology mapping and the first ABC9 partition. The next bounded implementation frontier is ABC9 on a second partition; this is a synthesis-runtime bottleneck, not a functional simulation or PCIe/DDR3 transport failure. No accelerator, compiler, PCIe, or DDR3 RTL was changed."
+}
