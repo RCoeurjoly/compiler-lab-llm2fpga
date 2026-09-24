@@ -1,0 +1,41 @@
+{
+  "schema": "llm2fpga.nextpnr.loop-classification.v1",
+  "date": "2026-09-24",
+  "candidate": {
+    "netlist": "/tmp/compiler-fulltop-default-ready2.json",
+    "netlist_sha256": "d0f45997537706c3d423eade03ef6a2a3effc3cbb2c252db8516ac19bddd07",
+    "seed": 15,
+    "profile": "two-lane DDR3 333/83.33 MHz; PCIe clocks unchanged"
+  },
+  "experiments": [
+    {
+      "mode": "pack-only",
+      "clock_script": "validated script without rowstream_clk",
+      "ignore_loops": false,
+      "exit_code": 255,
+      "result": "timing analysis failed before pack completion; remaining fanin names prompt_words write-mux nets"
+    },
+    {
+      "mode": "pack-only",
+      "clock_script": "validated script without rowstream_clk",
+      "ignore_loops": true,
+      "exit_code": 0,
+      "result": "packing completed with 983 warnings and 0 errors; packed JSON written"
+    },
+    {
+      "mode": "pack-only",
+      "clock_script": "temporary diagnostic script adding rowstream_clk at 83.333333 MHz",
+      "ignore_loops": false,
+      "exit_code": 255,
+      "result": "same timing-loop failure; prompt_words write-mux fanin remains"
+    }
+  ],
+  "netlist_analysis": {
+    "yosys_command": "read_json; hierarchy -top compiler_ddr3_trace_replay_top; scc -nofeedback",
+    "scc_count": 0,
+    "packed_cycle_example": "prompt_words mux -> SLICE_FFX D/Q -> LUT -> prompt_words mux",
+    "classification": "sequential feedback through an FDRE, not a proven combinational SCC"
+  },
+  "conclusion": "Adding the missing rowstream clock constraint is necessary but not sufficient. The nextpnr loop detector/timing model still rejects a packed design whose source netlist has no multi-cell combinational SCCs. This is a tool/packed-primitive timing issue; no RTL or PCIe/DDR3 change is justified.",
+  "next_step": "Build a minimal packed reproducer for the SLICE_FFX feedback classification and patch or configure nextpnr timing analysis to cut register Q/D arcs correctly, then rerun P&R with normal timing checks."
+}
