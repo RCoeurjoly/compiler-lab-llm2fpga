@@ -1,0 +1,31 @@
+{
+  "schema": "compiler-ddr3-nomeminit-coarse-pass-v1",
+  "status": "COARSE_SYNTHESIS_PASS",
+  "scope": "unchanged compiler-generated TinyStories-1M top with PCIe/UberDDR3 shell",
+  "model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "tool": {
+    "yosys": "0.66",
+    "flow": "synth_xilinx -flatten -arch xc7 -nosrl -noiopad -run coarse:coarse",
+    "read_verilog_option": "-nomeminit",
+    "timeout_seconds": 300,
+    "observed_seconds": 18.28,
+    "peak_memory_mb": 1076.02
+  },
+  "result": {
+    "rtl_hierarchy": "PASS",
+    "coarse_flow": "PASS",
+    "netlist_emitted": false,
+    "cells_including_submodules": 50912,
+    "memories": 61,
+    "memory_bits": 2080998,
+    "ports": 14049,
+    "compiler_accelerator_modified": false,
+    "transport_or_ddr_rtl_modified": false
+  },
+  "diagnosis": {
+    "without_nomeminit": "fails at UberDDR3 idelay_dqs_cntvaluein initialized-memory lowering",
+    "with_nomeminit": "initialization failure removed; coarse structural synthesis completes",
+    "interpretation": "The failure is a Yosys initialization-lowering incompatibility, not a compiler semantic failure. Runtime reset assignments remain in the authenticated UberDDR3 source; production equivalence still requires verification before promotion."
+  },
+  "next_step": "bounded mapped synthesis with -nomeminit and strict memory/time limits"
+}
