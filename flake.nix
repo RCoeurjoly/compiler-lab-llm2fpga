@@ -432,6 +432,7 @@
           "mlir_op_stats.sh"
           "normalize_calyx_for_export.py"
           "normalize_futil_float_constants.py"
+          "run_tinystories_integer_sv.py"
           "sv_mlir_to_sv.sh"
           "sv_to_il.sh"
           "sv_to_yosys_stat.sh"
@@ -1777,7 +1778,7 @@ PY
           '';
         tinystoriesIntegerSvEquivalenceReport = pkgs.runCommand
           "tinystories-representative-core-w4a8-integer-sv-equivalence" {
-            buildInputs = [ pythonWithTinyStories ];
+            buildInputs = [ pythonWithTinyStories pkgs.verilator pkgs.gcc ];
           } ''
             mkdir -p "$out"
             ${pythonWithTinyStories}/bin/python ${
@@ -1787,14 +1788,16 @@ PY
                 ./TinyStories/model_adapter_representative_core_w4a8_integer.py
               } \
               --out "$out/reference.json"
-            ${pythonWithTinyStories}/bin/python ${
-              ./scripts/pipeline/tinystories_integer_sv_equivalence_report.py
-            } \
-              --sv-dir ${
-                pipelineAliasPackages."tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-calyx-native-sv"
-              }/sv \
-              --expected-json "$out/reference.json" \
-              --out "$out/report.json"
+            ${pythonWithTinyStories}/bin/python ${./scripts/pipeline/run_tinystories_integer_sv.py} \
+              --sv ${pipelineAliasPackages."tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-calyx-native-sv"}/sv/main.sv \
+              --flat-scf ${pipelineStagePackagesNoHandshake."tinystories-representative-core-w4a8-integer-flat-scf"}/flat.scf.mlir \
+              --exported ${pipelineStagePackagesNoHandshake."tinystories-representative-core-w4a8-integer-pytorch-exported"} \
+              --reference "$out/reference.json" \
+              --work-dir "$out/simulation" \
+              --report "$out/report.json" \
+              --verilator ${pkgs.verilator}/bin/verilator \
+              --helpers ${./scripts/pipeline/run_rc_serving_w4a8_sv.py} \
+              --normalizer ${./scripts/pipeline/run_rc_sv_equivalence.py}
           '';
         task3TinyStoriesCapacities = {
           slices = 74650;

@@ -1,0 +1,28 @@
+{
+  "schema": "llm2fpga.rc-native-sv-equivalence.v2",
+  "status": "pass",
+  "target": "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-sv-equivalence",
+  "nix_build_exit_code": 0,
+  "semantic_memory_count": 52,
+  "rtl_memory_count": 83,
+  "input_memory_count": 51,
+  "output_port": 51,
+  "reference_output_i8": [-2, 76],
+  "actual_output_hex": "fe4c",
+  "reference_output_sha256": "8ab4cc3ce350de3e4d1da6136c6c0fd0d4f94f34e8fb82a8ee4eb80a3e9746ee",
+  "actual_output_sha256": "8ab4cc3ce350de3e4d1da6136c6c0fd0d4f94f34e8fb82a8ee4eb80a3e9746ee",
+  "compile_seconds": 41.43438452100236,
+  "simulation_seconds": 0.07295321099809371,
+  "global_bindings": [
+    "__constant_1x1xi64",
+    "__constant_xi32",
+    "__constant_xi32_0",
+    "__constant_xi32_1",
+    "__constant_xi32_2"
+  ],
+  "diagnosis": "The compiler-generated integer RC now has an executable memory-service simulation and matches its PyTorch output bit-for-bit. This is a functional simulation gate only; PCIe, DDR3, synthesis, routing, and board inference remain unverified.",
+  "provenance": {
+    "generated_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+    "simulation_report_sha256": "18c8c0545b48b65d84458d39d7dc6715e58ee14022b10f3679016f3450d84e5a"
+  }
+}

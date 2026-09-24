@@ -46,7 +46,7 @@ class GlobalMemoryBinding:
     words: tuple[int, ...]
 
 
-_ELEMENT_WIDTHS = {"i1": 1, "i8": 8, "i64": 64, "f32": 32}
+_ELEMENT_WIDTHS = {"i1": 1, "i8": 8, "i32": 32, "i64": 64, "f32": 32}
 
 
 def parse_flat_scf_abi(source: str) -> tuple[SemanticMemory, ...]:
@@ -108,7 +108,7 @@ def parse_flat_scf_global_bindings(
         fields = type_text.split("x")
         element = fields[-1]
         shape = tuple(int(field) for field in fields[:-1]) or (1,)
-        if element not in ("f32", "i64"):
+        if element not in ("f32", "i32", "i64"):
             raise ValueError(f"unsupported global element type: {element}")
         width = _ELEMENT_WIDTHS[element]
         resource = re.fullmatch(r"dense_resource<([^>]+)>", initializer)
@@ -123,8 +123,9 @@ def parse_flat_scf_global_bindings(
                 r"dense<([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?)>",
                 initializer,
             )
-            if scalar is not None and element == "i64":
-                payload = struct.pack("<q", int(scalar.group(1))) * math.prod(shape)
+            if scalar is not None and element in ("i32", "i64"):
+                fmt = "<i" if element == "i32" else "<q"
+                payload = struct.pack(fmt, int(scalar.group(1))) * math.prod(shape)
             elif float_scalar is not None and element == "f32":
                 payload = struct.pack("<f", float(float_scalar.group(1))) * math.prod(shape)
             else:
@@ -280,6 +281,7 @@ def tensor_payload(tensor: object) -> tuple[bytes, str, tuple[int, ...]]:
     flat = _flatten(value.tolist())
     formats = {
         "torch.int8": "b",
+        "torch.int32": "i",
         "torch.int64": "q",
         "torch.float32": "f",
     }
@@ -410,8 +412,8 @@ def decode_hex_words(source: str, *, width: int, count: int) -> bytes:
     return bytes(payload)
 
 
-def normalize_simulation_sv(source: str) -> str:
-    normalizer_path = Path(__file__).with_name("run_rc_sv_equivalence.py")
+def normalize_simulation_sv(source: str, normalizer_path: Path | None = None) -> str:
+    normalizer_path = normalizer_path or Path(__file__).with_name("run_rc_sv_equivalence.py")
     spec = importlib.util.spec_from_file_location("_rc_sv_equivalence_normalizer", normalizer_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load simulation normalizer from {normalizer_path}")
