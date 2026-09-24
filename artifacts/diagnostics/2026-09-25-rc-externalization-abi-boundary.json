@@ -1,0 +1,31 @@
+{
+  "schema": "llm2fpga.rc-externalization-abi-boundary.v1",
+  "status": "boundary_mismatch_localized",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "pipeline": "PyTorch -> Torch-MLIR -> Linalg -> SCF/flat-SCF -> LLM2FPGA passes -> Calyx -> native SystemVerilog",
+  "generated_sv": "/nix/store/8dfzm6nrjnmlh9a9dr4r6ndzwrj8bzgx-tinystories-representative-core-w4a8-integer-calyx-native-sv/sv/main.sv",
+  "generated_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+  "flat_scf": "/nix/store/x9i8b529csdirybr6m9py896wskcagwz-tinystories-representative-core-w4a8-integer-flat-scf/flat.scf.mlir",
+  "flat_scf_sha256": "b241f747f5d07e4c8612f4164320cd44eb2f5cd3506ee50e1aaf2d5e9cbbb7f6",
+  "abi": {
+    "semantic_memory_count": 52,
+    "generated_rtl_memory_port_count": 83,
+    "global_constant_ports": [52, 53, 54, 55, 56],
+    "immutable_tensor_ports": "0..49",
+    "local_token_input_port": 50,
+    "local_result_port": 51
+  },
+  "existing_pass_probe": {
+    "pass": "scripts/analysis/externalize_compiler_memory.py::externalize_memory",
+    "selected_memory": "mem_0",
+    "output_sha256": "9805aa643e47cbd21137c14803c49c35359380e8accceac2b7a6e5372c155a53",
+    "main_module_ports_exposed": true,
+    "main_1_module_ports_exposed": false
+  },
+  "finding": "The existing pass rewrites the flattened Calyx module main and adds ext_mem_* ports there, but the board-facing compiler boundary is main_1 with arg_mem_* ports. Therefore the pass alone cannot expose the RC memory transactions to PCIe/DDR3; an ABI-preserving generated wrapper or a hierarchy-aware compiler pass is required.",
+  "next_step": "Generate a transaction-level wrapper around main_1 that externalizes immutable ports 0..49 and global ports 52..56, while retaining token input port 50 and result port 51 locally; then connect that wrapper to the validated PCIe/UberDDR3 request contract.",
+  "limitations": [
+    "No PCIe or physical DDR3 behavior is claimed by this receipt.",
+    "No handwritten accelerator computation is introduced or reused."
+  ]
+}
