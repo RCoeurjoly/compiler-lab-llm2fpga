@@ -1,0 +1,37 @@
+{
+  "schema": "compiler-ddr3-nofsm-patched-route-timeout-v1",
+  "status": "ROUTING_TIMEOUT_NO_FASM",
+  "scope": "compiler-generated TinyStories-1M accelerator with unchanged PCIe/UberDDR3 shell",
+  "configuration": {
+    "enable_compiler_accelerator": 1,
+    "enable_trace_replay_csr": 0,
+    "seed": 15,
+    "byte_lanes": 2,
+    "ddr_profile_mhz": 333.33,
+    "rowstream_required_mhz": 83.333333,
+    "pcie_required_mhz": 62.5,
+    "fsm_optimization": "omitted; process lowering retained",
+    "router": "router1",
+    "timing_driven": false
+  },
+  "netlist": {
+    "path": "/tmp/compiler-csr0-nofsm-compat2.json",
+    "sha256": "1a7ebe107aba3a3a740097c9e37018a0f150e87a21cb8bb136aeed20847c70ed",
+    "bytes": 126995011
+  },
+  "tool": {
+    "nextpnr": "/nix/store/bhf0sqg4dsrbp0i52j5pb633s97xib7m-nextpnr-xilinx-0.8.2/bin/nextpnr-xilinx",
+    "sha256": "4b86f3f971ca0b57d589c0e646dba18439b958f327ee4270d7d67c137e417334",
+    "legalization_patch": "PCIe-meta A6 LUT constant legalization patches"
+  },
+  "route_probe": {
+    "command_log": "/tmp/compiler-csr0-nofsm-long-nextpnr.log",
+    "timeout_seconds": 1500,
+    "return_code": 124,
+    "last_iteration": 416000,
+    "last_remaining_arcs": 219231,
+    "last_router_seconds": 1266.88,
+    "fasm": "not produced"
+  },
+  "interpretation": "The patched nextpnr path avoids the prior post-placement assertion and actively routes the unchanged compiler/PCIe/UberDDR3 composition, but the fixed bounded run timed out with substantial unrouted connectivity and no FASM. This is an implementation-convergence failure; simulation and PCIe/UberDDR3 transport evidence remain separate and passing."
+}
