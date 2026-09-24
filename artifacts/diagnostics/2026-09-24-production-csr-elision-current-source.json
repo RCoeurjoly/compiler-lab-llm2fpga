@@ -27,5 +27,15 @@
     "netlist": "not produced",
     "fasm": "not attempted"
   },
+  "staged_probe": {
+    "script": "/tmp/compiler-accelerator-csr0-coarse.ys",
+    "log": "/tmp/compiler-accelerator-csr0-coarse.log",
+    "command": "synth_xilinx -flatten -arch xc7 -nosrl -noiopad -run begin:coarse",
+    "limit_seconds": 300,
+    "return_code": 124,
+    "stage_at_bound": "FSM_MAP",
+    "rtlil_checkpoint": "not produced",
+    "interpretation": "Even the bounded coarse synthesis path reaches FSM_MAP but does not emit an RTLIL checkpoint; this is an earlier compiler/tool time bottleneck than technology mapping or routing."
+  },
   "interpretation": "Eliding only the temporary replay CSR is a valid production-mode boundary and preserves PCIe AXI loading, but the current compiler source still does not complete full Yosys synthesis within the bounded host time. This negative result rules out CSR elision alone as the implementation unblock; it is not a functional, PCIe, DDR3, or accelerator mismatch."
 }
