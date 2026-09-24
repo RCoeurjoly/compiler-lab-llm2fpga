@@ -1,0 +1,26 @@
+{
+  "schema": "compiler-main-rtlil-incremental-v1",
+  "status": "MAPPED_RTLIL_PASS_COMPOSITION_ADAPTER_PENDING",
+  "scope": "standalone unchanged compiler-generated TinyStories-1M main",
+  "model_sha256": "daed4badbce39933ffbbec461fa40603ddfdec0d137f543132fd02fd7ec1d88a",
+  "tool": {
+    "path": "/nix/store/477lcja0ri0hdn8c6vcmikr0f3rlyhqv-yosys-dspfix2-with-plugins-0.66/bin/yosys",
+    "binary_sha256": "ec8053b861a65f70a925229ae84143084897fe0ffc947a895b20f7c6b18c0910"
+  },
+  "rtlil_stages": [
+    {"name": "coarse", "sha256": "03d3689af4fe13c03568d31fe9cecfa07f13c5b6d6d0a1dedcda6748bbca189d", "bytes": 15741850},
+    {"name": "xilinx_dsp", "sha256": "e2c67b53b04a556ebf98a0d609b2e0e3ab4f889c6cbd51aa8baa8b994a857bb6", "bytes": 20686353},
+    {"name": "map_memory", "sha256": "97e7644cd42f1a3cccc8ceb5dd40b7eff16ac5201efc12c34963a55db147e519", "bytes": 20707991},
+    {"name": "map_cells", "sha256": "72ddfe591952c92f521a3e7c1f567d4f46c4ac069c79fe57fe7413d3dae60d83", "bytes": 41412645},
+    {"name": "map_ffs", "sha256": "6ddfa5bae17933d6dd1c8db8a8468b8774e902d14ad077a65ae8c5daf32f28b1", "bytes": 41423004},
+    {"name": "map_luts", "sha256": "a92d69e037bb7d8538b02b7804099650d96990296045cec838596c96c287a8b4", "bytes": 30574869}
+  ],
+  "composition": {
+    "backend": "rtl/tinystories_1m_ddr3_backend.sv",
+    "arbiter": "rtl/memory/llm_external_memory_arbiter.sv",
+    "wishbone_pipeline": "rtl/memory/llm_wishbone_pipeline.sv",
+    "status": "not_yet_composed",
+    "failure": "Yosys design import/load paths do not yet merge the mapped RTLIL hierarchy with the source backend without module-selection/primitive-definition errors"
+  },
+  "interpretation": "RTLIL preserves the compiler module parameters and provides a fast, reproducible incremental mapping boundary. The next tool-flow task is a parameter-preserving hierarchy merge; no compiler, PCIe, or DDR3 RTL was changed and no hardware claim is made."
+}
