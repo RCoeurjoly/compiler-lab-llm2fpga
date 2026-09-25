@@ -1,0 +1,40 @@
+{
+  "schema": "llm2fpga.rc-registered-request-route.v1",
+  "date": "2026-09-25",
+  "status": "route_completed_timing_failed",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "implementation_source": "compiler-generated Calyx-to-SystemVerilog; no kev-gpt RTL",
+  "source_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+  "change": {
+    "generator_option": "--register-requests",
+    "adapter_parameter": "REGISTER_REQUESTS=1",
+    "intent": "register external memory requests before the DDR3 arbiter"
+  },
+  "simulation": {
+    "status": "pass",
+    "result": "WB_RC_PASS result=4cfe",
+    "expected_tokens": [-2, 76]
+  },
+  "synthesis": {
+    "status": "pass",
+    "gate": "watched compiler-shell nets have no undriven warnings"
+  },
+  "route": {
+    "status": "legal_route_but_timing_failed",
+    "nextpnr": "0.8.2",
+    "seed": 15,
+    "rowstream_clk_mhz": 62.21,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 72.40,
+    "pcie_required_mhz": 62.50,
+    "resources": {
+      "SLICE_LUTX": "44581/597200",
+      "SLICE_FFX": "19704/597200",
+      "RAMB18E1": "23/1910",
+      "RAMB36E1": "9/955",
+      "SELMUX2_1": "2444/225550"
+    },
+    "fasm_produced": false
+  },
+  "conclusion": "The registered request boundary preserves exact RC simulation and improves PCIe timing, but does not close the fixed DDR3-side requirement. The experiment is rejected for promotion; production integration was restored and no bitstream was programmed."
+}
