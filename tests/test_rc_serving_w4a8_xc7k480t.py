@@ -134,7 +134,7 @@ class RcServingW4A8Xc7k480tTest(unittest.TestCase):
                 with self.subTest(name=name):
                     out = work / name.replace(" ", "-")
                     script = ingestion_prefix.replace(
-                        "${sourceSvGz}", str(snapshot)
+                        "${sourceSnapshot}", str(snapshot)
                     ).replace("${sourceSha256}", sha256)
                     completed = subprocess.run(
                         ["bash", "-c", script],
@@ -291,7 +291,7 @@ ERROR: Failed to expand region (0, 0) |_> (309, 416) of 776182 SLICE_LUTXs
         self.assertRegex(source, r"nextpnr-xilinx\s+--chipdb\s+\$\{chipdb\}")
         self.assertIn("sourceSvGz", source)
         self.assertIn("sourceSha256", source)
-        self.assertIn("gzip -dc ${sourceSvGz} > \"$out/source.sv\"", source)
+        self.assertIn("gzip -dc ${sourceSnapshot} > \"$out/source.sv\"", source)
         self.assertNotIn("nativeSv", source)
 
     def test_snapshots_are_deterministic_hash_bound_copies_of_canonical_sv(self) -> None:
