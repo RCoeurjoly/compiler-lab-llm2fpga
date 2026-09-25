@@ -24,5 +24,18 @@
     "pci_express": false,
     "ddr3": false,
     "next_action": "avoid whole-SV event simulation for this phase; use a compiler-owned schedule/transaction executor or structurally reduce static-control expansion, then revalidate against the same reference"
+  },
+  "corrected_fixture_followup": {
+    "status": "heartbeat_observed_done_not_reached",
+    "fixture_directory": "/tmp/rc-prefill8-split-sim",
+    "compiler_sv_sha256": "c76d2f78c24be53541f11d074b4f79e319221d8efe41fb9c315f453e08c1f8d4",
+    "testbench_sha256": "10716a10cb97cf6064d6325e06a1221ca50616e87b2fe65ec68b94adc1f685a1",
+    "executable_sha256": "ee04875e3b5bc09153461e823b843b0a2032dfa72553c35166b26932db70e5e3",
+    "timeout_cycles": 400000,
+    "wall_timeout_seconds": 120,
+    "observed_heartbeats": [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000],
+    "done": false,
+    "memory_images_loaded": true,
+    "interpretation": "The corrected run advances through at least 80000 cycles but does not reach done within 120 seconds; this is a runtime frontier, not a semantic-equivalence or hardware result."
   }
 }
