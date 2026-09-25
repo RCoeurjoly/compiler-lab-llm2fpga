@@ -22,6 +22,14 @@ let
     path = sourceSvGz;
     name = "${phaseName}-canonical-sv.gz";
   };
+  normalizerScript = builtins.path {
+    path = normalizer;
+    name = "${phaseName}-sv-normalizer.py";
+  };
+  evidenceWriterScript = builtins.path {
+    path = evidenceWriter;
+    name = "${phaseName}-xc7-evidence-writer.py";
+  };
   dramCompatMap = pkgs.writeText "w4a8-xc7-dram-compat-map.v" ''
     module RAM64X1S(output O, input A0, A1, A2, A3, A4, A5, input D, WCLK, WE);
       parameter [63:0] INIT = 64'h0;
@@ -76,7 +84,7 @@ pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
   printf '%s\n' '${targetChipdb}' > "$out/target-chipdb.txt"
 
   set +e
-  ${python}/bin/python3 ${normalizer} "$out/source.sv" "$out/normalized.sv" \
+  ${python}/bin/python3 ${normalizerScript} "$out/source.sv" "$out/normalized.sv" \
     "$out/normalization-receipt.json" >"$out/normalizer.log" 2>&1
   normalizer_status=$?
   set -e
@@ -170,7 +178,7 @@ pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
   fi
   printf '%s\n' "$nextpnr_status" > "$out/nextpnr-status.txt"
 
-  ${python}/bin/python3 ${evidenceWriter} --phase '${phaseName}' \
+  ${python}/bin/python3 ${evidenceWriterScript} --phase '${phaseName}' \
     --source "$out/source.sv" --normalized "$out/normalized.sv" \
     --normalization-receipt "$out/normalization-receipt.json" \
     --yosys-stat "$out/mapped-stat.json" --yosys-status "$out/yosys-status.txt" \
