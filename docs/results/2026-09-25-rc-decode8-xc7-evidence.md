@@ -47,3 +47,12 @@ Therefore no single post-techmap pass is yet proven to be the sole blocker.
 The evidence points to the representation/scale of the generated netlist and
 the later memory-mapping stage. These experiments remain diagnostic; no
 semantics-changing pass omission has been adopted as a production flow.
+
+A bounded pre-memory-map replay completed in about eleven minutes and
+captured the first Xilinx-mapped statistics before the expensive memory
+library pass. The top module contained 313,593 cells, 1,241 memories,
+101,931 mux cells, 68,971 OR cells, and 266 DSP48E1 cells. This confirms that
+the dominant cost is the compiler-generated control/data representation, not
+PCIe or DDR3 integration. The temporary JSON backend probe itself stopped on
+an FDCE primitive-process limitation; the statistics remain valid because they
+were emitted before that probe.
