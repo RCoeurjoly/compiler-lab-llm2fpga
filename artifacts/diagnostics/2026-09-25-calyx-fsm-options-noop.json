@@ -9,7 +9,11 @@
     "options": [
       "tdcc.duplicate-cutoff=64",
       "static-fsm-opts.one-hot-cutoff=64",
-      "static-fsm-opts.one-hot-cutoff=2048"
+      "static-fsm-opts.one-hot-cutoff=2048",
+      "static-promotion.compaction=false",
+      "static-promotion.threshold=100000",
+      "static-promotion.cycle-limit=1000000000",
+      "tdcc.duplicate-cutoff=256"
     ],
     "driver": "Calyx 0.7.1, pass all"
   },
