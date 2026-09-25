@@ -186,6 +186,10 @@ let
 
   mkScfToCalyxDerivation = { name, flatScf, calyxMathProfile ? "none" }:
     let
+      # Keep the expensive scalarized backend bounded. A timeout is part of
+      # the derivation contract so a pathological graph cannot consume the
+      # host indefinitely; completed upstream stages remain reusable in Nix.
+      calyxTimeoutSeconds = 1800;
       mathPasses = if calyxMathProfile == "none" then ""
         else if calyxMathProfile == "scout" then
           ",llm2fpga-lower-scout-math-for-calyx,llm2fpga-lower-constant-fpowi-for-calyx"
@@ -199,12 +203,14 @@ let
       ${python}/bin/python3 ${pipelineScripts}/materialize_zero_seed_copies.py \
         ${flatScf}/flat.scf.mlir "$tmp_zero_seed_fixed" \
         "$out/zero-seed-materialization-receipt.json"
-      ${mlir}/bin/mlir-opt "$tmp_zero_seed_fixed" \
+      ${pkgs.coreutils}/bin/timeout ${toString calyxTimeoutSeconds} \
+        ${mlir}/bin/mlir-opt "$tmp_zero_seed_fixed" \
         --load-pass-plugin=${mlirPasses}/lib/LLM2FPGAMLIRPasses.so \
         --pass-pipeline='builtin.module(llm2fpga-lower-static-memref-views-for-calyx,llm2fpga-drop-calyx-unsupported-asserts,llm2fpga-fold-constant-truncf,llm2fpga-lower-roundeven-for-calyx,llm2fpga-lower-exact-math-for-calyx,llm2fpga-lower-negf-for-calyx${mathPasses},llm2fpga-lower-i1-uitofp-for-calyx,canonicalize,cse)' \
         -o "$tmp_pre_calyx"
       export CALYX_PREFLIGHT_REPORT=${calyxPreflightReport}
-      ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
+      ${pkgs.coreutils}/bin/timeout ${toString calyxTimeoutSeconds} \
+        ${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx} \
         ${circt}/bin/circt-opt "$tmp_pre_calyx" "$out"
       ${python}/bin/python3 ${pipelineScripts}/calyx_float_frontier_report.py \
         "$out/flat.scf.mlir" "$out/float-frontier.json" \
