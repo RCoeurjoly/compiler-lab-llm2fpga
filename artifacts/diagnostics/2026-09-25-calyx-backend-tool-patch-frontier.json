@@ -1,0 +1,34 @@
+{
+  "date": "2026-09-25",
+  "experiment": "calyx-backend-source-patch-frontier",
+  "source_pin": "5a4303847392609cad83dda6f4bdffc8cc0e5c89",
+  "local_build": {
+    "toolchain": "Nix cargo 1.98.0 / rustc 1.98.1",
+    "compatibility_patch": "Qualified the sv-parser-parser VersionSpecifier ambiguity in a temporary dependency checkout.",
+    "result": "build_pass"
+  },
+  "candidate_results": [
+    {
+      "change": "CALYX_SKIP_MORTY diagnostic escape hatch",
+      "result": "pass",
+      "artifact": "/tmp/rc-calyx-skip-morty/main.sv",
+      "bytes": 50716338
+    },
+    {
+      "change": "512 MiB Morty worker stack",
+      "result": "bounded_timeout",
+      "timeout_seconds": 180,
+      "max_rss_kib": 6697936,
+      "output_created": false
+    },
+    {
+      "change": "balanced priority mux emission",
+      "result": "bounded_timeout",
+      "timeout_seconds": 180,
+      "max_rss_kib": 4045888,
+      "output_created": false
+    }
+  ],
+  "conclusion": "A source-level build is now reproducible, and bypassing Morty proves Calyx's own SV emission completes. Stack sizing and mux balancing alone do not make Morty finish within the iteration budget. The viable tool-fix direction is to replace full-file AST pickling with a streaming/static dependency linker, or to make Morty parse only the external dependency closure rather than the generated main component.",
+  "scope_note": "All source patches in this experiment remain temporary under /tmp; no unverified Calyx fork or generated RTL has been promoted into the project."
+}
