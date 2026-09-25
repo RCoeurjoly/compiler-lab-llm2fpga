@@ -8,6 +8,7 @@ fix_futil_fptosi_handshake="${CALYX_FIX_FUTIL_FPTOSI_HANDSHAKE:-$SCRIPT_DIR/fix_
 fix_sv_roundeven_overflow="${CALYX_FIX_SV_ROUNDEVEN_OVERFLOW:-}"
 fix_sv_divsqrt_handshake="${CALYX_FIX_SV_DIVSQRT_HANDSHAKE:-}"
 verify_futil_bits="${CALYX_VERIFY_F32_CONSTANT_BITS:-$SCRIPT_DIR/verify_calyx_f32_constant_bits.py}"
+optimize_fsm_decode="${CALYX_OPTIMIZE_FSM_DECODE_SCRIPT:-$SCRIPT_DIR/optimize_calyx_fsm_decode.py}"
 
 circt_translate="${1:?usage: calyx_to_sv <circt-translate> <calyx-bin> <calyx-lib-dir> <calyx-dir> <output-dir>}"
 calyx_bin="${2:?usage: calyx_to_sv <circt-translate> <calyx-bin> <calyx-lib-dir> <calyx-dir> <output-dir>}"
@@ -213,6 +214,14 @@ Path(sys.argv[2]).write_text(json.dumps({
 }, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
   fi
+fi
+
+if [[ "${CALYX_OPTIMIZE_FSM_DECODE:-0}" == "1" ]]; then
+  python3 "$optimize_fsm_decode" \
+    "$output_dir/sv/main.sv" "$output_dir/sv/main.fsm_decode.sv" \
+    --receipt "$output_dir/fsm-decode-receipt.json"
+  mv "$output_dir/sv/main.fsm_decode.sv" "$output_dir/sv/main.sv"
+  test -s "$output_dir/fsm-decode-receipt.json"
 fi
 
 if [[ "${CALYX_SKIP_RESOURCE_REPORT:-0}" == "1" ]]; then

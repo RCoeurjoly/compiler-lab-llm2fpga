@@ -225,7 +225,8 @@ let
     '';
 
   mkCalyxNativeSvDerivation = { name, calyx, calyxCompilePasses ? [ ]
-    , calyxEmitNested ? true, calyxSkipResourceReport ? false }:
+    , calyxEmitNested ? true, calyxSkipResourceReport ? false
+    , calyxOptimizeFsmDecode ? false }:
     pkgs.runCommand "${name}-calyx-native-sv" {
       buildInputs = [ circt calyxTool python ];
     } ''
@@ -234,7 +235,9 @@ let
       export CALYX_FIX_FUTIL_FPTOSI_HANDSHAKE=${pipelineScripts}/fix_futil_fptosi_handshake.py
       export CALYX_FIX_SV_DIVSQRT_HANDSHAKE=${pipelineScripts}/fix_sv_divsqrt_handshake.py
       export CALYX_VERIFY_F32_CONSTANT_BITS=${pipelineScripts}/verify_calyx_f32_constant_bits.py
+      export CALYX_OPTIMIZE_FSM_DECODE_SCRIPT=${pipelineScripts}/optimize_calyx_fsm_decode.py
       export CALYX_COMPILE_PASSES=${pkgs.lib.escapeShellArg (pkgs.lib.concatStringsSep " " calyxCompilePasses)}
+      export CALYX_OPTIMIZE_FSM_DECODE=${if calyxOptimizeFsmDecode then "1" else "0"}
       export CALYX_EMIT_NESTED=${if calyxEmitNested then "1" else "0"}
       export CALYX_SKIP_RESOURCE_REPORT=${if calyxSkipResourceReport then "1" else "0"}
       ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
@@ -490,7 +493,7 @@ let
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false, calyxMathProfile ? "none"
     , calyxCompilePasses ? [ ], calyxEmitNested ? true
-    , calyxSkipResourceReport ? false }:
+    , calyxSkipResourceReport ? false, calyxOptimizeFsmDecode ? false }:
     let
       unavailable = stage: reason:
         mkUnavailableStage { inherit name stage reason; };
@@ -530,7 +533,7 @@ let
         };
         "calyx-native-sv" = mkCalyxNativeSvDerivation {
           inherit name calyxCompilePasses calyxEmitNested
-            calyxSkipResourceReport;
+            calyxSkipResourceReport calyxOptimizeFsmDecode;
           inherit (self) calyx;
         };
         "calyx-hw-sv" = mkCalyxHwSvDerivation {
@@ -602,7 +605,7 @@ let
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false, calyxMathProfile ? "none"
     , calyxCompilePasses ? [ ], calyxEmitNested ? true
-    , calyxSkipResourceReport ? false }:
+    , calyxSkipResourceReport ? false, calyxOptimizeFsmDecode ? false }:
     let
       resolvedHfSnapshot = mkHfSnapshotDerivation { inherit name hfSnapshot; };
       resolvedPyTorchExported = mkPyTorchExportedDerivation {
@@ -624,7 +627,7 @@ let
         torchStage = resolvedTorchStage;
         inherit allowHwExterns fpPrimsSv slangPerFileExternModules
           calyxMathProfile calyxCompilePasses calyxEmitNested
-          calyxSkipResourceReport;
+          calyxSkipResourceReport calyxOptimizeFsmDecode;
       };
       model = {
         inherit key name description;
@@ -643,6 +646,7 @@ let
       "calyxCompilePasses"
       "calyxEmitNested"
       "calyxSkipResourceReport"
+      "calyxOptimizeFsmDecode"
     ];
 
   registerModel = args:

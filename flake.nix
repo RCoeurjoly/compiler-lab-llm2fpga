@@ -413,6 +413,7 @@
           "calyx_float_frontier_report.py"
           "calyx_preflight_report.py"
           "calyx_to_sv_no_handshake.sh"
+          "optimize_calyx_fsm_decode.py"
           "cf_to_handshake.sh"
           "compare_task3_representative_core_parity.py"
           "externalize_large_memories.py"
