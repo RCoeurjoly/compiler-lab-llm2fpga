@@ -1,0 +1,33 @@
+{
+  "schema": "llm2fpga.rc-timing-pass-provenance-audit.v1",
+  "date": "2026-09-25",
+  "status": "historical_pass_not_authenticated_for_current_rc",
+  "receipt_under_audit": "artifacts/diagnostics/2026-09-25-rc-ddr3-shell-route-bitstream-pass.json",
+  "recorded_commit": "05aa89d",
+  "recorded_commit_facts": {
+    "dedicated_rc_shell_in_flake": false,
+    "compiler_generated_rc_route_target": false,
+    "source": "git show 05aa89d:flake.nix and git show 05aa89d:nix/task6-board-shell.nix"
+  },
+  "current_reproducible_rc": {
+    "source_hash": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+    "required_rowstream_mhz": 83.33,
+    "latest_completed_route_mhz": 59.39,
+    "latest_completed_route_store": "/nix/store/inm9lri7yfas6mlzn7ywkpw4dbzyknm2-compiler-ddr3-trace-replay-route"
+  },
+  "historical_store_passes": [
+    {
+      "store": "/nix/store/2xb34ymsrmpjz71i0dhfrvxgp41qww0f-compiler-ddr3-trace-replay-route",
+      "rowstream_mhz": 88.48,
+      "pcie_user_mhz": 95.26,
+      "fasm_sha256": "57f38a9a6d3986e6075351c2b27ca856e4591630eac9ca894b2b55780c82422"
+    },
+    {
+      "store": "/nix/store/6m62nwwkfyj8dk9a8jfnkg2m6c3kqsfm-compiler-ddr3-trace-replay-route",
+      "rowstream_mhz": 83.82,
+      "pcie_user_mhz": 95.46,
+      "fasm_sha256": "a8ac514627d9cb088e6c8677e86e3302507bbf785abb97e4617a7ef1a5d42a61"
+    }
+  ],
+  "conclusion": "Historical route passes are retained as diagnostic evidence only. They are not accepted as compiler-generated RC timing or bitstream evidence until their exact synthesis input, top, and provenance are reconstructed and matched to the current RC source. No historical pass is programmed."
+}
