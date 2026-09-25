@@ -37,5 +37,17 @@
     "done": false,
     "memory_images_loaded": true,
     "interpretation": "The corrected run advances through at least 80000 cycles but does not reach done within 120 seconds; this is a runtime frontier, not a semantic-equivalence or hardware result."
+  },
+  "safe_runner_followup": {
+    "status": "compile_wall_timeout",
+    "jobs": 1,
+    "compile_timeout_seconds": 300,
+    "simulation_timeout_seconds": 120,
+    "normalized_sv_sha256": "c76d2f78c24be53541f11d074b4f79e319221d8efe41fb9c315f453e08c1f8d4",
+    "testbench_sha256": "11e21bc4b8799b8cae0ec91206a7c2827954c7e4e381d923cdecc5efa1fdb305",
+    "compile_log_sha256": "7f701c95a798c3ce69779671e29406170fe368751bccbc28446ff5618245c96a",
+    "observed": "The single-job runner remained in Verilator C++ compilation and was stopped at the wall bound; no executable or simulation output was produced.",
+    "hardware": false,
+    "next_action": "reduce generated translation-unit/static-control expansion before another full-SV equivalence attempt"
   }
 }
