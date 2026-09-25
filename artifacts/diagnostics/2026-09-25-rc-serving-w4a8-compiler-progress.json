@@ -1,0 +1,60 @@
+{
+  "schema": "llm2fpga.rc-serving-w4a8-compiler-progress.v1",
+  "date": "2026-09-25",
+  "status": "compiler_stages_pass_simulation_pending",
+  "scope": "compiler-generated integrated stateful W4A8 Representative Core",
+  "implementation_commit": "a2f372310fcae280311ea6be185a5e1b49a506ad",
+  "compiler_fix": {
+    "description": "General static memref.collapse_shape composition over size-one dimensions and contiguous non-unit dimensions",
+    "focused_regression": {
+      "command": "nix develop --impure -c python -m unittest tests.test_tinystories_1m_exact_memref_subview_extension -v",
+      "result": "16 tests passed"
+    }
+  },
+  "nix_artifacts": {
+    "calyx": {
+      "path": "/nix/store/bd66hbvk4xvqrpb8p1nr3b4qqysrj62q-tinystories-w4a8-rc-serving-integrated-calyx",
+      "manifest_status": "ok",
+      "pre_calyx_prohibited_ops": {},
+      "model_calyx_mlir_sha256": "46730cc190947b0e1c962b95c3c36d56f2c5d022f862753a43ee8951a549b1f6",
+      "manifest_sha256": "5bbdc1acc6f677139a98644a3dec5af5572860615143a2136c2938fe4c1f27b3",
+      "pre_calyx_legality_sha256": "e7cc29335cb83efc22833ec818d1e7ed56235393bbcbb42a822a3402134c6de0"
+    },
+    "native_sv": {
+      "path": "/nix/store/n67kkw8acw03xhg615k38fcb3pvcjgsg-tinystories-w4a8-rc-serving-integrated-calyx-native-sv",
+      "manifest_status": "ok",
+      "main_sv_sha256": "dea39fe952ec37d409fba56d3345188cc7125eedc5f214808168494003e13f54",
+      "manifest_sha256": "8f045ab04cd5690db58dd007a7e98cc4202411a7e66601333d97c0bae344ba3f",
+      "size_bytes": 50861718
+    },
+    "public_shell": {
+      "path": "/nix/store/546shhzx57fn7mp50ahdzlr5d76mi544-tinystories-w4a8-rc-serving-integrated-shell",
+      "manifest_status": "ok",
+      "reference_top_sha256": "73bcbdbde16bd2a460b9741d55d36d3db1294cd9f71dc86c67dd137dc8491c20",
+      "receipt_sha256": "4245a9f7a46bdbb6d7709dc758c5d5c031050fd7d4d01cebc0d5b89501463eae",
+      "semantic_memories": 74,
+      "rtl_memories": 382,
+      "prompt_memories": 1,
+      "output_memories": 18,
+      "readback_words": 237
+    }
+  },
+  "simulation_diagnostics": {
+    "raw_iverilog_elaboration": {
+      "result": "failed",
+      "first_error": "duplicate sqrtOpOut declaration",
+      "secondary_error": "memory exhausted"
+    },
+    "repaired_iverilog_elaboration": {
+      "repair_receipt": "/tmp/rc-serving-integrated-synth-repair.json",
+      "repairs": {
+        "request_declaration": 1,
+        "duplicate_sqrtopout": 1,
+        "assertion_blocks": 8057
+      },
+      "result": "bounded timeout after 600 seconds",
+      "claim": "no integrated RTL simulation or equivalence pass is claimed"
+    }
+  },
+  "next_gate": "Make the integrated generated SV transaction-simulatable with a bounded split/hierarchical simulator or a compiler-owned transaction backend, then compare all 18 outputs and token/cache feedback against observation.json."
+}
