@@ -1,0 +1,38 @@
+{
+  "schema": "llm2fpga.rc-board-retiming-timing-frontier.v1",
+  "date": "2026-09-25",
+  "status": "route-complete-timing-fail",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "configuration": {
+    "REGISTER_LOCAL_MEMORIES": 1,
+    "REGISTER_REQUESTS": 0,
+    "synth_xilinx_retime": true,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "seed": 15
+  },
+  "synthesis": {
+    "status": "pass",
+    "output": "/nix/store/1fgs16p62ffl0k6rm6c0wlikw75nq13a-compiler-ddr3-trace-replay-synthesis-screen/replay.json",
+    "resource_observation": "retiming increased the routed design to 72256 LUTs and 23623 FFs"
+  },
+  "route": {
+    "status": "legal_route_but_timing_fail",
+    "output": "/nix/store/nxp9nymfcr38gybb0fxb0af7m7jqp5c3-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "379b7fb4b5aae5d0a7aa95df22c9d849876360f718a2ab90ab4be9b2f6f541e6",
+    "warnings": 24,
+    "errors": 0,
+    "rowstream_clk_mhz": 10.31,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 74.90,
+    "pcie_user_required_mhz": 62.5,
+    "router": "nextpnr-xilinx 0.8.2, seed 15"
+  },
+  "interpretation": "Retiming is rejected for this candidate: it materially increases resource use and collapses rowstream timing. The standard non-retimed recipe is restored.",
+  "claims": {
+    "compiler_generated_rtl": true,
+    "timing_closed": false,
+    "board_programming": false,
+    "next_gate": "use an explicit compiler-side pipeline cut, not global synthesis retiming"
+  }
+}
