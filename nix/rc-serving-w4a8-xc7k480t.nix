@@ -118,9 +118,12 @@ pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
     write_json "$out/mapped.json"
   YOSYS
     set +e
-    ${pkgs.time}/bin/time -v -o "$out/yosys.time" \
-      ${yosys}/bin/yosys -m ${yosysSlang}/share/yosys/plugins/slang.so \
-      -l "$out/yosys.log" -s "$out/yosys.ys" >"$out/yosys.console" 2>&1
+    # Keep synthesis bounded so a pathological generated netlist leaves a
+    # durable failure receipt rather than consuming the whole goal timebox.
+    ${pkgs.coreutils}/bin/timeout --signal=TERM 600 \
+      ${pkgs.time}/bin/time -v -o "$out/yosys.time" \
+        ${yosys}/bin/yosys -m ${yosysSlang}/share/yosys/plugins/slang.so \
+        -l "$out/yosys.log" -s "$out/yosys.ys" >"$out/yosys.console" 2>&1
     yosys_status=$?
     set -e
   else
@@ -147,9 +150,10 @@ pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
     if [ "$prep_status" -eq 0 ] && [ -s "$out/nextpnr.json" ]; then
       set +e
       ${pkgs.time}/bin/time -v -o "$out/nextpnr.time" \
-        ${nextpnr}/bin/nextpnr-xilinx --chipdb ${chipdb} --xdc "$out/probe.xdc" \
-        --json "$out/nextpnr.json" --fasm "$out/design.fasm" \
-        --log "$out/nextpnr.log" --freq 12 >"$out/nextpnr.console" 2>&1
+        ${pkgs.coreutils}/bin/timeout --signal=TERM 600 \
+          ${nextpnr}/bin/nextpnr-xilinx --chipdb ${chipdb} --xdc "$out/probe.xdc" \
+          --json "$out/nextpnr.json" --fasm "$out/design.fasm" \
+          --log "$out/nextpnr.log" --freq 12 >"$out/nextpnr.console" 2>&1
       nextpnr_status=$?
       set -e
     else
