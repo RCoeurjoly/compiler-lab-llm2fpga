@@ -1,0 +1,28 @@
+{
+  "schema": "llm2fpga.rc-calyx-no-cell-share-frontier.v1",
+  "date": "2026-09-25",
+  "status": "rejected-bounded-netlist-size",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "experiment": {
+    "pass": "Calyx all with cell-share disabled",
+    "purpose": "test whether duplicating shared datapath cells relieves compiler schedule fanout",
+    "transport": "PCIe + UberDDR3 shell, unchanged",
+    "seed": 15
+  },
+  "result": {
+    "generated_sv_bytes": 1650398,
+    "generated_sv_sha256": "1b89366a72356ee92da4e4e8fe71d6376d35622296c131b4a4b574a8f305df65",
+    "rtlil_json_bytes": 184320000,
+    "bounded_file_limit_bytes": 184320000,
+    "route_status": "not-started",
+    "failure": "synthesis JSON reached the 180000-block output limit and was truncated before nextpnr"
+  },
+  "interpretation": "Cell-share removal materially changes generated RTL but exceeds the bounded implementation artifact limit; it is not an acceptable fast-iteration path without a structural resource budget.",
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "timing_closed": false,
+    "board_programming": false,
+    "next_gate": "retain default sharing and target schedule-state representation rather than wholesale cell duplication"
+  }
+}
