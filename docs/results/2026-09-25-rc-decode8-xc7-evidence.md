@@ -63,3 +63,9 @@ entering `MEMORY_LIBMAP` for LUTRAM-only legalization. Disabling BRAM
 selection is therefore not a sufficient workaround; the mapping cost is
 driven by the number and shape of generated memories, not one physical-memory
 family.
+
+A fourth replay restricted `memory_libmap` to the Xilinx LUTRAM library only
+(with the BRAM library and its candidates removed). It still timed out at 700
+seconds while entering `MEMORY_LIBMAP`. Candidate-library breadth is therefore
+not the primary cause; reducing the number/shape of memories before Yosys is
+the next evidence-backed direction.
