@@ -7,8 +7,8 @@
     "after": 104,
     "before": 53324
   },
-  "output_bytes": 10454614,
-  "output_sv_sha256": "e3d56966264e93d6bac54d20a3c332faa6cffa924a9f8c8f6a987a55a9d48e8d",
+  "output_bytes": 10460675,
+  "output_sv_sha256": "4a479e144c4df0d79103a7fdafa44dc8b24c638db60208e09ace0437c40b973f",
   "postpass_verilator_lint": {
     "normalized_sv_bytes": 10507648,
     "normalized_sv_sha256": "1d06fa819d968b366fdde911195cbd567f7d555bc2c1ba0a0ab9d0d9bfcf3d08",
@@ -20,6 +20,7 @@
     ]
   },
   "replacement_count": 505,
+  "balanced_assignment_count": 3,
   "schema": "llm2fpga.rc-fsm-guarded-or-frontier.v1",
   "scope": "compiler-generated RC control expression reduction",
   "status": "diagnostic",

@@ -40,7 +40,24 @@ class SimplifyFsmGuardedOrTest(unittest.TestCase):
         output, count = module.simplify(source)
         self.assertEqual(count, 0)
         self.assertLess(max(map(len, output.splitlines())), 200)
-        self.assertIn("(signal_0_go_out | signal_1_go_out)", output)
+        self.assertIn("(signal_0_go_out |\n  signal_1_go_out)", output)
+
+    def test_boolean_terms_are_balanced_without_algebraic_rewrite(self) -> None:
+        source = (
+            "assign fsm_write_en = first_out | fsm_out == 3'd3 & second_out | "
+            "fsm_out != 3'd3 & third_out;\n"
+        )
+        output, count = module.simplify(source)
+        self.assertEqual(count, 0)
+        self.assertIn("((first_out |\n  fsm_out == 3'd3 & second_out)", output)
+
+    def test_long_assignment_is_balanced(self) -> None:
+        source = "assign signal = " + " | ".join(
+            f"term_{index}" for index in range(400)
+        ) + ";\n"
+        output, count = module.balance_large_assignments(source, minimum_bytes=100)
+        self.assertEqual(count, 1)
+        self.assertLess(max(map(len, output.splitlines())), 200)
 
 
 if __name__ == "__main__":
