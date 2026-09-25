@@ -708,6 +708,8 @@ in {
       hidden_size = 2;
     };
     allowHwExterns = false;
+    calyxOptimizeFsmDecode = true;
+    calyxFsmDecodeHierarchical = true;
     slangPerFileExternModules = false;
     hfSnapshot = tinyStories1m.snapshot;
     pytorchToolchain = [ pythonWithTinyStories torchMlir ];

@@ -224,6 +224,9 @@ if [[ "${CALYX_OPTIMIZE_FSM_DECODE:-0}" == "1" ]]; then
   if [[ "${CALYX_FSM_DECODE_SHARE_STATES:-0}" == "1" ]]; then
     fsm_decode_copy_args+=(--share-state-decodes)
   fi
+  if [[ "${CALYX_FSM_DECODE_HIERARCHICAL:-0}" == "1" ]]; then
+    fsm_decode_copy_args+=(--hierarchical-state-decodes)
+  fi
   python3 "$optimize_fsm_decode" \
     "$output_dir/sv/main.sv" "$output_dir/sv/main.fsm_decode.sv" \
     --receipt "$output_dir/fsm-decode-receipt.json" \

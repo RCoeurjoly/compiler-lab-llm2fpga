@@ -227,7 +227,7 @@ let
   mkCalyxNativeSvDerivation = { name, calyx, calyxCompilePasses ? [ ]
     , calyxEmitNested ? true, calyxSkipResourceReport ? false
     , calyxOptimizeFsmDecode ? false, calyxFsmDecodeKeepCopies ? false
-    , calyxFsmDecodeShareStates ? false }:
+    , calyxFsmDecodeShareStates ? false, calyxFsmDecodeHierarchical ? false }:
     pkgs.runCommand "${name}-calyx-native-sv" {
       buildInputs = [ circt calyxTool python ];
     } ''
@@ -241,6 +241,7 @@ let
       export CALYX_OPTIMIZE_FSM_DECODE=${if calyxOptimizeFsmDecode then "1" else "0"}
       export CALYX_FSM_DECODE_KEEP_COPIES=${if calyxFsmDecodeKeepCopies then "1" else "0"}
       export CALYX_FSM_DECODE_SHARE_STATES=${if calyxFsmDecodeShareStates then "1" else "0"}
+      export CALYX_FSM_DECODE_HIERARCHICAL=${if calyxFsmDecodeHierarchical then "1" else "0"}
       export CALYX_EMIT_NESTED=${if calyxEmitNested then "1" else "0"}
       export CALYX_SKIP_RESOURCE_REPORT=${if calyxSkipResourceReport then "1" else "0"}
       ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
@@ -497,7 +498,8 @@ let
     , slangPerFileExternModules ? false, calyxMathProfile ? "none"
     , calyxCompilePasses ? [ ], calyxEmitNested ? true
     , calyxSkipResourceReport ? false, calyxOptimizeFsmDecode ? false
-    , calyxFsmDecodeKeepCopies ? false, calyxFsmDecodeShareStates ? false }:
+    , calyxFsmDecodeKeepCopies ? false, calyxFsmDecodeShareStates ? false
+    , calyxFsmDecodeHierarchical ? false }:
     let
       unavailable = stage: reason:
         mkUnavailableStage { inherit name stage reason; };
@@ -538,7 +540,8 @@ let
         "calyx-native-sv" = mkCalyxNativeSvDerivation {
           inherit name calyxCompilePasses calyxEmitNested
             calyxSkipResourceReport calyxOptimizeFsmDecode
-            calyxFsmDecodeKeepCopies calyxFsmDecodeShareStates;
+            calyxFsmDecodeKeepCopies calyxFsmDecodeShareStates
+            calyxFsmDecodeHierarchical;
           inherit (self) calyx;
         };
         "calyx-hw-sv" = mkCalyxHwSvDerivation {
@@ -611,7 +614,8 @@ let
     , slangPerFileExternModules ? false, calyxMathProfile ? "none"
     , calyxCompilePasses ? [ ], calyxEmitNested ? true
     , calyxSkipResourceReport ? false, calyxOptimizeFsmDecode ? false
-    , calyxFsmDecodeKeepCopies ? false, calyxFsmDecodeShareStates ? false }:
+    , calyxFsmDecodeKeepCopies ? false, calyxFsmDecodeShareStates ? false
+    , calyxFsmDecodeHierarchical ? false }:
     let
       resolvedHfSnapshot = mkHfSnapshotDerivation { inherit name hfSnapshot; };
       resolvedPyTorchExported = mkPyTorchExportedDerivation {
@@ -634,7 +638,8 @@ let
         inherit allowHwExterns fpPrimsSv slangPerFileExternModules
           calyxMathProfile calyxCompilePasses calyxEmitNested
           calyxSkipResourceReport calyxOptimizeFsmDecode
-          calyxFsmDecodeKeepCopies calyxFsmDecodeShareStates;
+          calyxFsmDecodeKeepCopies calyxFsmDecodeShareStates
+          calyxFsmDecodeHierarchical;
       };
       model = {
         inherit key name description;
@@ -656,6 +661,7 @@ let
       "calyxOptimizeFsmDecode"
       "calyxFsmDecodeKeepCopies"
       "calyxFsmDecodeShareStates"
+      "calyxFsmDecodeHierarchical"
     ];
 
   registerModel = args:

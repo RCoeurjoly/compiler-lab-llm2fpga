@@ -120,8 +120,34 @@ def _share_state_decodes(source: str, state_signal: str) -> tuple[str, int]:
     return source, len(matches)
 
 
+def _hierarchical_state_decodes(source: str, state_signal: str) -> tuple[str, int]:
+    matches = sorted({int(value) for value in re.findall(
+        rf"{re.escape(state_signal)}\s*==\s*11'd(\d+)", source
+    )})
+    if not matches:
+        return source, 0
+    groups = sorted({state >> 5 for state in matches})
+    source = re.sub(
+        rf"{re.escape(state_signal)}\s*==\s*11'd(\d+)",
+        lambda match: (
+            f"(fsm_hi_{int(match.group(1)) >> 5} && "
+            f"{state_signal}[4:0] == 5'd{int(match.group(1)) & 31})"
+        ),
+        source,
+    )
+    declarations = "".join(
+        f"wire fsm_hi_{group} = {state_signal}[10:5] == 6'd{group};\n"
+        for group in groups
+    )
+    declaration = "logic [10:0] fsm0_out;"
+    insert_at = source.index(declaration) + len(declaration)
+    source = source[:insert_at] + "\n" + declarations + source[insert_at:]
+    return source, len(matches)
+
+
 def transform(source: str, keep_state_copies: bool = False,
-              share_state_decodes: bool = False) -> tuple[str, int]:
+              share_state_decodes: bool = False,
+              hierarchical_state_decodes: bool = False) -> tuple[str, int]:
     next_match = re.search(r"assign\s+fsm0_in\s*=.*?;", source, re.S)
     write_match = re.search(r"assign\s+fsm0_write_en\s*=.*?;", source, re.S)
     if next_match is None or write_match is None:
@@ -151,7 +177,9 @@ def transform(source: str, keep_state_copies: bool = False,
         insert_at = transformed.index(declaration) + len(declaration)
         transformed = transformed[:insert_at] + "\n" + prefix + transformed[insert_at:]
     shared_count = 0
-    if share_state_decodes:
+    if hierarchical_state_decodes:
+        transformed, shared_count = _hierarchical_state_decodes(transformed, next_signal)
+    elif share_state_decodes:
         transformed, shared_count = _share_state_decodes(transformed, next_signal)
     return transformed, shared_count
 
@@ -163,12 +191,14 @@ def main() -> None:
     parser.add_argument("--receipt", type=Path)
     parser.add_argument("--keep-state-copies", action="store_true")
     parser.add_argument("--share-state-decodes", action="store_true")
+    parser.add_argument("--hierarchical-state-decodes", action="store_true")
     args = parser.parse_args()
     source = args.input.read_text(encoding="utf-8")
     result, shared_count = transform(
         source,
         keep_state_copies=args.keep_state_copies,
         share_state_decodes=args.share_state_decodes,
+        hierarchical_state_decodes=args.hierarchical_state_decodes,
     )
     args.output.write_text(result, encoding="utf-8")
     if args.receipt is not None:
@@ -182,6 +212,7 @@ def main() -> None:
                     "state_logic": "fsm0_in and fsm0_write_en",
                     "keep_state_copies": args.keep_state_copies,
                     "share_state_decodes": args.share_state_decodes,
+                    "hierarchical_state_decodes": args.hierarchical_state_decodes,
                     "shared_state_decode_count": shared_count,
                 },
                 indent=2,
