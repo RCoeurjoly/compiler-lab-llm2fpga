@@ -1,0 +1,38 @@
+{
+  "schema": "llm2fpga.rc-share1000-frontier.v1",
+  "date": "2026-09-25",
+  "status": "same-as-share500-timing-fail",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "experiment": {
+    "pass": "Yosys share -fast -limit 1000",
+    "purpose": "test whether additional bounded resource sharing improves the share-500 RC timing frontier"
+  },
+  "simulation": {
+    "status": "pass-by-inherited-authenticated-gate",
+    "result": "0x4cfe",
+    "scope": "exact RC Wishbone transaction simulation; synthesis-only pass does not alter generated RTL"
+  },
+  "route": {
+    "status": "legal_route_but_timing_fail",
+    "output": "/nix/store/4hla9ip8cnnz6w0kk1c4fm5y17w22bqg-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "e605b1b04fb69c77fbdef0546596a38e820d7c09b2b60dcaa56236019d0aa82f",
+    "rowstream_clk_mhz": 61.27,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 82.72,
+    "pcie_user_required_mhz": 62.5,
+    "router": "nextpnr-xilinx 0.8.2, seed 15",
+    "warnings": 24,
+    "errors": 0
+  },
+  "comparison": {
+    "share500_fasm_sha256": "e605b1b04fb69c77fbdef0546596a38e820d7c09b2b60dcaa56236019d0aa82f",
+    "interpretation": "share-1000 produced identical resources, timing, and FASM to share-500; no additional merge opportunity exists in this netlist"
+  },
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "timing_closed": false,
+    "board_programming": false,
+    "next_gate": "retain share-500 and target compiler-side FSM state representation or pipeline fanout; do not increase the sharing limit"
+  }
+}
