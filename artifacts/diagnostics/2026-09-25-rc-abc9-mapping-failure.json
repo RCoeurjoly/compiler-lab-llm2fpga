@@ -1,0 +1,24 @@
+{
+  "schema": "llm2fpga.rc-board-abc9-mapping-failure.v1",
+  "date": "2026-09-25",
+  "status": "synthesis-fail-before-route",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "configuration": {
+    "REGISTER_LOCAL_MEMORIES": 1,
+    "REGISTER_REQUESTS": 0,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "seed": 15
+  },
+  "tool": "Yosys 0.66 synth_xilinx -abc9 -run coarse:finalize",
+  "failure": "ERROR: Module $\\__ABC9_LUT7 with (* abc9_lut *) has no specify entries.",
+  "output": "/nix/store/9w92yjyan9103c2v95nqywc8p2ngjnv9-compiler-ddr3-trace-replay-synthesis-screen/yosys.log",
+  "interpretation": "The installed ABC9/Xilinx mapping combination is not usable for this design; no route or hardware claim was made.",
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "timing_closed": false,
+    "board_programming": false,
+    "next_gate": "retain standard synth_xilinx mapping and target the compiler-generated FSM decode/data cone with an explicit pipeline transformation"
+  }
+}
