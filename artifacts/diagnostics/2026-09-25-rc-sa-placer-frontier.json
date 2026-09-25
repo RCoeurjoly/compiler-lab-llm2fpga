@@ -1,0 +1,28 @@
+{
+  "date": "2026-09-25",
+  "experiment": "representative-core-nextpnr-sa-placer-frontier",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "implementation": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pcie_unchanged": true,
+    "uberddr3_profile_unchanged": "two-lane 333/83.33 MHz",
+    "seed": 15,
+    "placer": "sa",
+    "placer_budgets": true
+  },
+  "simulation": {
+    "status": "unchanged_exact_rc_simulation_pass",
+    "result": "WB_RC_PASS result=4cfe",
+    "expected_tokens": [-2, 76]
+  },
+  "route": {
+    "status": "terminated_initial_placement",
+    "progress": "8000 of 67144 cells placed",
+    "timing_available": false,
+    "timing_closed": false,
+    "fasm_produced": false,
+    "board_programming": false
+  },
+  "interpretation": "The simulated-annealing placer is not compatible with the bounded fast-iteration workflow at this design size: it did not reach timing feedback within the timebox. The production heap placer is restored."
+}
