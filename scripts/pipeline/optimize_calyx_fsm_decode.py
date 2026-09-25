@@ -99,7 +99,29 @@ def _write_enable_case(expr: str, state_signal: str) -> str:
     return "\n".join(lines)
 
 
-def transform(source: str, keep_state_copies: bool = False) -> str:
+def _share_state_decodes(source: str, state_signal: str) -> tuple[str, int]:
+    matches = sorted({int(value) for value in re.findall(
+        rf"{re.escape(state_signal)}\s*==\s*11'd(\d+)", source
+    )})
+    if not matches:
+        return source, 0
+    source = re.sub(
+        rf"{re.escape(state_signal)}\s*==\s*11'd(\d+)",
+        lambda match: f"fsm_state_{match.group(1)}",
+        source,
+    )
+    declarations = "".join(
+        f"wire fsm_state_{state} = {state_signal} == 11'd{state};\n"
+        for state in matches
+    )
+    declaration = "logic [10:0] fsm0_out;"
+    insert_at = source.index(declaration) + len(declaration)
+    source = source[:insert_at] + "\n" + declarations + source[insert_at:]
+    return source, len(matches)
+
+
+def transform(source: str, keep_state_copies: bool = False,
+              share_state_decodes: bool = False) -> tuple[str, int]:
     next_match = re.search(r"assign\s+fsm0_in\s*=.*?;", source, re.S)
     write_match = re.search(r"assign\s+fsm0_write_en\s*=.*?;", source, re.S)
     if next_match is None or write_match is None:
@@ -128,7 +150,10 @@ def transform(source: str, keep_state_copies: bool = False) -> str:
         declaration = "logic [10:0] fsm0_out;"
         insert_at = transformed.index(declaration) + len(declaration)
         transformed = transformed[:insert_at] + "\n" + prefix + transformed[insert_at:]
-    return transformed
+    shared_count = 0
+    if share_state_decodes:
+        transformed, shared_count = _share_state_decodes(transformed, next_signal)
+    return transformed, shared_count
 
 
 def main() -> None:
@@ -137,9 +162,14 @@ def main() -> None:
     parser.add_argument("output", type=Path)
     parser.add_argument("--receipt", type=Path)
     parser.add_argument("--keep-state-copies", action="store_true")
+    parser.add_argument("--share-state-decodes", action="store_true")
     args = parser.parse_args()
     source = args.input.read_text(encoding="utf-8")
-    result = transform(source, keep_state_copies=args.keep_state_copies)
+    result, shared_count = transform(
+        source,
+        keep_state_copies=args.keep_state_copies,
+        share_state_decodes=args.share_state_decodes,
+    )
     args.output.write_text(result, encoding="utf-8")
     if args.receipt is not None:
         args.receipt.write_text(
@@ -151,6 +181,8 @@ def main() -> None:
                     "output_sv_sha256": hashlib.sha256(result.encode()).hexdigest(),
                     "state_logic": "fsm0_in and fsm0_write_en",
                     "keep_state_copies": args.keep_state_copies,
+                    "share_state_decodes": args.share_state_decodes,
+                    "shared_state_decode_count": shared_count,
                 },
                 indent=2,
                 sort_keys=True,
