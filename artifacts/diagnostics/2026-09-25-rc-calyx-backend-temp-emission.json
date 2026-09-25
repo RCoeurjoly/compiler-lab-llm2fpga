@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-25",
+  "experiment": "rc-calyx-backend-temp-emission",
+  "calyx_source_pin": "5a4303847392609cad83dda6f4bdffc8cc0e5c89",
+  "observation": "The Calyx Verilog backend leaves its NamedTempFile behind when the process aborts in Morty. The files contain complete inline primitives and the main_1 component, demonstrating that emit_component completed before the stack overflow.",
+  "artifacts": [
+    {
+      "path": "/tmp/.tmp1qVCzT",
+      "bytes": 50716338,
+      "module_count": 9,
+      "tail": "// COMPONENT END: main_1\\nendmodule"
+    },
+    {
+      "path": "/tmp/.tmpYMoUNt",
+      "bytes": 35187210,
+      "module_count": 9,
+      "tail": "// COMPONENT END: main_1\\nendmodule"
+    }
+  ],
+  "interpretation": "The crash is after Calyx IR-to-Verilog emission, during the HardFloat dependency pickling/post-processing path (Morty or its SystemVerilog parser), not in compile-invoke or the Calyx assignment emitter.",
+  "next_step": "Build or invoke Morty independently on the captured generated source, then make the smallest backend/tool change that avoids unbounded parser recursion while preserving the required HardFloat dependency closure."
+}
