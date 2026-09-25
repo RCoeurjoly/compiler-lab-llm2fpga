@@ -1,0 +1,40 @@
+{
+  "date": "2026-09-25",
+  "experiment": "representative-core-criticality-weighted-placer-control",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "implementation": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pcie_unchanged": true,
+    "uberddr3_profile_unchanged": "two-lane 333/83.33 MHz",
+    "seed": 15,
+    "control": "removed nextpnr --placer-budgets only"
+  },
+  "simulation": {
+    "status": "unchanged_exact_rc_simulation_pass",
+    "result": "WB_RC_PASS result=4cfe",
+    "expected_tokens": [-2, 76]
+  },
+  "route": {
+    "status": "route_completed_timing_failed",
+    "timing_closed": false,
+    "fasm_produced": false,
+    "board_programming": false,
+    "resource_summary": {
+      "SLICE_LUTX": 44452,
+      "SLICE_FFX": 19631,
+      "RAMB18E1": 23,
+      "RAMB36E1": 9,
+      "SELMUX2_1": 2405
+    },
+    "final_max_frequency_mhz": {
+      "rowstream_clk": 63.47,
+      "pcie_user_clk": 71.30
+    },
+    "required_frequency_mhz": {
+      "rowstream_clk": 83.33,
+      "pcie_user_clk": 62.5
+    }
+  },
+  "interpretation": "Criticality-weighted placement improves PCIe timing and slightly improves rowstream timing relative to the budgeted default for this compiler-generated RC, but 63.47 MHz remains below the fixed 83.33 MHz requirement. The production --placer-budgets heuristic is restored."
+}
