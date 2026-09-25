@@ -1,0 +1,28 @@
+{
+  "schema": "llm2fpga.rc-fsm-onehot-synthesis-frontier.v1",
+  "date": "2026-09-25",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "experiment": "Yosys fsm -encoding one-hot",
+  "configuration": {
+    "synthesis_timeout_seconds": 600,
+    "source": "unchanged compiler-generated RC RTL",
+    "transport": "PCIe plus UberDDR3 shell, unchanged",
+    "ddr3_profile": "two-lane 333/83.33 MHz",
+    "seed": 15
+  },
+  "simulation": {
+    "status": "pass-by-authenticated-existing-gate",
+    "result": "WB_RC_PASS result=4cfe"
+  },
+  "implementation": {
+    "status": "synthesis_timeout",
+    "mapped_netlist": false,
+    "route": false,
+    "bitstream": false,
+    "board_programming": false,
+    "board_inference": false,
+    "observed_log_bytes": 184549376
+  },
+  "diagnostic": "Generic FSM extraction expanded the scheduled 11-bit controller into enormous transition tables and consumed the full bounded synthesis timebox.",
+  "conclusion": "One-hot FSM extraction is not a viable optimization for this generated Calyx schedule. The production no-FSM synthesis recipe is restored; future improvement must be a schedule-aware compiler transformation or a targeted tool optimization, not generic Yosys FSM extraction."
+}
