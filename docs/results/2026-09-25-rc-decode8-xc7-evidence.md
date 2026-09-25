@@ -241,3 +241,11 @@ Kintex-7 LUT fabric. A bounded attempt to apply Yosys's generic `techmap.v`
 to the 814 MiB selected JSON exited without producing a replacement artifact.
 That failed experiment is diagnostic only; the production Nix flow is
 unchanged.
+
+A second bounded replay started the standard Xilinx `fine:map_cells` sequence
+from the persistent 584 MiB RTLIL checkpoint. It stopped during the initial
+optimizer and produced neither JSON nor a placement artifact. Thus the
+standard post-memory mapping stages cannot yet be evaluated on the complete
+checkpoint within the current host/timebox; a smaller extracted module is
+needed for the next tool experiment. This does not alter the RC semantics or
+the production flow.
