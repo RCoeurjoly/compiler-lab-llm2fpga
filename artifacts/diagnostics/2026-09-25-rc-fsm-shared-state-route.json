@@ -1,0 +1,39 @@
+{
+  "schema": "llm2fpga.rc-fsm-shared-state-route.v1",
+  "date": "2026-09-25",
+  "status": "rejected-timing-regression",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "experiment": {
+    "pass": "optimize_calyx_fsm_decode.py --share-state-decodes",
+    "shared_state_decode_count": 1116,
+    "input_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+    "output_sv_sha256": "3882a0cbfd90e2ca329717d62be61600e0e66da264a8df7320b4905088180304",
+    "exact_rc_simulation": "pass; expected [-2, 76], actual fe4c",
+    "seed": 15,
+    "transport": "PCIe + UberDDR3 shell, unchanged"
+  },
+  "route": {
+    "status": "legal_route_but_timing_fail",
+    "output": "/nix/store/qr8k5n477g36kls8y4dcijb06pwx5qiq-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "c158c036963d3531e9fa04dab2b3a230faf52936e56bbc78ededfe3213f26723",
+    "rowstream_clk_mhz": 58.03,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 88.57,
+    "pcie_user_required_mhz": 62.5,
+    "resources": {
+      "slice_lutx": 44199,
+      "slice_ffx": 19631,
+      "ramb36e1": 9,
+      "ramb18e1": 23,
+      "selmux2_1": 2328
+    }
+  },
+  "interpretation": "Sharing every state comparison preserves exact RTL simulation and reduces LUT/SELMUX counts, but routing remains far below the fixed rowstream requirement. Materializing the full decoder is not a sufficient timing fix; production flags are disabled.",
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "timing_closed": false,
+    "board_programming": false,
+    "next_gate": "Target the specific state-dependent address/readback schedule with selective compiler pipelining or state partitioning; do not materialize a global decoder."
+  }
+}
