@@ -151,3 +151,21 @@ correct pinned Series-7 library files and the same scalarized candidate. The
 run still reached `MEMORY_LIBMAP` and timed out after 420 seconds, without a
 mapped JSON. Disabling automatic block selection is therefore not a sufficient
 tool fix; the production synthesis script remains unchanged.
+
+### Replay-order correction and persistent checkpoint
+
+The first selective replays above were run from the pre-packed temporary
+source, so their mapping-frontier comparisons are not authoritative for the
+production candidate. They are retained only as diagnostic tool experiments.
+The corrected order is: frontend normalization (including packed `done_buf`),
+then selective style/scalar legalization. That source elaborates cleanly and
+its pre-memory-map flow completed in 417 seconds, writing a 594 MiB RTLIL
+checkpoint. Mapping that checkpoint independently still timed out in
+`MEMORY_LIBMAP` after 420 seconds while enumerating LUTRAM candidates.
+
+An explicit-only diagnostic (`-no-auto-block -no-auto-distributed`) completed
+memory lowering quickly, but produced 522,890 generic cells and no usable
+implementation result; it is a resource-explosion fallback, not an accepted
+flow. The checkpoint establishes the next fast-iteration boundary: future
+Yosys mapping/tool patches can be evaluated without repeating the 417-second
+front half.
