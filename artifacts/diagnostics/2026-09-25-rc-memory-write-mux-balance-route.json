@@ -1,0 +1,46 @@
+{
+  "schema": "llm2fpga.rc-memory-write-mux-balance-route.v1",
+  "date": "2026-09-25",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "experiment": "RC-only post-Calyx parallel-case rewrite of arg_mem_59_write_data",
+  "configuration": {
+    "pass": "balance_calyx_memory_write_mux.py",
+    "input_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+    "transport": "PCIe plus UberDDR3 shell, unchanged",
+    "ddr3_profile": "two-lane 333/83.33 MHz",
+    "seed": 15,
+    "router": "router2",
+    "selector_branches": 6
+  },
+  "simulation": {
+    "status": "pass",
+    "result": "WB_RC_PASS result=4cfe",
+    "reference_tokens": [-2, 76]
+  },
+  "synthesis": {
+    "status": "pass",
+    "shell_checker": "pass"
+  },
+  "route": {
+    "status": "legal_route_timing_rejected",
+    "rowstream_clk_mhz": 58.00,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 78.50,
+    "pcie_user_required_mhz": 62.50,
+    "resources": {
+      "slice_lutx": 44206,
+      "slice_ffx": 19631,
+      "ramb18e1": 23,
+      "ramb36e1": 9,
+      "selmux2_1": 2114
+    },
+    "fasm_present": true
+  },
+  "implementation": {
+    "timing_closed": false,
+    "bitstream_qualified": false,
+    "board_programming": false,
+    "board_inference": false
+  },
+  "conclusion": "The rewrite reduces SELMUX usage but worsens rowstream timing relative to the production frontier. It is rejected as the active RC implementation; the integration is reverted while the standalone pass remains available for a more targeted transformation."
+}
