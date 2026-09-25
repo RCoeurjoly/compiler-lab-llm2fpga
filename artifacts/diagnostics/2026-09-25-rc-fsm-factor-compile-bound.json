@@ -24,6 +24,13 @@
     "status": "pass",
     "warnings": ["TIMESCALEMOD", "CASEINCOMPLETE"]
   },
+  "frontend_codegen": {
+    "tool": "verilator 5.022",
+    "mode": "--cc",
+    "timeout_seconds": 120,
+    "status": "timeout",
+    "generated_object_directory": false
+  },
   "interpretation": "The pass itself is bounded and completes on the generated 13-bit, 7099-state FSM. Conservative compilation still exceeds the 180-second bound; this is a compile/convergence frontier, not functional or board evidence.",
   "status": "diagnostic"
 }
