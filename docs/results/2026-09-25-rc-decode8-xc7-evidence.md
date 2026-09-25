@@ -208,3 +208,19 @@ template for many memories (for example `main.mem_81.mem` through
 remaining candidates. This confirms the shape repair removes the immediate
 legality failure; the unresolved issue is the global mapper's search/runtime,
 not an invalid LUTRAM geometry.
+
+## Deterministic batched mapping and implementation probe
+
+The padded RTLIL checkpoint was mapped in deterministic two-cell batches,
+avoiding the global `MEMORY_LIBMAP` search. The first 40 memories mapped in
+265 seconds; the remaining 50 mapped from that checkpoint in 329 seconds.
+After primitive techmapping, the complete netlist contained 273 `RAM32M`
+LUTRAM primitives and 266 `DSP48E1` cells. Selected-top JSON serialization
+succeeded, providing a valid nextpnr input artifact.
+
+Constrained nextpnr then reached packing (including all 266 DSPs and the four
+diagnostic I/O ports) but terminated before placement/routing, producing no
+FASM or timing report. This is an implementation-scale/resource failure, not a
+functional or memory-legality failure. The batched mapper and checkpoint are
+diagnostic infrastructure; the production Nix gate remains unchanged until
+the batch schedule and netlist size are independently qualified.
