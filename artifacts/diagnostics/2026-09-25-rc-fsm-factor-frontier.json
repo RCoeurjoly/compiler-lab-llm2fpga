@@ -1,0 +1,12 @@
+{
+  "schema": "llm2fpga.rc-fsm-factor-frontier.v1",
+  "scope": "compiler-generated W4A8 Representative Core prefill-8 SV",
+  "input_sv_sha256": "eea4edc69cc6649afdd9b0bd80eb911360ae87ba4f5d85613746a07eec6defa2",
+  "pass": "scripts/pipeline/optimize_calyx_fsm_decode.py",
+  "options": ["--hierarchical-state-decodes"],
+  "result": "interrupted",
+  "observed": "The pass remained in _next_state_case while iterating NEXT_TERM_RE over the giant fsm0_in assignment for more than 60 seconds; no output or receipt was produced.",
+  "interpretation": "The existing textual FSM factoring pass is itself unbounded on this generated graph. It must be replaced with a streaming/parser-bounded implementation or applied only after compiler-side graph reduction.",
+  "hardware": false,
+  "next_gate": "bounded compiler transform on reduced static-control representation"
+}
