@@ -388,6 +388,30 @@ def render_fixture(
     )
 
 
+def verilator_compile_command(
+    verilator: str,
+    normalized_sv_path: Path,
+    fixture_path: Path,
+    obj_dir: Path,
+    jobs: int,
+) -> list[str]:
+    """Build the bounded simulation command with explicit parallel evaluation."""
+    command = [
+        verilator,
+        "--binary",
+        "--top-module", "tb",
+        "--Mdir", str(obj_dir),
+        "-Wno-fatal",
+        "-Wno-WIDTHEXPAND",
+        "-Wno-WIDTHTRUNC",
+        "-j", str(jobs),
+    ]
+    if jobs > 1:
+        command.extend(["--threads", str(jobs)])
+    command.extend([str(normalized_sv_path), str(fixture_path)])
+    return command
+
+
 def decode_hex_words(source: str, *, width: int, count: int) -> bytes:
     if width == 1:
         byte_width = 1
@@ -515,18 +539,10 @@ def _run(args: argparse.Namespace) -> int:
     normalized_sv_path = args.work_dir / "main.normalized.sv"
     normalized_sv_path.write_text(normalize_simulation_sv(sv_source), encoding="utf-8")
     compile_log = args.work_dir / "verilator-build.log"
-    compile_command = [
-        args.verilator,
-        "--binary",
-        "--top-module", "tb",
-        "--Mdir", str(args.work_dir / "obj_dir"),
-        "-Wno-fatal",
-        "-Wno-WIDTHEXPAND",
-        "-Wno-WIDTHTRUNC",
-        "-j", str(args.jobs),
-        str(normalized_sv_path),
-        str(fixture_path),
-    ]
+    compile_command = verilator_compile_command(
+        args.verilator, normalized_sv_path, fixture_path,
+        args.work_dir / "obj_dir", args.jobs,
+    )
     started = time.monotonic()
     with compile_log.open("w", encoding="utf-8") as log:
         compiled = subprocess.run(compile_command, stdout=log, stderr=subprocess.STDOUT)

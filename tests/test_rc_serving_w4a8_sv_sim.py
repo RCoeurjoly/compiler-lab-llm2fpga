@@ -16,6 +16,13 @@ spec.loader.exec_module(module)
 
 
 class RcServingW4A8SvSimTest(unittest.TestCase):
+    def test_verilator_threads_are_optional_compile_control(self) -> None:
+        command = module.verilator_compile_command(
+            "verilator", Path("main.sv"), Path("tb.sv"), Path("obj"), 4
+        )
+        self.assertIn("--threads", command)
+        self.assertIn("4", command)
+
     def test_flat_scf_abi_preserves_semantic_argument_order(self) -> None:
         mlir = """
         module {
