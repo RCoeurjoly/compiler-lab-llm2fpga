@@ -145,3 +145,9 @@ still passes with zero errors and warnings. The 420-second replay reached
 not the dominant remaining cost. The scalarization remains a valid
 representation cleanup; the unresolved blocker is the legalization of the
 remaining multi-entry memories and the mapper's search over their shapes.
+
+Finally, Yosys's `memory_libmap -no-auto-block` option was tested with the
+correct pinned Series-7 library files and the same scalarized candidate. The
+run still reached `MEMORY_LIBMAP` and timed out after 420 seconds, without a
+mapped JSON. Disabling automatic block selection is therefore not a sufficient
+tool fix; the production synthesis script remains unchanged.
