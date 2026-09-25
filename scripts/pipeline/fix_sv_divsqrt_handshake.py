@@ -81,6 +81,39 @@ def _remove_hardfloat_redeclarations(source: str) -> tuple[str, int]:
     return ALL_MODULES.sub(rewrite, source), count
 
 
+def _normalize_request_declaration(source: str) -> str:
+    """Make the generated request net visible before its first instance use."""
+    modules = list(MODULE.finditer(source))
+    if len(modules) != 1:
+        raise ValueError(
+            f"expected exactly one std_divSqrtFN module, found {len(modules)}"
+        )
+    match = modules[0]
+    module = match.group(0)
+    # Older repaired artifacts declared and initialized the net at the tail.
+    module = re.sub(
+        r"\bwire\s+llm2fpga_request\s*=",
+        "assign llm2fpga_request =",
+        module,
+        count=1,
+    )
+    use = module.find(".inValid(llm2fpga_request)")
+    declaration = module.find("wire llm2fpga_request;")
+    if use < 0 or (declaration >= 0 and declaration < use):
+        return source
+    header = re.search(
+        r"\bmodule\s+std_divSqrtFN\b.*?\);", module, flags=re.S
+    )
+    if header is None:
+        raise ValueError("could not locate std_divSqrtFN port terminator")
+    module = (
+        module[: header.end()]
+        + "\n\n    wire llm2fpga_request;\n"
+        + module[header.end() :]
+    )
+    return source[: match.start()] + module + source[match.end() :]
+
+
 def repair(source: str) -> tuple[str, int, int]:
     modules = list(MODULE.finditer(source))
     if len(modules) != 1:
@@ -96,6 +129,7 @@ def repair(source: str) -> tuple[str, int, int]:
     )
     if already_fixed:
         repaired_source, redeclaration_count = _remove_hardfloat_redeclarations(source)
+        repaired_source = _normalize_request_declaration(repaired_source)
         return repaired_source, 0, redeclaration_count
 
     module, request_count = re.subn(
