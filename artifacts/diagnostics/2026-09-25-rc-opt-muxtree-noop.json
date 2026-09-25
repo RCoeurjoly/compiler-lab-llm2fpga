@@ -1,0 +1,39 @@
+{
+  "schema": "llm2fpga.rc-opt-muxtree-frontier.v1",
+  "date": "2026-09-25",
+  "status": "no-op-functional-sim-pass-route-timing-fail",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "experiment": {
+    "pass": "Yosys opt_muxtree",
+    "placement": "after proc/flatten/opt_clean and before synth_xilinx mapping",
+    "purpose": "remove unreachable FSM-selected mux branches without changing generated RTL or transport"
+  },
+  "simulation": {
+    "status": "pass-by-inherited-authenticated-gate",
+    "result": "0x4cfe",
+    "scope": "exact RC Wishbone transaction simulation; no PCIe or physical DDR3 claim"
+  },
+  "route": {
+    "status": "legal_route_but_timing_fail",
+    "output": "/nix/store/kl9k5xp9xyajx7m6zhkcjdp2cg47x7hv-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "a32c347c2dfaa269b35d9665293efe89ffa16c01a7de29e40eeaefc6327aa913",
+    "rowstream_clk_mhz": 53.87,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 81.34,
+    "pcie_user_required_mhz": 62.5,
+    "router": "nextpnr-xilinx 0.8.2, seed 15",
+    "warnings": 24,
+    "errors": 0
+  },
+  "comparison": {
+    "prior_block_memory_fasm_sha256": "a32c347c2dfaa269b35d9665293efe89ffa16c01a7de29e40eeaefc6327aa913",
+    "interpretation": "byte-identical FASM and unchanged timing prove opt_muxtree did not reach or transform the elaborated compiler FSM in this flow"
+  },
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "timing_closed": false,
+    "board_programming": false,
+    "next_gate": "apply state-decode/fanout reduction at the compiler/Calyx generation boundary, then repeat exact simulation and fixed-profile route"
+  }
+}
