@@ -582,19 +582,37 @@ def _run(args: argparse.Namespace) -> int:
     )
     started = time.monotonic()
     with compile_log.open("w", encoding="utf-8") as log:
-        compiled = subprocess.run(compile_command, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            compiled = subprocess.run(
+                compile_command,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                timeout=args.compile_timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise RuntimeError(
+                "Verilator compilation exceeded the wall-time bound "
+                f"({args.compile_timeout_seconds}s); see {compile_log}"
+            ) from error
     compile_seconds = time.monotonic() - started
     if compiled.returncode:
         raise RuntimeError(f"Verilator compilation failed; see {compile_log}")
     simulation_log = args.work_dir / "simulation.log"
     started = time.monotonic()
     with simulation_log.open("w", encoding="utf-8") as log:
-        simulated = subprocess.run(
-            [str(args.work_dir / "obj_dir/Vtb")],
-            cwd=args.work_dir,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-        )
+        try:
+            simulated = subprocess.run(
+                [str(args.work_dir / "obj_dir/Vtb")],
+                cwd=args.work_dir,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                timeout=args.simulation_timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise RuntimeError(
+                "RTL simulation exceeded the wall-time bound "
+                f"({args.simulation_timeout_seconds}s); see {simulation_log}"
+            ) from error
     simulation_seconds = time.monotonic() - started
     if simulated.returncode:
         raise RuntimeError(f"RTL simulation failed; see {simulation_log}")
@@ -649,6 +667,14 @@ def main() -> None:
     parser.add_argument("--report", required=True, type=Path)
     parser.add_argument("--verilator", default="verilator")
     parser.add_argument("--jobs", type=int, default=1)
+    parser.add_argument(
+        "--compile-timeout-seconds", type=float, default=900.0,
+        help="wall-time bound for Verilator compilation",
+    )
+    parser.add_argument(
+        "--simulation-timeout-seconds", type=float, default=300.0,
+        help="wall-time bound for the generated RTL simulation",
+    )
     parser.add_argument("--timeout-cycles", type=int, default=100_000_000)
     parser.add_argument("--heartbeat-cycles", type=int, default=0)
     parser.add_argument("--probe-fsm", action="store_true")
