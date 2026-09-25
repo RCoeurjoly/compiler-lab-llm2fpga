@@ -1,0 +1,45 @@
+{
+  "schema": "llm2fpga.representative-core-w4a8-integer-bram-equivalence.v1",
+  "date": "2026-09-25",
+  "status": "pass",
+  "scope": "compiler-generated TinyStories-derived W4A8 integer Representative Core, BRAM-style initialized memories",
+  "artifacts": {
+    "pytorch_exported": {
+      "path": "/nix/store/dwv5gp2vbzl112zapjhy7hcvprc44rbx-tinystories-representative-core-w4a8-integer-pytorch-exported/exported.pt2",
+      "sha256": "081b5bda2f194e01cc2beb04567f4ac9b2a32f2fefd12e852b5c14fff48e4852"
+    },
+    "flat_scf": {
+      "path": "/nix/store/x9i8b529csdirybr6m9py896wskcagwz-tinystories-representative-core-w4a8-integer-flat-scf/flat.scf.mlir",
+      "sha256": "b241f747f5d07e4c8612f4164320cd44eb2f5cd3506ee50e1aaf2d5e9cbbb7f6"
+    },
+    "generated_sv": {
+      "path": "/nix/store/wad3fb272r9mzr4mfqzc06c9gwhm1a6k-tinystories-representative-core-w4a8-integer-calyx-native-sv/sv/main.sv",
+      "sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722"
+    },
+    "simulation_report": {
+      "path": "/nix/store/mwf7bc3cw43sk1gilnbfdwxgiz2k9900-tinystories-representative-core-w4a8-integer-sv-equivalence/report.json",
+      "sha256": "18c8c0545b48b65d84458d39d7dc6715e58ee14022b10f3679016f3450d84e5a"
+    }
+  },
+  "equivalence": {
+    "input_count": 51,
+    "semantic_memory_count": 52,
+    "rtl_memory_count": 83,
+    "expected_output_i8": [-2, 76],
+    "actual_output_hex": "fe4c",
+    "output_sha256": "8ab4cc3ce350de3e4d1da6136c6c0fd0d4f94f34e8fb82a8ee4eb80a3e9746ee",
+    "cycles": 4649,
+    "compile_seconds": 41.43438452100236,
+    "simulation_seconds": 0.07295321099809371
+  },
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pytorch_reference_match": true,
+    "pci_express": false,
+    "ddr3": false,
+    "board_hardware": false,
+    "autoregressive_generation": false,
+    "next_gate": "wrap this passing compiler-generated RC in the validated YPCB BRAM/JTAG or PCIe shell, then repeat the same output gate before DDR3 externalization"
+  }
+}
