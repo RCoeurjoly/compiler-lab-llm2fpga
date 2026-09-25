@@ -18,6 +18,12 @@
     "binary_produced": false,
     "simulation_attempted": false
   },
+  "lint": {
+    "tool": "verilator 5.022",
+    "timeout_seconds": 120,
+    "status": "pass",
+    "warnings": ["TIMESCALEMOD", "CASEINCOMPLETE"]
+  },
   "interpretation": "The pass itself is bounded and completes on the generated 13-bit, 7099-state FSM. Conservative compilation still exceeds the 180-second bound; this is a compile/convergence frontier, not functional or board evidence.",
   "status": "diagnostic"
 }
