@@ -1258,6 +1258,7 @@
               --exported ${pipelineStagePackagesNoHandshake."tinystories-representative-core-w4a8-integer-pytorch-exported"} \
               --helpers ${./scripts/pipeline/run_rc_serving_w4a8_sv.py} \
               --register-local-memories \
+              --block-local-memories \
               --out-dir "$out"
           '';
         tinystoriesIntegerRcYpcbShell = import ./nix/task6-board-shell.nix {

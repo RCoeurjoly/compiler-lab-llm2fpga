@@ -51,7 +51,8 @@ def _exported_values(exported_path: Path):
 def _render_top(rtl, *, external_ports: tuple[int, ...], token_port: int,
                 result_port: int, token_width: int, token_depth: int,
                 result_width: int, register_requests: bool,
-                register_local_memories: bool) -> str:
+                register_local_memories: bool,
+                block_local_memories: bool) -> str:
     external_index = {port: index for index, port in enumerate(external_ports)}
     declarations: list[str] = []
     connections: list[str] = []
@@ -69,7 +70,8 @@ def _render_top(rtl, *, external_ports: tuple[int, ...], token_port: int,
             f"  logic a{number}_done;",
         ])
         if number not in external_index:
-            declarations.append(f"  logic [{port.width - 1}:0] mem{number} [0:{port.depth - 1}];")
+            attribute = "(* ram_style = \"block\" *) " if block_local_memories else ""
+            declarations.append(f"  {attribute}logic [{port.width - 1}:0] mem{number} [0:{port.depth - 1}];")
         connections.extend([
             f".arg_mem_{number}_addr0(a{number}_addr)",
             f".arg_mem_{number}_content_en(a{number}_en)",
@@ -210,6 +212,8 @@ def main() -> None:
                         help="register compiler memory requests before arbitration")
     parser.add_argument("--register-local-memories", action="store_true",
                         help="register non-token local memory service requests")
+    parser.add_argument("--block-local-memories", action="store_true",
+                        help="request block-RAM mapping for local memories")
     args = parser.parse_args()
     if args.out_dir.exists():
         parser.error("--out-dir must not already exist")
@@ -255,7 +259,8 @@ def main() -> None:
                       token_depth=rtl[token_port].depth,
                       result_width=rtl[result_port].width,
                       register_requests=args.register_requests,
-                      register_local_memories=args.register_local_memories)
+                      register_local_memories=args.register_local_memories,
+                      block_local_memories=args.block_local_memories)
     top_path = args.out_dir / "top.sv"
     top_path.write_text(top, encoding="utf-8")
     (args.out_dir / "manifest.json").write_text(json.dumps({

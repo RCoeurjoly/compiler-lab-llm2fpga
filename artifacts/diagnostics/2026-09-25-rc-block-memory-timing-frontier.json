@@ -1,0 +1,69 @@
+{
+  "schema": "llm2fpga.rc-board-block-memory-timing-frontier.v1",
+  "date": "2026-09-25",
+  "status": "functional-sim-pass-legal-route-timing-fail",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "configuration": {
+    "ENABLE_COMPILER_ACCELERATOR": 1,
+    "ENABLE_COMPILER_GENERATED_RC": 1,
+    "REGISTER_REQUESTS": 0,
+    "REGISTER_LOCAL_MEMORIES": 1,
+    "BLOCK_LOCAL_MEMORIES": 1,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "ddr_clock_period_ps": 3000,
+    "seed": 15,
+    "BIST_MODE_PARAM": 2
+  },
+  "simulation": {
+    "status": "pass",
+    "result": "0x4cfe",
+    "command": "run_tinystories_integer_wb_sim.py",
+    "verilator": "5.052",
+    "scope": "exact RC image through Wishbone transaction model; no PCIe or physical DDR3 claim"
+  },
+  "synthesis": {
+    "status": "pass",
+    "output": "/nix/store/r40syfbcwbrw0h57cbbf97i7dxwnq38q-compiler-ddr3-trace-replay-synthesis-screen"
+  },
+  "route": {
+    "status": "legal_route_but_timing_fail",
+    "output": "/nix/store/mkfkn4pyip8hc1h1kf95y205gq9qh1nf-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "a32c347c2dfaa269b35d9665293efe89ffa16c01a7de29e40eeaefc6327aa913",
+    "warnings": 24,
+    "errors": 0,
+    "rowstream_clk_mhz": 53.87,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 81.34,
+    "pcie_user_required_mhz": 62.5,
+    "router": "nextpnr-xilinx 0.8.2, seed 15"
+  },
+  "resources": {
+    "SLICE_LUTX": 44507,
+    "SLICE_FFX": 19631,
+    "RAMB36E1": 9,
+    "RAMB18E1": 23,
+    "DSP48E1": 0
+  },
+  "critical_path_observation": {
+    "first_compiler_path": "gen_compiler_command_adapter.gen_compiler_generated_rc.compiler_generated_rc.generated.fsm0_out[3]",
+    "endpoint": "compiler-generated FSM output/data fanout into the registered local-memory service boundary",
+    "interpretation": "explicit block-memory inference changes storage and improves PCIe timing, but the generated control/data fanout remains the rowstream limiter"
+  },
+  "comparison": {
+    "direct_request_rowstream_clk_mhz": 54.27,
+    "registered_local_memory_rowstream_clk_mhz": 57.26,
+    "block_memory_rowstream_clk_mhz": 53.87,
+    "block_memory_pcie_user_clk_mhz": 81.34,
+    "interpretation": "block mapping is honored and legal, but does not improve the rowstream timing frontier; the next lever must be a compiler-generated pipeline boundary, not a transport change"
+  },
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pci_express": false,
+    "ddr3": false,
+    "board_programming": false,
+    "timing_closed": false,
+    "next_gate": "generate or insert a compiler-side pipeline boundary before the high-fanout FSM/local-memory service signals, then repeat exact simulation and fixed-profile route"
+  }
+}
