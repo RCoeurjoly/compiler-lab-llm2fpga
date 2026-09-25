@@ -1,0 +1,17 @@
+{
+  "date": "2026-09-25",
+  "experiment": "rc-calyx-nested-stack-budget",
+  "purpose": "Bounded investigation of the pinned Calyx nested Verilog backend before changing generated RTL.",
+  "input": "/nix/store/n67kkw8acw03xhg615k38fcb3pvcjgsg-tinystories-w4a8-rc-serving-integrated-calyx-native-sv/model.futil",
+  "calyx": "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/bin/calyx",
+  "calyx_source_pin": "5a4303847392609cad83dda6f4bdffc8cc0e5c89",
+  "command": "RUST_MIN_STACK=67108864 timeout --signal=TERM --kill-after=10s 180 calyx model.futil -l <calyx>/share/calyx -b verilog -p compile-repeat -p no-opt --nested -d papercut -o main.sv",
+  "result": "failed",
+  "exit_code": 134,
+  "elapsed_seconds": 49.31,
+  "max_rss_kib": 1899180,
+  "output_created": false,
+  "diagnostic": "thread 'main' has overflowed its stack; fatal runtime error: stack overflow, aborting",
+  "interpretation": "Raising Rust's thread stack to 64 MiB did not remove the failure. The pinned nested Calyx compile-invoke path still aborts after consuming about 1.9 GiB RSS, so this is a reproducible backend/tool frontier rather than evidence that a larger timeout or another RTL rewrite will solve it.",
+  "next_step": "Obtain/build the pinned Calyx source and instrument or patch the compile-invoke/nested-control recursion with a bounded reproducer; preserve this negative result and do not claim RC lowering success."
+}
