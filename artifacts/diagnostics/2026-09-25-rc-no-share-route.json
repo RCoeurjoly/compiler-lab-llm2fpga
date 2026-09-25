@@ -1,0 +1,40 @@
+{
+  "date": "2026-09-25",
+  "experiment": "representative-core-no-global-resource-sharing-control",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "implementation": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pcie_unchanged": true,
+    "uberddr3_profile_unchanged": "two-lane 333/83.33 MHz",
+    "seed": 15,
+    "control": "removed Yosys share -fast -limit 500 only"
+  },
+  "simulation": {
+    "status": "unchanged_exact_rc_simulation_pass",
+    "result": "WB_RC_PASS result=4cfe",
+    "expected_tokens": [-2, 76]
+  },
+  "route": {
+    "status": "route_completed_timing_failed",
+    "timing_closed": false,
+    "fasm_produced": false,
+    "board_programming": false,
+    "resource_summary": {
+      "SLICE_LUTX": 44452,
+      "SLICE_FFX": 19631,
+      "RAMB18E1": 23,
+      "RAMB36E1": 9,
+      "SELMUX2_1": 2405
+    },
+    "final_max_frequency_mhz": {
+      "rowstream_clk": 61.27,
+      "pcie_user_clk": 82.72
+    },
+    "required_frequency_mhz": {
+      "rowstream_clk": 83.33,
+      "pcie_user_clk": 62.5
+    }
+  },
+  "interpretation": "Removing global sharing improves PCIe timing but reduces rowstream timing relative to the production sharing recipe (61.27 versus 64.97 MHz). It is rejected for the fixed DDR3 profile; the production sharing step is restored."
+}
