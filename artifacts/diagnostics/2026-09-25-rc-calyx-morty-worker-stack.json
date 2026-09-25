@@ -1,0 +1,15 @@
+{
+  "date": "2026-09-25",
+  "experiment": "rc-calyx-morty-worker-stack",
+  "input": "/tmp/rc-calyx-phase/repeat.futil",
+  "tool": "locally rebuilt Calyx at pinned source 5a4303847392609cad83dda6f4bdffc8cc0e5c89",
+  "patch": "Move morty::build_syntax_tree to a 512 MiB worker stack using a confined owned-result wrapper.",
+  "result": "bounded_timeout",
+  "exit_code": 124,
+  "timeout_seconds": 180,
+  "stack_overflow": false,
+  "output_created": false,
+  "max_rss_kib": 6697936,
+  "interpretation": "The worker stack removes the immediate main-thread stack abort, but Morty still does not finish within three minutes and consumes about 6.7 GiB RSS. Increasing stack size is therefore not an acceptable production fix; parser AST construction/processing must be made bounded or avoided for this generated design.",
+  "next_step": "Do not raise memory or timeout further. Prototype a Calyx backend path that preserves the generated SV and links the known external HardFloat dependency closure without Morty parsing, or patch Morty to stream/chunk the generated source."
+}
