@@ -1,0 +1,31 @@
+{
+  "schema": "llm2fpga.rc-board-fsm-mapping-noop.v1",
+  "date": "2026-09-25",
+  "status": "synthesis-route-complete-timing-fail",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "configuration": {
+    "REGISTER_LOCAL_MEMORIES": 1,
+    "REGISTER_REQUESTS": 0,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "seed": 15
+  },
+  "tool": "Yosys 0.66 fsm pass before synth_xilinx coarse:finalize",
+  "route": {
+    "output": "/nix/store/izldqxjn72ilby4y4nfy8qw89d1lqsmy-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "6610559dd9cdcad6039b3a1df53a044553db1dee245d915b9292f52c637c5e4b",
+    "rowstream_clk_mhz": 57.26,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 70.23,
+    "pcie_user_required_mhz": 62.5,
+    "warnings": 24,
+    "errors": 0
+  },
+  "interpretation": "The FSM pass produced byte-identical FASM and no timing change; the generated fsm0 is not recognized as an optimizable Yosys FSM.",
+  "claims": {
+    "compiler_generated_rtl": true,
+    "timing_closed": false,
+    "board_programming": false,
+    "next_gate": "pipeline the generated control/data cone before fsm0_out-dependent decode rather than relying on generic FSM mapping"
+  }
+}
