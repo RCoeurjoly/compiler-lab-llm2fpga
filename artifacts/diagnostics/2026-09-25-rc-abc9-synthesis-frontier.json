@@ -1,0 +1,29 @@
+{
+  "schema": "llm2fpga.rc-abc9-synthesis-frontier.v1",
+  "date": "2026-09-25",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "experiment": "Yosys synth_xilinx -abc9",
+  "configuration": {
+    "source": "unchanged compiler-generated RC RTL",
+    "transport": "PCIe plus UberDDR3 shell, unchanged",
+    "ddr3_profile": "two-lane 333/83.33 MHz",
+    "seed": 15,
+    "synthesis_timeout_seconds": 600
+  },
+  "simulation": {
+    "status": "pass-by-authenticated-existing-gate",
+    "result": "WB_RC_PASS result=4cfe"
+  },
+  "implementation": {
+    "status": "abc9_mapping_failed",
+    "failure_stage": "Yosys ABC9_OPS/TECHMAP",
+    "diagnostic": "ERROR: Module $\\__ABC9_LUT7 with (* abc9_lut *) has no specify entries.",
+    "mapped_netlist": false,
+    "route": false,
+    "timing_closed": false,
+    "bitstream": false,
+    "board_programming": false,
+    "board_inference": false
+  },
+  "conclusion": "ABC9 cannot map this Xilinx primitive library with the pinned Yosys/plugin closure. The default synthesis mapping is restored; improving the RC requires a compiler-side structural transformation or a targeted ABC9 library/tool repair, not an unqualified -abc9 switch."
+}
