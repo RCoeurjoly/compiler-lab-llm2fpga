@@ -1,0 +1,19 @@
+{
+  "schema": "llm2fpga.rc-calyx-nested-frontier.v1",
+  "date": "2026-09-25",
+  "input_futil": "/nix/store/n67kkw8acw03xhg615k38fcb3pvcjgsg-tinystories-w4a8-rc-serving-integrated-calyx-native-sv/model.futil",
+  "command_profile": {
+    "backend": "verilog",
+    "passes": ["compile-repeat", "no-opt"],
+    "nested": true,
+    "disabled_passes": ["papercut"],
+    "timeout_seconds": 180
+  },
+  "status": "stack-overflow",
+  "elapsed_seconds": 60.49,
+  "peak_rss_kib": 1904240,
+  "output_emitted": false,
+  "diagnostic": "thread main overflowed its stack; fatal runtime error: stack overflow",
+  "interpretation": "Calyx hierarchy-preserving emission is not a viable immediate workaround for this wholesale RC artifact; it fails before SV emission.",
+  "status_class": "diagnostic"
+}
