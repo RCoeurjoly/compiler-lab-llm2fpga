@@ -13,8 +13,7 @@ def test_compiler_memory_adapter_returns_wishbone_read_to_requesting_port(tmp_pa
     verilator = shutil.which("verilator")
     assert verilator, "verilator is required for the adapter behavior test"
     tb = tmp_path / "tb.sv"
-    tb.write_text(
-        textwrap.dedent(
+    template = textwrap.dedent(
             """
             module tb;
               logic clk = 0; always #1 clk = ~clk;
@@ -28,7 +27,7 @@ def test_compiler_memory_adapter_returns_wishbone_read_to_requesting_port(tmp_pa
               logic [31:0] wb_addr;
               logic [15:0] wb_sel;
               logic [127:0] wb_rdata = 0;
-              llm_compiler_memory_wb_adapter #(.PORTS(2)) dut (.*);
+              llm_compiler_memory_wb_adapter #(.PORTS(2), .REGISTER_REQUESTS(`REGISTERED)) dut (.*);
               integer cycles = 0;
               always @(posedge clk) begin
                 cycles = cycles + 1;
@@ -51,15 +50,19 @@ def test_compiler_memory_adapter_returns_wishbone_read_to_requesting_port(tmp_pa
             endmodule
             """
         )
-    )
-    build = subprocess.run(
-        [verilator, "--binary", "--timing", "-Wno-fatal", "--top-module", "tb", str(tb), str(ADAPTER), str(ARBITER)],
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    assert build.returncode == 0, build.stderr + build.stdout
-    run = subprocess.run([str(tmp_path / "obj_dir/Vtb")], cwd=tmp_path, capture_output=True, text=True, timeout=30)
-    assert run.returncode == 0, run.stderr + run.stdout
-    assert "COMPILER_MEMORY_WB_ADAPTER_PASS" in run.stdout
+    for registered in (0, 1):
+        case = tmp_path / f"registered-{registered}"
+        case.mkdir()
+        tb = case / "tb.sv"
+        tb.write_text(f"`define REGISTERED {registered}\n" + template)
+        build = subprocess.run(
+            [verilator, "--binary", "--timing", "-Wno-fatal", "--top-module", "tb", str(tb), str(ADAPTER), str(ARBITER)],
+            cwd=case,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert build.returncode == 0, build.stderr + build.stdout
+        run = subprocess.run([str(case / "obj_dir/Vtb")], cwd=case, capture_output=True, text=True, timeout=30)
+        assert run.returncode == 0, run.stderr + run.stdout
+        assert "COMPILER_MEMORY_WB_ADAPTER_PASS" in run.stdout

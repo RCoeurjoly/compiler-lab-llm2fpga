@@ -1,0 +1,50 @@
+{
+  "schema": "llm2fpga.rc-board-direct-request-rebuild.v1",
+  "date": "2026-09-25",
+  "status": "legal-route-timing-fail",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "configuration": {
+    "ENABLE_COMPILER_ACCELERATOR": 1,
+    "ENABLE_COMPILER_GENERATED_RC": 1,
+    "REGISTER_REQUESTS": 0,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "ddr_clock_period_ps": 3000,
+    "seed": 15,
+    "BIST_MODE_PARAM": 2
+  },
+  "synthesis": {
+    "status": "pass",
+    "output": "/nix/store/pf6l4z9g93njgfv01d6qk41fddsaab29-compiler-ddr3-trace-replay-synthesis-screen/replay.json"
+  },
+  "route": {
+    "status": "legal_route_but_timing_fail",
+    "output": "/nix/store/k55sc3w1zgvhgx2ca2p3q016hkc3j2b2-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "c8ff3f781b0235fbdbded40ad3425d818cc865e07a4b9b7daff3eebdbf550945",
+    "warnings": 24,
+    "errors": 0,
+    "rowstream_clk_mhz": 54.27,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 81.19,
+    "pcie_user_required_mhz": 62.5,
+    "router": "nextpnr-xilinx 0.8.2, seed 15"
+  },
+  "critical_path_observation": {
+    "first_compiler_path": "gen_compiler_command_adapter.gen_compiler_generated_rc.compiler_generated_rc.generated.fsm0_out[6]",
+    "dominant_path": "compiler-generated a13_addr to local BRAM readback; transport registration is disabled"
+  },
+  "comparison": {
+    "previous_direct_rowstream_clk_mhz": 53.51,
+    "registered_request_rowstream_clk_mhz": 46.92,
+    "interpretation": "direct requests restore the production candidate and modestly improve this fixed-seed run, but timing remains unqualified"
+  },
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pci_express": false,
+    "ddr3": false,
+    "board_programming": false,
+    "timing_closed": false,
+    "next_gate": "address the measured compiler-generated local-memory address fanout with a semantics-preserving compiler-side transformation"
+  }
+}

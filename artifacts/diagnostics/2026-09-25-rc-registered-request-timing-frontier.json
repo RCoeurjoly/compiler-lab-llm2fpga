@@ -1,0 +1,51 @@
+{
+  "schema": "llm2fpga.rc-board-registered-request-timing-frontier.v1",
+  "date": "2026-09-25",
+  "status": "legal-route-timing-fail",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "top": "compiler_ddr3_trace_replay_top",
+  "configuration": {
+    "ENABLE_COMPILER_ACCELERATOR": 1,
+    "ENABLE_COMPILER_GENERATED_RC": 1,
+    "REGISTER_REQUESTS": 1,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "ddr_clock_period_ps": 3000,
+    "seed": 15,
+    "BIST_MODE_PARAM": 2
+  },
+  "synthesis": {
+    "status": "pass",
+    "output": "/nix/store/by2s68mmjxzfjh7359va301n9mas9js7-compiler-ddr3-trace-replay-synthesis-screen/replay.json"
+  },
+  "route": {
+    "status": "legal_route_but_timing_fail",
+    "output": "/nix/store/5x8h8d36dmcg651gf2idpcx56v6s8xhz-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "f6844386eb869789cb311d27a7334b26d512a7d1c1a564a2084d60366ca3826b",
+    "warnings": 24,
+    "errors": 0,
+    "rowstream_clk_mhz": 46.92,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 82.97,
+    "pcie_user_required_mhz": 62.5,
+    "router": "nextpnr-xilinx 0.8.2, seed 15"
+  },
+  "critical_path_observation": {
+    "first_compiler_path": "gen_compiler_command_adapter.gen_compiler_generated_rc.compiler_generated_rc.generated.fsm0_out[7]",
+    "dominant_path": "compiler-generated a13_addr to local mem66 readback; request registration did not cut the compiler address fanout"
+  },
+  "comparison": {
+    "direct_request_rowstream_clk_mhz": 53.51,
+    "registered_request_rowstream_clk_mhz": 46.92,
+    "interpretation": "negative timing result; retain the optional boundary and regression, but do not enable it for the RC production candidate"
+  },
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pci_express": false,
+    "ddr3": false,
+    "board_programming": false,
+    "timing_closed": false,
+    "next_gate": "restore direct RC requests and target the measured compiler-generated address-to-local-memory path rather than applying another transport speculation"
+  }
+}

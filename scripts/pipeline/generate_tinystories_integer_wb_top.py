@@ -50,7 +50,7 @@ def _exported_values(exported_path: Path):
 
 def _render_top(rtl, *, external_ports: tuple[int, ...], token_port: int,
                 result_port: int, token_width: int, token_depth: int,
-                result_width: int) -> str:
+                result_width: int, register_requests: bool) -> str:
     external_index = {port: index for index, port in enumerate(external_ports)}
     declarations: list[str] = []
     connections: list[str] = []
@@ -158,7 +158,7 @@ def _render_top(rtl, *, external_ports: tuple[int, ...], token_port: int,
         *declarations,
         "  main_1 generated(.clk(clk), .reset(reset), .go(go), .done(done),",
         "    " + ",\n    ".join(connections) + ");",
-        "  llm_compiler_memory_wb_adapter #(.PORTS(" + str(ext_count) + ")) external_memory (",
+        "  llm_compiler_memory_wb_adapter #(.PORTS(" + str(ext_count) + "), .REGISTER_REQUESTS(" + ("1" if register_requests else "0") + ")) external_memory (",
         "    .clk(clk), .rst(reset), .req_valid(ext_req_valid), .req_ready(ext_req_ready),",
         "    .req_addr(ext_req_addr), .rsp_valid(ext_rsp_valid), .rsp_data(ext_rsp_data),",
         "    .wb_cyc(wb_cyc), .wb_stb(wb_stb), .wb_addr(wb_addr), .wb_sel(wb_sel),",
@@ -182,6 +182,8 @@ def main() -> None:
     parser.add_argument("--exported", type=Path, required=True)
     parser.add_argument("--helpers", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
+    parser.add_argument("--register-requests", action="store_true",
+                        help="register compiler memory requests before arbitration")
     args = parser.parse_args()
     if args.out_dir.exists():
         parser.error("--out-dir must not already exist")
@@ -225,7 +227,8 @@ def main() -> None:
     top = _render_top(rtl, external_ports=external_ports, token_port=token_port,
                       result_port=result_port, token_width=rtl[token_port].width,
                       token_depth=rtl[token_port].depth,
-                      result_width=rtl[result_port].width)
+                      result_width=rtl[result_port].width,
+                      register_requests=args.register_requests)
     top_path = args.out_dir / "top.sv"
     top_path.write_text(top, encoding="utf-8")
     (args.out_dir / "manifest.json").write_text(json.dumps({
