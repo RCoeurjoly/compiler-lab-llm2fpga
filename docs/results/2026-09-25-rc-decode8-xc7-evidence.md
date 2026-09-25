@@ -249,3 +249,11 @@ standard post-memory mapping stages cannot yet be evaluated on the complete
 checkpoint within the current host/timebox; a smaller extracted module is
 needed for the next tool experiment. This does not alter the RC semantics or
 the production flow.
+
+Two additional bounded probes refined that frontier. Direct `abc -fast -lut 6`
+on the persistent checkpoint completed in about 25 seconds, but extracted
+zero gates because the checkpoint still consisted of coarse operators. A
+preceding `simplemap` expanded the design and reached ABC, but emitted no
+checkpoint within the bound. The complete RC therefore needs a partitioned
+coarse-to-gate mapping boundary; invoking the generic expansion on the
+monolithic checkpoint is not a viable iteration loop.
