@@ -28,6 +28,13 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         self.assertIn("-CFLAGS", command)
         self.assertIn("-O3", command)
 
+    def test_verilator_cxx_optimization_is_explicitly_selectable(self) -> None:
+        command = module.verilator_compile_command(
+            "verilator", Path("main.sv"), Path("tb.sv"), Path("obj"), 2,
+            cflags_opt="-O0",
+        )
+        self.assertEqual(command[command.index("-CFLAGS") + 1], "-O0")
+
     def test_fixture_can_emit_fsm_heartbeat(self) -> None:
         rtl = (module.SvMemoryPort(0, 32, 2),)
         roles = module.PhaseRoles((0,), (), 0, ())

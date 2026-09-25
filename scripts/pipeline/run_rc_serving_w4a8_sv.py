@@ -411,6 +411,7 @@ def verilator_compile_command(
     fixture_path: Path,
     obj_dir: Path,
     jobs: int,
+    cflags_opt: str = "-O3",
 ) -> list[str]:
     """Build the bounded simulation command with explicit parallel evaluation."""
     command = [
@@ -426,7 +427,7 @@ def verilator_compile_command(
         "--output-split", "10000",
         "--output-split-cfuncs", "10000",
         "-j", str(jobs),
-        "-CFLAGS", "-O3",
+        "-CFLAGS", cflags_opt,
     ]
     if jobs > 1:
         command.extend(["--threads", str(jobs)])
@@ -578,7 +579,7 @@ def _run(args: argparse.Namespace) -> int:
     compile_log = args.work_dir / "verilator-build.log"
     compile_command = verilator_compile_command(
         args.verilator, normalized_sv_path, fixture_path,
-        args.work_dir / "obj_dir", args.jobs,
+        args.work_dir / "obj_dir", args.jobs, args.cflags_opt,
     )
     started = time.monotonic()
     with compile_log.open("w", encoding="utf-8") as log:
@@ -667,6 +668,10 @@ def main() -> None:
     parser.add_argument("--report", required=True, type=Path)
     parser.add_argument("--verilator", default="verilator")
     parser.add_argument("--jobs", type=int, default=1)
+    parser.add_argument(
+        "--cflags-opt", choices=("-O0", "-O1", "-O2", "-O3"), default="-O3",
+        help="C++ optimization passed to Verilator (use -O0 for bounded generated-RTL builds)",
+    )
     parser.add_argument(
         "--compile-timeout-seconds", type=float, default=900.0,
         help="wall-time bound for Verilator compilation",
