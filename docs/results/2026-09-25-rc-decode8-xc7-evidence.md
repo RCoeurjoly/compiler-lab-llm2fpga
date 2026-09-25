@@ -200,3 +200,11 @@ comparator techmapping before `MEMORY_LIBMAP`, so the policy is not yet a
 production-flow change. It remains an evidence-backed compiler candidate to
 evaluate from the persistent pre-map checkpoint, with the packed baseline
 preserved.
+
+The padded candidate's pre-map flow completed in 421 seconds and produced a
+583 MiB RTLIL checkpoint. Independent mapping then selected the Xilinx LUTRAM
+template for many memories (for example `main.mem_81.mem` through
+`main.mem_147.mem`) but still timed out after 420 seconds while processing the
+remaining candidates. This confirms the shape repair removes the immediate
+legality failure; the unresolved issue is the global mapper's search/runtime,
+not an invalid LUTRAM geometry.
