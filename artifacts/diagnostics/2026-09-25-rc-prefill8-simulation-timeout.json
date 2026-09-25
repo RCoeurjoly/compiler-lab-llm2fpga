@@ -1,0 +1,38 @@
+{
+  "schema": "llm2fpga.rc-serving-w4a8-prefill8-simulation-diagnostic.v1",
+  "date": "2026-09-25",
+  "status": "verilator_compile_pass_runtime_timeout",
+  "scope": "compiler-generated W4A8 Representative Core prefill-8 phase",
+  "compiler_artifacts": {
+    "sv": {
+      "path": "/nix/store/assf2zarkj7w8rvwvaxi3f8v6wimq1ig-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv/sv/main.sv",
+      "sha256": "eea4edc69cc6649afdd9b0bd80eb911360ae87ba4f5d85613746a07eec6defa2"
+    },
+    "flat_scf": {
+      "path": "/nix/store/hnrx9lj23ay9vrd2glxn8msc7ak3yh81-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-flat-scf/flat.scf.mlir",
+      "sha256": "5fd9efe083f44b29d961a50f8d8487e094a88c5d0c15e0465b133a47cb9829e9"
+    },
+    "pytorch_reference": {
+      "path": "/nix/store/cjwzaww6fxijf7pxqbizinm6p29j6y75-tinystories-w4a8-rc-serving-mask10-vocab6-width2-frozen-bundle/prefill-8/reference.json",
+      "sha256": "3188f16fa6f89b1ad772c205032cf632389aed4994f210ad4e64ca513ddc5191"
+    }
+  },
+  "execution": {
+    "command": "timeout --signal=TERM --kill-after=20s 900 nix develop --impure -c bash -lc 'ulimit -v 26000000; python scripts/pipeline/run_rc_serving_w4a8_sv.py --phase prefill-8 ... --verilator verilator --jobs 4'",
+    "verilator_compile": "passed; linked /tmp/rc-prefill8-sim-j4/obj_dir/Vtb",
+    "simulation": "timed out after 900 seconds with empty simulation.log",
+    "simulation_report": "not produced",
+    "memory_cap_bytes": 26000000000,
+    "work_dir": "/tmp/rc-prefill8-sim-j4",
+    "generated_executable_bytes": 6700000
+  },
+  "interpretation": {
+    "semantic_equivalence": "not evaluated",
+    "hardware": false,
+    "board_fit": false,
+    "pci_express": false,
+    "ddr3": false,
+    "first_observed_boundary": "runtime execution after successful Verilator compilation",
+    "next_action": "reduce simulation runtime with an authenticated bounded-cycle or generated transaction backend before attempting integrated shell simulation"
+  }
+}
