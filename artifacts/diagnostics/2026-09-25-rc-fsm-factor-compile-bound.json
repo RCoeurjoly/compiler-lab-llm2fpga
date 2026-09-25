@@ -1,0 +1,23 @@
+{
+  "schema": "llm2fpga.rc-fsm-factor-compile-bound.v1",
+  "date": "2026-09-25",
+  "scope": "Representative-Core generated SV FSM factoring",
+  "input_sv_sha256": "4a8af9c29f3aaacd5097777a1c24acaa931fd8e0a02b1a2d66bc9438d81f7f06",
+  "optimized_sv_sha256": "96f7dd586eca6536eeb36db7c6a364fdc7549384eb6ee803617d54e51a87d986",
+  "optimized_sv_bytes": 10489412,
+  "optimized_sv_lines": 322618,
+  "shared_state_decode_count": 7099,
+  "transform_wall_seconds": 12.0,
+  "compile": {
+    "tool": "verilator 5.022",
+    "build_jobs": 2,
+    "output_split": 10000,
+    "output_split_cfuncs": 10000,
+    "timeout_seconds": 180,
+    "status": "timeout",
+    "binary_produced": false,
+    "simulation_attempted": false
+  },
+  "interpretation": "The pass itself is bounded and completes on the generated 13-bit, 7099-state FSM. Conservative compilation still exceeds the 180-second bound; this is a compile/convergence frontier, not functional or board evidence.",
+  "status": "diagnostic"
+}

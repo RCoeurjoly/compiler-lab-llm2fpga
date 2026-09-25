@@ -16,8 +16,14 @@ import re
 from collections import OrderedDict
 from pathlib import Path
 
-STATE_RE = re.compile(r"fsm0_out\s*==\s*11'd(\d+)")
-NEXT_TERM_RE = re.compile(r"(?P<cond>.*?)\?\s*(?P<value>11'd\d+)\s*:", re.S)
+STATE_RE = re.compile(r"fsm0_out\s*==\s*(?P<width>\d+)'d(?P<state>\d+)")
+# Generated Calyx FSM arms do not nest ternaries inside a condition.  The old
+# ``.*?`` expression therefore needlessly rescanned the complete (multi-MB)
+# assignment for every arm and could appear to hang forever.  Constrain the
+# condition to one arm so matching is linear in the generated assignment.
+NEXT_TERM_RE = re.compile(
+    r"(?P<cond>[^?]*?)\?\s*(?P<value>(?P<width>\d+)'d\d+)\s*:"
+)
 
 
 def _split_or(expr: str) -> list[str]:
@@ -44,7 +50,7 @@ def _state_guard(term: str) -> tuple[int, str]:
     match = STATE_RE.search(term)
     if match is None:
         raise ValueError(f"FSM term has no state comparison: {term[:120]!r}")
-    state = int(match.group(1))
+    state = int(match.group("state"))
     guard = (term[: match.start()] + term[match.end() :]).strip()
     guard = re.sub(r"^\s*&\s*", "", guard)
     return state, guard or "1'b1"
@@ -61,6 +67,10 @@ def _replace_assignment(source: str, name: str, replacement: str) -> str:
 
 def _next_state_case(expr: str, state_signal: str) -> str:
     body = expr.split("=", 1)[1].rsplit(";", 1)[0]
+    width_match = re.search(r"\b(\d+)'d\d+", body)
+    if width_match is None:
+        raise ValueError("FSM expression has no sized state literal")
+    width = width_match.group(1)
     arms: OrderedDict[int, list[tuple[str, str]]] = OrderedDict()
     cursor = 0
     for match in NEXT_TERM_RE.finditer(body):
@@ -70,11 +80,15 @@ def _next_state_case(expr: str, state_signal: str) -> str:
             state, guard = _state_guard(term)
             arms.setdefault(state, []).append((guard, value))
         cursor = match.end()
-    if not arms or "11'd0" not in body[cursor:]:
+    if not arms or not re.search(rf"\b{width}'d0\s*$", body[cursor:].strip()):
         raise ValueError("unexpected fsm0_in chain shape")
-    lines = ["always_comb begin", "  fsm0_in = 11'd0;", f"  case ({state_signal})"]
+    lines = [
+        "always_comb begin",
+        f"  fsm0_in = {width}'d0;",
+        f"  case ({state_signal})",
+    ]
     for state, entries in arms.items():
-        lines.append(f"    11'd{state}: begin")
+        lines.append(f"    {width}'d{state}: begin")
         for index, (guard, value) in enumerate(entries):
             keyword = "if" if index == 0 else "else if"
             lines.append(f"      {keyword} ({guard}) fsm0_in = {value};")
@@ -85,62 +99,77 @@ def _next_state_case(expr: str, state_signal: str) -> str:
 
 def _write_enable_case(expr: str, state_signal: str) -> str:
     body = expr.split("=", 1)[1].rsplit(";", 1)[0]
+    width_match = re.search(r"\b(\d+)'d\d+", body)
+    if width_match is None:
+        raise ValueError("FSM expression has no sized state literal")
+    width = width_match.group(1)
     arms: OrderedDict[int, list[str]] = OrderedDict()
     for term in _split_or(body):
         state, guard = _state_guard(term)
         arms.setdefault(state, []).append(guard)
     if not arms:
         raise ValueError("unexpected fsm0_write_en chain shape")
-    lines = ["always_comb begin", "  fsm0_write_en = 1'b0;", f"  case ({state_signal})"]
+    lines = [
+        "always_comb begin",
+        "  fsm0_write_en = 1'b0;",
+        f"  case ({state_signal})",
+    ]
     for state, guards in arms.items():
         condition = " | ".join(f"({guard})" for guard in guards)
-        lines.append(f"    11'd{state}: fsm0_write_en = {condition};")
+        lines.append(f"    {width}'d{state}: fsm0_write_en = {condition};")
     lines.extend(["  endcase", "end"])
     return "\n".join(lines)
 
 
 def _share_state_decodes(source: str, state_signal: str) -> tuple[str, int]:
-    matches = sorted({int(value) for value in re.findall(
-        rf"{re.escape(state_signal)}\s*==\s*11'd(\d+)", source
-    )})
+    state_pattern = rf"{re.escape(state_signal)}\s*==\s*(\d+)'d(\d+)"
+    state_matches = re.findall(state_pattern, source)
+    matches = sorted({int(value) for _width, value in state_matches})
     if not matches:
         return source, 0
     source = re.sub(
-        rf"{re.escape(state_signal)}\s*==\s*11'd(\d+)",
-        lambda match: f"fsm_state_{match.group(1)}",
+        state_pattern,
+        lambda match: f"fsm_state_{match.group(2)}",
         source,
     )
     declarations = "".join(
-        f"wire fsm_state_{state} = {state_signal} == 11'd{state};\n"
-        for state in matches
+        f"wire fsm_state_{state} = {state_signal} == {width}'d{state};\n"
+        for width, state in state_matches
     )
-    declaration = "logic [10:0] fsm0_out;"
-    insert_at = source.index(declaration) + len(declaration)
+    declaration_match = re.search(r"logic \[\d+:0\] fsm0_out;", source)
+    if declaration_match is None:
+        raise ValueError("expected fsm0_out declaration")
+    insert_at = declaration_match.end()
     source = source[:insert_at] + "\n" + declarations + source[insert_at:]
     return source, len(matches)
 
 
 def _hierarchical_state_decodes(source: str, state_signal: str) -> tuple[str, int]:
-    matches = sorted({int(value) for value in re.findall(
-        rf"{re.escape(state_signal)}\s*==\s*11'd(\d+)", source
-    )})
+    state_pattern = rf"{re.escape(state_signal)}\s*==\s*(\d+)'d(\d+)"
+    state_matches = re.findall(state_pattern, source)
+    matches = sorted({int(value) for _width, value in state_matches})
     if not matches:
         return source, 0
     groups = sorted({state >> 5 for state in matches})
     source = re.sub(
-        rf"{re.escape(state_signal)}\s*==\s*11'd(\d+)",
+        state_pattern,
         lambda match: (
-            f"(fsm_hi_{int(match.group(1)) >> 5} && "
-            f"{state_signal}[4:0] == 5'd{int(match.group(1)) & 31})"
+            f"(fsm_hi_{int(match.group(2)) >> 5} && "
+            f"{state_signal}[4:0] == 5'd{int(match.group(2)) & 31})"
         ),
         source,
     )
+    width = int(state_matches[0][0])
+    high_width = width - 5
     declarations = "".join(
-        f"wire fsm_hi_{group} = {state_signal}[10:5] == 6'd{group};\n"
+        f"wire fsm_hi_{group} = {state_signal}[{width - 1}:5] == "
+        f"{high_width}'d{group};\n"
         for group in groups
     )
-    declaration = "logic [10:0] fsm0_out;"
-    insert_at = source.index(declaration) + len(declaration)
+    declaration_match = re.search(r"logic \[\d+:0\] fsm0_out;", source)
+    if declaration_match is None:
+        raise ValueError("expected fsm0_out declaration")
+    insert_at = declaration_match.end()
     source = source[:insert_at] + "\n" + declarations + source[insert_at:]
     return source, len(matches)
 
@@ -157,13 +186,17 @@ def transform(source: str, keep_state_copies: bool = False,
     write_signal = "fsm0_out"
     prefix = ""
     if keep_state_copies:
+        declaration_match = re.search(r"logic \[(\d+):0\] fsm0_out;", source)
+        if declaration_match is None:
+            raise ValueError("expected fsm0_out declaration")
+        state_width = int(declaration_match.group(1)) + 1
         prefix = (
             # Keep the named observation points, but let synthesis absorb or
             # replicate the copy wires.  A hard dont_touch barrier forces a
             # physically separate high-fanout network and is therefore not a
             # valid timing experiment for the compiler-generated cone.
-            "(* keep = \"true\" *) wire [10:0] fsm0_out_decode;\n"
-            "(* keep = \"true\" *) wire [10:0] fsm0_out_write;\n"
+            f"(* keep = \"true\" *) wire [{state_width - 1}:0] fsm0_out_decode;\n"
+            f"(* keep = \"true\" *) wire [{state_width - 1}:0] fsm0_out_write;\n"
             "assign fsm0_out_decode = fsm0_out;\n"
             "assign fsm0_out_write = fsm0_out;\n"
         )
@@ -174,8 +207,10 @@ def transform(source: str, keep_state_copies: bool = False,
     transformed = _replace_assignment(source, "fsm0_in", next_replacement)
     transformed = _replace_assignment(transformed, "fsm0_write_en", write_replacement)
     if prefix:
-        declaration = "logic [10:0] fsm0_out;"
-        insert_at = transformed.index(declaration) + len(declaration)
+        declaration_match = re.search(r"logic \[\d+:0\] fsm0_out;", transformed)
+        if declaration_match is None:
+            raise ValueError("expected fsm0_out declaration")
+        insert_at = declaration_match.end()
         transformed = transformed[:insert_at] + "\n" + prefix + transformed[insert_at:]
     shared_count = 0
     if hierarchical_state_decodes:
@@ -185,9 +220,10 @@ def transform(source: str, keep_state_copies: bool = False,
     if max_fanout is not None:
         if max_fanout < 1:
             raise ValueError("max_fanout must be positive")
-        declaration = "logic [10:0] fsm0_out;"
-        if transformed.count(declaration) != 1:
+        declaration_match = re.search(r"logic \[\d+:0\] fsm0_out;", transformed)
+        if declaration_match is None:
             raise ValueError("expected one fsm0_out declaration")
+        declaration = declaration_match.group(0)
         transformed = transformed.replace(
             declaration,
             f'(* max_fanout = {max_fanout} *) {declaration}',
