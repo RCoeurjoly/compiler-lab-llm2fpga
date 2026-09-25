@@ -1258,7 +1258,7 @@
               --flat-scf ${pipelineStagePackagesNoHandshake."tinystories-representative-core-w4a8-integer-flat-scf"}/flat.scf.mlir \
               --exported ${pipelineStagePackagesNoHandshake."tinystories-representative-core-w4a8-integer-pytorch-exported"} \
               --helpers ${./scripts/pipeline/run_rc_serving_w4a8_sv.py} \
-              --register-local-port 59 \
+              --register-local-memories \
               --block-local-memories \
               --out-dir "$out"
           '';

@@ -1,0 +1,35 @@
+{
+  "date": "2026-09-25",
+  "experiment": "representative-core-selective-local-memory-registration",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "implementation": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "register_local_memories": false,
+    "register_local_ports": [59],
+    "block_local_memories": true,
+    "seed": 15,
+    "pcie_unchanged": true,
+    "uberddr3_profile_unchanged": "two-lane 333/83.33 MHz"
+  },
+  "simulation": {
+    "status": "pass",
+    "command": "run_tinystories_integer_wb_sim.py",
+    "result": "WB_RC_PASS result=4cfe",
+    "expected_tokens": [-2, 76],
+    "wrapper_dir": "/tmp/rc-selective-wrapper",
+    "generated_sv": "/tmp/rc-selective-sv/sv/main.sv"
+  },
+  "implementation_route": {
+    "status": "aborted_nonconvergent",
+    "reason": "post-placement validity error followed by persistent routing overuse",
+    "post_placement_error": "Bel SLICE_X4Y21/A5FF has no cell",
+    "last_observed_iteration": 1913,
+    "last_observed_overused_wires": 3,
+    "last_observed_overuse": 3,
+    "timing_closed": false,
+    "fasm_produced": false,
+    "board_programming": false
+  },
+  "interpretation": "Registering only local memory port 59 preserves exact transaction-level behavior but does not yet provide a convergent implementation route. The experiment is diagnostic evidence, not an acceptance result."
+}
