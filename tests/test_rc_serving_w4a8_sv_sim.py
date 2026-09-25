@@ -25,6 +25,15 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         self.assertIn("-CFLAGS", command)
         self.assertIn("-O3", command)
 
+    def test_fixture_can_emit_fsm_heartbeat(self) -> None:
+        rtl = (module.SvMemoryPort(0, 32, 2),)
+        roles = module.PhaseRoles((0,), (), 0, ())
+        fixture = module.render_fixture(
+            rtl, roles, timeout_cycles=123, heartbeat_cycles=10, probe_fsm=True
+        )
+        self.assertIn("HEARTBEAT cycles=%0d fsm=%0d", fixture)
+        self.assertIn("dut.fsm0_out", fixture)
+
     def test_flat_scf_abi_preserves_semantic_argument_order(self) -> None:
         mlir = """
         module {

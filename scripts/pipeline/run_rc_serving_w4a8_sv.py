@@ -306,9 +306,12 @@ def _flatten(value: object) -> list[object]:
 def render_fixture(
     rtl: tuple[SvMemoryPort, ...], roles: PhaseRoles, *, timeout_cycles: int,
     debug_ports: tuple[int, ...] = (), initialized_ports: tuple[int, ...] = (),
+    heartbeat_cycles: int = 0, probe_fsm: bool = False,
 ) -> str:
     if timeout_cycles <= 0:
         raise ValueError("timeout_cycles must be positive")
+    if heartbeat_cycles < 0:
+        raise ValueError("heartbeat_cycles must be non-negative")
     declarations: list[str] = []
     connections: list[str] = []
     service: list[str] = []
@@ -356,6 +359,19 @@ def render_fixture(
         f'  $writememh("debug{number}.hex", mem{number});'
         for number in debug_ports
     )
+    heartbeat = []
+    if heartbeat_cycles:
+        if probe_fsm:
+            heartbeat.append(
+                f'    if (timeout_counter > 0 && timeout_counter % {heartbeat_cycles} == 0) '
+                '$display("HEARTBEAT cycles=%0d fsm=%0d done=%b", '
+                'timeout_counter, dut.fsm0_out, done);'
+            )
+        else:
+            heartbeat.append(
+                f'    if (timeout_counter > 0 && timeout_counter % {heartbeat_cycles} == 0) '
+                '$display("HEARTBEAT cycles=%0d done=%b", timeout_counter, done);'
+            )
     return "\n".join(
         [
             "`timescale 1ns/1ps",
@@ -375,6 +391,7 @@ def render_fixture(
             "  @(negedge clk); reset = 0; go = 1;",
             f"  while (!done && timeout_counter < {timeout_cycles}) begin",
             "    @(posedge clk); timeout_counter = timeout_counter + 1;",
+            *heartbeat,
             "  end",
             "  if (!done) $fatal(1, \"TIMEOUT cycles=%0d\", timeout_counter);",
             "  @(negedge clk); go = 0; repeat (2) @(posedge clk);",
@@ -534,6 +551,7 @@ def _run(args: argparse.Namespace) -> int:
     fixture = render_fixture(
         rtl, roles, timeout_cycles=args.timeout_cycles, debug_ports=debug_ports,
         initialized_ports=tuple(binding.port for binding in globals_),
+        heartbeat_cycles=args.heartbeat_cycles, probe_fsm=args.probe_fsm,
     )
     fixture_path = args.work_dir / "tb.sv"
     fixture_path.write_text(fixture, encoding="utf-8")
@@ -614,6 +632,8 @@ def main() -> None:
     parser.add_argument("--verilator", default="verilator")
     parser.add_argument("--jobs", type=int, default=1)
     parser.add_argument("--timeout-cycles", type=int, default=100_000_000)
+    parser.add_argument("--heartbeat-cycles", type=int, default=0)
+    parser.add_argument("--probe-fsm", action="store_true")
     parser.add_argument("--atol", type=float, default=1e-4)
     parser.add_argument("--debug-port", action="append", type=int)
     args = parser.parse_args()

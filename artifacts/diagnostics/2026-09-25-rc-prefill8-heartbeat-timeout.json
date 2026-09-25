@@ -1,0 +1,28 @@
+{
+  "schema": "llm2fpga.rc-serving-w4a8-prefill8-heartbeat-diagnostic.v1",
+  "date": "2026-09-25",
+  "status": "no_heartbeat_before_timeout",
+  "scope": "compiler-generated W4A8 Representative Core prefill-8 phase",
+  "compiler_sv_sha256": "eea4edc69cc6649afdd9b0bd80eb911360ae87ba4f5d85613746a07eec6defa2",
+  "flat_scf_sha256": "5fd9efe083f44b29d961a50f8d8487e094a88c5d0c15e0465b133a47cb9829e9",
+  "pytorch_reference_sha256": "3188f16fa6f89b1ad772c205032cf632389aed4994f210ad4e64ca513ddc5191",
+  "diagnostic": {
+    "heartbeat_cycles": 100000,
+    "probe": "dut.fsm0_out",
+    "verilator_jobs": 4,
+    "verilator_threads": 4,
+    "generated_cxx_flags": ["-O3"],
+    "virtual_memory_cap_bytes": 26000000000,
+    "wall_timeout_seconds": 900,
+    "compile": "passed and linked",
+    "simulation": "timed out with zero heartbeat lines and empty simulation.log",
+    "semantic_comparison": false
+  },
+  "interpretation": {
+    "first_observable_boundary": "before 100000 generated clock iterations (not reached within wall bound)",
+    "hardware": false,
+    "pci_express": false,
+    "ddr3": false,
+    "next_action": "avoid whole-SV event simulation for this phase; use a compiler-owned schedule/transaction executor or structurally reduce static-control expansion, then revalidate against the same reference"
+  }
+}
