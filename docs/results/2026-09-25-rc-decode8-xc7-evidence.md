@@ -224,3 +224,20 @@ FASM or timing report. This is an implementation-scale/resource failure, not a
 functional or memory-legality failure. The batched mapper and checkpoint are
 diagnostic infrastructure; the production Nix gate remains unchanged until
 the batch schedule and netlist size are independently qualified.
+
+### Exact implementation failure and bounded legalization probe
+
+The authoritative nextpnr log gives the first concrete implementation error:
+
+```text
+ERROR: Unable to place cell '$100', no Bels remaining of type '$logic_and'
+```
+
+It reports 2,184 `SLICE_LUTX` and 266 `DSP48E1` cells before this error, and
+produces no FASM or timing report. The selected JSON therefore still crosses
+the nextpnr boundary with generic logic cells; this is an incomplete
+technology-mapping boundary, not evidence that the RC has exhausted the
+Kintex-7 LUT fabric. A bounded attempt to apply Yosys's generic `techmap.v`
+to the 814 MiB selected JSON exited without producing a replacement artifact.
+That failed experiment is diagnostic only; the production Nix flow is
+unchanged.
