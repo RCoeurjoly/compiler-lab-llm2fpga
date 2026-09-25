@@ -1257,6 +1257,7 @@
               --flat-scf ${pipelineStagePackagesNoHandshake."tinystories-representative-core-w4a8-integer-flat-scf"}/flat.scf.mlir \
               --exported ${pipelineStagePackagesNoHandshake."tinystories-representative-core-w4a8-integer-pytorch-exported"} \
               --helpers ${./scripts/pipeline/run_rc_serving_w4a8_sv.py} \
+              --register-local-memories \
               --out-dir "$out"
           '';
         tinystoriesIntegerRcYpcbShell = import ./nix/task6-board-shell.nix {

@@ -29,7 +29,7 @@ def _render_tb(ports, external_ports: list[int], expected: int) -> str:
         "  logic reset = 1, go = 0;",
         "  logic [127:0] token_data;",
         "  logic done; logic wb_cyc, wb_stb; logic [31:0] wb_addr; logic [15:0] wb_sel;",
-        "  logic wb_accept = 0, wb_ack = 0, wb_err = 0; logic [127:0] wb_rdata = 0;",
+        "  logic wb_accept, wb_ack, wb_err; logic [127:0] wb_rdata;",
         "  logic [7:0] result0, result1;",
         "  logic [63:0] token_words [0:1];",
         "  integer owner = -1; integer saved_addr = 0; integer pending = 0;",
@@ -43,7 +43,7 @@ def _render_tb(ports, external_ports: list[int], expected: int) -> str:
         ".wb_accept(wb_accept), .wb_ack(wb_ack), .wb_err(wb_err), .wb_rdata(wb_rdata),",
         ".result0(result0), .result1(result1)",
     ]
-    initial_loads = ["    $readmemh(\"token.hex\", token_words);", "    token_data = 128'd0;"]
+    initial_loads = ["    $readmemh(\"token.hex\", token_words);"]
     for port in ports:
         if port.number in external_ports:
             initial_loads.append(f'    $readmemh("mem{port.number}.hex", mem{port.number});')

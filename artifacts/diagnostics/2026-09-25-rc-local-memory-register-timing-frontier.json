@@ -1,0 +1,60 @@
+{
+  "schema": "llm2fpga.rc-board-local-memory-register-timing-frontier.v1",
+  "date": "2026-09-25",
+  "status": "functional-sim-pass-legal-route-timing-fail",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "configuration": {
+    "ENABLE_COMPILER_ACCELERATOR": 1,
+    "ENABLE_COMPILER_GENERATED_RC": 1,
+    "REGISTER_REQUESTS": 0,
+    "REGISTER_LOCAL_MEMORIES": 1,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "ddr_clock_period_ps": 3000,
+    "seed": 15,
+    "BIST_MODE_PARAM": 2
+  },
+  "simulation": {
+    "status": "pass",
+    "result": "0x4cfe",
+    "command": "run_tinystories_integer_wb_sim.py",
+    "verilator": "5.052",
+    "scope": "exact RC image through Wishbone transaction model; no PCIe or physical DDR3 claim"
+  },
+  "synthesis": {
+    "status": "pass",
+    "output": "/nix/store/rzsqn9yjmlsz7w2m6nxccvjlzsasy61j-compiler-ddr3-trace-replay-synthesis-screen/replay.json"
+  },
+  "route": {
+    "status": "legal_route_but_timing_fail",
+    "output": "/nix/store/13lr02an8vddnx41qdxxrmv9b0ysgmkb-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "6610559dd9cdcad6039b3a1df53a044553db1dee245d915b9292f52c637c5e4b",
+    "warnings": 24,
+    "errors": 0,
+    "rowstream_clk_mhz": 57.26,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 70.23,
+    "pcie_user_required_mhz": 62.5,
+    "router": "nextpnr-xilinx 0.8.2, seed 15"
+  },
+  "critical_path_observation": {
+    "first_compiler_path": "gen_compiler_command_adapter.gen_compiler_generated_rc.compiler_generated_rc.generated.fsm0_out[3]",
+    "endpoint": "compiler-generated a59_wdata into the registered local-memory service boundary",
+    "interpretation": "the boundary removes the address-to-BRAM path but exposes generated control/data fanout as the next critical path"
+  },
+  "comparison": {
+    "direct_request_rowstream_clk_mhz": 54.27,
+    "registered_request_rowstream_clk_mhz": 46.92,
+    "registered_local_memory_rowstream_clk_mhz": 57.26,
+    "interpretation": "positive but insufficient timing improvement; retain as the current functional RC candidate while targeting the compiler-generated output fanout"
+  },
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pci_express": false,
+    "ddr3": false,
+    "board_programming": false,
+    "timing_closed": false,
+    "next_gate": "insert or generate a compiler-side pipeline boundary before the high-fanout local-memory service signals, then repeat exact simulation and fixed-profile route"
+  }
+}

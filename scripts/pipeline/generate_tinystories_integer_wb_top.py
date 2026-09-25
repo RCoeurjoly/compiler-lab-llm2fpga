@@ -50,7 +50,8 @@ def _exported_values(exported_path: Path):
 
 def _render_top(rtl, *, external_ports: tuple[int, ...], token_port: int,
                 result_port: int, token_width: int, token_depth: int,
-                result_width: int, register_requests: bool) -> str:
+                result_width: int, register_requests: bool,
+                register_local_memories: bool) -> str:
     external_index = {port: index for index, port in enumerate(external_ports)}
     declarations: list[str] = []
     connections: list[str] = []
@@ -120,19 +121,42 @@ def _render_top(rtl, *, external_ports: tuple[int, ...], token_port: int,
                 f"  end",
             ])
         else:
-            local_services.extend([
-                f"  always_ff @(posedge clk) begin : service_mem_{number}",
-                f"    if (reset) begin a{number}_done <= 1'b0; a{number}_rdata <= '0; end",
-                f"    else begin",
-                f"      a{number}_done <= 1'b0;",
-                f"      if (a{number}_en) begin",
-                f"        a{number}_done <= 1'b1;",
-                f"        if (a{number}_we) mem{number}[a{number}_addr] <= a{number}_wdata;",
-                f"        else a{number}_rdata <= mem{number}[a{number}_addr];",
-                f"      end",
-                f"    end",
-                f"  end",
-            ])
+            if register_local_memories:
+                local_services.extend([
+                    f"  logic mem{number}_pending_q;",
+                    f"  logic [{addr_width - 1}:0] mem{number}_addr_q;",
+                    f"  logic mem{number}_we_q;",
+                    f"  logic [{port.width - 1}:0] mem{number}_wdata_q;",
+                    f"  always_ff @(posedge clk) begin : service_mem_{number}",
+                    f"    if (reset) begin",
+                    f"      mem{number}_pending_q <= 1'b0; a{number}_done <= 1'b0; a{number}_rdata <= '0;",
+                    f"    end else begin",
+                    f"      a{number}_done <= mem{number}_pending_q;",
+                    f"      if (mem{number}_pending_q) begin",
+                    f"        if (mem{number}_we_q) mem{number}[mem{number}_addr_q] <= mem{number}_wdata_q;",
+                    f"        else a{number}_rdata <= mem{number}[mem{number}_addr_q];",
+                    f"        mem{number}_pending_q <= 1'b0;",
+                    f"      end else if (a{number}_en) begin",
+                    f"        mem{number}_pending_q <= 1'b1; mem{number}_addr_q <= a{number}_addr;",
+                    f"        mem{number}_we_q <= a{number}_we; mem{number}_wdata_q <= a{number}_wdata;",
+                    f"      end",
+                    f"    end",
+                    f"  end",
+                ])
+            else:
+                local_services.extend([
+                    f"  always_ff @(posedge clk) begin : service_mem_{number}",
+                    f"    if (reset) begin a{number}_done <= 1'b0; a{number}_rdata <= '0; end",
+                    f"    else begin",
+                    f"      a{number}_done <= 1'b0;",
+                    f"      if (a{number}_en) begin",
+                    f"        a{number}_done <= 1'b1;",
+                    f"        if (a{number}_we) mem{number}[a{number}_addr] <= a{number}_wdata;",
+                    f"        else a{number}_rdata <= mem{number}[a{number}_addr];",
+                    f"      end",
+                    f"    end",
+                    f"  end",
+                ])
             local_initialization.append(
                 f"    for (int i{number} = 0; i{number} < {port.depth}; i{number}++) mem{number}[i{number}] = '0;"
             )
@@ -184,6 +208,8 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--register-requests", action="store_true",
                         help="register compiler memory requests before arbitration")
+    parser.add_argument("--register-local-memories", action="store_true",
+                        help="register non-token local memory service requests")
     args = parser.parse_args()
     if args.out_dir.exists():
         parser.error("--out-dir must not already exist")
@@ -228,7 +254,8 @@ def main() -> None:
                       result_port=result_port, token_width=rtl[token_port].width,
                       token_depth=rtl[token_port].depth,
                       result_width=rtl[result_port].width,
-                      register_requests=args.register_requests)
+                      register_requests=args.register_requests,
+                      register_local_memories=args.register_local_memories)
     top_path = args.out_dir / "top.sv"
     top_path.write_text(top, encoding="utf-8")
     (args.out_dir / "manifest.json").write_text(json.dumps({
