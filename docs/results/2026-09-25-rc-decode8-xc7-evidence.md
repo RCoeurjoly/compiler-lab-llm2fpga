@@ -83,3 +83,33 @@ this is a validated representation improvement but not yet a complete mapping
 fix. Its transformation receipt reports `packed_done_buf_repairs: 6` and
 output SHA-256
 `6d095664c791bf2797b86c6d0f062a4087bc7fc7670404b5b130e3bfd44670b8`.
+
+The packed pre-map replay quantified the effect: memories fell from 1,241 to
+160, memory bits from 20,284 to 18,122, and cells from 313,593 to 308,188.
+The remaining 160 memories correspond to the external RC memory ABI
+(`$memrd_v2`/`$memwr_v2`: 160 each). The normalization therefore removed the
+internal pipeline-state memories; the remaining implementation cost is now
+concentrated in the intended external memories and their control logic.
+
+## Global block-RAM mapping experiment (rejected)
+
+As a bounded tool experiment, the packed normalized source was copied to a
+temporary workspace and every generated `seq_mem_d1` declaration was given
+`(* ram_style = "block" *)`. The production source and compiler contract were
+not changed. The replay used the same Xilinx synthesis script, with the
+post-techmap `alumacc` and `opt` omissions used by the preceding diagnostic
+replays.
+
+Yosys entered `MEMORY_LIBMAP` and honored the attribute, but then failed on
+the generated memory `main.mem_128.mem` with:
+
+```text
+ERROR: no valid mapping found for memory main.mem_128.mem
+```
+
+This is evidence that a global block-RAM directive is not a valid legalization
+strategy: at least one generated width/depth shape is incompatible with the
+available Kintex-7 block-RAM templates. The experiment produced no mapped JSON,
+so it did not reach nextpnr and changed no repository RTL. The next tool-level
+direction is selective legalization (choose BRAM only for compatible shapes,
+LUTRAM or reshaping for the rest) or compiler-side memory-shape consolidation.
