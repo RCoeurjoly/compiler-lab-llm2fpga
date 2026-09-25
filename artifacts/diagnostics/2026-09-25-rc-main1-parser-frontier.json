@@ -6,7 +6,12 @@
     "main_1_yosys_log_reached_frontend": true,
     "main_1_yosys_read_timeout_seconds": 120,
     "main_1_yosys_status": "timeout",
-    "support_modules": "pass"
+    "support_modules": "pass",
+    "nomem2reg_probe": {
+      "status": "timeout",
+      "timeout_seconds": 120,
+      "interpretation": "Disabling Yosys memory-to-register conversion does not move the main_1 parse frontier."
+    }
   },
   "normalizer": {
     "input_source": "compiler-generated RC with committed FSM guard/tree passes",
