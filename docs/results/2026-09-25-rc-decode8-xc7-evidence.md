@@ -257,3 +257,15 @@ preceding `simplemap` expanded the design and reached ABC, but emitted no
 checkpoint within the bound. The complete RC therefore needs a partitioned
 coarse-to-gate mapping boundary; invoking the generic expansion on the
 monolithic checkpoint is not a viable iteration loop.
+
+### Emission hierarchy probe
+
+The generated SV contains one large compiler component (`main_1`) wrapped by
+`main`, alongside reusable primitive-library modules. A bounded Yosys probe
+that selected `main_1` as the top still elaborated the complete source and
+stopped at the frontend's deep-AST-recursion warning before writing RTLIL.
+This rules out post-hoc nextpnr selection as the immediate partitioning fix:
+the useful compute hierarchy has already been emitted as one monolithic
+component. A fast implementation loop therefore requires a compiler/Calyx
+emission boundary (or a mechanically generated component split) before Yosys
+technology mapping; no handwritten or kev-gpt RTL is introduced.
