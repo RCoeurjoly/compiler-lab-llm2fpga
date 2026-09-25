@@ -1,0 +1,53 @@
+{
+  "schema": "llm2fpga.representative-core-w4a8-integer-pnr.v1",
+  "date": "2026-09-25",
+  "status": "pass-bare-top",
+  "scope": "compiler-generated TinyStories-derived W4A8 integer Representative Core routed as a bare Kintex-7 top",
+  "source": {
+    "flat_scf": {
+      "path": "/nix/store/x9i8b529csdirybr6m9py896wskcagwz-tinystories-representative-core-w4a8-integer-flat-scf/flat.scf.mlir",
+      "sha256": "b241f747f5d07e4c8612f4164320cd44eb2f5cd3506ee50e1aaf2d5e9cbbb7f6"
+    },
+    "generated_sv": {
+      "path": "/nix/store/wad3fb272r9mzr4mfqzc06c9gwhm1a6k-tinystories-representative-core-w4a8-integer-calyx-native-sv/sv/main.sv",
+      "sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722"
+    },
+    "source_il": "tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-il"
+  },
+  "implementation": {
+    "path": "/nix/store/ixx4wniscc2l6dynmjcn40r8gfk0c5f4-tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-xc7k480t-nextpnr-utilization",
+    "part": "xc7k480tffg1156-1",
+    "family": "kintex7",
+    "top": "main",
+    "design_fasm_sha256": "2d97aeb06ef3481ad70058362a706f71e6664129ed53bca42fd48ca0dd250db3",
+    "manifest_sha256": "727d9222d1c28e9aeb015e4f557d7c9e56ca4fac8ef52cc13579c0731eef810d",
+    "route_sha256": "7bd3fa32ba7ca7302c627093b589f9a6118107e3fed08d80f5e6dea108b9e0ee",
+    "tool": {
+      "name": "nextpnr-xilinx",
+      "ref": "openxc7-stable-pcie-meta",
+      "revision": "32e8b798520d90e1130afe95908f04cf52125cf6"
+    },
+    "timing": {
+      "constraint_mhz": 12.0,
+      "reported_max_mhz": 102.44,
+      "status": "pass"
+    },
+    "resources": {
+      "lut": {"used": 4246, "capacity": 298600, "percent": 1.42},
+      "ff": {"used": 645, "capacity": 597200, "percent": 0.11},
+      "bram36": {"used": 0, "capacity": 955, "percent": 0.0},
+      "dsp": {"used": 0, "capacity": 1920, "percent": 0.0},
+      "slice_lower_bound": {"used": 531, "capacity": 74650, "percent": 0.71}
+    }
+  },
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pci_express": false,
+    "ddr3": false,
+    "ypcb_shell": false,
+    "board_programming": false,
+    "autoregressive_generation": false,
+    "next_gate": "instantiate the generated RC Wishbone wrapper in the existing YPCB shell and prove its BRAM-style reference result before externalizing memory to PCIe+UberDDR3"
+  }
+}
