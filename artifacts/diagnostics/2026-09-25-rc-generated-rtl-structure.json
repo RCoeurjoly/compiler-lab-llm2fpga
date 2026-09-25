@@ -1,0 +1,26 @@
+{
+  "schema": "llm2fpga.rc-generated-rtl-structure.v1",
+  "scope": "compiler-generated W4A8 Representative Core prefill-8",
+  "sv_path": "/nix/store/assf2zarkj7w8rvwvaxi3f8v6wimq1ig-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv/sv/main.sv",
+  "flat_scf_path": "/nix/store/hnrx9lj23ay9vrd2glxn8msc7ak3yh81-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-flat-scf/flat.scf.mlir",
+  "sv_bytes": 10165372,
+  "sv_lines": 299198,
+  "flat_scf_bytes": 295044,
+  "flat_scf_lines": 5819,
+  "sv_module_count": 65,
+  "sv_always_block_count": 46,
+  "sv_memory_declaration_count": 13302,
+  "native_calyx_resources": {
+    "estimated_external_bits": 69104,
+    "estimated_internal_bits": 5328,
+    "std_wire_count": 15210,
+    "std_reg_width4_count": 603,
+    "std_reg_width1_count": 1771,
+    "std_addfn_count": 191,
+    "std_mulfn_count": 129,
+    "std_comparefn_count": 411,
+    "std_divsqrtfn_count": 88
+  },
+  "compiler_warning": "calyx_opt::passes::data_path_infer Data path infer did not converge after 5 iterations",
+  "interpretation": "The generated RTL is dominated by flattened memory declarations and data-path wires; the Calyx data-path inference warning is a concrete compiler-side reduction target before further Verilator or hardware work."
+}
