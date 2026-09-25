@@ -1,4 +1,6 @@
-{ pkgs, bitstreamPkgs ? pkgs, openXC7Packages ? null }:
+{ pkgs, bitstreamPkgs ? pkgs, openXC7Packages ? null
+, compilerGeneratedRcWrapper ? null, compilerGeneratedSv ? null
+, enableCompilerGeneratedRc ? false }:
 let
   pins = builtins.fromJSON (builtins.readFile ../scripts/pipeline/task6_board_shell_pins.json);
   storeInputs = map (row: builtins.storePath
@@ -62,13 +64,24 @@ let
       ${../.superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv} \
       "$out/model.sv" "$out/annotation.json"
   '';
-  compilerSourceArgs = pkgs.lib.concatStringsSep " " [
+  legacyCompilerSourceArgs = [
     "${compilerAnnotatedSource}/model.sv"
     "${../rtl/memory/llm_external_memory_arbiter.sv}"
     "${../rtl/memory/llm_wishbone_pipeline.sv}"
     "${../rtl/tinystories_1m_ddr3_backend.sv}"
     "${../rtl/tinystories_1m_ddr3_command_adapter.sv}"
   ];
+  generatedRcSourceArgs = [
+    "${compilerGeneratedRcWrapper}/top.sv"
+    "${compilerGeneratedSv}"
+    "${../rtl/memory/llm_compiler_memory_wb_adapter.sv}"
+    "${../rtl/memory/llm_external_memory_arbiter.sv}"
+  ];
+  compilerSourceArgs = pkgs.lib.concatStringsSep " "
+    (if enableCompilerGeneratedRc then generatedRcSourceArgs else legacyCompilerSourceArgs);
+  compilerGeneratedRcParam = pkgs.lib.optionalString
+    enableCompilerGeneratedRc
+    "chparam -set ENABLE_COMPILER_GENERATED_RC 1 compiler_ddr3_trace_replay_top";
   yosys = builtins.storePath "/nix/store/1g0dvnvw75fnlnk4ad586c65wfxbf5rs-yosys-with-plugins-0.66";
   # Fast feedback target for the same production source closure.  This keeps
   # hierarchy/elaboration failures separate from the much slower global
@@ -82,6 +95,7 @@ let
     read_verilog -lib +/xilinx/cells_xtra.v
     read_verilog -sv -DTASK6_PCIE_ROWSTREAM_INGRESS_PORTS -DTASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS -DTASK6_COMPILER_DDR3_ACCELERATOR_PORTS ${sourceArgs} ${compilerSourceArgs} ${m2SourceClosure}/task6_normal_command_stage.sv ${../rtl/diagnostics/compiler_ddr3_trace_replay.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_top.sv}
     chparam -set ENABLE_COMPILER_ACCELERATOR 1 compiler_ddr3_trace_replay_top
+    ${compilerGeneratedRcParam}
     hierarchy -check -top compiler_ddr3_trace_replay_top
     proc
     opt_clean
@@ -102,6 +116,7 @@ let
     read_verilog -lib +/xilinx/cells_xtra.v
     read_verilog -sv -DTASK6_PCIE_ROWSTREAM_INGRESS_PORTS -DTASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS -DTASK6_COMPILER_DDR3_ACCELERATOR_PORTS ${sourceArgs} ${compilerSourceArgs} ${m2SourceClosure}/task6_normal_command_stage.sv ${../rtl/diagnostics/compiler_ddr3_trace_replay.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_top.sv}
     chparam -set ENABLE_COMPILER_ACCELERATOR 1 compiler_ddr3_trace_replay_top
+    ${compilerGeneratedRcParam}
     hierarchy -check -top compiler_ddr3_trace_replay_top
     synth_xilinx -flatten -arch xc7 -nosrl -noiopad -top compiler_ddr3_trace_replay_top
     check

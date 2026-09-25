@@ -1,0 +1,48 @@
+{
+  "schema": "llm2fpga.rc-board-shell-reproducibility.v1",
+  "date": "2026-09-25",
+  "status": "elaboration-pass-synthesis-timeout",
+  "target": "tinystories-representative-core-w4a8-integer-rc-board",
+  "configuration": {
+    "ENABLE_COMPILER_ACCELERATOR": 1,
+    "ENABLE_COMPILER_GENERATED_RC": 1,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "ddr_clock_period_ps": 3000,
+    "BIST_MODE_PARAM": 2
+  },
+  "generated_inputs": {
+    "wrapper": {
+      "path": "/nix/store/arzz3h2lswwb67qbx98ahm3yw109qxwp-tinystories-representative-core-w4a8-integer-wishbone-wrapper",
+      "top_sha256": "a078c1bfbe493729d3a8703f02f924fa9c5c62efe01e8d129d400e4d31f07a67"
+    },
+    "generated_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722"
+  },
+  "elaboration": {
+    "status": "pass",
+    "path": "/nix/store/avr7j9lx58r6pg3aisf4ks4w464abh10-compiler-ddr3-trace-replay-elaboration",
+    "rtlil_sha256": "387f4265ea678afaccba985c4610b0fa7905bf6d1175fb0b4a146adeda4fe7f8",
+    "wall_seconds": 59.93,
+    "checks": [
+      "generated tinystories_integer_rc_wb_top parsed",
+      "ENABLE_COMPILER_GENERATED_RC=1 reached the shell hierarchy",
+      "compiler-top.il emitted"
+    ]
+  },
+  "synthesis": {
+    "status": "timeout",
+    "wall_timeout_seconds": 600,
+    "exit_status": 124,
+    "partial_output": "/nix/store/c1glyf9kjbchjrg46qjarf6yz5k4cjzz-compiler-ddr3-trace-replay-synthesis-screen",
+    "partial_yosys_log_bytes": 184320000,
+    "observed_frontier": "synth_xilinx FSM extraction/optimization after wrapper elaboration"
+  },
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pci_express": false,
+    "ddr3": false,
+    "board_programming": false,
+    "next_gate": "bound or bypass the integrated-shell FSM reconstruction in a dedicated synthesis recipe, then compare resource/timing output before attempting route"
+  }
+}

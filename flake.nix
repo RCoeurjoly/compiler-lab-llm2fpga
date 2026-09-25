@@ -1241,6 +1241,32 @@
           }
         ];
         pipelineAliasPackages = mkPipelineAliases pipelineAliasSpecs;
+        # Reproducible YPCB shell input for the compiler-generated integer RC.
+        # This keeps the exact main_1 SV artifact and generated Wishbone wrapper
+        # together; the existing task6 shell remains unchanged for legacy
+        # diagnostics and is not used by this target.
+        tinystoriesIntegerRcWishboneWrapper = pkgs.runCommand
+          "tinystories-representative-core-w4a8-integer-wishbone-wrapper" {
+            nativeBuildInputs = [ pythonWithTinyStories ];
+          } ''
+            set -euo pipefail
+            export PYTHONPATH="${./.}:''${PYTHONPATH:-}"
+            ${pythonWithTinyStories}/bin/python \
+              ${./scripts/pipeline/generate_tinystories_integer_wb_top.py} \
+              --sv ${pipelineAliasPackages."tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-calyx-native-sv"}/sv/main.sv \
+              --flat-scf ${pipelineStagePackagesNoHandshake."tinystories-representative-core-w4a8-integer-flat-scf"}/flat.scf.mlir \
+              --exported ${pipelineStagePackagesNoHandshake."tinystories-representative-core-w4a8-integer-pytorch-exported"} \
+              --helpers ${./scripts/pipeline/run_rc_serving_w4a8_sv.py} \
+              --out-dir "$out"
+          '';
+        tinystoriesIntegerRcYpcbShell = import ./nix/task6-board-shell.nix {
+          inherit pkgs;
+          bitstreamPkgs = import inputs.task3-main-pipeline.inputs.nixpkgs { inherit system; };
+          openXC7Packages = inputs.task3-main-pipeline.inputs.openXC7.packages.${system};
+          compilerGeneratedRcWrapper = tinystoriesIntegerRcWishboneWrapper;
+          compilerGeneratedSv = pipelineAliasPackages."tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-calyx-native-sv" + "/sv/main.sv";
+          enableCompilerGeneratedRc = true;
+        };
         rcWorkingSystem = import ./nix/rc-working-system.nix {
           inherit pkgs pythonWithTinyStoriesTorchAO;
           exportedProgram =
@@ -3023,6 +3049,19 @@ PY
           compiler-ddr3-trace-replay-bar-observer-route = task6BoardShell.replayBarObserverRoute;
           compiler-ddr3-trace-replay-bar-observer-bitstream = task6BoardShell.replayBarObserverBitstream;
           compiler-ddr3-trace-replay-database = task6BoardShell.patchedDb;
+          # Dedicated RC shell: unlike the historical target above, this
+          # derivation feeds only the exact compiler-generated integer RC
+          # wrapper and main_1 artifact into the validated PCIe/UberDDR3 top.
+          tinystories-representative-core-w4a8-integer-wishbone-wrapper =
+            tinystoriesIntegerRcWishboneWrapper;
+          tinystories-representative-core-w4a8-integer-rc-board-elaboration =
+            tinystoriesIntegerRcYpcbShell.replayElaboration;
+          tinystories-representative-core-w4a8-integer-rc-board-synthesis =
+            tinystoriesIntegerRcYpcbShell.replaySynthesis;
+          tinystories-representative-core-w4a8-integer-rc-board-route =
+            tinystoriesIntegerRcYpcbShell.replayRoute;
+          tinystories-representative-core-w4a8-integer-rc-board-bitstream =
+            tinystoriesIntegerRcYpcbShell.replayBitstream;
           compiler-ddr3-replay-programmer = import ./nix/compiler-replay-programmer.nix { inherit pkgs; };
           compiler-ddr3-mmio32 = pkgs.stdenv.mkDerivation {
             pname = "compiler-ddr3-mmio32";
