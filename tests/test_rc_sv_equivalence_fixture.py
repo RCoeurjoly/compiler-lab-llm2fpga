@@ -1162,6 +1162,24 @@ class RcSvEquivalenceFixtureTest(unittest.TestCase):
         self.assertIn("cond_0000 ? 13'd0", normalized)
         self.assertIn("cond_1999 ? 13'd1999", normalized)
 
+    def test_large_signal_ternary_uses_ordered_continuous_pages(self):
+        pairs = "\n".join(
+            f"cond_{index:04d} ? signal_{index:04d} :" for index in range(1000)
+        )
+        source = "module m;\nlogic [12:0] state;\nassign state =\n" + pairs + " 13'd0;\nendmodule\n"
+        normalized = module._normalize_large_or_assignments(source)
+        self.assertIn("wire [12:0] __llm2fpga_sim_", normalized)
+        self.assertEqual(len(re.findall(r"signal_\d{4}", normalized)), 1000)
+
+    def test_large_scalar_signal_ternary_uses_ordered_continuous_pages(self):
+        pairs = "\n".join(
+            f"cond_{index:04d} ? signal_{index:04d} :" for index in range(1000)
+        )
+        source = "module m;\nlogic state;\nassign state =\n" + pairs + " 1'd0;\nendmodule\n"
+        normalized = module._normalize_large_or_assignments(source)
+        self.assertIn("wire __llm2fpga_sim_", normalized)
+        self.assertEqual(len(re.findall(r"signal_\d{4}", normalized)), 1000)
+
     def test_large_unproven_expressions_are_unchanged(self):
         wide_or, _ = self._large_scalar_or()
         wide_or = wide_or.replace("logic enable", "logic [12:0] enable")

@@ -2500,6 +2500,10 @@ def _unsigned_literal_width(expression: str) -> int | None:
     return int(literal.group(1)) if literal else None
 
 
+def _simple_signal(expression: str) -> bool:
+    return re.fullmatch(r"[A-Za-z_$][A-Za-z0-9_$]*", expression.strip()) is not None
+
+
 def _priority_chain(pairs: list[tuple[str, str]], fallback: str) -> str:
     result = fallback
     for condition, true_value in reversed(pairs):
@@ -2522,7 +2526,10 @@ def _render_ternary_pages(
         index: f"{prefix}_ternary_{index}"
         for index in range(1, len(chunks))
     }
-    lines = [f"wire {packed_range} {page_names[index]};" for index in page_names]
+    lines = [
+        f"wire {packed_range + ' ' if packed_range else ''}{page_names[index]};"
+        for index in page_names
+    ]
     fallback = default
     for index in reversed(range(1, len(chunks))):
         page = page_names[index]
@@ -2556,22 +2563,31 @@ def _normalize_large_or_assignments(source: str) -> str:
             if (
                 declaration is None
                 or declaration.group("signed") is not None
-                or declaration.group("packed") is None
                 or parsed is None
             ):
                 return match.group(0)
             pairs, default = parsed
-            width = int(declaration.group("hi")) - int(declaration.group("lo")) + 1
-            if (
-                len(pairs) <= NORMALIZER_PAGE_TERMS
-                or width <= 0
-                or _unsigned_literal_width(default) != width
-                or any(_unsigned_literal_width(true_value) != width for _, true_value in pairs)
-            ):
+            width = (
+                int(declaration.group("hi")) - int(declaration.group("lo")) + 1
+                if declaration.group("packed") is not None else 1
+            )
+            literal_arms = (
+                _unsigned_literal_width(default) == width
+                and all(_unsigned_literal_width(true_value) == width for _, true_value in pairs)
+            )
+            signal_arms = (
+                _unsigned_literal_width(default) == width
+                and all(
+                    _simple_signal(true_value)
+                    or _unsigned_literal_width(true_value) == width
+                    for _, true_value in pairs
+                )
+            )
+            if len(pairs) <= NORMALIZER_PAGE_TERMS or width <= 0 or not (literal_arms or signal_arms):
                 return match.group(0)
             return _render_ternary_pages(
                 name,
-                declaration.group("packed").strip(),
+                declaration.group("packed").strip() if declaration.group("packed") else "",
                 pairs,
                 default,
                 prefix,

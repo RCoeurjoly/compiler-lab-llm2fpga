@@ -1,0 +1,21 @@
+{
+  "date": "2026-09-25",
+  "interpretation": "Paging removes large priority-chain depth from the normalized source, but Yosys still cannot finish parsing main_1 within the bounded window. No functional or implementation claim follows from this parser diagnostic.",
+  "module_probe": {
+    "main_1_bytes": 10149959,
+    "main_1_yosys_log_reached_frontend": true,
+    "main_1_yosys_read_timeout_seconds": 120,
+    "main_1_yosys_status": "timeout",
+    "support_modules": "pass"
+  },
+  "normalizer": {
+    "input_source": "compiler-generated RC with committed FSM guard/tree passes",
+    "normalized_sv_bytes": 10512527,
+    "normalized_sv_lines": 490940,
+    "normalized_sv_sha256": "9e7a8e4b27781445b8a1ecf683e7ae0a7109f6b522f7428ed7b62bd6ad2e0385",
+    "priority_ternary_terms": 17013,
+    "signal_and_scalar_pages_enabled": true
+  },
+  "schema": "llm2fpga.rc-main1-parser-frontier.v1",
+  "status": "diagnostic"
+}
