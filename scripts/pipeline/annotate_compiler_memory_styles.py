@@ -31,6 +31,12 @@ SCALAR_INSTANCE = re.compile(
     r"(?P<name>mem_\d+)\s*\("
 )
 
+PAD_INSTANCE = re.compile(
+    r"(?ms)\bseq_mem_d1\s*#\s*\(\s*"
+    r"\.IDX_SIZE\((?P<idx>\d+)\),\s*\.SIZE\((?P<size>[2-9]|1\d|2\d)\),\s*"
+    r"\.WIDTH\((?P<width>\d+)\)\s*\)\s*mem_\d+\s*\("
+)
+
 SCALAR_MODULE = r'''
 module seq_mem_d1_scalar #(
     parameter WIDTH = 32,
@@ -77,8 +83,10 @@ endmodule
 # modes.  The depth/bit threshold below prevents tiny memories from being
 # forced into a block (the rejected global experiment failed on 8x1).
 BRAM_WIDTHS = {8, 9, 16, 18, 32, 36, 64, 72}
-MIN_DEPTH = 8
-MIN_BITS = 256
+MIN_DEPTH = 512
+MIN_BITS = 4096
+PAD_DEPTH = 32
+PAD_IDX_SIZE = 5
 
 
 def _sha256(text: str) -> str:
@@ -88,6 +96,7 @@ def _sha256(text: str) -> str:
 def annotate(source: str) -> tuple[str, dict[str, object]]:
     counts = {"instances": 0, "bram_annotations": 0, "left_unconstrained": 0}
     scalar_repairs = 0
+    padded_repairs = 0
     shapes: dict[str, int] = {}
 
     def replace(match: re.Match[str]) -> str:
@@ -115,6 +124,16 @@ def annotate(source: str) -> tuple[str, dict[str, object]]:
     output, scalar_repairs = SCALAR_INSTANCE.subn(scalarize, output)
     if scalar_repairs:
         output = SCALAR_MODULE + output
+
+    def pad(match: re.Match[str]) -> str:
+        nonlocal padded_repairs
+        padded_repairs += 1
+        text = match.group(0)
+        text = re.sub(r"\.IDX_SIZE\(\d+\)", f".IDX_SIZE({PAD_IDX_SIZE})", text, count=1)
+        text = re.sub(r"\.SIZE\(\d+\)", f".SIZE({PAD_DEPTH})", text, count=1)
+        return text
+
+    output, padded_repairs = PAD_INSTANCE.subn(pad, output)
     receipt = {
         "schema": "llm2fpga.compiler-memory-style.v1",
         "input_sv_sha256": _sha256(source),
@@ -126,6 +145,8 @@ def annotate(source: str) -> tuple[str, dict[str, object]]:
         },
         "counts": counts,
         "scalar_size1_repairs": scalar_repairs,
+        "padded_shallow_repairs": padded_repairs,
+        "padding": {"depth": PAD_DEPTH, "idx_size": PAD_IDX_SIZE},
         "shapes": dict(sorted(shapes.items())),
     }
     return output, receipt

@@ -12,7 +12,7 @@ SPEC.loader.exec_module(MODULE)
 
 
 class AnnotateCompilerMemoryStylesTest(unittest.TestCase):
-    def test_only_legal_sized_shapes_are_forced_to_block(self):
+    def test_shallow_shapes_are_padded_and_not_forced_to_block(self):
         source = """
 seq_mem_d1 # (.IDX_SIZE(4), .SIZE(8), .WIDTH(32)) mem_1 (
 );
@@ -22,11 +22,10 @@ seq_mem_d1 # (.IDX_SIZE(3), .SIZE(4), .WIDTH(64)) mem_3 (
 );
 """
         output, receipt = MODULE.annotate(source)
-        self.assertIn('ram_style = "block" *) seq_mem_d1', output)
-        self.assertEqual(output.count('ram_style = "block"'), 1)
+        self.assertNotIn('ram_style = "block"', output)
         self.assertEqual(receipt["counts"]["instances"], 3)
-        self.assertEqual(receipt["counts"]["bram_annotations"], 1)
-        self.assertEqual(receipt["counts"]["left_unconstrained"], 2)
+        self.assertEqual(receipt["counts"]["bram_annotations"], 0)
+        self.assertEqual(receipt["counts"]["left_unconstrained"], 3)
 
     def test_single_entry_memory_is_scalarized_without_abi_change(self):
         source = """
@@ -39,6 +38,15 @@ seq_mem_d1 # (.IDX_SIZE(1), .SIZE(1), .WIDTH(8)) mem_2 (
         self.assertTrue(output.startswith("\nmodule seq_mem_d1_scalar"))
         self.assertIn("seq_mem_d1_scalar # (.IDX_SIZE(1), .SIZE(1), .WIDTH(8)) mem_2", output)
         self.assertEqual(receipt["scalar_size1_repairs"], 1)
+
+    def test_shallow_memory_is_padded_to_lutram_geometry(self):
+        source = """
+seq_mem_d1 # (.IDX_SIZE(4), .SIZE(16), .WIDTH(32)) mem_7 (
+);
+"""
+        output, receipt = MODULE.annotate(source)
+        self.assertIn(".IDX_SIZE(5), .SIZE(32), .WIDTH(32)", output)
+        self.assertEqual(receipt["padded_shallow_repairs"], 1)
 
     def test_non_memory_text_is_unchanged(self):
         source = "module main; logic x; endmodule\n"

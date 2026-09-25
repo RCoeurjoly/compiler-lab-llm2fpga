@@ -183,3 +183,20 @@ Lowering the remaining memories immediately with `memory_map` is only a
 diagnostic fallback: it completes quickly but produces 522,890 generic cells,
 far beyond a useful Kintex-7 implementation. No bitstream or P&R claim is
 made from that fallback.
+
+## Memory-shape legality correction
+
+A direct RTLIL probe forced one representative `32x8` memory to BRAM and
+failed immediately with `no valid mapping found`. The pinned Series-7 memory
+library does not accept these shallow address geometries as block RAM. The
+candidate pass therefore no longer forces shallow memories to BRAM: it
+scalarizes one-entry memories and pads all other shallow `seq_mem_d1`
+instances to 32 entries with 5-bit addresses, a legal LUTRAM geometry. This
+adds 131 padding repairs to the packed decode-8 source; Yosys-Slang elaboration
+passes with zero errors and zero warnings.
+
+The first full 600-second replay of this padded source timed out in generic
+comparator techmapping before `MEMORY_LIBMAP`, so the policy is not yet a
+production-flow change. It remains an evidence-backed compiler candidate to
+evaluate from the persistent pre-map checkpoint, with the packed baseline
+preserved.
