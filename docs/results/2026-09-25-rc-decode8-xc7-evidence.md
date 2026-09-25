@@ -113,3 +113,17 @@ available Kintex-7 block-RAM templates. The experiment produced no mapped JSON,
 so it did not reach nextpnr and changed no repository RTL. The next tool-level
 direction is selective legalization (choose BRAM only for compatible shapes,
 LUTRAM or reshaping for the rest) or compiler-side memory-shape consolidation.
+
+## Selective memory-style pass (compiler-side candidate)
+
+The new `annotate_compiler_memory_styles.py` pass implements that policy as an
+auditable transformation rather than a global pragma. It annotates only
+`seq_mem_d1` instances whose width is compatible with a 7-series BRAM mode,
+whose depth is at least eight, and whose total storage is at least 256 bits.
+Tiny or irregular memories remain unconstrained so Yosys can choose LUTRAM or
+registers. On the packed decode-8 source this selects 31 of 165 instances and
+leaves 134 unconstrained. The pass emits a SHA-256 receipt and has focused
+unit coverage. Yosys-Slang elaboration of the transformed source completed with
+zero errors and warnings. It is not yet wired into the production Nix gate;
+that integration remains contingent on a bounded synthesis replay showing a
+real mapping improvement.
