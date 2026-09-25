@@ -59,7 +59,7 @@ def _replace_assignment(source: str, name: str, replacement: str) -> str:
     return source[: match.start()] + replacement + source[match.end() :]
 
 
-def _next_state_case(expr: str) -> str:
+def _next_state_case(expr: str, state_signal: str) -> str:
     body = expr.split("=", 1)[1].rsplit(";", 1)[0]
     arms: OrderedDict[int, list[tuple[str, str]]] = OrderedDict()
     cursor = 0
@@ -72,7 +72,7 @@ def _next_state_case(expr: str) -> str:
         cursor = match.end()
     if not arms or "11'd0" not in body[cursor:]:
         raise ValueError("unexpected fsm0_in chain shape")
-    lines = ["always_comb begin", "  fsm0_in = 11'd0;", "  case (fsm0_out)"]
+    lines = ["always_comb begin", "  fsm0_in = 11'd0;", f"  case ({state_signal})"]
     for state, entries in arms.items():
         lines.append(f"    11'd{state}: begin")
         for index, (guard, value) in enumerate(entries):
@@ -83,7 +83,7 @@ def _next_state_case(expr: str) -> str:
     return "\n".join(lines)
 
 
-def _write_enable_case(expr: str) -> str:
+def _write_enable_case(expr: str, state_signal: str) -> str:
     body = expr.split("=", 1)[1].rsplit(";", 1)[0]
     arms: OrderedDict[int, list[str]] = OrderedDict()
     for term in _split_or(body):
@@ -91,7 +91,7 @@ def _write_enable_case(expr: str) -> str:
         arms.setdefault(state, []).append(guard)
     if not arms:
         raise ValueError("unexpected fsm0_write_en chain shape")
-    lines = ["always_comb begin", "  fsm0_write_en = 1'b0;", "  case (fsm0_out)"]
+    lines = ["always_comb begin", "  fsm0_write_en = 1'b0;", f"  case ({state_signal})"]
     for state, guards in arms.items():
         condition = " | ".join(f"({guard})" for guard in guards)
         lines.append(f"    11'd{state}: fsm0_write_en = {condition};")
@@ -99,15 +99,32 @@ def _write_enable_case(expr: str) -> str:
     return "\n".join(lines)
 
 
-def transform(source: str) -> str:
+def transform(source: str, keep_state_copies: bool = False) -> str:
     next_match = re.search(r"assign\s+fsm0_in\s*=.*?;", source, re.S)
     write_match = re.search(r"assign\s+fsm0_write_en\s*=.*?;", source, re.S)
     if next_match is None or write_match is None:
         raise ValueError("generated SV does not contain both Calyx FSM assignments")
-    next_replacement = _next_state_case(next_match.group(0))
-    write_replacement = _write_enable_case(write_match.group(0))
+    next_signal = "fsm0_out"
+    write_signal = "fsm0_out"
+    prefix = ""
+    if keep_state_copies:
+        prefix = (
+            "(* keep = \"true\", dont_touch = \"true\" *) wire [10:0] fsm0_out_decode;\n"
+            "(* keep = \"true\", dont_touch = \"true\" *) wire [10:0] fsm0_out_write;\n"
+            "assign fsm0_out_decode = fsm0_out;\n"
+            "assign fsm0_out_write = fsm0_out;\n"
+        )
+        next_signal = "fsm0_out_decode"
+        write_signal = "fsm0_out_write"
+    next_replacement = _next_state_case(next_match.group(0), next_signal)
+    write_replacement = _write_enable_case(write_match.group(0), write_signal)
     transformed = _replace_assignment(source, "fsm0_in", next_replacement)
-    return _replace_assignment(transformed, "fsm0_write_en", write_replacement)
+    transformed = _replace_assignment(transformed, "fsm0_write_en", write_replacement)
+    if prefix:
+        declaration = "logic [10:0] fsm0_out;"
+        insert_at = transformed.index(declaration) + len(declaration)
+        transformed = transformed[:insert_at] + "\n" + prefix + transformed[insert_at:]
+    return transformed
 
 
 def main() -> None:
@@ -115,9 +132,10 @@ def main() -> None:
     parser.add_argument("input", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--receipt", type=Path)
+    parser.add_argument("--keep-state-copies", action="store_true")
     args = parser.parse_args()
     source = args.input.read_text(encoding="utf-8")
-    result = transform(source)
+    result = transform(source, keep_state_copies=args.keep_state_copies)
     args.output.write_text(result, encoding="utf-8")
     if args.receipt is not None:
         args.receipt.write_text(
@@ -128,6 +146,7 @@ def main() -> None:
                     "input_sv_sha256": hashlib.sha256(source.encode()).hexdigest(),
                     "output_sv_sha256": hashlib.sha256(result.encode()).hexdigest(),
                     "state_logic": "fsm0_in and fsm0_write_en",
+                    "keep_state_copies": args.keep_state_copies,
                 },
                 indent=2,
                 sort_keys=True,

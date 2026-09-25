@@ -217,9 +217,14 @@ PY
 fi
 
 if [[ "${CALYX_OPTIMIZE_FSM_DECODE:-0}" == "1" ]]; then
+  fsm_decode_copy_args=()
+  if [[ "${CALYX_FSM_DECODE_KEEP_COPIES:-0}" == "1" ]]; then
+    fsm_decode_copy_args+=(--keep-state-copies)
+  fi
   python3 "$optimize_fsm_decode" \
     "$output_dir/sv/main.sv" "$output_dir/sv/main.fsm_decode.sv" \
-    --receipt "$output_dir/fsm-decode-receipt.json"
+    --receipt "$output_dir/fsm-decode-receipt.json" \
+    "${fsm_decode_copy_args[@]}"
   mv "$output_dir/sv/main.fsm_decode.sv" "$output_dir/sv/main.sv"
   test -s "$output_dir/fsm-decode-receipt.json"
 fi
