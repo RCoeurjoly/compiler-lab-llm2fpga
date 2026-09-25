@@ -1,0 +1,40 @@
+{
+  "schema": "llm2fpga.rc-fsm-fanout-route-observed.v1",
+  "date": "2026-09-25",
+  "status": "route_completed_timing_failed",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "implementation_source": "compiler-generated Calyx-to-SystemVerilog; no kev-gpt RTL",
+  "source_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+  "transform": {
+    "name": "limit_calyx_fsm_fanout",
+    "max_fanout": 16,
+    "output_sv_sha256": "987a9566046694d6c200cc96e327c29bac27fd69d55b5845bae38ff9e07a7f16"
+  },
+  "simulation": {
+    "status": "pass",
+    "result": "WB_RC_PASS result=4cfe",
+    "expected_tokens": [-2, 76]
+  },
+  "synthesis": {
+    "status": "pass",
+    "gate": "watched compiler-shell nets have no undriven warnings"
+  },
+  "route": {
+    "status": "legal_route_but_timing_failed",
+    "nextpnr": "0.8.2",
+    "seed": 15,
+    "rowstream_clk_mhz": 60.78,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 78.76,
+    "pcie_required_mhz": 62.50,
+    "resources": {
+      "SLICE_LUTX": "44452/597200",
+      "SLICE_FFX": "19631/597200",
+      "RAMB18E1": "23/1910",
+      "RAMB36E1": "9/955",
+      "SELMUX2_1": "2405/225550"
+    },
+    "fasm_produced": false
+  },
+  "conclusion": "The fanout annotation preserves exact simulation and synthesis and modestly improves the rowstream result versus the 59.39 MHz baseline, but does not approach the fixed 83.33 MHz requirement. The candidate is rejected for promotion; production integration was restored and no bitstream was programmed."
+}
