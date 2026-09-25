@@ -421,6 +421,10 @@ def verilator_compile_command(
         "-Wno-fatal",
         "-Wno-WIDTHEXPAND",
         "-Wno-WIDTHTRUNC",
+        # Coarse translation units are substantially faster for the generated
+        # HardFloat/serving graph than Verilator's tiny default splits.
+        "--output-split", "10000",
+        "--output-split-cfuncs", "10000",
         "-j", str(jobs),
         "-CFLAGS", "-O3",
     ]

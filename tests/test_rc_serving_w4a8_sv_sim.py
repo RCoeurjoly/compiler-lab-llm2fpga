@@ -22,6 +22,9 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         )
         self.assertIn("--threads", command)
         self.assertIn("4", command)
+        self.assertIn("--output-split", command)
+        self.assertIn("10000", command)
+        self.assertIn("--output-split-cfuncs", command)
         self.assertIn("-CFLAGS", command)
         self.assertIn("-O3", command)
 
