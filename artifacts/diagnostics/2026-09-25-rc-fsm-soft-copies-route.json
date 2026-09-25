@@ -1,0 +1,38 @@
+{
+  "schema": "llm2fpga.rc-fsm-soft-copies-route.v1",
+  "date": "2026-09-25",
+  "status": "rejected-timing-regression",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "experiment": {
+    "pass": "optimize_calyx_fsm_decode.py --keep-state-copies",
+    "copy_attributes": ["keep"],
+    "dont_touch": false,
+    "exact_rc_simulation": "WB_RC_PASS result=4cfe",
+    "seed": 15,
+    "transport": "PCIe + UberDDR3 shell, unchanged"
+  },
+  "route": {
+    "status": "legal_route_but_timing_fail",
+    "output": "/nix/store/bd0im9z72bzlypfx9fa0kxwzipvbgyy9-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "241e3cde168234b0dde7c49e7d438192dc780df4e7554f69d086c1977a7b86c9",
+    "rowstream_clk_mhz": 61.20,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 78.12,
+    "pcie_user_required_mhz": 62.5,
+    "resources": {
+      "slice_lutx": 44387,
+      "slice_ffx": 19631,
+      "ramb36e1": 9,
+      "ramb18e1": 23,
+      "selmux2_1": 3059
+    }
+  },
+  "interpretation": "Allowing synthesis to absorb or replicate the FSM copy wires avoids the hard dont_touch penalty, but it still fails the fixed rowstream requirement. Fanout-copy replication alone is not an adequate compiler optimization; the production flags are disabled.",
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "timing_closed": false,
+    "board_programming": false,
+    "next_gate": "Target the state-dependent address/readback cone with a schedule-level or registered compiler transformation, screened first by exact simulation and synthesis before routing."
+  }
+}
