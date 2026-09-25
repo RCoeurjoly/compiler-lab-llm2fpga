@@ -52,6 +52,7 @@ def _render_top(rtl, *, external_ports: tuple[int, ...], token_port: int,
                 result_port: int, token_width: int, token_depth: int,
                 result_width: int, register_requests: bool,
                 register_local_memories: bool,
+                register_local_ports: frozenset[int],
                 block_local_memories: bool) -> str:
     external_index = {port: index for index, port in enumerate(external_ports)}
     declarations: list[str] = []
@@ -123,7 +124,7 @@ def _render_top(rtl, *, external_ports: tuple[int, ...], token_port: int,
                 f"  end",
             ])
         else:
-            if register_local_memories:
+            if register_local_memories or number in register_local_ports:
                 local_services.extend([
                     f"  logic mem{number}_pending_q;",
                     f"  logic [{addr_width - 1}:0] mem{number}_addr_q;",
@@ -212,6 +213,8 @@ def main() -> None:
                         help="register compiler memory requests before arbitration")
     parser.add_argument("--register-local-memories", action="store_true",
                         help="register non-token local memory service requests")
+    parser.add_argument("--register-local-port", action="append", type=int, default=[],
+                        help="register one selected local memory service request")
     parser.add_argument("--block-local-memories", action="store_true",
                         help="request block-RAM mapping for local memories")
     args = parser.parse_args()
@@ -260,6 +263,7 @@ def main() -> None:
                       result_width=rtl[result_port].width,
                       register_requests=args.register_requests,
                       register_local_memories=args.register_local_memories,
+                      register_local_ports=frozenset(args.register_local_port),
                       block_local_memories=args.block_local_memories)
     top_path = args.out_dir / "top.sv"
     top_path.write_text(top, encoding="utf-8")
