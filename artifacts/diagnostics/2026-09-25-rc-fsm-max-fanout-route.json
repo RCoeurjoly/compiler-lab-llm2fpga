@@ -1,0 +1,41 @@
+{
+  "date": "2026-09-25",
+  "experiment": "representative-core-fsm-max-fanout-annotation",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "implementation": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pcie_unchanged": true,
+    "uberddr3_profile_unchanged": "two-lane 333/83.33 MHz",
+    "seed": 15,
+    "pass": "optimize_calyx_fsm_decode.py --max-fanout"
+  },
+  "simulation": {
+    "status": "pass_for_both_values",
+    "result": "WB_RC_PASS result=4cfe",
+    "expected_tokens": [-2, 76],
+    "tested_max_fanout": [32, 16]
+  },
+  "route": {
+    "status": "route_completed_timing_failed_for_both_values",
+    "timing_closed": false,
+    "fasm_produced": false,
+    "board_programming": false,
+    "resource_summary": {
+      "SLICE_LUTX": 44387,
+      "SLICE_FFX": 19631,
+      "RAMB18E1": 23,
+      "RAMB36E1": 9,
+      "SELMUX2_1": 3059
+    },
+    "final_max_frequency_mhz": {
+      "max_fanout_32": {"rowstream_clk": 64.97, "pcie_user_clk": 67.59},
+      "max_fanout_16": {"rowstream_clk": 64.97, "pcie_user_clk": 67.59}
+    },
+    "required_frequency_mhz": {
+      "rowstream_clk": 83.33,
+      "pcie_user_clk": 62.5
+    }
+  },
+  "interpretation": "The annotation preserves exact RC behavior and improves the rowstream result relative to the port-72 experiment, but changing the limit from 32 to 16 produces identical mapped resources and timing. The open-source synthesis flow is not honoring this attribute as a controllable physical replication knob; it is not an acceptance result."
+}

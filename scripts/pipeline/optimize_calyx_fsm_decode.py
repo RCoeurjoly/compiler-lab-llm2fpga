@@ -147,7 +147,8 @@ def _hierarchical_state_decodes(source: str, state_signal: str) -> tuple[str, in
 
 def transform(source: str, keep_state_copies: bool = False,
               share_state_decodes: bool = False,
-              hierarchical_state_decodes: bool = False) -> tuple[str, int]:
+              hierarchical_state_decodes: bool = False,
+              max_fanout: int | None = None) -> tuple[str, int]:
     next_match = re.search(r"assign\s+fsm0_in\s*=.*?;", source, re.S)
     write_match = re.search(r"assign\s+fsm0_write_en\s*=.*?;", source, re.S)
     if next_match is None or write_match is None:
@@ -181,6 +182,17 @@ def transform(source: str, keep_state_copies: bool = False,
         transformed, shared_count = _hierarchical_state_decodes(transformed, next_signal)
     elif share_state_decodes:
         transformed, shared_count = _share_state_decodes(transformed, next_signal)
+    if max_fanout is not None:
+        if max_fanout < 1:
+            raise ValueError("max_fanout must be positive")
+        declaration = "logic [10:0] fsm0_out;"
+        if transformed.count(declaration) != 1:
+            raise ValueError("expected one fsm0_out declaration")
+        transformed = transformed.replace(
+            declaration,
+            f'(* max_fanout = {max_fanout} *) {declaration}',
+            1,
+        )
     return transformed, shared_count
 
 
@@ -192,6 +204,7 @@ def main() -> None:
     parser.add_argument("--keep-state-copies", action="store_true")
     parser.add_argument("--share-state-decodes", action="store_true")
     parser.add_argument("--hierarchical-state-decodes", action="store_true")
+    parser.add_argument("--max-fanout", type=int)
     args = parser.parse_args()
     source = args.input.read_text(encoding="utf-8")
     result, shared_count = transform(
@@ -199,6 +212,7 @@ def main() -> None:
         keep_state_copies=args.keep_state_copies,
         share_state_decodes=args.share_state_decodes,
         hierarchical_state_decodes=args.hierarchical_state_decodes,
+        max_fanout=args.max_fanout,
     )
     args.output.write_text(result, encoding="utf-8")
     if args.receipt is not None:
@@ -213,6 +227,7 @@ def main() -> None:
                     "keep_state_copies": args.keep_state_copies,
                     "share_state_decodes": args.share_state_decodes,
                     "hierarchical_state_decodes": args.hierarchical_state_decodes,
+                    "max_fanout": args.max_fanout,
                     "shared_state_decode_count": shared_count,
                 },
                 indent=2,
