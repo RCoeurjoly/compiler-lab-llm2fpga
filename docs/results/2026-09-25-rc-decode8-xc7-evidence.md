@@ -56,3 +56,10 @@ the dominant cost is the compiler-generated control/data representation, not
 PCIe or DDR3 integration. The temporary JSON backend probe itself stopped on
 an FDCE primitive-process limitation; the statistics remain valid because they
 were emitted before that probe.
+
+A third replay passed `-nobram` to the final `synth_xilinx -run
+map_memory:` stage. It also timed out at 700 seconds, this time while
+entering `MEMORY_LIBMAP` for LUTRAM-only legalization. Disabling BRAM
+selection is therefore not a sufficient workaround; the mapping cost is
+driven by the number and shape of generated memories, not one physical-memory
+family.
