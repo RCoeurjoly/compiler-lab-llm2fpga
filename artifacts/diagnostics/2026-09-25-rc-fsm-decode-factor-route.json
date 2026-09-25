@@ -1,0 +1,39 @@
+{
+  "schema": "llm2fpga.rc-fsm-decode-factor-route.v1",
+  "date": "2026-09-25",
+  "status": "rejected-timing-regression",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "experiment": {
+    "pass": "compiler optimize_calyx_fsm_decode.py",
+    "transformed_assignments": ["fsm0_in", "fsm0_write_en"],
+    "input_sv_sha256": "7e3b9b34dfdb0f3c41599b8131682b24fff10ecaa33d0fb7901356ee63b13722",
+    "output_sv_sha256": "7782d5f5a06db32c5afd012c988f72e809bdebe7d8e3a0326b4babe66bae78ca",
+    "exact_rc_simulation": "WB_RC_PASS result=4cfe",
+    "seed": 15,
+    "transport": "PCIe + UberDDR3 shell, unchanged"
+  },
+  "route": {
+    "status": "legal_route_but_timing_fail",
+    "output": "/nix/store/q9vzap2042qxabgfihn6s1v720g9h4qy-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "a2696c44087ea45f4190717e501a1d24c5072dcd6e4664339427f0050f5027fa",
+    "rowstream_clk_mhz": 61.53,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 77.72,
+    "pcie_user_required_mhz": 62.5,
+    "resources": {
+      "slice_lutx": 44387,
+      "slice_ffx": 19631,
+      "ramb36e1": 9,
+      "ramb18e1": 23,
+      "selmux2_1": 3059
+    }
+  },
+  "interpretation": "Case factoring preserves exact simulation but does not close rowstream timing and worsens PCIe timing; it is not enabled for the production RC baseline.",
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "timing_closed": false,
+    "board_programming": false,
+    "next_gate": "target a deeper compiler schedule transformation or controlled state fanout replication; do not claim this pass as a timing fix"
+  }
+}
