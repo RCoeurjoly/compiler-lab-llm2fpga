@@ -1,0 +1,32 @@
+{
+  "schema": "llm2fpga.rc-tosa-legality-frontier.v1",
+  "date": "2026-09-25",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "experiment": "build the existing TOSA frontend path for the exact RC",
+  "configuration": {
+    "frontend": "TOSA",
+    "backend": "Calyx native SystemVerilog",
+    "model": "tinystories-representative-core-w4a8-integer",
+    "reference_path": "Linalg frontend, unchanged",
+    "kev_gpt_rtl_reused": false
+  },
+  "result": {
+    "status": "rejected-before-calyx-lowering",
+    "failure_stage": "TOSA legality",
+    "diagnostic": "tosa.matmul op illegal: operand/result types (i32,i32,i32,i32,i64) do not match the installed TOSA profile",
+    "affected_operation_count": 4,
+    "required_contract": "i32 multiplied operands with i64 accumulation"
+  },
+  "simulation": {
+    "status": "not_reached",
+    "known_linalg_rc_result": "WB_RC_PASS result=4cfe"
+  },
+  "implementation": {
+    "synthesis": false,
+    "timing_closed": false,
+    "bitstream": false,
+    "board_programming": false,
+    "board_inference": false
+  },
+  "conclusion": "The exact RC remains on the Linalg compiler path. A TOSA route would first require an explicit, semantics-preserving legalization for the i64 accumulator contract; it is not a drop-in timing alternative."
+}
