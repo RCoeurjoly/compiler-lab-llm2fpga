@@ -47,6 +47,9 @@ always_ff @(posedge clk) begin
   end
 end
 endmodule
+module divSqrtRecFN_small(output sqrtOpOut);
+wire sqrtOpOut;
+endmodule
 module untouched; endmodule
 """
 
@@ -71,14 +74,20 @@ class SvDivSqrtHandshakeFixTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             output = output_path.read_text()
             self.assertIn(".inValid(llm2fpga_request)", output)
+            self.assertLess(
+                output.index("wire llm2fpga_request;"),
+                output.index(".inValid(llm2fpga_request)"),
+            )
             self.assertIn("LLM2FPGA_BUSY", output)
             self.assertIn("LLM2FPGA_COMPLETE", output)
             self.assertIn("if (!go)", output)
             self.assertIn("if (outValid) begin", output)
             self.assertNotIn("done_buf", output)
+            self.assertNotIn("wire sqrtOpOut;", output)
             self.assertIn("module untouched; endmodule", output)
             receipt = json.loads(receipt_path.read_text())
             self.assertEqual(receipt["repair_count"], 1)
+            self.assertEqual(receipt["hardfloat_redeclaration_count"], 1)
             self.assertNotEqual(receipt["input_sv_sha256"], receipt["output_sv_sha256"])
 
     def test_second_application_is_byte_identical(self):

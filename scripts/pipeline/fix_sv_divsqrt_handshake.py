@@ -14,9 +14,7 @@ MODULE = re.compile(
 LEGACY_TAIL = re.compile(
     r"(?ms)\s*logic\s+done_buf\s*\[31:0\]\s*;.*?(?=\s*endmodule\b)"
 )
-HARD_FLOAT_MODULE = re.compile(
-    r"(?ms)\bmodule\s+divSqrtRecFNToRaw_small\b.*?\bendmodule\b"
-)
+ALL_MODULES = re.compile(r"(?ms)\bmodule\b.*?\bendmodule\b")
 
 FIXED_TAIL = r"""
 
@@ -26,7 +24,7 @@ FIXED_TAIL = r"""
     localparam logic [1:0] LLM2FPGA_BUSY = 2'd1;
     localparam logic [1:0] LLM2FPGA_COMPLETE = 2'd2;
     logic [1:0] llm2fpga_state;
-    wire llm2fpga_request =
+    assign llm2fpga_request =
         llm2fpga_state == LLM2FPGA_IDLE && go && inReady;
 
     assign done = llm2fpga_state == LLM2FPGA_COMPLETE;
@@ -77,7 +75,10 @@ def _remove_hardfloat_redeclarations(source: str) -> tuple[str, int]:
         count += removed
         return module
 
-    return HARD_FLOAT_MODULE.sub(rewrite, source), count
+    # The generated source contains both the raw HardFloat implementation and
+    # a wrapper.  Either may redeclare an ANSI output port, so scope this
+    # repair by the port shape rather than one historical module name.
+    return ALL_MODULES.sub(rewrite, source), count
 
 
 def repair(source: str) -> tuple[str, int, int]:
@@ -106,6 +107,21 @@ def repair(source: str) -> tuple[str, int, int]:
         raise ValueError(
             f"expected one legacy .inValid(go) connection, found {request_count}"
         )
+    # Slang rejects the generated wrapper's use-before-declaration even
+    # though permissive Verilog frontends accept it.  Declare the handshake
+    # net in the module header area and assign it in the state-machine tail.
+    header = re.search(
+        r"\bmodule\s+std_divSqrtFN\b.*?\);", module, flags=re.S
+    )
+    if header is None:
+        raise ValueError(
+            "could not locate std_divSqrtFN port terminator"
+        )
+    module = (
+        module[: header.end()]
+        + "\n\n    wire llm2fpga_request;\n"
+        + module[header.end() :]
+    )
     module, tail_count = LEGACY_TAIL.subn(FIXED_TAIL, module)
     if tail_count != 1:
         raise ValueError(
