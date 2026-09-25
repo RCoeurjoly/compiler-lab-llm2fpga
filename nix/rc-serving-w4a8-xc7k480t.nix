@@ -40,17 +40,6 @@ let
         );
     endmodule
   '';
-  probeXdc = pkgs.writeText "${phaseName}-xc7k480t-probe.xdc" ''
-    # P&R-only probe constraints; this is not a board-function interface.
-    set_property PACKAGE_PIN AA28 [get_ports {clk}]
-    set_property PACKAGE_PIN R28 [get_ports {reset}]
-    set_property PACKAGE_PIN P30 [get_ports {go}]
-    set_property PACKAGE_PIN M30 [get_ports {done}]
-    set_property IOSTANDARD LVCMOS18 [get_ports {clk}]
-    set_property IOSTANDARD LVCMOS18 [get_ports {reset}]
-    set_property IOSTANDARD LVCMOS18 [get_ports {go}]
-    set_property IOSTANDARD LVCMOS18 [get_ports {done}]
-  '';
 in
 pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
   nativeBuildInputs = [ python yosys yosysSlang nextpnr pkgs.coreutils pkgs.gzip pkgs.time ];
@@ -60,7 +49,20 @@ pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
   gzip -dc ${sourceSvGz} > "$out/source.sv"
   test "$(sha256sum "$out/source.sv" | cut -d ' ' -f 1)" = '${sourceSha256}'
   : > "$out/normalized.sv"
-  cp ${probeXdc} "$out/probe.xdc"
+  # Keep this diagnostic-only XDC inside the evidence derivation.  A separate
+  # writeText derivation intermittently produced an unreadable .drv on the
+  # constrained Nix daemon, preventing the actual Yosys/nextpnr gate from
+  # starting.  These constraints are not the YPCB board interface.
+  cat > "$out/probe.xdc" <<'XDC'
+  set_property PACKAGE_PIN AA28 [get_ports {clk}]
+  set_property PACKAGE_PIN R28 [get_ports {reset}]
+  set_property PACKAGE_PIN P30 [get_ports {go}]
+  set_property PACKAGE_PIN M30 [get_ports {done}]
+  set_property IOSTANDARD LVCMOS18 [get_ports {clk}]
+  set_property IOSTANDARD LVCMOS18 [get_ports {reset}]
+  set_property IOSTANDARD LVCMOS18 [get_ports {go}]
+  set_property IOSTANDARD LVCMOS18 [get_ports {done}]
+  XDC
   cp ${dramCompatMap} "$out/dram-compat-map.v"
   printf '%s\n' '${targetPart}' > "$out/target-part.txt"
   printf '%s\n' '${targetChipdb}' > "$out/target-chipdb.txt"
