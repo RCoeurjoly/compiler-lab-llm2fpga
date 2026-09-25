@@ -169,3 +169,17 @@ implementation result; it is a resource-explosion fallback, not an accepted
 flow. The checkpoint establishes the next fast-iteration boundary: future
 Yosys mapping/tool patches can be evaluated without repeating the 417-second
 front half.
+
+The persisted-checkpoint inspection adds an important Yosys detail: with
+`-no-auto-block -no-auto-distributed`, `memory_libmap` completes in about
+nine seconds, but leaves 90 `$mem_v2` memories and emits no BRAM/LUTRAM cells.
+The earlier Verilog `ram_style` annotations are not preserved as actionable
+placement metadata after `memory -nomap`/memory collection. Therefore a
+production fix must reattach placement intent at the RTLIL `$mem_v2` stage (or
+teach Yosys to classify those memories by width/depth); adding more source
+attributes alone will not constrain the mapper.
+
+Lowering the remaining memories immediately with `memory_map` is only a
+diagnostic fallback: it completes quickly but produces 522,890 generic cells,
+far beyond a useful Kintex-7 implementation. No bitstream or P&R claim is
+made from that fallback.
