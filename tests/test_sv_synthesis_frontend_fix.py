@@ -58,6 +58,19 @@ endmodule
         self.assertIn("assign y = a;", output)
         self.assertEqual(receipt["assertion_block_repairs"], 1)
 
+    def test_packs_two_bit_done_buffer_as_registers(self):
+        source = "module x;\n  logic done_buf[1:0];\n  assign done = done_buf[1];\nendmodule\n"
+        output, receipt = normalize(source)
+        self.assertIn("logic [1:0] done_buf;", output)
+        self.assertNotIn("logic done_buf[1:0]", output)
+        self.assertEqual(receipt["packed_done_buf_repairs"], 1)
+
+    def test_done_buffer_packing_is_idempotent(self):
+        source = "module x; logic [1:0] done_buf; endmodule\n"
+        output, receipt = normalize(source)
+        self.assertEqual(output, source)
+        self.assertEqual(receipt["packed_done_buf_repairs"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -69,3 +69,17 @@ A fourth replay restricted `memory_libmap` to the Xilinx LUTRAM library only
 seconds while entering `MEMORY_LIBMAP`. Candidate-library breadth is therefore
 not the primary cause; reducing the number/shape of memories before Yosys is
 the next evidence-backed direction.
+
+## Packed done-buffer normalization
+
+The synthesis frontend now rewrites the six generated declarations of the
+form `logic done_buf[1:0]` to `logic [1:0] done_buf`. Bit-select semantics are
+unchanged, but the packed form prevents Yosys from importing each pipeline
+pair as a separate memory. The focused frontend suite passes, and Yosys-Slang
+AST elaboration of the transformed RC passes with zero errors and warnings.
+
+The bounded synthesis replay still reaches `MEMORY_LIBMAP` and times out, so
+this is a validated representation improvement but not yet a complete mapping
+fix. Its transformation receipt reports `packed_done_buf_repairs: 6` and
+output SHA-256
+`6d095664c791bf2797b86c6d0f062a4087bc7fc7670404b5b130e3bfd44670b8`.

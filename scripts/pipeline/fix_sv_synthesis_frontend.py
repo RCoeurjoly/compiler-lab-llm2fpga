@@ -24,6 +24,9 @@ ONEHOT_ASSERT = re.compile(
     r"if\s*\(\s*~\s*\$onehot0\s*\(\s*\{.*?\}\s*\)\s*\)\s*begin\s*"
     r"\$fatal\s*\(.*?\)\s*;\s*end\s*end"
 )
+PACKED_DONE_BUF = re.compile(
+    r"(?m)^(?P<indent>\s*)logic\s+done_buf\s*\[1:0\]\s*;"
+)
 
 
 def _sha256(text: str) -> str:
@@ -35,6 +38,7 @@ def normalize(source: str) -> tuple[str, dict[str, object]]:
     request_repairs = 0
     duplicate_repairs = 0
     assertion_repairs = 0
+    packed_done_buf_repairs = 0
 
     match = STD_DIVSQRT.search(output)
     if match:
@@ -57,6 +61,15 @@ def normalize(source: str) -> tuple[str, dict[str, object]]:
 
     output, assertion_repairs = ONEHOT_ASSERT.subn("\n", output)
 
+    # Calyx's HardFloat wrappers use a two-element unpacked array for a pair
+    # of pipeline bits.  Slang accepts it, but Yosys imports every instance as
+    # a separate $mem, forcing MEMORY_LIBMAP to solve hundreds of trivial
+    # memories.  A packed vector has identical bit-select semantics and is
+    # elaborated as ordinary flip-flops.
+    output, packed_done_buf_repairs = PACKED_DONE_BUF.subn(
+        r"\g<indent>logic [1:0] done_buf;", output
+    )
+
     match = RAW_SMALL.search(output)
     if match:
         module = match.group(0)
@@ -72,8 +85,12 @@ def normalize(source: str) -> tuple[str, dict[str, object]]:
         "request_declaration_repairs": request_repairs,
         "duplicate_sqrtopout_repairs": duplicate_repairs,
         "assertion_block_repairs": assertion_repairs,
+        "packed_done_buf_repairs": packed_done_buf_repairs,
     }
-    receipt["repair_count"] = request_repairs + duplicate_repairs + assertion_repairs
+    receipt["repair_count"] = (
+        request_repairs + duplicate_repairs + assertion_repairs
+        + packed_done_buf_repairs
+    )
     return output, receipt
 
 
