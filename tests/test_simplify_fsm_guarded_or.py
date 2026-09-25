@@ -33,6 +33,15 @@ class SimplifyFsmGuardedOrTest(unittest.TestCase):
         self.assertEqual(count, 0)
         self.assertEqual(output, source)
 
+    def test_many_terms_are_balanced(self) -> None:
+        source = "assign fsm_write_en = " + " | ".join(
+            f"signal_{index}_go_out" for index in range(8)
+        ) + ";\n"
+        output, count = module.simplify(source)
+        self.assertEqual(count, 0)
+        self.assertLess(max(map(len, output.splitlines())), 200)
+        self.assertIn("(signal_0_go_out | signal_1_go_out)", output)
+
 
 if __name__ == "__main__":
     unittest.main()

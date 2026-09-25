@@ -3,19 +3,20 @@
   "date": "2026-09-25",
   "scope": "compiler-generated RC control expression reduction",
   "input_sv_sha256": "c837b7c14fc7296fc723ed33e58be56e5dc2f08f6cd9682440534e8fe6e718fe",
-  "output_sv_sha256": "912696979d65c385c58f72b6aab975800920102920df8e0f382e3029b0f868da",
+  "output_sv_sha256": "e3d56966264e93d6bac54d20a3c332faa6cffa924a9f8c8f6a987a55a9d48e8d",
   "replacement_count": 505,
   "input_bytes": 10489345,
-  "output_bytes": 10453603,
+  "output_bytes": 10454614,
   "largest_fsm_write_enable_line_bytes": {
     "before": 53324,
-    "after": 17582
+    "after": 104
   },
+  "balanced_tree": true,
   "yosys": {
     "tool": "yosys 0.66",
     "read_hierarchy_stat_timeout_seconds": 120,
     "status": "timeout",
     "reached_rtlil_generation": true
   },
-  "status": "diagnostic"
+    "status": "diagnostic"
 }

@@ -45,6 +45,16 @@ def simplify(source: str) -> tuple[str, int]:
             changed |= count > 0
         if not changed:
             break
+    terms = [term.strip() for term in body.split("|") if term.strip()]
+    if len(terms) > 2 and all(re.fullmatch(r"[A-Za-z_$][A-Za-z0-9_$]*", term) for term in terms):
+        level = terms
+        while len(level) > 1:
+            level = [
+                f"({level[index]} | {level[index + 1]})"
+                if index + 1 < len(level) else level[index]
+                for index in range(0, len(level), 2)
+            ]
+        body = "\n  " + level[0]
     output = source[:match.start("body")] + body + source[match.end("body"):]
     return output, replacements
 
