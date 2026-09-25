@@ -1,0 +1,47 @@
+{
+  "date": "2026-09-25",
+  "experiment": "rc-calyx-backend-phase-isolation",
+  "input": "/nix/store/n67kkw8acw03xhg615k38fcb3pvcjgsg-tinystories-w4a8-rc-serving-integrated-calyx-native-sv/model.futil",
+  "calyx": "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/bin/calyx",
+  "calyx_source_pin": "5a4303847392609cad83dda6f4bdffc8cc0e5c89",
+  "tests": [
+    {
+      "passes": ["compile-repeat"],
+      "backend": "none (futil output)",
+      "result": "pass",
+      "elapsed_seconds": 0.85,
+      "output_bytes": 7667712
+    },
+    {
+      "passes": ["no-opt"],
+      "disabled": ["papercut"],
+      "backend": "none (futil output)",
+      "result": "pass",
+      "elapsed_seconds": 12,
+      "output_bytes": 16777216,
+      "compile_invoke_warning_ms": 6112
+    },
+    {
+      "passes": ["no-opt"],
+      "disabled": ["papercut"],
+      "backend": "verilog",
+      "nested": false,
+      "result": "failed",
+      "exit_code": 134,
+      "elapsed_seconds": 90,
+      "diagnostic": "thread 'main' has overflowed its stack"
+    },
+    {
+      "passes": ["no-opt"],
+      "disabled": ["papercut"],
+      "backend": "verilog",
+      "nested": true,
+      "result": "failed",
+      "exit_code": 134,
+      "elapsed_seconds": 90,
+      "diagnostic": "thread 'main' has overflowed its stack"
+    }
+  ],
+  "interpretation": "The compiler passes, including compile-invoke, complete and emit a 16 MiB lowered Futil. Both Verilog emission modes then abort with stack overflow, so the immediate frontier is the Verilog backend or its HardFloat/Morty post-processing, not compile-invoke and not a missing timeout.",
+  "next_step": "Instrument/build the pinned Calyx backend (including Morty invocation) and create a smaller backend reproducer from the lowered Futil before attempting a tool patch."
+}
