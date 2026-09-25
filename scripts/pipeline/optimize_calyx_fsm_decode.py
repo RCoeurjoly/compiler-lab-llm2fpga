@@ -109,8 +109,12 @@ def transform(source: str, keep_state_copies: bool = False) -> str:
     prefix = ""
     if keep_state_copies:
         prefix = (
-            "(* keep = \"true\", dont_touch = \"true\" *) wire [10:0] fsm0_out_decode;\n"
-            "(* keep = \"true\", dont_touch = \"true\" *) wire [10:0] fsm0_out_write;\n"
+            # Keep the named observation points, but let synthesis absorb or
+            # replicate the copy wires.  A hard dont_touch barrier forces a
+            # physically separate high-fanout network and is therefore not a
+            # valid timing experiment for the compiler-generated cone.
+            "(* keep = \"true\" *) wire [10:0] fsm0_out_decode;\n"
+            "(* keep = \"true\" *) wire [10:0] fsm0_out_write;\n"
             "assign fsm0_out_decode = fsm0_out;\n"
             "assign fsm0_out_write = fsm0_out;\n"
         )
