@@ -1,0 +1,21 @@
+{
+  "schema": "llm2fpga.rc-verilator-split-benchmark.v1",
+  "status": "bounded_compile_timeout",
+  "scope": "compiler-generated W4A8 Representative Core prefill-8 SV",
+  "normalized_sv_sha256": "c76d2f78c24be53541f11d074b4f79e319221d8efe41fb9c315f453e08c1f8d4",
+  "testbench_sha256": "11e21bc4b8799b8cae0ec91206a7c2827954c7e4e381d923cdecc5efa1fdb305",
+  "configuration": {
+    "output_split": 1000,
+    "output_split_cfuncs": 1000,
+    "build_jobs": 2,
+    "wall_timeout_seconds": 180
+  },
+  "observed": {
+    "generated_cpp_files": 3007,
+    "executable_produced": false,
+    "simulation_started": false,
+    "host_freeze": false
+  },
+  "interpretation": "Finer Verilator splitting increases translation-unit count and does not solve the compile frontier. Preserve the coarse split for future probes; reduce generated static-control/translation volume in the compiler output instead.",
+  "next_gate": "compiler-side structural reduction followed by bounded generated-SV compile"
+}
