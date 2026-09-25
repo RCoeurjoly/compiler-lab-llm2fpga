@@ -31,3 +31,19 @@ The bounded run therefore establishes a current implementation bottleneck in
 Yosys on this generated phase, before mapping or placement. It does not
 invalidate the previously recorded bit-exact compiler/RTL simulation result,
 and it does not claim PCIe, DDR3, bitstream, or board inference.
+
+## Pass-localization experiments
+
+Two temporary replays used the exact normalized source and the same synthesis
+script:
+
+1. Removing only the explicit post-techmap `alumacc` pass still timed out
+   after 700 seconds, during the following optimizer work on about 406,000
+   cells.
+2. Removing both post-techmap `alumacc` and `opt` progressed farther, into
+   Xilinx memory library mapping, but also timed out at 700 seconds.
+
+Therefore no single post-techmap pass is yet proven to be the sole blocker.
+The evidence points to the representation/scale of the generated netlist and
+the later memory-mapping stage. These experiments remain diagnostic; no
+semantics-changing pass omission has been adopted as a production flow.
