@@ -1,0 +1,46 @@
+{
+  "schema": "llm2fpga.rc-board-route-timing-frontier.v1",
+  "date": "2026-09-25",
+  "status": "route-complete-timing-fail",
+  "model": "tinystories-representative-core-w4a8-integer",
+  "top": "compiler_ddr3_trace_replay_top",
+  "configuration": {
+    "ENABLE_COMPILER_ACCELERATOR": 1,
+    "ENABLE_COMPILER_GENERATED_RC": 1,
+    "DDR_BYTE_LANES": 2,
+    "controller_clock_period_ps": 12000,
+    "ddr_clock_period_ps": 3000,
+    "seed": 15,
+    "BIST_MODE_PARAM": 2
+  },
+  "synthesis": {
+    "status": "pass",
+    "recipe": "manual prepare without FSM extraction, then synth_xilinx coarse:finalize and select =*; proc for library-cell JSON emission",
+    "output": "/nix/store/dw6lpazh66hfqgcjbl42bdymjm116kyj-compiler-ddr3-trace-replay-synthesis-screen/replay.json"
+  },
+  "route": {
+    "status": "legal_route_but_timing_fail",
+    "output": "/nix/store/1d5dkr76zdm1krar8n1fmn706xnjq5sr-compiler-ddr3-trace-replay-route",
+    "fasm_sha256": "36afc4f79dbe33a8cec70fe475f3cf126e1bcd933f2cdc401f55f18c95c4187a",
+    "warnings": 24,
+    "errors": 0,
+    "rowstream_clk_mhz": 53.51,
+    "rowstream_required_mhz": 83.33,
+    "pcie_user_clk_mhz": 86.93,
+    "pcie_user_required_mhz": 62.5,
+    "router": "nextpnr-xilinx 0.8.2, seed 15"
+  },
+  "critical_path_observation": {
+    "first_compiler_path": "gen_compiler_command_adapter.gen_compiler_generated_rc.compiler_generated_rc.generated.fsm0_out[6]",
+    "dominant_shell_path": "rowstream_clk timing through compiler_accel_cyc and UberDDR3 command logic"
+  },
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pci_express": false,
+    "ddr3": false,
+    "board_programming": false,
+    "timing_closed": false,
+    "next_gate": "reduce the compiler RC critical path or add a transport-neutral registered boundary, then rerun the same fixed-profile route"
+  }
+}

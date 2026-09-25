@@ -82,6 +82,30 @@ let
   compilerGeneratedRcParam = pkgs.lib.optionalString
     enableCompilerGeneratedRc
     "chparam -set ENABLE_COMPILER_GENERATED_RC 1 compiler_ddr3_trace_replay_top";
+  # The generic synth_xilinx prepare stage spends most of its time trying to
+  # reconstruct enormous generated control FSMs.  For the RC shell we keep
+  # the normal prepare operations but deliberately skip FSM extraction, then
+  # continue with the standard Xilinx coarse/fine mapping stages.  The legacy
+  # target retains the unmodified public recipe.
+  synthesisCommand = if enableCompilerGeneratedRc then ''
+    proc
+    check
+    flatten
+    tribuf -logic
+    deminout
+    opt_expr
+    opt_clean
+    check
+    opt -nodffe -nosdff
+    opt
+    wreduce
+    peepopt
+    opt_clean
+    sort
+    synth_xilinx -run coarse:finalize -top compiler_ddr3_trace_replay_top
+  '' else ''
+    synth_xilinx -flatten -arch xc7 -nosrl -noiopad -top compiler_ddr3_trace_replay_top
+  '';
   yosys = builtins.storePath "/nix/store/1g0dvnvw75fnlnk4ad586c65wfxbf5rs-yosys-with-plugins-0.66";
   # Fast feedback target for the same production source closure.  This keeps
   # hierarchy/elaboration failures separate from the much slower global
@@ -118,9 +142,13 @@ let
     chparam -set ENABLE_COMPILER_ACCELERATOR 1 compiler_ddr3_trace_replay_top
     ${compilerGeneratedRcParam}
     hierarchy -check -top compiler_ddr3_trace_replay_top
-    synth_xilinx -flatten -arch xc7 -nosrl -noiopad -top compiler_ddr3_trace_replay_top
+    ${synthesisCommand}
     check
     stat -top compiler_ddr3_trace_replay_top
+    select =*
+    proc
+    select -clear
+    hierarchy -purge_lib
     write_json $out/replay.json
     EOF
     # Screen only. Bound wall time and per-file output; no bitstream is built.
@@ -136,13 +164,21 @@ let
   # bridge).  The synthesis screen remains bounded and is now the provenance
   # source for every replay bitstream.
   replayTimingBaseline = replaySynthesis;
-  replayResetPatched = pkgs.runCommand "compiler-ddr3-trace-replay-reset-patched" {
-    nativeBuildInputs = [ pkgs.python3 ];
-  } ''
-    mkdir -p "$out"
-    python3 ${../scripts/pipeline/patch_replay_pcie_reset_netlist.py} \
-      ${replayTimingBaseline}/replay.json "$out/replay.json" "$out/patch-receipt.json"
-  '';
+  replayResetPatched = if enableCompilerGeneratedRc then pkgs.runCommand
+    "compiler-ddr3-trace-replay-reset-not-applied" { } ''
+      mkdir -p "$out"
+      cp ${replayTimingBaseline}/replay.json "$out/replay.json"
+      cat > "$out/patch-receipt.json" <<'JSON'
+      {"schema":"compiler-ddr3-reset-patch.v1","status":"not-applied",
+       "reason":"dedicated compiler-generated RC netlist has no historical reset patch profile"}
+      JSON
+    '' else pkgs.runCommand "compiler-ddr3-trace-replay-reset-patched" {
+      nativeBuildInputs = [ pkgs.python3 ];
+    } ''
+      mkdir -p "$out"
+      python3 ${../scripts/pipeline/patch_replay_pcie_reset_netlist.py} \
+        ${replayTimingBaseline}/replay.json "$out/replay.json" "$out/patch-receipt.json"
+    '';
   # The current synthesis has already eliminated the absolute BAR high bits;
   # applying the historical bit-disconnect patch would be both unnecessary and
   # unauthenticated.  Preserve the reset-patch receipt as the route input.
