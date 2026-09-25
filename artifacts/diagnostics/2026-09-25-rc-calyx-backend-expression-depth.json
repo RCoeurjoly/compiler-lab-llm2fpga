@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-25",
+  "experiment": "rc-calyx-backend-expression-depth",
+  "source": "/tmp/rc-calyx-phase/repeat.futil",
+  "captured_backend_temps": [
+    {
+      "path": "/tmp/.tmp1qVCzT",
+      "mode": "flat assignments (nested=false)",
+      "bytes": 50716338,
+      "largest_line_bytes": 204297,
+      "largest_line_kind": "always_comb $onehot0 vector check"
+    },
+    {
+      "path": "/tmp/.tmpYMoUNt",
+      "mode": "nested assignments (nested=true)",
+      "bytes": 35187210,
+      "largest_line_bytes": 1242616,
+      "largest_line_kind": "fsm_write_en OR guard with 18248 pipe operators"
+    }
+  ],
+  "interpretation": "The backend has already produced pathological single-line expressions before Morty starts. The nested mode creates an 18k-term FSM guard; the flat mode still creates a 204 KiB onehot verification expression. These depths plausibly exceed sv-parser recursion and explain why merely raising the Rust thread stack is ineffective.",
+  "tool_fix_direction": "Add bounded/chunked emission for guard disjoint checks and large guard expressions (or disable verification checks for this generated artifact), then regression-test the exact RC Futil through Morty and Verilog emission. This is a Calyx backend fix, not a kev-gpt or handwritten-RTL substitution."
+}
