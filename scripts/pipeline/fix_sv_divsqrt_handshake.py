@@ -14,6 +14,9 @@ MODULE = re.compile(
 LEGACY_TAIL = re.compile(
     r"(?ms)\s*logic\s+done_buf\s*\[31:0\]\s*;.*?(?=\s*endmodule\b)"
 )
+HARD_FLOAT_MODULE = re.compile(
+    r"(?ms)\bmodule\s+divSqrtRecFNToRaw_small\b.*?\bendmodule\b"
+)
 
 FIXED_TAIL = r"""
 
@@ -60,7 +63,24 @@ def sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def repair(source: str) -> tuple[str, int]:
+def _remove_hardfloat_redeclarations(source: str) -> tuple[str, int]:
+    count = 0
+
+    def rewrite(match: re.Match[str]) -> str:
+        nonlocal count
+        module = match.group(0)
+        if not re.search(r"\boutput\s+sqrtOpOut\b", module):
+            return module
+        module, removed = re.subn(
+            r"\n\s*wire\s+sqrtOpOut\s*;", "", module, count=1
+        )
+        count += removed
+        return module
+
+    return HARD_FLOAT_MODULE.sub(rewrite, source), count
+
+
+def repair(source: str) -> tuple[str, int, int]:
     modules = list(MODULE.finditer(source))
     if len(modules) != 1:
         raise ValueError(
@@ -74,7 +94,8 @@ def repair(source: str) -> tuple[str, int]:
         and "done_buf" not in module
     )
     if already_fixed:
-        return source, 0
+        repaired_source, redeclaration_count = _remove_hardfloat_redeclarations(source)
+        return repaired_source, 0, redeclaration_count
 
     module, request_count = re.subn(
         r"\.inValid\(\s*go\s*\)",
@@ -90,7 +111,11 @@ def repair(source: str) -> tuple[str, int]:
         raise ValueError(
             f"expected one legacy fixed-delay/output tail, found {tail_count}"
         )
-    return source[: match.start()] + module + source[match.end() :], 1
+    repaired_source = source[: match.start()] + module + source[match.end() :]
+    repaired_source, redeclaration_count = _remove_hardfloat_redeclarations(
+        repaired_source
+    )
+    return repaired_source, 1, redeclaration_count
 
 
 def main() -> int:
@@ -102,12 +127,13 @@ def main() -> int:
         return 2
     try:
         source = Path(sys.argv[1]).read_text(encoding="utf-8")
-        output, repair_count = repair(source)
+        output, repair_count, redeclaration_count = repair(source)
         receipt = {
             "schema": "llm2fpga.sv-divsqrt-handshake-repair.v1",
             "input_sv_sha256": sha256(source),
             "output_sv_sha256": sha256(output),
             "repair_count": repair_count,
+            "hardfloat_redeclaration_count": redeclaration_count,
         }
         Path(sys.argv[2]).write_text(output, encoding="utf-8")
         Path(sys.argv[3]).write_text(

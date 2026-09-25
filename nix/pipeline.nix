@@ -232,6 +232,7 @@ let
 
   mkCalyxNativeSvDerivation = { name, calyx, calyxCompilePasses ? [ ]
     , calyxEmitNested ? true, calyxStreamMorty ? false
+    , calyxDisableVerify ? false
     , calyxSkipResourceReport ? false
     , calyxOptimizeFsmDecode ? false, calyxFsmDecodeKeepCopies ? false
     , calyxFsmDecodeShareStates ? false, calyxFsmDecodeHierarchical ? false }:
@@ -251,6 +252,7 @@ let
       export CALYX_FSM_DECODE_HIERARCHICAL=${if calyxFsmDecodeHierarchical then "1" else "0"}
       export CALYX_EMIT_NESTED=${if calyxEmitNested then "1" else "0"}
       export CALYX_STREAM_MORTY=${if calyxStreamMorty then "1" else "0"}
+      export CALYX_DISABLE_VERIFY=${if calyxDisableVerify then "1" else "0"}
       export CALYX_SKIP_RESOURCE_REPORT=${if calyxSkipResourceReport then "1" else "0"}
       ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
         ${circt}/bin/circt-translate \
@@ -506,6 +508,7 @@ let
     , slangPerFileExternModules ? false, calyxMathProfile ? "none"
     , calyxCompilePasses ? [ ], calyxEmitNested ? true
     , calyxStreamMorty ? false
+    , calyxDisableVerify ? false
     , calyxSkipResourceReport ? false, calyxOptimizeFsmDecode ? false
     , calyxFsmDecodeKeepCopies ? false, calyxFsmDecodeShareStates ? false
     , calyxFsmDecodeHierarchical ? false }:
@@ -548,6 +551,7 @@ let
         };
         "calyx-native-sv" = mkCalyxNativeSvDerivation {
           inherit name calyxCompilePasses calyxEmitNested calyxStreamMorty
+            calyxDisableVerify
             calyxSkipResourceReport calyxOptimizeFsmDecode
             calyxFsmDecodeKeepCopies calyxFsmDecodeShareStates
             calyxFsmDecodeHierarchical;
@@ -623,6 +627,7 @@ let
     , slangPerFileExternModules ? false, calyxMathProfile ? "none"
     , calyxCompilePasses ? [ ], calyxEmitNested ? true
     , calyxStreamMorty ? false
+    , calyxDisableVerify ? false
     , calyxSkipResourceReport ? false, calyxOptimizeFsmDecode ? false
     , calyxFsmDecodeKeepCopies ? false, calyxFsmDecodeShareStates ? false
     , calyxFsmDecodeHierarchical ? false }:
@@ -647,6 +652,7 @@ let
         torchStage = resolvedTorchStage;
         inherit allowHwExterns fpPrimsSv slangPerFileExternModules
           calyxMathProfile calyxCompilePasses calyxEmitNested calyxStreamMorty
+          calyxDisableVerify
           calyxSkipResourceReport calyxOptimizeFsmDecode
           calyxFsmDecodeKeepCopies calyxFsmDecodeShareStates
           calyxFsmDecodeHierarchical;
@@ -668,6 +674,7 @@ let
       "calyxCompilePasses"
       "calyxEmitNested"
       "calyxStreamMorty"
+      "calyxDisableVerify"
       "calyxSkipResourceReport"
       "calyxOptimizeFsmDecode"
       "calyxFsmDecodeKeepCopies"

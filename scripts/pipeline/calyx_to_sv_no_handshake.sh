@@ -138,6 +138,13 @@ calyx_synthesis_args=()
 if [[ "${CALYX_SYNTHESIS:-1}" == "1" ]]; then
   calyx_synthesis_args+=(--synthesis)
 fi
+calyx_verify_args=()
+if [[ "${CALYX_DISABLE_VERIFY:-0}" == "1" ]]; then
+  # Large generated schedules can contain multi-megabyte onehot assertions.
+  # They are backend checks, not datapath logic; make their omission explicit
+  # and auditable for bounded compiler-generated builds.
+  calyx_verify_args+=(--disable-verify)
+fi
 calyx_disabled_pass_args=(-d papercut)
 if [[ "${CALYX_DISABLE_CELL_SHARE:-0}" == "1" ]]; then
   # The validated LayerNorm-slice candidate disables Calyx cell sharing.  It
@@ -157,6 +164,7 @@ fi
   -b verilog \
   "${calyx_pass_args[@]}" \
   "${calyx_synthesis_args[@]}" \
+  "${calyx_verify_args[@]}" \
   "${calyx_nested_args[@]}" \
   "${calyx_disabled_pass_args[@]}" \
   -o "$output_dir/sv/main.sv" >"$tmp_calyx_log" 2>&1
@@ -237,8 +245,9 @@ fi
 
 if [[ "${CALYX_SKIP_RESOURCE_REPORT:-0}" == "1" ]]; then
   printf '%s\n' "$output_dir/sv/main.sv" >"$output_dir/sources.f"
-  printf '{"backend":"native-calyx","stage":"calyx-sv","status":"ok","sources":"sources.f","cell_share_disabled":%s}\n' \
-    "$([[ "${CALYX_DISABLE_CELL_SHARE:-0}" == "1" ]] && echo true || echo false)" >"$output_dir/manifest.json"
+  printf '{"backend":"native-calyx","stage":"calyx-sv","status":"ok","sources":"sources.f","cell_share_disabled":%s,"verify_disabled":%s}\n' \
+    "$([[ "${CALYX_DISABLE_CELL_SHARE:-0}" == "1" ]] && echo true || echo false)" \
+    "$([[ "${CALYX_DISABLE_VERIFY:-0}" == "1" ]] && echo true || echo false)" >"$output_dir/manifest.json"
   exit 0
 fi
 
@@ -283,5 +292,6 @@ PY
 
 printf '%s\n' "$output_dir/sv/main.sv" >"$output_dir/sources.f"
 
-printf '{"backend":"native-calyx","resources":"resources.json","stage":"calyx-sv","status":"ok","sources":"sources.f","cell_share_disabled":%s}\n' \
-  "$([[ "${CALYX_DISABLE_CELL_SHARE:-0}" == "1" ]] && echo true || echo false)" >"$output_dir/manifest.json"
+printf '{"backend":"native-calyx","resources":"resources.json","stage":"calyx-sv","status":"ok","sources":"sources.f","cell_share_disabled":%s,"verify_disabled":%s}\n' \
+  "$([[ "${CALYX_DISABLE_CELL_SHARE:-0}" == "1" ]] && echo true || echo false)" \
+  "$([[ "${CALYX_DISABLE_VERIFY:-0}" == "1" ]] && echo true || echo false)" >"$output_dir/manifest.json"

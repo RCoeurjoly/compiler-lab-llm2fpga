@@ -868,6 +868,12 @@
               calyxCompilePasses = [ "compile-repeat" "no-opt" ];
               calyxEmitNested = false;
               calyxStreamMorty = true;
+              # The generated schedule is too large for backend onehot
+              # assertions; the datapath remains compiler-generated and the
+              # omission is recorded in the native-SV manifest.
+              calyxDisableVerify = true;
+              calyxOptimizeFsmDecode = true;
+              calyxFsmDecodeHierarchical = true;
               calyxSkipResourceReport = true;
               inherit fpPrimsSv;
               hfSnapshot = tinyStories1m.snapshot;

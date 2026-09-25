@@ -39,6 +39,48 @@ class OptimizeCalyxFsmDecodeTest(unittest.TestCase):
         self.assertIn("case (fsm0_out)", transformed)
         self.assertIn("11'd1999", transformed)
 
+    def test_current_calyx_names_and_guard_aliases(self) -> None:
+        source = """
+module main(
+  input logic clk,
+  output logic done
+);
+logic [3:0] fsm_out;
+wire _guard0 = fsm_out == 4'd0;
+wire _guard1 = fsm_out == 4'd1;
+wire _guard2 = _guard0 & ready;
+wire fsm_in;
+wire fsm_write_en;
+assign fsm_in = _guard2 ? 4'd1 : _guard1 ? 4'd0 : 4'd0;
+assign fsm_write_en = _guard0 | _guard1;
+endmodule
+module helper(input logic clk, output logic out);
+assign out = 1'b0;
+endmodule
+"""
+        transformed, _shared = module.transform(
+            source, hierarchical_state_decodes=True
+        )
+        self.assertIn("case (fsm_out)", transformed)
+        self.assertIn("fsm_in = 4'd1", transformed)
+        self.assertNotIn("assign fsm_in =", transformed)
+
+    def test_opaque_guard_chain_uses_priority_case(self) -> None:
+        source = """
+module main(input logic clk, output logic done);
+logic [3:0] fsm_out;
+wire _guard0 = ready;
+wire _guard1 = finished;
+wire fsm_in;
+wire fsm_write_en;
+assign fsm_in = _guard0 ? 4'd1 : _guard1 ? 4'd2 : 4'd0;
+assign fsm_write_en = _guard0 | _guard1;
+endmodule
+"""
+        transformed, _shared = module.transform(source)
+        self.assertIn("case (1'b1)", transformed)
+        self.assertIn("(_guard0): fsm_in = 4'd1", transformed)
+
 
 if __name__ == "__main__":
     unittest.main()
