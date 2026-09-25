@@ -4,6 +4,7 @@ rustPlatform.buildRustPackage rec {
   pname = "calyx";
   version = "0.7.1";
   src = calyxSrc;
+  patches = [ ../patches/calyx/0001-stream-external-morty-link.patch ];
   nativeBuildInputs = [ makeWrapper ];
   cargoLock = {
     lockFile = "${calyxSrc}/Cargo.lock";

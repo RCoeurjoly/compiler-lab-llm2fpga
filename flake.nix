@@ -867,6 +867,7 @@
               # favors ugly, semantics-preserving low-optimization RTL.
               calyxCompilePasses = [ "compile-repeat" "no-opt" ];
               calyxEmitNested = false;
+              calyxStreamMorty = true;
               calyxSkipResourceReport = true;
               inherit fpPrimsSv;
               hfSnapshot = tinyStories1m.snapshot;

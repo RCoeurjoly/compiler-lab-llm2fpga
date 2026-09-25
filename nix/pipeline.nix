@@ -231,7 +231,8 @@ let
     '';
 
   mkCalyxNativeSvDerivation = { name, calyx, calyxCompilePasses ? [ ]
-    , calyxEmitNested ? true, calyxSkipResourceReport ? false
+    , calyxEmitNested ? true, calyxStreamMorty ? false
+    , calyxSkipResourceReport ? false
     , calyxOptimizeFsmDecode ? false, calyxFsmDecodeKeepCopies ? false
     , calyxFsmDecodeShareStates ? false, calyxFsmDecodeHierarchical ? false }:
     pkgs.runCommand "${name}-calyx-native-sv" {
@@ -249,6 +250,7 @@ let
       export CALYX_FSM_DECODE_SHARE_STATES=${if calyxFsmDecodeShareStates then "1" else "0"}
       export CALYX_FSM_DECODE_HIERARCHICAL=${if calyxFsmDecodeHierarchical then "1" else "0"}
       export CALYX_EMIT_NESTED=${if calyxEmitNested then "1" else "0"}
+      export CALYX_STREAM_MORTY=${if calyxStreamMorty then "1" else "0"}
       export CALYX_SKIP_RESOURCE_REPORT=${if calyxSkipResourceReport then "1" else "0"}
       ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
         ${circt}/bin/circt-translate \
@@ -503,6 +505,7 @@ let
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false, calyxMathProfile ? "none"
     , calyxCompilePasses ? [ ], calyxEmitNested ? true
+    , calyxStreamMorty ? false
     , calyxSkipResourceReport ? false, calyxOptimizeFsmDecode ? false
     , calyxFsmDecodeKeepCopies ? false, calyxFsmDecodeShareStates ? false
     , calyxFsmDecodeHierarchical ? false }:
@@ -544,7 +547,7 @@ let
           flatScf = self."flat-scf";
         };
         "calyx-native-sv" = mkCalyxNativeSvDerivation {
-          inherit name calyxCompilePasses calyxEmitNested
+          inherit name calyxCompilePasses calyxEmitNested calyxStreamMorty
             calyxSkipResourceReport calyxOptimizeFsmDecode
             calyxFsmDecodeKeepCopies calyxFsmDecodeShareStates
             calyxFsmDecodeHierarchical;
@@ -619,6 +622,7 @@ let
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false, calyxMathProfile ? "none"
     , calyxCompilePasses ? [ ], calyxEmitNested ? true
+    , calyxStreamMorty ? false
     , calyxSkipResourceReport ? false, calyxOptimizeFsmDecode ? false
     , calyxFsmDecodeKeepCopies ? false, calyxFsmDecodeShareStates ? false
     , calyxFsmDecodeHierarchical ? false }:
@@ -642,7 +646,7 @@ let
         pytorchExported = resolvedPyTorchExported;
         torchStage = resolvedTorchStage;
         inherit allowHwExterns fpPrimsSv slangPerFileExternModules
-          calyxMathProfile calyxCompilePasses calyxEmitNested
+          calyxMathProfile calyxCompilePasses calyxEmitNested calyxStreamMorty
           calyxSkipResourceReport calyxOptimizeFsmDecode
           calyxFsmDecodeKeepCopies calyxFsmDecodeShareStates
           calyxFsmDecodeHierarchical;
@@ -663,6 +667,7 @@ let
       "calyxMathProfile"
       "calyxCompilePasses"
       "calyxEmitNested"
+      "calyxStreamMorty"
       "calyxSkipResourceReport"
       "calyxOptimizeFsmDecode"
       "calyxFsmDecodeKeepCopies"
