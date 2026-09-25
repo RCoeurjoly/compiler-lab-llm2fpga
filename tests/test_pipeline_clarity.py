@@ -37,6 +37,19 @@ class PipelineClarityTest(unittest.TestCase):
         self.assertNotIn("registerQuantizedModel", pipeline)
         self.assertNotIn("modelPipelinesFromRegistry", pipeline)
 
+    def test_scalarized_calyx_stage_has_a_bounded_timebox(self) -> None:
+        pipeline = read("nix/pipeline.nix")
+
+        self.assertIn("calyxTimeoutSeconds = 1800", pipeline)
+        self.assertIn(
+            "${pkgs.coreutils}/bin/timeout ${toString calyxTimeoutSeconds}",
+            pipeline,
+        )
+        self.assertIn(
+            "${pkgs.bash}/bin/bash ${noHandshakeScfToCalyx}",
+            pipeline,
+        )
+
     def test_build_input_names_describe_their_scope(self) -> None:
         pipeline = read("nix/pipeline.nix")
         models = read("nix/models.nix")
