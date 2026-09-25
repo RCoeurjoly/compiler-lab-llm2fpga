@@ -206,6 +206,17 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         self.assertIn("__llm2fpga_sim_fsm0_write_en_", normalized)
         self.assertLess(max(map(len, normalized.splitlines())), 40_000)
 
+    def test_simulation_normalizer_reuses_synthesis_sqrt_output_repair(self) -> None:
+        source = """
+module divSqrtRecFN_small(output sqrtOpOut);
+  wire sqrtOpOut;
+endmodule
+"""
+        normalized = module.normalize_simulation_sv(source)
+        self.assertIn("module divSqrtRecFN_small", normalized)
+        self.assertIn("output sqrtOpOut", normalized)
+        self.assertNotIn("wire sqrtOpOut", normalized)
+
 
 if __name__ == "__main__":
     unittest.main()

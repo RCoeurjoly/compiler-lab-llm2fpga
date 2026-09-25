@@ -456,6 +456,20 @@ def decode_hex_words(source: str, *, width: int, count: int) -> bytes:
 
 def normalize_simulation_sv(source: str, normalizer_path: Path | None = None) -> str:
     normalizer_path = normalizer_path or Path(__file__).with_name("run_rc_sv_equivalence.py")
+    # Reuse the proven synthesis-front-end repair first.  The Calyx/HardFloat
+    # bundle declares ``sqrtOpOut`` both as a module output and as a local wire;
+    # Icarus rejects that duplicate even though the downstream synthesis path
+    # already repairs it.  Keeping simulation and synthesis on the same
+    # frontend normalization avoids a false elaboration blocker.
+    frontend_path = Path(__file__).with_name("fix_sv_synthesis_frontend.py")
+    frontend_spec = importlib.util.spec_from_file_location(
+        "_rc_sv_synthesis_frontend", frontend_path
+    )
+    if frontend_spec is None or frontend_spec.loader is None:
+        raise RuntimeError(f"cannot load simulation frontend normalizer from {frontend_path}")
+    frontend = importlib.util.module_from_spec(frontend_spec)
+    frontend_spec.loader.exec_module(frontend)
+    source, _receipt = frontend.normalize(source)
     spec = importlib.util.spec_from_file_location("_rc_sv_equivalence_normalizer", normalizer_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load simulation normalizer from {normalizer_path}")
