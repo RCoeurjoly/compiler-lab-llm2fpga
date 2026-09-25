@@ -1,0 +1,32 @@
+{
+  "schema": "llm2fpga.rc-calyx-pass-frontier.v1",
+  "scope": "compiler-generated W4A8 Representative Core prefill-8 Futil",
+  "input": "/nix/store/assf2zarkj7w8rvwvaxi3f8v6wimq1ig-tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv/model.futil",
+  "calyx": "/nix/store/hafr57h6q1q46494z95a83fc9ad6bjlf-calyx-0.7.1/bin/calyx",
+  "data_path_infer_warning": "did not converge after 5 iterations",
+  "experiments": [
+    {
+      "passes": ["all"],
+      "papercut": "enabled",
+      "result": "failed",
+      "diagnostic": "write_together papercut violations on generated arg_mem write groups"
+    },
+    {
+      "passes": ["all"],
+      "papercut": "disabled",
+      "stack": "default",
+      "result": "aborted",
+      "diagnostic": "stack overflow"
+    },
+    {
+      "passes": ["all"],
+      "papercut": "disabled",
+      "stack": "unlimited",
+      "virtual_memory_limit_bytes": 12000000000,
+      "wall_timeout_seconds": 90,
+      "result": "timeout",
+      "diagnostic": "no Verilog output produced"
+    }
+  ],
+  "interpretation": "The general Calyx optimization route is not a bounded iteration path for this generated Futil. The next compiler change must reduce or partition the generated static-control/data-path graph before invoking all/pre-opt, while preserving the eager reference contract."
+}
