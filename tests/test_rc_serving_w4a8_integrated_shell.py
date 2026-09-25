@@ -39,8 +39,12 @@ class IntegratedShellTest(unittest.TestCase):
             "prompt_index", "prompt_data", "prompt_write", "go", "busy", "done",
             "protocol_error", "readback_address", "readback_request",
             "readback_response_valid", "readback_response_data",
+            "token0", "token1", "token2",
         ):
             self.assertIn(name, source)
+        self.assertIn("assign token0 = mem4[0];", source)
+        self.assertIn("assign token1 = mem5[0];", source)
+        self.assertIn("assign token2 = mem6[0];", source)
         self.assertIn("main_1 generated", source)
         self.assertIn("prompt_written[prompt_index]", source)
         self.assertIn("if (busy || prompt_written != 8'hff)", source)

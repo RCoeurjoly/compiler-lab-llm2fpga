@@ -153,6 +153,9 @@ def render_public_shell(
         cases.append(f"      {binding.address}: readback_response_data <= {value};")
     address_count = int(manifest["address_count"])
     address_width = max(1, math.ceil(math.log2(max(2, address_count))))
+    # The integrated ABI keeps the three phase tokens in the first three
+    # output memories; logits and cache leaves follow in phase/readback order.
+    token_ports = output_ports[:3]
 
     return "\n".join((
         "`timescale 1ns/1ps",
@@ -161,6 +164,7 @@ def render_public_shell(
         "  input logic [2:0] prompt_index, input logic [63:0] prompt_data,",
         "  input logic prompt_write, input logic go,",
         "  output logic busy, output logic done, output logic protocol_error,",
+        "  output logic [63:0] token0, output logic [63:0] token1, output logic [63:0] token2,",
         f"  input logic [{address_width - 1}:0] readback_address, input logic readback_request,",
         "  output logic readback_response_valid, output logic [63:0] readback_response_data",
         ");",
@@ -169,6 +173,9 @@ def render_public_shell(
         "main_1 generated(.clk(clk), .reset(reset), .go(generated_go), .done(generated_done),",
         "  " + ",\n  ".join(connections) + ");",
         *services,
+        f"assign token0 = mem{token_ports[0]}[0];",
+        f"assign token1 = mem{token_ports[1]}[0];",
+        f"assign token2 = mem{token_ports[2]}[0];",
         "always_ff @(posedge clk) begin",
         "  if (reset) begin",
         "    prompt_written <= 8'h00; generated_go <= 1'b0; busy <= 1'b0;",
