@@ -1,0 +1,46 @@
+{
+  "date": "2026-09-25",
+  "experiment": "representative-core-selective-local-memory-registration",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "implementation": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "register_local_memories": false,
+    "register_local_ports": [72],
+    "block_local_memories": true,
+    "seed": 15,
+    "pcie_unchanged": true,
+    "uberddr3_profile_unchanged": "two-lane 333/83.33 MHz"
+  },
+  "simulation": {
+    "status": "pass",
+    "result": "WB_RC_PASS result=4cfe",
+    "expected_tokens": [-2, 76],
+    "wrapper_store": "/nix/store/aj6v0p4pv702r7pghf69dfhv1glwi7wm-tinystories-representative-core-w4a8-integer-wishbone-wrapper",
+    "generated_sv_store": "/nix/store/cwh1cfnb83l5pfsbh4bm33yiwpcvsvaw-tinystories-representative-core-w4a8-integer-calyx-native-sv"
+  },
+  "implementation_route": {
+    "status": "route_completed_timing_failed",
+    "post_placement_valid": true,
+    "routing_converged": true,
+    "resource_summary": {
+      "SLICE_LUTX": 44805,
+      "SLICE_FFX": 18876,
+      "RAMB18E1": 23,
+      "RAMB36E1": 9,
+      "SELMUX2_1": 3152
+    },
+    "final_max_frequency_mhz": {
+      "rowstream_clk": 48.13,
+      "pcie_user_clk": 79.55
+    },
+    "required_frequency_mhz": {
+      "rowstream_clk": 83.33,
+      "pcie_user_clk": 62.5
+    },
+    "timing_closed": false,
+    "fasm_produced": false,
+    "board_programming": false
+  },
+  "interpretation": "Registering the critical local memory port 72 preserves exact transaction-level behavior and fixes route convergence, but the compiler-generated RC still fails the 83.33 MHz rowstream timing requirement. PCIe timing passes in the final report. This is diagnostic evidence, not an acceptance result."
+}
