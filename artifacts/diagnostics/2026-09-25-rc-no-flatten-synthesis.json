@@ -1,0 +1,29 @@
+{
+  "date": "2026-09-25",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "experiment": "remove Yosys flattening before Xilinx synthesis",
+  "hypothesis": "Preserving generated-module hierarchy might reduce the FSM/mux critical path and improve implementation timing.",
+  "configuration": {
+    "source": "compiler-generated RC RTL; no RTL or interface changes",
+    "transport": "PCIe plus UberDDR3",
+    "ddr3_profile": "two-lane 333/83.33 MHz",
+    "clock_constraints": "unchanged",
+    "seed": 15,
+    "flatten_removed": true
+  },
+  "simulation": {
+    "status": "pass",
+    "result": "WB_RC_PASS result=4cfe",
+    "interpretation": "The exact RC behavioral fixture remains valid; this experiment changes only the synthesis recipe."
+  },
+  "implementation": {
+    "status": "synthesis_failed",
+    "derivation": "/nix/store/af1ai2v4cn066mnfzpqkgq7v037pr350-compiler-ddr3-trace-replay-synthesis-screen.drv",
+    "diagnostic": "ERROR: no valid mapping found for memory tinystories_integer_rc_wb_top.mem51",
+    "timing_closed": false,
+    "bitstream": false,
+    "board_programming": false,
+    "board_inference": false
+  },
+  "conclusion": "Removing flattening is not a viable timing optimization for this generated RC: Yosys fails during technology mapping before placement and routing. The production flattening recipe is restored."
+}
