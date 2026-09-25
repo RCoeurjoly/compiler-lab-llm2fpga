@@ -22,6 +22,8 @@ class RcServingW4A8SvSimTest(unittest.TestCase):
         )
         self.assertIn("--threads", command)
         self.assertIn("4", command)
+        self.assertIn("-CFLAGS", command)
+        self.assertIn("-O3", command)
 
     def test_flat_scf_abi_preserves_semantic_argument_order(self) -> None:
         mlir = """

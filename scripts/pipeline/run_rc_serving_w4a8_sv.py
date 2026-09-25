@@ -405,6 +405,7 @@ def verilator_compile_command(
         "-Wno-WIDTHEXPAND",
         "-Wno-WIDTHTRUNC",
         "-j", str(jobs),
+        "-CFLAGS", "-O3",
     ]
     if jobs > 1:
         command.extend(["--threads", str(jobs)])
