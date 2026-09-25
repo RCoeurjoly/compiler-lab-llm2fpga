@@ -127,3 +127,12 @@ unit coverage. Yosys-Slang elaboration of the transformed source completed with
 zero errors and warnings. It is not yet wired into the production Nix gate;
 that integration remains contingent on a bounded synthesis replay showing a
 real mapping improvement.
+
+The candidate was replayed with the redundant full `opt` immediately before
+`map_dsp:coarse` removed (the required `opt -nodffe -nosdff` cleanup was kept).
+That bounded 420-second run reached `SYNTH_XILINX`'s `MEMORY_LIBMAP` stage;
+the previous run spent the whole bound in the optimizer. It still timed out
+inside memory legalization and emitted no mapped JSON, so the change is
+diagnostic rather than an accepted production-flow modification. The evidence
+supports separating the optimizer and memory-library timeboxes and evaluating
+the selective annotations with a longer, independently bounded mapping stage.
