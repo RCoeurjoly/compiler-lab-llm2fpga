@@ -101,6 +101,11 @@ let
     wreduce
     peepopt
     opt_clean
+    # Bound resource sharing to a small diagnostic probe.  This is the same
+    # compiler-generated netlist, but may reduce duplicated decode datapaths.
+    share -fast -limit 500
+    opt
+    opt_clean
     sort
     synth_xilinx -run coarse:finalize -top compiler_ddr3_trace_replay_top
   '' else ''
