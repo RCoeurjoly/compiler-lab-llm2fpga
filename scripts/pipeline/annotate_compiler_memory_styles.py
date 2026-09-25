@@ -24,6 +24,55 @@ INSTANCE = re.compile(
     r"(?P<name>mem_\d+)\s*\("
 )
 
+SCALAR_INSTANCE = re.compile(
+    r"(?ms)(?P<prefix>\b)seq_mem_d1(?P<params>\s*#\s*\(\s*"
+    r"\.IDX_SIZE\((?P<idx>\d+)\),\s*\.SIZE\(1\),\s*"
+    r"\.WIDTH\((?P<width>\d+)\)\s*\)\s*)"
+    r"(?P<name>mem_\d+)\s*\("
+)
+
+SCALAR_MODULE = r'''
+module seq_mem_d1_scalar #(
+    parameter WIDTH = 32,
+    parameter SIZE = 1,
+    parameter IDX_SIZE = 1
+) (
+   input wire logic clk,
+   input wire logic reset,
+   input wire logic [IDX_SIZE-1:0] addr0,
+   input wire logic content_en,
+   output logic done,
+   output logic [WIDTH-1:0] read_data,
+   input wire logic [WIDTH-1:0] write_data,
+   input wire logic write_en
+);
+  logic [WIDTH-1:0] mem;
+  logic [WIDTH-1:0] read_out;
+  assign read_data = read_out;
+  always_ff @(posedge clk) begin
+    if (reset)
+      read_out <= '0;
+    else if (content_en && !write_en)
+      read_out <= mem;
+    else if (content_en && write_en)
+      read_out <= 'x;
+  end
+  always_ff @(posedge clk) begin
+    if (reset)
+      done <= '0;
+    else if (content_en)
+      done <= '1;
+    else
+      done <= '0;
+  end
+  always_ff @(posedge clk) begin
+    if (!reset && content_en && write_en)
+      mem <= write_data;
+  end
+endmodule
+
+'''
+
 # Widths that correspond to native or straightforwardly packed 7-series BRAM
 # modes.  The depth/bit threshold below prevents tiny memories from being
 # forced into a block (the rejected global experiment failed on 8x1).
@@ -38,6 +87,7 @@ def _sha256(text: str) -> str:
 
 def annotate(source: str) -> tuple[str, dict[str, object]]:
     counts = {"instances": 0, "bram_annotations": 0, "left_unconstrained": 0}
+    scalar_repairs = 0
     shapes: dict[str, int] = {}
 
     def replace(match: re.Match[str]) -> str:
@@ -56,6 +106,15 @@ def annotate(source: str) -> tuple[str, dict[str, object]]:
         return f'(* ram_style = "block" *) {match.group(0)}'
 
     output = INSTANCE.sub(replace, source)
+
+    def scalarize(match: re.Match[str]) -> str:
+        nonlocal scalar_repairs
+        scalar_repairs += 1
+        return f"seq_mem_d1_scalar{match.group('params')}{match.group('name')} ("
+
+    output, scalar_repairs = SCALAR_INSTANCE.subn(scalarize, output)
+    if scalar_repairs:
+        output = SCALAR_MODULE + output
     receipt = {
         "schema": "llm2fpga.compiler-memory-style.v1",
         "input_sv_sha256": _sha256(source),
@@ -66,6 +125,7 @@ def annotate(source: str) -> tuple[str, dict[str, object]]:
             "minimum_bits": MIN_BITS,
         },
         "counts": counts,
+        "scalar_size1_repairs": scalar_repairs,
         "shapes": dict(sorted(shapes.items())),
     }
     return output, receipt

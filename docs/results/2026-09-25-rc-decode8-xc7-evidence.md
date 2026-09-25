@@ -136,3 +136,12 @@ inside memory legalization and emitted no mapped JSON, so the change is
 diagnostic rather than an accepted production-flow modification. The evidence
 supports separating the optimizer and memory-library timeboxes and evaluating
 the selective annotations with a longer, independently bounded mapping stage.
+
+The selective pass was then extended to scalarize all 32 one-entry
+`seq_mem_d1` instances (including the previously failing `8x1` shape) into a
+same-ABI `seq_mem_d1_scalar` register implementation. Yosys-Slang elaboration
+still passes with zero errors and warnings. The 420-second replay reached
+`MEMORY_LIBMAP` but timed out at the same frontier, so one-entry memories are
+not the dominant remaining cost. The scalarization remains a valid
+representation cleanup; the unresolved blocker is the legalization of the
+remaining multi-entry memories and the mapper's search over their shapes.

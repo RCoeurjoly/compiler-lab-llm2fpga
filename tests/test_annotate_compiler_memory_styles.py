@@ -28,6 +28,18 @@ seq_mem_d1 # (.IDX_SIZE(3), .SIZE(4), .WIDTH(64)) mem_3 (
         self.assertEqual(receipt["counts"]["bram_annotations"], 1)
         self.assertEqual(receipt["counts"]["left_unconstrained"], 2)
 
+    def test_single_entry_memory_is_scalarized_without_abi_change(self):
+        source = """
+seq_mem_d1 # (.IDX_SIZE(1), .SIZE(1), .WIDTH(8)) mem_2 (
+  .addr0(a), .clk(c), .content_en(en), .done(done), .read_data(rd),
+  .reset(r), .write_data(wd), .write_en(we)
+);
+"""
+        output, receipt = MODULE.annotate(source)
+        self.assertTrue(output.startswith("\nmodule seq_mem_d1_scalar"))
+        self.assertIn("seq_mem_d1_scalar # (.IDX_SIZE(1), .SIZE(1), .WIDTH(8)) mem_2", output)
+        self.assertEqual(receipt["scalar_size1_repairs"], 1)
+
     def test_non_memory_text_is_unchanged(self):
         source = "module main; logic x; endmodule\n"
         output, receipt = MODULE.annotate(source)
