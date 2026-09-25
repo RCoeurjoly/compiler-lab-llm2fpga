@@ -1,0 +1,31 @@
+{
+  "schema": "llm2fpga.rc-router1-frontier.v1",
+  "date": "2026-09-25",
+  "scope": "compiler-generated TinyStories-derived Representative Core",
+  "experiment": "nextpnr-xilinx alternate router",
+  "configuration": {
+    "router": "router1",
+    "seed": 15,
+    "placer": "heap with placer budgets",
+    "timing_allow_fail": true,
+    "transport": "PCIe plus UberDDR3 shell, unchanged",
+    "ddr3_profile": "two-lane 333/83.33 MHz",
+    "rtl": "unchanged compiler-generated RC"
+  },
+  "simulation": {
+    "status": "pass-by-authenticated-existing-gate",
+    "result": "WB_RC_PASS result=4cfe"
+  },
+  "implementation": {
+    "status": "router_timeout",
+    "timeout_seconds": 1200,
+    "observed_elapsed_seconds": 1026,
+    "last_remaining_arcs": 34919,
+    "fasm": false,
+    "timing_closed": false,
+    "bitstream": false,
+    "board_programming": false,
+    "board_inference": false
+  },
+  "conclusion": "Router1 did not converge within the bounded implementation timebox and produced no FASM. It is not a viable replacement for the production router2 path for this RC. Restore router2; the next useful change must address the compiler-generated critical cone or use a bounded tool patch rather than another router selection."
+}
