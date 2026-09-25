@@ -14,6 +14,14 @@
 let
   targetPart = "xc7k480tffg1156-1";
   targetChipdb = "xc7k480tffg1156.bin";
+  # Re-materialize the checked-in gzip under a fresh store name, rather than
+  # depending on a possibly stale/corrupt source-path realization in the
+  # daemon store.  The source file is still authenticated by sourceSha256
+  # after decompression.
+  sourceSnapshot = builtins.path {
+    path = sourceSvGz;
+    name = "${phaseName}-canonical-sv.gz";
+  };
   dramCompatMap = pkgs.writeText "w4a8-xc7-dram-compat-map.v" ''
     module RAM64X1S(output O, input A0, A1, A2, A3, A4, A5, input D, WCLK, WE);
       parameter [63:0] INIT = 64'h0;
@@ -46,7 +54,7 @@ pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
 } ''
   set -euo pipefail
   mkdir -p "$out"
-  gzip -dc ${sourceSvGz} > "$out/source.sv"
+  gzip -dc ${sourceSnapshot} > "$out/source.sv"
   test "$(sha256sum "$out/source.sv" | cut -d ' ' -f 1)" = '${sourceSha256}'
   : > "$out/normalized.sv"
   # Keep this diagnostic-only XDC inside the evidence derivation.  A separate
