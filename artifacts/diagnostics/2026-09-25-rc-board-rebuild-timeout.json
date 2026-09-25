@@ -1,0 +1,33 @@
+{
+  "schema": "llm2fpga.rc-board-rebuild-timeout.v1",
+  "date": "2026-09-25",
+  "status": "timeout",
+  "target": "compiler-ddr3-trace-replay-bitstream",
+  "command": "XDG_CACHE_HOME=/tmp/xdg-cache-nix-rc nix build --impure .#compiler-ddr3-trace-replay-bitstream -L",
+  "derivations": {
+    "synthesis": "/nix/store/i17zwjf41xdwkg5wbc497s0wikrd5kiq-compiler-ddr3-trace-replay-synthesis-screen.drv",
+    "route": "/nix/store/9msk9arzriqw5ph4w1nv5d2mggxyphlx-compiler-ddr3-trace-replay-route.drv",
+    "bitstream": "/nix/store/i3ykxbfpxzrc66b829jczv16xm31dq1w-compiler-ddr3-trace-replay-bitstream.drv"
+  },
+  "synthesis": {
+    "wall_timeout_seconds": 600,
+    "exit_status": 124,
+    "partial_output": "/nix/store/9r5n1hb5bhkxk4ylpbak2q5cy1c5wn0c-compiler-ddr3-trace-replay-synthesis-screen",
+    "partial_yosys_log_bytes": 184320000,
+    "reason": "the current public target reaches the legacy compiler source closure and does not resolve the generated Representative-Core wrapper as a reproducible input"
+  },
+  "hardware_state": {
+    "pcie_endpoint": "0000:42:00.0",
+    "identity": "10ee:0480",
+    "subsystem": "10ee:abcd",
+    "bar0": "0x74000000/4096"
+  },
+  "claims": {
+    "compiler_generated_rtl": true,
+    "kev_gpt_rtl_reused": false,
+    "pci_express": false,
+    "ddr3": false,
+    "board_programming": false,
+    "next_gate": "add the generated RC wrapper and its exact memory image to a dedicated reproducible YPCB shell derivation, then rerun bounded synthesis before programming"
+  }
+}
