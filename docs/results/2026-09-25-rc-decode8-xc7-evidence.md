@@ -739,3 +739,11 @@ The same bounded probe with `cell-share` disabled (while retaining
 763,672 KiB.  Calyx reported `compile-invoke` at 7.2 s before the timeout and
 did not emit SV.  The option is now plumbed through the reproducible Nix
 pipeline as `calyxDisableCellShare`; the default remains unchanged.
+
+Additional pass-isolation probes were bounded at 30 seconds.  Disabling
+`compile-repeat` reaches `cell-share` in about 9.7 s but then panics because
+later Calyx passes require repeats to have been compiled.  Disabling both
+`compile-repeat` and `tdcc` reaches `wire-inliner` and fails with
+`Malformed Control: Structure has more than one group`.  These are pass-order
+diagnostics, not candidate production routes: any optimization must preserve
+the control invariants expected by downstream Calyx passes.
