@@ -465,6 +465,15 @@ and identifies the next compiler boundary: preserve the phase/cache contract
 but emit independently elaborable phase components or a compiler-generated
 coordinator, rather than attempting another simulator flag on the monolith.
 
+The integrated PyTorch export already provides the exact stateful target for
+that partition: its authenticated observation records phase token IDs
+`[0, 0, 4]` for `prefill-8`, `decode-8`, and `decode-9`, with 18 output regions
+(three selected tokens, three logits vectors, and twelve cache leaves).  Its
+receipt reports `frozen_phase_qparams_equal`, `frozen_prefill_equal`, and
+`save_reload_equal` all true.  A partitioned compiler emission can therefore
+be checked against a concrete token/cache contract; it must not invent a new
+sequence or reuse reference RTL.
+
 ### Alternate-simulator probe for the integrated stateful closure
 
 As a bounded diagnostic, Icarus Verilog 12.0 was run against the exact
