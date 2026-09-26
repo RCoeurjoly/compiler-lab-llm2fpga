@@ -757,3 +757,12 @@ out at 30 seconds, while peak RSS increased to 1,807,188 KiB (compared with
 about 764 MiB for the cell-share-disabled wrapped form).  Removing the wrapper
 is therefore not a viable compile-invoke optimization; the wrapper/reference
 structure is retained.
+
+### Exact production-pass cell-share comparison (2026-09-26)
+
+Repeating the comparison with the actual integrated pass selection
+(`-p compile-repeat -p no-opt`) gives the same convergence result: both
+baseline and `cell-share`-disabled runs hit the 30-second bound without SV.
+Peak RSS is nevertheless 833,144 KiB for baseline versus 637,312 KiB with
+cell sharing disabled.  This confirms a substantial memory reduction on the
+real route, but the remaining time bottleneck is still control lowering.
