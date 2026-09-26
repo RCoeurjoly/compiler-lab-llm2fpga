@@ -747,3 +747,13 @@ later Calyx passes require repeats to have been compiled.  Disabling both
 `Malformed Control: Structure has more than one group`.  These are pass-order
 diagnostics, not candidate production routes: any optimization must preserve
 the control invariants expected by downstream Calyx passes.
+
+### Wrapper-flattening diagnostic (2026-09-26)
+
+The generated Futil has one top-level wrapper invoking `main_1` with 382 memory
+bindings.  A temporary variant promoted `main_1` to the top component, made its
+382 memory refs top-level externals, and removed the invoke.  It still timed
+out at 30 seconds, while peak RSS increased to 1,807,188 KiB (compared with
+about 764 MiB for the cell-share-disabled wrapped form).  Removing the wrapper
+is therefore not a viable compile-invoke optimization; the wrapper/reference
+structure is retained.
