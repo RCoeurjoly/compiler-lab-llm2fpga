@@ -47,6 +47,19 @@ component main() -> () {
     assert result.count("@external scratch_a") == 1
 
 
+def test_apply_aliases_accepts_generated_external_attributes():
+    futil = """@external(1) scratch_a = seq_mem_d1(64, 8, 3);
+@external(1) scratch_b = seq_mem_d1(64, 8, 3);
+component main() -> () {
+  cells { scratch_a = seq_mem_d1(64, 8, 3); scratch_b = seq_mem_d1(64, 8, 3); }
+  control { empty }
+}
+"""
+    result = module.apply_aliases(futil, {"scratch_b": "scratch_a"})
+    assert "@external(1) scratch_b" not in result
+    assert result.count("@external(1) scratch_a") == 1
+
+
 def test_conservative_aliases_protect_model_memories_and_do_not_chain():
     futil = """@external weights = seq_mem_d1(8, 8, 3);
 @external a = seq_mem_d1(64, 8, 3);

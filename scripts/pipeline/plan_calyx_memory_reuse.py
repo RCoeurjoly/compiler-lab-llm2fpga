@@ -139,7 +139,12 @@ def apply_aliases(text: str, aliases: dict[str, str]) -> str:
         raise ValueError("alias map must point directly to surviving memories")
     rewritten = text
     for removed, canonical in sorted(aliases.items()):
-        rewritten = re.sub(rf"\s*@external\s+{re.escape(removed)}\s*=\s*seq_mem_d1\([^;]+;\n", "\n", rewritten, count=1)
+        rewritten = re.sub(
+            rf"\s*@external(?:\([^)]*\))?\s+{re.escape(removed)}\s*=\s*seq_mem_d1\([^;]+;\n",
+            "\n",
+            rewritten,
+            count=1,
+        )
         if re.search(rf"\b{re.escape(removed)}\b", rewritten) is None:
             raise ValueError(f"memory declaration not found: {removed}")
         rewritten = re.sub(rf"\b{re.escape(removed)}\b", canonical, rewritten)

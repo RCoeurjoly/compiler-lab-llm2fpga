@@ -686,3 +686,12 @@ the report finds 382 declared memories, 10,932 control-group references, 378
 memory lifetime intervals, and 5,029 same-shape disjoint candidates.  This is
 still an analysis-only result: no aliases have been applied, and each candidate
 requires an IR dependency proof and semantic regression before transformation.
+
+The greedy alias map was exercised as a bounded structural probe, not as an
+accepted compiler transformation.  It removes 252 declarations (382 to 130)
+and rewrites the 6.1 MB Futil source without leaving removed names.  The pinned
+Calyx parser reports 1,727 existing `write_together` diagnostics for both the
+baseline and rewritten source, with no new syntax/structural failure.  This
+confirms the rewrite reaches the same pre-existing Calyx legality frontier; it
+does not yet prove that any alias is semantically safe or that Yosys will
+converge after the reduction.
