@@ -28,6 +28,7 @@ class SvMemoryPort:
     number: int
     width: int
     depth: int
+    address_width: int | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -216,7 +217,7 @@ def parse_sv_memory_ports(source: str) -> tuple[SvMemoryPort, ...]:
         # address. It has no addressable elements; retain one fixture word so
         # SystemVerilog can model the otherwise-empty external memory.
         depth = 1 if address_width == 64 else 1 << address_width
-        result.append(SvMemoryPort(number, width, depth))
+        result.append(SvMemoryPort(number, width, depth, address_width))
     return tuple(result)
 
 

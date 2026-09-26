@@ -965,6 +965,93 @@
               --decode9-sv ${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv"}/sv/main.sv \
               --output "$out/report.json"
           '';
+        rcServingW4A8PhaseNamespaced = pkgs.runCommand
+          "tinystories-w4a8-rc-serving-phase-namespaced"
+          { nativeBuildInputs = [ python ]; }
+          ''
+            set -euo pipefail
+            mkdir -p "$out"
+            ${python}/bin/python ${./scripts/pipeline/namespace_rc_phase_sv.py} \
+              --input ${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv"}/sv/main.sv \
+              --prefix prefill8 --output "$out/prefill8.sv" --receipt "$out/prefill8.json"
+            ${python}/bin/python ${./scripts/pipeline/namespace_rc_phase_sv.py} \
+              --input ${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv"}/sv/main.sv \
+              --prefix decode8 --output "$out/decode8.sv" --receipt "$out/decode8.json"
+            ${python}/bin/python ${./scripts/pipeline/namespace_rc_phase_sv.py} \
+              --input ${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv"}/sv/main.sv \
+              --prefix decode9 --output "$out/decode9.sv" --receipt "$out/decode9.json"
+          '';
+        rcServingW4A8PhaseArtifactMap = pkgs.writeText
+          "tinystories-w4a8-rc-serving-phase-artifact-map.json"
+          (builtins.toJSON {
+            "prefill-8" = {
+              flat_scf = "${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-flat-scf"}/flat.scf.mlir";
+              sv = "${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv"}/sv/main.sv";
+              namespaced_sv = "${rcServingW4A8PhaseNamespaced}/prefill8.sv";
+              exported = "${rcServingW4A8System.prefill8PytorchExported}/exported.pt2";
+              namespace_receipt = "${rcServingW4A8PhaseNamespaced}/prefill8.json";
+            };
+            "decode-8" = {
+              flat_scf = "${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-flat-scf"}/flat.scf.mlir";
+              sv = "${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv"}/sv/main.sv";
+              namespaced_sv = "${rcServingW4A8PhaseNamespaced}/decode8.sv";
+              exported = "${rcServingW4A8System.decode8PytorchExported}/exported.pt2";
+              namespace_receipt = "${rcServingW4A8PhaseNamespaced}/decode8.json";
+            };
+            "decode-9" = {
+              flat_scf = "${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-flat-scf"}/flat.scf.mlir";
+              sv = "${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv"}/sv/main.sv";
+              namespaced_sv = "${rcServingW4A8PhaseNamespaced}/decode9.sv";
+              exported = "${rcServingW4A8System.decode9PytorchExported}/exported.pt2";
+              namespace_receipt = "${rcServingW4A8PhaseNamespaced}/decode9.json";
+            };
+          });
+        rcServingW4A8PhaseHandoff = pkgs.runCommand
+          "tinystories-w4a8-rc-serving-phase-handoff"
+          { nativeBuildInputs = [ pythonWithTinyStoriesTorchAO ]; }
+          ''
+            set -euo pipefail
+            mkdir -p "$out"
+            export PYTHONPATH="${./.}:''${PYTHONPATH:-}"
+            ${pythonWithTinyStoriesTorchAO}/bin/python -m scripts.pipeline.build_rc_phase_handoff \
+              --abi ${rcServingW4A8IntegratedSystem.pytorchExported}/compiler-phase-abi.json \
+              --artifact-map ${rcServingW4A8PhaseArtifactMap} \
+              --output "$out/handoff.json"
+          '';
+        rcServingW4A8PhaseComposedShell = pkgs.runCommand
+          "tinystories-w4a8-rc-serving-phase-composed-shell"
+          { nativeBuildInputs = [ python ]; }
+          ''
+            set -euo pipefail
+            export PYTHONPATH="${./.}:''${PYTHONPATH:-}"
+            ${python}/bin/python -m scripts.pipeline.generate_rc_phase_composed_shell \
+              --manifest ${rcServingW4A8PhaseHandoff}/handoff.json \
+              --prefill-sv ${rcServingW4A8PhaseNamespaced}/prefill8.sv \
+              --decode8-sv ${rcServingW4A8PhaseNamespaced}/decode8.sv \
+              --decode9-sv ${rcServingW4A8PhaseNamespaced}/decode9.sv \
+              --output "$out"
+            ln -s ${rcServingW4A8PhaseHandoff}/handoff.json "$out/handoff.json"
+            ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/observation.json "$out/observation.json"
+          '';
+        rcServingW4A8PhaseComposedSimulation = pkgs.runCommand
+          "tinystories-w4a8-rc-serving-phase-composed-simulation"
+          { nativeBuildInputs = [ python pkgs.verilator pkgs.stdenv.cc ]; }
+          ''
+            set -euo pipefail
+            mkdir -p "$out"
+            export PYTHONPATH="${./.}:''${PYTHONPATH:-}"
+            set +e
+            ${python}/bin/python ${./scripts/pipeline/run_rc_serving_w4a8_integrated_sv.py} \
+              --composed --shell ${rcServingW4A8PhaseComposedShell} \
+              --manifest ${rcServingW4A8PhaseHandoff}/handoff.json \
+              --observation ${rcServingW4A8IntegratedSystem.pytorchExported}/observation.json \
+              --work-dir "$out" --jobs 1 --compile-timeout-seconds 2700 \
+              --simulation-timeout-seconds 900 --max-memory-gib 20 \
+              > "$out/runner.stdout.log" 2>&1
+            result=$?
+            set -e
+            printf '%s\n' "$result" > "$out/runner-exit-code"
+          '';
         rcServingW4A8Xc7Evidence = {
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-xc7k480t-evidence" =
             import ./nix/rc-serving-w4a8-xc7k480t.nix {
@@ -3360,6 +3447,14 @@ PY
             rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx-native-sv";
           "tinystories-w4a8-rc-serving-integrated-shell" =
             rcServingW4A8IntegratedShell;
+          "tinystories-w4a8-rc-serving-phase-namespaced" =
+            rcServingW4A8PhaseNamespaced;
+          "tinystories-w4a8-rc-serving-phase-handoff" =
+            rcServingW4A8PhaseHandoff;
+          "tinystories-w4a8-rc-serving-phase-composed-shell" =
+            rcServingW4A8PhaseComposedShell;
+          "tinystories-w4a8-rc-serving-phase-composed-simulation" =
+            rcServingW4A8PhaseComposedSimulation;
           "tinystories-w4a8-rc-serving-phase-abi-verification" =
             rcServingW4A8PhaseAbiVerification;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-pytorch-exported" =

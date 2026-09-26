@@ -178,6 +178,11 @@ def synthetic_testbench() -> str:
 
 
 class ComposedShellTests(unittest.TestCase):
+    def test_shell_preserves_zero_extent_address_pin_width(self):
+        manifest = small_manifest()
+        manifest["phases"][0]["rtl_memories"][1]["address_width"] = 64
+        self.assertIn("wire [63:0] a0_1_addr;", render_shell(manifest))
+
     def test_rejects_wrong_token_feedback_port(self):
         manifest = small_manifest()
         manifest["handoffs"][0]["token_destination_port"] = 0

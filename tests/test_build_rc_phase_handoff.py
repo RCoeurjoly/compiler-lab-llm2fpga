@@ -6,6 +6,7 @@ from pathlib import Path
 
 from scripts.pipeline.build_rc_phase_handoff import build_handoff
 from scripts.pipeline.run_rc_serving_w4a8_sv import SemanticMemory, SvMemoryPort
+from scripts.pipeline.run_rc_serving_w4a8_sv import parse_sv_memory_ports
 from scripts.pipeline.verify_rc_serving_phase_abi import verify
 
 
@@ -50,6 +51,26 @@ def fixture():
 
 
 class BuildHandoffTests(unittest.TestCase):
+    def test_zero_extent_placeholder_keeps_64_bit_address_pin(self):
+        source = """module main_1(
+          output logic [63:0] arg_mem_0_addr0,
+          output logic arg_mem_0_content_en,
+          output logic arg_mem_0_write_en,
+          output logic [31:0] arg_mem_0_write_data,
+          input logic [31:0] arg_mem_0_read_data,
+          input logic arg_mem_0_done
+        ); endmodule"""
+        parsed = parse_sv_memory_ports(source)
+        self.assertEqual(parsed[0].depth, 1)
+        self.assertEqual(parsed[0].address_width, 64)
+
+    def test_handoff_carries_explicit_address_pin_width(self):
+        abi, phases = fixture()
+        ports = list(phases["prefill-8"]["rtl"])
+        ports[1] = SvMemoryPort(1, 32, 1, 64)
+        phases["prefill-8"]["rtl"] = tuple(ports)
+        self.assertEqual(build_handoff(abi, phases)["phases"][0]["rtl_memories"][1]["address_width"], 64)
+
     def test_connects_cache_leaves_and_last_prefill_logits(self):
         abi, phases = fixture()
         manifest = build_handoff(abi, phases)

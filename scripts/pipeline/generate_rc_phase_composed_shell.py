@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import re
 from pathlib import Path
 
@@ -37,6 +36,8 @@ def _validate(manifest: dict) -> None:
             raise ValueError(f"{phase['name']}: RTL memory ports are not dense")
         if len(memories) < 37 or any(m["width"] < 1 or m["depth"] < 1 for m in memories):
             raise ValueError(f"{phase['name']}: missing or invalid RTL memory ports")
+        if any(m.get("address_width", max(1, (m["depth"] - 1).bit_length())) < 1 for m in memories):
+            raise ValueError(f"{phase['name']}: invalid RTL memory address width")
         token_port = phase["token_input_port"]
         if token_port != (31 if index == 0 else 27) or memories[token_port]["width"] != 64:
             raise ValueError(f"{phase['name']}: token input port is invalid")
@@ -119,7 +120,7 @@ def render_shell(manifest: dict) -> str:
         lines.append(f"wire core_go{p} = state == RUN{p};")
         for memory in phase["rtl_memories"]:
             port, width, depth = (memory[k] for k in ("port", "width", "depth"))
-            aw = max(1, math.ceil(math.log2(depth)))
+            aw = memory.get("address_width", max(1, (depth - 1).bit_length()))
             stem = f"a{p}_{port}"
             mem = _memory_name(p, port)
             lines += [f"logic [{width - 1}:0] {mem} [0:{depth - 1}];",

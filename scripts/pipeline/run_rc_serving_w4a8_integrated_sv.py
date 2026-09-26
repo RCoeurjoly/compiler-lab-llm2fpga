@@ -6,14 +6,248 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import resource
+import shutil
+import signal
+import struct
 import subprocess
 import time
 from pathlib import Path
 
+from scripts.pipeline.run_rc_serving_w4a8_sv import normalize_simulation_sv
+
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def classify_process_result(stage: str, *, timed_out: bool, returncode: int | None) -> str:
+    """Keep tool resource failures separate from behavioral mismatches."""
+    if timed_out:
+        return f"{stage}_timeout"
+    if returncode in (-9, 137):
+        return f"{stage}_signal9"
+    if returncode != 0:
+        return f"{stage}_failure"
+    return "pass"
+
+
+def compare_composed_readback(
+    manifest: dict, observation: dict, actual: dict[int, int], tokens: list[int]
+) -> dict:
+    """Compare every raw 64-bit readback word against the frozen RC oracle."""
+    expected: dict[int, tuple[int, str, int, int]] = {}
+    expected_tokens = []
+    for phase_manifest, phase_observation in zip(manifest["phases"], observation["phases"], strict=True):
+        name = phase_manifest["name"]
+        if phase_observation["name"] != name:
+            raise ValueError("observation phase order differs from compiler manifest")
+        token = int(phase_observation["token"])
+        expected_tokens.append(token)
+        expected[phase_manifest["token_address"]] = (token, name, -1, 0)
+        logits = phase_manifest["logits"]
+        if len(phase_observation["logits"]) != logits["words"]:
+            raise ValueError(f"{name}: logits width differs from manifest")
+        for index, value in enumerate(phase_observation["logits"]):
+            bits = int.from_bytes(struct.pack("<f", float(value)), "little")
+            expected[phase_manifest["token_address"] + 1 + index] = (
+                bits, name, logits["port"], logits["offset"] + index
+            )
+        for leaf in phase_manifest["cache_outputs"]:
+            payload = bytes.fromhex(phase_observation["cache_leaves"][leaf["leaf"]]["little_endian_hex"])
+            if len(payload) != 4 * leaf["words"]:
+                raise ValueError(f"{name}: cache leaf {leaf['leaf']} byte count differs")
+            for index in range(leaf["words"]):
+                bits = int.from_bytes(payload[index * 4:index * 4 + 4], "little")
+                expected[leaf["readback_address"] + index] = (bits, name, leaf["port"], index)
+    if sorted(expected) != list(range(manifest["readback_words"])):
+        raise ValueError("compiler manifest readback addresses are incomplete or overlapping")
+    mismatches = []
+    for address in sorted(expected):
+        value, phase, port, word = expected[address]
+        observed = actual.get(address)
+        if observed != value:
+            xor = None if observed is None else value ^ observed
+            mismatches.append({
+                "address": address, "phase": phase, "port": port, "word": word,
+                "expected": f"0x{value:08x}",
+                "actual": None if observed is None else f"0x{observed:08x}",
+                "first_differing_bit": None if xor is None else (xor & -xor).bit_length() - 1,
+            })
+    token_match = tokens == expected_tokens
+    return {
+        "status": "pass" if not mismatches and token_match and len(actual) == len(expected) else "mismatch",
+        "expected_tokens": expected_tokens, "actual_tokens": tokens,
+        "readback_word_count": len(expected), "actual_readback_word_count": len(actual),
+        "mismatch_count": len(mismatches), "first_mismatch": mismatches[0] if mismatches else None,
+    }
+
+
+def _sv_tb_composed(prompt: list[int], address_count: int, timeout_cycles: int) -> str:
+    prompt_lines = []
+    for index, token in enumerate(prompt):
+        prompt_lines += [
+            "    @(negedge clk);",
+            f"    prompt_index = 3'd{index}; prompt_data = 64'd{token}; prompt_write = 1;",
+            "    @(negedge clk); prompt_write = 0;",
+        ]
+    return "\n".join([
+        "`timescale 1ns/1ps",
+        "module tb;",
+        "logic clk=0, reset=1, prompt_write=0, start=0;",
+        "logic [2:0] prompt_index=0; logic [63:0] prompt_data=0;",
+        "logic [7:0] readback_addr=0; wire [63:0] readback_data;",
+        "wire busy, done, error; wire [63:0] token0, token1, token2;",
+        "integer cycles=0, address, fd;",
+        "always #5 clk = ~clk;",
+        "always @(posedge clk) if (!reset) cycles = cycles + 1;",
+        "rc_phase_composed dut(.*);",
+        "initial begin",
+        "  repeat (3) @(posedge clk); @(negedge clk); reset=0;",
+        *prompt_lines,
+        "  @(negedge clk); start=1; @(negedge clk); start=0;",
+        f"  while (!done && cycles < {timeout_cycles}) @(negedge clk);",
+        "  if (!done) $fatal(1, \"TIMEOUT cycles=%0d\", cycles);",
+        "  if (error) $fatal(1, \"PROTOCOL_ERROR\");",
+        "  $display(\"TOKENS %0d %0d %0d CYCLES %0d\", token0, token1, token2, cycles);",
+        "  fd=$fopen(\"readback.hex\", \"w\");",
+        f"  for (address=0; address<{address_count}; address=address+1) begin",
+        "    readback_addr=address[7:0]; #1;",
+        "    $fwrite(fd, \"%0d %016h\\n\", address, readback_data);",
+        "  end",
+        "  $fclose(fd); $finish;",
+        "end",
+        "endmodule", "",
+    ])
+
+
+def _memory_limit(limit_gib: int) -> None:
+    limit = limit_gib * 1024**3
+    resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
+
+
+def run_bounded_command(
+    command: list[str], *, cwd: Path, log: object, timeout_seconds: float, max_memory_gib: int
+) -> tuple[bool, int | None]:
+    """Timebox a compiler and its worker processes as one process group."""
+    process = subprocess.Popen(
+        command, cwd=cwd, stdout=log, stderr=subprocess.STDOUT,
+        start_new_session=True, preexec_fn=lambda: _memory_limit(max_memory_gib),
+    )
+    try:
+        return False, process.wait(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait(timeout=10)
+        return True, None
+
+
+def normalize_composed_sources(source_paths: list[Path], work_dir: Path) -> list[Path]:
+    """Apply the proven simulation-only frontend repair after source hashing."""
+    work_dir.mkdir(parents=True, exist_ok=True)
+    normalized_paths = []
+    for index, path in enumerate(source_paths):
+        normalized = work_dir / f"phase{index}.simulation.sv"
+        normalized.write_text(normalize_simulation_sv(path.read_text()))
+        normalized_paths.append(normalized)
+    return normalized_paths
+
+
+def run_composed(
+    shell: Path, manifest_path: Path, observation_path: Path, work_dir: Path, *,
+    verilator: str = "verilator", jobs: int = 1, timeout_cycles: int = 100_000_000,
+    compile_timeout_seconds: float = 900, simulation_timeout_seconds: float = 900,
+    max_memory_gib: int = 20,
+) -> dict:
+    """Run the real composed compiler phases with durable failure receipts."""
+    if jobs < 1 or compile_timeout_seconds <= 0 or simulation_timeout_seconds <= 0 or max_memory_gib < 1:
+        raise ValueError("jobs, timeouts and memory limit must be positive")
+    work_dir.mkdir(parents=True, exist_ok=True)
+    manifest = json.loads(manifest_path.read_text())
+    observation = json.loads(observation_path.read_text())
+    receipt_path = shell / "receipt.json"
+    receipt = json.loads(receipt_path.read_text())
+    manifest_hash = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+    if receipt["manifest_sha256"] != manifest_hash:
+        raise ValueError("composed shell receipt has a different handoff manifest")
+    for name, expected_hash in receipt["files"].items():
+        path = Path(name)
+        if not path.is_absolute():
+            path = shell / path
+        if not path.is_file() or _sha256(path) != expected_hash:
+            raise ValueError(f"composed shell file hash mismatch: {name}")
+    source_paths = [Path(path) for path in receipt["sources"]]
+    (work_dir / "tb.sv").write_text(_sv_tb_composed(
+        [0, 1, 2, 3, 4, 5, 0, 1], manifest["readback_words"], timeout_cycles
+    ))
+    for image in shell.glob("phase*_mem*.hex"):
+        shutil.copyfile(image, work_dir / image.name)
+    report = {
+        "schema": "rc-phase-composed-sv-equivalence-v1",
+        "status": "not-run",
+        "manifest_sha256": _sha256(manifest_path),
+        "observation_sha256": _sha256(observation_path),
+        "package_receipt_sha256": _sha256(receipt_path),
+        "shell_sha256": _sha256(shell / "rc_phase_composed.sv"),
+        "sources": [{"path": str(path), "sha256": _sha256(path)} for path in source_paths],
+        "compile_seconds": None, "simulation_seconds": None,
+        "max_memory_gib": max_memory_gib,
+    }
+    normalize_started = time.monotonic()
+    simulation_sources = normalize_composed_sources(source_paths, work_dir)
+    report["normalization_seconds"] = time.monotonic() - normalize_started
+    report["simulation_sources"] = [
+        {"path": str(path), "sha256": _sha256(path)} for path in simulation_sources
+    ]
+
+    def save() -> dict:
+        (work_dir / "report.json").write_text(json.dumps(report, sort_keys=True, indent=2) + "\n")
+        return report
+
+    command = [verilator, "--binary", "--timing", "-Wno-fatal", "--top-module", "tb",
+               "--Mdir", str(work_dir / "obj_dir"), "--output-split", "10000",
+               "--output-split-cfuncs", "10000", "-j", str(jobs), "-CFLAGS", "-O2",
+               str(shell / "rc_phase_composed.sv"), *(str(path) for path in simulation_sources),
+               str(work_dir / "tb.sv")]
+    report["compile_command"] = command
+    started = time.monotonic()
+    with (work_dir / "verilator-build.log").open("w") as log:
+        timed_out, returncode = run_bounded_command(
+            command, cwd=work_dir, log=log, timeout_seconds=compile_timeout_seconds,
+            max_memory_gib=max_memory_gib,
+        )
+    report["compile_seconds"] = time.monotonic() - started
+    report["status"] = classify_process_result("compile", timed_out=timed_out, returncode=returncode)
+    report["compile_returncode"] = returncode
+    if report["status"] != "pass":
+        return save()
+
+    started = time.monotonic()
+    with (work_dir / "simulation.log").open("w") as log:
+        timed_out, returncode = run_bounded_command(
+            [str(work_dir / "obj_dir" / "Vtb")], cwd=work_dir, log=log,
+            timeout_seconds=simulation_timeout_seconds, max_memory_gib=max_memory_gib,
+        )
+    report["simulation_seconds"] = time.monotonic() - started
+    report["status"] = classify_process_result("simulation", timed_out=timed_out, returncode=returncode)
+    report["simulation_returncode"] = returncode
+    if report["status"] != "pass":
+        return save()
+
+    actual: dict[int, int] = {}
+    for line in (work_dir / "readback.hex").read_text().splitlines():
+        address_text, value_text = line.split()
+        address = int(address_text)
+        if address in actual:
+            raise ValueError(f"duplicate readback address {address}")
+        actual[address] = int(value_text, 16)
+    token_match = re.search(r"TOKENS\s+(\d+)\s+(\d+)\s+(\d+)",
+                            (work_dir / "simulation.log").read_text())
+    tokens = [int(value) for value in token_match.groups()] if token_match else []
+    report.update(compare_composed_readback(manifest, observation, actual, tokens))
+    return save()
 
 
 def _sv_tb(prompt: list[int], address_count: int, timeout_cycles: int) -> str:
@@ -94,7 +328,20 @@ def main() -> int:
     parser.add_argument("--timeout-cycles", type=int, default=100_000_000)
     parser.add_argument("--compile-timeout-seconds", type=float, default=900.0)
     parser.add_argument("--simulation-timeout-seconds", type=float, default=300.0)
+    parser.add_argument("--composed", action="store_true",
+                        help="run the autonomous three-phase compiler shell")
+    parser.add_argument("--max-memory-gib", type=int, default=20)
     args = parser.parse_args()
+    if args.composed:
+        report = run_composed(
+            args.shell, args.manifest, args.observation, args.work_dir,
+            verilator=args.verilator, jobs=args.jobs, timeout_cycles=args.timeout_cycles,
+            compile_timeout_seconds=args.compile_timeout_seconds,
+            simulation_timeout_seconds=args.simulation_timeout_seconds,
+            max_memory_gib=args.max_memory_gib,
+        )
+        print(json.dumps(report, sort_keys=True))
+        return 0 if report["status"] == "pass" else 1
     args.work_dir.mkdir(parents=True, exist_ok=True)
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     observation = json.loads(args.observation.read_text(encoding="utf-8"))

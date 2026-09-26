@@ -113,7 +113,9 @@ def build_handoff(abi: dict, phases: dict[str, dict]) -> dict:
             "token_address": cursor,
             "logits": {"port": 32, "offset": logits_offset, "words": vocab},
             "cache_outputs": cache_reports,
-            "rtl_memories": [{"port": item.number, "width": item.width, "depth": item.depth} for item in rtl],
+            "rtl_memories": [{"port": item.number, "width": item.width, "depth": item.depth,
+                              "address_width": item.address_width if item.address_width is not None
+                              else max(1, (item.depth - 1).bit_length())} for item in rtl],
             "initial_memories": artifact["initial_memories"],
             "hashes": {key: artifact[key] for key in ("sv_sha256", "flat_scf_sha256", "exported_sha256")},
             "namespaced_sv_sha256": receipt["output_sha256"],
