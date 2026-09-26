@@ -417,3 +417,13 @@ intervaltree/sortedcontainers paths and the database part file
 structural decoding, not board programming, PCIe enumeration, DDR3
 calibration, or inference.  The bitstream remains unprogrammed pending the
 board gate and an independently reproducible route receipt.
+
+The same frame stream is already present in the content-addressed Nix output
+`/nix/store/2lla0fwzm7y2kn0y9wbljlwmd7vpmhmc-compiler-ddr3-trace-replay-bitstream`:
+its `replay.frames` hash is the same `a240215e...fada8`, and its decoded
+configuration hash is the same `fa1b8482...1734e9`.  Its bitstream hash is
+`a6683622793ac1975de4615ca4bd8ee271fd74b0684080f7e579d2203e301690`.
+The byte-level `.bit` hash differs from the `/tmp` conversion because the
+container header is generated separately; the frame payload and decoded
+configuration agree.  This Nix output is the preferred programming source
+once the JTAG device is available.
