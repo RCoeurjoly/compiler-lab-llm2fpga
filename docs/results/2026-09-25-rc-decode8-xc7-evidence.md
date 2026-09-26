@@ -375,6 +375,19 @@ This revalidation changes no RTL or transport.  It freezes the exact
 compiler input and phase/cache contract that the next compiler-side
 partitioning work must preserve.
 
+### Flat-SCF phase-boundary measurement (2026-09-26)
+
+The current integrated compiler artifact
+`/nix/store/jcrilmvr5m4gnynd9ib57qkdp20ydn8x-tinystories-w4a8-rc-serving-integrated-flat-scf/flat.scf.mlir`
+contains one `func.func @main`, 74 memref arguments, 1,711 `scf` loop/branch
+operations, and no `func.call`, phase-named operation, or cache-phase symbol.
+The three phases are therefore represented as straight-line regions inside a
+single flattened function before Calyx emission.  This is the direct evidence
+for the current implementation bottleneck: the next compiler transformation
+must recover explicit prefill/decode component boundaries (including the
+four-leaf cache ABI) before generic Calyx/Yosys lowering, while preserving the
+fresh export contract above.
+
 ### PCIe transport availability observation (2026-09-26)
 
 At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
