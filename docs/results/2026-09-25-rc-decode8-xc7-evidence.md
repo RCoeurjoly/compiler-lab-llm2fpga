@@ -388,6 +388,12 @@ must recover explicit prefill/decode component boundaries (including the
 four-leaf cache ABI) before generic Calyx/Yosys lowering, while preserving the
 fresh export contract above.
 
+The corresponding Nix-provided Python contract gate was rerun with
+`unittest`: 21 tests passed and 2 tests were intentionally skipped.  This
+covers the cache ABI, phase ordering, integrated observation/readback
+manifest, and export save/reload behavior; it does not claim generated-RTL,
+PCIe, DDR3, or board success.
+
 ### PCIe transport availability observation (2026-09-26)
 
 At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
