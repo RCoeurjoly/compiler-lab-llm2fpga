@@ -470,6 +470,13 @@ Comb Group`, before SV emission.  The generated invoke boundary is therefore
 required by the current Calyx pipeline; removing it is not a valid workaround
 for the integrated control frontier.
 
+For pass-order localization, a short replay additionally disabled
+`static-promotion` and `static-inference` along with `compile-invoke`.  Calyx
+then stopped at `top_down_compile_control.rs:216`, reporting that `invoke`
+statements must be compiled away before control lowering.  This confirms that
+the invoke rewrite is a structural prerequisite independent of promotion
+heuristics; the fix must make that rewrite tractable rather than bypass it.
+
 ### PCIe transport availability observation (2026-09-26)
 
 At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
