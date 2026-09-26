@@ -248,6 +248,7 @@ let
   mkCalyxNativeSvDerivation = { name, calyx, calyxCompilePasses ? [ ]
     , calyxEmitNested ? true, calyxStreamMorty ? false
     , calyxDisableVerify ? false
+    , calyxDisableCellShare ? false
     , calyxSkipResourceReport ? false
     , calyxOptimizeFsmDecode ? false, calyxFsmDecodeKeepCopies ? false
     , calyxFsmDecodeShareStates ? false, calyxFsmDecodeHierarchical ? false }:
@@ -268,6 +269,7 @@ let
       export CALYX_EMIT_NESTED=${if calyxEmitNested then "1" else "0"}
       export CALYX_STREAM_MORTY=${if calyxStreamMorty then "1" else "0"}
       export CALYX_DISABLE_VERIFY=${if calyxDisableVerify then "1" else "0"}
+      export CALYX_DISABLE_CELL_SHARE=${if calyxDisableCellShare then "1" else "0"}
       export CALYX_SKIP_RESOURCE_REPORT=${if calyxSkipResourceReport then "1" else "0"}
       ${pkgs.bash}/bin/bash ${calyxToSvNoHandshake} \
         ${circt}/bin/circt-translate \
@@ -525,6 +527,7 @@ let
     , calyxCompilePasses ? [ ], calyxEmitNested ? true
     , calyxStreamMorty ? false
     , calyxDisableVerify ? false
+    , calyxDisableCellShare ? false
     , calyxSkipResourceReport ? false, calyxOptimizeFsmDecode ? false
     , calyxFsmDecodeKeepCopies ? false, calyxFsmDecodeShareStates ? false
     , calyxFsmDecodeHierarchical ? false }:
@@ -568,6 +571,7 @@ let
         "calyx-native-sv" = mkCalyxNativeSvDerivation {
           inherit name calyxCompilePasses calyxEmitNested calyxStreamMorty
             calyxDisableVerify
+            calyxDisableCellShare
             calyxSkipResourceReport calyxOptimizeFsmDecode
             calyxFsmDecodeKeepCopies calyxFsmDecodeShareStates
             calyxFsmDecodeHierarchical;
@@ -644,6 +648,7 @@ let
     , calyxCompilePasses ? [ ], calyxEmitNested ? true
     , calyxStreamMorty ? false
     , calyxDisableVerify ? false
+    , calyxDisableCellShare ? false
     , calyxSkipResourceReport ? false, calyxOptimizeFsmDecode ? false
     , calyxFsmDecodeKeepCopies ? false, calyxFsmDecodeShareStates ? false
     , calyxFsmDecodeHierarchical ? false, phaseAbi ? null }:
@@ -669,6 +674,7 @@ let
         inherit allowHwExterns fpPrimsSv slangPerFileExternModules
           calyxMathProfile calyxCompilePasses calyxEmitNested calyxStreamMorty
           calyxDisableVerify
+          calyxDisableCellShare
           calyxSkipResourceReport calyxOptimizeFsmDecode
           calyxFsmDecodeKeepCopies calyxFsmDecodeShareStates
           calyxFsmDecodeHierarchical phaseAbi;
@@ -691,6 +697,7 @@ let
       "calyxEmitNested"
       "calyxStreamMorty"
       "calyxDisableVerify"
+      "calyxDisableCellShare"
       "calyxSkipResourceReport"
       "calyxOptimizeFsmDecode"
       "calyxFsmDecodeKeepCopies"

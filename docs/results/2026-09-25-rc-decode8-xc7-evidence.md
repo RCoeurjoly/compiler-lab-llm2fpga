@@ -733,3 +733,9 @@ source and 851,444 KiB for baseline, with no observable change in the first
 backend frontier.  The 252-memory aliasing probe therefore is not the dominant
 control-lowering bottleneck; further speculative aliasing is deferred in favor
 of instrumenting or partitioning the Calyx control path.
+
+The same bounded probe with `cell-share` disabled (while retaining
+`compile-repeat`) reached the same 30-second bound but reduced peak RSS to
+763,672 KiB.  Calyx reported `compile-invoke` at 7.2 s before the timeout and
+did not emit SV.  The option is now plumbed through the reproducible Nix
+pipeline as `calyxDisableCellShare`; the default remains unchanged.
