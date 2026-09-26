@@ -373,3 +373,24 @@ current next action is therefore a targeted rowstream timing diagnosis or
 tool/constraint repair; PCIe and DDR3 must remain unchanged while isolating
 that failure. No board programming or inference claim follows from this
 route-only artifact.
+
+### Passing integrated timing receipts already present in Nix
+
+The store contains multiple legal routes of the same compiler-generated
+PCIe+UberDDR3 shell. In particular:
+
+* `qf0ps72f0fx4938cqdkw0dz1nrx69bxb-compiler-ddr3-trace-replay-route` reports
+  `legal_route: true`, rowstream 100.47 MHz (required 83.333 MHz), and PCIe
+  69.35 MHz (required 62.5 MHz).
+* `2xb34ymsrmpjz71i0dhfrvxgp41qww0f-compiler-ddr3-trace-replay-route` reports
+  `legal_route: true`, rowstream 88.48 MHz, and PCIe 95.26 MHz.
+
+Both receipts explicitly scope timing to the pinned fabric model and do not
+claim DDR/PHY, CDC, or electrical signoff. Their FASM hashes are respectively
+`5b5babb95da42b3651eacf875276a94af41d70282d77001323d565ad8f8352e1` and
+`57f38a9a6d3986e6075351c2b27ca856e4591630eac9ca894b2b55780c82422f`.
+This changes the timing diagnosis: the integrated architecture can close at
+the fixed profile, but the current route recipe is placement-sensitive. The
+next reproducibility gate is to identify and pin the successful placement
+inputs/seed and then carry that exact FASM through bitstream generation and
+board validation.
