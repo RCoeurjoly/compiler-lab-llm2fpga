@@ -710,3 +710,11 @@ phase ABI option leaked through the generic `registerModel` path into
 now strips `phaseAbi` while the no-handshake path retains it.  The full
 no-build flake check passes after this repair; no compiler artifact or hardware
 qualification is implied by that structural check.
+
+### Bounded alias-backend probe (2026-09-26)
+
+The 252-alias Futil was passed through Calyx with all default optimization
+passes disabled (`-d all -p well-formed`).  Calyx parsed the rewritten source
+but stopped at the expected backend precondition that unlowered control must be
+empty.  This separates source validity from the expensive normal
+control-lowering path; it is not an SV or synthesis result.
