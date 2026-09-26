@@ -19,8 +19,11 @@ Two bounded observations follow:
 2. The current `sf28…` variant includes the div/sqrt handshake receipt and was
    compiled successfully with Verilator `-j1 -O0`. Its simulation did not
    produce `done` or output files within the 900-second bound, and an extended
-   already-built-binary run was bounded at 1,800 seconds. This is a runtime
-   frontier, not a semantic mismatch result.
+   already-built-binary run was bounded at 1,800 seconds. The extended run
+   terminated with `timeout` exit 124 at exactly 30:00 wall time; its log is
+   `/tmp/rc-prefill8-authenticated-vvlf-lowmem/simulation-1800s.log` (SHA-256
+   `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`).
+   This is a runtime frontier, not a semantic mismatch result.
 
 The historical repaired three-phase receipt (`16b1189`) reports a prefill
 simulation of 580.66 seconds and bit-exact outputs, but its native-SV closure
