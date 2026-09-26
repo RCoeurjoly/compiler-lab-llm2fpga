@@ -949,6 +949,22 @@
           ]);
         rcServingW4A8PipelinePackages =
           pipelineLib.pipelineStagePackagesFromRegistry rcServingW4A8Registry;
+        rcServingW4A8PhaseAbiVerification = pkgs.runCommand
+          "tinystories-w4a8-rc-serving-phase-abi-verification"
+          { nativeBuildInputs = [ python ]; }
+          ''
+            set -euo pipefail
+            mkdir -p "$out"
+            ${python}/bin/python ${./scripts/pipeline/verify_rc_serving_phase_abi.py} \
+              --abi ${rcServingW4A8IntegratedSystem.pytorchExported}/compiler-phase-abi.json \
+              --prefill-flat-scf ${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-flat-scf"}/flat.scf.mlir \
+              --decode8-flat-scf ${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-flat-scf"}/flat.scf.mlir \
+              --decode9-flat-scf ${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-flat-scf"}/flat.scf.mlir \
+              --prefill-sv ${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-calyx-native-sv"}/sv/main.sv \
+              --decode8-sv ${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv"}/sv/main.sv \
+              --decode9-sv ${rcServingW4A8PipelinePackages."tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-calyx-native-sv"}/sv/main.sv \
+              --output "$out/report.json"
+          '';
         rcServingW4A8Xc7Evidence = {
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-xc7k480t-evidence" =
             import ./nix/rc-serving-w4a8-xc7k480t.nix {
@@ -3344,6 +3360,8 @@ PY
             rcServingW4A8IntegratedPipelinePackages."tinystories-w4a8-rc-serving-integrated-calyx-native-sv";
           "tinystories-w4a8-rc-serving-integrated-shell" =
             rcServingW4A8IntegratedShell;
+          "tinystories-w4a8-rc-serving-phase-abi-verification" =
+            rcServingW4A8PhaseAbiVerification;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-pytorch-exported" =
             rcServingW4A8System.prefill8PytorchExported;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-pytorch-exported" =
