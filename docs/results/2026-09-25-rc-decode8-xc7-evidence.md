@@ -411,6 +411,12 @@ five semantic output ports, maximum absolute error `0.0`, compilation time
 compiler-generated RTL phase gate; it is not yet the integrated multi-phase
 program and does not exercise PCIe, DDR3, or hardware.
 
+The Nix wiring, generated-shell, and XC7 phase-artifact regression tests also
+pass (`21 tests`, `unittest`).  These tests retain the one-wholesale-integrated
+program invariant and reject silently substituting a bundle of phase programs;
+they are structural checks, not a claim that the integrated RTL has passed
+simulation or implementation.
+
 ### PCIe transport availability observation (2026-09-26)
 
 At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
