@@ -40,6 +40,12 @@ Two bounded attempts were made against the exact generated shell:
    the original RTL in 62.45 seconds (5.24 GiB peak RSS).  `write_verilog`
    emitted a 146 MiB netlist, substantially larger than the 55 MiB source;
    this is a viable parser/staging route but not yet a simulator solution.
+7. The pinned Calyx 0.7.1 backend was rerun with `CALYX_EMIT_NESTED=1` on
+   the integrated Calyx artifact.  Normalization, Calyx export, and constant
+   verification completed.  Native Calyx conversion reached the 900-second
+   limit and exited 124 without producing SV.  The converter used more than
+   23 GiB RSS near the limit.  This mode does not currently provide a bounded
+   integrated RTL path on this host.
 
 The generated file is approximately 1.43 million lines. No clock was
 executed, so these attempts provide no functional pass or mismatch result.
