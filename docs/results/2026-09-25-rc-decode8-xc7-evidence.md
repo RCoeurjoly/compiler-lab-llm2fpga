@@ -353,6 +353,28 @@ INT8 output `[-2, 76]`. The expected and simulated output hashes both equal
 This establishes the RC's current compiler-generated simulation equivalence;
 it is not yet autoregressive generation and does not exercise PCIe or DDR3.
 
+### Fresh Nix revalidation of the integrated PyTorch contract (2026-09-26)
+
+The integrated export was rebuilt from the current flake rather than relying
+on the older store path.  The fresh derivation is
+`/nix/store/4fh14bw446l1ngvjhb905vl98jrclalp-tinystories-w4a8-rc-serving-integrated-pytorch-exported`.
+Its receipt records one integrated exported program, 18 output tensors,
+`frozen_phase_qparams_equal=true`, `frozen_prefill_equal=true`, and
+`save_reload_equal=true`.  The cache-chained observation remains the
+three-stage contract `prefill-8 -> decode-8 -> decode-9` with token sequence
+`[0, 0, 4]`; the source model is the pinned TinyStories-1M snapshot.  The
+fresh hashes are:
+
+| artifact | SHA-256 |
+| --- | --- |
+| `exported.pt2` | `03cec6bc7857ac7184fb5c63b53565c36228245474ed2f6299670e7ef33fded9` |
+| `observation.json` | `3a318cc316848d8865fb013b7c9573b432218e99f8595d0af28725cf253d2da1` |
+| `readback-manifest.json` | `e8708c8692c48721153cff1381db3cc6054abd9e32aa8965235dd905b81dd298` |
+
+This revalidation changes no RTL or transport.  It freezes the exact
+compiler input and phase/cache contract that the next compiler-side
+partitioning work must preserve.
+
 ### Compiler-RC plus PCIe/UberDDR3 integration route
 
 The realized `compiler-ddr3-trace-replay-route` artifact
