@@ -427,3 +427,15 @@ The byte-level `.bit` hash differs from the `/tmp` conversion because the
 container header is generated separately; the frame payload and decoded
 configuration agree.  This Nix output is the preferred programming source
 once the JTAG device is available.
+
+### Autoregressive interface audit
+
+The current compiler-generated Wishbone wrapper does not yet satisfy the
+goal's autoregressive gate. `generate_tinystories_integer_wb_top.py` exposes
+`token_data` as a two-entry local input memory and exposes `result0/result1` as
+the two output bytes. `run_tinystories_integer_wb_sim.py` asserts `go` once,
+waits for one `done`, and checks `16'h4cfe`; it does not feed a generated token
+back into a subsequent invocation. Therefore the existing `pass` receipt is
+one-shot semantic equivalence only. Multi-token feedback simulation, PCIe
+image load/readback, DDR3 calibration/BIST, and board inference remain open
+gates rather than being implied by the route or bitstream artifacts.
