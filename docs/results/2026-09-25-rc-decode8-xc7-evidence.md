@@ -394,3 +394,26 @@ the fixed profile, but the current route recipe is placement-sensitive. The
 next reproducibility gate is to identify and pin the successful placement
 inputs/seed and then carry that exact FASM through bitstream generation and
 board validation.
+
+### Bitstream conversion of a timing-passing integrated route
+
+The qf0 route was converted with the pinned prjxray tools and Kintex-7
+database.  The input FASM is the route artifact above (SHA-256
+`5b5babb95da42b3651eacf875276a94af41d70282d77001323d565ad8f8352e1`).
+Conversion completed with `fasm2frames` and `xc7frames2bit`; `bitread` then
+decoded the result and reported `DONE` and 46,336 configuration frames.
+
+The resulting host-only artifacts were:
+
+* frames SHA-256: `a240215edcb0900541b688606fb8dc4b6825e24594569228cdb6f671118fada8`;
+* bitstream SHA-256: `0718ebb99b270e3bc9cb58414cb8ad471948ccebcc5becce8c530c4f22972d48`;
+* decoded configuration-bit listing SHA-256:
+  `fa1b848244fd5c9fbc8a130dee43030b976f0ae9dae0970f058b45a3081734e9`;
+* decoded listing: 880,384 nonempty lines.
+
+The conversion used only pinned Nix-store fasm/prjxray/PyYAML/simplejson/
+intervaltree/sortedcontainers paths and the database part file
+`xc7k480tffg1156-1/part.yaml`.  This proves FASM-to-bitstream conversion and
+structural decoding, not board programming, PCIe enumeration, DDR3
+calibration, or inference.  The bitstream remains unprogrammed pending the
+board gate and an independently reproducible route receipt.
