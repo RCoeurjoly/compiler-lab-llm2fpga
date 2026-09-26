@@ -36,6 +36,10 @@ Two bounded attempts were made against the exact generated shell:
 5. A reachability-pruned source retained 48 of 94 module definitions, but
    Verilator still received signal 9 during elaboration.  The pruning utility
    is retained as a reusable diagnostic; it is not claimed as a solution.
+6. Yosys 0.66 with the repository DSP fix successfully parsed and hierarchied
+   the original RTL in 62.45 seconds (5.24 GiB peak RSS).  `write_verilog`
+   emitted a 146 MiB netlist, substantially larger than the 55 MiB source;
+   this is a viable parser/staging route but not yet a simulator solution.
 
 The generated file is approximately 1.43 million lines. No clock was
 executed, so these attempts provide no functional pass or mismatch result.
