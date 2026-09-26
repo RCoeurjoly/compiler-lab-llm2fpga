@@ -6,6 +6,8 @@ import torch
 from torch import nn
 
 from TinyStories import rc_serving_w4a8_export as export
+from TinyStories.rc_serving_contract import load_trace, phase_by_name
+from TinyStories.rc_serving_w4a8_cache_abi import flatten_dynamic_cache
 
 
 class _FakeExported:
@@ -15,6 +17,36 @@ class _FakeExported:
 
 
 class RcServingW4A8ExportTest(unittest.TestCase):
+    def test_next_phase_uses_converted_logits_and_cache(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        trace = load_trace(root / "TinyStories" / "rc_serving_trace_input.json")
+        cache = tuple(
+            torch.arange(16, dtype=torch.float32).reshape(1, 1, 8, 2) + ordinal
+            for ordinal in range(4)
+        )
+        invocation = export.phase_invocation_from_converted_output(
+            phase_by_name("decode-8"),
+            trace,
+            torch.tensor([[[0.25, 0.75, 0.5, 0.1, 0.2, 0.3]]]),
+            cache,
+        )
+        self.assertEqual(invocation.input_ids.tolist(), [[1]])
+        actual_cache = flatten_dynamic_cache(invocation.past_key_values, expected_layers=2)
+        self.assertTrue(all(torch.equal(actual, expected) for actual, expected in zip(actual_cache, cache)))
+
+    def test_next_phase_rejects_prefill_or_wrong_cache_arity(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        trace = load_trace(root / "TinyStories" / "rc_serving_trace_input.json")
+        logits = torch.zeros((1, 1, 6))
+        with self.assertRaisesRegex(ValueError, "non-prefill"):
+            export.phase_invocation_from_converted_output(
+                phase_by_name("prefill-8"), trace, logits, tuple()
+            )
+        with self.assertRaisesRegex(ValueError, "four cache leaves"):
+            export.phase_invocation_from_converted_output(
+                phase_by_name("decode-8"), trace, logits, tuple()
+            )
+
     def test_convert_w4a8_program_materializes_signed_int4_weight(self) -> None:
         class Linear(nn.Module):
             def __init__(self) -> None:

@@ -32,10 +32,15 @@ from .rc_serving_w4a8_contract import (
     WEIGHT_MIN,
     validate_manifest,
 )
-from .rc_serving_contract import load_trace
-from .rc_serving_w4a8_cache_abi import TensorCachePhaseWrapper, flatten_dynamic_cache
+from .rc_serving_contract import argmax_lowest, load_trace
+from .rc_serving_w4a8_cache_abi import (
+    TensorCachePhaseWrapper,
+    flatten_dynamic_cache,
+    reconstruct_dynamic_cache,
+)
 from .rc_serving_evidence import enable_hf_dynamic_cache_export_support, tensor_record
 from .rc_serving_w4a8_source import build_w4a8_source_model, fresh_w4a8_phase_invocation
+from .rc_serving_source import PhaseInvocation
 
 
 @dataclass(frozen=True)
@@ -234,16 +239,47 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def phase_invocation_from_converted_output(
+    phase: object,
+    trace: object,
+    logits: torch.Tensor,
+    cache_leaves: tuple[torch.Tensor, ...],
+) -> PhaseInvocation:
+    """Build the next phase input from the preceding converted phase."""
+    if getattr(phase, "cache_length_before", 0) <= 0:
+        raise ValueError("converted-output chaining requires a non-prefill phase")
+    if len(cache_leaves) != 4:
+        raise ValueError("converted-output chaining requires four cache leaves")
+    token = argmax_lowest(logits[0, -1, :].detach().cpu().tolist())
+    past_key_values = reconstruct_dynamic_cache(cache_leaves, expected_layers=2)
+    return PhaseInvocation(
+        phase,
+        torch.tensor([[token]], dtype=torch.long),
+        past_key_values,
+        trace,
+    )
+
+
 def materialize_w4a8_bundle(model_path: Path, trace_path: Path, out_dir: Path) -> None:
     trace = load_trace(trace_path)
     out_dir.mkdir(parents=True, exist_ok=False)
     converted_phases: dict[str, torch.export.ExportedProgram] = {}
     phase_digests: dict[str, str] = {}
+    previous_logits: torch.Tensor | None = None
+    previous_cache: tuple[torch.Tensor, ...] | None = None
     enable_hf_dynamic_cache_export_support()
     for phase_name in PHASE_NAMES:
         torch._dynamo.reset()
         model = build_w4a8_source_model(model_path)
-        invocation = fresh_w4a8_phase_invocation(model, trace, phase_name)
+        phase = next(item for item in trace.phases if item.name == phase_name)
+        if phase_name == PHASE_NAMES[0]:
+            invocation = fresh_w4a8_phase_invocation(model, trace, phase_name)
+        else:
+            if previous_logits is None or previous_cache is None:
+                raise RuntimeError(f"missing converted predecessor for {phase_name}")
+            invocation = phase_invocation_from_converted_output(
+                phase, trace, previous_logits, previous_cache
+            )
         cache_inputs = (
             ()
             if invocation.past_key_values is None
@@ -263,6 +299,8 @@ def materialize_w4a8_bundle(model_path: Path, trace_path: Path, out_dir: Path) -
             output = converted.module()(*example_inputs)
         if not isinstance(output, tuple) or len(output) != 5 or not isinstance(output[0], torch.Tensor):
             raise RuntimeError(f"{phase_name} converted program did not return logits and cache")
+        previous_logits = output[0].detach().clone()
+        previous_cache = tuple(tensor.detach().clone() for tensor in output[1:])
         _write_json(
             phase_dir / "reference.json",
             {
