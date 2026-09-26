@@ -452,6 +452,17 @@ This confirms that the backend requires a coordinated control-lowering
 sequence; removing the general pass set is not a safe shortcut.  No
 production pass was changed.
 
+### Integrated Futil control census (2026-09-26)
+
+The retained compiler-generated Futil (`model.futil` SHA-256
+`980d3e36d8fcb0c4bf6e49388be20c20f1bea2f2feae2dc138203188421a1101`) contains
+764 `seq_mem_d1` memories, 10,157 registers, 10,932 groups, 3,091 `seq`
+blocks, 1,829 `par` blocks, and 1,829 `repeat` loops.  The public component
+has one `invoke` of `main_1`, whose generated control contains the repeated
+phase/block schedule.  This census explains why `compile-invoke` remains the
+frontier after cell sharing is disabled and provides the quantitative target
+for a compiler-side control/memory consolidation pass.
+
 ### PCIe transport availability observation (2026-09-26)
 
 At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
