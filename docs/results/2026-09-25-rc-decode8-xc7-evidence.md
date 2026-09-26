@@ -463,6 +463,13 @@ phase/block schedule.  This census explains why `compile-invoke` remains the
 frontier after cell sharing is disabled and provides the quantitative target
 for a compiler-side control/memory consolidation pass.
 
+A bounded direct Calyx replay disabled only `compile-invoke` (also disabling
+cell sharing and verification).  It failed immediately in
+`promotion_analysis.rs:95` with `Shouldn't Promote to Static if there is a
+Comb Group`, before SV emission.  The generated invoke boundary is therefore
+required by the current Calyx pipeline; removing it is not a valid workaround
+for the integrated control frontier.
+
 ### PCIe transport availability observation (2026-09-26)
 
 At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
