@@ -444,6 +444,14 @@ skipping all compile passes as a useful workaround; any further experiment
 must retain repeat lowering and selectively bound the subsequent control
 passes.
 
+A fourth replay used the minimal legal pass set
+`CALYX_COMPILE_PASSES=compile-repeat` (with `cell-share` disabled).  It did
+not reach SV emission: Calyx rejected the resulting Futil with
+`Malformed Structure: Control must be empty` at the generated `seq` block.
+This confirms that the backend requires a coordinated control-lowering
+sequence; removing the general pass set is not a safe shortcut.  No
+production pass was changed.
+
 ### PCIe transport availability observation (2026-09-26)
 
 At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
