@@ -25,6 +25,7 @@ from .rc_serving_w4a8_cache_abi import (
 )
 from .rc_serving_w4a8_integrated_contract import IntegratedObservation
 from .rc_serving_w4a8_integrated_contract import (
+    build_compiler_phase_abi,
     build_readback_manifest,
     write_integrated_observation,
 )
@@ -309,6 +310,11 @@ def materialize_integrated_bundle(
     (out_dir / "graph.txt").write_text(graph_text, encoding="utf-8")
     (out_dir / "readback-manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (out_dir / "compiler-phase-abi.json").write_text(
+        json.dumps(build_compiler_phase_abi(manifest), indent=2, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
     )
     observation_path = out_dir / "observation.json"
     write_integrated_observation(observation_path, observation, manifest)

@@ -25,6 +25,17 @@ def valid_phase_shapes() -> dict[str, dict[str, object]]:
 
 
 class RcServingW4A8IntegratedContractTest(unittest.TestCase):
+    def test_compiler_phase_abi_is_derived_from_readback_manifest(self) -> None:
+        readback = contract.build_readback_manifest(valid_phase_shapes())
+        abi = contract.build_compiler_phase_abi(readback)
+
+        contract.validate_compiler_phase_abi(abi)
+        self.assertEqual(
+            [phase["name"] for phase in abi["phases"]],
+            ["prefill-8", "decode-8", "decode-9"],
+        )
+        self.assertEqual(abi["source"], contract.READBACK_SCHEMA)
+
     def test_readback_manifest_is_dense_and_phase_ordered(self) -> None:
         manifest = contract.build_readback_manifest(valid_phase_shapes())
 

@@ -17,6 +17,7 @@ from .rc_serving_w4a8_contract import PHASE_NAMES, W4A8_MODEL_KEY
 
 OBSERVATION_SCHEMA = "rc-serving-w4a8-integrated-observation-v1"
 READBACK_SCHEMA = "rc-serving-w4a8-integrated-readback-v1"
+PHASE_ABI_SCHEMA = "rc-serving-w4a8-compiler-phase-abi-v1"
 ARGMAX_TIE_BREAK = "lowest-index"
 CACHE_LEAF_COUNT = 4
 _PHASE_SEQUENCE_LENGTHS = dict(zip(PHASE_NAMES, (8, 9, 10)))
@@ -194,6 +195,70 @@ def validate_readback_manifest(raw: Mapping[str, object]) -> None:
                 raise ValueError(f"{phase} cache leaf {leaf_number} sequence length is invalid")
             if leaf.get("word_count") != _element_count(shape):
                 raise ValueError(f"{phase} cache leaf {leaf_number} word count is invalid")
+
+
+def build_compiler_phase_abi(readback: Mapping[str, object]) -> dict[str, object]:
+    """Project the authenticated readback layout into a compiler ABI sidecar.
+
+    The exported graph does not retain serving-phase names.  This sidecar is
+    therefore the explicit handoff consumed by later MLIR/Calyx stages; it
+    contains no executable implementation and is derived solely from the
+    already validated readback manifest.
+    """
+
+    validate_readback_manifest(readback)
+    regions = readback["regions"]
+    assert isinstance(regions, list)
+    return {
+        "schema": PHASE_ABI_SCHEMA,
+        "model_key": W4A8_MODEL_KEY,
+        "phases": [
+            {
+                "name": region["phase"],
+                "token_address": region["token_address"],
+                "logits": region["logits"],
+                "cache_leaves": region["cache_leaves"],
+            }
+            for region in regions
+        ],
+        "output_order": [
+            "prefill-8.token",
+            "decode-8.token",
+            "decode-9.token",
+            "prefill-8.logits",
+            "prefill-8.cache[0..3]",
+            "decode-8.logits",
+            "decode-8.cache[0..3]",
+            "decode-9.logits",
+            "decode-9.cache[0..3]",
+        ],
+        "source": "rc-serving-w4a8-integrated-readback-v1",
+    }
+
+
+def validate_compiler_phase_abi(raw: Mapping[str, object]) -> None:
+    if raw.get("schema") != PHASE_ABI_SCHEMA:
+        raise ValueError("unsupported compiler phase ABI schema")
+    if raw.get("model_key") != W4A8_MODEL_KEY:
+        raise ValueError("compiler phase ABI model key does not match")
+    if raw.get("source") != READBACK_SCHEMA:
+        raise ValueError("compiler phase ABI source does not match readback schema")
+    phases = raw.get("phases")
+    if not isinstance(phases, list) or [p.get("name") for p in phases] != list(PHASE_NAMES):
+        raise ValueError("compiler phase ABI phases are not canonical")
+    output_order = raw.get("output_order")
+    if output_order != [
+        "prefill-8.token",
+        "decode-8.token",
+        "decode-9.token",
+        "prefill-8.logits",
+        "prefill-8.cache[0..3]",
+        "decode-8.logits",
+        "decode-8.cache[0..3]",
+        "decode-9.logits",
+        "decode-9.cache[0..3]",
+    ]:
+        raise ValueError("compiler phase ABI output order is not canonical")
 
 
 def _validate_observation(
