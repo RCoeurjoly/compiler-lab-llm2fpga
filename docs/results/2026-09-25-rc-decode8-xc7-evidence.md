@@ -662,3 +662,14 @@ hashing approximately 298,000 cells rather than stalling in `CMP2LCU`
 expansion. Removing that techmap changes the frontier but does not solve the
 implementation bottleneck; the next experiment should target the large
 post-techmap optimization pass or partition the generated phase before Yosys.
+
+### No-CMP2LCU/no-post-opt synthesis comparison (2026-09-26)
+
+The second diagnostic variant,
+`tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-xc7k480t-no-cmp2lcu-no-opt-evidence`,
+was run to the same 600-second Yosys bound. Its receipt is
+`/nix/store/ldp7gny0d84qcnn0yrrqrfkd1f2g19vn-decode-8-no-cmp2lcu-no-opt-xc7k480t-evidence`.
+Yosys again timed out (`124`) and nextpnr was not run, but the log advanced
+through optimization and reached `SYNTH_XILINX`/`MEMORY_LIBMAP`. This confirms
+that post-techmap `OPT_MERGE` is costly but not the final blocker; the generated
+memory mapping is now the next implementation frontier.
