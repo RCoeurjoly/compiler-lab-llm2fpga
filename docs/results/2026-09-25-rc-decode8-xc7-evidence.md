@@ -375,6 +375,15 @@ This revalidation changes no RTL or transport.  It freezes the exact
 compiler input and phase/cache contract that the next compiler-side
 partitioning work must preserve.
 
+### PCIe transport availability observation (2026-09-26)
+
+At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
+`0000:42:00.0`, Xilinx device `10ee:0480`, subsystem `10ee:abcd`, with BAR0
+assigned at `0x74000000` (4 KiB).  This confirms that the established PCIe
+lifecycle is currently available.  It does **not** identify the programmed
+FPGA image and does not prove DDR3 calibration, image load/readback, or RC
+inference; those remain separate acceptance gates.
+
 ### Compiler-RC plus PCIe/UberDDR3 integration route
 
 The realized `compiler-ddr3-trace-replay-route` artifact
