@@ -439,3 +439,10 @@ back into a subsequent invocation. Therefore the existing `pass` receipt is
 one-shot semantic equivalence only. Multi-token feedback simulation, PCIe
 image load/readback, DDR3 calibration/BIST, and board inference remain open
 gates rather than being implied by the route or bitstream artifacts.
+
+The current wrapper was re-run through the pinned Verilator binary from the
+Nix store using the content-addressed wrapper and compiler SV artifacts.  The
+transaction-level Wishbone test completed with `WB_RC_PASS result=4cfe`;
+Verilator compilation took 18.531 s and simulation took 0.051 s.  This is a
+fresh confirmation of the one-shot RC semantic gate, not a multi-token or
+autoregressive result.
