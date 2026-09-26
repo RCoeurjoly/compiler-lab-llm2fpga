@@ -65,6 +65,9 @@ def verify(abi_path: Path, flat_scf_paths: dict[str, Path], sv_paths: dict[str, 
         if output_shapes != expected:
             raise ValueError(f"{name}: output shapes disagree with phase ABI")
         if shapes[0] != ((8,) if name == "prefill-8" else (1,)):
+            raise ValueError(f"{name}: position input shape is not canonical")
+        token_port = 31 if name == "prefill-8" else 27
+        if shapes[token_port] != ((1, 8) if name == "prefill-8" else (1, 1)):
             raise ValueError(f"{name}: token input shape is not canonical")
         if name != "prefill-8":
             input_cache = shapes[28:32]
@@ -78,7 +81,9 @@ def verify(abi_path: Path, flat_scf_paths: dict[str, Path], sv_paths: dict[str, 
             "semantic_memories": len(shapes),
             "input_count": 32,
             "output_count": 5,
-            "token_input_shape": list(shapes[0]),
+            "position_input_shape": list(shapes[0]),
+            "token_input_port": token_port,
+            "token_input_shape": list(shapes[token_port]),
             "cache_input_shapes": [list(shape) for shape in shapes[28:32]],
             "cache_output_shapes": [list(shape) for shape in output_shapes[1:]],
         }
