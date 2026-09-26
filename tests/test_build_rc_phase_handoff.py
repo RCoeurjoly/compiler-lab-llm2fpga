@@ -120,6 +120,19 @@ class BuildHandoffTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "initial memory.*hash"):
             build_handoff(abi, phases)
 
+    def test_rejects_frozen_examples_on_dynamic_token_and_cache_ports(self):
+        for phase, port, width in (("prefill-8", 31, 64), ("decode-8", 27, 64),
+                                   ("decode-8", 28, 32), ("decode-9", 31, 32)):
+            with self.subTest(phase=phase, port=port):
+                abi, phases = fixture()
+                payload = bytes(width // 8)
+                phases[phase]["initial_memories"][str(port)] = {
+                    "width": width, "words": [payload.hex()],
+                    "sha256": hashlib.sha256(payload).hexdigest(),
+                }
+                with self.assertRaisesRegex(ValueError, "dynamic user input"):
+                    build_handoff(abi, phases)
+
     def test_existing_phase_verifier_checks_token_not_position_port(self):
         abi, _ = fixture()
         with tempfile.TemporaryDirectory() as directory:

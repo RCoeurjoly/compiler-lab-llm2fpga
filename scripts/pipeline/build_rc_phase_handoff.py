@@ -60,6 +60,7 @@ def build_handoff(abi: dict, phases: dict[str, dict]) -> dict:
             raise ValueError(f"{name}: namespaced main_1 is missing")
         if "namespaced_sv_sha256" in artifact and receipt.get("output_sha256") != artifact["namespaced_sv_sha256"]:
             raise ValueError(f"{name}: namespaced output source hash is stale")
+        token_port = artifact["token_input_port"]
         for key, image in artifact["initial_memories"].items():
             port_number = int(key)
             if port_number < 0 or port_number >= len(rtl):
@@ -72,7 +73,8 @@ def build_handoff(abi: dict, phases: dict[str, dict]) -> dict:
             payload = b"".join(int(word, 16).to_bytes(byte_width, "little") for word in words)
             if _digest(payload) != image["sha256"]:
                 raise ValueError(f"{name}: initial memory {key} hash mismatch")
-        token_port = artifact["token_input_port"]
+            if port_number == token_port or (name != "prefill-8" and 28 <= port_number <= 31):
+                raise ValueError(f"{name}: dynamic user input port {key} must not be preinitialized")
         expected_token_port = 31 if name == "prefill-8" else 27
         token_shape = (1, 8) if name == "prefill-8" else (1, 1)
         if token_port != expected_token_port or semantic[token_port].shape != token_shape or semantic[token_port].width != 64:
@@ -184,6 +186,8 @@ def load_phase_artifacts(phase: str, paths: dict[str, Path]) -> dict:
         expected = semantic[port]
         if shape != expected.shape and not (shape == () and expected.shape == (1,)):
             raise ValueError(f"{phase}: runtime memory {port} shape mismatch")
+        if port in user_input_ports:
+            continue
         images[str(port)] = {"width": expected.width, "words": memory_words(payload, width=expected.width),
                              "dtype": dtype, "sha256": _digest(payload)}
     globals_ = parse_flat_scf_global_bindings(flat_bytes.decode(), first_port=len(semantic))

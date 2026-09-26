@@ -1052,6 +1052,16 @@
             set -e
             printf '%s\n' "$result" > "$out/runner-exit-code"
           '';
+        rcServingW4A8PhaseComposedAcceptance = pkgs.runCommand
+          "tinystories-w4a8-rc-serving-phase-composed-acceptance"
+          { nativeBuildInputs = [ python ]; }
+          ''
+            set -euo pipefail
+            mkdir -p "$out"
+            ${python}/bin/python ${./scripts/pipeline/check_rc_phase_composed_receipt.py} \
+              --simulation ${rcServingW4A8PhaseComposedSimulation} \
+              --output "$out/acceptance.json"
+          '';
         rcServingW4A8Xc7Evidence = {
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-xc7k480t-evidence" =
             import ./nix/rc-serving-w4a8-xc7k480t.nix {
@@ -3455,6 +3465,8 @@ PY
             rcServingW4A8PhaseComposedShell;
           "tinystories-w4a8-rc-serving-phase-composed-simulation" =
             rcServingW4A8PhaseComposedSimulation;
+          "tinystories-w4a8-rc-serving-phase-composed-acceptance" =
+            rcServingW4A8PhaseComposedAcceptance;
           "tinystories-w4a8-rc-serving-phase-abi-verification" =
             rcServingW4A8PhaseAbiVerification;
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-prefill-8-pytorch-exported" =

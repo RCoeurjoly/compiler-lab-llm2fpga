@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from scripts.pipeline.run_rc_serving_w4a8_integrated_sv import (
+    _sv_tb_composed,
     classify_process_result,
     compare_composed_readback,
     run_composed,
@@ -15,6 +16,20 @@ from scripts.pipeline.run_rc_serving_w4a8_integrated_sv import (
 
 
 class ComposedReadbackTests(unittest.TestCase):
+    def test_real_testbench_checks_every_handoff_word_and_token(self):
+        manifest = {"handoffs": [
+            {"token_destination_port": 27,
+             "cache": [{"source_port": 33, "destination_port": 28, "words": 2}]},
+            {"token_destination_port": 27,
+             "cache": [{"source_port": 34, "destination_port": 29, "words": 3}]},
+        ]}
+        tb = _sv_tb_composed([0] * 8, 237, 1000, handoff_manifest=manifest)
+        self.assertIn("dut.mem_p1_28[1] !== dut.mem_p0_33[1]", tb)
+        self.assertIn("dut.mem_p2_29[2] !== dut.mem_p1_34[2]", tb)
+        self.assertIn("dut.mem_p1_27[0] !== token0", tb)
+        self.assertIn("dut.mem_p2_27[0] !== token1", tb)
+        self.assertIn("HANDOFF_CHECKED 5", tb)
+
     def test_first_cache_word_mismatch_reports_phase_port_word_and_bit(self):
         manifest = {
             "readback_words": 4,
@@ -59,7 +74,7 @@ class ComposedReadbackTests(unittest.TestCase):
             shell.write_text("module rc_phase_composed; endmodule\n")
             phase = package / "phase.sv"
             phase.write_text("module generated_phase; endmodule\n")
-            manifest = {"readback_words": 2, "phases": []}
+            manifest = {"readback_words": 2, "phases": [], "handoffs": []}
             manifest_path = root / "handoff.json"
             manifest_path.write_text(json.dumps(manifest))
             observation_path = root / "observation.json"

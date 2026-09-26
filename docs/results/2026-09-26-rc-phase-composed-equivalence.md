@@ -12,21 +12,26 @@ simulated design. The shell consumed prompt IDs `[0, 1, 2, 3, 4, 5, 0, 1]`,
 selected each next token from hardware logits, and copied the four raw `f32`
 cache leaves into the next phase.
 
-The immutable Nix output is
-`/nix/store/3p2v5hlrg6ar8vr5x2pylj0ywdk8ak93-tinystories-w4a8-rc-serving-phase-composed-simulation`.
-Its `report.json` (SHA-256
-`fde50bcc0e1d330000a511b16cb64489faf2ae3ebf2ec52640dae918edec191a`)
-records:
+The corrected simulation output is
+`/nix/store/4y264sijpfgly9v1l2i3fd463rk4aa3r-tinystories-w4a8-rc-serving-phase-composed-simulation`.
+Its `report.json` SHA-256 is
+`ffa2dcd1f40b30161b5126ccbfcfabb01e726e85532ddbab81aa684037b14d45`.
+The separate **fail-closed** Nix target
+`tinystories-w4a8-rc-serving-phase-composed-acceptance` produced
+`/nix/store/wzdb796j6mhp1vpcb2yvrxv61s02s9hg-tinystories-w4a8-rc-serving-phase-composed-acceptance/acceptance.json`
+(SHA-256 `89e1ace4939d16b0e2a696d0bb0f15853052aba51cc04426c251307f16c628c0`).
+It reports `status=accepted` and records:
 
 | Check | Observed result |
 | --- | --- |
-| Verilator build | exit 0, 1288.47 s, one C++ job, 2700 s bound |
-| Simulation | exit 0, 715.14 s, 900 s bound |
+| Verilator build | exit 0, 1286.16 s, one C++ job, 2700 s bound |
+| Simulation | exit 0, 731.89 s, 900 s bound |
 | Tokens | expected and actual `[0, 0, 4]` |
+| Cache handoff | all 136 words checked at `RUN1`/`RUN2`; both generated token inputs checked |
 | Readback | 237/237 exact words, zero mismatches |
 | Simulation cycles | 654,936 |
 | Raw `readback.hex` SHA-256 | `60110f1629a17ae8c0cba430b2956c5a20f35083ad27c3aa670af2cd0b2a8455` |
-| Generated shell SHA-256 | `16a5d8fcbdd264ab4543c4fa2651845dbf2cc94e2ef2154c00681f1de675d954` |
+| Generated shell SHA-256 | `047b230e7fe5437ddfa529cd38f1a4ba2a1cb6c7f64e05ba719894cf97743156` |
 | Frozen observation SHA-256 | `97a7f335a15fb99226a8e29bdeff48944fc498fa45756699db121cadfd4b5e52` |
 
 The manifest and package receipts are in the output report. Its source table
@@ -37,15 +42,25 @@ operations. The manifest preserves actual 64-bit address pins on generated
 zero-extent placeholder memories; the earlier one-bit shell connections have
 been corrected.
 
+The first passing Nix diagnostic had preloaded the frozen decode token/cache
+examples into dynamic USER_INPUT memories. Its token and readback match was
+real, but it did **not** independently establish that the shell transferred
+cache values. The corrected handoff manifest has no initialization images for
+prefill token port 31 or decode token/cache ports 27–31. Its testbench checks
+all 136 destination cache words against preceding phase outputs at the phase
+boundaries and checks both generated token inputs. A small synthetic generated
+RTL run also exercised the same monitor with nonzero token sequence
+`[2, 3, 4]`. The corrected real run retained the same raw readback hash.
+
 The first Nix attempt used four parallel C++ jobs and retained a
 `compile_failure` report at
 `/nix/store/jfi06my3qdcks4dljnrf36nz8bn28mq1-tinystories-w4a8-rc-serving-phase-composed-simulation`:
 `cc1plus` was killed during object compilation. Only build scheduling and its
-time bound changed for the passing run. A separate local run of the same
-generated phase composition had already produced the identical raw readback
-SHA-256. The Nix derivation intentionally succeeds when it has written a
-failure receipt, so acceptance requires inspecting `report.json`, not merely
-the `nix build` exit code.
+time bound changed for the first passing diagnostic run. The simulation
+derivation intentionally succeeds when it has written a failure receipt;
+`nix build .#tinystories-w4a8-rc-serving-phase-composed-acceptance` is the
+fail-closed gate and rejects a failed status, nonzero runner exit, incomplete
+handoff observation, wrong tokens, or missing/reordered raw readback words.
 
 Next, classify immutable versus mutable phase memories against this exact
 handoff manifest, connect immutable reads to the existing PCIe-loaded

@@ -85,7 +85,9 @@ def compare_composed_readback(
     }
 
 
-def _sv_tb_composed(prompt: list[int], address_count: int, timeout_cycles: int) -> str:
+def _sv_tb_composed(
+    prompt: list[int], address_count: int, timeout_cycles: int, *, handoff_manifest: dict
+) -> str:
     prompt_lines = []
     for index, token in enumerate(prompt):
         prompt_lines += [
@@ -93,6 +95,27 @@ def _sv_tb_composed(prompt: list[int], address_count: int, timeout_cycles: int) 
             f"    prompt_index = 3'd{index}; prompt_data = 64'd{token}; prompt_write = 1;",
             "    @(negedge clk); prompt_write = 0;",
         ]
+    handoff_checks = []
+    checked_words = 0
+    for index, handoff in enumerate(handoff_manifest["handoffs"]):
+        source, destination = index, index + 1
+        state = 4 if index == 0 else 7
+        handoff_checks += [
+            f"logic handoff{index}_checked = 0;",
+            "always @(negedge clk) begin",
+            f"  if (!reset && dut.state == 4'd{state} && !handoff{index}_checked) begin",
+            f"    if (dut.mem_p{destination}_{handoff['token_destination_port']}[0] !== token{source}) "
+            f"$fatal(1, \"TOKEN_HANDOFF {index}\");",
+        ]
+        for leaf in handoff["cache"]:
+            for word in range(leaf["words"]):
+                checked_words += 1
+                handoff_checks.append(
+                    f"    if (dut.mem_p{destination}_{leaf['destination_port']}[{word}] !== "
+                    f"dut.mem_p{source}_{leaf['source_port']}[{word}]) "
+                    f"$fatal(1, \"CACHE_HANDOFF phase={index} port={leaf['destination_port']} word={word}\");"
+                )
+        handoff_checks += [f"    handoff{index}_checked = 1;", "  end", "end"]
     return "\n".join([
         "`timescale 1ns/1ps",
         "module tb;",
@@ -104,6 +127,7 @@ def _sv_tb_composed(prompt: list[int], address_count: int, timeout_cycles: int) 
         "always #5 clk = ~clk;",
         "always @(posedge clk) if (!reset) cycles = cycles + 1;",
         "rc_phase_composed dut(.*);",
+        *handoff_checks,
         "initial begin",
         "  repeat (3) @(posedge clk); @(negedge clk); reset=0;",
         *prompt_lines,
@@ -111,6 +135,8 @@ def _sv_tb_composed(prompt: list[int], address_count: int, timeout_cycles: int) 
         f"  while (!done && cycles < {timeout_cycles}) @(negedge clk);",
         "  if (!done) $fatal(1, \"TIMEOUT cycles=%0d\", cycles);",
         "  if (error) $fatal(1, \"PROTOCOL_ERROR\");",
+        "  if (!handoff0_checked || !handoff1_checked) $fatal(1, \"HANDOFF_NOT_OBSERVED\");",
+        f"  $display(\"HANDOFF_CHECKED {checked_words}\");",
         "  $display(\"TOKENS %0d %0d %0d CYCLES %0d\", token0, token1, token2, cycles);",
         "  fd=$fopen(\"readback.hex\", \"w\");",
         f"  for (address=0; address<{address_count}; address=address+1) begin",
@@ -180,7 +206,8 @@ def run_composed(
             raise ValueError(f"composed shell file hash mismatch: {name}")
     source_paths = [Path(path) for path in receipt["sources"]]
     (work_dir / "tb.sv").write_text(_sv_tb_composed(
-        [0, 1, 2, 3, 4, 5, 0, 1], manifest["readback_words"], timeout_cycles
+        [0, 1, 2, 3, 4, 5, 0, 1], manifest["readback_words"], timeout_cycles,
+        handoff_manifest=manifest,
     ))
     for image in shell.glob("phase*_mem*.hex"):
         shutil.copyfile(image, work_dir / image.name)
@@ -243,10 +270,17 @@ def run_composed(
         if address in actual:
             raise ValueError(f"duplicate readback address {address}")
         actual[address] = int(value_text, 16)
-    token_match = re.search(r"TOKENS\s+(\d+)\s+(\d+)\s+(\d+)",
-                            (work_dir / "simulation.log").read_text())
+    simulation_text = (work_dir / "simulation.log").read_text()
+    token_match = re.search(r"TOKENS\s+(\d+)\s+(\d+)\s+(\d+)", simulation_text)
     tokens = [int(value) for value in token_match.groups()] if token_match else []
     report.update(compare_composed_readback(manifest, observation, actual, tokens))
+    handoff_match = re.search(r"HANDOFF_CHECKED\s+(\d+)", simulation_text)
+    expected_handoff_words = sum(
+        leaf["words"] for handoff in manifest["handoffs"] for leaf in handoff["cache"]
+    )
+    report["handoff_checked_words"] = int(handoff_match.group(1)) if handoff_match else 0
+    if report["handoff_checked_words"] != expected_handoff_words:
+        report["status"] = "handoff_incomplete"
     return save()
 
 
