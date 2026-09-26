@@ -339,3 +339,16 @@ design: the artifact has no PCIe endpoint, no UberDDR3 controller, and no
 board inference evidence. The next gate is therefore functional transaction-
 level RC equivalence followed by integration with the existing platform, not
 another generic Yosys/nextpnr experiment.
+
+### Existing compiler RC semantic-equivalence receipt
+
+The realized Nix package
+`tinystories-representative-core-w4a8-integer-sv-equivalence` provides the
+transaction-level semantic gate for the same compiler-generated integer RC.
+Its report status is `pass`: 51 tensor inputs are bound, 83 RTL memories are
+initialized from the authenticated image, the simulation completes in
+0.04995 seconds, and the output bytes are `fe4c`, corresponding to PyTorch
+INT8 output `[-2, 76]`. The expected and simulated output hashes both equal
+`8ab4cc3ce350de3e4d1da6136c6c0fd0d4f94f34e8fb82a8ee4eb80a3e9746ee`.
+This establishes the RC's current compiler-generated simulation equivalence;
+it is not yet autoregressive generation and does not exercise PCIe or DDR3.
