@@ -33,6 +33,9 @@ Two bounded attempts were made against the exact generated shell:
 4. Icarus 11 (SystemVerilog, single top) was allowed a bounded compile window;
    it produced no executable or diagnostic before the attempt was terminated
    to avoid an unbounded host resource stall.
+5. A reachability-pruned source retained 48 of 94 module definitions, but
+   Verilator still received signal 9 during elaboration.  The pruning utility
+   is retained as a reusable diagnostic; it is not claimed as a solution.
 
 The generated file is approximately 1.43 million lines. No clock was
 executed, so these attempts provide no functional pass or mismatch result.
