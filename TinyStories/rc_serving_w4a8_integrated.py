@@ -133,6 +133,48 @@ def convert_integrated_w4a8_program(
     return converted
 
 
+class ComposedFrozenW4A8Module(torch.nn.Module):
+    """Compose the already-quantized serving phases without re-quantizing them."""
+
+    def __init__(self, phase_programs: Sequence[torch.export.ExportedProgram]) -> None:
+        super().__init__()
+        if len(phase_programs) != len(PHASE_NAMES):
+            raise ValueError("frozen composition requires three phase programs")
+        self.prefill, self.decode_8, self.decode_9 = tuple(
+            program.module() for program in phase_programs
+        )
+
+    def forward(self, prompt: torch.Tensor) -> tuple[torch.Tensor, ...]:
+        prefill = self.prefill(prompt)
+        token_8 = torch.argmax(prefill[0][:, -1, :], dim=-1, keepdim=True)
+        decode_8 = self.decode_8(token_8, *prefill[1:])
+        token_9 = torch.argmax(decode_8[0][:, -1, :], dim=-1, keepdim=True)
+        decode_9 = self.decode_9(token_9, *decode_8[1:])
+        token_10 = torch.argmax(decode_9[0][:, -1, :], dim=-1, keepdim=True)
+        return (
+            token_8,
+            token_9,
+            token_10,
+            prefill[0][:, -1, :],
+            *prefill[1:],
+            decode_8[0][:, -1, :],
+            *decode_8[1:],
+            decode_9[0][:, -1, :],
+            *decode_9[1:],
+        )
+
+
+def compose_frozen_w4a8_program(
+    phase_programs: Sequence[torch.export.ExportedProgram], prompt: torch.Tensor
+) -> torch.export.ExportedProgram:
+    """Export one stateful program from frozen phase programs."""
+
+    if tuple(prompt.shape) != (1, PREFILL_LENGTH):
+        raise ValueError(f"integrated prompt must have shape [1, {PREFILL_LENGTH}]")
+    module = ComposedFrozenW4A8Module(phase_programs)
+    return torch.export.export(module, (prompt,), strict=False)
+
+
 def run_integrated_eager(
     module: IntegratedW4A8Module, prompt: torch.Tensor
 ) -> IntegratedObservation:
@@ -202,42 +244,18 @@ def assert_frozen_phase_qparams_equal(
         raise ValueError("qparam comparison requires three phase programs")
     integrated_nodes = _quantized_nodes(integrated)
     phase_nodes = [_quantized_nodes(program) for program in phase_programs]
-    if any(len(nodes) != 163 for nodes in phase_nodes):
-        raise AssertionError("frozen phase programs must each contain 163 q/dq nodes")
-    if len(integrated_nodes) != sum(len(nodes) for nodes in phase_nodes):
-        raise AssertionError("integrated program does not contain 489 q/dq nodes")
-
-    integrated_shared = [
-        node for node in integrated_nodes if not node.meta.get("stack_trace")
+    expected = [
+        signature
+        for nodes in phase_nodes
+        for signature in map(_qparam_signature, nodes)
     ]
-    offset = 0
-    for phase_index, nodes in enumerate(phase_nodes):
-        reference_shared = [node for node in nodes if not node.meta.get("stack_trace")]
-        candidate = integrated_shared[offset : offset + len(reference_shared)]
-        if list(map(_qparam_signature, candidate)) != list(
-            map(_qparam_signature, reference_shared)
-        ):
-            raise AssertionError(f"{PHASE_NAMES[phase_index]} shared qparams differ")
-        offset += len(reference_shared)
-    if offset != len(integrated_shared):
-        raise AssertionError("integrated shared qparam partition is incomplete")
-
-    markers = (
-        "token_8, logits_8",
-        "token_9, logits_9",
-        "token_10, logits_10",
-    )
-    for phase_index, (nodes, marker) in enumerate(zip(phase_nodes, markers)):
-        reference_call = [node for node in nodes if node.meta.get("stack_trace")]
-        integrated_call = [
-            node
-            for node in integrated_nodes
-            if marker in str(node.meta.get("stack_trace", ""))
-        ]
-        if list(map(_qparam_signature, integrated_call)) != list(
-            map(_qparam_signature, reference_call)
-        ):
-            raise AssertionError(f"{PHASE_NAMES[phase_index]} call-site qparams differ")
+    actual = list(map(_qparam_signature, integrated_nodes))
+    if actual != expected:
+        first = next(
+            (index for index, (before, after) in enumerate(zip(actual, expected)) if before != after),
+            min(len(actual), len(expected)),
+        )
+        raise AssertionError(f"frozen phase qparams differ at quantized node {first}")
     return len(integrated_nodes)
 
 
@@ -258,33 +276,37 @@ def materialize_integrated_bundle(
     if out_dir.exists():
         raise FileExistsError(f"integrated output directory already exists: {out_dir}")
     enable_hf_dynamic_cache_export_support()
-    trace = load_trace(trace_path)
-    prompt = torch.tensor([trace.prompt_token_ids], dtype=torch.long)
-    module = IntegratedW4A8Module(build_w4a8_source_model(model_path))
-    converted = convert_integrated_w4a8_program(module, prompt)
-    with torch.no_grad():
-        converted_outputs = converted.module()(prompt)
-    observation = integrated_observation_from_outputs(prompt, converted_outputs)
-
     phase_programs = []
     for phase in PHASE_NAMES:
         exported_path = phase_oracle / phase / "exported.pt2"
         if not exported_path.is_file():
             raise FileNotFoundError(f"missing frozen phase program: {exported_path}")
         phase_programs.append(torch.export.load(exported_path))
+    trace = load_trace(trace_path)
+    prompt = torch.tensor([trace.prompt_token_ids], dtype=torch.long)
+    converted = compose_frozen_w4a8_program(phase_programs, prompt)
+    with torch.no_grad():
+        converted_outputs = converted.module()(prompt)
+    observation = integrated_observation_from_outputs(prompt, converted_outputs)
     qdq_count = assert_frozen_phase_qparams_equal(converted, phase_programs)
-
-    prefill_reference = json.loads(
-        (phase_oracle / "prefill-8" / "reference.json").read_text(encoding="utf-8")
-    )
-    prefill_equal = (
-        tensor_record(converted_outputs[3].reshape(-1))
-        == prefill_reference["last_logits"]
-        and [tensor_record(converted_outputs[4 + index]) for index in range(4)]
-        == prefill_reference["cache_leaves"]
-    )
-    if not prefill_equal:
-        raise AssertionError("integrated W4A8 prefill differs from frozen phase oracle")
+    phase_outputs_equal = []
+    for phase_index, phase in enumerate(PHASE_NAMES):
+        reference = json.loads(
+            (phase_oracle / phase / "reference.json").read_text(encoding="utf-8")
+        )
+        output_offset = 3 + phase_index * 5
+        equal = (
+            tensor_record(converted_outputs[output_offset].reshape(-1))
+            == reference["last_logits"]
+            and [
+                tensor_record(converted_outputs[output_offset + 1 + index])
+                for index in range(4)
+            ]
+            == reference["cache_leaves"]
+        )
+        phase_outputs_equal.append(equal)
+        if not equal:
+            raise AssertionError(f"integrated W4A8 {phase} differs from frozen phase oracle")
 
     phase_shapes = {
         phase: {
@@ -325,8 +347,7 @@ def materialize_integrated_bundle(
         "output_tensor_count": len(converted_outputs),
         "quantized_decomposed_node_count": qdq_count,
         "frozen_phase_qparams_equal": True,
-        "frozen_prefill_equal": prefill_equal,
-        "phase_decode_oracle_status": "superseded-by-w4a8-cache-chained-observation",
+        "frozen_phase_outputs_equal": phase_outputs_equal,
         "save_reload_equal": save_reload_equal,
         "model_path": str(model_path),
         "phase_oracle_path": str(phase_oracle),

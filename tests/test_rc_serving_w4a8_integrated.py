@@ -11,6 +11,7 @@ from TinyStories.rc_serving_w4a8_cache_abi import flatten_dynamic_cache
 from TinyStories.rc_serving_contract import load_trace
 from TinyStories.rc_serving_evidence import run_native_trace, tensor_record
 from TinyStories.rc_serving_w4a8_integrated import (
+    ComposedFrozenW4A8Module,
     IntegratedW4A8Module,
     assert_integrated_observation_equal,
     convert_integrated_w4a8_program,
@@ -27,7 +28,7 @@ class RecordingModel(torch.nn.Module):
         self.seen_tokens: list[tuple[int, ...]] = []
         self.seen_cache_lengths: list[int | None] = []
 
-    def forward(self, input_ids, past_key_values, **kwargs):
+    def forward(self, input_ids, past_key_values=None, **kwargs):
         self.seen_tokens.append(tuple(int(value) for value in input_ids.reshape(-1)))
         if past_key_values is None:
             before = 0
@@ -69,6 +70,18 @@ class ExportableIntegratedFixture(torch.nn.Module):
 
 
 class RcServingW4A8IntegratedTest(unittest.TestCase):
+    def test_composed_frozen_phases_forward_converted_token_and_cache(self) -> None:
+        models = [RecordingModel(), RecordingModel(), RecordingModel()]
+        programs = [type("Program", (), {"module": lambda self, model=model: model})() for model in models]
+        prompt = torch.tensor([[0, 1, 2, 3, 4, 5, 0, 1]], dtype=torch.long)
+
+        flat = ComposedFrozenW4A8Module(programs)(prompt)
+
+        self.assertEqual(tuple(int(token.item()) for token in flat[:3]), (1, 2, 0))
+        self.assertEqual(models[0].seen_cache_lengths, [None])
+        self.assertEqual(models[1].seen_cache_lengths, [8])
+        self.assertEqual(models[2].seen_cache_lengths, [9])
+
     def test_integrated_materializer_cli_has_one_program_contract(self) -> None:
         source = Path(
             "scripts/pipeline/materialize_rc_serving_w4a8_integrated.py"

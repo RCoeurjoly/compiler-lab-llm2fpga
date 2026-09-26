@@ -70,3 +70,31 @@ PCIe ingress, UberDDR3 calibration or image loading, FPGA fit/timing, a
 bitstream, or board inference. The next gate is to expose this same chained
 phase ABI through the RC platform wrapper and prove image load/readback before
 attempting physical inference.
+
+## Integrated export repair
+
+The first wholesale integrated-export attempt failed before MLIR lowering. It
+re-quantized the float serving module in one calibration pass, rather than
+preserving the phase-frozen programs. The first qparam divergence was in
+`decode-8` (zero-point `-127` in the frozen phase versus `-128` in the
+integrated conversion); `decode-9` then diverged again (`-88` versus `-79`).
+The resulting integrated outputs were not equivalent: prefill matched, but
+decode cache leaves and tokens did not.
+
+The repair composes the three already-converted phase programs and exports that
+composition. This preserves all 489 frozen quantize/dequantize nodes instead
+of recalibrating them. The corrected Nix receipt is:
+
+- integrated export: `/nix/store/43l65zdd0hyp0c4mw2580pdyw4m24za3-tinystories-w4a8-rc-serving-integrated-pytorch-exported`
+- exported program SHA-256: `89653bb633e6137a27ef56d8ea4fc6ce70e0347851f33e5c5709e6c0db019712`
+- compiler phase ABI SHA-256: `c941f2129d91d407dfc4aa1db1b8f35ee0cf818edaa4d6b20e5155a959956c6c`
+- `frozen_phase_outputs_equal`: `[true, true, true]`
+- `frozen_phase_qparams_equal`: `true`
+- save/reload equality: `true`
+
+The Nix phase-ABI receipt is `/nix/store/8rkz3l80r4a45lgx8zfxz6zqwnz424jx-tinystories-w4a8-rc-serving-phase-abi-verification/report.json`,
+SHA-256 `101e32f60f6755e28092558c6ed21109039d0e2c0371e50844ae9e65936df422`.
+It records the corrected cache chain and all three generated flat-SCF/native-SV
+phase hashes. The integrated output ABI emits last-token logits (`[1, 6]`),
+while each internal phase retains its full sequence logits; this shape is now
+explicitly normalized at the compiler-owned boundary.
