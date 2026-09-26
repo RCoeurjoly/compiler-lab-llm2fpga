@@ -15,7 +15,9 @@ import re
 from pathlib import Path
 
 
-DECL_RE = re.compile(r"@external\s+(\w+)\s*=\s*seq_mem_d1\((\d+),\s*(\d+),")
+DECL_RE = re.compile(
+    r"@external(?:\([^)]*\))?\s+(\w+)\s*=\s*seq_mem_d1\((\d+),\s*(\d+),"
+)
 GROUP_RE = re.compile(r"\b(?:static\s+)?group\s+(\w+)\s*\{")
 
 
