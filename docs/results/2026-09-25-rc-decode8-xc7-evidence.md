@@ -269,3 +269,46 @@ the useful compute hierarchy has already been emitted as one monolithic
 component. A fast implementation loop therefore requires a compiler/Calyx
 emission boundary (or a mechanically generated component split) before Yosys
 technology mapping; no handwritten or kev-gpt RTL is introduced.
+
+## Wrapped-main staged implementation probe
+
+The previous `main_1` probe was the wrong implementation top for a board-facing
+closure test: it deliberately exposed every compiler memory port and therefore
+presented 6,441 top-level bits to nextpnr. The compiler-generated `main`
+wrapper has the intended four-port shell (`clk`, `reset`, `go`, and `done`) and
+keeps the `main_1` memory interface internal. This is still the exact
+compiler-generated source, not a handwritten or kev-gpt-derived replacement.
+
+Using the pinned `yosys-slang` frontend on the source (SHA-256
+`1b89366a72356ee92da4e4e8fe71d6376d35622296c131b4a4b574a8f305df65`) with
+`--top main` completed with zero errors and zero warnings in 2.8 seconds. The
+post-frontend RTLIL contains 24,269 cells. A bounded no-FSM preparation
+completed in 5.9 seconds and produced 13,480 cells; FSM extraction remains
+omitted as a diagnostic fast path because it was the earlier synthesis
+blow-up.
+
+The staged Xilinx mapping then completed as follows:
+
+| checkpoint | result |
+| --- | --- |
+| coarse | no DSPs for this integer RC; 13,480 cells |
+| fine | 38 CARRY4, 26,663 cells |
+| ABC + Xilinx LUT/FF legalization | 948 FDRE, 1,452 LUT2, 931 LUT3, 913 LUT4, 667 LUT5, 974 LUT6, 38 CARRY4 |
+
+The final mapped JSON before metadata legalization has SHA-256
+`5f40972e38a9aac0b5351a637cce20ac4e1f34ff65b3631013a6aa7d0f034e21`. The
+pinned nextpnr frontend requires explicit `port_directions` for generated
+primitive cells. Adding those directions mechanically (without changing
+connections, parameters, or logic) yields JSON SHA-256
+`572dbc7d6992d77eb17416f1d3fbbe5b544df83930aaf9ffaf46fde8686cbbad`.
+
+With the four-port probe XDC, nextpnr passed packing, placement, global-clock
+routing, and main routing. The emitted diagnostic FASM is SHA-256
+`8c9c1cd4de1eec3dbcfc5a1b323106a6903dcb8542a2c7abf2f17a4d7de8945a`.
+The final critical-path report is 91.15 MHz (PASS at the 12 MHz probe target);
+the reported path is 1.6 ns logic plus 9.4 ns routing. This is an
+implementation/fit probe only: it uses the four-port diagnostic XDC, not the
+YPCB PCIe/DDR3 top, and does not establish functional simulation, PCIe ingress,
+DDR3 calibration, or board inference. The first nextpnr issue has therefore
+progressed from missing DSP directions and an invalid memory-heavy top to a
+closed, routed compiler-generated RC diagnostic image.
