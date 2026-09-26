@@ -649,3 +649,16 @@ It contains a nonempty `compiler-phase-abi.json` with SHA-256
 `c941f2129d91d407dfc4aa1db1b8f35ee0cf818edaa4d6b20e5155a959956c6c`.
 This proves the ABI survives the actual Nix export-to-flat-SCF build; it does
 not yet prove that Calyx consumes the ABI or that the graph is partitioned.
+
+### No-CMP2LCU synthesis comparison (2026-09-26)
+
+The preserved diagnostic variant
+`tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-xc7k480t-no-cmp2lcu-evidence`
+was run to its built-in 600-second Yosys bound. Its receipt is
+`/nix/store/2kghwpj11jg2zwqrs9awnjgbwf14i795-decode-8-no-cmp2lcu-xc7k480t-evidence`.
+Yosys still timed out (`124`) and nextpnr was not run, so the variant does not
+fit yet. Without the comparator techmap, the log reaches `OPT_MERGE` while
+hashing approximately 298,000 cells rather than stalling in `CMP2LCU`
+expansion. Removing that techmap changes the frontier but does not solve the
+implementation bottleneck; the next experiment should target the large
+post-techmap optimization pass or partition the generated phase before Yosys.
