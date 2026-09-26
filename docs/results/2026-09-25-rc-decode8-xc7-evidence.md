@@ -436,6 +436,14 @@ out with exit 124 before SV emission.  Therefore `cell-share` is not the sole
 blocker; the monolithic invoke/control representation remains the dominant
 unbounded stage.  No production pass was changed.
 
+A third bounded replay retained the same source and disabled optimization
+passes with `CALYX_COMPILE_PASSES=no-opt`.  Calyx rejected this before SV
+emission with its invariant that `repeat` statements must first be removed by
+`compile-repeat` (panic in `top_down_compile_control.rs:212`).  This rules out
+skipping all compile passes as a useful workaround; any further experiment
+must retain repeat lowering and selectively bound the subsequent control
+passes.
+
 ### PCIe transport availability observation (2026-09-26)
 
 At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
