@@ -766,3 +766,9 @@ baseline and `cell-share`-disabled runs hit the 30-second bound without SV.
 Peak RSS is nevertheless 833,144 KiB for baseline versus 637,312 KiB with
 cell sharing disabled.  This confirms a substantial memory reduction on the
 real route, but the remaining time bottleneck is still control lowering.
+
+Disabling Calyx `infer-data-path` on the same production route (retaining
+`compile-repeat` and disabling `cell-share`) also hit the 30-second bound
+without SV, while peak RSS increased to 1,185,340 KiB.  The five-iteration
+non-convergence warning is therefore diagnostic rather than a safe optimization
+target; removing the pass makes the route worse.
