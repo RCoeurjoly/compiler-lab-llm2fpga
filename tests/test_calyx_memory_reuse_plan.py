@@ -117,3 +117,25 @@ component child() -> () {
 """
     result = module.plan(futil)
     assert result["intervals"] == {"mem_0": {"first": 0, "last": 0}}
+
+
+def test_plan_rejects_lexical_aliases_crossing_parallel_control():
+    futil = """
+@external first = seq_mem_d1(64, 8, 3);
+@external second = seq_mem_d1(64, 8, 3);
+component main() -> () {
+  wires {
+    group produce { first.addr0 = 3'd0; first.write_en = 1'd1; first.write_data = 64'd1; }
+    group consume { second.addr0 = 3'd0; second.write_en = 1'd1; second.write_data = 64'd2; }
+  }
+  control {
+    par { seq { produce; } seq { consume; } }
+  }
+}
+"""
+    result = module.plan(futil)
+    pairs = {(entry["first"], entry["second"]) for entry in result["same_shape_disjoint_candidates"]}
+    assert ("first", "second") in pairs
+    assert result["proven_same_shape_disjoint_candidates"] == []
+    assert set(result["parallel_memory_names"]) == {"first", "second"}
+    assert module.conservative_scratch_aliases(futil, set()) == {}

@@ -695,3 +695,9 @@ baseline and rewritten source, with no new syntax/structural failure.  This
 confirms the rewrite reaches the same pre-existing Calyx legality frontier; it
 does not yet prove that any alias is semantically safe or that Yosys will
 converge after the reduction.
+
+The lifetime report now also records control-order safety.  It identifies 1,829
+groups under `par`; none of the 382 generated memories is used by those groups,
+so the conservative sequential-order filter retains all 5,029 candidates for
+this artifact.  A regression fixture confirms that a candidate touching a
+parallel branch is rejected rather than treated as textually ordered.

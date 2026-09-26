@@ -19,6 +19,7 @@ DECL_RE = re.compile(
     r"@external(?:\([^)]*\))?\s+(\w+)\s*=\s*seq_mem_d1\((\d+),\s*(\d+),"
 )
 GROUP_RE = re.compile(r"\b(?:static\s+)?group\s+(\w+)\s*\{")
+PAR_RE = re.compile(r"\bpar\s*\{")
 
 
 def _memory_names_in_group(body: str, memories: dict[str, dict[str, int]]) -> list[str]:
@@ -75,9 +76,17 @@ def plan(text: str) -> dict[str, object]:
         groups[match.group(1)] = _balanced(text, match.end())
     uses = {group: _memory_names_in_group(body, memories) for group, body in groups.items()}
     order: list[str] = []
+    parallel_groups: set[str] = set()
     for match in control_matches:
         body = _balanced(text, match.end())
         order.extend(token for token in re.findall(r"\b[A-Za-z_]\w*\b", body) if token in uses)
+        for par_match in PAR_RE.finditer(body):
+            par_body = _balanced(body, par_match.end())
+            parallel_groups.update(
+                token
+                for token in re.findall(r"\b[A-Za-z_]\w*\b", par_body)
+                if token in uses
+            )
     positions: dict[str, list[int]] = {name: [] for name in memories}
     for position, group in enumerate(order):
         for name in uses[group]:
@@ -104,6 +113,21 @@ def plan(text: str) -> dict[str, object]:
                         "saved_bits_if_aliased": memories[left]["width"] * memories[left]["depth"],
                     }
                 )
+    memory_groups = {
+        name: {group for group, names_for_group in uses.items() if name in names_for_group}
+        for name in intervals
+    }
+    proven_candidates = [
+        candidate
+        for candidate in candidates
+        if not (
+            memory_groups[candidate["first"]] & parallel_groups
+            or memory_groups[candidate["second"]] & parallel_groups
+        )
+    ]
+    parallel_memory_names = sorted(
+        name for name, groups_for_memory in memory_groups.items() if groups_for_memory & parallel_groups
+    )
     return {
         "schema": "calyx-memory-reuse-plan-v1",
         "input_sha256": hashlib.sha256(text.encode()).hexdigest(),
@@ -111,7 +135,10 @@ def plan(text: str) -> dict[str, object]:
         "memories": memories,
         "intervals": intervals,
         "control_group_tokens": len(order),
+        "parallel_control_groups": sorted(parallel_groups),
+        "parallel_memory_names": parallel_memory_names,
         "same_shape_disjoint_candidates": candidates,
+        "proven_same_shape_disjoint_candidates": proven_candidates,
         "policy": "analysis-only; no aliasing without IR dependency proof",
     }
 
@@ -161,9 +188,10 @@ def conservative_scratch_aliases(text: str, protected: set[str]) -> dict[str, st
     result = plan(text)
     memories = result["memories"]
     intervals = result["intervals"]
+    parallel_memories = set(result["parallel_memory_names"])
     by_shape: dict[tuple[int, int], list[str]] = {}
     for name, shape in memories.items():
-        if name in protected or name not in intervals:
+        if name in protected or name in parallel_memories or name not in intervals:
             continue
         by_shape.setdefault((shape["width"], shape["depth"]), []).append(name)
     aliases: dict[str, str] = {}
