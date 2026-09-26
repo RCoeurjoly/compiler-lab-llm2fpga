@@ -417,6 +417,18 @@ program invariant and reject silently substituting a bundle of phase programs;
 they are structural checks, not a claim that the integrated RTL has passed
 simulation or implementation.
 
+### Nested Calyx emission diagnostic (2026-09-26)
+
+As a bounded tool experiment, the existing integrated Calyx artifact was sent
+through the same backend with `CALYX_EMIT_NESTED=1` and a 900-second wall-time
+bound.  CIRCT export completed (input Calyx-MLIR SHA-256
+`46730cc190947b0e1c962b95c3c36d56f2c5d022f862753a43ee8951a549b1f6`; exported
+Futil SHA-256 `980d3e36d8fcb0c4bf6e49388be20c20f1bea2f2feae2dc138203188421a1101`),
+but Calyx timed out with exit 124 during its `cell-share` stage.  No SV was
+emitted.  This diagnostic does not change the production flow; it shows that
+enabling nested emission alone is not a bounded solution for the current
+monolithic program.
+
 ### PCIe transport availability observation (2026-09-26)
 
 At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
