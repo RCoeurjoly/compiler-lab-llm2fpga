@@ -28,6 +28,7 @@ let
     mkdir -p "$out"
     ln -s ${pytorchExported}/observation.json "$out/observation.json"
     ln -s ${pytorchExported}/readback-manifest.json "$out/readback-manifest.json"
+    ln -s ${pytorchExported}/compiler-phase-abi.json "$out/compiler-phase-abi.json"
     ln -s ${pytorchExported}/receipt.json "$out/receipt.json"
   '';
 in {

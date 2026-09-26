@@ -882,6 +882,7 @@
                 ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/exported.pt2 "$out/exported.pt2"
                 ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/observation.json "$out/observation.json"
                 ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/readback-manifest.json "$out/readback-manifest.json"
+                ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/compiler-phase-abi.json "$out/compiler-phase-abi.json"
                 ln -s ${rcServingW4A8IntegratedSystem.pytorchExported}/receipt.json "$out/integrated-receipt.json"
               '';
             };
