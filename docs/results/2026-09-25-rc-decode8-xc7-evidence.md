@@ -723,3 +723,13 @@ The planner now exposes this probe reproducibly with
 `--apply-aliases --rewritten-futil <path>`, recording the rewritten source hash
 in the JSON report.  The pinned artifact produced 252 aliases and rewritten
 source SHA-256 `031af1a6a704c1eaa68b5e0e5dbed0ab64bcc0b17040d1cb9fa60e8eede19578`.
+
+### Bounded normal Calyx comparison (2026-09-26)
+
+The exact rewritten Futil and the unmodified baseline were each run through
+the normal Calyx Verilog backend with a 30-second wall-time bound.  Both timed
+out before emitting SV (`124`).  Maximum RSS was 850,268 KiB for the aliased
+source and 851,444 KiB for baseline, with no observable change in the first
+backend frontier.  The 252-memory aliasing probe therefore is not the dominant
+control-lowering bottleneck; further speculative aliasing is deferred in favor
+of instrumenting or partitioning the Calyx control path.
