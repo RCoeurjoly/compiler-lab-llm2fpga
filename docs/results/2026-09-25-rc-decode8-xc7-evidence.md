@@ -352,3 +352,24 @@ INT8 output `[-2, 76]`. The expected and simulated output hashes both equal
 `8ab4cc3ce350de3e4d1da6136c6c0fd0d4f94f34e8fb82a8ee4eb80a3e9746ee`.
 This establishes the RC's current compiler-generated simulation equivalence;
 it is not yet autoregressive generation and does not exercise PCIe or DDR3.
+
+### Compiler-RC plus PCIe/UberDDR3 integration route
+
+The realized `compiler-ddr3-trace-replay-route` artifact
+`/nix/store/kl9k5xp9xyajx7m6zhkcjdp2cg47x7hv-compiler-ddr3-trace-replay-route`
+contains the compiler-generated RC under
+`gen_compiler_command_adapter.gen_compiler_generated_rc`, integrated with the
+PCIe and two-lane UberDDR3 shell. Its route log reports 24 warnings and zero
+errors, emits `replay.fasm` (SHA-256
+`a32c347c2dfaa269b35d9665293efe89ffa16c01a7de29e40eeaefc6327aa913`), and
+completes routing.
+
+This is the first durable implementation evidence for the actual integrated
+architecture, but it is not timing-qualified: `pcie_user_clk` reaches 81.34
+MHz against its 62.50 MHz requirement, while `rowstream_clk` reaches only
+53.87 MHz against the fixed 83.33 MHz DDR3 requirement. The failing critical
+path is in the integrated rowstream/DDR3 domain, not the PCIe clock. The
+current next action is therefore a targeted rowstream timing diagnosis or
+tool/constraint repair; PCIe and DDR3 must remain unchanged while isolating
+that failure. No board programming or inference claim follows from this
+route-only artifact.
