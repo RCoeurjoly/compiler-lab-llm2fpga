@@ -639,3 +639,13 @@ contract/observation receipt, not in the graph consumed by Torch-MLIR. This is
 direct evidence that a backend pass cannot reliably recover serving boundaries
 from the exported graph alone: phase/cache annotations must be introduced
 before export or carried as an explicit compiler-owned ABI.
+
+### Phase-ABI flat-SCF build gate (2026-09-26)
+
+The integrated pipeline was rebuilt through the Nix flat-SCF stage after adding
+the compiler-owned ABI handoff. The resulting store artifact is
+`/nix/store/mxypdnn44pf89cnlpzhnxhcmrxc37r8g-tinystories-w4a8-rc-serving-integrated-flat-scf`.
+It contains a nonempty `compiler-phase-abi.json` with SHA-256
+`c941f2129d91d407dfc4aa1db1b8f35ee0cf818edaa4d6b20e5155a959956c6c`.
+This proves the ABI survives the actual Nix export-to-flat-SCF build; it does
+not yet prove that Calyx consumes the ABI or that the graph is partitioned.
