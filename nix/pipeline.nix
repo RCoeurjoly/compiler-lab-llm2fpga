@@ -174,14 +174,20 @@ let
         ${mlir}/bin/mlir-opt ${linalg} "$out"
     '';
 
-  mkScfToFlatScfDerivation = { name, scf }:
-    pkgs.runCommand "${name}-flat-scf" { buildInputs = [ mlir python ]; } ''
+  mkScfToFlatScfDerivation = { name, scf, phaseAbi ? null }:
+    let
+      phaseAbiInstall = if phaseAbi == null then "" else ''
+        cp ${phaseAbi} "$out/compiler-phase-abi.json"
+        test -s "$out/compiler-phase-abi.json"
+      '';
+    in pkgs.runCommand "${name}-flat-scf" { buildInputs = [ mlir python ]; } ''
       export FLAT_SCF_BLOCKER_REPORT=${flatScfBlockerReport}
       ${pkgs.bash}/bin/bash ${noHandshakeScfToFlatScf} \
         ${mlir}/bin/mlir-opt ${scf} "$out"
       test -f "$out/flat.scf.mlir"
       test -f "$out/manifest.json"
       test -f "$out/blockers.json"
+      ${phaseAbiInstall}
     '';
 
   mkScfToCalyxDerivation = { name, flatScf, calyxMathProfile ? "none" }:
@@ -504,6 +510,7 @@ let
   mkNoHandshakePipeline = { name, hfSnapshot, pytorchExported, torchStage
     , tosaFromTorch ? null, linalgFromStages ?
       ({ name, torch, ... }: mkLinalgDerivation { inherit name torch; })
+    , phaseAbi ? null
     , allowHwExterns ? false, fpPrimsSv ? null
     , slangPerFileExternModules ? false, calyxMathProfile ? "none"
     , calyxCompilePasses ? [ ], calyxEmitNested ? true
@@ -542,7 +549,7 @@ let
           inherit (self) linalg;
         };
         "flat-scf" = mkScfToFlatScfDerivation {
-          inherit name;
+          inherit name phaseAbi;
           inherit (self) scf;
         };
         calyx = mkScfToCalyxDerivation {
@@ -630,7 +637,7 @@ let
     , calyxDisableVerify ? false
     , calyxSkipResourceReport ? false, calyxOptimizeFsmDecode ? false
     , calyxFsmDecodeKeepCopies ? false, calyxFsmDecodeShareStates ? false
-    , calyxFsmDecodeHierarchical ? false }:
+    , calyxFsmDecodeHierarchical ? false, phaseAbi ? null }:
     let
       resolvedHfSnapshot = mkHfSnapshotDerivation { inherit name hfSnapshot; };
       resolvedPyTorchExported = mkPyTorchExportedDerivation {
@@ -655,7 +662,7 @@ let
           calyxDisableVerify
           calyxSkipResourceReport calyxOptimizeFsmDecode
           calyxFsmDecodeKeepCopies calyxFsmDecodeShareStates
-          calyxFsmDecodeHierarchical;
+          calyxFsmDecodeHierarchical phaseAbi;
       };
       model = {
         inherit key name description;

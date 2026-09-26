@@ -875,6 +875,7 @@
               calyxOptimizeFsmDecode = true;
               calyxFsmDecodeHierarchical = true;
               calyxSkipResourceReport = true;
+              phaseAbi = "${rcServingW4A8IntegratedSystem.pytorchExported}/compiler-phase-abi.json";
               inherit fpPrimsSv;
               hfSnapshot = tinyStories1m.snapshot;
               pytorchToolchain = [ pythonWithTinyStoriesTorchAO torchMlir ];
