@@ -188,6 +188,11 @@ let
       test -f "$out/manifest.json"
       test -f "$out/blockers.json"
       ${phaseAbiInstall}
+      if test -f "$out/compiler-phase-abi.json"; then
+        ${python}/bin/python3 ${pipelineScripts}/annotate_flat_scf_phase_abi.py \
+          "$out/flat.scf.mlir" "$out/compiler-phase-abi.json" \
+          "$out/annotated-flat.scf.mlir" "$out/phase-abi-annotation-receipt.json"
+      fi
     '';
 
   mkScfToCalyxDerivation = { name, flatScf, calyxMathProfile ? "none" }:
@@ -205,9 +210,13 @@ let
     in pkgs.runCommand "${name}-calyx" { buildInputs = [ mlir circt python ]; } ''
       tmp_pre_calyx="$(mktemp /tmp/no_handshake_pre_calyx_XXXXXX.mlir)"
       tmp_zero_seed_fixed="$(mktemp /tmp/no_handshake_zero_seed_XXXXXX.mlir)"
+      flat_scf_input="${flatScf}/flat.scf.mlir"
+      if test -f "${flatScf}/annotated-flat.scf.mlir"; then
+        flat_scf_input="${flatScf}/annotated-flat.scf.mlir"
+      fi
       mkdir -p "$out"
       ${python}/bin/python3 ${pipelineScripts}/materialize_zero_seed_copies.py \
-        ${flatScf}/flat.scf.mlir "$tmp_zero_seed_fixed" \
+        "$flat_scf_input" "$tmp_zero_seed_fixed" \
         "$out/zero-seed-materialization-receipt.json"
       ${pkgs.coreutils}/bin/timeout ${toString calyxTimeoutSeconds} \
         ${mlir}/bin/mlir-opt "$tmp_zero_seed_fixed" \
