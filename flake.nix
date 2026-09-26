@@ -434,6 +434,7 @@
           "mlir_op_stats.sh"
           "normalize_calyx_for_export.py"
           "normalize_futil_float_constants.py"
+          "plan_calyx_memory_reuse.py"
           "run_tinystories_integer_sv.py"
           "sv_mlir_to_sv.sh"
           "sv_to_il.sh"
