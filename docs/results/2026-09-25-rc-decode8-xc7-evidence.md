@@ -303,7 +303,11 @@ connections, parameters, or logic) yields JSON SHA-256
 `572dbc7d6992d77eb17416f1d3fbbe5b544df83930aaf9ffaf46fde8686cbbad`.
 
 With the four-port probe XDC, nextpnr passed packing, placement, global-clock
-routing, and main routing. The emitted diagnostic FASM is SHA-256
+routing, and main routing, and emitted a diagnostic FASM. The bounded host
+observation ended during post-routing legalisation rather than capturing the
+process's final success marker; the FASM and completed routing/timing records
+are therefore implementation evidence, not yet a reproducible qualified
+Nix gate. The diagnostic FASM is SHA-256
 `8c9c1cd4de1eec3dbcfc5a1b323106a6903dcb8542a2c7abf2f17a4d7de8945a`.
 The final critical-path report is 91.15 MHz (PASS at the 12 MHz probe target);
 the reported path is 1.6 ns logic plus 9.4 ns routing. This is an
@@ -311,4 +315,5 @@ implementation/fit probe only: it uses the four-port diagnostic XDC, not the
 YPCB PCIe/DDR3 top, and does not establish functional simulation, PCIe ingress,
 DDR3 calibration, or board inference. The first nextpnr issue has therefore
 progressed from missing DSP directions and an invalid memory-heavy top to a
-closed, routed compiler-generated RC diagnostic image.
+closed, routed compiler-generated RC diagnostic image, pending a durable
+terminal-success receipt.
