@@ -452,6 +452,19 @@ three-phase receipt still does not prove PCIe ingress, UberDDR3 calibration,
 FPGA fit for the integrated shell, or board inference; those remain the next
 integration gates.
 
+### Integrated-closure size profile
+
+The compiler-emitted integrated closure is a single monolithic `main_1`
+component: `sv/main.sv` is 50,901,558 bytes / 1,658,528 lines, with 8,097
+sequential or combinational process blocks and approximately 63,229 generated
+logic declarations.  The public shell is only a small wrapper; almost the
+entire cost is inside `main_1`.  The Calyx source likewise contains one
+top-level component with 382 external memories and no phase-named subcomponents.
+This explains why simulator memory is exhausted before public-port execution
+and identifies the next compiler boundary: preserve the phase/cache contract
+but emit independently elaborable phase components or a compiler-generated
+coordinator, rather than attempting another simulator flag on the monolith.
+
 ### Alternate-simulator probe for the integrated stateful closure
 
 As a bounded diagnostic, Icarus Verilog 12.0 was run against the exact
