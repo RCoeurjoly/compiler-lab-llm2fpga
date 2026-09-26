@@ -215,13 +215,21 @@ def main() -> int:
     parser.add_argument("-o", "--output", type=Path)
     parser.add_argument("--apply-aliases", action="store_true")
     parser.add_argument("--protected", action="append", default=[])
+    parser.add_argument(
+        "--rewritten-futil",
+        type=Path,
+        help="write the source rewritten with the conservative alias map",
+    )
     args = parser.parse_args()
     source = args.futil.read_text(encoding="utf-8")
     result = plan(source)
     if args.apply_aliases:
         aliases = conservative_scratch_aliases(source, set(args.protected))
         result["aliases"] = aliases
-        result["rewritten_sha256"] = hashlib.sha256(apply_aliases(source, aliases).encode()).hexdigest()
+        rewritten = apply_aliases(source, aliases)
+        result["rewritten_sha256"] = hashlib.sha256(rewritten.encode()).hexdigest()
+        if args.rewritten_futil:
+            args.rewritten_futil.write_text(rewritten, encoding="utf-8")
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")

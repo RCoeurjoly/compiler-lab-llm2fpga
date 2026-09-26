@@ -718,3 +718,8 @@ passes disabled (`-d all -p well-formed`).  Calyx parsed the rewritten source
 but stopped at the expected backend precondition that unlowered control must be
 empty.  This separates source validity from the expensive normal
 control-lowering path; it is not an SV or synthesis result.
+
+The planner now exposes this probe reproducibly with
+`--apply-aliases --rewritten-futil <path>`, recording the rewritten source hash
+in the JSON report.  The pinned artifact produced 252 aliases and rewritten
+source SHA-256 `031af1a6a704c1eaa68b5e0e5dbed0ab64bcc0b17040d1cb9fa60e8eede19578`.
