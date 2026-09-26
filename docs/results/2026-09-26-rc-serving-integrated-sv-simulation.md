@@ -30,6 +30,9 @@ Two bounded attempts were made against the exact generated shell:
    signal 9 before simulation.
 3. Verilator 5.022 with `--hierarchical` and one job; front-end elaboration
    was again killed by signal 9 before simulation.
+4. Icarus 11 (SystemVerilog, single top) was allowed a bounded compile window;
+   it produced no executable or diagnostic before the attempt was terminated
+   to avoid an unbounded host resource stall.
 
 The generated file is approximately 1.43 million lines. No clock was
 executed, so these attempts provide no functional pass or mismatch result.
