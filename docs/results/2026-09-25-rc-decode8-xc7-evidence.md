@@ -429,6 +429,13 @@ emitted.  This diagnostic does not change the production flow; it shows that
 enabling nested emission alone is not a bounded solution for the current
 monolithic program.
 
+A second bounded replay disabled only Calyx `cell-share` while retaining the
+same generated Futil, non-nested emission, and 900-second bound.  It advanced
+past `cell-share` (the log recorded `compile-invoke: 7198ms`) but still timed
+out with exit 124 before SV emission.  Therefore `cell-share` is not the sole
+blocker; the monolithic invoke/control representation remains the dominant
+unbounded stage.  No production pass was changed.
+
 ### PCIe transport availability observation (2026-09-26)
 
 At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
