@@ -21,6 +21,28 @@ DECL_RE = re.compile(
 GROUP_RE = re.compile(r"\b(?:static\s+)?group\s+(\w+)\s*\{")
 
 
+def _memory_names_in_group(body: str, memories: dict[str, dict[str, int]]) -> list[str]:
+    """Resolve direct memory uses, including generated component arguments.
+
+    The integrated exporter declares top-level cells as ``mem_N`` and passes
+    them into the generated child component as ``arg_mem_N``.  Group bodies
+    therefore reference the latter even though the actual external memory
+    declaration is the former.  The suffix binding is emitted by the invoke
+    ABI and is unambiguous for this generated form; keep the mapping local to
+    this analysis pass and do not mutate the source.
+    """
+    result: set[str] = set()
+    for token in re.findall(r"\b[A-Za-z_]\w*\b", body):
+        if token in memories:
+            result.add(token)
+            continue
+        if token.startswith("arg_"):
+            candidate = token[4:]
+            if candidate in memories:
+                result.add(candidate)
+    return sorted(result)
+
+
 def _balanced(text: str, start: int) -> str:
     depth = 1
     pos = start
@@ -37,17 +59,25 @@ def plan(text: str) -> dict[str, object]:
         m.group(1): {"width": int(m.group(2)), "depth": int(m.group(3))}
         for m in DECL_RE.finditer(text)
     }
-    marker = text.find("  control {")
-    if marker < 0:
+    control_matches = list(re.finditer(r"\bcontrol\s*\{", text))
+    if not control_matches:
         raise ValueError("generated Futil has no top-level control")
+
+    # Calyx emits groups in a component's ``wires`` section, which may appear
+    # before or after another component's control block.  Restricting the
+    # search to text before the first control therefore misses the groups used
+    # by the generated child component (the integrated RC currently has this
+    # shape).  Parse all group declarations and collect references only from
+    # actual control bodies, so declarations cannot masquerade as schedule
+    # entries.
     groups: dict[str, str] = {}
-    for match in GROUP_RE.finditer(text[:marker]):
+    for match in GROUP_RE.finditer(text):
         groups[match.group(1)] = _balanced(text, match.end())
-    uses = {
-        group: sorted(name for name in memories if re.search(rf"\b{re.escape(name)}\b", body))
-        for group, body in groups.items()
-    }
-    order = [token for token in re.findall(r"\b[A-Za-z_]\w*\b", text[marker:]) if token in uses]
+    uses = {group: _memory_names_in_group(body, memories) for group, body in groups.items()}
+    order: list[str] = []
+    for match in control_matches:
+        body = _balanced(text, match.end())
+        order.extend(token for token in re.findall(r"\b[A-Za-z_]\w*\b", body) if token in uses)
     positions: dict[str, list[int]] = {name: [] for name in memories}
     for position, group in enumerate(order):
         for name in uses[group]:

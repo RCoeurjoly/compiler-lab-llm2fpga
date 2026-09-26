@@ -673,3 +673,16 @@ Yosys again timed out (`124`) and nextpnr was not run, but the log advanced
 through optimization and reached `SYNTH_XILINX`/`MEMORY_LIBMAP`. This confirms
 that post-techmap `OPT_MERGE` is costly but not the final blocker; the generated
 memory mapping is now the next implementation frontier.
+
+### Nested-control memory-lifetime analysis (2026-09-26)
+
+The first memory-reuse report incorrectly returned zero control references: it
+only searched for groups before the first top-level `control` block, while the
+generated child component declares its groups in `wires` and references them in
+a later control block.  The analyzer now parses all group declarations and all
+control bodies, and resolves the generated `arg_mem_N` component arguments back
+to their top-level `mem_N` bindings.  On the pinned integrated Futil artifact,
+the report finds 382 declared memories, 10,932 control-group references, 378
+memory lifetime intervals, and 5,029 same-shape disjoint candidates.  This is
+still an analysis-only result: no aliases have been applied, and each candidate
+requires an IR dependency proof and semantic regression before transformation.

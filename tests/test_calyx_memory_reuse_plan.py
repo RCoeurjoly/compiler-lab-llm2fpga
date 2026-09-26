@@ -60,3 +60,47 @@ component main() -> () {
 """
     aliases = module.conservative_scratch_aliases(futil, {"weights"})
     assert aliases == {"b": "a"}
+
+
+def test_plan_finds_groups_declared_in_wires_before_nested_component_control():
+    futil = """
+@external mem_0 = seq_mem_d1(64, 8, 3);
+component main() -> () {
+  cells { child = child(); }
+  control { invoke child(); }
+}
+component child() -> () {
+  cells {
+    @external first = seq_mem_d1(64, 8, 3);
+    @external second = seq_mem_d1(64, 8, 3);
+  }
+  wires {
+    group produce { first.addr0 = 3'd0; first.write_en = 1'd1; }
+    group consume { first.addr0 = 3'd0; second.addr0 = 3'd0; }
+    group overwrite { second.addr0 = 3'd0; }
+  }
+  control {
+    seq { produce; consume; overwrite; }
+  }
+}
+"""
+    result = module.plan(futil)
+    assert result["control_group_tokens"] == 3
+    pairs = {(entry["first"], entry["second"]) for entry in result["same_shape_disjoint_candidates"]}
+    assert ("first", "second") not in pairs
+
+
+def test_plan_resolves_generated_component_memory_arguments():
+    futil = """
+@external mem_0 = seq_mem_d1(64, 8, 3);
+component main() -> () {
+  control { invoke child[arg_mem_0 = mem_0](); }
+}
+component child() -> () {
+  cells { ref arg_mem_0 = seq_mem_d1(64, 8, 3); }
+  wires { group use_mem { arg_mem_0.addr0 = 3'd0; } }
+  control { seq { use_mem; } }
+}
+"""
+    result = module.plan(futil)
+    assert result["intervals"] == {"mem_0": {"first": 0, "last": 0}}
