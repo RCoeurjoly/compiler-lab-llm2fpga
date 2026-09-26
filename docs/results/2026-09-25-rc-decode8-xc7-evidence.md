@@ -627,3 +627,15 @@ transaction-level Wishbone test completed with `WB_RC_PASS result=4cfe`;
 Verilator compilation took 18.531 s and simulation took 0.051 s.  This is a
 fresh confirmation of the one-shot RC semantic gate, not a multi-token or
 autoregressive result.
+
+### Exported-graph boundary probe (2026-09-26)
+
+The integrated exported-program archive was inspected without executing its
+custom quantized operators. Its serialized `exported/models/model.json`
+(`sha256=a48467b2aef1ae5eb9245b34e28c61066e03765afc61d42e030c636a509ced17`)
+contains no literal `prefill-8`, `decode-8`, or `decode-9` phase markers and no
+`"phase"` metadata keys. The phase names exist only in the surrounding
+contract/observation receipt, not in the graph consumed by Torch-MLIR. This is
+direct evidence that a backend pass cannot reliably recover serving boundaries
+from the exported graph alone: phase/cache annotations must be introduced
+before export or carried as an explicit compiler-owned ABI.
