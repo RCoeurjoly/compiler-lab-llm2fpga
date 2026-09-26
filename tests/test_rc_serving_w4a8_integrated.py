@@ -213,6 +213,7 @@ class RcServingW4A8IntegratedTest(unittest.TestCase):
         self.assertEqual(
             files,
             [
+                "compiler-phase-abi.json",
                 "exported.pt2",
                 "graph.txt",
                 "observation.json",
