@@ -440,6 +440,18 @@ one-shot semantic equivalence only. Multi-token feedback simulation, PCIe
 image load/readback, DDR3 calibration/BIST, and board inference remain open
 gates rather than being implied by the route or bitstream artifacts.
 
+This audit must be read together with the separate stateful-serving RC
+evidence, not as a claim that the compiler lacks a multi-token path.  The
+durable receipt `docs/results/2026-08-14-w4a8-three-phase-equivalence.json`
+reports `prefill-8 -> decode-8 -> decode-9` compiler-generated SystemVerilog
+closures, all bit-exact against their frozen PT2E references (maximum absolute
+error zero).  That serving profile has explicit cache/state phase boundaries
+and is the appropriate compiler milestone for autoregressive simulation.  It
+is distinct from the smaller integer diagnostic wrapper audited above.  The
+three-phase receipt still does not prove PCIe ingress, UberDDR3 calibration,
+FPGA fit for the integrated shell, or board inference; those remain the next
+integration gates.
+
 The current wrapper was re-run through the pinned Verilator binary from the
 Nix store using the content-addressed wrapper and compiler SV artifacts.  The
 transaction-level Wishbone test completed with `WB_RC_PASS result=4cfe`;
