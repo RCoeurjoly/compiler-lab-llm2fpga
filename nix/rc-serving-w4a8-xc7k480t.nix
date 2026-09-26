@@ -10,12 +10,14 @@
 , sourceSvGz
 , sourceSha256
 , skipCmp2Lcu ? false
+, skipPostTechmapOpt ? false
 }:
 
 let
   targetPart = "xc7k480tffg1156-1";
   targetChipdb = "xc7k480tffg1156.bin";
   cmp2lcuMap = if skipCmp2Lcu then "" else "-map +/cmp2lcu.v";
+  postTechmapOpt = if skipPostTechmapOpt then "" else "opt";
   # Re-materialize the checked-in gzip under a fresh store name, rather than
   # depending on a possibly stale/corrupt source-path realization in the
   # daemon store.  The source file is still authenticated by sourceSha256
@@ -120,7 +122,7 @@ pkgs.runCommand "${phaseName}-xc7k480t-evidence" {
     synth_xilinx -family xc7 -top main -flatten -run map_dsp:coarse
     techmap -map +/cmp2lut.v ${cmp2lcuMap} -D LUT_WIDTH=6
     alumacc
-    opt
+    ${postTechmapOpt}
     memory -nomap
     opt_clean
     synth_xilinx -family xc7 -top main -flatten -run map_memory:

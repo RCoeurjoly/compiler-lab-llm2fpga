@@ -986,6 +986,20 @@
               sourceSha256 = "62255f24c12c11b699c972b824fb2cb4119d94f733d57124117b9c00a5e18fa6";
               skipCmp2Lcu = true;
             };
+          "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-xc7k480t-no-cmp2lcu-no-opt-evidence" =
+            import ./nix/rc-serving-w4a8-xc7k480t.nix {
+              inherit pkgs python yosysSlang;
+              yosys = yosysPkg;
+              nextpnr = task3MainLib.task3Toolchain.nextpnr;
+              chipdb = task3MainLib.task3Toolchain.chipdb;
+              normalizer = ./scripts/pipeline/fix_sv_synthesis_frontend.py;
+              evidenceWriter = ./scripts/pipeline/write_w4a8_xc7_evidence.py;
+              phaseName = "decode-8-no-cmp2lcu-no-opt";
+              sourceSvGz = ./artifacts/w4a8-xc7k480t-sv/decode-8-main.sv.gz;
+              sourceSha256 = "62255f24c12c11b699c972b824fb2cb4119d94f733d57124117b9c00a5e18fa6";
+              skipCmp2Lcu = true;
+              skipPostTechmapOpt = true;
+            };
           "tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-9-xc7k480t-evidence" =
             import ./nix/rc-serving-w4a8-xc7k480t.nix {
               inherit pkgs python yosysSlang;
