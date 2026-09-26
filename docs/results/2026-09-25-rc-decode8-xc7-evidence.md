@@ -701,3 +701,12 @@ groups under `par`; none of the 382 generated memories is used by those groups,
 so the conservative sequential-order filter retains all 5,029 candidates for
 this artifact.  A regression fixture confirms that a candidate touching a
 parallel branch is rejected rather than treated as textually ordered.
+
+### Nix pipeline argument-closure repair (2026-09-26)
+
+`nix flake check --no-build --impure` initially failed because the integrated
+phase ABI option leaked through the generic `registerModel` path into
+`mkPipeline`, which does not consume that option.  The generic argument filter
+now strips `phaseAbi` while the no-handshake path retains it.  The full
+no-build flake check passes after this repair; no compiler artifact or hardware
+qualification is implied by that structural check.

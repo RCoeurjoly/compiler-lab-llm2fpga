@@ -696,6 +696,10 @@ let
       "calyxFsmDecodeKeepCopies"
       "calyxFsmDecodeShareStates"
       "calyxFsmDecodeHierarchical"
+      # Phase ABI metadata is consumed only by the no-handshake flat-SCF
+      # pipeline.  Do not leak it into mkPipeline/mkTosaPipeline, whose
+      # signatures intentionally do not accept that experiment-specific arg.
+      "phaseAbi"
     ];
 
   registerModel = args:
