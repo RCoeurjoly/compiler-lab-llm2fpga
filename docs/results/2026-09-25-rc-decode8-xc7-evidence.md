@@ -317,3 +317,25 @@ DDR3 calibration, or board inference. The first nextpnr issue has therefore
 progressed from missing DSP directions and an invalid memory-heavy top to a
 closed, routed compiler-generated RC diagnostic image, pending a durable
 terminal-success receipt.
+
+### Existing Nix-qualified RC route receipt
+
+The project’s existing Nix attribute
+`tinystories-representative-core-w4a8-integer-via-linalg-no-handshake-xc7k480t-nextpnr-utilization`
+has now been inspected directly in the store. Its route receipt reports
+`status: success`, `exit_status: 0`, and a nonempty FASM. This is the durable
+checkpoint to use instead of the transient `/tmp` replay above:
+
+* mapped JSON SHA-256: `4e82c669582eaa84d114ddccdc966ba635a471fea5d6793ce2c28bc90613cf9c`;
+* FASM SHA-256: `2d97aeb06ef3481ad70058362a706f71e6664129ed53bca42fd48ca0dd250db3`;
+* route receipt SHA-256: `7bd3fa32ba7ca7302c627093b589f9a6118107e3fed08d80f5e6dea108b9e0ee`;
+* nextpnr log SHA-256: `67d3359f30e07be93423421900077f93a9fa351b25a3cce04013fdb56c38cbb1`;
+* final reported frequency: 102.44 MHz at the 12 MHz probe target;
+* routed utilization: 5,200 LUTX, 645 FF, 38 CARRY4, zero DSP and zero BRAM.
+
+This proves a reproducible compiler-generated RC implementation route under
+the diagnostic four-port XDC. It is not yet the requested YPCB PCIe+UberDDR3
+design: the artifact has no PCIe endpoint, no UberDDR3 controller, and no
+board inference evidence. The next gate is therefore functional transaction-
+level RC equivalence followed by integration with the existing platform, not
+another generic Yosys/nextpnr experiment.
