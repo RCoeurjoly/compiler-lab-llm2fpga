@@ -394,6 +394,23 @@ covers the cache ABI, phase ordering, integrated observation/readback
 manifest, and export save/reload behavior; it does not claim generated-RTL,
 PCIe, DDR3, or board success.
 
+### Fresh compiler-generated decode-8 RTL gate (2026-09-26)
+
+The missing phase artifact was rebuilt through the pinned pipeline and
+simulated against its fresh exported-program reference.  The Nix outputs are:
+
+* SV: `/nix/store/qvymxdvl9896q0x3xibcqqvdqc92grfb-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-calyx-native-sv`
+  (`main.sv` SHA-256
+  `05dde596f14194bbbc5c67cdf71634b3adff93e310438d581c2f478ffeef354a`);
+* flat-SCF: `/nix/store/29ysf5wv89bvifsk0pz971p6dx1cjys6-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-flat-scf`;
+* exported program: `/nix/store/najg24bh3ff27a2s8159ml2sdlrk682h-tinystories-w4a8-rc-serving-mask10-vocab6-width2-decode-8-pytorch-exported`.
+
+`run_rc_serving_w4a8_sv.py` reports `status=pass`, bit-exact equality on all
+five semantic output ports, maximum absolute error `0.0`, compilation time
+129.98 seconds, and simulation time 297.07 seconds.  This is a
+compiler-generated RTL phase gate; it is not yet the integrated multi-phase
+program and does not exercise PCIe, DDR3, or hardware.
+
 ### PCIe transport availability observation (2026-09-26)
 
 At `2026-09-26T10:23:01+02:00`, the host enumerated the YPCB endpoint as
