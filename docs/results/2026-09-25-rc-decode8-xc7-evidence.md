@@ -452,6 +452,20 @@ three-phase receipt still does not prove PCIe ingress, UberDDR3 calibration,
 FPGA fit for the integrated shell, or board inference; those remain the next
 integration gates.
 
+### Alternate-simulator probe for the integrated stateful closure
+
+As a bounded diagnostic, Icarus Verilog 12.0 was run against the exact
+compiler-generated integrated shell and closure.  The raw source first hit a
+duplicate `sqrtOpOut` declaration and then exhausted memory at approximately
+872 MiB RSS.  Applying the pinned synthesis-front-end normalizer removed 8,057
+assertion blocks, one duplicate square-root wire, one duplicate request
+declaration, and six packed `done_buf` declarations (receipt SHA-256
+`2cfccc9572b19be21da662f47908d9eeec589e2f3eed8edf9ac616d6f24d4544`).  The
+normalized source still exhausted Icarus memory at approximately 867 MiB RSS,
+before elaboration.  This rules out Icarus as a low-memory qualification path;
+the integrated RTL runner remains an implementation/tooling bottleneck, not a
+semantic mismatch.
+
 The current wrapper was re-run through the pinned Verilator binary from the
 Nix store using the content-addressed wrapper and compiler SV artifacts.  The
 transaction-level Wishbone test completed with `WB_RC_PASS result=4cfe`;
