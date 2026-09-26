@@ -18,6 +18,11 @@ struct Vmain___024root {
   bool main__DOT__selected_tokens_content_en = false;
   unsigned main__DOT__selected_tokens_addr0 = 0;
   uint16_t main__DOT__selected_tokens__DOT__mem[2] = {0,0};
+  bool main__DOT__context_tokens_write_en = false;
+  bool main__DOT__context_tokens_content_en = false;
+  unsigned main__DOT__context_tokens_addr0 = 0;
+  uint16_t main__DOT__context_tokens_write_data = 0;
+  uint16_t main__DOT__context_tokens__DOT__mem[20] = {};
 };
 struct Vmain {
   Vmain___024root root;
@@ -29,9 +34,18 @@ struct Vmain {
     if (clk) {
       if (reset) { cycles=0; done=0; root={}; }
       else {
+        if (valid && !start) {
+          root.main__DOT__context_tokens__DOT__mem[0] = prompt_0;
+          root.main__DOT__context_tokens__DOT__mem[1] = prompt_1;
+          root.main__DOT__context_tokens__DOT__mem[2] = prompt_2;
+          root.main__DOT__context_tokens__DOT__mem[3] = prompt_3;
+        }
         if (root.main__DOT__selected_tokens_write_en)
           root.main__DOT__selected_tokens__DOT__mem[root.main__DOT__selected_tokens_addr0] =
             root.main__DOT__selected_tokens_addr0 ? 612 : 11;
+        if (root.main__DOT__context_tokens_write_en)
+          root.main__DOT__context_tokens__DOT__mem[root.main__DOT__context_tokens_addr0] =
+            root.main__DOT__context_tokens_write_data;
         ++cycles;
       }
     }
@@ -40,6 +54,12 @@ struct Vmain {
       !MISSING && (cycles == 12 || (EXTRA && cycles == 20));
     root.main__DOT__selected_tokens_content_en = root.main__DOT__selected_tokens_write_en;
     root.main__DOT__selected_tokens_addr0 = cycles == 20;
+    root.main__DOT__context_tokens_write_en = root.main__DOT__selected_tokens_write_en;
+    root.main__DOT__context_tokens_content_en = root.main__DOT__selected_tokens_content_en;
+    root.main__DOT__context_tokens_addr0 = 4 + root.main__DOT__selected_tokens_addr0;
+    root.main__DOT__context_tokens_write_data =
+      BAD_FEEDBACK && root.main__DOT__selected_tokens_addr0 ? 99 :
+      (root.main__DOT__selected_tokens_addr0 ? 612 : 11);
     token_id = BAD_PORT ? 99 : root.main__DOT__selected_tokens__DOT__mem[token_index];
   }
 };
@@ -47,8 +67,8 @@ struct Vmain {
 
 
 class HarnessTest(unittest.TestCase):
-    def execute(self, *, bad_port=0, missing=0, extra=0):
-        artifact = SimpleNamespace(provenance={"source_memories": {}, "schedule": {"generation_steps": 1}})
+    def execute(self, *, bad_port=0, missing=0, extra=0, bad_feedback=0, steps=1):
+        artifact = SimpleNamespace(provenance={"source_memories": {}, "schedule": {"generation_steps": steps}})
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             (directory / "Vmain.h").write_text(MODEL)
@@ -57,6 +77,7 @@ class HarnessTest(unittest.TestCase):
             (directory / "harness.cpp").write_text(harness(artifact))
             subprocess.run(["g++", "-std=c++17", f"-DBAD_PORT={bad_port}",
                             f"-DMISSING={missing}", f"-DEXTRA={extra}",
+                            f"-DBAD_FEEDBACK={bad_feedback}",
                             "harness.cpp", "-o", "check"], cwd=directory, check=True,
                            capture_output=True, timeout=30)
             return subprocess.run([str(directory / "check"), str(directory)],
@@ -74,3 +95,12 @@ class HarnessTest(unittest.TestCase):
 
     def test_rejects_second_step_in_one_step_execution(self):
         self.assertNotEqual(self.execute(extra=1).returncode, 0)
+
+    def test_accepts_two_tokens_with_hardware_context_feedback(self):
+        result = self.execute(extra=1, steps=2)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_reports_first_corrupt_feedback_even_when_output_tokens_match(self):
+        result = self.execute(extra=1, steps=2, bad_feedback=1)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('"event":"context_mismatch","run":0,"step":1', result.stdout)

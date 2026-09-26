@@ -250,6 +250,10 @@ int main(int argc, char** argv) {
       const bool selected = root->main__DOT__selected_tokens_write_en &&
         root->main__DOT__selected_tokens_content_en;
       const unsigned step = root->main__DOT__selected_tokens_addr0;
+      const bool context_written = root->main__DOT__context_tokens_write_en &&
+        root->main__DOT__context_tokens_content_en;
+      const unsigned context_address = root->main__DOT__context_tokens_addr0;
+      const unsigned context_data = root->main__DOT__context_tokens_write_data;
       model.clk = 1; model.eval(); ++completed[run];
       // Keep long full-model runs observable without producing millions of
       // lines of transport output.
@@ -260,6 +264,26 @@ int main(int argc, char** argv) {
         if (step >= steps) return 6;
         seen |= 1u << step;
         tokens[run][step] = root->main__DOT__selected_tokens__DOT__mem[step];
+        if (!context_written || context_address != 4 + step ||
+            context_data != tokens[run][step]) {
+          std::cout << "{\"event\":\"context_mismatch\",\"run\":" << run
+            << ",\"step\":" << step << ",\"address\":" << context_address
+            << ",\"expected\":" << tokens[run][step]
+            << ",\"actual\":" << context_data << "}" << std::endl;
+          return 8;
+        }
+        const unsigned prompt[4] = {7454, 2402, 257, 640};
+        for (unsigned address = 0; address <= 4 + step; ++address) {
+          const unsigned want = address < 4 ? prompt[address] : expected[address - 4];
+          const unsigned got = root->main__DOT__context_tokens__DOT__mem[address];
+          if (got != want) {
+            std::cout << "{\"event\":\"context_mismatch\",\"run\":" << run
+              << ",\"step\":" << step << ",\"address\":" << address
+              << ",\"expected\":" << want << ",\"actual\":" << got
+              << "}" << std::endl;
+            return 8;
+          }
+        }
         std::cout << "{\"event\":\"selected\",\"run\":" << run
           << ",\"step\":" << step << ",\"token\":" << tokens[run][step]
           << ",\"cycles\":" << completed[run] << "}" << std::endl;
@@ -318,7 +342,10 @@ def main():
         'public_flat_rw -module "seq_mem_d1" -var "mem" @(posedge clk)',
         'public_flat_rw -module "seq_mem_d1_bram" -var "mem" @(posedge clk)',
     ]
-    visibility += [f'public_flat_rd -module "main" -var "{name}"' for name in ("selected_tokens_write_en", "selected_tokens_content_en", "selected_tokens_addr0")]
+    visibility += [f'public_flat_rd -module "main" -var "{name}"' for name in (
+        "selected_tokens_write_en", "selected_tokens_content_en", "selected_tokens_addr0",
+        "context_tokens_write_en", "context_tokens_content_en",
+        "context_tokens_addr0", "context_tokens_write_data")]
     (directory / "visibility.vlt").write_text("\n".join(visibility) + "\n")
     (directory / "harness.cpp").write_text(harness(artifact))
     build = directory / "verilator"
