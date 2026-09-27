@@ -309,6 +309,68 @@ int main(int argc, char** argv) {
 '''.replace("PRELOADS", preloads).replace("GENERATION_STEPS", str(steps))
 
 
+def run_and_record_harness(
+    executable: Path,
+    directory: Path,
+    *,
+    generation_steps: int,
+    timeout_seconds: int = 7200,
+    bindings: dict | None = None,
+) -> dict:
+    """Preserve the actual simulator stream and accept only two exact runs."""
+    expected = [11, 612, 373, 257, 1310, 2576, 3706, 20037,
+                13, 1375, 6151, 284, 711, 2354, 287, 262][:generation_steps]
+    if generation_steps not in (1, 2, 16):
+        raise ValueError("generation_steps must be 1, 2, or 16")
+    log_path = directory / "production-execution.jsonl"
+    start = time.monotonic()
+    with log_path.open("w") as log:
+        result = subprocess.run([str(executable), str(directory)], cwd=ROOT,
+                                stdout=log, stderr=subprocess.STDOUT,
+                                timeout=timeout_seconds, check=False)
+    elapsed = time.monotonic() - start
+    if result.returncode:
+        raise subprocess.CalledProcessError(result.returncode, result.args)
+    selected = [[], []]
+    output_ports = [[], []]
+    cycles = [None, None]
+    for line in log_path.read_text().splitlines():
+        event = json.loads(line)
+        kind = event.get("event")
+        if kind == "context_mismatch":
+            raise ValueError("simulator reported a context mismatch")
+        if kind not in ("selected", "token_port", "complete"):
+            continue
+        run = event.get("run")
+        if type(run) is not int or run not in (0, 1):
+            raise ValueError("invalid simulator run index")
+        if kind in ("selected", "token_port"):
+            target = selected if kind == "selected" else output_ports
+            if event.get("step") != len(target[run]):
+                raise ValueError("missing or unordered token event")
+            target[run].append(event.get("token"))
+        elif cycles[run] is not None or type(event.get("cycles")) is not int:
+            raise ValueError("missing or repeated completion event")
+        else:
+            cycles[run] = event["cycles"]
+    if selected != [expected, expected] or output_ports != [expected, expected]:
+        raise ValueError("selected tokens or public output ports differ from the frozen reference")
+    if cycles[0] is None or cycles[0] <= 0 or cycles[0] != cycles[1]:
+        raise ValueError("simulator did not complete two repeatable runs")
+    receipt = {
+        "status": "passed",
+        "generation_steps": generation_steps,
+        "selected_tokens": selected,
+        "cycles": cycles,
+        "log_sha256": hashlib.sha256(log_path.read_bytes()).hexdigest(),
+        "elapsed_seconds": elapsed,
+    }
+    if bindings:
+        receipt.update(bindings)
+    (directory / "production-execution.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    return receipt
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", nargs="?", type=Path, default=Path("/tmp/llm2fpga-tinystories-bram-production-sv"))
@@ -350,10 +412,16 @@ def main():
     (directory / "harness.cpp").write_text(harness(artifact))
     build = directory / "verilator"
     subprocess.run(["verilator", "--cc", "--exe", "--build", "-j", "8", "--top-module", "main", "--Mdir", str(build), "-CFLAGS", "-std=c++17 -O3", "-o", "production_harness", str(directory / "visibility.vlt"), str(directory / "model.sv"), str(directory / "harness.cpp")], cwd=ROOT, check=True)
-    result = subprocess.run([str(build / "production_harness"), str(directory)], cwd=ROOT, text=True, check=True)
-    receipt = {"status": "passed", "generation_steps": args.generation_steps, "oracle_sha256": artifact.provenance["oracle_sha256"], "futil_sha256": artifact.provenance["futil_sha256"], "sv_sha256": hashlib.sha256((directory / "model.sv").read_bytes()).hexdigest(), "elapsed_seconds": time.time()}
-    receipt["memory_latency_receipt_sha256"] = json.loads((library / "production-memory-latency.json").read_text())["receipt_sha256"]
-    (directory / "production-execution.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    run_and_record_harness(
+        build / "production_harness", directory, generation_steps=args.generation_steps,
+        bindings={
+            "oracle_sha256": artifact.provenance["oracle_sha256"],
+            "futil_sha256": artifact.provenance["futil_sha256"],
+            "sv_sha256": hashlib.sha256((directory / "model.sv").read_bytes()).hexdigest(),
+            "memory_latency_receipt_sha256": json.loads(
+                (library / "production-memory-latency.json").read_text())["receipt_sha256"],
+        },
+    )
 
 
 if __name__ == "__main__":

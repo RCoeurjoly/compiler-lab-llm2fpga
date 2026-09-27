@@ -5,10 +5,14 @@ This tests checker acceptance/rejection, not TinyStories computation.
 import subprocess
 import tempfile
 import unittest
+import hashlib
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from scripts.pipeline.run_bram_production_sv import harness
+from scripts.pipeline import run_bram_production_sv as production_runner
+
+harness = production_runner.harness
 
 MODEL = r'''
 #pragma once
@@ -104,3 +108,45 @@ class HarnessTest(unittest.TestCase):
         result = self.execute(extra=1, steps=2, bad_feedback=1)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('"event":"context_mismatch","run":0,"step":1', result.stdout)
+
+
+class ProductionExecutionReceiptTest(unittest.TestCase):
+    def test_preserves_two_exact_runs_and_binds_log_to_receipt(self):
+        self.assertTrue(hasattr(production_runner, "run_and_record_harness"))
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            executable = directory / "fake-harness"
+            executable.write_text("#!/bin/sh\n" + "\n".join((
+                "echo '{\"event\":\"selected\",\"run\":0,\"step\":0,\"token\":11,\"cycles\":10}'",
+                "echo '{\"event\":\"selected\",\"run\":0,\"step\":1,\"token\":612,\"cycles\":20}'",
+                "echo '{\"event\":\"token_port\",\"run\":0,\"step\":0,\"token\":11}'",
+                "echo '{\"event\":\"token_port\",\"run\":0,\"step\":1,\"token\":612}'",
+                "echo '{\"event\":\"complete\",\"run\":0,\"cycles\":20}'",
+                "echo '{\"event\":\"selected\",\"run\":1,\"step\":0,\"token\":11,\"cycles\":10}'",
+                "echo '{\"event\":\"selected\",\"run\":1,\"step\":1,\"token\":612,\"cycles\":20}'",
+                "echo '{\"event\":\"token_port\",\"run\":1,\"step\":0,\"token\":11}'",
+                "echo '{\"event\":\"token_port\",\"run\":1,\"step\":1,\"token\":612}'",
+                "echo '{\"event\":\"complete\",\"run\":1,\"cycles\":20}'",
+            )) + "\n")
+            executable.chmod(0o755)
+            receipt = production_runner.run_and_record_harness(executable, directory, generation_steps=2)
+            log = (directory / "production-execution.jsonl").read_bytes()
+            self.assertEqual(receipt["status"], "passed")
+            self.assertEqual(receipt["selected_tokens"], [[11, 612], [11, 612]])
+            self.assertEqual(receipt["cycles"], [20, 20])
+            self.assertEqual(receipt["log_sha256"], hashlib.sha256(log).hexdigest())
+            self.assertEqual(json.loads((directory / "production-execution.json").read_text()), receipt)
+            self.assertGreaterEqual(receipt["elapsed_seconds"], 0)
+            self.assertLess(receipt["elapsed_seconds"], 10)
+
+    def test_rejects_success_exit_with_missing_token_event_and_preserves_log(self):
+        self.assertTrue(hasattr(production_runner, "run_and_record_harness"))
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            executable = directory / "fake-harness"
+            executable.write_text("#!/bin/sh\necho '{\"event\":\"complete\",\"run\":0,\"cycles\":20}'\n")
+            executable.chmod(0o755)
+            with self.assertRaises(ValueError):
+                production_runner.run_and_record_harness(executable, directory, generation_steps=2)
+            self.assertIn('"event":"complete"', (directory / "production-execution.jsonl").read_text())
+            self.assertFalse((directory / "production-execution.json").exists())
