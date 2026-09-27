@@ -80,5 +80,27 @@ not substitute for an end-to-end Nix replay of the simulator.
 
 Nothing here proves resource fit, full timing coverage, a bitstream, a JTAG
 transaction, or board inference. The accepted first-token board image is
-unchanged. The immediate physical blocker remains the two-token route
-documented in `2026-09-27-tinystories-two-token-synthesis-route.md`.
+unchanged. The current physical blocker is the two-token JTAG CSR response
+alignment, after a legal two-token route and bitstream, as documented in
+`2026-09-27-tinystories-two-token-synthesis-route.md`.
+
+## Full-sixteen pre-DSP synthesis checkpoint
+
+While a fresh Nix-pinned two-run simulator replay was still live, the existing
+`--preserve-multipliers` frontend was run on the same authenticated full-16
+static-init generated SV (normalized SHA-256
+`ceec2a666d1e7d013c51acbafeeef275f7de71fc623ac2724b6bc25440062415`).
+It exited zero under a 12 GiB virtual-memory cap and produced pre-DSP RTLIL
+SHA-256 `ccc02961764ce1a1f789127497e927d47645ab3c86ce1da70ff7b7bdbb6312ed`
+with 39 `$mul` cells. The pinned Yosys 0.66 `synth_xilinx -family xc7
+-top main -run map_dsp:coarse` stage, with the existing
+`xilinx_dsp.multonly=1` setting, exited zero and inferred 225 `DSP48E1`
+cells. Its RTLIL and log SHA-256 values are respectively
+`3305182733b6b726f5f3d2f11d6f5d72691d53ca9c51c3c20ede5559f3be3a32`
+and `bc0fe7d190e4aa6bcfc09e96ea6281325f39d7a65acfd8cdf0bc8005e0f14912`.
+The checkpoints are under the ignored
+`.superpowers/sdd/2026-09-09-tinystories-16-token-board/current16/static-image/`
+working directory. They contain the compiler-generated core, not a finalized
+CSR-integrated board image. No full-16 native memory mapping, placement,
+routing, timing qualification, bitstream, or board inference follows from this
+DSP checkpoint.
