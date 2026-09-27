@@ -307,3 +307,32 @@ for the observed half-value, not yet a verified hardware fix. An existing
 so the CSR change must pass a targeted red/green bit-level test and a newly
 routed board gate before accepting `[11,612]`. The current board image is the
 accepted first-token control, not the failed two-token candidate.
+
+## Opt-in router2 congestion attribution
+
+An isolated nextpnr package added an opt-in iteration-1 report to router2;
+the production package and routing decisions were not changed. The diagnostic
+binary SHA-256 is
+`98134bc08a32a19ee141169dde79707ab9046c0ddccd014fdb81c09c915b4889`.
+The input was the original **default** two-token placed JSON (SHA-256
+`f4534ac4dc7af8a2af20c624737b3702b03a824842025a02ca9da1b52f681ece`)
+with only `router2/diagnosticIter1=1` inserted; deleting that line reproduced
+the original file byte-for-byte. The router used the same chipdb, XDC,
+30 MHz target, seed 15, and `--no-tmdriv`, under a 12 GiB virtual-memory cap.
+It was stopped after iteration 1, not used to produce a routed bitstream.
+
+Iteration 1 reported 161,614 overused wires and 196,129 total overuse,
+matching the historical default-placement measurement. The heatmap sums to
+exactly 196,129. The largest single 10×10 coordinate bin (x=260–269,
+y=190–199) contains 1,205 overuse, about 0.61% of the total. The leading
+ranked nets by count of shared wires were a mapped `$techmap` net (474),
+`reset` (348), `c_proj_weight_codes_i8.read_addr[8]` (344),
+`c_fc_output_q16_16.read_addr[8]` (328), and
+`lm_gemv_weight_address_out[15]` (248). These are contributors, not proof of
+one local or single-net root cause; congestion is distributed. The diagnostic
+log and heatmap SHA-256 values are respectively
+`15f56cccb9fc255c204d7d48b93e3d2c577f93f37d1d991526c534e7c45fc742`
+and `457835b7f1943a8bee46e923b7e53268f9fd5d44258ad128af6e9ec1b8edfb97`.
+The checker passed on the real report and rejected a deliberately corrupted
+heatmap. The immediate inference blocker remains the physical CSR response
+alignment, not this now-routed placement.

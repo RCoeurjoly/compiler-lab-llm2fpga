@@ -62,6 +62,13 @@
               ./patches/nextpnr-xilinx/0038-allow-kintex-heap-geometry-diagnostic-overrides.patch
             ];
           });
+        nextpnrKintexCongestionDiagnostic =
+          nextpnrKintexGeometryDiagnostic.overrideAttrs (old: {
+            pname = "nextpnr-xilinx-kintex-congestion-diagnostic";
+            patches = (old.patches or [ ]) ++ [
+              ./patches/nextpnr-xilinx/0039-report-router2-iteration1-congestion.patch
+            ];
+          });
         task3MainLock = builtins.fromJSON
           (builtins.readFile ./task3-main/flake.lock);
         nextpnrXilinxForkLock =
@@ -3222,6 +3229,7 @@ PY
         packages = {
           nextpnr-kintex-route-control = nextpnrKintexRouteControl;
           nextpnr-kintex-geometry-diagnostic = nextpnrKintexGeometryDiagnostic;
+          nextpnr-kintex-congestion-diagnostic = nextpnrKintexCongestionDiagnostic;
           task6-board-shell-source-closure = task6BoardShell.sourceClosure;
           task6-board-shell-m2-source-closure = task6BoardShell.m2SourceClosure;
           compiler-ddr3-trace-replay-elaboration = task6BoardShell.replayElaboration;

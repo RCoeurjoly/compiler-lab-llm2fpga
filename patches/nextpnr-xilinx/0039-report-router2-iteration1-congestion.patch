@@ -1,0 +1,38 @@
+diff --git a/common/router2.cc b/common/router2.cc
+--- a/common/router2.cc
++++ b/common/router2.cc
+@@ -1376,10 +1376,31 @@ struct Router2
+             do_route();
+             route_queue.clear();
+             update_congestion();
+-#if 0
+-            if (iter == 1 && ctx->debug) {
++            if (iter == 1 && ctx->setting<bool>("router2/diagnosticIter1", false)) {
+                 std::ofstream cong_map("cong_map_0.csv");
+                 write_heatmap(cong_map, true);
++                std::vector<int> shared_wires_by_net(nets_by_udata.size(), 0);
++                for (const auto &wire : flat_wires) {
++                    if (wire.bound_nets.size() <= 1)
++                        continue;
++                    for (const auto &bound : wire.bound_nets)
++                        ++shared_wires_by_net.at(bound.first);
++                }
++                std::vector<int> ranked_nets;
++                for (int n = 0; n < int(shared_wires_by_net.size()); ++n)
++                    if (shared_wires_by_net.at(n) > 0)
++                        ranked_nets.push_back(n);
++                std::sort(ranked_nets.begin(), ranked_nets.end(), [&](int a, int b) {
++                    if (shared_wires_by_net.at(a) != shared_wires_by_net.at(b))
++                        return shared_wires_by_net.at(a) > shared_wires_by_net.at(b);
++                    return nets_by_udata.at(a)->name < nets_by_udata.at(b)->name;
++                });
++                log_info("router2 diagnostic iteration=1 overused=%d overuse=%d\n", overused_wires,
++                         total_overuse);
++                for (int rank = 0; rank < std::min(20, int(ranked_nets.size())); ++rank) {
++                    int n = ranked_nets.at(rank);
++                    log_info("router2 diagnostic net rank=%d shared_wires=%d name=%s\n", rank + 1,
++                             shared_wires_by_net.at(n), ctx->nameOf(nets_by_udata.at(n)));
++                }
+             }
+-#endif
+             dump_statistics();
