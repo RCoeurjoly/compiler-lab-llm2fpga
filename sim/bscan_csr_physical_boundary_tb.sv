@@ -43,15 +43,41 @@ module bscan_csr_physical_boundary_tb;
     end
   endtask
 
+  // Set up a known CSR response through the already verified 64-edge command
+  // path.  The physical probe below isolates response capture/shift alignment;
+  // it does not claim to model the board's UPDATE command reconstruction.
+  task automatic command_full(input [63:0] command);
+    integer i;
+    begin
+      scan_capture = 1; #1 scan_drck = 1; #1 scan_drck = 0;
+      scan_capture = 0; scan_shift = 1;
+      for (i = 0; i < 64; i = i + 1) begin
+        scan_tdi = command[i];
+        #1 scan_drck = 1; #1 scan_drck = 0;
+      end
+      scan_shift = 0; scan_update = 1; #1 scan_update = 0;
+      repeat (8) @(posedge sys_clk);
+    end
+  endtask
+
   reg [63:0] observed;
   initial begin
     #1 scan_reset = 1; #20 scan_reset = 0;
-    exchange(64'h7000000000000001, observed);
-    $display("physical-model command_tdo=%016x response=%016x", observed, response_word);
+    // The board returns the preceding command's response during the next
+    // exchange.  A non-palindromic loopback detects any one-bit slip.
+    command_full(64'h7123456789abcdef);
+    if (response_word !== 64'h7123456789abcdef)
+      $fatal(1, "command loopback update failed: %016x", response_word);
     exchange(64'h3000000000000000, observed);
-    $display("physical-model status_tdo=%016x response=%016x", observed, response_word);
+    if (observed !== 64'h7123456789abcdef)
+      $fatal(1, "physical loopback TDO shifted: %016x", observed);
+    command_full(64'h3000000000000000);
+    if (response_word !== 64'h2800000000000000)
+      $fatal(1, "status command update failed: %016x", response_word);
     exchange(64'h3000000000000000, observed);
-    $display("physical-model status2_tdo=%016x response=%016x", observed, response_word);
+    if (observed !== 64'h2800000000000000)
+      $fatal(1, "physical STATUS TDO shifted: %016x", observed);
+    $display("PASS: physical BSCANE2 boundary returns exact loopback and STATUS words");
     $finish;
   end
 endmodule

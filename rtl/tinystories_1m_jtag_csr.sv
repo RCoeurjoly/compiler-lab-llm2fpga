@@ -103,15 +103,15 @@ module tinystories_1m_jtag_csr #(
       scan_shift_reg <= {8'hd3, diag_capture_count, diag_shift_count,
                          diag_update_count, 32'hc0de5a17};
 `elsif BSCAN_SIM_PHYSICAL
-      // Diagnostic simulation mode: retain the physical preload adjustment
-      // while still using the explicit BSCAN_SIM ports.
-      scan_shift_reg <= {1'b0, response_word[63:1]};
+      // Exercise the same response preload as the physical primitive through
+      // the explicit BSCAN_SIM ports.
+      scan_shift_reg <= response_word;
 `elsif BSCAN_SIM
       scan_shift_reg <= response_word;
 `else
-      // Physical BSCANE2 presents the captured word one bit late at TDO;
-      // preload a right-shifted copy so the host observes the ABI word.
-      scan_shift_reg <= {1'b0, response_word[63:1]};
+      // The host samples TDO before each shift edge. Pre-shifting here caused
+      // a measured one-bit-right response on YPCB for STATUS and loopback.
+      scan_shift_reg <= response_word;
 `endif
       scan_shift_count <= 7'd0;
 `ifdef BSCAN_DIAGNOSTIC
