@@ -371,16 +371,31 @@ def run_and_record_harness(
     return receipt
 
 
-def main():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", nargs="?", type=Path, default=Path("/tmp/llm2fpga-tinystories-bram-production-sv"))
     parser.add_argument("--generation-steps", type=int, choices=(1, 2, 16), default=2)
-    args = parser.parse_args()
+    parser.add_argument("--model-package", type=Path,
+                        help="exact TinyStories model package (use a pinned Nix store path for replay)")
+    parser.add_argument("--model-snapshot", type=Path,
+                        help="exact TinyStories HF snapshot (use a pinned Nix store path for replay)")
+    return parser.parse_args(argv)
+
+
+def load_model_bundle(args, capture):
+    package = args.model_package if args.model_package is not None else capture.DEFAULT_PACKAGE
+    snapshot = args.model_snapshot if args.model_snapshot is not None else capture.DEFAULT_MODEL
+    return capture.exact_adapter.load_successor_exact_model(
+        capture.DEFAULT_CONTRACT, package, snapshot, capture.DEFAULT_GENERATION)
+
+
+def main():
+    args = parse_args()
     directory = args.directory.resolve()
     directory.mkdir(parents=True, exist_ok=True)
     artifact = production.generate_production_kernel(generation_steps=args.generation_steps)
     capture = base._load(ROOT / "TinyStories/capture_fixed_point_model_token_step_oracle.py", "production_execution_oracle")
-    bundle = capture.exact_adapter.load_successor_exact_model(capture.DEFAULT_CONTRACT, capture.DEFAULT_PACKAGE, capture.DEFAULT_MODEL, capture.DEFAULT_GENERATION)
+    bundle = load_model_bundle(args, capture)
     for name, tensor in base.materialize_model_sources(artifact, bundle).items():
         (directory / ("source-" + name + ".bin")).write_bytes(tensor.numpy().astype("<i8").tobytes())
     (directory / "model.futil").write_text(artifact.futil)

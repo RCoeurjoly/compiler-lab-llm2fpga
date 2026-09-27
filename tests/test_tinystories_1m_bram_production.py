@@ -6,6 +6,7 @@ import json
 import random
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/pipeline/lower_fixed_point_model_bram_production.py"
@@ -75,6 +76,27 @@ class BramProductionTest(unittest.TestCase):
     def test_production_runner_cli_accepts_sixteen_steps(self):
         source = (ROOT / "scripts/pipeline/run_bram_production_sv.py").read_text()
         self.assertIn("choices=(1, 2, 16)", source)
+
+    def test_production_runner_uses_explicit_model_inputs(self):
+        path = ROOT / "scripts/pipeline/run_bram_production_sv.py"
+        spec = importlib.util.spec_from_file_location("bram_sv_runner_inputs", path)
+        assert spec and spec.loader
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        package = Path("/nix/store/test-model-package")
+        snapshot = Path("/nix/store/test-hf-snapshot")
+        args = runner.parse_args([
+            "/tmp/test-sixteen", "--generation-steps", "16",
+            "--model-package", str(package), "--model-snapshot", str(snapshot),
+        ])
+        marker = object()
+        adapter = Mock()
+        adapter.load_successor_exact_model.return_value = marker
+        capture = Mock(DEFAULT_CONTRACT="contract", DEFAULT_GENERATION="generation", exact_adapter=adapter)
+        self.assertIs(runner.load_model_bundle(args, capture), marker)
+        adapter.load_successor_exact_model.assert_called_once_with(
+            "contract", package, snapshot, "generation"
+        )
 
     @staticmethod
     def _signed(value: int, width: int) -> int:
