@@ -70,3 +70,32 @@ this exact corrected JSON, then independently program SRAM and require
 evidenced placement/backend change is needed first. Neither the simulation nor
 pack-only pass can be counted as board inference. Repository-wide tests remain
 historically red/timeboxed; this is the user-approved diagnostic checkpoint.
+
+## Checkpointed placement diagnostic
+
+A bounded placement-only replay of the same final JSON, XDC, seed 15,
+30 MHz target, and `--no-tmdriv` settings completed successfully. It reproduced
+the pack checksum `0x0778a750`, placed checksum `0x7dc024d1`, SA wirelength
+6,884,338, and covered-path accelerator estimate 35.06 MHz from the original
+attempt. The resulting reusable placed JSON has SHA-256
+`fd1f1b3b3b8233ef5b728b2129673c1bc0e18677cf217dd04c882d618a53ce92`.
+A `--no-pack --no-place --no-route` reload exited zero with the same primitive
+utilization. This is a placement checkpoint, not a routed result; its purpose
+is to isolate router cost without rerunning synthesis or placement.
+
+The checkpointed router2 continuation used that exact placed JSON, the same
+XDC, 30 MHz target, seed 15, and `--no-tmdriv`, with packing and placement
+disabled. It ran low priority under a 12 GB virtual-memory cap and a bounded
+3,600-second timeout. It exited **124** after six iterations. Overused routing
+resources fell `161614 → 28730 → 6524 → 3591 → 2832 → 2462`, but never reached
+zero. Its log SHA-256 is
+`182f517db0f2aa00ba7495ddbc4e56e5a0364d32e14592ccd854a3bfd25f2d2a`;
+the placement-only log SHA-256 is
+`0943cf24e8a0ef732a8004c2c1404b467554d0da80e7f9d39b7f0d5978b8aaba`.
+No routed JSON or FASM was written. This rules out merely repeating the same
+placement with a modestly longer router timeout as a fast route to board
+inference; it does **not** prove the design is unroutable. The next controlled
+experiment should change one evidenced placement/router variable, compare
+wirelength and early overuse against this checkpoint, and retain the exact
+model, fixed-point arithmetic, 30 MHz constraints, and seed 15. No speculative
+compiler-bank rewrite is supported by these results alone.
