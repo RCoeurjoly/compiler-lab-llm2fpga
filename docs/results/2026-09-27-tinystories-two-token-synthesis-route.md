@@ -367,3 +367,19 @@ evidence localizes the immediate two-token response mismatch, but does not
 establish that a preload-only edit is sufficient. A corrected candidate must
 first reproduce the raw-vector behavior in a bit-level test, then pass the
 complete reset/status/prompt/readback/START and `[11,612]` board gates.
+
+## Existing CSR test reproduces the first hardware mismatch
+
+With the current, unmodified CSR source (SHA-256
+`1f997db3ab0522d7a3d9420ea7b2050a48d38e4c4055a73dc807584078a5847e`)
+and existing full CSR testbench (SHA-256
+`c829fdc52851a15132b3346e7365b221332453d7a9e9ee4fff6a3c8445cf4dc7`),
+Icarus 13 (binary SHA-256
+`5553e9ceab3b9e1af68480f7c5bf7fe71641d51f1218aa492137a9acba224c7b`)
+passes the ordinary `-DBSCAN_SIM` prompt/readback/reset/START test. Adding
+only `-DBSCAN_SIM_PHYSICAL` to that compile fails at the test's **first STATUS
+capture**: expected `0x2800000000000000`, actual `0x1400000000000000`.
+The latter is the exact first failure observed on this two-token bitstream.
+This is a targeted simulation reproduction, not yet a verified correction;
+the earlier September 11 physical-boundary replay modeled a different image
+and did not reproduce that image's full transaction behavior.
