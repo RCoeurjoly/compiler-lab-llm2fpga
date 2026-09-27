@@ -1,10 +1,12 @@
 # Compiler TinyStories-1M two-token synthesis and route diagnostic
 
-Status: **diagnostic checkpoint, not board acceptance**. The accelerator RTL is
-compiler-generated; no kev-gpt accelerator RTL is used. The pinned model
-package supplies authenticated weights, not implementation logic. This report
-records the 30 MHz, BRAM/LUTRAM, JTAG-only two-token candidate. The accepted
-first-token bitstream remains untouched.
+Status: **routed bitstream produced; hardware CSR failed before START; not board
+acceptance**. The accelerator RTL is compiler-generated; no kev-gpt accelerator
+RTL is used. The pinned model package supplies authenticated weights, not
+implementation logic. This report records the 30 MHz, BRAM/LUTRAM, JTAG-only
+two-token candidate. Earlier no-route statements below describe historical
+attempts; the final section supersedes them. The accepted first-token
+bitstream remains untouched.
 
 ## Passed gates
 
@@ -249,3 +251,59 @@ congestion in the current architecture; this does not prove either netlist
 unroutable or identify the underlying net/region bottleneck. A subsequent
 backend change should therefore target measured shared congestion rather
 than attributing the slowdown to token feedback alone.
+
+## Geometry-controlled legal route, bitstream, and first hardware boundary
+
+The separately named geometry-diagnostic nextpnr binary (SHA-256
+`07577e755556cfe04f4932b83c95e16dc38dd918ec13371556374e1ec5df2ecf`)
+continued the same two-token placed checkpoint with only
+`kintexHeap/hpwlScaleY=1` changed. Its router2 overused-resource counts fell
+`152091 → 22722 → 3162 → 1344 → 983 → 834`, then reached zero at iteration
+40 with `archfail=0`. The router1 legality check and post-route legalization
+completed, and nextpnr exited zero. The routed JSON SHA-256 is
+`3546cfb3b71889a68d7d708fdb70ae290a8c2801a782caab5d0d80036fcec66c`;
+the first route log SHA-256 is
+`b29f33f0829ac26ebbbea067fa03e06c973af608ca3a324b5cacd17cdfaa6a26`.
+Covered-path accelerator Fmax was 39.56 MHz against the unchanged 30 MHz
+target. BRAM/DSP timing coverage remains incomplete, so this is not full
+timing qualification.
+
+Reloading the routed JSON in this pinned nextpnr crashes before FASM emission:
+`BaseCtx::attributesToArchInfo` calls `Arch::getPipByName`, which throws
+`std::out_of_range` for a saved route PIP. Source inspection shows the writer
+uses `source->destination` names while the importer expects the older tile/index
+form. No routed JSON was edited to mask this. Rerouting the identical placed
+checkpoint with `--fasm` in the same process exited zero, reproduced the routed
+JSON byte-for-byte and the 39.56 MHz estimate, and emitted FASM SHA-256
+`3de464ea452ac4a7f84705c672a9d5bdc779ef9fea0328c31148b71f5d887aa3`
+(route log SHA-256
+`17ca7cfa8fb1e262dc6d9f40ba6c159eb47e7ae6b06f0d5e1f48cc38ded0c8a0`).
+The repository's `fasm2frames → xc7frames2bit → bitread` gate exited zero with
+the exact `xc7k480tffg1156-2` part. The USER1 BSCAN feature is present in
+FASM and its expected bit is set in the decoded configuration frame. Bitstream
+SHA-256 is
+`a45e654a942f28f2d5006dad680c43cb240c463393a13fba4ddaf052260f0ec6`.
+These ignored working artifacts are under
+`.superpowers/sdd/2026-09-09-tinystories-16-token-board/kintex-geometry-20260927/`.
+
+The identity-checked Helios isolation helper removed the live PCIe endpoint
+before sudoless HS3 SRAM programming. Programming this two-token bitstream
+exited zero with `isc_done=1`, `init=1`, `done=1`. The canonical Nix/JTAG
+generation checker then failed **before START**: after reset, STATUS returned
+`0x1400000000000000` rather than `0x2800000000000000`. No prompt was loaded
+and no token inference was attempted. The raw receipt SHA-256 is
+`b9e21a030fec919f0bc81e936470541928c74ee65b76a55cd3e5f42d90c4db51`.
+
+As a same-cable control, the authenticated accepted first-token bitstream
+(SHA-256 `2e28abb6638b407fd55b681018275c712afe47fde2de24ba8d1ebe584208b91a`)
+was reprogrammed into SRAM. Its established checker passed, returned exact
+token 11 in 3.18 seconds, and observed the correct `0x28…` STATUS prefix
+(control receipt SHA-256
+`162bbbf025ba2c8714933d22bbc066902e6a038a3a5358126b0e528644b93ea4`).
+The accepted CSR source captured the unshifted response word; the current CSR
+preloads a one-bit right-shifted word. This is a specific, testable explanation
+for the observed half-value, not yet a verified hardware fix. An existing
+`BSCAN_SIM_PHYSICAL` replay does not reproduce the exact hardware transaction,
+so the CSR change must pass a targeted red/green bit-level test and a newly
+routed board gate before accepting `[11,612]`. The current board image is the
+accepted first-token control, not the failed two-token candidate.
