@@ -104,3 +104,14 @@ working directory. They contain the compiler-generated core, not a finalized
 CSR-integrated board image. No full-16 native memory mapping, placement,
 routing, timing qualification, bitstream, or board inference follows from this
 DSP checkpoint.
+
+The existing YPCB clock, JTAG CSR, and BRAM top were then elaborated against
+that DSP-mapped full-16 core with `TOKEN_INDEX_WIDTH=4` (the core's generated
+`token_index` input is four bits). Bounded Yosys hierarchy checking exited
+zero, derived the CSR with the same width, and reported no token-index port
+width warning. Its log SHA-256 is
+`c3f27a92d8fb7f5e85c14a18f15f1c31d47be84b8748edc875f7c80fced6b353`.
+The 109 coarse memories and 225 DSP48E1 cells are pre-mapping hierarchy
+counts, not FPGA utilization. The wrapper still contains the unresolved
+physical CSR response shift; successful elaboration is not a functional board
+gate or an endorsement of that response path.
