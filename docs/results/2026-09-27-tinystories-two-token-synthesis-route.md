@@ -214,3 +214,38 @@ iteration-1 measurement with the diagnostic binary was not obtained. A modest
 early congestion improvement and placement timing estimate do **not** establish
 route convergence, post-route timing, a bitstream, or board inference. The
 geometry probe is diagnostic evidence, not a production backend change.
+
+## Current-compiler one-token physical control
+
+The archived accepted first-token bitstream uses a different compiler memory
+architecture, so it cannot isolate token feedback. A fresh current-compiler
+`generation_steps=1` control instead used the same authenticated 89 source
+images, 108 flattened mapped memories, pinned Yosys/nextpnr/chipdb, XDC,
+seed 15, 30 MHz target, `--no-tmdriv`, and memory-mapping policy as the
+current two-token candidate. Its Futil hash is `a390eb19...`; its generated
+RTL simulation passed two independent reset/start runs, each selecting and
+returning token 11 after 92,936,279 cycles. The simulation receipt SHA-256 is
+`824bada41497a04635b3402999076b76664273b9313cc94261017a58d9914ad5`.
+
+The one-token final Yosys JSON SHA-256 is
+`b1a1de9f8358a99a5825240d0aacbb7e4932737f774fb0702c6afcbbf9bda5e9`.
+It contains the same 755 RAMB36E1, 88 RAMB18E1, 14,708 RAM64M, and 190
+DSP48E1 as the two-token netlist. Pack-only passed with checksum
+`0xbdbafda0` and 137,561 SLICE_LUTX, versus 137,604 for two tokens.
+Default placement completed with checksum `0xa25fd82d`, 6,977,810 SA
+wirelength, and a 31.58 MHz accelerator estimate on covered paths, versus
+6,884,338 and 35.06 MHz for two tokens. Its placed JSON SHA-256 is
+`bcbe8bd2255d2e6e2662151a167c5dd5f9bceacec7023bd89a0090c499af383c`.
+
+A router-only continuation from that placement, capped at 900 seconds and
+12 GiB of virtual memory, exited 124 after iteration 1. It reported
+3,907,568 wires, 162,752 overused resources, and total overuse 208,317;
+the comparable two-token placed-checkpoint iteration 1 reported 161,614
+overused resources and total overuse 196,129. Router log SHA-256 is
+`a1a898ccf5748000649ccbff441947518a1c813ffd84ce0b96f35373eed3c00e`.
+There is no one-token routed JSON, bitstream, or board result from this
+control. Removing the second-token feedback did not reduce *initial* routing
+congestion in the current architecture; this does not prove either netlist
+unroutable or identify the underlying net/region bottleneck. A subsequent
+backend change should therefore target measured shared congestion rather
+than attributing the slowdown to token feedback alone.
