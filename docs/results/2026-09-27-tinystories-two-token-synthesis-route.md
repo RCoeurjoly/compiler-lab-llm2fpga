@@ -99,3 +99,50 @@ experiment should change one evidenced placement/router variable, compare
 wirelength and early overuse against this checkpoint, and retain the exact
 model, fixed-point arithmetic, 30 MHz constraints, and seed 15. No speculative
 compiler-bank rewrite is supported by these results alone.
+
+## Router and placer-control localization
+
+The pinned nextpnr binary comes from Nix derivation
+`fc75my8285h9bkcbwcqf0l2qpzpiq8w3-nextpnr-xilinx-0.8.2.drv` and source
+`rzmrkc8aff649333zc7rfc6pdzmsimqy-source`. This identity matters: the
+working checkout of nextpnr has newer, unbuilt edits and is **not** the
+executable used for the preceding route. The derivation's Kintex `Arch::place`
+hard-codes HeAP `alpha=0.08`, `beta=0.4`, `hpwl_scale_x=1`,
+`hpwl_scale_y=2`, `spread_scale_x=2`, and `spread_scale_y=1` after reading
+generic placer settings.
+
+Two controlled router probes used the exact placed checkpoint. First,
+`--router router1` alone still entered router2: loading the placed JSON restored
+its saved `router2` setting after CLI setup. The pinned Python binding lacks
+`ctx.setSetting`, so a pre-route hook cannot change it. A copy of the placed
+JSON with its **sole** router setting changed to `router1` was reversibly
+verified against the original SHA-256. This time nextpnr actually entered
+router1 and reported 685,780 arcs. The run was stopped with SIGTERM (exit
+143) after approximately 315 routing seconds: it had processed 134,000 arc
+attempts and still reported 602,479 remaining. It cannot complete the
+15-minute diagnostic bound at that observed rate. Its log SHA-256 is
+`39800ffdd5cc82cc90f10262d46e1d41519bccc32a78e1a335fe7b945ed6ae2f`.
+There is no routed artifact from either probe.
+
+Three one-variable placer-input probes retained the exact synthesized cells,
+seed, XDC, and 30 MHz target. Adding generic `placerHeap/alpha=0.05` completed
+placement, but its entire iteration sequence, SA wirelength 6,884,338, and
+all 165,972 cell-to-BEL assignments matched baseline exactly. Its log and
+placed-JSON SHA-256 values are respectively
+`3c55d5d5c476f99fc37a7490ec0b038f5cadafd0cdc0a83917e29d45645e4716`
+and `a5731da46139c3c3870f5de664ecaa9479d282d12a8dea4938aaa91d9c3ed046`.
+`placerHeap/beta=0.8` and `placerHeap/hpwlScaleY=1` were each terminated after
+seven analytical iterations because every reported solved/spread/legal wirelength
+was identical to baseline. Their partial-log SHA-256 values are respectively
+`4d79a6106888810c1f4527ba2b673aad9d3ac63856f0abbcc0a8f8f0c6fc0b81`
+and `ad659289ba1a2ca7596add338c5dec0028faed50d062f527fcfad4fac4b98c30`.
+The source-level Kintex override explains why these JSON settings did not
+exercise the intended heuristics. They are invalid as evidence for or against
+the numerical parameter choices themselves.
+
+The next backend step should preserve the validated binary and build a
+separately named Nix diagnostic variant that makes the Kintex geometry
+parameters configurable while retaining their current defaults. Only a
+verified change in cell placement and early router2 overuse would justify a
+full routing retry. No accelerator arithmetic, model memory, or board image
+was changed in these diagnostics.
