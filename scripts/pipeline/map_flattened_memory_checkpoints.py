@@ -26,6 +26,30 @@ LUTRAM_NAMES = {
     "ln1_output_q16_16.mem",
     "ln2_output_q16_16.mem",
     "final_output_q16_16.mem",
+    # These are the production runner's distributed variants.  Mapping one
+    # of them with the BRAM-only library rejects its ram_style before the
+    # checkpoint chain can reach the large immutable model ROMs.
+    "q_input_codes_i8.mem",
+    "q_input_q16_16.mem",
+    "q_accumulator_i64.mem",
+    "q_output_q16_16.mem",
+    "k_input_q16_16.mem",
+    "k_output_q16_16.mem",
+    "v_input_q16_16.mem",
+    "v_output_q16_16.mem",
+    "out_input_q16_16.mem",
+    "out_output_q16_16.mem",
+    "c_fc_input_codes_i8.mem",
+    "c_fc_input_q16_16.mem",
+    "c_fc_output_codes_i8.mem",
+    "c_fc_output_q16_16.mem",
+    "c_proj_input_q16_16.mem",
+    "c_proj_output_q16_16.mem",
+    "c_proj_post_weight_rescale_bias_q16_16.mem",
+    "attention_score_q8.mem",
+    "attention_delta_q8.mem",
+    "attention_exp_q1_20.mem",
+    "lm_input_q16_16.mem",
 }
 
 IMMUTABLE_LUTRAM_NAMES = {

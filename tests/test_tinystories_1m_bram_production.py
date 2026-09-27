@@ -372,6 +372,24 @@ seq_mem_d1 #(.SIZE(2048), .WIDTH(8)) large ( .clk(clk) );
         finally:
             sample.unlink(missing_ok=True)
 
+    def test_flattened_mapper_follows_all_production_lutram_variants(self):
+        mapper_path = ROOT / "scripts/pipeline/map_flattened_memory_checkpoints.py"
+        mapper_spec = importlib.util.spec_from_file_location("flattened_mapper_policy", mapper_path)
+        assert mapper_spec and mapper_spec.loader
+        mapper = importlib.util.module_from_spec(mapper_spec)
+        mapper_spec.loader.exec_module(mapper)
+        runner_path = ROOT / "scripts/pipeline/run_bram_production_sv.py"
+        runner_spec = importlib.util.spec_from_file_location("bram_runner_policy", runner_path)
+        assert runner_spec and runner_spec.loader
+        runner = importlib.util.module_from_spec(runner_spec)
+        runner_spec.loader.exec_module(runner)
+        self.assertEqual(mapper.LUTRAM_NAMES,
+                         {name + ".mem" for name in runner.LUTRAM_MEMORIES})
+        script = mapper.checkpoint_script(Path("input.il"), Path("output.il"),
+                                          "out_output_q16_16.mem")
+        self.assertIn("lutrams_xc5v.txt", script)
+        self.assertNotIn("brams_xc4v.txt", script)
+
 
 if __name__ == "__main__":
     unittest.main()
