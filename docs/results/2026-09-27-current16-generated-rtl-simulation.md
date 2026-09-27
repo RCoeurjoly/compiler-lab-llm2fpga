@@ -53,6 +53,31 @@ requirement. The long run also recorded token/context/output events rather
 than internal activation-checkpoint hashes; that separate Task 4 requirement
 remains open.
 
+## Nix-pinned regeneration preflight
+
+A fresh `nix develop . -c python` check bypassed the runner's ambient default
+paths by passing the package and HF snapshot above directly to the existing
+`load_successor_exact_model` API. The current compiler regenerated Futil
+SHA-256 `13f2a5f8de4e82fdedbd306e2c4c28c8d7932a92b365752c30e684a42d6ec974`
+and all 89 source-memory byte hashes in the tracked receipt. The initial
+sandboxed command could not update Nix's fetcher cache; the identical check
+with normal Nix access exited zero. No model input was downloaded or replaced
+by the Python check; it read the existing Nix-store package and snapshot.
+
+`nix build --no-link --print-out-paths .#calyx` resolved pinned Calyx 0.7.1
+at `/nix/store/80r0hfh3w0w1y2vssxr70h91g33gi9dg-calyx-0.7.1`. Running
+the existing production latency-library overlay and Calyx flags on the
+tracked Futil, then the unchanged memory-annotation function, regenerated
+the exact tracked SV hash
+`938fe8a1cd2508178c98719e3c403d90323f58b146481fe808568ce3a67e8e91`.
+The overlay receipt SHA-256 was
+`e6be59542728c10dc1b6c41fa701a130aa4ae4e7c3eaac6a6ef6932fa9440293`.
+The current harness generator also reproduced the recorded C++ harness hash
+`6e09fe97edb1751af5e220a2713af2ec6a63080ffc17a7ac18df3feb492f052a`.
+These checks localize the remaining replay gap to runner orchestration and the
+long Verilator execution, not model loading or Calyx code generation. They do
+not substitute for an end-to-end Nix replay of the simulator.
+
 Nothing here proves resource fit, full timing coverage, a bitstream, a JTAG
 transaction, or board inference. The accepted first-token board image is
 unchanged. The immediate physical blocker remains the two-token route
