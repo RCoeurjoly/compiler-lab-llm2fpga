@@ -336,3 +336,34 @@ and `457835b7f1943a8bee46e923b7e53268f9fd5d44258ad128af6e9ec1b8edfb97`.
 The checker passed on the real report and rejected a deliberately corrupted
 heatmap. The immediate inference blocker remains the physical CSR response
 alignment, not this now-routed placement.
+
+## Exact two-token CSR raw-vector A/B
+
+The same routed two-token bitstream (`a45e654a942f28f2d5006dad680c43cb240c463393a13fba4ddaf052260f0ec6`)
+was reprogrammed into SRAM with Helios still deauthorized. The existing
+canonical HS3/MPSSE raw-vector probe used USER1 (`0x02`), 1 MHz, TDO bit 7,
+negative-edge drive, and three 64-bit loopback transactions for
+`0x7123456789abcdef`. The first returned zero (pipeline fill); the following
+two returned the identical `0x3891a2b3c4d5e6f7`, exactly the command shifted
+right by one bit. Raw individual TDO bits are retained in
+`board-two-token-raw-loopback.json` (SHA-256
+`bcfc3d61155b59fc2ba7b100bfd9f2855c5e86f31f9120af3eaf908dc2dc1d20`).
+The canonical generation checker on this fresh SRAM configuration again
+failed before START at STATUS: expected `0x2800000000000000`, observed
+`0x1400000000000000`; receipt SHA-256
+`ac0a68f6ca53942ec97007791bb253bf93c6dd9cddd93757a4d5fd41dd6bd85b`.
+Thus both a high-entropy response and STATUS exhibit the same right shift.
+
+The accepted first-token bitstream (`2e28abb6638b407fd55b681018275c712afe47fde2de24ba8d1ebe584208b91a`)
+was restored and its established checker again passed exact token 11 in 3.21
+seconds, on the same cable and transport (control receipt SHA-256
+`d3dcbfcef44609e5541c93774f591e57c8f3d3471b8792525c63b539c78f5055`).
+The board is left with this accepted SRAM image. The current physical CSR
+capture preloads `response_word >> 1`; the accepted CSR captured the unshifted
+word. That difference directly predicts both observed half-values. However,
+the September 11 CSR-only experiment found that removing this preload did
+*not* pass its full protocol on a different image. Therefore the present
+evidence localizes the immediate two-token response mismatch, but does not
+establish that a preload-only edit is sufficient. A corrected candidate must
+first reproduce the raw-vector behavior in a bit-level test, then pass the
+complete reset/status/prompt/readback/START and `[11,612]` board gates.
