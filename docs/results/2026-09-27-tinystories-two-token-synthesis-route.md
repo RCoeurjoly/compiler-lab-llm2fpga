@@ -64,6 +64,23 @@ No compiler banking change is justified from this histogram alone. A bounded
 SA-placer comparison was terminated early at about 10,000/165,960 initial
 cells because it could not reach a placement result within its 15-minute cap.
 
+This first-token control is **not** an isolated test of token feedback. The
+accepted board source (Futil SHA-256
+`e422c0093658d376e23510dea1a8375a87c0df10292d9a237454c862dc49fecc`)
+declares 296 external memories and 35,027,168 logical bits, including 197
+separate INT8 token-code banks. The current two-token source (Futil SHA-256
+`69ce8f774d78f9d301f621cd701c04f571b62d393b26fbeaf1f50c2be3d132ae`)
+declares 118 external memories and 32,849,120 logical bits, including 25
+packed 64-bit token-code banks. It also applies explicit lifetime reuse and
+narrower stored scale words. These source-architecture changes confound any
+first-token-versus-two-token routing comparison. In contrast, freshly
+regenerated *current-compiler* one- and two-token sources have identical 118
+external-memory declarations and 32,849,120 logical bits; their Futil hashes
+are `a390eb19ba739018ddb1a7f9962db7c119c119a9d543dd9793b2f8cbb60539bd`
+and `69ce8f774d78f9d301f621cd701c04f571b62d393b26fbeaf1f50c2be3d132ae`.
+A controlled synthesis/place/route comparison within this current architecture
+would be needed before attributing the slowdown to the added token step.
+
 Next gate: obtain a legally routed, timing-reported two-token bitstream from
 this exact corrected JSON, then independently program SRAM and require
 `[11, 612]` after one START. A longer deterministic route or a separately
