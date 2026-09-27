@@ -125,3 +125,36 @@ post-map utilization, and packing, LUTRAM use, placement, routing, and timing
 must still be checked on a complete sixteen-token board netlist. It does show
 that the added context capacity alone does not exceed the presently unused
 raw RAMB36 site count.
+
+## Full-sixteen YPCB synthesis and pack checkpoint
+
+The exact authenticated full-sixteen compiler-generated core was integrated
+with the existing YPCB clock, BRAM top, and JTAG CSR at
+`TOKEN_INDEX_WIDTH=4`, then run through the same pinned Yosys 0.66 native
+memory and DSP mapping flow used for the two-token candidate. The
+restartable mapper completed all 108 memories. A 600-second native BRAM
+mapping attempt reached 744 template expansions but timed out; one bounded
+900-second retry of the identical input and policy completed. The native
+memory RTLIL SHA-256 is
+`9e7703977a0fab370a19577d1fab3fdabf19e7fb473a8b77623f2bb1689df190`.
+The final Yosys `check` found zero problems and no residual memories. The
+final JSON and RTLIL SHA-256 values are, respectively,
+`4e0de71853fef401d8d78a3eac21e4979ce47c9abaa84368af2fb0ed50f68bb2`
+and `ed1ae857926784924f06972ff9d62d2a5cfba6df14de2b8cb28ac4517ca5abe3`.
+
+The production-pinned nextpnr-xilinx pack-only gate exited zero with the
+unchanged YPCB XDC, seed 15, 30 MHz target, and `--no-tmdriv`. Its log
+SHA-256 is
+`e88f58c6d51eedabeecd1c907c316058e8514e4cb6917fe9d07cd28ccb67371d`.
+Pack reported 169,372/597,200 SLICE_LUTX (28%), 755/955 RAMB36E1
+(79%), 89/1,910 RAMB18E1 (4%), 190/1,920 DSP48E1 (9%), one BSCAN,
+and one MMCME2_ADV. These are packed resource counts, not placed or routed
+timing results. The native mapped image and pack log are retained in the
+ignored `current16/static-image/` plan workspace; the hashes above identify
+the exact checkpoints.
+
+This demonstrates that the complete full-sixteen board netlist passes
+synthesis and resource packing without exceeding device capacity. Placement,
+routing, covered-path timing, bitstream generation, physical CSR response
+alignment, and board inference remain unproved. In particular, pack success
+does not close the existing two-token CSR failure or BRAM/DSP timing coverage.
