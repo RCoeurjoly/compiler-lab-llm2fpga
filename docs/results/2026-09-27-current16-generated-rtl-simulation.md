@@ -115,3 +115,13 @@ The 109 coarse memories and 225 DSP48E1 cells are pre-mapping hierarchy
 counts, not FPGA utilization. The wrapper still contains the unresolved
 physical CSR response shift; successful elaboration is not a functional board
 gate or an endorsement of that response path.
+
+The compiler's runtime BRAM bank plans for the exact two-token and sixteen-token
+artifacts differ by 2,174,976 physical capacity bits, or 59 RAMB36-equivalent
+banks, as row capacity grows from 8 to 20. The routed two-token implementation
+uses 755 of the target's 955 RAMB36E1 sites, leaving a nominal 200-site margin.
+This comparison does **not** establish sixteen-token fit: the bank plan is not
+post-map utilization, and packing, LUTRAM use, placement, routing, and timing
+must still be checked on a complete sixteen-token board netlist. It does show
+that the added context capacity alone does not exceed the presently unused
+raw RAMB36 site count.
