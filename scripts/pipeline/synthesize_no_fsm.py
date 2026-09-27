@@ -24,6 +24,33 @@ COMMANDS = (
 )
 
 
+def build_script(
+    sv: Path | str,
+    *,
+    top: str = "main",
+    preserve_multipliers: bool = False,
+    rtlil: Path | None = None,
+) -> str:
+    """Prepare generated SV without FSM extraction.
+
+    The pre-DSP boundary must retain $mul cells: running alumacc here turns
+    them into $macc_v2 before synth_xilinx's map_dsp stage can see them.
+    """
+    commands = COMMANDS[:3] + (
+        ("memory_dff; opt_expr -fine; wreduce; stat;",)
+        if preserve_multipliers
+        else COMMANDS[3:]
+    )
+    script = (
+        f"read_slang --threads 1 --no-proc --max-parse-depth 20000 "
+        f"--top {top} {sv}; "
+        + " ".join(part.format(top=top) for part in commands)
+    )
+    if rtlil:
+        script += f" write_rtlil {rtlil};"
+    return script
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("sv", type=Path)
@@ -31,16 +58,20 @@ def main() -> int:
     parser.add_argument("--rtlil", type=Path)
     parser.add_argument("--log", type=Path)
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument(
+        "--preserve-multipliers",
+        action="store_true",
+        help="stop before alumacc so Xilinx map_dsp can infer signed DSPs",
+    )
     args = parser.parse_args()
     if not args.sv.is_file():
         parser.error(f"missing SystemVerilog input: {args.sv}")
-    script = (
-        f'read_slang --threads 1 --no-proc --max-parse-depth 20000 '
-        f'--top {args.top} {args.sv}; '
-        + " ".join(part.format(top=args.top) for part in COMMANDS)
+    script = build_script(
+        args.sv,
+        top=args.top,
+        preserve_multipliers=args.preserve_multipliers,
+        rtlil=args.rtlil,
     )
-    if args.rtlil:
-        script += f" write_rtlil {args.rtlil};"
     result = subprocess.run(
         ["yosys", "-m", "slang", "-p", script],
         text=True,
