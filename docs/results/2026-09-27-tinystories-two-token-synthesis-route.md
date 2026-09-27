@@ -146,3 +146,54 @@ parameters configurable while retaining their current defaults. Only a
 verified change in cell placement and early router2 overuse would justify a
 full routing retry. No accelerator arithmetic, model memory, or board image
 was changed in these diagnostics.
+
+## Isolated Kintex geometry diagnostic
+
+The separately named `.#nextpnr-kintex-geometry-diagnostic` Nix package pins
+the historical nextpnr source and build settings, then applies only
+`0038-allow-kintex-heap-geometry-diagnostic-overrides.patch`. It does not
+replace the production tool. The initial patch tried to reuse generic
+`placerHeap/alpha` and `beta`; nextpnr's generic constructor had already
+populated those keys with 0.10 and 0.90. Its first analytical iteration
+diverged from the historical control, so that invalid run was stopped. The
+corrected patch uses separate `kintexHeap/*` keys with the historical Kintex
+defaults. Three focused tests and the Nix package build passed.
+
+The corrected tool (binary SHA-256
+`07577e755556cfe04f4932b83c95e16dc38dd918ec13371556374e1ec5df2ecf`)
+placed the exact final synthesized JSON (`b9f3364b...`), historical chipdb
+(`d8472bfc...`), board XDC (`4213bcdb...`), seed 15 and 30 MHz
+`--no-tmdriv` setting. With no geometry override, it reproduced pack checksum
+`0x0778a750`, final placement checksum `0x7dc024d1`, 6,884,338 SA wirelength,
+35.06 MHz covered-path Fmax, and all 165,972 `NEXTPNR_BEL` assignments of
+the historical placed checkpoint. The JSON files are not byte-identical
+because the diagnostic tool records its six default `kintexHeap/*` settings.
+The new control placed JSON and log SHA-256 values are
+`f4534ac4dc7af8a2af20c624737b3702b03a824842025a02ca9da1b52f681ece`
+and `67342c48d709cfcbe4db8c659e396aba30a6d123d498814d248f3af578675697`.
+
+One changed input set only `kintexHeap/hpwlScaleY=1` (instead of 2), keeping
+the model, synthesized cells, chipdb, XDC, seed, and clock target fixed. Its
+input JSON SHA-256 is
+`8b229c73e62f854760f4a5cb9ea9c896a67ee816741b1aaaf3af2c1348a2acb6`.
+Placement completed with checksum `0xd11cb119`, 165,014 changed
+`NEXTPNR_BEL` assignments, and 37.59 MHz covered-path Fmax. Its placed JSON
+and log SHA-256 values are
+`53f954273a5c7d5296b308ececfd03986d18baaa56c994ec677e2031640a7ef9`
+and `2042c21f654542522f056d79f763fe6e6273cc5f30a3fdd06b47923ada424c14`.
+The placer wirelength objective uses different vertical scaling, so its raw
+number is not directly comparable with the default's.
+
+An identical-binary router-only control hit a 300-second cap before its first
+iteration. The changed placement's router2 run, also under a 12 GiB memory
+cap, was stopped immediately after iteration 1: 3,879,626 wires, 152,091
+overused resources, total overuse 184,150 (log SHA-256
+`563e6f0bc099c1b6ad60d7a8e6740a7c54d213bf377867dc9227e6cc37bab832`).
+Against the *historical* router-only default placement, iteration-1 overused
+resources decreased from 161,614 by about 5.9%, and total overuse decreased
+from 196,129 by about 6.1%. This comparison is qualified: the placements
+were proven identical, and the router source was unchanged, but a paired
+iteration-1 measurement with the diagnostic binary was not obtained. A modest
+early congestion improvement and placement timing estimate do **not** establish
+route convergence, post-route timing, a bitstream, or board inference. The
+geometry probe is diagnostic evidence, not a production backend change.

@@ -36,6 +36,32 @@
         task3MainPackages =
           inputs.task3-main-pipeline.packages.${system};
         task3MainLib = inputs.task3-main-pipeline.lib.${system};
+        # Match the exact backend used by the recorded two-token route.  The
+        # root flake's transitive nextpnr input has since resolved to an older
+        # source/patch stack, so it is not a valid single-variable control.
+        nextpnrKintexRouteControl =
+          task3MainLib.task3Toolchain.nextpnr.overrideAttrs (_: {
+            src = pkgs.fetchgit {
+              name = "source";
+              url = "https://github.com/RCoeurjoly/nextpnr-xilinx";
+              rev = "32e8b798520d90e1130afe95908f04cf52125cf6";
+              hash = "sha256-qKIxVFH1okPM1w2WFR0xgDisjRSw65qHGQpQa5eakgA=";
+              fetchSubmodules = true;
+            };
+            patches = [ ];
+            postPatch = ''
+              substituteInPlace common/placer1.cc \
+                --replace-fail 'timing_analysis(ctx);' \
+                'timing_analysis(ctx, true, true, true, false);'
+            '';
+          });
+        nextpnrKintexGeometryDiagnostic =
+          nextpnrKintexRouteControl.overrideAttrs (old: {
+            pname = "nextpnr-xilinx-kintex-geometry-diagnostic";
+            patches = (old.patches or [ ]) ++ [
+              ./patches/nextpnr-xilinx/0038-allow-kintex-heap-geometry-diagnostic-overrides.patch
+            ];
+          });
         task3MainLock = builtins.fromJSON
           (builtins.readFile ./task3-main/flake.lock);
         nextpnrXilinxForkLock =
@@ -3194,6 +3220,8 @@ PY
           '';
       in {
         packages = {
+          nextpnr-kintex-route-control = nextpnrKintexRouteControl;
+          nextpnr-kintex-geometry-diagnostic = nextpnrKintexGeometryDiagnostic;
           task6-board-shell-source-closure = task6BoardShell.sourceClosure;
           task6-board-shell-m2-source-closure = task6BoardShell.m2SourceClosure;
           compiler-ddr3-trace-replay-elaboration = task6BoardShell.replayElaboration;
