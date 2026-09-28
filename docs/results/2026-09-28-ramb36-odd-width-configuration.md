@@ -257,8 +257,19 @@ Completed pack/place artifact:
 It includes both native logs and the placed checkpoint, and deliberately
 does not run routing or emit a FASM file.
 
-Routing, covered-path timing, bitstream generation and full sixteen-token
-board acceptance for this candidate remain unverified. The
+The candidate subsequently completed its constrained route in 1,717.42 seconds
+(28.62 minutes), within the 90-minute cap, at iteration 34,
+with zero overused wires and zero architecture failures. The routed
+accelerator-clock report is 55.08 MHz, passing the unchanged 30 MHz target.
+This qualifies the covered paths only; omitted BRAM/DSP internal timing is
+still not qualified.
+
+Completed route artifact:
+`/nix/store/vl799qzyilfyjyiysvz06klrz487h13n-compiler-full16-two-rom-placement-route-90m`.
+It retains the exact routed JSON, FASM, native log, deadline observation and
+source/provenance receipt. Bitstream conversion and independent physical
+BRAM-mode checks are running; full sixteen-token board acceptance remains
+unverified. The
 accepted first-token SRAM image was not changed by this comparison. The
 separate unchanged-placement late-congestion diagnostic completed as recorded
 below; it is not a qualified route. BRAM/DSP timing coverage
@@ -288,9 +299,10 @@ does not explain or prove resolution of these physical conflicts.
 
 The two-ROM candidate nevertheless has independently verified resource,
 fanout and placement improvements, plus the corrected historical two-token
-board checkpoint. One new route-only qualification attempt is running from
-its completed placement, using the production corrected tool, seed 15,
-unchanged 30 MHz constraints, and a 5,400-second native deadline. No synthesis,
-packing or placement is repeated, and no further RTL changes are applied.
-It must reach zero overuse and pass covered-path timing before conversion;
-hardware acceptance and omitted BRAM/DSP timing coverage remain separate.
+board checkpoint. Its single bounded route-only trial subsequently passed,
+as recorded above, using the production corrected tool, seed 15 and unchanged
+30 MHz constraints. No synthesis, packing or placement was repeated and no
+further RTL changes were applied. The result supports this mapping as a
+useful physical improvement without identifying it as the sole cause of the
+old conflicts. Hardware acceptance and omitted BRAM/DSP timing coverage
+remain separate.
