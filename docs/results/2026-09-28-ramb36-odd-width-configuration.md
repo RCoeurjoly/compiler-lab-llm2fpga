@@ -243,8 +243,22 @@ Durable Nix artifacts:
 - Passed native resource comparison:
   `/nix/store/fm9bk4ynkh7rzzcd1rdbh5w475dl0q88-compiler-full16-two-rom-native-resource-comparison`.
 
-Placement, routing, covered-path timing, bitstream generation and full
-sixteen-token board acceptance for this candidate remain unverified. The
+The candidate subsequently passed native packing in 23.91 seconds and
+placement in 241.26 seconds, preserving seed 15, the 30 MHz constraints,
+`hpwlScaleY='1'`, and the corrected nextpnr tool. Its packed SLICE_LUTX count
+is 108,630, compared with the previous profile's 138,935. These are tool
+virtual-cell counts, not datasheet six-input-LUT utilization. BRAM36 packing
+uses 813 of the tool's 955 slots. The placement-stage accelerator-clock
+estimate is 41.70 MHz, compared with 35.33 MHz previously; neither is a
+routed timing result.
+
+Completed pack/place artifact:
+`/nix/store/jxx5sx0060drg1skrwjl3byh6sc3nqfh-compiler-full16-two-rom-bounded-pack-place`.
+It includes both native logs and the placed checkpoint, and deliberately
+does not run routing or emit a FASM file.
+
+Routing, covered-path timing, bitstream generation and full sixteen-token
+board acceptance for this candidate remain unverified. The
 accepted first-token SRAM image was not changed by this comparison. The
 separate unchanged-placement late-congestion diagnostic is still running;
 its intermediate counts are not a qualified route. BRAM/DSP timing coverage
