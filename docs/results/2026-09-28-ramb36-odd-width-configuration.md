@@ -268,9 +268,10 @@ Completed route artifact:
 `/nix/store/vl799qzyilfyjyiysvz06klrz487h13n-compiler-full16-two-rom-placement-route-90m`.
 It retains the exact routed JSON, FASM, native log, deadline observation and
 source/provenance receipt. Bitstream conversion and independent physical
-BRAM-mode checks are running; full sixteen-token board acceptance remains
-unverified. The
-accepted first-token SRAM image was not changed by this comparison. The
+BRAM-mode checks subsequently passed, followed by exact sixteen-token board
+inference on three independent SRAM reconfigurations. See the
+[board acceptance report](2026-09-29-compiler-full16-bram-board-acceptance.md).
+The accepted first-token SRAM image was restored and verified afterward. The
 separate unchanged-placement late-congestion diagnostic completed as recorded
 below; it is not a qualified route. BRAM/DSP timing coverage
 remains incomplete, and PCIe/UberDDR3 inference remains a subsequent milestone.
@@ -304,5 +305,5 @@ as recorded above, using the production corrected tool, seed 15 and unchanged
 30 MHz constraints. No synthesis, packing or placement was repeated and no
 further RTL changes were applied. The result supports this mapping as a
 useful physical improvement without identifying it as the sole cause of the
-old conflicts. Hardware acceptance and omitted BRAM/DSP timing coverage
-remain separate.
+old conflicts. The subsequent hardware acceptance is recorded separately;
+omitted BRAM/DSP timing coverage remains unresolved.
