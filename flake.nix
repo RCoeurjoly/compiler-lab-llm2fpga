@@ -67,6 +67,7 @@
             pname = "nextpnr-xilinx-kintex-checkpoint-diagnostic";
             patches = (old.patches or [ ]) ++ [
               ./patches/nextpnr-xilinx/0040-import-emitted-wire-to-wire-pip-names.patch
+              ./patches/nextpnr-xilinx/0041-preserve-unique-pip-identity-in-checkpoints.patch
             ];
           });
         nextpnrKintexCongestionDiagnostic =
@@ -3632,6 +3633,23 @@ PY
 
         checks = {
           default = modelRegistryJson;
+          nextpnr-kintex-checkpoint-identity = pkgs.runCommand
+            "nextpnr-kintex-checkpoint-identity" {
+              nativeBuildInputs = [ pkgs.python3 ];
+            } ''
+              mkdir -p tests/fixtures/nextpnr scripts/diagnostics
+              cp ${./tests/test_nextpnr_checkpoint_cli.py} tests/test_nextpnr_checkpoint_cli.py
+              cp ${./tests/test_routed_checkpoint_identity.py} tests/test_routed_checkpoint_identity.py
+              cp ${./tests/fixtures/nextpnr/kintex-routed-clock-pipids.json} tests/fixtures/nextpnr/kintex-routed-clock-pipids.json
+              cp ${./tests/fixtures/nextpnr/kintex-routed-arrow.json} tests/fixtures/nextpnr/kintex-routed-arrow.json
+              cp ${./scripts/diagnostics/check_routed_checkpoint_identity.py} scripts/diagnostics/check_routed_checkpoint_identity.py
+              export NEXTPNR_CHECKPOINT_TOOL=${nextpnrKintexCheckpointDiagnostic}/bin/nextpnr-xilinx
+              export NEXTPNR_CHECKPOINT_CHIPDB=${task3MainLib.task3Toolchain.chipdb}
+              if ! python -m unittest -v tests.test_nextpnr_checkpoint_cli tests.test_routed_checkpoint_identity > "$out" 2>&1; then
+                cat "$out"
+                exit 1
+              fi
+            '';
           "pipeline-runtime-source-closure" = pipelineRuntimeSourceClosure;
           "calyx-float-library" = calyxFloatLibrarySelftest;
           "calyx-rc-basic-float-bindings" = calyxRcBasicFloatBindingsSelftest;

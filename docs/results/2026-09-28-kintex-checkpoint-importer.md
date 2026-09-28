@@ -90,3 +90,41 @@ The user explicitly approved committing this failed experiment as a diagnostic
 checkpoint and continuing with bounded configuration-preserving recovery.
 This checkpoint records the full-sentinel failure, not a completed importer fix.
 Commit `2a92742` is unaffected.
+
+## Unique-identity serialization follow-up
+
+The failed importer diagnostic was committed as `ce5c1b6` with explicit user
+approval. A subsequent isolated patch, 0041, emits `PIPID/tile-name/index` names,
+qualified by the exact pinned chipdb. It does not change routing decisions.
+The chipdb confirms the affected site's parallel PIPs 148 and 149 have the same
+source/destination and timing class but different CLK/CLK_B selectors.
+
+Source inspection also found that the old getPipName copied TileTypeInfoPOD and
+TileInstInfoPOD objects containing self-relative pointers; their offsets are
+valid only at the original mapped addresses. The new numeric naming avoids
+these copies as well as selector-name collisions. This is a checkpoint writer
+defect, not established as the inference mismatch's cause.
+
+The public CLI regression first failed on the old diagnostic tool. Its initial
+new-tool run exposed stale ROUTING attributes during no-route JSON export.
+Patch 0041 refreshes those attributes from actual bound resources before
+writing. The final Nix check passed all nine tests, including two reloads,
+preservation of the second parallel selector, invalid-ID rejection, unambiguous
+legacy-arrow import and fail-closed ambiguous legacy-arrow import:
+
+```sh
+nix build --impure .#checks.x86_64-linux.nextpnr-kintex-checkpoint-identity \
+  --no-link --max-jobs 1 --cores 2
+```
+
+Receipt: `/nix/store/42b5hgzzkxdacf0djvcmws25jhwijc4d-nextpnr-kintex-checkpoint-identity`.
+The check pins its tool and chipdb as Nix dependencies and does not program hardware.
+
+The repository-wide unittest run was separately bounded to 180 seconds and
+exited 124 during `test_full_pinned_loader_shell_bar_fixture`, without a final
+suite result. No FAIL/ERROR test statuses had been observed before termination;
+this is incomplete verification, not a green suite. The user explicitly approved
+the serializer follow-up as a diagnostic checkpoint despite this incomplete
+repository-wide verification. Recovering ambiguous names in the
+old full sentinel/production checkpoint and proving equivalent original FASM
+remain pending; no production SDF timing or hardware inference success is claimed.

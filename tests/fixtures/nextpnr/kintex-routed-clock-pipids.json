@@ -1,0 +1,17 @@
+{
+  "creator": "Two distinct clock selectors from the pinned xc7k480t chipdb",
+  "modules": {
+    "top": {
+      "attributes": {"top": "00000000000000000000000000000001"},
+      "ports": {},
+      "cells": {
+        "clock0": {"type": "SLICE_LUTX", "parameters": {"LUT_INIT": "0"}, "attributes": {}, "port_directions": {"O": "output"}, "connections": {"O": [2]}},
+        "clock1": {"type": "SLICE_LUTX", "parameters": {"LUT_INIT": "0"}, "attributes": {}, "port_directions": {"O": "output"}, "connections": {"O": [3]}}
+      },
+      "netnames": {
+        "noninverted_selector": {"hide_name": 0, "bits": [2], "attributes": {"ROUTING": "SITEWIRE/SLICE_X36Y184/CLKINV_OUT;PIPID/CLBLL_R_X25Y184/148;1;SITEWIRE/SLICE_X36Y184/CLK;;1"}},
+        "inverted_selector": {"hide_name": 0, "bits": [3], "attributes": {"ROUTING": "SITEWIRE/SLICE_X37Y184/CLKINV_OUT;PIPID/CLBLL_R_X25Y184/368;1;SITEWIRE/SLICE_X37Y184/CLK;;1"}}
+      }
+    }
+  }
+}
