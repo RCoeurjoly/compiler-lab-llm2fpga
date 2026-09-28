@@ -68,6 +68,9 @@
             patches = (old.patches or [ ]) ++ [
               ./patches/nextpnr-xilinx/0040-import-emitted-wire-to-wire-pip-names.patch
               ./patches/nextpnr-xilinx/0041-preserve-unique-pip-identity-in-checkpoints.patch
+              ./patches/nextpnr-xilinx/0042-normalize-evidenced-legacy-slice-clock-selectors.patch
+              ./patches/nextpnr-xilinx/0043-recover-canonical-int-pip-aliases-from-original-fasm.patch
+              ./patches/nextpnr-xilinx/0044-ignore-functionally-unused-postroute-lut-input-arcs.patch
             ];
           });
         nextpnrKintexCongestionDiagnostic =
