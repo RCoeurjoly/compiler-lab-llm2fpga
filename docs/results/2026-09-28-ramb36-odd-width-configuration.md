@@ -260,6 +260,37 @@ does not run routing or emit a FASM file.
 Routing, covered-path timing, bitstream generation and full sixteen-token
 board acceptance for this candidate remain unverified. The
 accepted first-token SRAM image was not changed by this comparison. The
-separate unchanged-placement late-congestion diagnostic is still running;
-its intermediate counts are not a qualified route. BRAM/DSP timing coverage
+separate unchanged-placement late-congestion diagnostic completed as recorded
+below; it is not a qualified route. BRAM/DSP timing coverage
 remains incomplete, and PCIe/UberDDR3 inference remains a subsequent milestone.
+
+## Late routing-conflict localization
+
+The approved diagnostic replay of the original one-ROM placement completed
+after 4,940.80 seconds, within its 5,400-second cap. At iteration 34 it captured
+87 overused wires and 174 competing bindings, then deliberately stopped the
+tool with exit code 255. The evidence builder verified that every reported
+wire has two distinct competing nets and produced no routed JSON or FASM.
+This is a successful diagnostic gate, not routing or timing acceptance.
+
+Artifact:
+`/nix/store/ii2jh1j3gyjf98l00s641hk7rc2vfgpi-compiler-full16-late-congestion-diagnostic-only`.
+Its `router2-conflicts.tsv` contains the actual wires, competing nets, PIPs,
+and backend grid coordinates; `route.log` and `receipt.json` retain the native
+iterations and stop condition.
+
+`core.c_proj_weight_codes_i8.read_addr[2]` occurs on only one of the 87 shared
+wires. The report therefore does not support treating that ROM as the sole
+or dominant demonstrated cause of late congestion. Most competing bindings
+are in arithmetic and activation-memory logic; 160 of the 174 bindings lie
+within backend grid x=200–274, y=200–224. Native pin-fanout reduction alone
+does not explain or prove resolution of these physical conflicts.
+
+The two-ROM candidate nevertheless has independently verified resource,
+fanout and placement improvements, plus the corrected historical two-token
+board checkpoint. One new route-only qualification attempt is running from
+its completed placement, using the production corrected tool, seed 15,
+unchanged 30 MHz constraints, and a 5,400-second native deadline. No synthesis,
+packing or placement is repeated, and no further RTL changes are applied.
+It must reach zero overuse and pass covered-path timing before conversion;
+hardware acceptance and omitted BRAM/DSP timing coverage remain separate.
