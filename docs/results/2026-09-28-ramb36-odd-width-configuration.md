@@ -32,8 +32,69 @@ began an unrelated nextpnr rebuild.
 This is **one** observed two-token run, not three cold-start runs or sixteen
 tokens. The checker retains `independent_reconfiguration_verified=false`;
 the separate completed SRAM-programming log is the programming evidence.
-Full sixteen-token generated-RTL/board acceptance, repeatability, PCIe/DDR3
+Full sixteen-token board acceptance, repeatability, PCIe/DDR3
 integration and full physical timing qualification remain outstanding.
+
+## Requalification of the earlier two-ROM image
+
+The previously rejected compiler-generated image with **both** `c_fc` and
+`c_proj` weight ROMs in BRAM now passes `[11,612]` after one START, in
+6.333635330 seconds. The host writes only the four initial prompt tokens.
+The runner then restores the accepted first-token SRAM image and obtains
+token 11 in 3.202103091 seconds. BPI flash is not written.
+
+The earlier two-ROM image returned `[547,1111]`. It predates patch 0045:
+all 29 `c_proj` BRAMs use `READ_WIDTH_A=9`, but the original FASM contains
+none of the required RAMB36 macro-mode features. Re-emission through the
+already-corrected writer preserves all 2,159,251 original configuration
+features, adds exactly 783 required mode features, and removes none.
+The additions include all 29 `c_proj` modes. Independent bitread decoding
+checks every required physical mode bit before SRAM programming.
+
+No accelerator RTL, model data, arithmetic, placement or routes are rebuilt.
+All 101,662 cells' semantic connections and all 263,824 named net aliases
+are preserved. The first raw JSON comparison fails because re-emission
+renumbers bit IDs and omits unconnected zero-width ports. The successful
+comparison resolves numeric IDs through complete net-alias groups and
+compares every connected port, parameter, cell attribute and top port.
+It does not tolerate changed circuit connections. Complete FASM preservation
+separately verifies the original physical configuration, except for the
+explicit mode-bit additions.
+
+Durable Nix artifacts:
+
+- Configuration and semantic-connectivity proof:
+  `/nix/store/88q3axfz5xlc2xa81fjjyszmz2hfk3vz-compiler-two-rom-configuration-correction-evidence`.
+- Corrected bitstream and independent decoding:
+  `/nix/store/vxwsxf9l6ycqimihwc1h54mxrwk86frx-compiler-two-rom-corrected-mode-bitstream`.
+- Raw board transactions, both programming logs, executed runner, oracle
+  and verification:
+  `/nix/store/g5mq9724i2p6w8w51rfsq2lalkhmvanp-compiler-two-rom-corrected-mode-board-evidence`.
+
+The board-evidence derivation checks the exact token pair, runtime, one START,
+four prompt writes, candidate identity, the recorded 783-mode decoding
+preflight, successful
+programming status, and baseline restoration. It validates the recorded
+hardware execution; it does not rerun hardware in the Nix sandbox.
+The legacy two-token simulation fixture and the current sixteen-token
+continuation have different identities; their complete two-step prefixes
+are checked for equality, and the current oracle is bound to the passing
+full-sixteen Nix semantic receipt.
+
+Consequently, the old failure is not evidence that `c_proj` must remain in
+LUTRAM. Its BRAM implementation works for this authenticated two-token
+checkpoint once the known configuration omission is corrected. This supports
+reconsidering the compiler's one-ROM-only mapping policy to relieve physical
+implementation pressure. It does **not** prove sixteen-token board inference,
+three independent cold starts, or full BRAM/DSP timing qualification.
+The historical two-ROM route's covered-path result is 61.83 MHz at the
+unchanged 30 MHz constraint; no new routing or timing analysis is claimed.
+
+The full-sixteen on-chip design still needs a legal, constrained route and
+board acceptance. The approved late-congestion diagnostic runs independently
+on its unchanged placement; this two-ROM experiment does not replace that
+control or the full project goal. PCIe/UberDDR3 acceptance remains subsequent
+work. These experiments and their documentation are LLM-assisted.
 
 ## Evidence and scope
 
