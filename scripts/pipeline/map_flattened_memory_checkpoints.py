@@ -53,10 +53,9 @@ LUTRAM_NAMES = {
 }
 
 IMMUTABLE_LUTRAM_NAMES = {
-    # The exact full model exceeds BRAM capacity by 94 full blocks. These
-    # immutable memories consume 128 BRAMs but fit in available SLICEM RAM.
-    # Keep widths, initialization, ports and register stages unchanged.
-    "c_fc_weight_codes_i8.mem",
+    # The board-evidenced split leaves c_proj distributed: mapping both
+    # projection ROMs to BRAM regressed the first token from 11 to 547.
+    # c_fc uses the default BRAM descriptor to relieve routing pressure.
     "c_proj_weight_codes_i8.mem",
     "token_weight_scale_q8_24_b0.mem",
     "token_weight_scale_q8_24_b1.mem",

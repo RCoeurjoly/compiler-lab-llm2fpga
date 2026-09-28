@@ -71,9 +71,9 @@ endmodule
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
             self.assertIn("PASS native ROM", run.stdout)
 
-    def test_capacity_banks_map_to_distributed_memory_without_changing_ports(self):
+    def test_capacity_banks_choose_native_memory_without_changing_ports(self):
         for name, width, depth, distributed in (
-            ("c_fc_weight_codes_i8", 8, 131072, True),
+            ("c_fc_weight_codes_i8", 8, 131072, False),
             ("c_proj_weight_codes_i8", 8, 131072, True),
             *((f"token_weight_scale_q8_24_b{i}", 32, 16384, True) for i in range(4)),
             ("token_weight_codes_i8_b0", 8, 16384, False),

@@ -227,6 +227,24 @@ seq_mem_d1 #(.SIZE(512), .WIDTH(64)) attention_context_q16_16 ( .clk(clk) );
         result = runner.annotate_bram_memories(source)
         self.assertIn("seq_mem_d1_lutram # (.SIZE(512), .WIDTH(64)) attention_context_q16_16", result)
 
+    def test_only_c_fc_weight_rom_uses_bram_without_moving_scratch_buffers(self):
+        path = ROOT / "scripts/pipeline/run_bram_production_sv.py"
+        spec = importlib.util.spec_from_file_location("bram_sv_runner_weight_roms", path)
+        assert spec and spec.loader
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        source = """module seq_mem_d1 #(parameter SIZE=16, parameter WIDTH=8, parameter IDX_SIZE=4) (input clk);
+  logic [WIDTH-1:0] mem[SIZE-1:0];
+endmodule
+seq_mem_d1 #(.SIZE(131072), .WIDTH(8)) c_fc_weight_codes_i8 ( .clk(clk) );
+seq_mem_d1 #(.SIZE(131072), .WIDTH(8)) c_proj_weight_codes_i8 ( .clk(clk) );
+seq_mem_d1 #(.SIZE(512), .WIDTH(64)) attention_context_q16_16 ( .clk(clk) );
+"""
+        result = runner.annotate_bram_memories(source)
+        self.assertIn("seq_mem_d1_bram # (.SIZE(131072), .WIDTH(8)) c_fc_weight_codes_i8", result)
+        self.assertIn("seq_mem_d1_lutram # (.SIZE(131072), .WIDTH(8)) c_proj_weight_codes_i8", result)
+        self.assertIn("seq_mem_d1_lutram # (.SIZE(512), .WIDTH(64)) attention_context_q16_16", result)
+
     def test_signed_multiply_repair_is_strict_and_preserves_result_context(self):
         path = ROOT / "scripts/pipeline/repair_calyx_signed_multiply_width.py"
         spec = importlib.util.spec_from_file_location("signed_multiply_repair", path)

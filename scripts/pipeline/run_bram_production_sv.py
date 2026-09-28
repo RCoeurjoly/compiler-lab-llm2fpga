@@ -30,11 +30,10 @@ LUTRAM_MEMORIES = {
     "attention_score_q8", "attention_delta_q8", "attention_exp_q1_20",
     "c_fc_output_codes_i8", "c_fc_output_q16_16",
     "c_proj_post_weight_rescale_bias_q16_16", "lm_input_q16_16",
-    # Immutable projection-code ROMs and four token-scale banks are the
-    # capacity partition validated by the memory-mapping probes.  They are
-    # read-only after model initialization, so distributed mapping preserves
-    # their contents/latency while freeing block RAM for the remaining banks.
-    "c_fc_weight_codes_i8", "c_proj_weight_codes_i8",
+    # Only c_fc's large immutable ROM uses BRAM. The exact one-ROM board
+    # diagnostic restored first-token 11; mapping c_proj to BRAM returned 547.
+    # Keep c_proj and the four token-scale banks distributed.
+    "c_proj_weight_codes_i8",
     "token_weight_scale_q8_24_b0", "token_weight_scale_q8_24_b1",
     "token_weight_scale_q8_24_b2", "token_weight_scale_q8_24_b3",
 }
