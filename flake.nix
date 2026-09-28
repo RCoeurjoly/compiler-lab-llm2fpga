@@ -62,6 +62,13 @@
               ./patches/nextpnr-xilinx/0038-allow-kintex-heap-geometry-diagnostic-overrides.patch
             ];
           });
+        nextpnrKintexCheckpointDiagnostic =
+          nextpnrKintexGeometryDiagnostic.overrideAttrs (old: {
+            pname = "nextpnr-xilinx-kintex-checkpoint-diagnostic";
+            patches = (old.patches or [ ]) ++ [
+              ./patches/nextpnr-xilinx/0040-import-emitted-wire-to-wire-pip-names.patch
+            ];
+          });
         nextpnrKintexCongestionDiagnostic =
           nextpnrKintexGeometryDiagnostic.overrideAttrs (old: {
             pname = "nextpnr-xilinx-kintex-congestion-diagnostic";
@@ -3229,6 +3236,7 @@ PY
         packages = {
           nextpnr-kintex-route-control = nextpnrKintexRouteControl;
           nextpnr-kintex-geometry-diagnostic = nextpnrKintexGeometryDiagnostic;
+          nextpnr-kintex-checkpoint-diagnostic = nextpnrKintexCheckpointDiagnostic;
           nextpnr-kintex-congestion-diagnostic = nextpnrKintexCongestionDiagnostic;
           task6-board-shell-source-closure = task6BoardShell.sourceClosure;
           task6-board-shell-m2-source-closure = task6BoardShell.m2SourceClosure;

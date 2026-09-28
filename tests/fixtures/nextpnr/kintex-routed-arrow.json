@@ -1,0 +1,41 @@
+{
+  "creator": "Reduced from the routed YPCB CSR sentinel; no placement or routing required",
+  "modules": {
+    "top": {
+      "attributes": {"top": "00000000000000000000000000000001"},
+      "ports": {},
+      "cells": {
+        "node_driver": {
+          "type": "SLICE_LUTX",
+          "parameters": {"LUT_INIT": "0000000000000000000000000000000000000000000000000000000000000000"},
+          "attributes": {},
+          "port_directions": {"O": "output"},
+          "connections": {"O": [3]}
+        },
+        "driver": {
+          "type": "SLICE_LUTX",
+          "parameters": {"LUT_INIT": "0000000000000000000000000000000000000000000000000000000000000000"},
+          "attributes": {},
+          "port_directions": {"O": "output"},
+          "connections": {"O": [2]}
+        }
+      },
+      "netnames": {
+        "node_arrow_regression": {
+          "hide_name": 0,
+          "bits": [3],
+          "attributes": {
+            "ROUTING": "INT_R_X25Y180/SS6A0;INT_R_X25Y181/LOGIC_OUTS0->INT_R_X25Y180/SS6A0;1;INT_R_X25Y181/LOGIC_OUTS0;;1"
+          }
+        },
+        "arrow_regression": {
+          "hide_name": 0,
+          "bits": [2],
+          "attributes": {
+            "ROUTING": "SITEWIRE/SLICE_X36Y180/DCY0_OUT;SITEWIRE/SLICE_X36Y180/D5LUT_O5->SITEWIRE/SLICE_X36Y180/DCY0_OUT;1;SITEWIRE/SLICE_X36Y180/D5LUT_O5;;1"
+          }
+        }
+      }
+    }
+  }
+}
