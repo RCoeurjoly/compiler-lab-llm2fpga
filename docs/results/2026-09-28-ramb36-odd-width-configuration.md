@@ -196,3 +196,56 @@ back to estimates and BRAM/DSP internal timing remains omitted. Regeneration
 without routing does not repair or expand this timing coverage. Neither a
 passing tool regression nor functional board success proves full timing
 qualification.
+
+## Full sixteen-token two-ROM compiler comparison
+
+After the corrected historical two-ROM image passed the two-token board
+checkpoint, an isolated full sixteen-token compiler profile moved only the
+immutable `c_proj_weight_codes_i8` ROM from LUTRAM to BRAM. The production
+mapping default remains unchanged. No accelerator SystemVerilog was edited
+by hand, and no kev-gpt RTL was used.
+
+The compiler regenerated the authenticated Calyx IR and lowered it to
+SystemVerilog in 3.015 seconds. Its control output is byte-identical to the
+passing sixteen-token simulation source. The candidate differs only in the
+projection ROM's primitive selection; the two primitive bodies have identical
+behavior after removing their module names and synthesis attributes. All 89
+authenticated image files are unchanged. This is source behavioral equivalence,
+not a fresh full-model simulation or proof of native memory mapping equivalence.
+The user-cancelled second simulation was not restarted.
+
+The bounded native synthesis completed successfully within its 30-minute cap.
+The resource gate first rejected the actual old netlist for retaining 5,462
+RAM64M cells in `c_proj`, then passed against the actual candidate. It verifies
+that every other memory inventory is unchanged and all 108 memory checkpoints
+completed.
+
+| Native resource | Previous one-ROM profile | Isolated two-ROM profile |
+| --- | ---: | ---: |
+| RAMB36E1 | 784 | 813 |
+| RAMB18E1 | 89 | 89 |
+| RAM64M | 15,150 | 9,688 |
+| DSP48E1 | 190 | 190 |
+
+The projection ROM alone changes from 5,462 RAM64M cells to 29 RAMB36E1
+cells. These are actual reachable native-cell counts, not a placement-fit or
+timing claim. The corrected odd-width BRAM configuration writer remains
+required for subsequent bitstream generation.
+
+Durable Nix artifacts:
+
+- Compiler output and source-equivalence witness:
+  `/nix/store/dd6kqmnzsz0g1jj53hhgb67lllzhdmas-compiler-full16-equivalent-two-rom-postpass`.
+- Authenticated static image:
+  `/nix/store/xnbq8in3l32c1klirmpbbn6wah25ns55-compiler-full16-equivalent-two-rom-static-image`.
+- Completed native synthesis:
+  `/nix/store/b358d2hiyr4yxgqk84kz0cdr85vwvc6f-compiler-full16-equivalent-two-rom-ypcb-synthesis`.
+- Passed native resource comparison:
+  `/nix/store/fm9bk4ynkh7rzzcd1rdbh5w475dl0q88-compiler-full16-two-rom-native-resource-comparison`.
+
+Placement, routing, covered-path timing, bitstream generation and full
+sixteen-token board acceptance for this candidate remain unverified. The
+accepted first-token SRAM image was not changed by this comparison. The
+separate unchanged-placement late-congestion diagnostic is still running;
+its intermediate counts are not a qualified route. BRAM/DSP timing coverage
+remains incomplete, and PCIe/UberDDR3 inference remains a subsequent milestone.
