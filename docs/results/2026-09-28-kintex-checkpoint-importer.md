@@ -128,3 +128,65 @@ the serializer follow-up as a diagnostic checkpoint despite this incomplete
 repository-wide verification. Recovering ambiguous names in the
 old full sentinel/production checkpoint and proving equivalent original FASM
 remain pending; no production SDF timing or hardware inference success is claimed.
+
+## Legacy slice-clock evidence preparation
+
+The test-first `prepare_legacy_clock_recovery.py` helper validates the placed
+SLICE_FFX cells' original FF types and boolean clock-inversion parameters
+against the original FASM and pinned tilegrid. It rejects missing, conflicting,
+unsupported or mismatching evidence before writing any derived design. Its
+only design mutation is explicit `checkpoint/selector/<site>/CLKINV` settings;
+cell parameters, placement and routing attributes are preserved. Original
+files cannot be overwritten. CLK versus CLK_B is a physical-configuration
+normalization, not proof of the lost historical PIP index.
+
+The positive tests first failed because the helper was absent; all seven
+preparation tests now pass. The expanded pinned Nix check passes all 16 tests:
+`/nix/store/0gzd9z4wp5gj470k64rqr15j8nvd2wga-nextpnr-kintex-checkpoint-identity`.
+Actual original-artifact runs also passed: the CSR sentinel validates 274 FFs
+at 118 sites, and the one-ROM two-token candidate validates 16,622 FFs at
+7,451 sites. Both receipts explicitly mark historical PIP identity and full
+route/FASM equivalence as unproven.
+
+The isolated importer does not consume these settings yet. Full-sentinel
+reload, wire/strength preservation, equivalent original FASM and production
+SDF export remain pending. No accelerator RTL, route, bitstream, programming,
+clock or constraint changed. This helper result is not hardware acceptance.
+
+An initial repository-wide run used bare pinned Python, outside the project's
+development environment. A focused reproduction identified missing `torch`
+and missing `iverilog`; that run is not valid project-suite verification.
+The suite was rerun with `nix develop --impure -c timeout ... python -m unittest
+discover -s tests -v` and a 180-second limit, so the declared dependencies are
+available. The isolated preparation/checkpoint check remains independently
+Nix-reproducible and passed as recorded above.
+
+The correctly configured broad run exited 124 at the 180-second deadline
+during `test_selection_capture_and_response_boundaries` in
+`test_external_memory_arbiter_staging`, without a final suite result.
+It recorded twelve ERROR statuses in `test_continue_pcie_smoke_lifecycle`
+and one FAIL in `test_exact_pipeline_source_closure`. This
+is failed and incomplete verification, not a green suite. The user separately
+approved committing the preparation helper as a diagnostic checkpoint despite
+these verification limits. The earlier serializer approval was not treated as
+standing permission for subsequent checkpoints.
+
+A separate Nix-shell reproduction of those two test modules completed:
+17 tests, one failure and twelve errors. The lifecycle module refuses import
+with `reviewed lifecycle backend changed; refusing import`; the source-closure
+test finds an allowlist mismatch. Those runtime scripts and allowlist were
+not changed by this preparation step. No blanket repository-suite pass is
+claimed, and these existing verification failures are not silently repaired
+as part of the checkpoint recovery.
+
+An independent whole-JSON comparison of the actual derived artifacts confirms
+that the sentinel adds exactly 118 selector settings and the production
+candidate adds exactly 7,451. Removing only these newly added settings makes
+each parsed JSON document equal to its original in full, including cells,
+parameters, placement, connections, seed and routing triples. This validates
+preparation's preservation contract, not the still-pending importer reload or
+physical FASM equivalence.
+
+Immediately before the approved commit, all 16 focused tests were rerun
+against the pinned diagnostic binary and chipdb: exit zero in 2.549 seconds.
+Full importer/FASM recovery and hardware acceptance remain pending.

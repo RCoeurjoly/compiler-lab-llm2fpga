@@ -3640,12 +3640,14 @@ PY
               mkdir -p tests/fixtures/nextpnr scripts/diagnostics
               cp ${./tests/test_nextpnr_checkpoint_cli.py} tests/test_nextpnr_checkpoint_cli.py
               cp ${./tests/test_routed_checkpoint_identity.py} tests/test_routed_checkpoint_identity.py
+              cp ${./tests/test_prepare_legacy_clock_recovery.py} tests/test_prepare_legacy_clock_recovery.py
               cp ${./tests/fixtures/nextpnr/kintex-routed-clock-pipids.json} tests/fixtures/nextpnr/kintex-routed-clock-pipids.json
               cp ${./tests/fixtures/nextpnr/kintex-routed-arrow.json} tests/fixtures/nextpnr/kintex-routed-arrow.json
               cp ${./scripts/diagnostics/check_routed_checkpoint_identity.py} scripts/diagnostics/check_routed_checkpoint_identity.py
+              cp ${./scripts/diagnostics/prepare_legacy_clock_recovery.py} scripts/diagnostics/prepare_legacy_clock_recovery.py
               export NEXTPNR_CHECKPOINT_TOOL=${nextpnrKintexCheckpointDiagnostic}/bin/nextpnr-xilinx
               export NEXTPNR_CHECKPOINT_CHIPDB=${task3MainLib.task3Toolchain.chipdb}
-              if ! python -m unittest -v tests.test_nextpnr_checkpoint_cli tests.test_routed_checkpoint_identity > "$out" 2>&1; then
+              if ! python -m unittest -v tests.test_nextpnr_checkpoint_cli tests.test_routed_checkpoint_identity tests.test_prepare_legacy_clock_recovery > "$out" 2>&1; then
                 cat "$out"
                 exit 1
               fi
