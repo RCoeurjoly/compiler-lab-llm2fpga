@@ -1,5 +1,40 @@
 # RAMB36 odd-width configuration correction
 
+## Current board result
+
+The corrected immutable bitstream passes the authenticated two-token YPCB
+checkpoint: `[11,612]` after exactly one START, in 6.318203071 seconds.
+The recorded transactions contain only the four initial prompt writes;
+the host supplies no generated token or intermediate model state.
+This is the same compiler-generated accelerator, arithmetic, placement,
+routing and 30 MHz constraints that previously returned `[11,1375]`.
+Only the 754 required RAMB36 configuration features were added.
+This hardware result demonstrates that the missing-mode correction resolves
+the observed two-token checkpoint, not merely an isolated writer regression.
+
+The runner finishes successfully after independently programming the accepted
+first-token image again and obtaining token 11 in 3.182181594 seconds.
+Raw transactions and both programming logs are preserved in
+`/nix/store/j2i0j6iqx3m9priivpvvljjy7pi00qwd-compiler-two-token-ramb36-odd-width-board-evidence`.
+Its executable verification requires the exact token pair, one START, only
+initial prompt writes, the authenticated oracle identity, the runtime bound,
+and successful baseline restoration. This validates recorded physical-board
+observations; it does not rerun hardware in a Nix sandbox.
+
+Bitstream:
+`/nix/store/wjhgmrkrqxxfv38xffyywafj2nfbxw1f-compiler-two-token-ramb36-odd-width-bitstream/fixed.bit`.
+SHA-256: `460e083f27341d4deb351972249fe71739aec25eca12bd4192055ba4012973a1`.
+Independent bitread decoding confirms all 754 required mode bits enabled.
+The isolated conversion derivation uses cached pinned prjxray dependencies;
+the broad development-shell attempt described below was stopped when it
+began an unrelated nextpnr rebuild.
+
+This is **one** observed two-token run, not three cold-start runs or sixteen
+tokens. The checker retains `independent_reconfiguration_verified=false`;
+the separate completed SRAM-programming log is the programming evidence.
+Full sixteen-token generated-RTL/board acceptance, repeatability, PCIe/DDR3
+integration and full physical timing qualification remain outstanding.
+
 ## Evidence and scope
 
 The unchanged compiler-generated two-token YPCB image returns `[11,1375]`,
@@ -77,7 +112,7 @@ Detailed receipts are `bram-mode-fix/checkpoint-identity.json` and
 `bram-mode-fix/fasm-delta.json`; executed diagnostic checkers are retained in
 `mapped-cproj-cone/check-fixed-bram-{checkpoint,fasm}.py`.
 
-The first direct prjxray invocation stops immediately on a missing `fasm`
+At diagnostic commit `c1f4e68`, the first direct prjxray invocation stops immediately on a missing `fasm`
 Python dependency. Bitstream conversion is now running in the existing
 `task3-main` Nix development environment, which supplies the pinned prjxray
 Python dependencies. Corrected-bitstream programming and board inference
@@ -88,7 +123,8 @@ The user explicitly authorizes this diagnostic checkpoint despite incomplete
 repository-wide verification and pending hardware revalidation. It is not
 two-token, sixteen-token, or full timing acceptance.
 
-The retained diagnostics are under
+Those statements describe the configuration checkpoint before the subsequent
+successful board experiment recorded above. The retained diagnostics are under
 `.superpowers/sdd/2026-09-09-tinystories-16-token-board/checkpoint-recovery-20260928/`,
 particularly `mapped-cproj-cone/` and `bram-mode-fix/`. Physical inference must
 pass before this is described as an accelerator correction. Full sixteen-token
