@@ -73,6 +73,13 @@
               ./patches/nextpnr-xilinx/0044-ignore-functionally-unused-postroute-lut-input-arcs.patch
             ];
           });
+        nextpnrKintexBramModeFix =
+          nextpnrKintexCheckpointDiagnostic.overrideAttrs (old: {
+            pname = "nextpnr-xilinx-kintex-bram-mode-fix";
+            patches = (old.patches or [ ]) ++ [
+              ./patches/nextpnr-xilinx/0045-emit-ramb36-odd-width-mode-features.patch
+            ];
+          });
         nextpnrKintexCongestionDiagnostic =
           nextpnrKintexGeometryDiagnostic.overrideAttrs (old: {
             pname = "nextpnr-xilinx-kintex-congestion-diagnostic";
@@ -3241,6 +3248,7 @@ PY
           nextpnr-kintex-route-control = nextpnrKintexRouteControl;
           nextpnr-kintex-geometry-diagnostic = nextpnrKintexGeometryDiagnostic;
           nextpnr-kintex-checkpoint-diagnostic = nextpnrKintexCheckpointDiagnostic;
+          nextpnr-kintex-bram-mode-fix = nextpnrKintexBramModeFix;
           nextpnr-kintex-congestion-diagnostic = nextpnrKintexCongestionDiagnostic;
           task6-board-shell-source-closure = task6BoardShell.sourceClosure;
           task6-board-shell-m2-source-closure = task6BoardShell.m2SourceClosure;
@@ -3636,6 +3644,19 @@ PY
 
         checks = {
           default = modelRegistryJson;
+          nextpnr-kintex-bram-mode = pkgs.runCommand
+            "nextpnr-kintex-bram-mode" {
+              nativeBuildInputs = [ pkgs.python3 ];
+            } ''
+              mkdir -p tests
+              cp ${./tests/test_nextpnr_bram_mode_cli.py} tests/test_nextpnr_bram_mode_cli.py
+              export NEXTPNR_CHECKPOINT_TOOL=${nextpnrKintexBramModeFix}/bin/nextpnr-xilinx
+              export NEXTPNR_CHECKPOINT_CHIPDB=${task3MainLib.task3Toolchain.chipdb}
+              if ! python -m unittest -v tests.test_nextpnr_bram_mode_cli > "$out" 2>&1; then
+                cat "$out"
+                exit 1
+              fi
+            '';
           nextpnr-kintex-checkpoint-identity = pkgs.runCommand
             "nextpnr-kintex-checkpoint-identity" {
               nativeBuildInputs = [ pkgs.python3 ];
