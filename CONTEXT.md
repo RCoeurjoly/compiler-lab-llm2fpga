@@ -5,6 +5,18 @@ reference accelerator, and validation scope.
 
 ## Terms
 
+**Model inference**: Execution of the complete selected language model on input
+tokens to compute model outputs under a specified numerical contract. A forward
+pass does not, by itself, establish autoregressive generation.
+
+**Autoregressive generation**: Repeated model inference in which each selected
+output token becomes part of the next input context. Autonomous FPGA generation
+means this feedback occurs on the device, without host-supplied generated tokens.
+
+**Project completion boundary**: The deliverables and acceptance requirements
+agreed for the funded project. Additional product usability or architectural
+features do not become completion requirements merely because they are desirable.
+
 **Working notes**: The evolving record of project reasoning, evidence,
 decisions, open questions, and next actions. It supplements the formal project
 plan and does not change its scope by itself.
