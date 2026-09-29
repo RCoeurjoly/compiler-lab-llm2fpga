@@ -41,45 +41,55 @@ establish full timing qualification or funding acceptance.
 
 ## Task 6: resource usage reduction strategies
 
-The written task requires a survey of 5–10 mitigation strategies at model,
-compiler/MLIR, or RTL level; evaluation of all selected strategies against a
-baseline; and a conclusion about effectiveness and applicability. Required
-measurements are LUT/FF/BRAM/DSP deltas, maximum-frequency deltas, and toolchain
-runtime/peak-memory deltas. Negative and neutral results are acceptable.
-Successful strategies must not depend on operator stubs or hidden blackboxes.
+The original written task calls for a survey of 5–10 mitigation strategies at
+model, compiler/MLIR, or RTL level. The user now sets an outcome-based stopping
+rule: do not treat five as a minimum number of new experiments. If one or two
+distinct, measured strategies achieve correct board fit for the Task 6 baseline,
+stop optimization experiments and report those results. This is an explicit
+revision to the original 5–10-strategy requirement, not a claim that the
+original text already permits early completion. Existing additional strategies
+may be surveyed and reported without new runs; do not invent five evaluations.
+For strategies actually evaluated, compare against the baseline and record
+LUT/FF/BRAM/DSP, maximum-frequency, toolchain-runtime and peak-memory deltas
+where available. Negative and neutral results are valid evidence. Successful
+strategies must not depend on operator stubs or hidden blackboxes.
 
 First inventory existing optimizations and recover comparable measurements.
 Do not reimplement an optimization merely to recreate its history. Identify
-missing evidence and new experiments only after that audit. Freeze the survey
-set before evaluating it; do not keep adding candidates indefinitely.
+missing evidence and new experiments only after that audit. Evaluate additional
+strategies only while the board-fit stopping condition remains unmet; do not
+keep adding candidates indefinitely.
 
 Treat Task 6 primarily as consolidation of existing experiments and reporting,
 not a new optimization-development project. The corrected quantization strategy
 is a central candidate: compare the earlier Task 3 numerical representation
 with the corrected profile, documenting correctness as well as resource,
 timing, runtime and peak-memory differences. If quantization enables correct
-BRAM-resident inference, DDR3 is not required to demonstrate that reduction;
-this does not waive the remaining written survey and comparison deliverables.
+BRAM-resident inference for the Task 6 baseline, stop optimization experiments
+and document the measured outcome; DDR3 is not required to demonstrate it.
 
-Include DDR3 externalization as an evaluated resource-reduction alternative,
-with its integration failures and unverified hardware results stated explicitly.
-A negative result can satisfy a strategy evaluation; working DDR3 inference is
-not a Task 6 completion gate. Preserve its existing evidence without reopening
-the deferred integration effort solely for this survey.
+Report any existing DDR3 externalization evaluation as a resource-reduction
+alternative, with integration failures and unverified hardware results stated
+explicitly. A negative result is valid evidence; working DDR3 inference is not
+a Task 6 completion gate. Preserve its existing evidence without reopening the
+deferred integration effort solely for this survey.
 
-Compiler-pipeline changes may provide the remaining distinct strategies needed
-for the minimum five-strategy survey. Using Calyx alone is an architectural
+Compiler-pipeline changes may provide distinct strategies if more experiments
+are needed to achieve board fit. Using Calyx alone is an architectural
 choice, not evidence of resource reduction. Count concrete techniques separately
 only when their mechanisms and experimental evidence are distinguishable: for
 example, compute-unit sharing, memory banking/mapping, or request-controller
 consolidation. These are inventory candidates, not assertions that each has
-already been evaluated. Do not split one change into several labels to reach
-five. Reuse comparable existing measurements, mark missing comparisons, and
-perform only the bounded experiments needed to close identified evidence gaps.
+already been evaluated. Do not split one change into several strategy labels.
+Reuse comparable existing measurements, mark missing comparisons, and
+perform only the bounded experiments needed to establish the outcome or explain
+why it remains unmet.
 
-Deliver the strategy survey, reproducible usage scripts, before/after resource
-reports, and a comparison table with deltas and viability status. Distinguish
-semantic corrections and tool compatibility fixes from resource optimizations.
+Deliver a strategy survey, reproducible usage scripts for strategies actually
+evaluated, before/after resource reports, and a comparison table with available
+deltas and viability status. State the early-stop decision and its evidence.
+Distinguish semantic corrections and tool compatibility fixes from resource
+optimizations.
 Do not describe a failed or semantically mismatching strategy as a viable
 resource reduction. Any deliberately different numerical profile needs its own
 disclosed reference; it cannot silently replace the Task 4 fixed-point contract.
@@ -87,8 +97,9 @@ disclosed reference; it cannot silently replace the Task 4 fixed-point contract.
 The plan requires the largest successfully lowered model from Task 5 as the
 baseline. Begin with the currently evidenced 1M model, but label the Task 6
 baseline provisional until the Task 5 matrix establishes that largest model.
-Reconcile or rerun comparisons on a larger baseline if required. The priority
-order does not waive this dependency or permit premature Task 6 completion.
+If a larger model is lowered, check whether the claimed board-fit outcome holds
+for that baseline; otherwise report the 1M result as a narrower achievement,
+not Task 6 completion. The priority order does not waive this dependency.
 
 ## Task 4: FPGA integration and hardware validation
 
@@ -152,10 +163,11 @@ new implementation dependencies or reasons to migrate the accepted accelerator.
 
 ## Completion audit and handoff
 
-Before marking Tasks 4–6 complete, map every written deliverable to committed
-sources, a reproducible command, and inspected results. Resolve missing
-artifacts, incomparable optimization baselines, unsupported functional claims,
-and the Task 6/Task 5 baseline dependency. Publish limitations and failed cases.
+Before marking Tasks 4–6 complete, map every applicable deliverable to committed
+sources, a reproducible command, and inspected results. Record the Task 6
+early-stop revision alongside the original plan, and resolve missing artifacts,
+incomparable optimization baselines, unsupported functional claims, and the
+Task 6/Task 5 baseline dependency. Publish limitations and failed cases.
 
 This spec approves neither task completion nor external submission. The next
 step is written-spec review, then an implementation plan led by evidence
