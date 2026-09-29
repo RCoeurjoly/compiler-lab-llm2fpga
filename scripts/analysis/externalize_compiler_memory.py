@@ -31,6 +31,67 @@ _BANK_CONTENT_ASSIGNMENT = re.compile(
 )
 _BANK_SELECTION_MARKER = "// LLM2FPGA selected-bank external-memory reads v1"
 _COMPLETION_JOIN_MARKER = "// LLM2FPGA latency-tolerant external-memory joins v1"
+_PACKED_BANK_MARKER = "// LLM2FPGA selected packed-bank external-memory reads v1"
+_PACKED_BANK_FAMILIES = {
+    "token_weight_codes_packed": (64, (
+        ("lm_gemv_read_operands", "lm_gemv_weight_bank_out"),
+        ("model_read_token_codes", "model_token_bank_out"))),
+    "token_weight_scale_q8_24": (32, (
+        ("model_read_token_scale", "model_token_scale_bank_out"),
+        ("model_read_logit_scale", "model_logit_scale_bank_out"))),
+}
+
+
+def _packed_bank_enable(phases, index: int) -> str:
+    return "(" + " || ".join(
+        f"({phase}_go_out && ({selector} == 5'd{index}))"
+        for phase, selector in phases
+    ) + ")"
+
+
+def select_packed_banked_memory_reads(source: str) -> str:
+    """Use the existing five-bit packed-code/scale mux selectors for reads."""
+    if _PACKED_BANK_MARKER in source:
+        return source
+    changed = False
+    for family, (width, phases) in _PACKED_BANK_FAMILIES.items():
+        assignment = re.compile(
+            rf"(?m)^(?P<prefix>[ \t]*assign\s+{family}_b(?P<index>\d+)_content_en\s*=\s*)"
+            r"(?P<rhs>[^;]+);"
+        )
+        matches = list(assignment.finditer(source))
+        if not matches:
+            continue
+        indices = sorted(int(m["index"]) for m in matches)
+        if indices != list(range(len(indices))) or indices[-1] >= 32:
+            raise ValueError(f"{family} banks must be unique, contiguous and fit five bits")
+        instances = {m["name"]: m for m in _INSTANCE.finditer(source)}
+        for m in matches:
+            name = f"{family}_b{m['index']}"
+            if name not in instances or _parameter(instances[name]["params"], "WIDTH") != width:
+                raise ValueError(f"unsupported packed bank width for {name}")
+            if {x.strip() for x in m["rhs"].split("|")} != {f"{p}_go_out" for p, _ in phases}:
+                raise ValueError(f"unsupported packed bank read enables for {name}")
+        for phase, selector in phases:
+            if not re.search(rf"\b(?:logic|wire)\s+\[4:0\]\s+{selector}\b", source):
+                raise ValueError(f"missing five-bit packed selector {selector}")
+            done = re.compile(rf"(?m)^([ \t]*assign\s+{phase}_done_in\s*=\s*)([^;]+);")
+            found = list(done.finditer(source))
+            if len(found) != 1:
+                raise ValueError(f"expected one packed completion for {phase}")
+            m = found[0]
+            terms = _split_top_level_and(m[2])
+            bank_terms = [f"{family}_b{i}_done" for i in indices]
+            if sorted(t for t in terms if re.fullmatch(rf"{family}_b\d+_done", t)) != sorted(bank_terms):
+                raise ValueError(f"{phase} must completion-join every packed bank exactly once")
+            others = [t for t in terms if t not in bank_terms]
+            selected = " | ".join(f"(({selector} == 5'd{i}) & {family}_b{i}_done)" for i in indices)
+            replacement = m[1] + " & ".join(others + [f"({selected})"]) + ";"
+            source = source[:m.start()] + replacement + source[m.end():]
+        source = assignment.sub(
+            lambda m: m["prefix"] + _packed_bank_enable(phases, int(m["index"])) + ";", source)
+        changed = True
+    return f"{_PACKED_BANK_MARKER}\n{source}" if changed else source
 
 
 @dataclass(frozen=True)
@@ -72,6 +133,7 @@ def select_banked_memory_reads(source: str) -> str:
     mux address.
     """
 
+    source = select_packed_banked_memory_reads(source)
     if _BANK_SELECTION_MARKER in source:
         return source
     assignments = list(_BANK_CONTENT_ASSIGNMENT.finditer(source))
@@ -195,7 +257,10 @@ def latch_external_memory_completion_joins(
         # Token lookup has one selected-bank completion expression, but its
         # selector-to-done-to-go feedback is also a measured critical path.
         # Register that predicate without discarding bank qualification.
-        if len(terms) < 2 and match.group("signal") != "model_read_token_codes_done_in":
+        if len(terms) < 2 and match.group("signal") not in {
+            "model_read_token_codes_done_in", "model_read_token_scale_done_in",
+            "model_read_logit_scale_done_in",
+        }:
             continue
         identifiers = set(re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", match.group("rhs")))
         if not identifiers.intersection(external_done):
@@ -529,6 +594,16 @@ def _completion_joined_enable(source: str, body: str) -> bool:
     if len(assignments) == 1:
         expression = assignments[0].strip()
     terms = [term.strip() for term in expression.split("|")]
+    # Selection qualifies an audited phase with its bank predicate. Recognize
+    # only the exact expression this pass emits for the corresponding bank;
+    # do not turn arbitrary streaming enables into once-per-phase operations.
+    for family, (_, phases) in _PACKED_BANK_FAMILIES.items():
+        bank = re.fullmatch(rf"{family}_b(\d+)_content_en", port.group(1))
+        if bank and re.sub(r"\s+", "", expression) == re.sub(
+            r"\s+", "", _packed_bank_enable(phases, int(bank[1]))
+        ):
+            terms = [f"{phase}_go_out" for phase, _ in phases]
+            break
     for term in terms:
         phase = re.fullmatch(r"(\w+)_go_out", term)
         if phase is None or not re.search(
