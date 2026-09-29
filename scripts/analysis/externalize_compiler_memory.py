@@ -512,6 +512,33 @@ def canonicalize_static_counter(source: str) -> str:
     return source[:main.start()] + body + source[main.end():]
 
 
+def _completion_joined_enable(source: str, body: str) -> bool:
+    """Recognize only ORs of audited, completion-joined dynamic read phases.
+
+    Generic/streaming memories retain their native repeat contract. A joined
+    operand, however, represents one operation: after its response the join
+    may wait for other operands, and another read would outlive that phase.
+    """
+    port = re.search(r"\.content_en\s*\(\s*(\w+)\s*\)", body)
+    if port is None:
+        return False
+    expression = port.group(1)
+    assignments = re.findall(
+        rf"\bassign\s+{re.escape(expression)}\s*=\s*([^;]+);", source
+    )
+    if len(assignments) == 1:
+        expression = assignments[0].strip()
+    terms = [term.strip() for term in expression.split("|")]
+    for term in terms:
+        phase = re.fullmatch(r"(\w+)_go_out", term)
+        if phase is None or not re.search(
+            rf"\blogic\s+\[\d+:0\]\s+llm2fpga_{re.escape(phase.group(1))}_completion_seen\s*;",
+            source,
+        ):
+            return False
+    return bool(terms)
+
+
 def externalize_memories(
     source: str,
     memory_names: list[str],
@@ -577,6 +604,8 @@ def externalize_memories(
             f",\n  .ext_rsp_data(ext_mem_rsp_data[{index * 64 + 63}:{index * 64}])"
         )
         params = match.group("params") + f",\n    .EXT_BASE_ADDR({bases[name]})"
+        if _completion_joined_enable(source, match.group("body")):
+            params += ",\n    .ONCE_PER_ENABLE(1)"
         replacement = "seq_mem_d1_external # (" + params + ") " + name + " (" + body + ");"
         rewritten = rewritten[: match.start()] + replacement + rewritten[match.end() :]
     if "module seq_mem_d1_external" not in rewritten:
@@ -589,7 +618,8 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
     parameter SIZE = 16,
     parameter IDX_SIZE = 4,
     parameter INIT_FILE = "",
-    parameter EXT_BASE_ADDR = 0
+    parameter EXT_BASE_ADDR = 0,
+    parameter ONCE_PER_ENABLE = 0
 ) (
    input wire logic clk,
    input wire logic reset,
@@ -607,6 +637,7 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
 );
   logic pending;
   logic request_queued;
+  logic issued_for_enable;
   logic [31:0] queued_address;
   // Keep the captured local index visible to structural timing audits.  It is
   // not on the external request payload, but removing it would make the
@@ -635,11 +666,16 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
     if (reset) begin
       pending <= 1'b0;
       request_queued <= 1'b0;
+      issued_for_enable <= 1'b0;
       request_index <= '0;
       response_byte_offset <= '0;
       done <= 1'b0;
       read_data <= '0;
     end else begin
+      // Joined operands must not enqueue a duplicate while other operands
+      // finish. Rearm only after the generated read phase deasserts enable.
+      // Generic streaming instances keep ONCE_PER_ENABLE=0.
+      if (!content_en) issued_for_enable <= 1'b0;
       done <= pending && ext_rsp_valid;
       // Sample the payload whenever the local slot is empty. On the enqueue
       // edge both payload and valid capture the same client inputs; queued/
@@ -657,8 +693,9 @@ _EXTERNAL_MODULE = r'''module seq_mem_d1_external #(
         request_queued <= 1'b0;
         response_byte_offset <= ext_req_addr[2:0];
       end else if (content_en && !write_en && !pending && !request_queued &&
-                   1'b1) begin
+                   (!ONCE_PER_ENABLE || !issued_for_enable)) begin
         request_queued <= 1'b1;
+        issued_for_enable <= 1'b1;
       end
     end
   end
