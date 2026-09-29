@@ -30,7 +30,7 @@ Task 4 board-inference packaging or full timing qualification.
 Historical PT2E W8A8/direct-Linalg and generic Calyx attempts are not counted
 as additional successful reductions. The full-model direct-Linalg path stopped
 before Calyx/SystemVerilog and has no FPGA-utilization result
-([[file:docs/results/2026-07-15-full-w8a8-direct-linalg-scout.md][boundary report]]). The old FP32 memory-blackbox diagnostic retained an
+([[file:docs/results/2026-07-15-full-w8a8-direct-linalg-scout.md][boundary report]]). The PT2E W8A8 Calyx memory-blackbox diagnostic retained an
 unimplemented memory service; its provisional counts are not comparable to
 the fitted complete design ([[file:docs/adr/2026-07-13-calyx-memory-blackbox-diagnostic.md][diagnostic]]).
 
@@ -65,13 +65,15 @@ be false precision.
 
 * Reproduction and source closure
 
-- The stable reference and compiler sources are committed under
+- The stable reference and compiler entry points are committed under
   =artifacts/reference/tinystories-1m-fixed-point-continuation-oracle.json=,
   =scripts/pipeline/lower_fixed_point_model_to_calyx.py=,
   =scripts/pipeline/lower_fixed_point_model_bram_production.py=, and
-  =scripts/pipeline/run_bram_production_sv.py=. The fit audit checks the
-  actual acceptance candidate's compiler-source digests against the
-  committed files.
+  =scripts/pipeline/run_bram_production_sv.py=. Separately, the fit audit
+  rehashed the three compiler modules named in the accepted postpass
+  provenance: =lower_fixed_point_block_composition_to_calyx.py=,
+  =lower_fixed_point_attention_crossing_to_calyx.py=, and
+  =lower_fixed_point_mlp_crossing_to_calyx.py=, all under =scripts/pipeline/=.
 - The completed native resource comparison, route and bitstream are retained
   as Nix derivations. On this host, for example, =nix build --no-link
   /nix/store/fhnzlis2sj5a55k7p7wwh9fxwkxj8kd0-compiler-full16-two-rom-qualified-mode-checked-bitstream.drv=
