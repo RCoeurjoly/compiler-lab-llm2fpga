@@ -42,10 +42,11 @@ establish full timing qualification or funding acceptance.
 ## Task 6: resource usage reduction strategies
 
 Task 3 ended with reported 143× FPGA resource overutilization. Task 6 retains
-its resource-reduction goal: find and assess strategies that bring the baseline
-design within the target FPGA's resource capacity. The original written task
-calls for a survey and evaluation of 5–10 mitigation strategies at model,
-compiler/MLIR, or RTL level. The user's stopping rule is outcome-based: if even
+its resource-reduction goal: find and assess strategies that bring the
+TinyStories-1M compiler-generated design within the target FPGA's resource
+capacity. The original written task calls for a survey and evaluation of 5–10
+mitigation strategies at model, compiler/MLIR, or RTL level. The user's
+stopping rule is outcome-based: if even
 one or two measured strategies achieve FPGA fit, stop searching and report the
 result; five is not a minimum in this success case. If fit is not achieved,
 review and evaluate 5–10 distinct strategies, document their outcomes, and
@@ -101,12 +102,13 @@ Do not describe a failed or semantically mismatching strategy as a viable
 resource reduction. Any deliberately different numerical profile needs its own
 disclosed reference; it cannot silently replace the Task 4 fixed-point contract.
 
-The plan requires the largest successfully lowered model from Task 5 as the
-baseline. Begin with the currently evidenced 1M model, but label the Task 6
-baseline provisional until the Task 5 matrix establishes that largest model.
-If a larger model is lowered, check whether the claimed FPGA-fit outcome holds
-for that baseline; otherwise report the 1M result as a narrower achievement,
-not Task 6 completion. The priority order does not waive this dependency.
+The original project plan names the largest successfully lowered Task 5 model
+as Task 6's baseline. The user explicitly replaces that dependency for project
+completion: TinyStories-1M is the Task 6 fit target. Once a functionally valid
+compiler-generated TinyStories-1M implementation fits the target FPGA and the
+result is documented, Task 6 is complete; a larger model lowered later in
+Task 5 does not reopen it. Record this baseline revision alongside the
+original plan rather than silently attributing it to the original wording.
 
 ## Task 4: FPGA integration and hardware validation
 
@@ -172,9 +174,9 @@ new implementation dependencies or reasons to migrate the accepted accelerator.
 
 Before marking Tasks 4–6 complete, map every applicable deliverable to committed
 sources, a reproducible command, and inspected results. Record the Task 6
-early-stop revision alongside the original plan, and resolve missing artifacts,
-incomparable optimization baselines, unsupported functional claims, and the
-Task 6/Task 5 baseline dependency. Publish limitations and failed cases.
+early-stop and TinyStories-1M baseline revisions alongside the original plan,
+and resolve missing artifacts, incomparable optimization baselines and
+unsupported functional claims. Publish limitations and failed cases.
 
 This spec approves neither task completion nor external submission. The next
 step is written-spec review, then an implementation plan led by evidence
