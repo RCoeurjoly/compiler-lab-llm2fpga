@@ -41,15 +41,20 @@ establish full timing qualification or funding acceptance.
 
 ## Task 6: resource usage reduction strategies
 
-The original written task calls for a survey of 5–10 mitigation strategies at
-model, compiler/MLIR, or RTL level. The user now sets an outcome-based stopping
-rule: do not treat five as a minimum number of new experiments. If one or two
-distinct, measured strategies achieve correct board fit for the Task 6 baseline,
-stop optimization experiments and report those results. This is an explicit
-revision to the original 5–10-strategy requirement, not a claim that the
-original text already permits early completion. Existing additional strategies
-may be surveyed and reported without new runs; do not invent five evaluations.
-For strategies actually evaluated, compare against the baseline and record
+Task 3 ended with reported 143× FPGA resource overutilization. Task 6 retains
+its resource-reduction goal: find and assess strategies that bring the baseline
+design within the target FPGA's resource capacity. The original written task
+calls for a survey and evaluation of 5–10 mitigation strategies at model,
+compiler/MLIR, or RTL level. The user's stopping rule is outcome-based: if even
+one or two measured strategies achieve FPGA fit, stop searching and report the
+result; five is not a minimum in this success case. If fit is not achieved,
+review and evaluate 5–10 distinct strategies, document their outcomes, and
+stop rather than extending the search indefinitely. This changes the original
+five-strategy minimum only for the successful early-stop case; do not present
+it as wording already in the project plan. FPGA fit is an implementation
+resource result, not by itself Task 4's board-inference result.
+
+For strategies evaluated, compare against the baseline and record
 LUT/FF/BRAM/DSP, maximum-frequency, toolchain-runtime and peak-memory deltas
 where available. Negative and neutral results are valid evidence. Successful
 strategies must not depend on operator stubs or hidden blackboxes.
@@ -57,16 +62,17 @@ strategies must not depend on operator stubs or hidden blackboxes.
 First inventory existing optimizations and recover comparable measurements.
 Do not reimplement an optimization merely to recreate its history. Identify
 missing evidence and new experiments only after that audit. Evaluate additional
-strategies only while the board-fit stopping condition remains unmet; do not
-keep adding candidates indefinitely.
+strategies only while FPGA fit remains unmet and the 5–10-strategy unsuccessful
+search limit has not been reached.
 
 Treat Task 6 primarily as consolidation of existing experiments and reporting,
 not a new optimization-development project. The corrected quantization strategy
 is a central candidate: compare the earlier Task 3 numerical representation
 with the corrected profile, documenting correctness as well as resource,
-timing, runtime and peak-memory differences. If quantization enables correct
-BRAM-resident inference for the Task 6 baseline, stop optimization experiments
-and document the measured outcome; DDR3 is not required to demonstrate it.
+timing, runtime and peak-memory differences. If quantization produces a
+functionally valid BRAM-resident implementation of the Task 6 baseline that
+fits the FPGA, stop optimization experiments and document the measured outcome;
+DDR3 is not required to demonstrate it.
 
 Report any existing DDR3 externalization evaluation as a resource-reduction
 alternative, with integration failures and unverified hardware results stated
@@ -75,8 +81,8 @@ a Task 6 completion gate. Preserve its existing evidence without reopening the
 deferred integration effort solely for this survey.
 
 Compiler-pipeline changes may provide distinct strategies if more experiments
-are needed to achieve board fit. Using Calyx alone is an architectural
-choice, not evidence of resource reduction. Count concrete techniques separately
+are needed to achieve fit. Using Calyx alone is an architectural choice, not
+evidence of resource reduction. Count concrete techniques separately
 only when their mechanisms and experimental evidence are distinguishable: for
 example, compute-unit sharing, memory banking/mapping, or request-controller
 consolidation. These are inventory candidates, not assertions that each has
@@ -87,7 +93,8 @@ why it remains unmet.
 
 Deliver a strategy survey, reproducible usage scripts for strategies actually
 evaluated, before/after resource reports, and a comparison table with available
-deltas and viability status. State the early-stop decision and its evidence.
+deltas and viability status. State whether the search stopped because fit was
+achieved or because 5–10 strategies were evaluated without fit.
 Distinguish semantic corrections and tool compatibility fixes from resource
 optimizations.
 Do not describe a failed or semantically mismatching strategy as a viable
@@ -97,7 +104,7 @@ disclosed reference; it cannot silently replace the Task 4 fixed-point contract.
 The plan requires the largest successfully lowered model from Task 5 as the
 baseline. Begin with the currently evidenced 1M model, but label the Task 6
 baseline provisional until the Task 5 matrix establishes that largest model.
-If a larger model is lowered, check whether the claimed board-fit outcome holds
+If a larger model is lowered, check whether the claimed FPGA-fit outcome holds
 for that baseline; otherwise report the 1M result as a narrower achievement,
 not Task 6 completion. The priority order does not waive this dependency.
 
