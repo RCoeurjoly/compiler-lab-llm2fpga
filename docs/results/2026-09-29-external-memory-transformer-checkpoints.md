@@ -60,6 +60,39 @@ existing selected-bank lowering to this packed layout, preserving operation
 isolation and requiring checkpoint/first-token equivalence before physical
 implementation. That optimization has not been applied or approved yet.
 
+## LM-head iteration bound
+
+The accepted compiler `model.futil` explicitly loops over one last-context row,
+50,257 output logits and 64 coefficients per logit. Its `lm_gemv_read_operands`
+group enables all 25 packed weight banks and completion-joins all their done
+signals, although its data mux selects just one bank. The current externalized
+candidate preserves that broadcast and issues each joined read once per phase.
+Thus the LM head alone requires at least 3,216,448 coefficient operations and
+80,411,200 packed-weight memory transactions. Packing eight codes per word does
+not reduce this count: the current loop rereads the packed word for each code.
+
+An executable Icarus experiment instantiates the **unchanged production arbiter**
+with one continuously requesting client, immediate Wishbone acceptance and the
+earliest legal response. All 1,000 responses are spaced exactly four clocks
+apart. A negative control expecting three clocks fails at the second response.
+The four sequential states are IDLE → CAPTURE → ISSUE → WAIT_ACK; neither
+additional clients nor real memory stalls can shorten this service sequence.
+The durable Nix artifact includes the actual RTL, testbench, compiled simulation
+and both logs:
+`/nix/store/j20bw2wca39qddmdg6226s3xkadyksfc-compiler-external-arbiter-best-case-service-bound`.
+
+Consequently weight traffic alone consumes at least 321,644,800 service clocks,
+before LM input-scale reads, logit-scale reads, arithmetic or control overhead.
+Adding the already observed 75,133,217-cycle prefix gives a conservative
+396,778,017-cycle first-token floor. The current test driver's 180,000,000-cycle
+cap cannot reach the first token with this broadcast lowering. This is a cycle
+bound, not a measured full-head runtime or a hardware performance estimate.
+
+The next action remains selected-bank compiler lowering with operation isolation
+and exact checkpoint/token equivalence. No unoptimized first-token simulation
+was launched, no limit was silently extended, and no implementation or board
+change was made for this audit.
+
 See [operation isolation](2026-09-29-external-memory-operation-isolation.md) for
 the stale-response correction and the explicitly red/incomplete repository-wide
 verification. This report is a verified simulation result, not a whole-suite
