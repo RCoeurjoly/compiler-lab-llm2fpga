@@ -4,6 +4,9 @@
 // compiler core's four-word prompt and held start/valid contract.  This module
 // owns no model state and does not alter the DDR3 or PCIe transport.
 module tinystories_1m_ddr3_command_adapter #(
+  parameter integer MEMORY_PORTS = 240,
+  parameter integer TOKEN_INDEX_WIDTH = 1,
+  parameter integer RESULT_COUNT = 1,
   parameter integer WB_ADDR_BITS = 32,
   parameter integer WB_DATA_BITS = 128
 ) (
@@ -34,6 +37,8 @@ module tinystories_1m_ddr3_command_adapter #(
   reg [15:0] prompt_words [0:3];
   reg [2:0] prompt_count;
   reg run_active;
+  reg result_pending;
+  reg [TOKEN_INDEX_WIDTH-1:0] result_index;
   reg token_valid_q;
   reg [15:0] token_id_q;
   reg error_q;
@@ -47,10 +52,13 @@ module tinystories_1m_ddr3_command_adapter #(
   wire [WB_ADDR_BITS-1:0] core_wb_addr;
   wire [WB_DATA_BITS/8-1:0] core_wb_sel;
 
-  assign prompt_ready = !run_active && !token_valid_q && prompt_count < 3'd4;
+  initial if (RESULT_COUNT < 1 || RESULT_COUNT > (2**TOKEN_INDEX_WIDTH))
+    $fatal(1, "result count exceeds compiler token-index ABI");
+
+  assign prompt_ready = !run_active && !token_valid_q && !result_pending && prompt_count < 3'd4;
   assign token_valid = token_valid_q;
   assign token_id = token_id_q;
-  assign busy = run_active || token_valid_q;
+  assign busy = run_active || token_valid_q || result_pending;
   assign error = error_q;
   assign error_code = error_code_q;
   assign request_count = request_count_q;
@@ -60,9 +68,12 @@ module tinystories_1m_ddr3_command_adapter #(
   assign wb_addr = core_wb_addr;
   assign wb_sel = core_wb_sel;
 
-  tinystories_1m_ddr3_backend core (
-    .clk(clk), .reset(reset),
-    .start(run_active), .valid(run_active), .token_index(1'b0),
+  tinystories_1m_ddr3_backend #(
+    .MEMORY_PORTS(MEMORY_PORTS), .TOKEN_INDEX_WIDTH(TOKEN_INDEX_WIDTH),
+    .WB_ADDR_BITS(WB_ADDR_BITS), .WB_DATA_BITS(WB_DATA_BITS)
+  ) core (
+    .clk(clk), .reset(reset || clear),
+    .start(run_active), .valid(run_active), .token_index(result_index),
     .prompt_0(prompt_words[0]), .prompt_1(prompt_words[1]),
     .prompt_2(prompt_words[2]), .prompt_3(prompt_words[3]),
     .done(core_done), .token_id(core_token_id),
@@ -76,6 +87,8 @@ module tinystories_1m_ddr3_command_adapter #(
     if (reset || clear) begin
       prompt_count <= 3'd0;
       run_active <= 1'b0;
+      result_pending <= 1'b0;
+      result_index <= '0;
       token_valid_q <= 1'b0;
       token_id_q <= 16'd0;
       error_q <= 1'b0;
@@ -90,10 +103,11 @@ module tinystories_1m_ddr3_command_adapter #(
         prompt_words[prompt_count] <= prompt_token;
         prompt_count <= prompt_count + 3'd1;
       end
-      if (start && !run_active && !token_valid_q) begin
-        if (prompt_count == 3'd4)
+      if (start && !busy) begin
+        if (prompt_count == 3'd4) begin
           run_active <= 1'b1;
-        else begin
+          result_index <= '0;
+        end else begin
           error_q <= 1'b1;
           error_code_q <= 8'h01; // start before four prompt words
         end
@@ -105,8 +119,22 @@ module tinystories_1m_ddr3_command_adapter #(
         token_valid_q <= 1'b1;
         token_id_q <= core_token_id;
       end
-      if (token_valid_q && token_ready)
+      // No generated token is fed back by this wrapper: the compiler has
+      // already completed autonomous generation and stored every result.
+      // Set the new index on retirement, then sample its combinational mux
+      // one clock later. Hold the sampled word until downstream accepts it.
+      if (result_pending) begin
+        token_id_q <= core_token_id;
+        token_valid_q <= 1'b1;
+        result_pending <= 1'b0;
+      end
+      if (token_valid_q && token_ready) begin
         token_valid_q <= 1'b0;
+        if (result_index != TOKEN_INDEX_WIDTH'(RESULT_COUNT-1)) begin
+          result_index <= result_index + 1'b1;
+          result_pending <= 1'b1;
+        end
+      end
     end
   end
 endmodule

@@ -35,6 +35,12 @@
         };
         task3MainPackages =
           inputs.task3-main-pipeline.packages.${system};
+        task6CompilerFull16BoardShell = import ./nix/task6-board-shell.nix {
+          inherit pkgs;
+          compilerFull16Artifact = builtins.storePath "/nix/store/g67jq7vcsw5mdyf2psbiwr9m668135vk-compiler-accepted-full16-ddr-weights-preflight";
+          compilerFull16Image = builtins.storePath "/nix/store/xnbq8in3l32c1klirmpbbn6wah25ns55-compiler-full16-equivalent-two-rom-static-image";
+          compilerFull16SemanticReceipt = builtins.storePath "/nix/store/gf6f2r4y1fp5cc8jzchlanbzkblbxbz0-compiler-full16-86-port-loaded-image-first-token-diagnostic";
+        };
         task3MainLib = inputs.task3-main-pipeline.lib.${system};
         # Match the exact backend used by the recorded two-token route.  The
         # root flake's transitive nextpnr input has since resolved to an older
@@ -3252,6 +3258,9 @@ PY
           nextpnr-kintex-congestion-diagnostic = nextpnrKintexCongestionDiagnostic;
           task6-board-shell-source-closure = task6BoardShell.sourceClosure;
           task6-board-shell-m2-source-closure = task6BoardShell.m2SourceClosure;
+          compiler-full16-ddr3-board-source = task6CompilerFull16BoardShell.full16CompilerSource;
+          compiler-full16-ddr3-board-elaboration = task6CompilerFull16BoardShell.replayElaboration;
+          compiler-full16-ddr3-board-synthesis = task6CompilerFull16BoardShell.replaySynthesis;
           compiler-ddr3-trace-replay-elaboration = task6BoardShell.replayElaboration;
           compiler-ddr3-trace-replay-synthesis-screen = task6BoardShell.replaySynthesis;
           compiler-ddr3-trace-replay-route = task6BoardShell.replayRoute;

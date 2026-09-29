@@ -7,6 +7,7 @@
 // UberDDR3 top remain outside this module.
 module tinystories_1m_ddr3_backend #(
   parameter integer MEMORY_PORTS = 240,
+  parameter integer TOKEN_INDEX_WIDTH = 1,
   parameter integer WB_ADDR_BITS = 32,
   parameter integer WB_DATA_BITS = 128
 ) (
@@ -14,7 +15,7 @@ module tinystories_1m_ddr3_backend #(
   input  wire                         reset,
   input  wire                         start,
   input  wire                         valid,
-  input  wire                         token_index,
+  input  wire [TOKEN_INDEX_WIDTH-1:0]   token_index,
   input  wire [15:0]                  prompt_0,
   input  wire [15:0]                  prompt_1,
   input  wire [15:0]                  prompt_2,
@@ -31,17 +32,16 @@ module tinystories_1m_ddr3_backend #(
   input  wire                         wb_err,
   input  wire [WB_DATA_BITS-1:0]      wb_rdata
 );
-  // The externalizer's indexed ABI is deliberately explicit.  Keep the
-  // parameter as an assertion/documentation aid; changing it without
-  // regenerating main is rejected rather than silently truncating vectors.
-  initial if (MEMORY_PORTS != 240 || WB_DATA_BITS != 128)
-    $error("tinystories_1m_ddr3_backend requires 240 ports and 128-bit Wishbone");
+  // Match these parameters to the externalizer's indexed ABI. Native
+  // elaboration must reject any main/backend port-width discrepancy.
+  initial if (MEMORY_PORTS < 1 || TOKEN_INDEX_WIDTH < 1 || WB_DATA_BITS != 128)
+    $fatal(1, "invalid compiler memory/result ABI or Wishbone width");
 
-  wire [239:0] ext_mem_req_valid;
-  wire [239:0] ext_mem_req_ready;
-  wire [7679:0] ext_mem_req_addr;
-  wire [239:0] ext_mem_rsp_valid;
-  wire [15359:0] ext_mem_rsp_data;
+  wire [MEMORY_PORTS-1:0] ext_mem_req_valid;
+  wire [MEMORY_PORTS-1:0] ext_mem_req_ready;
+  wire [MEMORY_PORTS*WB_ADDR_BITS-1:0] ext_mem_req_addr;
+  wire [MEMORY_PORTS-1:0] ext_mem_rsp_valid;
+  wire [MEMORY_PORTS*64-1:0] ext_mem_rsp_data;
 
   // Preserve the compiler/transport cut during staged synthesis.  The
   // generated main and the audited arbiter must be lowered independently;
@@ -70,7 +70,7 @@ module tinystories_1m_ddr3_backend #(
   wire [WB_DATA_BITS-1:0] arb_wb_rdata;
 
   (* keep_hierarchy = "yes" *) llm_external_memory_arbiter #(
-    .PORTS(240), .ADDRESS_BITS(WB_ADDR_BITS), .DATA_BITS(64),
+    .PORTS(MEMORY_PORTS), .ADDRESS_BITS(WB_ADDR_BITS), .DATA_BITS(64),
     .WB_DATA_BITS(128)
   ) memory_arbiter (
     .clk(clk), .rst(reset),

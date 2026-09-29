@@ -1,6 +1,11 @@
 { pkgs, bitstreamPkgs ? pkgs, openXC7Packages ? null
 , compilerGeneratedRcWrapper ? null, compilerGeneratedSv ? null
+, compilerFull16Artifact ? null, compilerFull16Image ? null
+, compilerFull16SemanticReceipt ? null
 , enableCompilerGeneratedRc ? false }:
+assert !(enableCompilerGeneratedRc && compilerFull16Artifact != null);
+assert compilerFull16Artifact == null ||
+  (compilerFull16Image != null && compilerFull16SemanticReceipt != null);
 let
   pins = builtins.fromJSON (builtins.readFile ../scripts/pipeline/task6_board_shell_pins.json);
   storeInputs = map (row: builtins.storePath
@@ -64,8 +69,40 @@ let
       ${../.superpowers/sdd/2026-09-18-compiler-micron-integration/task-4-recovered-inputs/model.sv} \
       "$out/model.sv" "$out/annotation.json"
   '';
+  # Import the accepted compiler output and its immutable semantic proof,
+  # never the historical model.sv behind the legacy package name. This is a
+  # source binding, not a fresh model lowering or a hardware acceptance claim.
+  full16CompilerSource = if compilerFull16Artifact == null then null else pkgs.runCommand "compiler-full16-ddr3-board-source" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    mkdir -p "$out"
+    python3 - ${compilerFull16Artifact} ${compilerFull16Image} ${compilerFull16SemanticReceipt} "$out" <<'PY'
+    import hashlib, json, pathlib, shutil, sys
+    candidate, image, proof_dir, out = map(pathlib.Path, sys.argv[1:])
+    lower = json.loads((candidate / 'receipt.json').read_text())
+    proof = json.loads((proof_dir / 'receipt.json').read_text())
+    assert proof['status'] == 'passed-full-image-and-first-token-only'
+    assert proof['candidate'] == str(candidate)
+    assert lower['image'] == str(image) and lower['externalized_count'] == 86
+    assert proof['externalized_rtl_sha256'] == lower['external_sha256']
+    assert hashlib.sha256((candidate / 'model-external.sv').read_bytes()).hexdigest() == lower['external_sha256']
+    assert proof['image_sha256'] == lower['image_sha256']
+    positive = proof['runs'][0]
+    assert positive['passed'] and positive['balanced_trace'] and positive['final_ln_matches']
+    assert proof['stage'] == 'first-token' and positive['first_token_matches']
+    assert positive['embedding_matches'] and len(positive['block_checkpoints']) == 8
+    assert positive['requests'] == positive['responses'] == positive['memory_trace_records']
+    assert hashlib.sha256((candidate / 'model-image.bin').read_bytes()).hexdigest() == proof['image_sha256']
+    assert all(row['passed'] for row in positive['block_checkpoints'])
+    shutil.copyfile(candidate / 'model-external.sv', out / 'model.sv')
+    for name in lower['local_image_memories']:
+        shutil.copyfile(image / ('image-' + name + '.hex'), out / ('image-' + name + '.hex'))
+    shutil.copyfile(proof_dir / 'receipt.json', out / 'semantic-receipt.json')
+    shutil.copyfile(candidate / 'receipt.json', out / 'lowering-receipt.json')
+    PY
+  '';
   legacyCompilerSourceArgs = [
-    "${compilerAnnotatedSource}/model.sv"
+    "${if compilerFull16Artifact != null then full16CompilerSource else compilerAnnotatedSource}/model.sv"
     "${../rtl/memory/llm_external_memory_arbiter.sv}"
     "${../rtl/memory/llm_wishbone_pipeline.sv}"
     "${../rtl/tinystories_1m_ddr3_backend.sv}"
@@ -82,6 +119,12 @@ let
   compilerGeneratedRcParam = pkgs.lib.optionalString
     enableCompilerGeneratedRc
     "chparam -set ENABLE_COMPILER_GENERATED_RC 1 compiler_ddr3_trace_replay_top";
+  compilerFull16Params = pkgs.lib.optionalString (compilerFull16Artifact != null) ''
+    chparam -set COMPILER_MEMORY_PORTS 86 -set COMPILER_TOKEN_INDEX_WIDTH 4 -set COMPILER_RESULT_COUNT 16 compiler_ddr3_trace_replay_top
+  '';
+  prepareFull16LocalImages = pkgs.lib.optionalString (compilerFull16Artifact != null) ''
+    cp ${full16CompilerSource}/image-*.hex .
+  '';
   # The generic synth_xilinx prepare stage spends most of its time trying to
   # reconstruct enormous generated control FSMs.  For the RC shell we keep
   # the normal prepare operations but deliberately skip FSM extraction, then
@@ -119,12 +162,14 @@ let
     nativeBuildInputs = [ pkgs.python3 ];
   } ''
     mkdir -p "$out"
+    ${prepareFull16LocalImages}
     cat > run.ys <<EOF
     read_verilog -lib +/xilinx/cells_sim.v
     read_verilog -lib +/xilinx/cells_xtra.v
     read_verilog -sv -DTASK6_PCIE_ROWSTREAM_INGRESS_PORTS -DTASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS -DTASK6_COMPILER_DDR3_ACCELERATOR_PORTS ${sourceArgs} ${compilerSourceArgs} ${m2SourceClosure}/task6_normal_command_stage.sv ${../rtl/diagnostics/compiler_ddr3_trace_replay.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_top.sv}
     chparam -set ENABLE_COMPILER_ACCELERATOR 1 compiler_ddr3_trace_replay_top
     ${compilerGeneratedRcParam}
+    ${compilerFull16Params}
     hierarchy -check -top compiler_ddr3_trace_replay_top
     proc
     opt_clean
@@ -140,12 +185,14 @@ let
     nativeBuildInputs = [ pkgs.python3 ];
   } ''
     mkdir -p "$out"
+    ${prepareFull16LocalImages}
     cat > run.ys <<EOF
     read_verilog -lib +/xilinx/cells_sim.v
     read_verilog -lib +/xilinx/cells_xtra.v
     read_verilog -sv -DTASK6_PCIE_ROWSTREAM_INGRESS_PORTS -DTASK6_TINYSTORIES_DDR_ACCELERATOR_PORTS -DTASK6_COMPILER_DDR3_ACCELERATOR_PORTS ${sourceArgs} ${compilerSourceArgs} ${m2SourceClosure}/task6_normal_command_stage.sv ${../rtl/diagnostics/compiler_ddr3_trace_replay.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_csr.sv} ${../rtl/diagnostics/compiler_ddr3_trace_replay_top.sv}
     chparam -set ENABLE_COMPILER_ACCELERATOR 1 compiler_ddr3_trace_replay_top
     ${compilerGeneratedRcParam}
+    ${compilerFull16Params}
     hierarchy -check -top compiler_ddr3_trace_replay_top
     ${synthesisCommand}
     check
@@ -291,4 +338,4 @@ let
       ${dbRoot} ${dbRoot}/xc7k480tffg1156-1/part.yaml
     sha256sum "$out/replay.bit" > "$out/replay.bit.sha256"
   '';
-in { inherit sourceClosure commandSourceClosure m2SourceClosure replayObserverSourceClosure replayElaboration replaySynthesis replayTimingBaseline replayResetPatched replayBarOffsetPatched replayRoute replayBitstream replayBarObserverResetPatched replayBarObserverRoute replayBarObserverBitstream patchedDb; }
+in { inherit sourceClosure commandSourceClosure m2SourceClosure replayObserverSourceClosure replayElaboration replaySynthesis replayTimingBaseline replayResetPatched replayBarOffsetPatched replayRoute replayBitstream replayBarObserverResetPatched replayBarObserverRoute replayBarObserverBitstream patchedDb full16CompilerSource; }

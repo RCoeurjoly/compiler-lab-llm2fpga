@@ -11,7 +11,10 @@ RTL = ROOT / "rtl" / "tinystories_1m_ddr3_command_adapter.sv"
 # A contract test double, never accelerator implementation RTL. It checks the
 # adapter's held run controls and prompt wiring, and completes one delayed read.
 BEHAVIOR_TB = r'''
-module tinystories_1m_ddr3_backend (
+module tinystories_1m_ddr3_backend #(
+ parameter MEMORY_PORTS=240, TOKEN_INDEX_WIDTH=1,
+ parameter WB_ADDR_BITS=32, WB_DATA_BITS=128
+) (
  input wire clk, reset, start, valid, token_index,
  input wire [15:0] prompt_0, prompt_1, prompt_2, prompt_3,
  output reg done, output reg [15:0] token_id,

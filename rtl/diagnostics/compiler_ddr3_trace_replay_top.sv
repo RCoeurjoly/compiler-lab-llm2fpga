@@ -21,7 +21,10 @@ module compiler_ddr3_trace_replay_top #(
   // Select the compiler-generated RC transport shell.  The legacy command
   // adapter remains the default diagnostic path; this option never reuses its
   // compute RTL.
-  parameter bit ENABLE_COMPILER_GENERATED_RC = 1'b0
+  parameter bit ENABLE_COMPILER_GENERATED_RC = 1'b0,
+  parameter int COMPILER_MEMORY_PORTS = 240,
+  parameter int COMPILER_TOKEN_INDEX_WIDTH = 1,
+  parameter int COMPILER_RESULT_COUNT = 1
 ) (
   output wire        pci_exp_txp,
   output wire        pci_exp_txn,
@@ -464,7 +467,16 @@ module compiler_ddr3_trace_replay_top #(
       assign compiler_accel_addr = rc_wb_addr[24:0];
       assign compiler_accel_sel = rc_wb_sel;
     end else begin : gen_legacy_command_adapter
-      tinystories_1m_ddr3_command_adapter compiler_command_adapter (
+      wire [31:0] compiler_byte_line_addr;
+      // The generated memory ABI uses 32-bit addresses; the validated DDR
+      // owner takes 25-bit 128-bit-line addresses. Preserve that truncation
+      // explicitly rather than relying on a resized instance connection.
+      assign compiler_accel_addr = compiler_byte_line_addr[24:0];
+      tinystories_1m_ddr3_command_adapter #(
+        .MEMORY_PORTS(COMPILER_MEMORY_PORTS),
+        .TOKEN_INDEX_WIDTH(COMPILER_TOKEN_INDEX_WIDTH),
+        .RESULT_COUNT(COMPILER_RESULT_COUNT)
+      ) compiler_command_adapter (
         .clk(rowstream_clk), .reset(!rowstream_rst_n),
         .clear(rowstream_tinystories_clear),
         .prompt_valid(rowstream_tinystories_prompt),
@@ -476,7 +488,7 @@ module compiler_ddr3_trace_replay_top #(
         .error(compiler_error), .error_code(compiler_error_code),
         .request_count(compiler_request_count),
         .wb_cyc(compiler_accel_cyc), .wb_stb(compiler_accel_stb),
-        .wb_we(compiler_accel_we), .wb_addr(compiler_accel_addr),
+        .wb_we(compiler_accel_we), .wb_addr(compiler_byte_line_addr),
         .wb_sel(compiler_accel_sel), .wb_accept(compiler_accel_accept),
         .wb_ack(compiler_accel_ack), .wb_err(compiler_accel_err),
         .wb_rdata(compiler_accel_rdata));
