@@ -151,6 +151,14 @@ let
     opt_clean
     sort
     synth_xilinx -run coarse:finalize -top compiler_ddr3_trace_replay_top
+  '' else if compilerFull16Artifact != null then ''
+    # Protect the canonical generated register after flattening, not its
+    # pre-flatten alias. Keep every normal Xilinx DSP/memory mapping stage.
+    proc
+    flatten
+    select -assert-count 1 main/w:fsm0.out
+    setattr -set fsm_encoding "none" main/w:fsm0.out
+    synth_xilinx -flatten -arch xc7 -nosrl -noiopad -top compiler_ddr3_trace_replay_top
   '' else ''
     synth_xilinx -flatten -arch xc7 -nosrl -noiopad -top compiler_ddr3_trace_replay_top
   '';
@@ -181,7 +189,7 @@ let
     grep -q 'Checking module compiler_ddr3_trace_replay_top' "$out/yosys.log"
     cp run.ys "$out/"
   '';
-  replaySynthesis = pkgs.runCommand "compiler-ddr3-trace-replay-synthesis-screen" {
+  replaySynthesisRaw = pkgs.runCommand "compiler-ddr3-trace-replay-synthesis-screen" {
     nativeBuildInputs = [ pkgs.python3 ];
   } ''
     mkdir -p "$out"
@@ -205,10 +213,36 @@ let
     EOF
     # Screen only. Bound wall time and per-file output; no bitstream is built.
     ulimit -f 180000
-    timeout 600 ${yosys}/bin/yosys -Q -s run.ys > "$out/yosys.log" 2>&1
+    ${pkgs.lib.optionalString (compilerFull16Artifact != null) ''
+      ulimit -v 12582912
+      export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+      set -o pipefail
+    ''}
+    ${if compilerFull16Artifact != null then ''
+      timeout --kill-after=10s 600 ${yosys}/bin/yosys -Q -s run.ys 2>&1 | tee "$out/yosys.log"
+    '' else ''
+      timeout 600 ${yosys}/bin/yosys -Q -s run.ys > "$out/yosys.log" 2>&1
+    ''}
     python3 ${../scripts/analysis/check_compiler_shell_status.py} \
       "$out/yosys.log" --top compiler_ddr3_trace_replay_top
     cp run.ys "$out/"
+  '';
+  full16Compatibility = import ./full16-board-compat.nix {
+    inherit pkgs yosys;
+    synthesis = replaySynthesisRaw;
+    fsmCheck = full16FsmEncodingCheck;
+  };
+  replaySynthesis = if compilerFull16Artifact != null
+    then full16Compatibility.compatible else replaySynthesisRaw;
+  full16FsmEncodingCheck = pkgs.runCommand "compiler-full16-board-fsm-encoding-check" {
+    nativeBuildInputs = [ pkgs.python3 ];
+  } ''
+    mkdir -p "$out"
+    ulimit -v 8388608
+    export FULL16_SYNTHESIS_COMMAND=${pkgs.writeText "full16-production-synthesis-command" replaySynthesisRaw.buildCommand}
+    export FULL16_ELABORATION=${replayElaboration}/compiler-top.il
+    export YOSYS=${yosys}/bin/yosys
+    python3 ${../tests/test_full16_board_fsm_encoding.py} > "$out/test.log" 2>&1
   '';
   # Route the current compiler-generated top, not a historical synthesis JSON.
   # A pinned netlist can silently discard RTL integration fixes (and was the
@@ -216,13 +250,13 @@ let
   # bridge).  The synthesis screen remains bounded and is now the provenance
   # source for every replay bitstream.
   replayTimingBaseline = replaySynthesis;
-  replayResetPatched = if enableCompilerGeneratedRc then pkgs.runCommand
+  replayResetPatched = if enableCompilerGeneratedRc || compilerFull16Artifact != null then pkgs.runCommand
     "compiler-ddr3-trace-replay-reset-not-applied" { } ''
       mkdir -p "$out"
       cp ${replayTimingBaseline}/replay.json "$out/replay.json"
       cat > "$out/patch-receipt.json" <<'JSON'
       {"schema":"compiler-ddr3-reset-patch.v1","status":"not-applied",
-       "reason":"dedicated compiler-generated RC netlist has no historical reset patch profile"}
+       "reason":"current compiler-generated netlist excludes historical reset patch profiles"}
       JSON
     '' else pkgs.runCommand "compiler-ddr3-trace-replay-reset-patched" {
       nativeBuildInputs = [ pkgs.python3 ];
@@ -235,7 +269,7 @@ let
   # applying the historical bit-disconnect patch would be both unnecessary and
   # unauthenticated.  Preserve the reset-patch receipt as the route input.
   replayBarOffsetPatched = replayResetPatched;
-  replayBarObserverResetPatched = pkgs.runCommand "compiler-ddr3-trace-replay-bar-observer-reset-patched" {
+  replayBarObserverResetPatched = if compilerFull16Artifact != null then replayResetPatched else pkgs.runCommand "compiler-ddr3-trace-replay-bar-observer-reset-patched" {
     nativeBuildInputs = [ pkgs.python3 ];
   } ''
     mkdir -p "$out"
@@ -338,4 +372,4 @@ let
       ${dbRoot} ${dbRoot}/xc7k480tffg1156-1/part.yaml
     sha256sum "$out/replay.bit" > "$out/replay.bit.sha256"
   '';
-in { inherit sourceClosure commandSourceClosure m2SourceClosure replayObserverSourceClosure replayElaboration replaySynthesis replayTimingBaseline replayResetPatched replayBarOffsetPatched replayRoute replayBitstream replayBarObserverResetPatched replayBarObserverRoute replayBarObserverBitstream patchedDb full16CompilerSource; }
+in { inherit sourceClosure commandSourceClosure m2SourceClosure replayObserverSourceClosure replayElaboration replaySynthesisRaw replaySynthesis full16Compatibility full16FsmEncodingCheck replayTimingBaseline replayResetPatched replayBarOffsetPatched replayRoute replayBitstream replayBarObserverResetPatched replayBarObserverRoute replayBarObserverBitstream patchedDb full16CompilerSource; }

@@ -3261,6 +3261,9 @@ PY
           compiler-full16-ddr3-board-source = task6CompilerFull16BoardShell.full16CompilerSource;
           compiler-full16-ddr3-board-elaboration = task6CompilerFull16BoardShell.replayElaboration;
           compiler-full16-ddr3-board-synthesis = task6CompilerFull16BoardShell.replaySynthesis;
+          compiler-full16-ddr3-board-synthesis-raw = task6CompilerFull16BoardShell.replaySynthesisRaw;
+          compiler-full16-ddr3-ram64-proof = task6CompilerFull16BoardShell.full16Compatibility.proof;
+          compiler-full16-ddr3-fsm-encoding-check = task6CompilerFull16BoardShell.full16FsmEncodingCheck;
           compiler-ddr3-trace-replay-elaboration = task6BoardShell.replayElaboration;
           compiler-ddr3-trace-replay-synthesis-screen = task6BoardShell.replaySynthesis;
           compiler-ddr3-trace-replay-route = task6BoardShell.replayRoute;
