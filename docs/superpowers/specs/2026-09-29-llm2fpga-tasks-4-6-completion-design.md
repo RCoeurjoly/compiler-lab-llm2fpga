@@ -53,6 +53,30 @@ Do not reimplement an optimization merely to recreate its history. Identify
 missing evidence and new experiments only after that audit. Freeze the survey
 set before evaluating it; do not keep adding candidates indefinitely.
 
+Treat Task 6 primarily as consolidation of existing experiments and reporting,
+not a new optimization-development project. The corrected quantization strategy
+is a central candidate: compare the earlier Task 3 numerical representation
+with the corrected profile, documenting correctness as well as resource,
+timing, runtime and peak-memory differences. If quantization enables correct
+BRAM-resident inference, DDR3 is not required to demonstrate that reduction;
+this does not waive the remaining written survey and comparison deliverables.
+
+Include DDR3 externalization as an evaluated resource-reduction alternative,
+with its integration failures and unverified hardware results stated explicitly.
+A negative result can satisfy a strategy evaluation; working DDR3 inference is
+not a Task 6 completion gate. Preserve its existing evidence without reopening
+the deferred integration effort solely for this survey.
+
+Compiler-pipeline changes may provide the remaining distinct strategies needed
+for the minimum five-strategy survey. Using Calyx alone is an architectural
+choice, not evidence of resource reduction. Count concrete techniques separately
+only when their mechanisms and experimental evidence are distinguishable: for
+example, compute-unit sharing, memory banking/mapping, or request-controller
+consolidation. These are inventory candidates, not assertions that each has
+already been evaluated. Do not split one change into several labels to reach
+five. Reuse comparable existing measurements, mark missing comparisons, and
+perform only the bounded experiments needed to close identified evidence gaps.
+
 Deliver the strategy survey, reproducible usage scripts, before/after resource
 reports, and a comparison table with deltas and viability status. Distinguish
 semantic corrections and tool compatibility fixes from resource optimizations.
