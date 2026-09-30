@@ -29,7 +29,7 @@ def strip_source_locations(value):
 
 
 def main() -> None:
-    repo, image, yosys, slang, out = map(Path, sys.argv[1:])
+    repo, image, yosys, slang, mapper_wrapper, out = map(Path, sys.argv[1:])
     manifest = json.loads((image / "manifest.json").read_text())
     assert manifest["status"] == "source-rebuilt-accepted-two-rom-static-image"
     assert len(manifest["source_memories"]) == 89
@@ -71,7 +71,7 @@ def main() -> None:
     stage("memory-unpack", "read_rtlil integrated-coarse.il; memory_unpack; stat; write_rtlil unpacked.il")
     start = time.monotonic()
     with (out / "memory-map.log").open("w") as log:
-        subprocess.run([sys.executable, str(repo / "scripts/pipeline/task6_two_rom_mapper.py"),
+        subprocess.run([sys.executable, str(mapper_wrapper),
                         "unpacked.il", "memory-checkpoints", "--yosys", str(yosys / "bin/yosys"),
                         "--top", "main", "--timeout", "120"],
                        check=True, timeout=7200, stdout=log, stderr=subprocess.STDOUT)

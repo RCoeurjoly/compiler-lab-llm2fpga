@@ -291,9 +291,34 @@
           calyxSrc = inputs.calyx-src;
           inherit hardfloat;
         };
+        # Keep physical-stage recipe edits out of the compiler/synthesis input.
+        task6CompilerSource = builtins.path {
+          path = ./.;
+          name = "task6-compiler-source";
+          filter = path: type:
+            let
+              rel = pkgs.lib.removePrefix "${toString ./.}/" (toString path);
+            in path == toString ./. || builtins.elem rel [
+              "scripts" "scripts/__init__.py" "scripts/pipeline"
+              "scripts/comparison"
+              "TinyStories" "artifacts" "artifacts/reference" "rtl" "tests"
+              "tests/test_tinystories_1m_exact_generation.py"
+              "docs" "docs/superpowers" "docs/superpowers/specs"
+              "docs/superpowers/specs/2026-08-28-reference-guided-tinystories-1m-compiler-design.md"
+              "rtl/tinystories_1m_ypcb_clock.sv"
+              "rtl/tinystories_1m_jtag_csr.sv"
+              "rtl/tinystories_1m_ypcb_bram_production_top.sv"
+            ] || (pkgs.lib.hasPrefix "scripts/pipeline/" rel
+              && !(pkgs.lib.hasPrefix "scripts/pipeline/rebuild_task6_bram_" rel)
+              && rel != "scripts/pipeline/task6_two_rom_mapper.py")
+              || pkgs.lib.hasPrefix "scripts/comparison/" rel
+              || pkgs.lib.hasPrefix "TinyStories/" rel
+              || pkgs.lib.hasPrefix "artifacts/reference/" rel;
+        };
         task6BramPostpass = import ./nix/task6-bram-postpass.nix {
           inherit pkgs calyx;
           python = pythonWithTinyStoriesTorchAO;
+          source = task6CompilerSource;
         };
         task6BramImage = import ./nix/task6-bram-image.nix {
           inherit pkgs;
@@ -301,6 +326,7 @@
           postpass = task6BramPostpass;
           package = exactTinyStoriesPackage;
           snapshot = tinyStories1m.snapshot;
+          source = task6CompilerSource;
         };
         task6BramSynthesis = import ./nix/task6-bram-synthesis.nix {
           inherit pkgs;
@@ -308,6 +334,15 @@
           yosys = yosysPkgBase;
           slang = yosysSlang;
           image = task6BramImage;
+          source = task6CompilerSource;
+        };
+        task6BramPlacement = import ./nix/task6-bram-placement.nix {
+          inherit pkgs;
+          python = pkgs.python3;
+          synthesis = task6BramSynthesis;
+          nextpnr = nextpnrKintexBramModeFix;
+          chipdb = task3MainLib.task3Toolchain.chipdb;
+          constraints = ./fpga/constraints/tinystories_1m_ypcb_bram_production.xdc;
         };
         calyxFloatLibrarySelftest = pkgs.runCommand
           "calyx-float-library-selftest" {
@@ -3272,6 +3307,7 @@ PY
           task6-bram-postpass = task6BramPostpass;
           task6-bram-image = task6BramImage;
           task6-bram-synthesis = task6BramSynthesis;
+          task6-bram-placement = task6BramPlacement;
           nextpnr-kintex-route-control = nextpnrKintexRouteControl;
           nextpnr-kintex-geometry-diagnostic = nextpnrKintexGeometryDiagnostic;
           nextpnr-kintex-checkpoint-diagnostic = nextpnrKintexCheckpointDiagnostic;
