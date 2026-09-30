@@ -352,6 +352,13 @@
           chipdb = task3MainLib.task3Toolchain.chipdb;
           constraints = ./fpga/constraints/tinystories_1m_ypcb_bram_production.xdc;
         };
+        task6BramBitstream = import ./nix/task6-bram-bitstream.nix {
+          inherit pkgs;
+          bitstreamPkgs = import inputs.task3-main-pipeline.inputs.nixpkgs { inherit system; };
+          openXC7Packages = inputs.task3-main-pipeline.inputs.openXC7.packages.${system};
+          nextpnr = nextpnrKintexBramModeFix;
+          route = task6BramRoute;
+        };
         calyxFloatLibrarySelftest = pkgs.runCommand
           "calyx-float-library-selftest" {
             nativeBuildInputs = [ calyx yosysPkg python ];
@@ -3317,6 +3324,7 @@ PY
           task6-bram-synthesis = task6BramSynthesis;
           task6-bram-placement = task6BramPlacement;
           task6-bram-route = task6BramRoute;
+          task6-bram-bitstream = task6BramBitstream;
           nextpnr-kintex-route-control = nextpnrKintexRouteControl;
           nextpnr-kintex-geometry-diagnostic = nextpnrKintexGeometryDiagnostic;
           nextpnr-kintex-checkpoint-diagnostic = nextpnrKintexCheckpointDiagnostic;
