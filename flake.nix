@@ -291,6 +291,10 @@
           calyxSrc = inputs.calyx-src;
           inherit hardfloat;
         };
+        task6BramPostpass = import ./nix/task6-bram-postpass.nix {
+          inherit pkgs calyx;
+          python = pythonWithTinyStoriesTorchAO;
+        };
         calyxFloatLibrarySelftest = pkgs.runCommand
           "calyx-float-library-selftest" {
             nativeBuildInputs = [ calyx yosysPkg python ];
@@ -3251,6 +3255,7 @@ PY
           '';
       in {
         packages = {
+          task6-bram-postpass = task6BramPostpass;
           nextpnr-kintex-route-control = nextpnrKintexRouteControl;
           nextpnr-kintex-geometry-diagnostic = nextpnrKintexGeometryDiagnostic;
           nextpnr-kintex-checkpoint-diagnostic = nextpnrKintexCheckpointDiagnostic;
