@@ -74,25 +74,30 @@ be false precision.
   provenance: =lower_fixed_point_block_composition_to_calyx.py=,
   =lower_fixed_point_attention_crossing_to_calyx.py=, and
   =lower_fixed_point_mlp_crossing_to_calyx.py=, all under =scripts/pipeline/=.
-- The completed native resource comparison, route and bitstream are retained
-  as Nix derivations. On this host, for example, =nix build --no-link
-  /nix/store/fhnzlis2sj5a55k7p7wwh9fxwkxj8kd0-compiler-full16-two-rom-qualified-mode-checked-bitstream.drv=
-  replays a *local store derivation*. It is not a clean-clone command.
-- The exact accepted two-ROM bitstream chain was not found as a committed
-  flake output or complete in-repository recipe. The local derivations and
-  store source scripts preserve historical evidence but do not satisfy
-  portable source-rebuild closure. The usage-script deliverable for that
-  exact production build remains incomplete; no source-reproducibility
-  claim or fabricated command is made here.
+- From a checkout of this branch with its pinned flake inputs available,
+  run =nix build .#task6-bram-bitstream --no-link --print-out-paths=. The
+  committed stages =task6-bram-postpass=, =task6-bram-image=,
+  =task6-bram-synthesis=, =task6-bram-placement=, =task6-bram-route=, and
+  =task6-bram-bitstream= can also be built individually to inspect their
+  receipts. The model snapshot and exact 1M data package are Nix-pinned;
+  no kev-gpt accelerator RTL is used.
+- The source-rebuilt compiler SV and all 89 model images match their archived
+  hashes. Its native netlist matches structurally after excluding Yosys source
+  paths embedded in metadata/net names. The legal route has the same sorted
+  FASM feature multiset; configuration frames and bitread-decoded bits match
+  the board-tested image byte-for-byte. The rebuilt =.bit= file itself has a
+  different SHA-256 because xc7frames2bit writes the output path and date/time
+  in the header. See the [[file:docs/results/2026-09-29-task6-fit-audit.md][fit audit]] for exact hashes and limits.
 
 * Conclusion
 
 The measured full-model system fits, legally routes and performs exact
-on-board autoregressive inference, so Task 6's *engineering fit objective*
-has been achieved and no additional strategy experiment is warranted. The
-ROM-mapping ablation is the defensible quantitative single-variable resource
-result. The numerical and shared-datapath contributions are real parts of
-the accepted system but lack isolated deltas. DDR3 externalization was
-investigated and deferred. The exact clean-clone build recipe remains a
-documented publication/reproducibility gap rather than a reason to reopen
-optimization.
+on-board autoregressive inference, so Task 6 is complete under the approved
+TinyStories-1M baseline and early-stop rule. The ROM-mapping ablation is the
+defensible quantitative single-variable resource result. The numerical and
+shared-datapath contributions are real parts of the accepted system but lack
+isolated deltas. DDR3 externalization was investigated and deferred. The
+committed Nix recipe reproduces the accepted FPGA configuration without
+relying on historical ad hoc store derivations. It does not establish full
+BRAM/DSP timing coverage or constitute a new hardware run. NLnet has not
+accepted the user's deviations from the original project-plan wording.
