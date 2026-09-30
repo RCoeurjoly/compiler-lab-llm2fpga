@@ -302,6 +302,13 @@
           package = exactTinyStoriesPackage;
           snapshot = tinyStories1m.snapshot;
         };
+        task6BramSynthesis = import ./nix/task6-bram-synthesis.nix {
+          inherit pkgs;
+          python = pythonWithTinyStoriesTorchAO;
+          yosys = yosysPkgBase;
+          slang = yosysSlang;
+          image = task6BramImage;
+        };
         calyxFloatLibrarySelftest = pkgs.runCommand
           "calyx-float-library-selftest" {
             nativeBuildInputs = [ calyx yosysPkg python ];
@@ -3264,6 +3271,7 @@ PY
         packages = {
           task6-bram-postpass = task6BramPostpass;
           task6-bram-image = task6BramImage;
+          task6-bram-synthesis = task6BramSynthesis;
           nextpnr-kintex-route-control = nextpnrKintexRouteControl;
           nextpnr-kintex-geometry-diagnostic = nextpnrKintexGeometryDiagnostic;
           nextpnr-kintex-checkpoint-diagnostic = nextpnrKintexCheckpointDiagnostic;
