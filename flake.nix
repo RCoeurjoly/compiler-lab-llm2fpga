@@ -336,6 +336,27 @@
           image = task6BramImage;
           source = task6CompilerSource;
         };
+        task6BramOneRomImage = import ./nix/task6-bram-one-rom-image.nix {
+          inherit pkgs;
+          python = pythonWithTinyStoriesTorchAO;
+          postpass = task6BramPostpass;
+          image = task6BramImage;
+          source = task6CompilerSource;
+        };
+        task6BramOneRomSynthesis = import ./nix/task6-bram-one-rom-synthesis.nix {
+          inherit pkgs;
+          python = pythonWithTinyStoriesTorchAO;
+          yosys = yosysPkgBase;
+          slang = yosysSlang;
+          image = task6BramOneRomImage;
+          source = task6CompilerSource;
+        };
+        task6BramOneRomComparison = import ./nix/task6-bram-one-rom-comparison.nix {
+          inherit pkgs;
+          python = pkgs.python3;
+          baseline = task6BramOneRomSynthesis;
+          candidate = task6BramSynthesis;
+        };
         task6BramPlacement = import ./nix/task6-bram-placement.nix {
           inherit pkgs;
           python = pkgs.python3;
@@ -3322,6 +3343,9 @@ PY
           task6-bram-postpass = task6BramPostpass;
           task6-bram-image = task6BramImage;
           task6-bram-synthesis = task6BramSynthesis;
+          task6-bram-one-rom-image = task6BramOneRomImage;
+          task6-bram-one-rom-synthesis = task6BramOneRomSynthesis;
+          task6-bram-one-rom-comparison = task6BramOneRomComparison;
           task6-bram-placement = task6BramPlacement;
           task6-bram-route = task6BramRoute;
           task6-bram-bitstream = task6BramBitstream;
