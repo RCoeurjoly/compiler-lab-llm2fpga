@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "tokens": [
+    11,
+    612,
+    373,
+    257,
+    1310,
+    2576,
+    3706,
+    20037,
+    13,
+    1375,
+    6151,
+    284,
+    711,
+    2354,
+    287,
+    262
+  ],
+  "elapsed_seconds": [
+    66.40973332402064,
+    66.4091346039786,
+    66.40039149002405
+  ],
+  "independently_programmed_SRAM_runs": 3,
+  "baseline_restored": true,
+  "bitstream_sha256": "bcf27e4da6abb290ad96a9d45618b0a3ef207fd5e35efbb2550996741c62426f",
+  "START_count_per_run": 1,
+  "host_prompt_writes_per_run": 4,
+  "raw_indexed_TDO_tokens_verified": true,
+  "full_timing_qualification": false,
+  "scope": "BRAM/LUTRAM, 30 MHz, JTAG; independent SRAM reconfiguration, not chassis power cycles; PCIe/DDR3 not covered"
+}
