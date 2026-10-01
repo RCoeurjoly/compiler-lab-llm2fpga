@@ -310,7 +310,8 @@
               "rtl/tinystories_1m_ypcb_bram_production_top.sv"
             ] || (pkgs.lib.hasPrefix "scripts/pipeline/" rel
               && !(pkgs.lib.hasPrefix "scripts/pipeline/rebuild_task6_bram_" rel)
-              && rel != "scripts/pipeline/task6_two_rom_mapper.py")
+              && rel != "scripts/pipeline/task6_two_rom_mapper.py"
+              && rel != "scripts/pipeline/verify_task4_board_archive.py")
               || pkgs.lib.hasPrefix "scripts/comparison/" rel
               || pkgs.lib.hasPrefix "TinyStories/" rel
               || pkgs.lib.hasPrefix "artifacts/reference/" rel;
@@ -379,6 +380,11 @@
           openXC7Packages = inputs.task3-main-pipeline.inputs.openXC7.packages.${system};
           nextpnr = nextpnrKintexBramModeFix;
           route = task6BramRoute;
+        };
+        task4BoardEvidence = import ./nix/task4-board-evidence.nix {
+          inherit pkgs;
+          python = pkgs.python3;
+          bitstream = task6BramBitstream;
         };
         calyxFloatLibrarySelftest = pkgs.runCommand
           "calyx-float-library-selftest" {
@@ -3340,6 +3346,7 @@ PY
           '';
       in {
         packages = {
+          task4-board-evidence = task4BoardEvidence;
           task6-bram-postpass = task6BramPostpass;
           task6-bram-image = task6BramImage;
           task6-bram-synthesis = task6BramSynthesis;
