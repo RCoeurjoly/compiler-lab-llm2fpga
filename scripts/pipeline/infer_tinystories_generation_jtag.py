@@ -19,12 +19,13 @@ STATUS = 0x3000000000000000
 
 
 def infer_generation(client, *, clock_tms, reset_tap, shift_ir, prompt,
-                     expected_tokens, timeout=300, delay=time.sleep,
-                     monotonic=time.monotonic):
+                     expected_tokens=None, generation_steps=None, timeout=300,
+                     delay=time.sleep, monotonic=time.monotonic):
     result = {"schema": "tinystories-generation-jtag-v1", "status": "failed",
               "transactions": [], "tokens": [], "inference_started": False,
               "transient_zero_status_reads": 0,
-              "independent_reconfiguration_verified": False}
+              "independent_reconfiguration_verified": False,
+              "token_check": "none" if expected_tokens is None else "exact_oracle"}
     begun = monotonic()
 
     def exchange(command):
@@ -51,9 +52,17 @@ def infer_generation(client, *, clock_tms, reset_tap, shift_ir, prompt,
     try:
         if len(prompt) != 4 or any(type(x) is not int or not 0 <= x <= 65535 for x in prompt):
             raise ValueError("four unsigned 16-bit prompt words required")
-        if len(expected_tokens) not in (2, 16) or any(
-                type(x) is not int or not 0 <= x <= 65535 for x in expected_tokens):
-            raise ValueError("two or sixteen unsigned 16-bit expected tokens required")
+        if expected_tokens is None:
+            if generation_steps != 16:
+                raise ValueError("unverified readback requires generation_steps=16")
+            token_count = 16
+        else:
+            if len(expected_tokens) not in (2, 16) or any(
+                    type(x) is not int or not 0 <= x <= 65535 for x in expected_tokens):
+                raise ValueError("two or sixteen unsigned 16-bit expected tokens required")
+            token_count = len(expected_tokens)
+            if generation_steps is not None and generation_steps != token_count:
+                raise ValueError("generation_steps and expected token count differ")
         if not 0 < timeout <= 300:
             raise ValueError("timeout must be in (0, 300]")
         reset_tap(client)
@@ -82,12 +91,12 @@ def infer_generation(client, *, clock_tms, reset_tap, shift_ir, prompt,
             delay(0.01)
         else:
             raise RuntimeError("inference timeout")
-        for index, expected in enumerate(expected_tokens):
+        for index in range(token_count):
             token = read(0x4000000000000000 | index)
             result["tokens"].append(token)
-            if token != expected:
+            if expected_tokens is not None and token != expected_tokens[index]:
                 raise RuntimeError(
-                    f"token mismatch at index {index}: expected {expected}, got {token}")
+                    f"token mismatch at index {index}: expected {expected_tokens[index]}, got {token}")
             if monotonic() - begun > timeout:
                 raise RuntimeError("inference timeout during token readback")
         result["status"] = "passed"

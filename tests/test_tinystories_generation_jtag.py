@@ -11,13 +11,14 @@ SCRIPT = Path(__file__).resolve().parents[1] / "scripts/pipeline/infer_tinystori
 
 class GenerationDevice(Device):
     def __init__(self, tokens=(11, 612), *, stuck=False, bad_prompt=False,
-                 zero_status_once=False, ignore_index=False):
+                 zero_status_once=False, ignore_index=False, bad_status=False):
         super().__init__()
         self.tokens = tokens
         self.stuck = stuck
         self.bad_prompt = bad_prompt
         self.zero_status_once = zero_status_once
         self.ignore_index = ignore_index
+        self.bad_status = bad_status
         self.started = False
         self.polls = 0
         self.now = 0.0
@@ -48,6 +49,8 @@ class GenerationDevice(Device):
             if self.started:
                 self.polls += 1
                 status = 0x2a00000000000000 if self.stuck or self.polls < 3 else 0x2c00000000000000
+                if self.bad_status:
+                    status = 0x2e00000000000000
                 self.response = status | self.prompt[0]
                 if self.zero_status_once and not self.zero_sent and self.polls == 2:
                     captured = 0
@@ -63,16 +66,19 @@ class GenerationDevice(Device):
 
 
 class GenerationJtagTest(unittest.TestCase):
-    def execute(self, device, expected=(11, 612)):
+    def execute(self, device, expected=(11, 612), *, prompt=(7454, 2402, 257, 640),
+                generation_steps=None):
         self.assertTrue(SCRIPT.is_file(), "missing generation inference checker")
         spec = importlib.util.spec_from_file_location("generation_jtag", SCRIPT)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
+        mode = {} if generation_steps is None else {"generation_steps": generation_steps}
         return module.infer_generation(
             device, clock_tms=lambda *_: None, reset_tap=device.reset,
-            shift_ir=lambda *_: None, prompt=(7454, 2402, 257, 640),
+            shift_ir=lambda *_: None, prompt=prompt,
             expected_tokens=expected, timeout=0.5,
             delay=device.delay, monotonic=lambda: device.now,
+            **mode,
         )
 
     def test_exact_two_tokens_require_one_start_and_indexed_reads(self):
@@ -95,6 +101,33 @@ class GenerationJtagTest(unittest.TestCase):
         self.assertEqual([command & 15 for command in device.commands if command >> 60 == 4],
                          list(range(16)))
         self.assertEqual(sum(command >> 60 == 2 for command in device.commands), 1)
+
+    def test_unverified_new_prompt_reads_sixteen_tokens_once(self):
+        tokens = tuple(range(100, 116))
+        device = GenerationDevice(tokens=tokens)
+        result = self.execute(device, expected=None, prompt=(464, 1310, 2576, 20037),
+                              generation_steps=16)
+        self.assertEqual(result["status"], "passed", result)
+        self.assertEqual(result["token_check"], "none")
+        self.assertEqual(result["tokens"], list(tokens))
+        self.assertEqual(device.prompt, [464, 1310, 2576, 20037])
+        self.assertEqual(sum(command >> 60 == 2 for command in device.commands), 1)
+        self.assertEqual([command & 15 for command in device.commands if command >> 60 == 4],
+                         list(range(16)))
+
+    def test_unverified_mode_retries_one_transient_zero(self):
+        device = GenerationDevice(tokens=tuple(range(16)), zero_status_once=True)
+        result = self.execute(device, expected=None, generation_steps=16)
+        self.assertEqual(result["status"], "passed", result)
+        self.assertEqual(result["transient_zero_status_reads"], 1)
+        self.assertEqual(sum(command >> 60 == 2 for command in device.commands), 1)
+
+    def test_unverified_mode_rejects_persistent_bad_status(self):
+        device = GenerationDevice(tokens=tuple(range(16)), bad_status=True)
+        result = self.execute(device, expected=None, generation_steps=16)
+        self.assertEqual(result["status"], "failed", result)
+        self.assertIn("unexpected inference status", result["error"])
+        self.assertFalse(any(command >> 60 == 4 for command in device.commands))
 
     def test_wrong_second_token_fails_after_recording_first(self):
         result = self.execute(GenerationDevice(tokens=(11, 99)))
