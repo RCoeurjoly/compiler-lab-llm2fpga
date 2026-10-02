@@ -8,6 +8,7 @@ refresult
 rcsvresult
 .nix-gc-roots/
 .worktrees/
+.local/
 circt-toolchain
 mlir-toolchain
 torch-mlir-toolchain

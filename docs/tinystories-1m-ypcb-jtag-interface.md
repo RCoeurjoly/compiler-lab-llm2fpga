@@ -56,24 +56,45 @@ short-prompt comparisons are recorded in
 
 ## Short text prompt client
 
-With the accepted 16-token image already programmed, the host-only CLI can
-tokenize one text prompt, issue one START, and decode the 16 returned IDs:
+From a clone of this repository, create and enter the CLI worktree:
 
 ```sh
-nix develop -c env LD_LIBRARY_PATH=/nix/store/giikxmmn66cadlpql43w4515wwik9fs1-libftdi-1.5/lib \
-  python scripts/pipeline/prompt_tinystories_generation_jtag.py \
-  --prompt "Once upon a time" \
-  --tokenizer-dir /path/to/authenticated/tinystories-1m \
-  --transport-dir /path/to/hs3-jtag-client \
-  --receipt /tmp/tinystories-short-prompt.json
+git fetch origin codex/short-prompt-cli
+git worktree add .worktrees/short-prompt-cli origin/codex/short-prompt-cli
+cd .worktrees/short-prompt-cli
 ```
 
-The tokenizer directory must contain the exact package `tokenizer.json` whose
-SHA-256 is recorded in the checked-in exact-input contract. The text must
-encode to exactly four IDs; the command reports an error before opening the
-board if it does not. `--serial` defaults to `210299BF3824`, and `--timeout`
-defaults to 300 seconds. The client does not program the FPGA or retain context
-between invocations. `status=passed` and `token_check=none` in its receipt mean
-the JTAG run completed and returned 16 IDs; they do not establish agreement
-with the fixed-point model for that text. The original generation checker
-remains the frozen-prompt oracle acceptance path.
+The accepted image, authenticated tokenizer, and JTAG transport
+are committed in this branch. A pinned Nix development shell provides Python,
+`libftdi1.so`, and `openFPGALoader`. With an HS3 cable attached to the YPCB,
+program the accepted SRAM image and run one prompt:
+
+```sh
+nix develop -c python scripts/pipeline/prompt_tinystories_generation_jtag.py \
+  --program --prompt "Once upon a day" \
+  --receipt .local/tinystories-short-prompt/day.json
+```
+
+While the image remains programmed, omit `--program` on later invocations:
+
+```sh
+nix develop -c python scripts/pipeline/prompt_tinystories_generation_jtag.py \
+  --prompt "Once upon a time" \
+  --receipt .local/tinystories-short-prompt/time.json
+```
+
+The CLI validates the committed tokenizer, JTAG modules, and image against
+their accepted SHA-256 digests. It rejects text that does not encode to exactly
+four IDs before opening or programming the board. `--serial` defaults to
+`210299BF3824`; `--timeout` defaults to 300 seconds. It holds a per-serial
+lock under the user's XDG cache directory for programming and inference.
+Receipts and programming logs in `.local/` stay in the worktree and are ignored
+by Git. The 16-token image is held in SRAM and must be programmed again after
+a reset, power cycle, or another bitstream load.
+
+Each invocation starts a fresh continuation; the CLI does not retain context.
+`status=passed` and `token_check=none` mean the board returned 16 IDs, not
+that they match the fixed-point model for that text. The original generation
+checker remains the frozen-prompt oracle acceptance path. See the
+[short-prompt result](results/2026-10-02-tinystories-short-prompt-cli.md) for
+the observed match and mismatch.

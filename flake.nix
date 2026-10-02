@@ -381,6 +381,9 @@
           nextpnr = nextpnrKintexBramModeFix;
           route = task6BramRoute;
         };
+        shortPromptProgrammer = import ./nix/compiler-replay-programmer.nix {
+          inherit pkgs;
+        };
         task4BoardEvidence = import ./nix/task4-board-evidence.nix {
           inherit pkgs;
           python = pkgs.python3;
@@ -3817,9 +3820,12 @@ PY
             surveyTex
             pkgs.verilator
             pkgs.verilog
+            pkgs.libftdi1
+            shortPromptProgrammer
           ];
           shellHook = ''
             export SURVEY_DECLARED_TEXLIVE="${surveyTex}"
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.libftdi1 ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           '';
         };
 

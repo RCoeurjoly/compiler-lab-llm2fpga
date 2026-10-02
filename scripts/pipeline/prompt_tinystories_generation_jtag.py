@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import fcntl
 import hashlib
 import importlib
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
+import time
 
 if str(Path(__file__).resolve().parents[2]) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -18,6 +24,79 @@ from scripts.pipeline.infer_tinystories_generation_jtag import infer_generation
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = ROOT / "artifacts/reference/tinystories-1m-exact-input-contract.json"
 VOCAB_SIZE = 50257
+DEFAULT_TOKENIZER_DIR = ROOT / "artifacts/runtime/tinystories-1m-full16/tokenizer"
+DEFAULT_TRANSPORT_DIR = ROOT / "third_party/llm2fpga-jtag"
+DEFAULT_IMAGE = ROOT / "artifacts/runtime/tinystories-1m-full16/bitstream/model.bit"
+ACCEPTED_IMAGE_SHA256 = "bcf27e4da6abb290ad96a9d45618b0a3ef207fd5e35efbb2550996741c62426f"
+TRANSPORT_SHA256 = {
+    "read_jtag_debug_ftdi_bitbang.py": "dec0f56290324fa3f178a5d86b6afca3432e68f043f1ec1c9f0b51aaf244184c",
+    "read_jtag_debug_xvc.py": "14b9a6737f05741399969e24b841859de025197ffde2b6f559a4f6e7c9746b40",
+}
+
+
+def verify_bundled_runtime() -> None:
+    """Fail closed if the committed board inputs differ from accepted bytes."""
+    expected_tokenizer = json.loads(CONTRACT.read_text(encoding="utf-8"))["tokenizer"]["sha256"]
+    inputs = {
+        DEFAULT_TOKENIZER_DIR / "tokenizer.json": expected_tokenizer,
+        DEFAULT_IMAGE: ACCEPTED_IMAGE_SHA256,
+        **{DEFAULT_TRANSPORT_DIR / name: digest for name, digest in TRANSPORT_SHA256.items()},
+    }
+    for path, expected in inputs.items():
+        actual = _sha256_file(path)
+        if actual != expected:
+            raise ValueError(f"bundled input SHA-256 mismatch: {path} (expected {expected}, got {actual})")
+
+
+def _run_dir() -> Path:
+    return ROOT / ".local/tinystories-short-prompt"
+
+
+@contextmanager
+def board_lock(serial: str):
+    """Serialize CLI use across worktrees of the same user without /tmp."""
+    cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+    lock_path = cache / "llm2fpga" / f"ypcb-hs3-{serial}.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+") as lock_file:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise RuntimeError(f"board is in use (lock: {lock_path})") from error
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+def program_board(image: Path, serial: str, log_path: Path) -> dict[str, object]:
+    log_path = log_path.resolve()
+    actual = _sha256_file(image)
+    if actual != ACCEPTED_IMAGE_SHA256:
+        raise ValueError(f"accepted bitstream SHA-256 mismatch: expected {ACCEPTED_IMAGE_SHA256}, got {actual}")
+    programmer = shutil.which("openFPGALoader")
+    if programmer is None:
+        raise RuntimeError("openFPGALoader is unavailable; use the pinned Nix development shell")
+    command = [programmer, "-c", "digilent_hs3", "--ftdi-serial", serial,
+               "--freq", "1000000", "-m", str(image)]
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    started = time.monotonic()
+    with log_path.open("w", encoding="utf-8") as stream:
+        completed = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT,
+                                   timeout=360, check=False)
+    receipt = {
+        "status": "passed" if completed.returncode == 0 else "failed",
+        "command": command,
+        "image_sha256": actual,
+        "serial": serial,
+        "returncode": completed.returncode,
+        "log_path": str(log_path),
+        "log_sha256": _sha256_file(log_path),
+        "elapsed_seconds": time.monotonic() - started,
+    }
+    if completed.returncode != 0:
+        raise RuntimeError(f"FPGA programming failed (exit {completed.returncode}); log: {log_path}")
+    return receipt
 
 
 def load_tokenizer(tokenizer_dir: Path):
@@ -61,7 +140,8 @@ def _write_receipt(receipt: dict[str, object], path: Path | None) -> None:
 
 
 def run_prompt(text: str, tokenizer_dir: Path, transport_dir: Path, serial: str,
-               timeout: float, receipt_path: Path | None = None) -> dict[str, object]:
+               timeout: float, receipt_path: Path | None = None, *,
+               program: bool = False) -> dict[str, object]:
     """Execute one fresh prompt; `passed` means transport completion only."""
     receipt: dict[str, object] = {
         "schema": "tinystories-short-prompt-jtag-v1",
@@ -83,10 +163,16 @@ def run_prompt(text: str, tokenizer_dir: Path, transport_dir: Path, serial: str,
     try:
         if not 0 < timeout <= 300:
             raise ValueError("timeout must be in (0, 300]")
+        if tokenizer_dir == DEFAULT_TOKENIZER_DIR and transport_dir == DEFAULT_TRANSPORT_DIR:
+            verify_bundled_runtime()
         tokenizer = load_tokenizer(tokenizer_dir)
         receipt["tokenizer_sha256"] = _sha256_file(tokenizer_dir / "tokenizer.json")
         prompt_ids = encode_prompt(text, tokenizer)
         receipt["prompt_ids"] = prompt_ids
+        if program:
+            log_path = (receipt_path.with_suffix(".program.log") if receipt_path else
+                        _run_dir() / f"program-{int(time.time())}-{os.getpid()}.log")
+            receipt["programming"] = program_board(DEFAULT_IMAGE, serial, log_path)
         client, jtag = open_transport(transport_dir, serial)
         receipt["transport_sha256"] = {
             name: _sha256_file(transport_dir / name)
@@ -124,14 +210,21 @@ def run_prompt(text: str, tokenizer_dir: Path, transport_dir: Path, serial: str,
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prompt", required=True, help="text encoding to exactly four token IDs")
-    parser.add_argument("--tokenizer-dir", type=Path, required=True)
-    parser.add_argument("--transport-dir", type=Path, required=True)
+    parser.add_argument("--tokenizer-dir", type=Path, default=DEFAULT_TOKENIZER_DIR)
+    parser.add_argument("--transport-dir", type=Path, default=DEFAULT_TRANSPORT_DIR)
+    parser.add_argument("--program", action="store_true", help="load the accepted full16 SRAM image before inference")
     parser.add_argument("--serial", default="210299BF3824")
     parser.add_argument("--timeout", type=float, default=300)
     parser.add_argument("--receipt", type=Path)
     args = parser.parse_args(argv)
-    result = run_prompt(args.prompt, args.tokenizer_dir, args.transport_dir,
-                        args.serial, args.timeout, args.receipt)
+    try:
+        with board_lock(args.serial):
+            result = run_prompt(args.prompt, args.tokenizer_dir, args.transport_dir,
+                                args.serial, args.timeout, args.receipt,
+                                program=args.program)
+    except (OSError, RuntimeError) as error:
+        print(f"short-prompt inference failed: {error}", file=sys.stderr)
+        return 1
     if result["status"] == "passed":
         print("Prompt IDs:", " ".join(str(token) for token in result["prompt_ids"]))
         print("Continuation:")

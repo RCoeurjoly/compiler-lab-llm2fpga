@@ -77,3 +77,17 @@ The CLI is transport-functional for four-token prompts on this image. Exact
 software/FPGA equivalence is observed for `Once upon a day` and the archived
 frozen prompt; it is false for `The little girl went`. Broader prompt
 equivalence and chat-like use are not established by these runs.
+
+## Clone-local command verification
+
+After bundling the accepted bitstream, tokenizer, and JTAG transport in the
+CLI branch, the documented `nix develop -c python ... --program --prompt
+"Once upon a day"` command completed on the YPCB. The pinned shell resolved
+`libftdi1.so` and `openFPGALoader` without an explicit store path. Programming
+completed in 150.78 seconds and the 16-token readback in 66.35 seconds. The
+printed continuation matched the row above, and the receipt compared 16/16
+with the authenticated fixed-point model. The new run's programming log had
+SHA-256 `ff980b973374db544136b9e400e32ec4bfd2c70387f9039e060bc3b6b88966b6`,
+matching the earlier accepted-image programming log. This verifies the
+worktree-local command on the current machine; another person still needs the
+specified board and HS3 cable.
