@@ -1,0 +1,18 @@
+{
+  "command": [
+    "/nix/store/39xij3c8kp29nkldm436g8im3rqb8jaj-openfpgaloader-3ae5e5e-bpi-full-verify/bin/openFPGALoader",
+    "-c",
+    "digilent_hs3",
+    "--ftdi-serial",
+    "210299BF3824",
+    "--freq",
+    "1000000",
+    "-m",
+    "/nix/store/mb1678v9k8cxwwrzsj9brzcms31b6v27-compiler-full16-two-rom-qualified-mode-checked-bitstream/model.bit"
+  ],
+  "image_sha256": "bcf27e4da6abb290ad96a9d45618b0a3ef207fd5e35efbb2550996741c62426f",
+  "serial": "210299BF3824",
+  "returncode": 0,
+  "log_sha256": "ff980b973374db544136b9e400e32ec4bfd2c70387f9039e060bc3b6b88966b6",
+  "elapsed_seconds": 150.76361307199113
+}

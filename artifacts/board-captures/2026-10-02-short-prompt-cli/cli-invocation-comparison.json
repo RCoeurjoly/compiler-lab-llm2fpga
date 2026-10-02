@@ -1,0 +1,53 @@
+{
+  "schema": "tinystories-short-prompt-comparison-v1",
+  "status": "passed",
+  "prompt_ids": [
+    7454,
+    2402,
+    257,
+    1110
+  ],
+  "board_tokens": [
+    11,
+    612,
+    373,
+    257,
+    1310,
+    2576,
+    3706,
+    20037,
+    13,
+    1375,
+    373,
+    845,
+    3772,
+    284,
+    711,
+    351
+  ],
+  "software_tokens": [
+    11,
+    612,
+    373,
+    257,
+    1310,
+    2576,
+    3706,
+    20037,
+    13,
+    1375,
+    373,
+    845,
+    3772,
+    284,
+    711,
+    351
+  ],
+  "first_mismatch": null,
+  "model_sha256": "c187c2eb174bc5eadba742029915a7ba55a8cef66cd58f000db09c8ac9976233",
+  "tokenizer_sha256": "f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5",
+  "bitstream_sha256": "bcf27e4da6abb290ad96a9d45618b0a3ef207fd5e35efbb2550996741c62426f",
+  "program_log_sha256": "ff980b973374db544136b9e400e32ec4bfd2c70387f9039e060bc3b6b88966b6",
+  "board_receipt_sha256": "73f75787166de4dbdd3a8e42828e0019d7c2a5a697b2c204f87d44e95f6ca968",
+  "sha256": "22a6ec9428193b1972f0e7086b1f815eed032b4d153cd3053c656208b002a9e3"
+}

@@ -1,4 +1,4 @@
-# TinyStories-1M short-prompt CLI: host result and board gate
+# TinyStories-1M short-prompt CLI: host and board result
 
 The one-shot text CLI and exact-model comparison tool are implemented on
 `codex/short-prompt-cli`. The CLI authenticates `tokenizer.json`, rejects text
@@ -31,14 +31,49 @@ board receipt, its run-0 programming log, the accepted bitstream, and the
 authenticated 16-token oracle: `status=passed`, `first_mismatch=null`. This is
 an offline replay of existing evidence, not a new FPGA run.
 
-## Physical acceptance still open
+## Physical board comparison
 
-The board has not yet been run with either new prompt in this worktree. The
-accepted Task 4 runner restored the earlier first-token image after its three
-16-token demonstrations, so the full16 image must be reprogrammed before new
-prompt checks. Each new run needs exclusive YPCB/HS3 access, an SRAM programming
-log bound to image SHA-256
-`bcf27e4da6abb290ad96a9d45618b0a3ef207fd5e35efbb2550996741c62426f`,
-a raw CLI receipt, and a 16/16 comparison with the exact-model tokens above.
-Until these runs finish, only the host path and frozen archived replay have
-passed; general new-prompt board correctness remains unclaimed.
+The YPCB/HS3 board was reserved exclusively with
+`flock -n /tmp/llm2fpga-ypcb.lock`. The accepted full16 image was loaded into
+SRAM using `openFPGALoader -m` on serial `210299BF3824`; the command exited
+successfully in 150.76 seconds. Its image SHA-256 is
+`bcf27e4da6abb290ad96a9d45618b0a3ef207fd5e35efbb2550996741c62426f`.
+The [programming receipt](../../artifacts/board-captures/2026-10-02-short-prompt-cli/programming-receipt.json)
+binds the [raw programming log](../../artifacts/board-captures/2026-10-02-short-prompt-cli/program.log)
+(SHA-256 `ff980b973374db544136b9e400e32ec4bfd2c70387f9039e060bc3b6b88966b6`)
+to that image and serial. The board was isolated from the Thunderbolt/PCIe path
+for these JTAG runs.
+
+The first attempt to run the CLI failed before JTAG because `libftdi1.so` was
+absent from the runtime loader path. Its [receipt and summary](../../artifacts/board-captures/2026-10-02-short-prompt-cli/summary.json)
+are retained. A standalone `ctypes.CDLL("libftdi1.so")` check failed in the
+default Nix shell and passed when `LD_LIBRARY_PATH` included the installed
+libftdi library. The same programmed SRAM image was then used for both prompt
+checks with that path set; no reprogramming occurred between them.
+
+| Prompt | Board result | First mismatch | Board continuation | Run time |
+| --- | --- | ---: | --- | ---: |
+| `Once upon a day` | 16/16 exact-model match | none | `, there was a little girl named Lily. She was very happy to play with` | 66.42 s |
+| `The little girl went` | mismatch | 3 (fourth output) | ` to explore the forest. She saw a small, a small, green tree.` | 66.40 s |
+
+The [first board receipt](../../artifacts/board-captures/2026-10-02-short-prompt-cli/transport-retry/prompt0-board.json)
+and [comparison](../../artifacts/board-captures/2026-10-02-short-prompt-cli/transport-retry/prompt0-comparison.json)
+show the exact match. The [second board receipt](../../artifacts/board-captures/2026-10-02-short-prompt-cli/transport-retry/prompt1-board.json)
+and [comparison](../../artifacts/board-captures/2026-10-02-short-prompt-cli/transport-retry/prompt1-comparison.json)
+show board token `8222` where the exact model selected `11376`; later tokens
+also diverge. The prompt echo and transport checks passed, and each receipt
+contains one START and all 16 indexed reads. A [repeat of the second prompt](../../artifacts/board-captures/2026-10-02-short-prompt-cli/prompt1-repeat/comparison.json)
+returned the same 16 board IDs and the same first mismatch at index 3. The
+cause of that reproducible model/FPGA difference has not been established.
+
+The terminal entry point was also invoked directly with `--prompt "Once upon a
+day"` and `--receipt`. It exited 0, printed prompt IDs
+`7454 2402 257 1110` and the continuation in the table, and took 66.37
+seconds. Its [receipt](../../artifacts/board-captures/2026-10-02-short-prompt-cli/cli-invocation.json)
+also [compares 16/16](../../artifacts/board-captures/2026-10-02-short-prompt-cli/cli-invocation-comparison.json)
+with the authenticated exact model.
+
+The CLI is transport-functional for four-token prompts on this image. Exact
+software/FPGA equivalence is observed for `Once upon a day` and the archived
+frozen prompt; it is false for `The little girl went`. Broader prompt
+equivalence and chat-like use are not established by these runs.

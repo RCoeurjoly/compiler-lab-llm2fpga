@@ -1,0 +1,23 @@
+{
+  "schema": "tinystories-short-prompt-jtag-v1",
+  "status": "failed",
+  "prompt_text": "Once upon a day",
+  "prompt_ids": [
+    7454,
+    2402,
+    257,
+    1110
+  ],
+  "tokens": [],
+  "transactions": [],
+  "token_check": "none",
+  "inference_started": false,
+  "transport_serial": "210299BF3824",
+  "tokenizer_sha256": "f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5",
+  "checker_sha256": {
+    "prompt_cli": "296a73aadfffef62ce9de31cd68bd953b86a0becae7f8e9488e7e43366b361f9",
+    "generation_jtag": "ade14964f6f28ee3e62dd0de9de8b04009b982bd2fe56a9f8f3b61358d63fcba"
+  },
+  "error": "libftdi1.so: cannot open shared object file: No such file or directory",
+  "receipt_sha256": "5256df092382a70369080df76f163851a22b5c77464c29e29f706704e04ef0e8"
+}

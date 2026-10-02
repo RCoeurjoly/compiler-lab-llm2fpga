@@ -50,8 +50,9 @@ issues one START, polls busy `0x2a00000000001d1e` until done
 transient zero status immediately after START, but rejects other status values
 and a 300-second inference timeout. The core performs greedy token feedback
 internally; the host neither supplies generated tokens nor intermediate
-tensors. Hardware has been accepted only for this frozen four-token input and
-16-token continuation. Other prompts are not claimed to work.
+tensors. The frozen prompt has an accepted 16-token result. Subsequent
+short-prompt comparisons are recorded in
+`docs/results/2026-10-02-tinystories-short-prompt-cli.md`.
 
 ## Short text prompt client
 
@@ -59,7 +60,8 @@ With the accepted 16-token image already programmed, the host-only CLI can
 tokenize one text prompt, issue one START, and decode the 16 returned IDs:
 
 ```sh
-nix develop -c python scripts/pipeline/prompt_tinystories_generation_jtag.py \
+nix develop -c env LD_LIBRARY_PATH=/nix/store/giikxmmn66cadlpql43w4515wwik9fs1-libftdi-1.5/lib \
+  python scripts/pipeline/prompt_tinystories_generation_jtag.py \
   --prompt "Once upon a time" \
   --tokenizer-dir /path/to/authenticated/tinystories-1m \
   --transport-dir /path/to/hs3-jtag-client \

@@ -1,6 +1,6 @@
 # TinyStories-1M short-prompt board CLI
 
-Status: host implementation complete; new-prompt board acceptance pending
+Status: implemented and physically compared; one new prompt matches and one reproducibly diverges
 
 ## Objective
 
@@ -35,3 +35,4 @@ to the Task 4 timing-coverage limitation.
 
 Spec: `docs/superpowers/specs/2026-10-02-tinystories-short-prompt-cli-design.md`.
 Plan: `docs/superpowers/plans/2026-10-02-tinystories-short-prompt-cli.md`.
+Result: `docs/results/2026-10-02-tinystories-short-prompt-cli.md`.

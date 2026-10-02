@@ -1,0 +1,19 @@
+{
+  "schema": "tinystories-short-prompt-board-campaign-v1",
+  "status": "failed",
+  "image_sha256": "bcf27e4da6abb290ad96a9d45618b0a3ef207fd5e35efbb2550996741c62426f",
+  "software_reference_sha256": "18d20da48dfab82696756271a7e61e72df25df2ec42cdd82fb779c3270fa9e37",
+  "programming_receipt_sha256": "d7872c776528447baac85d2dcc0ce9fcc72aaffd4e8c7b9045354b8750bbd7f4",
+  "results": [
+    {
+      "prompt": "Once upon a day",
+      "status": "transport_failed",
+      "error": "libftdi1.so: cannot open shared object file: No such file or directory"
+    },
+    {
+      "prompt": "The little girl went",
+      "status": "transport_failed",
+      "error": "libftdi1.so: cannot open shared object file: No such file or directory"
+    }
+  ]
+}
