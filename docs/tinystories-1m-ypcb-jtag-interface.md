@@ -52,3 +52,26 @@ and a 300-second inference timeout. The core performs greedy token feedback
 internally; the host neither supplies generated tokens nor intermediate
 tensors. Hardware has been accepted only for this frozen four-token input and
 16-token continuation. Other prompts are not claimed to work.
+
+## Short text prompt client
+
+With the accepted 16-token image already programmed, the host-only CLI can
+tokenize one text prompt, issue one START, and decode the 16 returned IDs:
+
+```sh
+nix develop -c python scripts/pipeline/prompt_tinystories_generation_jtag.py \
+  --prompt "Once upon a time" \
+  --tokenizer-dir /path/to/authenticated/tinystories-1m \
+  --transport-dir /path/to/hs3-jtag-client \
+  --receipt /tmp/tinystories-short-prompt.json
+```
+
+The tokenizer directory must contain the exact package `tokenizer.json` whose
+SHA-256 is recorded in the checked-in exact-input contract. The text must
+encode to exactly four IDs; the command reports an error before opening the
+board if it does not. `--serial` defaults to `210299BF3824`, and `--timeout`
+defaults to 300 seconds. The client does not program the FPGA or retain context
+between invocations. `status=passed` and `token_check=none` in its receipt mean
+the JTAG run completed and returned 16 IDs; they do not establish agreement
+with the fixed-point model for that text. The original generation checker
+remains the frozen-prompt oracle acceptance path.
