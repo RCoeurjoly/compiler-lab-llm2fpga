@@ -1,6 +1,6 @@
 # TinyStories-1M short-prompt board CLI
 
-Status: planned
+Status: host implementation complete; new-prompt board acceptance pending
 
 ## Objective
 

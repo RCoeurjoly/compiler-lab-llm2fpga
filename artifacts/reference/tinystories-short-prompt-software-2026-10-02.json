@@ -1,0 +1,72 @@
+[
+  {
+    "text": "Once upon a day",
+    "prompt_ids": [
+      7454,
+      2402,
+      257,
+      1110
+    ],
+    "tokens": [
+      11,
+      612,
+      373,
+      257,
+      1310,
+      2576,
+      3706,
+      20037,
+      13,
+      1375,
+      373,
+      845,
+      3772,
+      284,
+      711,
+      351
+    ],
+    "tokenizer_sha256": "f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5",
+    "model_sha256": "c187c2eb174bc5eadba742029915a7ba55a8cef66cd58f000db09c8ac9976233",
+    "model_identity": {
+      "contract_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+      "package_manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+      "model_config_sha256": "ff74c30d5ebb5ab1da0f2ea479adf7197c504b42b5522a858c334ab91ed4958c",
+      "historical_generation_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3"
+    }
+  },
+  {
+    "text": "The little girl went",
+    "prompt_ids": [
+      464,
+      1310,
+      2576,
+      1816
+    ],
+    "tokens": [
+      284,
+      7301,
+      262,
+      11376,
+      13,
+      1375,
+      2497,
+      257,
+      1263,
+      11,
+      4077,
+      15061,
+      13,
+      1375,
+      2227,
+      284
+    ],
+    "tokenizer_sha256": "f6ed3d307010c244c22aeffbde05f419cf277c23e64cf98b673cac5449cfeff5",
+    "model_sha256": "c187c2eb174bc5eadba742029915a7ba55a8cef66cd58f000db09c8ac9976233",
+    "model_identity": {
+      "contract_sha256": "859fe3095a4842e413ee99466f5dc63d5420d0e890a3dce0cf7a52e3bd2d1d3c",
+      "package_manifest_sha256": "374171e8c0a06dc2632434965f218cf2fc6c82ee15470c47a958b6b9f5f6ca35",
+      "model_config_sha256": "ff74c30d5ebb5ab1da0f2ea479adf7197c504b42b5522a858c334ab91ed4958c",
+      "historical_generation_sha256": "e611002b083c8ecde9dc7d2bd89a6b41bf18811fe3630321ba79e186aead60e3"
+    }
+  }
+]
