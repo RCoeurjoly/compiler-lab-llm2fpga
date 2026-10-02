@@ -150,7 +150,7 @@ class ShortPromptRunTest(unittest.TestCase):
         output = io.StringIO()
         with patch.object(cli, "run_prompt", return_value={
                 "status": "passed", "prompt_ids": [1, 2, 3, 4],
-                "continuation_text": " test"}) as run, \
+                "tokens": [5, 6], "continuation_text": " test"}) as run, \
              patch.object(cli, "board_lock", return_value=nullcontext()), redirect_stdout(output):
             code = cli.main(["--prompt", "Once upon a day"])
         self.assertEqual(code, 0)
@@ -184,13 +184,14 @@ class ShortPromptRunTest(unittest.TestCase):
         cli = load_cli()
         output = io.StringIO()
         result = {"status": "passed", "prompt_ids": [1, 2, 3, 4],
-                  "continuation_text": "  made  a story"}
+                  "tokens": [5, 6], "continuation_text": "  made  a story"}
         with patch.object(cli, "run_prompt", return_value=result), \
              patch.object(cli, "board_lock", return_value=nullcontext()), redirect_stdout(output):
             code = cli.main(["--prompt", "A new story", "--tokenizer-dir", "/tokenizer",
                              "--transport-dir", "/transport"])
         self.assertEqual(code, 0)
-        self.assertEqual(output.getvalue(), "Prompt IDs: 1 2 3 4\nContinuation:\n  made  a story\n")
+        self.assertEqual(output.getvalue(),
+                         "Prompt IDs: 1 2 3 4\nGenerated IDs: 5 6\nContinuation:\n  made  a story\n")
 
     def test_main_reports_error_on_stderr(self):
         cli = load_cli()

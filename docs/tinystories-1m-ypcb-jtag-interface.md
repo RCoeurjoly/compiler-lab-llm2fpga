@@ -98,3 +98,37 @@ that they match the fixed-point model for that text. The original generation
 checker remains the frozen-prompt oracle acceptance path. See the
 [short-prompt result](results/2026-10-02-tinystories-short-prompt-cli.md) for
 the observed match and mismatch.
+
+## Prompt the exact PyTorch model
+
+Run the same text through the authenticated fixed-point PyTorch model, with no
+board connection required:
+
+```sh
+nix develop -c python scripts/pipeline/prompt_tinystories_software.py \
+  --prompt "Once upon a day" \
+  --receipt .local/tinystories-short-prompt/day-software.json
+```
+
+The pinned Nix shell supplies the exact model package and GPT-Neo config
+snapshot. Both prompt commands use the committed tokenizer, require exactly
+four prompt IDs, generate 16 greedy IDs, and print `Prompt IDs`, `Generated
+IDs`, and `Continuation` in the same format. Compare the generated IDs first:
+
+```sh
+python3 - <<'PY'
+import json
+from pathlib import Path
+p = Path('.local/tinystories-short-prompt')
+board = json.loads((p / 'day.json').read_text())['tokens']
+software = json.loads((p / 'day-software.json').read_text())['tokens']
+assert len(board) == len(software) == 16
+print('first mismatch:', next((i for i, pair in enumerate(zip(board, software))
+                               if pair[0] != pair[1]), None))
+PY
+```
+
+`None` means all 16 IDs match. The index is zero-based. This software CLI uses
+the fixed-point PyTorch adapter selected for the accelerator, not the original
+floating-point Hugging Face model. The latter is a different numerical
+reference and can choose different tokens.

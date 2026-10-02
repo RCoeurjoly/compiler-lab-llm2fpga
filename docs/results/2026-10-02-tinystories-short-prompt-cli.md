@@ -91,3 +91,12 @@ SHA-256 `ff980b973374db544136b9e400e32ec4bfd2c70387f9039e060bc3b6b88966b6`,
 matching the earlier accepted-image programming log. This verifies the
 worktree-local command on the current machine; another person still needs the
 specified board and HS3 cable.
+
+## Matching software prompt command
+
+The clone-local `prompt_tinystories_software.py` command was run through the
+same pinned Nix shell and tokenizer. For `Once upon a day`, its 16 generated
+IDs matched the board receipt exactly. For `The little girl went`, it returned
+the exact-model IDs in the table above, including `11376` at output index 3
+where the board returned `8222`. Both commands now print generated IDs as well
+as decoded text for direct comparison.

@@ -227,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if result["status"] == "passed":
         print("Prompt IDs:", " ".join(str(token) for token in result["prompt_ids"]))
+        print("Generated IDs:", " ".join(str(token) for token in result["tokens"]))
         print("Continuation:")
         sys.stdout.write(str(result["continuation_text"]) + "\n")
         return 0

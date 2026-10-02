@@ -3826,6 +3826,8 @@ PY
           shellHook = ''
             export SURVEY_DECLARED_TEXLIVE="${surveyTex}"
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.libftdi1 ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            export TINYSTORIES_1M_EXACT_PACKAGE="${exactTinyStoriesPackage}"
+            export TINYSTORIES_1M_SNAPSHOT="${tinyStories1m.snapshot}"
           '';
         };
 
